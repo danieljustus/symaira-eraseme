@@ -90,8 +90,20 @@ def _run_himalaya(
     return result
 
 
-def hismalaya_available() -> bool:
+def himalaya_available() -> bool:
     return shutil.which("himalaya") is not None
+
+
+def hismalaya_available() -> bool:
+    """Deprecated: use himalaya_available instead."""
+    import warnings
+
+    warnings.warn(
+        "hismalaya_available is deprecated; use himalaya_available instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return himalaya_available()
 
 
 def list_messages(

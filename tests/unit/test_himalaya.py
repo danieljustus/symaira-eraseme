@@ -10,7 +10,7 @@ from openeraseme.adapters.email.himalaya import (
     HimalayaNotInstalledError,
     Message,
     get_message,
-    hismalaya_available,
+    himalaya_available,
     list_messages,
     send_message,
 )
@@ -25,11 +25,11 @@ def _mock_result(stdout: str = "", stderr: str = "", returncode: int = 0):
 class TestHimalayaAvailable:
     @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_available_when_on_path(self, _mock):
-        assert hismalaya_available() is True
+        assert himalaya_available() is True
 
     @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value=None)
     def test_not_available_when_missing(self, _mock):
-        assert hismalaya_available() is False
+        assert himalaya_available() is False
 
 
 class TestListMessages:
