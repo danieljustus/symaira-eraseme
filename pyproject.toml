@@ -41,7 +41,6 @@ dev = [
 ]
 email = [
     "aiosmtplib>=3.0.0",
-    "aioimaplib>=1.1.0",
 ]
 web = [
     "playwright>=1.44.0",
