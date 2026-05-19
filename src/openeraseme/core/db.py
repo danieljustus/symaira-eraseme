@@ -117,6 +117,27 @@ def init_db(path: str | None = None) -> Path:
             sent_at         TIMESTAMP,
             account         TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS manual_tasks (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id          INTEGER REFERENCES removal_requests(id),
+            broker_id           TEXT NOT NULL DEFAULT '',
+            broker_name         TEXT NOT NULL DEFAULT '',
+            form_url            TEXT NOT NULL DEFAULT '',
+            reason              TEXT NOT NULL DEFAULT 'generic_error',
+            instructions        TEXT NOT NULL DEFAULT '',
+            screenshot_path     TEXT NOT NULL DEFAULT '',
+            html_snapshot_path  TEXT NOT NULL DEFAULT '',
+            form_fields_json    TEXT NOT NULL DEFAULT '{}',
+            status              TEXT NOT NULL DEFAULT 'pending',
+            created_at          TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+            completed_at        TIMESTAMP,
+            notes               TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_manual_tasks_status
+            ON manual_tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_manual_tasks_request
+            ON manual_tasks(request_id);
     """)
     conn.commit()
     return db_file

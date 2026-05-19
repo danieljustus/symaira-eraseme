@@ -1066,6 +1066,119 @@ def generate_rebuttal_cmd(
 
 
 # ---------------------------------------------------------------------------
+# manual-tasks
+# ---------------------------------------------------------------------------
+
+
+manual_tasks_app = typer.Typer(
+    name="manual-tasks",
+    help="List and manage manual fallback tasks for web forms",
+    no_args_is_help=True,
+)
+app.add_typer(manual_tasks_app)
+
+
+@manual_tasks_app.command(name="list")
+def manual_tasks_list(
+    ctx: typer.Context,
+    status: str = typer.Option(
+        None, "--status", help="Filter by status (pending, completed, cancelled)"
+    ),
+    request_id: int = typer.Option(None, "--request-id", help="Filter by request ID"),
+) -> None:
+    """List manual fallback tasks for web forms."""
+    from openeraseme.core.db import init_db
+    from openeraseme.core.manual_fallback import list_manual_tasks
+
+    init_db()
+    tasks = list_manual_tasks(status=status, request_id=request_id)
+
+    if ctx.obj.get("output") == "json":
+        import json as _json
+
+        typer.echo(_json.dumps(tasks, indent=2, default=str))
+        return
+
+    if not tasks:
+        typer.echo("No manual tasks found.")
+        return
+
+    typer.echo(f"Manual tasks ({len(tasks)}):")
+    for t in tasks:
+        status_str = t.get("status", "unknown")
+        task_id = t.get("id", "?")
+        broker = t.get("broker_name", t.get("broker_id", "?"))
+        reason = t.get("reason", "?")
+        created = t.get("created_at", "?")
+        typer.echo(f"  #{task_id} [{status_str}] {broker} ({reason}) @ {created}")
+
+
+@manual_tasks_app.command(name="show")
+def manual_tasks_show(
+    ctx: typer.Context,
+    task_id: int = typer.Argument(..., help="Task ID to show"),
+) -> None:
+    """Show details of a manual task."""
+    from openeraseme.core.db import init_db
+    from openeraseme.core.manual_fallback import get_manual_task
+
+    init_db()
+    task = get_manual_task(task_id)
+
+    if task is None:
+        typer.echo(f"Manual task #{task_id} not found.", err=True)
+        raise typer.Exit(1)
+
+    if ctx.obj.get("output") == "json":
+        import json as _json
+
+        typer.echo(_json.dumps(task, indent=2, default=str))
+        return
+
+    typer.echo(f"Manual task #{task_id}:")
+    typer.echo(f"  Broker:     {task.get('broker_name', '?')} ({task.get('broker_id', '?')})")
+    typer.echo(f"  URL:        {task.get('form_url', '?')}")
+    typer.echo(f"  Reason:     {task.get('reason', '?')}")
+    typer.echo(f"  Status:     {task.get('status', '?')}")
+    typer.echo(f"  Created:    {task.get('created_at', '?')}")
+    if task.get("completed_at"):
+        typer.echo(f"  Completed:  {task['completed_at']}")
+    if task.get("screenshot_path"):
+        typer.echo(f"  Screenshot: {task['screenshot_path']}")
+    if task.get("html_snapshot_path"):
+        typer.echo(f"  HTML:       {task['html_snapshot_path']}")
+    typer.echo(f"\nInstructions:\n{task.get('instructions', '')}")
+    if task.get("notes"):
+        typer.echo(f"\nNotes: {task['notes']}")
+
+
+@manual_tasks_app.command(name="complete")
+def manual_tasks_complete(
+    ctx: typer.Context,
+    task_id: int = typer.Argument(..., help="Task ID to mark as completed"),
+    notes: str = typer.Option("", "--notes", help="Optional completion notes"),
+) -> None:
+    """Mark a manual task as completed after user action."""
+    from openeraseme.core.db import init_db
+    from openeraseme.core.manual_fallback import resume_from_manual
+
+    init_db()
+    result = resume_from_manual(task_id, notes=notes, completed=True)
+
+    if result is None:
+        typer.echo(f"Manual task #{task_id} not found.", err=True)
+        raise typer.Exit(1)
+
+    if ctx.obj.get("output") == "json":
+        import json as _json
+
+        typer.echo(_json.dumps(result.__dict__, indent=2, default=str))
+        return
+
+    typer.echo(f"Manual task #{task_id} marked as completed.")
+
+
+# ---------------------------------------------------------------------------
 # solve-captcha
 # ---------------------------------------------------------------------------
 
