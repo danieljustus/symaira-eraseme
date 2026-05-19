@@ -19,35 +19,36 @@ jobs:
       - name: Install dependencies
         run: uv sync
       - name: Check broker website URLs
-        run: uv run python -c "
-import urllib.request, yaml, sys
-from urllib.error import HTTPError, URLError
-from pathlib import Path
+        run: |
+          uv run python -c "
+          import urllib.request, yaml, sys
+          from urllib.error import HTTPError, URLError
+          from pathlib import Path
 
-errors = []
-for yml in sorted(Path('registry/brokers').rglob('*.yaml')):
-    with open(yml) as f:
-        data = yaml.safe_load(f)
-    url = data.get('website', '')
-    name = data.get('name', yml.stem)
-    try:
-        req = urllib.request.Request(url, method='HEAD')
-        req.add_header('User-Agent', 'OpenEraseMe-LinkCheck/0.1')
-        urllib.request.urlopen(req, timeout=10)
-        print(f'  ✓ {name} — {url}')
-    except HTTPError as e:
-        if e.code == 403:
-            print(f'  ~ {name} — {url} (HTTP {e.code}, skipping)')
-        else:
-            errors.append(f'{name}: HTTP {e.code} — {url}')
-            print(f'  ✗ {name} — {url} (HTTP {e.code})')
-    except (URLError, ValueError, OSError) as e:
-        errors.append(f'{name}: {e} — {url}')
-        print(f'  ✗ {name} — {url} ({e})')
+          errors = []
+          for yml in sorted(Path('registry/brokers').rglob('*.yaml')):
+              with open(yml) as f:
+                  data = yaml.safe_load(f)
+              url = data.get('website', '')
+              name = data.get('name', yml.stem)
+              try:
+                  req = urllib.request.Request(url, method='HEAD')
+                  req.add_header('User-Agent', 'OpenEraseMe-LinkCheck/0.1')
+                  urllib.request.urlopen(req, timeout=10)
+                  print(f'  ✓ {name} — {url}')
+              except HTTPError as e:
+                  if e.code == 403:
+                      print(f'  ~ {name} — {url} (HTTP {e.code}, skipping)')
+                  else:
+                      errors.append(f'{name}: HTTP {e.code} — {url}')
+                      print(f'  ✗ {name} — {url} (HTTP {e.code})')
+              except (URLError, ValueError, OSError) as e:
+                  errors.append(f'{name}: {e} — {url}')
+                  print(f'  ✗ {name} — {url} ({e})')
 
-if errors:
-    print(f'\n{len(errors)} link(s) failed:')
-    for e in errors:
-        print(f'  - {e}')
-    sys.exit(1)
-"
+          if errors:
+              print(f'\n{len(errors)} link(s) failed:')
+              for e in errors:
+                  print(f'  - {e}')
+              sys.exit(1)
+          "

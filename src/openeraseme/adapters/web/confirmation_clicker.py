@@ -11,31 +11,33 @@ logger = logging.getLogger(__name__)
 
 RE_URL = re.compile(r"https?://[^\s<>\"']+")
 
-KNOWN_BROKER_DOMAINS: frozenset[str] = frozenset({
-    "acxiom.com",
-    "oracle.com",
-    "schufa.de",
-    "beenverified.com",
-    "spokeo.com",
-    "intelius.com",
-    "whitepages.com",
-    "mylife.com",
-    "peekyou.com",
-    "pipl.com",
-    "radaris.com",
-    "truepeoplesearch.com",
-    "ussearch.com",
-    "peoplefinders.com",
-    "instantcheckmate.com",
-    "truthfinder.com",
-    "addresses.com",
-    "anywho.com",
-    "dexknows.com",
-    "meridiandata.us",
-    "experian.com",
-    "transunion.com",
-    "equifax.com",
-})
+KNOWN_BROKER_DOMAINS: frozenset[str] = frozenset(
+    {
+        "acxiom.com",
+        "oracle.com",
+        "schufa.de",
+        "beenverified.com",
+        "spokeo.com",
+        "intelius.com",
+        "whitepages.com",
+        "mylife.com",
+        "peekyou.com",
+        "pipl.com",
+        "radaris.com",
+        "truepeoplesearch.com",
+        "ussearch.com",
+        "peoplefinders.com",
+        "instantcheckmate.com",
+        "truthfinder.com",
+        "addresses.com",
+        "anywho.com",
+        "dexknows.com",
+        "meridiandata.us",
+        "experian.com",
+        "transunion.com",
+        "equifax.com",
+    }
+)
 
 
 class ConfirmationClickerError(Exception):
@@ -124,7 +126,8 @@ async def auto_confirm(
     links = extract_confirmation_links(reply_body, allowed_domains=allowed_domains)
     if not links:
         return ConfirmationResult(
-            success=False, step="no_links",
+            success=False,
+            step="no_links",
             error="No confirmation links found in reply body",
         )
 
@@ -133,8 +136,10 @@ async def auto_confirm(
 
     if dry_run:
         return ConfirmationResult(
-            success=True, clicked_url=target_url,
-            step="dry_run", dry_run=True,
+            success=True,
+            clicked_url=target_url,
+            step="dry_run",
+            dry_run=True,
         )
 
     try:
@@ -168,9 +173,7 @@ async def auto_confirm(
 
             if screenshot_dir_path:
                 screenshot_before_path = str(
-                    await _save_screenshot(
-                        page, screenshot_dir_path, f"req{request_id}_before"
-                    )
+                    await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_before")
                 )
                 result.screenshot_before = screenshot_before_path
 
@@ -226,7 +229,8 @@ async def auto_confirm(
                 suffix = "success" if result.success else "failed"
                 screenshot_after_path = str(
                     await _save_screenshot(
-                        page, screenshot_dir_path,
+                        page,
+                        screenshot_dir_path,
                         f"req{request_id}_after_{suffix}",
                     )
                 )
@@ -236,9 +240,7 @@ async def auto_confirm(
             result.error = _capture_clicker_error(e, page.url if page else target_url)
             if screenshot_dir_path:
                 screenshot_after_path = str(
-                    await _save_screenshot(
-                        page, screenshot_dir_path, f"req{request_id}_error"
-                    )
+                    await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_error")
                 )
                 result.screenshot_after = screenshot_after_path
             logger.warning("Auto-confirm failed: %s", result.error)
@@ -267,4 +269,5 @@ async def _save_screenshot(page: Any, directory: Path, name: str) -> Path:
 
 async def _async_sleep(seconds: float) -> None:
     import asyncio
+
     await asyncio.sleep(seconds)

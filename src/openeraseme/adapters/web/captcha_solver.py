@@ -33,9 +33,7 @@ class CaptchaSolver(ABC):
         self._api_key = api_key
 
     @abstractmethod
-    def solve_image(
-        self, image_path: str | Path, **kwargs: Any
-    ) -> CaptchaSolution: ...
+    def solve_image(self, image_path: str | Path, **kwargs: Any) -> CaptchaSolution: ...
 
     @abstractmethod
     def solve_recaptcha_v2(
@@ -59,6 +57,7 @@ class CapSolverSolver(CaptchaSolver):
     def solve_image(self, image_path: str | Path, **kwargs: Any) -> CaptchaSolution:
         with open(image_path, "rb") as f:
             import base64
+
             image_b64 = base64.b64encode(f.read()).decode()
 
         task = {
@@ -69,9 +68,7 @@ class CapSolverSolver(CaptchaSolver):
             task["module"] = kwargs["module"]
         return self._solve_task(task)
 
-    def solve_recaptcha_v2(
-        self, site_key: str, page_url: str, **kwargs: Any
-    ) -> CaptchaSolution:
+    def solve_recaptcha_v2(self, site_key: str, page_url: str, **kwargs: Any) -> CaptchaSolution:
         task: dict[str, Any] = {
             "type": "ReCaptchaV2Task",
             "websiteURL": page_url,
@@ -107,10 +104,12 @@ class CapSolverSolver(CaptchaSolver):
         return CaptchaSolution(token=token, task_id=task_id)
 
     def _create_task(self, task: dict[str, Any]) -> str:
-        payload = json.dumps({
-            "clientKey": self._api_key,
-            "task": task,
-        }).encode()
+        payload = json.dumps(
+            {
+                "clientKey": self._api_key,
+                "task": task,
+            }
+        ).encode()
         req = Request(
             f"{CAPSOLVER_BASE}/createTask",
             data=payload,
@@ -126,10 +125,12 @@ class CapSolverSolver(CaptchaSolver):
         return str(data.get("taskId", ""))
 
     def _await_solution(self, task_id: str, max_retries: int = 30) -> dict[str, Any]:
-        payload = json.dumps({
-            "clientKey": self._api_key,
-            "taskId": task_id,
-        }).encode()
+        payload = json.dumps(
+            {
+                "clientKey": self._api_key,
+                "taskId": task_id,
+            }
+        ).encode()
         for _ in range(max_retries):
             time.sleep(POLL_INTERVAL)
             try:
@@ -155,6 +156,7 @@ class TwoCaptchaSolver(CaptchaSolver):
     def solve_image(self, image_path: str | Path, **kwargs: Any) -> CaptchaSolution:
         with open(image_path, "rb") as f:
             import base64
+
             image_b64 = base64.b64encode(f.read()).decode()
 
         params: dict[str, Any] = {
@@ -171,9 +173,7 @@ class TwoCaptchaSolver(CaptchaSolver):
             params["numeric"] = int(kwargs["numeric"])
         return self._solve(params)
 
-    def solve_recaptcha_v2(
-        self, site_key: str, page_url: str, **kwargs: Any
-    ) -> CaptchaSolution:
+    def solve_recaptcha_v2(self, site_key: str, page_url: str, **kwargs: Any) -> CaptchaSolution:
         params: dict[str, Any] = {
             "key": self._api_key,
             "method": "userrecaptcha",
@@ -224,12 +224,14 @@ class TwoCaptchaSolver(CaptchaSolver):
         return str(data.get("request", ""))
 
     def _await_result(self, captcha_id: str, max_retries: int = 30) -> str:
-        params = urlencode({
-            "key": self._api_key,
-            "action": "get",
-            "id": captcha_id,
-            "json": 1,
-        })
+        params = urlencode(
+            {
+                "key": self._api_key,
+                "action": "get",
+                "id": captcha_id,
+                "json": 1,
+            }
+        )
         for _ in range(max_retries):
             time.sleep(POLL_INTERVAL)
             try:
@@ -262,16 +264,14 @@ def create_solver(
         key = api_key or os.environ.get("CAPSOLVER_API_KEY", "")
         if not key:
             raise CaptchaError(
-                "CapSolver API key not configured. "
-                "Set CAPSOLVER_API_KEY env var or pass --api-key"
+                "CapSolver API key not configured. Set CAPSOLVER_API_KEY env var or pass --api-key"
             )
         return CapSolverSolver(key)
     elif provider == "twocaptcha":
         key = api_key or os.environ.get("TWOCAPTCHA_API_KEY", "")
         if not key:
             raise CaptchaError(
-                "2Captcha API key not configured. "
-                "Set TWOCAPTCHA_API_KEY env var or pass --api-key"
+                "2Captcha API key not configured. Set TWOCAPTCHA_API_KEY env var or pass --api-key"
             )
         return TwoCaptchaSolver(key)
     else:

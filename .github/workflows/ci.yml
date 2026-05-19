@@ -57,23 +57,24 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
       - name: Validate registry YAMLs against schema
-        run: uv run python -c "
-import yaml, json, jsonschema, sys
-from pathlib import Path
+        run: |
+          uv run python -c "
+          import yaml, json, jsonschema, sys
+          from pathlib import Path
 
-schema_path = Path('registry/schemas/broker.schema.json')
-if schema_path.exists():
-    with open(schema_path) as f:
-        schema = json.load(f)
-    for yml in Path('registry/brokers').rglob('*.yaml'):
-        with open(yml) as f:
-            data = yaml.safe_load(f)
-        try:
-            jsonschema.validate(data, schema)
-            print(f'  ✓ {yml}')
-        except jsonschema.ValidationError as e:
-            print(f'  ✗ {yml}: {e.message}')
-            sys.exit(1)
-else:
-    print('  Schema not yet created — skipping validation')
-"
+          schema_path = Path('registry/schemas/broker.schema.json')
+          if schema_path.exists():
+              with open(schema_path) as f:
+                  schema = json.load(f)
+              for yml in Path('registry/brokers').rglob('*.yaml'):
+                  with open(yml) as f:
+                      data = yaml.safe_load(f)
+                  try:
+                      jsonschema.validate(data, schema)
+                      print(f'  ✓ {yml}')
+                  except jsonschema.ValidationError as e:
+                      print(f'  ✗ {yml}: {e.message}')
+                      sys.exit(1)
+          else:
+              print('  Schema not yet created — skipping validation')
+          "

@@ -1,12 +1,29 @@
 from __future__ import annotations
 
 import json
+import os
+from importlib import resources
 from pathlib import Path
 
 import jsonschema
 import yaml
 
 from openeraseme.registry.schema import Broker
+
+
+def _registry_dir() -> Path:
+    env_dir = os.environ.get("OPENERASEME_RESOURCES")
+    if env_dir:
+        return Path(env_dir)
+    pkg_root = resources.files("openeraseme")
+    candidate = Path(str(pkg_root)) / "registry"
+    if candidate.exists() and (candidate / "brokers").exists():
+        return candidate
+    for parent in Path(str(pkg_root)).parents:
+        if (parent / "registry" / "brokers").exists():
+            return parent / "registry"
+    msg = "Could not find registry directory"
+    raise FileNotFoundError(msg)
 
 
 def _load_broker_schema() -> dict:
@@ -16,10 +33,7 @@ def _load_broker_schema() -> dict:
     the repo root.  It is the single source of truth — pydantic models are
     derived from it (validated through testing).
     """
-    here = Path(__file__).resolve()
-    # Walk up from src/openeraseme/registry/ to repo root
-    repo_root = here.parents[3]
-    schema_path = repo_root / "registry" / "schemas" / "broker.schema.json"
+    schema_path = _registry_dir() / "schemas" / "broker.schema.json"
     if not schema_path.exists():
         msg = f"Broker schema not found at {schema_path}"
         raise FileNotFoundError(msg)
@@ -53,6 +67,17 @@ def load_broker(broker_id: str) -> Broker:
     raise FileNotFoundError(msg)
 
 
+_BROKER_CACHE: dict[tuple[str, tuple[tuple[str, float], ...]], list[Broker]] = {}
+
+
+def _broker_cache_key(registry_dir: Path) -> tuple[str, tuple[tuple[str, float], ...]]:
+    mtimes: list[tuple[str, float]] = []
+    for yml in sorted(registry_dir.rglob("*.yaml")):
+        if not yml.name.startswith("_"):
+            mtimes.append((str(yml), yml.stat().st_mtime))
+    return (str(registry_dir), tuple(mtimes))
+
+
 def load_all_brokers(
     registry_dir: str | Path | None = None,
     jurisdiction: str | None = None,
@@ -60,28 +85,35 @@ def load_all_brokers(
     category: str | None = None,
 ) -> list[Broker]:
     if registry_dir is None:
-        here = Path(__file__).resolve()
-        repo_root = here.parents[3]
-        registry_dir = repo_root / "registry" / "brokers"
+        registry_dir = _registry_dir() / "brokers"
 
     registry_path = Path(registry_dir)
-    brokers: list[Broker] = []
+    cache_key = _broker_cache_key(registry_path)
 
-    for yml in sorted(registry_path.rglob("*.yaml")):
-        if yml.name.startswith("_"):
-            continue  # skip _example.yaml etc.
-        try:
-            broker = load_broker_yaml(yml)
-        except (yaml.YAMLError, jsonschema.ValidationError, Exception):
-            continue
+    if cache_key in _BROKER_CACHE:
+        brokers = _BROKER_CACHE[cache_key]
+    else:
+        brokers = []
+        for yml in sorted(registry_path.rglob("*.yaml")):
+            if yml.name.startswith("_"):
+                continue
+            try:
+                broker = load_broker_yaml(yml)
+            except (yaml.YAMLError, jsonschema.ValidationError, Exception):
+                continue
+            brokers.append(broker)
+        _BROKER_CACHE[cache_key] = brokers
 
+    if not (jurisdiction or priority or category):
+        return brokers
+
+    filtered: list[Broker] = []
+    for broker in brokers:
         if jurisdiction and jurisdiction not in broker.jurisdictions:
             continue
         if priority and broker.priority.value != priority:
             continue
         if category and broker.category.value != category:
             continue
-
-        brokers.append(broker)
-
-    return brokers
+        filtered.append(broker)
+    return filtered

@@ -8,25 +8,37 @@ from .conftest import (
 
 
 class TestPollInbox:
-    def test_poll_inbox_requires_auth(self, seeded_db):
+    def test_poll_inbox_requires_auth(self, seeded_db, monkeypatch):
+        monkeypatch.setenv("IMAP_PASSWORD", "password")
         result = invoke(
             "poll-inbox",
             "--username", "test@test.com",
-            "--password", "password",
             "--host", "imap.test.com",
             "--since", "1",
         )
         assert result.exit_code != 0
 
-    def test_poll_inbox_json_output(self, seeded_db):
+    def test_poll_inbox_json_output(self, seeded_db, monkeypatch):
+        monkeypatch.setenv("IMAP_PASSWORD", "password")
         result = invoke(
             "poll-inbox",
             "--username", "test@test.com",
-            "--password", "password",
             "--host", "imap.test.com",
             "--since", "1",
         )
         assert result.exit_code != 0
+
+    def test_poll_inbox_rejects_cli_password(self, seeded_db):
+        result = invoke(
+            "poll-inbox",
+            "--username", "test@test.com",
+            "--password", "should-fail",
+            "--host", "imap.test.com",
+            "--since", "1",
+        )
+        assert result.exit_code != 0
+        # --password option was removed for security; CLI should reject it
+        assert "No such option" in result.stderr
 
 
 class TestClassifyReply:

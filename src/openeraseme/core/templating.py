@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -9,9 +11,18 @@ from openeraseme.registry.schema import IdentityProfile
 
 
 def _templates_dir() -> Path:
-    here = Path(__file__).resolve()
-    repo_root = here.parents[3]
-    return repo_root / "registry" / "laws"
+    env_dir = os.environ.get("OPENERASEME_RESOURCES")
+    if env_dir:
+        return Path(env_dir) / "registry" / "laws"
+    pkg_root = resources.files("openeraseme")
+    candidate = Path(str(pkg_root)) / "registry" / "laws"
+    if candidate.exists() and any(candidate.iterdir()):
+        return candidate
+    for parent in Path(str(pkg_root)).parents:
+        if (parent / "registry" / "laws").exists():
+            return parent / "registry" / "laws"
+    msg = "Could not find templates directory (registry/laws)"
+    raise FileNotFoundError(msg)
 
 
 def _create_env(templates_dir: str | Path | None = None) -> Environment:

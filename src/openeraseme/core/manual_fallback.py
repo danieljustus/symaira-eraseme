@@ -9,6 +9,7 @@ the process manually.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -112,21 +113,27 @@ def capture_form_state(
     field_selectors: list[str] = []
     screenshot_path: str | None = None
 
-    try:
-        html_snapshot = _async_get_content(page)
-    except Exception as e:
-        logger.warning("Failed to capture HTML snapshot: %s", e)
-
-    try:
-        form_fields, field_selectors = _async_extract_form_fields(page)
-    except Exception as e:
-        logger.warning("Failed to extract form fields: %s", e)
-
-    if screenshot_dir:
+    async def _capture() -> None:
+        nonlocal html_snapshot, form_fields, field_selectors, screenshot_path
         try:
-            screenshot_path = _async_save_screenshot(page, screenshot_dir, "manual_fallback")
+            html_snapshot = await _async_get_content(page)
         except Exception as e:
-            logger.warning("Failed to save screenshot: %s", e)
+            logger.warning("Failed to capture HTML snapshot: %s", e)
+
+        try:
+            form_fields, field_selectors = await _async_extract_form_fields(page)
+        except Exception as e:
+            logger.warning("Failed to extract form fields: %s", e)
+
+        if screenshot_dir:
+            try:
+                screenshot_path = await _async_save_screenshot(
+                    page, Path(screenshot_dir), "manual_fallback"
+                )
+            except Exception as e:
+                logger.warning("Failed to save screenshot: %s", e)
+
+    asyncio.run(_capture())
 
     return FormState(
         url=captured_url,
@@ -143,31 +150,15 @@ def capture_form_state(
     )
 
 
-def _async_get_content(page: Any) -> str:
-    """Get page content synchronously from an async Playwright page."""
-    import asyncio
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return ""
-        return loop.run_until_complete(page.content())
-    except RuntimeError:
-        return ""
+async def _async_get_content(page: Any) -> str:
+    """Get page content from an async Playwright page."""
+    return await page.content()
 
 
-def _async_extract_form_fields(page: Any) -> tuple[dict[str, str], list[str]]:
+async def _async_extract_form_fields(page: Any) -> tuple[dict[str, str], list[str]]:
     """Extract form field names and current values from a Playwright page."""
-    import asyncio
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return {}, []
-
-        field_info = loop.run_until_complete(
-            page.evaluate(
-                """() => {
+    field_info = await page.evaluate(
+        """() => {
             const fields = {};
             const selectors = [];
             document.querySelectorAll('input, select, textarea').forEach(el => {
@@ -175,39 +166,26 @@ def _async_extract_form_fields(page: Any) -> tuple[dict[str, str], list[str]]:
                     const key = el.name || el.id;
                     fields[key] = el.value || '';
                     const selector = el.id ? '#' + el.id :
-                        'input[name="' + el.name + '"]';
+                        'input[name="' + el.name + '"]'
                     selectors.push(selector);
                 }
             });
             return { fields: JSON.stringify(fields), selectors: JSON.stringify(selectors) };
         }"""
-            )
-        )
-        fields = json.loads(field_info.get("fields", "{}"))
-        selectors = json.loads(field_info.get("selectors", "[]"))
-        return fields, selectors
-    except (RuntimeError, Exception) as e:
-        logger.warning("Failed to extract form fields: %s", e)
-        return {}, []
+    )
+    fields = json.loads(field_info.get("fields", "{}"))
+    selectors = json.loads(field_info.get("selectors", "[]"))
+    return fields, selectors
 
 
-def _async_save_screenshot(page: Any, directory: Path, name: str) -> str:
-    """Save a page screenshot synchronously."""
-    import asyncio
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return ""
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
-        filename = f"{timestamp}_{safe_name}.png"
-        path = directory / filename
-        loop.run_until_complete(page.screenshot(path=str(path), full_page=True))
-        return str(path)
-    except (RuntimeError, Exception) as e:
-        logger.warning("Failed to save screenshot: %s", e)
-        return ""
+async def _async_save_screenshot(page: Any, directory: Path, name: str) -> str:
+    """Save a page screenshot."""
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    filename = f"{timestamp}_{safe_name}.png"
+    path = directory / filename
+    await page.screenshot(path=str(path), full_page=True)
+    return str(path)
 
 
 def _instructions_for_reason(reason: str, broker_name: str, form_url: str) -> str:

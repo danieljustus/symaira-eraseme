@@ -7,15 +7,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "aioimaplib"
-version = "2.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ee/da/a454c47fb8522e607425e15bf1f49ccfdb3d75f4071f40b63ebd49573495/aioimaplib-2.0.1.tar.gz", hash = "sha256:5a494c3b75f220977048f5eb2c7ba9c0570a3148aaf38bee844e37e4d7af8648", size = 35555, upload-time = "2025-01-16T10:38:23.14Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/52/48aaa287fb3c4c995edcb602370b10d182dc5c48371df7cb3a404356733f/aioimaplib-2.0.1-py3-none-any.whl", hash = "sha256:727e00c35cf25106bd34611dddd6e2ddf91a5f1a7e72d9269f3ce62486b31e14", size = 34729, upload-time = "2025-01-16T10:38:20.427Z" },
-]
-
-[[package]]
 name = "aiosmtplib"
 version = "5.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -684,6 +675,19 @@ wheels = [
 ]
 
 [[package]]
+name = "keyrings-alt"
+version = "5.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jaraco-classes" },
+    { name = "jaraco-context" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/7b/e3bf53326e0753bee11813337b1391179582ba5c6851b13e0d9502d15a50/keyrings_alt-5.0.2.tar.gz", hash = "sha256:8f097ebe9dc8b185106502b8cdb066c926d2180e13b4689fd4771a3eab7d69fb", size = 29229, upload-time = "2024-08-14T01:09:28.12Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/0d/9c59313ab43d0858a9a665e80763bd830dc78d5f379afc3815e123c486c2/keyrings.alt-5.0.2-py3-none-any.whl", hash = "sha256:6be74693192f3f37bbb752bfac9b86e6177076b17d2ac12a390f1d6abff8ac7c", size = 17930, upload-time = "2024-08-14T01:09:26.785Z" },
+]
+
+[[package]]
 name = "librt"
 version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -947,6 +951,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "keyrings-alt" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -954,7 +959,6 @@ dev = [
     { name = "ruff" },
 ]
 email = [
-    { name = "aioimaplib" },
     { name = "aiosmtplib" },
 ]
 triage = [
@@ -966,7 +970,6 @@ web = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aioimaplib", marker = "extra == 'email'", specifier = ">=1.1.0" },
     { name = "aiosmtplib", marker = "extra == 'email'", specifier = ">=3.0.0" },
     { name = "anthropic", marker = "extra == 'triage'", specifier = ">=0.34.0" },
     { name = "cryptography", specifier = ">=42.0.0" },
@@ -974,6 +977,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "jsonschema", specifier = ">=4.20.0" },
     { name = "keyring", specifier = ">=24.0.0" },
+    { name = "keyrings-alt", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9.0" },
     { name = "playwright", marker = "extra == 'web'", specifier = ">=1.44.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.0" },

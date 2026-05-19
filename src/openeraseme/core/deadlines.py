@@ -93,9 +93,7 @@ def _tick_for_request(
     deadline_days = JURISDICTION_DEADLINES.get(jurisdiction, 30)
 
     if status == "AWAITING_ACK":
-        action = _check_reminder(
-            rid, req, sent_at, now, reminders_sent, dry_run=dry_run
-        )
+        action = _check_reminder(rid, req, sent_at, now, reminders_sent, dry_run=dry_run)
         if action:
             actions.append(action)
 
@@ -114,9 +112,7 @@ def _tick_for_request(
             actions.append(action)
 
     elif status == "CONFIRMED":
-        action = _check_rescan(
-            rid, req, resolved_at, now, dry_run=dry_run
-        )
+        action = _check_rescan(rid, req, resolved_at, now, dry_run=dry_run)
         if action:
             actions.append(action)
 

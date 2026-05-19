@@ -74,9 +74,7 @@ def _resolve_bin() -> str:
     """Resolve the openeraseme binary path."""
     from shutil import which
 
-    return which("openeraseme") or os.environ.get(
-        "OPENERASEME_BIN", "/usr/local/bin/openeraseme"
-    )
+    return which("openeraseme") or os.environ.get("OPENERASEME_BIN", "/usr/local/bin/openeraseme")
 
 
 def _resolve_venv() -> str:
@@ -159,7 +157,7 @@ def generate_cron(
     poll_wrapper = f"""#!/usr/bin/env bash
 set -euo pipefail
 
-{('source "' + venv + '"') if venv else ''}
+{('source "' + venv + '"') if venv else ""}
 export OPENERASEME_HEADLESS=1
 export PATH="${{PATH}}:/usr/local/bin:/opt/homebrew/bin"
 cd "{project_dir}"
@@ -194,9 +192,7 @@ esac
         ),
         "",
         "# Poll inbox (every hour, wrapper checks configured times)",
-        "0 * * * * {wrapper_dir}/openeraseme-poll.sh".format(
-            wrapper_dir="{wrapper_dir}"
-        ),
+        "0 * * * * {wrapper_dir}/openeraseme-poll.sh".format(wrapper_dir="{wrapper_dir}"),
         "",
         "# Re-scan (quarterly on 1st of Jan, Apr, Jul, Oct)",
         "{min} {hour} 1 1,4,7,10 * {wrapper_dir}/openeraseme-rescan.sh".format(
@@ -349,9 +345,7 @@ def generate_launchd(
     out["openeraseme-poll.sh"] = poll_sh
 
     # launchd supports StartCalendarInterval as an array of dicts
-    poll_entries = "\n".join(
-        _plist_calendar(t.hour, t.minute) for t in config.poll_times
-    )
+    poll_entries = "\n".join(_plist_calendar(t.hour, t.minute) for t in config.poll_times)
     out["com.openeraseme.poll.plist"] = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -638,10 +632,7 @@ systemctl $USER_MODE daemon-reload
 echo "Systemd timers uninstalled."
 """
     # Add SCRIPT_DIR to the uninstall script
-    uninstall_script_fixed = (
-        'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n\n'
-        + uninstall_script
-    )
+    uninstall_script_fixed = 'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n\n' + uninstall_script
     out["install.sh"] = install_script
     out["uninstall.sh"] = uninstall_script_fixed
 
@@ -769,11 +760,13 @@ def get_schedule_status(platform_name: str = "") -> dict[str, Any]:
 
         for label in ["com.openeraseme.tick", "com.openeraseme.poll", "com.openeraseme.rescan"]:
             plist_path = Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
-            status["installed"].append({
-                "label": label,
-                "installed": plist_path.exists(),
-                "path": str(plist_path) if plist_path.exists() else "",
-            })
+            status["installed"].append(
+                {
+                    "label": label,
+                    "installed": plist_path.exists(),
+                    "path": str(plist_path) if plist_path.exists() else "",
+                }
+            )
 
     elif platform_name == "systemd":
         import subprocess
@@ -782,16 +775,20 @@ def get_schedule_status(platform_name: str = "") -> dict[str, Any]:
             try:
                 result = subprocess.run(
                     ["systemctl", "--user", "is-enabled", f"{name}.timer"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 enabled = result.returncode == 0
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 enabled = False
-            status["installed"].append({
-                "label": name,
-                "installed": enabled,
-                "path": f"{name}.timer",
-            })
+            status["installed"].append(
+                {
+                    "label": name,
+                    "installed": enabled,
+                    "path": f"{name}.timer",
+                }
+            )
 
     else:
         # cron: check crontab for our entries
@@ -800,19 +797,25 @@ def get_schedule_status(platform_name: str = "") -> dict[str, Any]:
         try:
             result = subprocess.run(
                 ["crontab", "-l"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             has_entries = "openeraseme" in result.stdout
-            status["installed"].append({
-                "label": "cron",
-                "installed": has_entries,
-                "path": "crontab",
-            })
+            status["installed"].append(
+                {
+                    "label": "cron",
+                    "installed": has_entries,
+                    "path": "crontab",
+                }
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            status["installed"].append({
-                "label": "cron",
-                "installed": False,
-                "error": "crontab not available",
-            })
+            status["installed"].append(
+                {
+                    "label": "cron",
+                    "installed": False,
+                    "error": "crontab not available",
+                }
+            )
 
     return status

@@ -8,14 +8,8 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
-def _get_status_count(
-    requests: list[dict[str, Any]], status: str
-) -> int:
-    return sum(
-        1
-        for r in requests
-        if (r.get("current_status") or "").upper() == status.upper()
-    )
+def _get_status_count(requests: list[dict[str, Any]], status: str) -> int:
+    return sum(1 for r in requests if (r.get("current_status") or "").upper() == status.upper())
 
 
 def get_dashboard_data(
@@ -116,9 +110,7 @@ def get_dashboard_data(
         "confirmed": _get_status_count(all_requests, "CONFIRMED"),
         "rejected": _get_status_count(all_requests, "REJECTED_FINAL"),
         "overdue": _get_status_count(all_requests, "OVERDUE"),
-        "broker_status": sorted(
-            broker_status.values(), key=lambda x: x["total"], reverse=True
-        ),
+        "broker_status": sorted(broker_status.values(), key=lambda x: x["total"], reverse=True),
         "recent_events": recent_events,
         "generated_at": datetime.now(UTC).isoformat(),
     }

@@ -119,9 +119,7 @@ def get_report_data(
         "campaigns": campaigns_agg,
         "total_campaigns": len(campaigns_agg),
         "total_requests": len(all_requests),
-        "status_breakdown": dict(
-            sorted(status_counts.items(), key=lambda x: -x[1])
-        ),
+        "status_breakdown": dict(sorted(status_counts.items(), key=lambda x: -x[1])),
         "broker_leaderboard": broker_stats,
         "jurisdiction_stats": jurisdiction_stats,
         "timeline": timeline,
@@ -166,21 +164,17 @@ def _aggregate_campaign(camp: dict[str, Any]) -> dict[str, Any]:
                 "%Y-%m-%d %H:%M:%S",
             ):
                 try:
-                    sent_dt = datetime.strptime(
-                        str(sent).rstrip("Z"), fmt
-                    ).replace(tzinfo=UTC)
-                    resolved_dt = datetime.strptime(
-                        str(resolved).rstrip("Z"), fmt
-                    ).replace(tzinfo=UTC)
+                    sent_dt = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
+                    resolved_dt = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(
+                        tzinfo=UTC
+                    )
                     diff = (resolved_dt - sent_dt).total_seconds() / 86400
                     response_times.append(diff)
                     break
                 except ValueError:
                     continue
 
-    avg_response_time = (
-        sum(response_times) / len(response_times) if response_times else None
-    )
+    avg_response_time = sum(response_times) / len(response_times) if response_times else None
 
     return {
         "campaign_id": camp["id"],
@@ -195,22 +189,12 @@ def _aggregate_campaign(camp: dict[str, Any]) -> dict[str, Any]:
         "confirmed": status_counts.get("CONFIRMED", 0),
         "rejected": status_counts.get("REJECTED_FINAL", 0),
         "overdue": status_counts.get("OVERDUE", 0),
-        "confirmation_rate": (
-            round(
-                status_counts.get("CONFIRMED", 0) / max(total, 1) * 100, 1
-            )
-        ),
-        "rejection_rate": (
-            round(
-                status_counts.get("REJECTED_FINAL", 0) / max(total, 1) * 100, 1
-            )
-        ),
+        "confirmation_rate": (round(status_counts.get("CONFIRMED", 0) / max(total, 1) * 100, 1)),
+        "rejection_rate": (round(status_counts.get("REJECTED_FINAL", 0) / max(total, 1) * 100, 1)),
         "avg_response_time_days": (
             round(avg_response_time, 1) if avg_response_time is not None else None
         ),
-        "total_reminders_sent": sum(
-            r.get("reminders_sent", 0) for r in reqs
-        ),
+        "total_reminders_sent": sum(r.get("reminders_sent", 0) for r in reqs),
         "requests": reqs,
     }
 
@@ -255,12 +239,8 @@ def _broker_leaderboard(
                 "%Y-%m-%d %H:%M:%S",
             ):
                 try:
-                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(
-                        tzinfo=UTC
-                    )
-                    res = datetime.strptime(
-                        str(resolved).rstrip("Z"), fmt
-                    ).replace(tzinfo=UTC)
+                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
+                    res = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(tzinfo=UTC)
                     bd["response_times"].append((res - s).total_seconds() / 86400)
                     break
                 except ValueError:
@@ -272,19 +252,19 @@ def _broker_leaderboard(
             bd["avg_response_time_days"] = round(
                 sum(bd["response_times"]) / len(bd["response_times"]), 1
             )
-        bd["success_rate"] = (
-            round(bd["confirmed"] / max(bd["total"], 1) * 100, 1)
+        bd["success_rate"] = round(bd["confirmed"] / max(bd["total"], 1) * 100, 1)
+        result.append(
+            {
+                "broker_id": bd["broker_id"],
+                "total": bd["total"],
+                "confirmed": bd["confirmed"],
+                "rejected": bd["rejected"],
+                "overdue": bd["overdue"],
+                "pending": bd["pending"],
+                "success_rate": bd["success_rate"],
+                "avg_response_time_days": bd["avg_response_time_days"],
+            }
         )
-        result.append({
-            "broker_id": bd["broker_id"],
-            "total": bd["total"],
-            "confirmed": bd["confirmed"],
-            "rejected": bd["rejected"],
-            "overdue": bd["overdue"],
-            "pending": bd["pending"],
-            "success_rate": bd["success_rate"],
-            "avg_response_time_days": bd["avg_response_time_days"],
-        })
 
     return sorted(result, key=lambda x: -x["total"])
 
@@ -316,9 +296,7 @@ def _jurisdiction_breakdown(
 
     result = []
     for _jur, jd in jdata.items():
-        jd["confirmation_rate"] = round(
-            jd["confirmed"] / max(jd["total"], 1) * 100, 1
-        )
+        jd["confirmation_rate"] = round(jd["confirmed"] / max(jd["total"], 1) * 100, 1)
         result.append(jd)
 
     return sorted(result, key=lambda x: -x["total"])
@@ -360,13 +338,11 @@ def _historical_comparison(
         "previous_campaign": previous["campaign_id"],
         "requests_change": latest["total"] - previous["total"],
         "confirmation_rate_change": round(
-            (latest.get("confirmation_rate", 0) or 0)
-            - (previous.get("confirmation_rate", 0) or 0),
+            (latest.get("confirmation_rate", 0) or 0) - (previous.get("confirmation_rate", 0) or 0),
             1,
         ),
         "rejection_rate_change": round(
-            (latest.get("rejection_rate", 0) or 0)
-            - (previous.get("rejection_rate", 0) or 0),
+            (latest.get("rejection_rate", 0) or 0) - (previous.get("rejection_rate", 0) or 0),
             1,
         ),
         "avg_response_time_change": (
@@ -390,21 +366,11 @@ def _success_metrics(
     if total == 0:
         return {}
 
-    confirmed = sum(
-        1
-        for r in requests
-        if (r.get("current_status") or "").upper() == "CONFIRMED"
-    )
+    confirmed = sum(1 for r in requests if (r.get("current_status") or "").upper() == "CONFIRMED")
     rejected = sum(
-        1
-        for r in requests
-        if (r.get("current_status") or "").upper() == "REJECTED_FINAL"
+        1 for r in requests if (r.get("current_status") or "").upper() == "REJECTED_FINAL"
     )
-    overdue = sum(
-        1
-        for r in requests
-        if (r.get("current_status") or "").upper() == "OVERDUE"
-    )
+    overdue = sum(1 for r in requests if (r.get("current_status") or "").upper() == "OVERDUE")
 
     response_times: list[float] = []
     for r in requests:
@@ -417,12 +383,8 @@ def _success_metrics(
                 "%Y-%m-%d %H:%M:%S",
             ):
                 try:
-                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(
-                        tzinfo=UTC
-                    )
-                    res = datetime.strptime(
-                        str(resolved).rstrip("Z"), fmt
-                    ).replace(tzinfo=UTC)
+                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
+                    res = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(tzinfo=UTC)
                     response_times.append((res - s).total_seconds() / 86400)
                     break
                 except ValueError:
@@ -434,13 +396,9 @@ def _success_metrics(
         "overall_rejection_rate": round(rejected / max(total, 1) * 100, 1),
         "overdue_rate": round(overdue / max(total, 1) * 100, 1),
         "avg_response_time_days": (
-            round(sum(response_times) / len(response_times), 1)
-            if response_times
-            else None
+            round(sum(response_times) / len(response_times), 1) if response_times else None
         ),
-        "median_response_time_days": (
-            _median(sorted(response_times)) if response_times else None
-        ),
+        "median_response_time_days": (_median(sorted(response_times)) if response_times else None),
     }
 
 
@@ -469,37 +427,41 @@ def export_csv(data: dict[str, Any]) -> str:
     writer = csv.writer(output)
 
     # Header
-    writer.writerow([
-        "campaign_id",
-        "request_id",
-        "broker_id",
-        "jurisdiction",
-        "channel",
-        "status",
-        "sent_at",
-        "acknowledged_at",
-        "resolved_at",
-        "deadline_at",
-        "reminders_sent",
-        "escalation_level",
-    ])
+    writer.writerow(
+        [
+            "campaign_id",
+            "request_id",
+            "broker_id",
+            "jurisdiction",
+            "channel",
+            "status",
+            "sent_at",
+            "acknowledged_at",
+            "resolved_at",
+            "deadline_at",
+            "reminders_sent",
+            "escalation_level",
+        ]
+    )
 
     for camp in data.get("campaigns", []):
         for req in camp.get("requests", []):
-            writer.writerow([
-                camp["campaign_id"],
-                req.get("id", ""),
-                req.get("broker_id", ""),
-                req.get("jurisdiction", ""),
-                req.get("channel", ""),
-                req.get("current_status", ""),
-                req.get("sent_at", ""),
-                req.get("acknowledged_at", ""),
-                req.get("resolved_at", ""),
-                req.get("deadline_at", ""),
-                req.get("reminders_sent", 0),
-                req.get("escalation_level", 0),
-            ])
+            writer.writerow(
+                [
+                    camp["campaign_id"],
+                    req.get("id", ""),
+                    req.get("broker_id", ""),
+                    req.get("jurisdiction", ""),
+                    req.get("channel", ""),
+                    req.get("current_status", ""),
+                    req.get("sent_at", ""),
+                    req.get("acknowledged_at", ""),
+                    req.get("resolved_at", ""),
+                    req.get("deadline_at", ""),
+                    req.get("reminders_sent", 0),
+                    req.get("escalation_level", 0),
+                ]
+            )
 
     return output.getvalue()
 

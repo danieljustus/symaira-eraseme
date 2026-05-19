@@ -100,12 +100,14 @@ def list_tokens() -> list[dict]:
             f.unlink(missing_ok=True)
             continue
         token_id = f.stem.replace("consent_", "")
-        tokens.append({
-            "token": token_id,
-            "command": payload.get("command", "?"),
-            "issued_at": payload.get("issued_at", 0),
-            "expires_at": expiry,
-        })
+        tokens.append(
+            {
+                "token": token_id,
+                "command": payload.get("command", "?"),
+                "issued_at": payload.get("issued_at", 0),
+                "expires_at": expiry,
+            }
+        )
     return tokens
 
 
@@ -139,7 +141,5 @@ def check_consent(
     if env_token:
         return verify_token(command, env_token)
     if interactive:
-        return _tty_prompt(
-            f"Destructive command '{command}' requires consent. Proceed?"
-        )
+        return _tty_prompt(f"Destructive command '{command}' requires consent. Proceed?")
     return False

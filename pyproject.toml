@@ -38,10 +38,10 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.9.0",
     "pre-commit>=3.7.0",
+    "keyrings.alt>=5.0.0",
 ]
 email = [
     "aiosmtplib>=3.0.0",
-    "aioimaplib>=1.1.0",
 ]
 web = [
     "playwright>=1.44.0",

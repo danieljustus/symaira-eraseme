@@ -59,13 +59,9 @@ def list_replies(
             "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
         )
     elif status == "drafted":
-        conditions.append(
-            "r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)"
-        )
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)")
     elif status == "sent":
-        conditions.append(
-            "r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
-        )
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)")
     elif status == "classified":
         conditions.append("r.classified_as IS NOT NULL")
     elif status == "unclassified":
@@ -204,6 +200,7 @@ def draft_reply(
     broker_website = ""
     try:
         from openeraseme.registry.loader import load_broker
+
         broker = load_broker(broker_id)
         broker_name = broker.name
         broker_website = broker.website
@@ -226,9 +223,7 @@ def draft_reply(
         "human_required": "gdpr-rebuttal-rejected.en.md.j2",
         "unclear": "gdpr-rebuttal-rejected.en.md.j2",
     }
-    template_name = template_map.get(
-        classification, "gdpr-rebuttal-rejected.en.md.j2"
-    )
+    template_name = template_map.get(classification, "gdpr-rebuttal-rejected.en.md.j2")
 
     try:
         identity_profile = load_profile() if profile_exists() else None
@@ -414,35 +409,41 @@ def _fallback_rebuttal(
         "",
     ]
     if classification == "verification":
-        lines.extend([
-            "Dear Sir or Madam,",
-            "",
-            "Thank you for your response.",
-            "",
-            "You have requested additional information to verify my identity.",
-            "Please find the requested information attached to this message.",
-            "",
-            "I look forward to your confirmation that my data has been erased.",
-        ])
+        lines.extend(
+            [
+                "Dear Sir or Madam,",
+                "",
+                "Thank you for your response.",
+                "",
+                "You have requested additional information to verify my identity.",
+                "Please find the requested information attached to this message.",
+                "",
+                "I look forward to your confirmation that my data has been erased.",
+            ]
+        )
     else:
-        lines.extend([
-            "Dear Sir or Madam,",
-            "",
-            "I am writing in response to your reply regarding my data deletion request.",
-            "",
-            "You responded with the following:",
-            "",
-            f"{reply_snippet}",
-            "",
-            "I respectfully disagree with your assessment and reaffirm my request",
-            "for the erasure of my personal data under applicable data protection law.",
-            "",
-            "Please confirm the deletion at your earliest convenience.",
-        ])
+        lines.extend(
+            [
+                "Dear Sir or Madam,",
+                "",
+                "I am writing in response to your reply regarding my data deletion request.",
+                "",
+                "You responded with the following:",
+                "",
+                f"{reply_snippet}",
+                "",
+                "I respectfully disagree with your assessment and reaffirm my request",
+                "for the erasure of my personal data under applicable data protection law.",
+                "",
+                "Please confirm the deletion at your earliest convenience.",
+            ]
+        )
 
-    lines.extend([
-        "",
-        "Best regards,",
-        user_name,
-    ])
+    lines.extend(
+        [
+            "",
+            "Best regards,",
+            user_name,
+        ]
+    )
     return "\n".join(lines)
