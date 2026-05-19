@@ -1,0 +1,32 @@
+Subject: RE: Request for erasure under Article 17 GDPR — Rebuttal
+
+To whom it may concern,
+
+I refer to your response to my data erasure request ({{ request_id | default("reference") }})
+regarding {{ broker_name }}, in which you declined to erase my personal data.
+
+You responded with the following:
+
+> {{ broker_reply_snippet | default("") }}
+
+I respectfully disagree with your assessment and hereby reaffirm my request for
+the erasure of my personal data under Article 17(1) GDPR.
+
+Legal basis:
+- Article 17(1)(a) GDPR: The personal data are no longer necessary in relation to
+  the purposes for which they were collected or otherwise processed.
+- Article 17(1)(b) GDPR: I withdraw my consent on which the processing is based.
+- Article 12(3) GDPR: You must respond to my request without undue delay and
+  within one month of receipt.
+
+If you believe specific grounds for retaining my data exist under Article 17(3)
+GDPR, please provide the precise legal basis and the specific data categories you
+consider exempt.
+
+Otherwise, I expect you to proceed with the erasure without further delay.
+
+Yours faithfully,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

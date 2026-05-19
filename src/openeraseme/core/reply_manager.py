@@ -5,6 +5,7 @@ from typing import Any
 
 from openeraseme.core.db import get_connection
 from openeraseme.core.events import append_event, get_removal_request
+from openeraseme.core.identity import load_profile, profile_exists
 from openeraseme.core.projection import upsert_state
 from openeraseme.core.templating import render_template
 
@@ -230,22 +231,29 @@ def draft_reply(
     )
 
     try:
+        identity_profile = load_profile() if profile_exists() else None
+    except Exception:
+        identity_profile = None
+
+    try:
         draft_body = render_template(
             template_name,
-            profile=None,
+            profile=identity_profile,
             broker_name=broker_name,
             broker_website=broker_website,
             extra_vars=rebuttal_context,
         )
     except Exception:
         logger.warning(
-            "Template %s not found, falling back to plain-text rebuttal",
+            "Template %s not found in registry/laws/, using fallback",
             template_name,
         )
+        user_name = identity_profile.full_name if identity_profile else "Your Name"
         draft_body = _fallback_rebuttal(
             broker_name=broker_name,
             classification=classification,
             reply_snippet=reply_body,
+            user_name=user_name,
         )
 
     draft_subject = f"Re: Data Deletion Request — {broker_name}"
@@ -398,6 +406,7 @@ def _fallback_rebuttal(
     broker_name: str,
     classification: str,
     reply_snippet: str,
+    user_name: str = "Your Name",
 ) -> str:
     """Plain-text fallback when the rebuttal template is not available."""
     lines = [
@@ -434,6 +443,6 @@ def _fallback_rebuttal(
     lines.extend([
         "",
         "Best regards,",
-        "[Your Name]",
+        user_name,
     ])
     return "\n".join(lines)
