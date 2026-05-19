@@ -33,13 +33,37 @@ def version() -> None:
 
 
 @app.command()
-def init_profile() -> None:
-    typer.echo("init-profile: not yet implemented")
+def init_profile(
+    full_name: str = typer.Option(..., prompt="Full name"),
+    email: str = typer.Option(..., prompt="Email address"),
+) -> None:
+    """Create or update your encrypted identity profile."""
+    from openeraseme.core.identity import profile_exists, save_profile
+    from openeraseme.registry.schema import IdentityProfile
+
+    profile = IdentityProfile(full_name=full_name, email_addresses=[email])
+    path = save_profile(profile)
+    action = "Updated" if profile_exists() else "Created"
+    typer.echo(f"{action} encrypted identity profile at {path}")
 
 
 @app.command()
 def show_profile() -> None:
-    typer.echo("show-profile: not yet implemented")
+    """Display your current identity profile."""
+    from openeraseme.core.identity import load_profile, profile_exists
+
+    if not profile_exists():
+        typer.echo("No identity profile found. Run 'openeraseme init-profile' first.")
+        raise typer.Exit(1)
+
+    profile = load_profile()
+    typer.echo(f"Name:  {profile.full_name}")
+    for e in profile.email_addresses:
+        typer.echo(f"Email: {e}")
+    for a in profile.addresses:
+        typer.echo(f"Address: {a.street}, {a.city}, {a.country}")
+    for j in profile.jurisdictions:
+        typer.echo(f"Jurisdiction: {j}")
 
 
 if __name__ == "__main__":
