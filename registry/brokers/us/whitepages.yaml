@@ -1,0 +1,40 @@
+id: whitepages
+name: Whitepages
+website: https://www.whitepages.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 4
+priority: high
+
+opt_out:
+  - type: web_form
+    url: https://www.whitepages.com/suppression_requests
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#first_name": "${full_name}"
+            "#last_name": "${last_name}"
+            "#email": "${email}"
+            "#phone": "${phone_number}"
+        - solve_captcha:
+            type: recaptcha-v2
+            site_key: "6Lc..."
+        - click: "#submit-request"
+        - wait_for: ".confirmation-message"
+        - screenshot: "result"
+      timeout_seconds: 60.0
+      rate_limit_delay: 2.5
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "suppression request"
+  rejection_keywords:
+    - "cannot process"
+    - "not found"
+  human_required_keywords:
+    - "additional information"

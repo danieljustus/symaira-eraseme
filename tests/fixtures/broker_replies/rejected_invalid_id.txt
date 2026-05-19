@@ -1,0 +1,19 @@
+Subject: Your request could not be processed
+From: support@lookupbroker.com
+
+Dear Customer,
+
+We were unable to process your data deletion request because the
+information provided does not match our records.
+
+To proceed, please provide:
+- Full legal name
+- Date of birth
+- Current mailing address
+
+Without this information we cannot verify your identity and process
+the deletion request.
+
+Regards,
+Support Team
+LookUpBroker LLC

@@ -1,0 +1,13 @@
+Subject: Re: Data Deletion Request
+From: compliance@broker.example.com
+
+Dear Customer,
+
+We acknowledge receipt of your data deletion request (reference #DR-2026-05123).
+
+Your request is being processed and we will notify you once the deletion is complete.
+Please allow up to 30 business days for processing.
+
+Best regards,
+Data Privacy Team
+Acme Data Solutions GmbH

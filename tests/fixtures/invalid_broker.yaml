@@ -1,0 +1,3 @@
+id: "invalid-broker"
+# Missing required fields: name, website, jurisdiction, laws, priority, opt_out
+category: people-search

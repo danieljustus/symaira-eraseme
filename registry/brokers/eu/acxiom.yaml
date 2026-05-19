@@ -1,0 +1,33 @@
+id: acxiom-eu
+name: Acxiom (EU)
+website: https://www.acxiom.com
+category: marketing
+jurisdictions:
+  - DE
+  - FR
+  - UK
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@acxiom.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+  rejection_keywords:
+    - "cannot verify"
+  human_required_keywords:
+    - "additional information"

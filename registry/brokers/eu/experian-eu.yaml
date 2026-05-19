@@ -1,0 +1,35 @@
+id: experian-eu
+name: Experian Limited (UK/EU)
+website: https://www.experian.co.uk
+category: credit
+jurisdictions:
+  - UK
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@experian.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+      - address
+      - date_of_birth
+    supports_suppression: false
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "reference"
+  rejection_keywords:
+    - "cannot verify"
+    - "additional information"
+  human_required_keywords:
+    - "identity check"
+    - "documentation required"

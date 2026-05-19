@@ -1,0 +1,35 @@
+id: adroll-eu
+name: AdRoll (EU)
+website: https://www.adroll.com
+category: marketing
+jurisdictions:
+  - IE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 3
+priority: medium
+
+opt_out:
+  - type: web_form
+    url: https://www.adroll.com/privacy/opt-out
+    form_spec:
+      steps:
+        - goto: .
+        - click: "#cookie-consent-accept"
+        - fill:
+            "#adroll-email": "${email}"
+        - click: "#opt-out-submit"
+        - wait_for: "#opt-out-confirmed"
+        - screenshot: "result"
+      timeout_seconds: 30.0
+      rate_limit_delay: 1.5
+
+verification:
+  ack_keywords:
+    - "opted out"
+    - "confirmation"
+  rejection_keywords:
+    - "already opted out"
+  human_required_keywords:
+    - "contact support"

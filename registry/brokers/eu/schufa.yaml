@@ -1,0 +1,36 @@
+id: schufa-de
+name: SCHUFA Holding AG
+website: https://www.schufa.de
+category: credit
+jurisdictions:
+  - DE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: datenschutz@schufa.de
+    template: gdpr-art17
+    locale: de
+    required_fields:
+      - full_name
+      - address
+      - email
+      - date_of_birth
+    supports_suppression: false
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "bestätigen"
+    - "erhalten"
+    - "vorgangsnummer"
+  rejection_keywords:
+    - "nicht verifizieren"
+    - "weitere Angaben"
+  human_required_keywords:
+    - "ausweis"
+    - "identitätsnachweis"

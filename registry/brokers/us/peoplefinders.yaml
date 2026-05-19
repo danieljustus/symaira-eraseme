@@ -1,0 +1,38 @@
+id: peoplefinders
+name: PeopleFinders
+website: https://www.peoplefinders.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 5
+priority: medium
+
+opt_out:
+  - type: web_form
+    url: https://www.peoplefinders.com/opt-out
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#optOutFirstName": "${full_name}"
+            "#optOutLastName": "${last_name}"
+            "#optOutEmailAddress": "${email}"
+        - select:
+            "#optOutState": "${address_state_0}"
+        - click: "#optOutSubmit"
+        - wait_for: "#confirmation-page"
+        - screenshot: "result"
+      timeout_seconds: 60.0
+      rate_limit_delay: 2.0
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "opt out"
+  rejection_keywords:
+    - "not found"
+    - "ineligible"
+  human_required_keywords:
+    - "identity verification"

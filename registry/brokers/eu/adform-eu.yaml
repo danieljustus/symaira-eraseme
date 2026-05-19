@@ -1,0 +1,32 @@
+id: adform-eu
+name: Adform A/S
+website: https://www.adform.com
+category: marketing
+jurisdictions:
+  - DK
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@adform.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "confirm"
+  rejection_keywords:
+    - "cannot verify"
+    - "insufficient information"
+  human_required_keywords:
+    - "additional documentation"

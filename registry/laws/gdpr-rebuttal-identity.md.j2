@@ -1,0 +1,39 @@
+Subject: RE: Request for erasure under Article 17 GDPR — Identity Verification Provided
+
+To whom it may concern,
+
+I refer to your response to my previous data erasure request dated
+{{ original_request_date | default("recently") }}, in which you requested
+additional identity verification.
+
+I have provided the following information to verify my identity:
+
+{% if email_addresses %}
+- Email address: {{ email_addresses | first }}
+{% endif %}
+{% if phone_numbers %}
+- Phone number: {{ phone_numbers | first }}
+{% endif %}
+{% if date_of_birth %}
+- Date of birth: {{ date_of_birth }}
+{% endif %}
+{% if addresses %}
+- Current address: {{ addresses[0].street }}, {{ addresses[0].city }},
+  {{ addresses[0].postal_code }}, {{ addresses[0].country }}
+{% endif %}
+
+Under Article 12(6) GDPR, you may request additional information necessary to
+confirm my identity only where you have reasonable doubts about my identity.
+The information provided above is sufficient to verify me as the data subject.
+
+I request that you proceed with the erasure of my personal data without further
+delay, pursuant to Article 17(1) GDPR. The one-month response period under
+Article 12(3) GDPR is already running from the date of my original request.
+
+Please confirm receipt of this information and confirm the erasure.
+
+Yours faithfully,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

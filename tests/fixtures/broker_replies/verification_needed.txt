@@ -1,0 +1,18 @@
+Subject: Verification required for your request
+From: compliance@personfinder.com
+
+Hello,
+
+Before we can process your data removal request, we need you to
+verify your identity. Please follow the link below and upload
+a copy of your government-issued ID:
+
+https://personfinder.example.com/verify/ABC123
+
+This verification step is required to protect against fraudulent
+deletion requests. Once verified we will process your request
+within 14 business days.
+
+Thank you,
+Privacy Team
+PersonFinder

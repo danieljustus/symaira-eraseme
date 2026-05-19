@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/danieljustus/OpenEraseMe/registry/schemas/broker.schema.json",
+  "title": "Data Broker Definition",
+  "description": "Schema for YAML broker files in the OpenEraseMe registry.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "website",
+    "category",
+    "jurisdictions",
+    "laws",
+    "priority",
+    "opt_out"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique identifier (lowercase, hyphenated)."
+    },
+    "name": {
+      "type": "string",
+      "description": "Full legal name of the broker."
+    },
+    "website": {
+      "type": "string",
+      "format": "uri",
+      "description": "Broker homepage URL."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "people-search",
+        "marketing",
+        "credit",
+        "analytics",
+        "background-check",
+        "social-media",
+        "other"
+      ]
+    },
+    "jurisdictions": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z]{2}(-[A-Z]{2})?$" },
+      "minItems": 1,
+      "description": "ISO country codes (e.g. DE, US, EU)."
+    },
+    "laws": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["GDPR", "CCPA", "CPRA", "LGPD", "PIPEDA"]
+      },
+      "minItems": 1
+    },
+    "data_sensitivity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 3,
+      "description": "1–5 scale of data sensitivity."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "opt_out": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "oneOf": [
+          {
+            "properties": {
+              "type": { "const": "email" },
+              "endpoint": { "type": "string", "format": "email" },
+              "template": { "type": "string" },
+              "locale": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+              "required_fields": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "supports_suppression": { "type": "boolean" },
+              "expected_response_days": { "type": "integer", "minimum": 1 }
+            },
+            "required": ["endpoint", "template", "locale"]
+          },
+          {
+            "properties": {
+              "type": { "const": "web_form" },
+              "url": { "type": "string", "format": "uri" },
+              "form_spec": {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "array",
+                    "items": { "type": "object" }
+                  }
+                },
+                "required": ["steps"]
+              }
+            },
+            "required": ["url", "form_spec"]
+          }
+        ],
+        "additionalProperties": true
+      }
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "ack_keywords": { "type": "array", "items": { "type": "string" } },
+        "rejection_keywords": { "type": "array", "items": { "type": "string" } },
+        "human_required_keywords": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

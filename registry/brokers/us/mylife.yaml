@@ -1,0 +1,34 @@
+id: mylife
+name: MyLife
+website: https://www.mylife.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 4
+priority: medium
+
+opt_out:
+  - type: web_form
+    url: https://www.mylife.com/optout
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#optout_name": "${full_name}"
+            "#optout_email": "${email}"
+        - click: "#optout_submit"
+        - assert_text: "Your opt-out request has been submitted"
+        - screenshot: "result"
+      timeout_seconds: 45.0
+      rate_limit_delay: 2.0
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "opt-out"
+  rejection_keywords:
+    - "already"
+  human_required_keywords:
+    - "support"

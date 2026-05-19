@@ -1,0 +1,33 @@
+id: oracle-data-cloud-eu
+name: Oracle Data Cloud (EU)
+website: https://www.oracle.com/data-cloud
+category: marketing
+jurisdictions:
+  - DE
+  - IE
+  - NL
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@oracle.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+  rejection_keywords:
+    - "cannot verify"
+  human_required_keywords:
+    - "additional verification"

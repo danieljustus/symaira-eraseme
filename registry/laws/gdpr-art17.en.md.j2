@@ -1,0 +1,32 @@
+Subject: Request for erasure under Article 17 GDPR
+
+To whom it may concern,
+
+I, {{ full_name }}, hereby request the immediate erasure of all personal data
+concerning me that you are processing, pursuant to Article 17(1) of the
+General Data Protection Regulation (GDPR).
+
+{% if email_addresses %}
+My registered email address: {{ email_addresses | first }}
+{% endif %}
+{% if date_of_birth %}
+Date of birth: {{ date_of_birth }}
+{% endif %}
+
+Grounds under Article 17(1) GDPR:
+- The personal data are no longer necessary in relation to the purposes for
+  which they were collected or otherwise processed.
+- I withdraw my consent on which the processing is based according to
+  Article 6(1)(a) or Article 9(2)(a) GDPR.
+
+Please confirm receipt of this request and confirm the erasure within the
+statutory deadline of one month pursuant to Article 12(3) GDPR.
+
+If you require additional information for identity verification, please
+inform me without undue delay.
+
+Yours faithfully,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

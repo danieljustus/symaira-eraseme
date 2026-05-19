@@ -1,0 +1,34 @@
+id: meta-ads-eu
+name: Meta Platforms Ireland Ltd (Facebook/Instagram Ads)
+website: https://www.facebook.com
+category: social-media
+jurisdictions:
+  - IE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@facebook.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+    - "case number"
+  rejection_keywords:
+    - "cannot verify"
+    - "additional information"
+  human_required_keywords:
+    - "manual review"
+    - "appeal"

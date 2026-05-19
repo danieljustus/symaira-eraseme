@@ -1,0 +1,33 @@
+id: microsoft-ads-eu
+name: Microsoft Ireland Operations Ltd (LinkedIn/Bing Ads)
+website: https://www.microsoft.com
+category: marketing
+jurisdictions:
+  - IE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 4
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@microsoft.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+    - "acknowledge"
+  rejection_keywords:
+    - "cannot verify"
+    - "additional information"
+  human_required_keywords:
+    - "escalated"

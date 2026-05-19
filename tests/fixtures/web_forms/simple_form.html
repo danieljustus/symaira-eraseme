@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head><title>Opt-Out Form</title></head>
+<body>
+  <h1>Data Removal Request</h1>
+  <form id="optout-form">
+    <label>Full Name:
+      <input type="text" name="full_name" id="full_name" />
+    </label>
+    <label>Email:
+      <input type="email" name="email" id="email" />
+    </label>
+    <label>Reason:
+      <select name="reason" id="reason">
+        <option value="">Select...</option>
+        <option value="gdpr">GDPR Right to Erasure</option>
+        <option value="ccpa">CCPA Opt-Out</option>
+      </select>
+    </label>
+    <button type="submit" id="submit-btn">Submit Request</button>
+  </form>
+  <div id="success-message" style="display:none;">
+    Your request has been submitted successfully.
+  </div>
+  <script>
+    document.getElementById('submit-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('optout-form').style.display = 'none';
+      document.getElementById('success-message').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

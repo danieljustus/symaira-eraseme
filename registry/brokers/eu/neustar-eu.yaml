@@ -1,0 +1,31 @@
+id: neustar-eu
+name: Neustar Inc (TransUnion EU)
+website: https://www.home.neustar
+category: analytics
+jurisdictions:
+  - UK
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@neustar.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+  rejection_keywords:
+    - "cannot verify"
+  human_required_keywords:
+    - "identity verification"

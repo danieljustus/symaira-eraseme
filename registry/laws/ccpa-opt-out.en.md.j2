@@ -1,0 +1,30 @@
+Subject: Request to opt out of sale of personal information under CCPA
+
+To whom it may concern,
+
+I, {{ full_name }}, hereby exercise my right to opt out of the sale of my
+personal information under the California Consumer Privacy Act (CCPA)
+Section 1798.120.
+
+{% if email_addresses %}
+My email address on file: {{ email_addresses | first }}
+{% endif %}
+
+I direct that you and any of your service providers or contractors immediately
+cease the sale of my personal information. I further request that you:
+1. Not sell my personal information in the future
+2. Honor this opt-out request without requiring me to complete a further
+   opt-out process
+3. Notify any third parties to whom you have sold my personal information
+   within the past 90 days
+
+This request applies to my personal information collected across all
+platforms, devices, and services.
+
+Please confirm within 15 days that you have processed this opt-out request.
+
+Sincerely,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

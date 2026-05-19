@@ -1,0 +1,42 @@
+id: spokeo-eu
+name: Spokeo (EU)
+website: https://www.spokeo.com
+category: people-search
+jurisdictions:
+  - DE
+  - FR
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 4
+priority: medium
+
+opt_out:
+  - type: web_form
+    url: https://www.spokeo.com/gdpr-optout
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#gdpr-email": "${email}"
+            "#gdpr-full-name": "${full_name}"
+        - select:
+            "#gdpr-country": "${address_country_0}"
+        - solve_captcha:
+            type: recaptcha-v2
+            site_key: "6Lc..."
+        - click: "#gdpr-submit"
+        - wait_for: ".success-message"
+        - screenshot: "result"
+      timeout_seconds: 45.0
+      rate_limit_delay: 2.0
+
+verification:
+  ack_keywords:
+    - "received"
+    - "erasure request"
+  rejection_keywords:
+    - "cannot verify"
+    - "additional information"
+  human_required_keywords:
+    - "manual review"

@@ -1,0 +1,31 @@
+id: yahoo-eu
+name: Yahoo EMEA Limited
+website: https://www.yahoo.com
+category: marketing
+jurisdictions:
+  - IE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 4
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@yahooinc.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "request id"
+  rejection_keywords:
+    - "cannot verify"
+  human_required_keywords:
+    - "manual review"

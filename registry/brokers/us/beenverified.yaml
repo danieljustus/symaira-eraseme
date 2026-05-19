@@ -1,0 +1,36 @@
+id: beenverified-us
+name: BeenVerified
+website: https://www.beenverified.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 4
+priority: high
+
+opt_out:
+  - type: web_form
+    url: https://www.beenverified.com/app/optout
+    form_spec:
+      steps:
+        - fill:
+            selector: "#first_name"
+            from: full_name
+        - fill:
+            selector: "#email"
+            from: email
+        - solve_captcha:
+            type: recaptcha-v2
+            sitekey: "6Lc..."
+        - click: "#submit"
+        - wait_for: ".confirmation"
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "opt-out request"
+  rejection_keywords:
+    - "already opted out"
+  human_required_keywords:
+    - "manual review"

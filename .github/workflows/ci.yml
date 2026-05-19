@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Ruff lint
+        run: uv run ruff check src/openeraseme/
+      - name: Ruff format check
+        run: uv run ruff format --check src/openeraseme/
+      - name: MyPy type check
+        run: uv run mypy src/openeraseme/
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Run tests
+        run: uv run pytest --verbose --tb=short
+
+  schema-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Validate registry YAMLs against schema
+        run: uv run python -c "
+import yaml, json, jsonschema, sys
+from pathlib import Path
+
+schema_path = Path('registry/schemas/broker.schema.json')
+if schema_path.exists():
+    with open(schema_path) as f:
+        schema = json.load(f)
+    for yml in Path('registry/brokers').rglob('*.yaml'):
+        with open(yml) as f:
+            data = yaml.safe_load(f)
+        try:
+            jsonschema.validate(data, schema)
+            print(f'  ✓ {yml}')
+        except jsonschema.ValidationError as e:
+            print(f'  ✗ {yml}: {e.message}')
+            sys.exit(1)
+else:
+    print('  Schema not yet created — skipping validation')
+"

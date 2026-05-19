@@ -1,0 +1,35 @@
+id: outbrain-eu
+name: Outbrain (EU)
+website: https://www.outbrain.com
+category: marketing
+jurisdictions:
+  - IL
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 3
+priority: low
+
+opt_out:
+  - type: web_form
+    url: https://www.outbrain.com/privacy/opt-out
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#email-address": "${email}"
+        - click: "#submit-optout"
+        - wait_for: ".success-message"
+        - assert_text: "successfully opted out"
+        - screenshot: "result"
+      timeout_seconds: 30.0
+      rate_limit_delay: 1.5
+
+verification:
+  ack_keywords:
+    - "opted out"
+    - "confirmation"
+  rejection_keywords:
+    - "already"
+  human_required_keywords:
+    - "contact"

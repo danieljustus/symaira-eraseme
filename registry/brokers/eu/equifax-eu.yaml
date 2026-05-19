@@ -1,0 +1,35 @@
+id: equifax-eu
+name: Equifax Ltd (UK/EU)
+website: https://www.equifax.co.uk
+category: credit
+jurisdictions:
+  - UK
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 5
+priority: high
+
+opt_out:
+  - type: email
+    endpoint: privacy@equifax.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+      - address
+      - date_of_birth
+    supports_suppression: false
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "reference number"
+  rejection_keywords:
+    - "cannot verify"
+    - "insufficient information"
+  human_required_keywords:
+    - "identity verification"
+    - "proof of address"

@@ -1,0 +1,32 @@
+Betreff: Löschungsantrag gemäß Art. 17 DSGVO
+
+Sehr geehrte Damen und Herren,
+
+hiermit beantrage ich, {{ full_name }}, die unverzügliche Löschung aller mich
+betreffenden personenbezogenen Daten, die Sie verarbeiten, gemäß Artikel 17
+Absatz 1 der Datenschutz-Grundverordnung (DSGVO).
+
+{% if email_addresses %}
+Meine bei Ihnen gespeicherte E-Mail-Adresse: {{ email_addresses | first }}
+{% endif %}
+{% if date_of_birth %}
+Geburtsdatum: {{ date_of_birth }}
+{% endif %}
+
+Begründung nach Art. 17 Abs. 1 DSGVO:
+- Die personenbezogenen Daten sind für die Zwecke, für die sie erhoben oder
+  verarbeitet wurden, nicht mehr notwendig.
+- Ich widerrufe meine Einwilligung, auf die sich die Verarbeitung gemäß
+  Art. 6 Abs. 1 Buchstabe a oder Art. 9 Abs. 2 Buchstabe a DSGVO stützte.
+
+Bitte bestätigen Sie mir den Eingang dieses Antrags und die erfolgte Löschung
+innerhalb der gesetzlichen Frist von einem Monat gemäß Art. 12 Abs. 3 DSGVO.
+
+Sollten Sie zur Identitätsprüfung zusätzliche Informationen benötigen, teilen
+Sie mir dies bitte umgehend mit.
+
+Mit freundlichen Grüßen,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

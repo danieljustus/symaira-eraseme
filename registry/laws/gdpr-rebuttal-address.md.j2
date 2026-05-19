@@ -1,0 +1,37 @@
+Subject: RE: Request for erasure under Article 17 GDPR — Additional Information Provided
+
+To whom it may concern,
+
+I refer to your response to my previous data erasure request dated
+{{ original_request_date | default("recently") }}, in which you indicated that
+an old address on file prevents you from processing my request.
+
+I confirm that the personal data I provided in my original request is accurate
+and complete. Under Article 17(1) GDPR, my right to erasure is not contingent
+on my current address matching your records. You are obligated to erase personal
+data concerning me where one of the grounds listed in Article 17(1) applies,
+regardless of address discrepancies.
+
+{% if addresses %}
+For the avoidance of doubt, here are my current and past addresses:
+{% for addr in addresses %}
+- {{ addr.street }}, {{ addr.city }}, {{ addr.postal_code }}, {{ addr.country }}
+{% endfor %}
+{% endif %}
+
+Legal basis:
+- Article 17(1)(a) GDPR: The personal data are no longer necessary in relation to
+  the purposes for which they were collected.
+- Article 17(1)(b) GDPR: I withdraw my consent on which the processing is based.
+- Article 12(3) GDPR: You must respond without undue delay and within one month
+  of receipt of this request.
+
+Please proceed with the erasure without further delay. If you believe you have
+a legitimate basis to retain my data, please provide specific legal grounds in
+accordance with Article 17(3) GDPR.
+
+Yours faithfully,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}

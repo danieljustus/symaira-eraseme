@@ -1,0 +1,34 @@
+id: taboola-eu
+name: Taboola (EU)
+website: https://www.taboola.com
+category: marketing
+jurisdictions:
+  - IL
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 3
+priority: low
+
+opt_out:
+  - type: web_form
+    url: https://www.taboola.com/privacy/opt-out
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#taboola-email": "${email}"
+        - click: "#opt-out-button"
+        - wait_for: "#opt-out-confirmed"
+        - screenshot: "result"
+      timeout_seconds: 30.0
+      rate_limit_delay: 1.5
+
+verification:
+  ack_keywords:
+    - "opted out"
+    - "opt-out successful"
+  rejection_keywords:
+    - "already opted out"
+  human_required_keywords:
+    - "support"

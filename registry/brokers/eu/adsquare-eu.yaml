@@ -1,0 +1,31 @@
+id: adsquare-eu
+name: Adsquare GmbH
+website: https://www.adsquare.com
+category: marketing
+jurisdictions:
+  - DE
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 4
+priority: medium
+
+opt_out:
+  - type: email
+    endpoint: privacy@adsquare.com
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+
+verification:
+  ack_keywords:
+    - "received"
+    - "confirm"
+  rejection_keywords:
+    - "cannot verify"
+  human_required_keywords:
+    - "additional information"

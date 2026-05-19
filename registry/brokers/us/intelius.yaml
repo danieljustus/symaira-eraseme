@@ -1,0 +1,35 @@
+id: intelius
+name: Intelius
+website: https://www.intelius.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 4
+priority: high
+
+opt_out:
+  - type: web_form
+    url: https://www.intelius.com/optout
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#optout-first-name": "${full_name}"
+            "#optout-last-name": "${last_name}"
+            "#optout-email": "${email}"
+        - click: "#optout-submit"
+        - wait_for: ".optout-confirmation"
+        - screenshot: "result"
+      timeout_seconds: 45.0
+      rate_limit_delay: 2.0
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "opt-out request"
+  rejection_keywords:
+    - "already opted out"
+  human_required_keywords:
+    - "manual review"

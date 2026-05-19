@@ -1,0 +1,43 @@
+Subject: RE: Request to delete personal information under CCPA — Follow-Up
+
+To whom it may concern,
+
+I refer to your response to my previous request to delete my personal
+information under the California Consumer Privacy Act (CCPA) Section 1798.105.
+
+You have indicated that additional information or verification is required
+to process my deletion request. Please find below the information you requested:
+
+{% if email_addresses %}
+- Email address: {{ email_addresses | first }}
+{% endif %}
+{% if phone_numbers %}
+- Phone number: {{ phone_numbers | first }}
+{% endif %}
+{% if addresses %}
+- Address: {{ addresses[0].street }}, {{ addresses[0].city }},
+  {{ addresses[0].postal_code }}, {{ addresses[0].country }}
+{% endif %}
+
+As a California resident, I am exercising my right to deletion under the CCPA.
+Under California Code of Regulations Title 11, Section 999.313, a business
+shall verify the consumer's identity to a reasonable degree of certainty.
+The information provided above meets this standard.
+
+Please note the following statutory requirements:
+1. You must confirm receipt of this request within 10 business days
+   (Section 1798.110(d)).
+2. You must delete my personal information within 45 days, extendable by an
+   additional 45 days with notice (Section 1798.105(d)).
+3. You must instruct all service providers to delete my personal information
+   (Section 1798.105(c)).
+
+Please proceed with the deletion and confirm once completed. If you need
+specific additional information, please identify the exact data elements
+required and the legal basis for requesting them.
+
+Sincerely,
+{{ full_name }}
+{% if email_addresses %}
+{{ email_addresses | first }}
+{% endif %}
