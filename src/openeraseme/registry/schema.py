@@ -31,14 +31,22 @@ class Priority(StrEnum):
 
 
 class FormStep(BaseModel):
+    goto: str | None = None
     fill: dict[str, str] | None = None
     click: str | None = None
+    select: dict[str, str] | None = None
     wait_for: str | None = None
+    wait_seconds: float | None = None
+    screenshot: str | None = None
+    assert_text: str | None = None
     solve_captcha: dict[str, str] | None = None
 
 
 class FormSpec(BaseModel):
     steps: list[FormStep]
+    timeout_seconds: float = 30.0
+    headless: bool = True
+    rate_limit_delay: float = 1.0
 
 
 class EmailOptOut(BaseModel):

@@ -651,6 +651,110 @@ def classify_reply(
 
 
 # ---------------------------------------------------------------------------
+# run-web-form
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="run-web-form")
+def run_web_form(
+    ctx: typer.Context,
+    broker_id: str = typer.Argument(..., help="Broker ID from registry"),
+    headed: bool = typer.Option(False, "--headed", help="Show browser window"),
+    screenshot_dir: str = typer.Option(
+        "", "--screenshots", help="Directory for screenshots"
+    ),
+) -> None:
+    """Run a broker's web form opt-out using Playwright."""
+    import asyncio
+
+    from openeraseme.adapters.web.playwright_runner import (
+        PlaywrightRunnerError,
+    )
+    from openeraseme.adapters.web.playwright_runner import (
+        run_web_form as _run_form,
+    )
+    from openeraseme.core.identity import load_profile, profile_exists
+    from openeraseme.registry.loader import load_broker
+
+    try:
+        broker = load_broker(broker_id)
+    except Exception as e:
+        typer.echo(f"Broker '{broker_id}' not found: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    web_forms = [c for c in broker.opt_out if c.type == "web_form"]
+    if not web_forms:
+        typer.echo(f"Broker '{broker_id}' has no web form opt-out channel.", err=True)
+        raise typer.Exit(1)
+
+    form = web_forms[0]
+    url = form.url
+    steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
+
+    identity_fields: dict[str, str] = {}
+    if profile_exists():
+        profile = load_profile()
+        identity_fields = {
+            "full_name": profile.full_name,
+            "email": profile.email_addresses[0] if profile.email_addresses else "",
+        }
+        for i, addr in enumerate(profile.addresses):
+            identity_fields[f"address_street_{i}"] = addr.street
+            identity_fields[f"address_city_{i}"] = addr.city
+            identity_fields[f"address_zip_{i}"] = addr.postal_code
+            identity_fields[f"address_country_{i}"] = addr.country
+
+    typer.echo(f"Running web form for {broker.name} ({url})")
+    typer.echo(f"Steps: {len(steps_data)}")
+
+    try:
+        result = asyncio.run(
+            _run_form(
+                url=url,
+                steps=steps_data,
+                headless=not headed,
+                timeout_seconds=form.form_spec.timeout_seconds,
+                rate_limit_delay=form.form_spec.rate_limit_delay,
+                screenshot_dir=screenshot_dir or None,
+                identity_fields=identity_fields,
+            )
+        )
+    except PlaywrightRunnerError as e:
+        typer.echo(f"Playwright error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    if ctx.obj.get("output") == "json":
+        import json as _json
+
+        typer.echo(
+            _json.dumps(
+                {
+                    "broker_id": broker_id,
+                    "success": result.success,
+                    "step_index": result.step_index,
+                    "total_steps": result.total_steps,
+                    "error": result.error,
+                    "screenshot_path": result.screenshot_path,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if result.success:
+        typer.echo(f"Web form completed successfully ({result.total_steps} steps).")
+    else:
+        typer.echo(
+            f"Web form failed at step {result.step_index + 1}/{result.total_steps}: "
+            f"{result.error}"
+        )
+        if result.screenshot_path:
+            typer.echo(f"Screenshot saved to: {result.screenshot_path}")
+
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
 # db
 # ---------------------------------------------------------------------------
 
