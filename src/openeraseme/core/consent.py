@@ -34,7 +34,7 @@ def issue_token(command: str, ttl: int = TOKEN_TTL) -> str:
         sort_keys=True,
     )
     token = hmac.new(
-        str(os.urandom(32)).encode(),
+        os.urandom(32).hex().encode(),
         payload.encode(),
         hashlib.sha256,
     ).hexdigest()[:16]

@@ -1,16 +1,105 @@
-"""SQLite connection management for the event store."""
+"""SQLite connection management for the event store.
+
+When ``OPENERASEME_ENCRYPT_DB=1`` is set (or the database file is already
+encrypted), the file is transparently encrypted at rest using AES-256-GCM
+(Fernet) with a key derived from the identity master key in the system keyring.
+"""
 
 from __future__ import annotations
 
+import atexit
+import hashlib
+import logging
 import os
 import sqlite3
+import tempfile
 import threading
+from base64 import urlsafe_b64encode
 from pathlib import Path
+
+from cryptography.fernet import Fernet
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DB_DIR = "~/.local/share/openeraseme"
 DEFAULT_DB_NAME = "openeraseme.db"
 
+_ENC_HEADER = b"OPENERASEME_ENCv1\n"
+
+_DB_TEMP: dict[Path, Path] = {}
+
 _local = threading.local()
+
+
+def _db_encryption_enabled() -> bool:
+    val = os.environ.get("OPENERASEME_ENCRYPT_DB", "").strip().lower()
+    return val in ("1", "true", "yes")
+
+
+def _get_db_fernet_key() -> bytes | None:
+    try:
+        from openeraseme.core.identity import _get_or_create_master_key
+
+        master_key = _get_or_create_master_key()
+    except Exception as exc:
+        logger.debug("DB encryption key unavailable: %s", exc)
+        return None
+
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        master_key,
+        b"openeraseme-db-encryption-v1",
+        100_000,
+    )
+    return urlsafe_b64encode(derived)
+
+
+def _is_encrypted(path: Path) -> bool:
+    if not path.exists() or path.stat().st_size == 0:
+        return False
+    return path.read_bytes()[: len(_ENC_HEADER)] == _ENC_HEADER
+
+
+def _decrypt_to_temp(path: Path) -> Path:
+    raw = path.read_bytes()
+    encrypted_data = raw[len(_ENC_HEADER) :]
+    fernet_key = _get_db_fernet_key()
+    if fernet_key is None:
+        msg = (
+            f"Cannot decrypt DB {path} \u2014 identity master key is not available. "
+            "Run `openeraseme init-profile` first."
+        )
+        raise RuntimeError(msg)
+    f = Fernet(fernet_key)
+    decrypted = f.decrypt(encrypted_data)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
+        tmp.write(decrypted)
+        tmp_path = Path(tmp.name)
+    _DB_TEMP[path.resolve()] = tmp_path
+    return tmp_path
+
+
+def _encrypt_file(source: Path, target: Path) -> None:
+    fernet_key = _get_db_fernet_key()
+    if fernet_key is None:
+        logger.warning("Cannot encrypt DB \u2014 identity master key is not available.")
+        return
+    f = Fernet(fernet_key)
+    encrypted = f.encrypt(source.read_bytes())
+    target.write_bytes(_ENC_HEADER + encrypted)
+
+
+@atexit.register
+def _cleanup_temp_files() -> None:
+    for orig, tmp in list(_DB_TEMP.items()):
+        try:
+            if tmp.exists():
+                _encrypt_file(tmp, orig)
+                tmp.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+    _DB_TEMP.clear()
 
 
 def _db_path(path: str | None = None) -> Path:
@@ -22,14 +111,22 @@ def _db_path(path: str | None = None) -> Path:
 
 
 def get_connection(path: str | None = None) -> sqlite3.Connection:
-    """Get a thread-local SQLite connection (singleton per thread)."""
     if not hasattr(_local, "conn") or _local.conn is None:
         db_file = _db_path(path)
+
+        should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
+
+        if should_encrypt and db_file.exists() and _is_encrypted(db_file):
+            db_file = _decrypt_to_temp(db_file)
+        elif should_encrypt and not db_file.exists():
+            _DB_TEMP[db_file.resolve()] = db_file
+
         conn = sqlite3.connect(str(db_file))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
+        _local.db_path = str(_db_path(path)) if not should_encrypt else str(db_file)
     return _local.conn
 
 
@@ -37,6 +134,19 @@ def close_connection() -> None:
     if hasattr(_local, "conn") and _local.conn is not None:
         _local.conn.close()
         _local.conn = None
+
+    for orig, tmp in list(_DB_TEMP.items()):
+        try:
+            if tmp.exists():
+                _encrypt_file(tmp, orig)
+                if tmp != orig:
+                    tmp.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+    _DB_TEMP.clear()
+
+    if hasattr(_local, "db_path"):
+        _local.db_path = None
 
 
 def init_db(path: str | None = None) -> Path:
