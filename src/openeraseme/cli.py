@@ -755,6 +755,135 @@ def run_web_form(
 
 
 # ---------------------------------------------------------------------------
+# auto-confirm
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="auto-confirm")
+def auto_confirm_cmd(
+    ctx: typer.Context,
+    request_id: int = typer.Argument(..., help="Request ID to auto-confirm"),
+    headed: bool = typer.Option(False, "--headed", help="Show browser window"),
+    screenshot_dir: str = typer.Option("", "--screenshots", help="Directory for screenshots"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Simulate without clicking"),
+) -> None:
+    """Auto-confirm a removal request by clicking verification links via Playwright."""
+    import asyncio
+
+    from openeraseme.adapters.web.confirmation_clicker import auto_confirm
+    from openeraseme.core.db import init_db
+    from openeraseme.core.events import append_event, get_events, get_removal_request
+    from openeraseme.core.projection import upsert_state
+
+    init_db()
+
+    req = get_removal_request(request_id)
+    if req is None:
+        typer.echo(f"Request #{request_id} not found.", err=True)
+        raise typer.Exit(1)
+
+    events = get_events(request_id)
+    if not events:
+        typer.echo(f"No events found for request #{request_id}.", err=True)
+        raise typer.Exit(1)
+
+    last_event = events[-1]
+    payload = last_event.get("payload_json", {}) or {}
+    reply_body = payload.get("snippet", "") or payload.get("template", "") or ""
+
+    from openeraseme.core.db import get_connection
+
+    conn = get_connection()
+    reply = conn.execute(
+        "SELECT id, snippet, from_addr FROM inbox_replies "
+        "WHERE request_id = ? ORDER BY received_at DESC LIMIT 1",
+        (request_id,),
+    ).fetchone()
+
+    if reply:
+        reply_body = reply["snippet"] or reply_body
+        from_addr = reply["from_addr"] or ""
+    else:
+        from_addr = ""
+
+    typer.echo(f"Scanning for confirmation links in reply for request #{request_id}...")
+
+    result = asyncio.run(
+        auto_confirm(
+            request_id,
+            reply_body,
+            from_addr=from_addr,
+            headless=not headed,
+            screenshot_dir=screenshot_dir or None,
+            dry_run=dry_run,
+        )
+    )
+
+    if not dry_run and result.success:
+        append_event(
+            request_id,
+            "CONFIRMATION_LINK_CLICKED",
+            payload={
+                "url": result.clicked_url,
+                "step": result.step,
+                "screenshot_before": result.screenshot_before,
+                "screenshot_after": result.screenshot_after,
+            },
+            source="system",
+        )
+        upsert_state(request_id)
+    elif not dry_run and result.error:
+        append_event(
+            request_id,
+            "NOTE_ADDED",
+            payload={
+                "note": f"Auto-confirm failed: {result.error}",
+                "url": result.clicked_url,
+            },
+            source="system",
+        )
+        upsert_state(request_id)
+
+    if ctx.obj.get("output") == "json":
+        import json as _json
+
+        typer.echo(
+            _json.dumps(
+                {
+                    "request_id": request_id,
+                    "success": result.success,
+                    "step": result.step,
+                    "clicked_url": result.clicked_url,
+                    "error": result.error,
+                    "dry_run": result.dry_run,
+                    "screenshot_before": result.screenshot_before,
+                    "screenshot_after": result.screenshot_after,
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return
+
+    if result.dry_run:
+        typer.echo(f"[DRY RUN] Would click: {result.clicked_url}")
+        return
+
+    if result.success:
+        typer.echo(f"Confirmation link clicked: {result.clicked_url}")
+        typer.echo(f"  Step: {result.step}")
+        if result.screenshot_before:
+            typer.echo(f"  Screenshot before: {result.screenshot_before}")
+        if result.screenshot_after:
+            typer.echo(f"  Screenshot after: {result.screenshot_after}")
+    else:
+        typer.echo(f"Failed: {result.error}", err=True)
+        if result.clicked_url:
+            typer.echo(f"  URL: {result.clicked_url}")
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
 # db
 # ---------------------------------------------------------------------------
 
