@@ -1,0 +1,14 @@
+Subject: Your data has been deleted
+From: privacy@databroker.com
+
+Dear Customer,
+
+This is to confirm that all personal data associated with your account
+has been permanently deleted from our systems in accordance with your
+deletion request (ticket #DEL-78901).
+
+No further action is required on your part.
+
+Sincerely,
+Privacy Operations
+DataBroker Inc.

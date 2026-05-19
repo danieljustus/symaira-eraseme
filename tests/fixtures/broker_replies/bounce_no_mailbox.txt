@@ -1,0 +1,10 @@
+From: MAILER-DAEMON@mx.broker.com
+Subject: Delivery Status Notification (Failure)
+
+This is an automatically generated Delivery Status Notification.
+
+Delivery to the following recipient failed permanently:
+
+privacy@old-broker-website.com
+
+Reason: 550 5.1.1 The email account that you tried to reach does not exist.
