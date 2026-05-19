@@ -1,12 +1,29 @@
 from __future__ import annotations
 
 import json
+import os
+from importlib import resources
 from pathlib import Path
 
 import jsonschema
 import yaml
 
 from openeraseme.registry.schema import Broker
+
+
+def _registry_dir() -> Path:
+    env_dir = os.environ.get("OPENERASEME_RESOURCES")
+    if env_dir:
+        return Path(env_dir)
+    pkg_root = resources.files("openeraseme")
+    candidate = Path(pkg_root) / "registry"
+    if candidate.exists() and (candidate / "brokers").exists():
+        return candidate
+    for parent in Path(pkg_root).parents:
+        if (parent / "registry" / "brokers").exists():
+            return parent / "registry"
+    msg = "Could not find registry directory"
+    raise FileNotFoundError(msg)
 
 
 def _load_broker_schema() -> dict:
@@ -16,10 +33,7 @@ def _load_broker_schema() -> dict:
     the repo root.  It is the single source of truth — pydantic models are
     derived from it (validated through testing).
     """
-    here = Path(__file__).resolve()
-    # Walk up from src/openeraseme/registry/ to repo root
-    repo_root = here.parents[3]
-    schema_path = repo_root / "registry" / "schemas" / "broker.schema.json"
+    schema_path = _registry_dir() / "schemas" / "broker.schema.json"
     if not schema_path.exists():
         msg = f"Broker schema not found at {schema_path}"
         raise FileNotFoundError(msg)
@@ -60,9 +74,7 @@ def load_all_brokers(
     category: str | None = None,
 ) -> list[Broker]:
     if registry_dir is None:
-        here = Path(__file__).resolve()
-        repo_root = here.parents[3]
-        registry_dir = repo_root / "registry" / "brokers"
+        registry_dir = _registry_dir() / "brokers"
 
     registry_path = Path(registry_dir)
     brokers: list[Broker] = []
