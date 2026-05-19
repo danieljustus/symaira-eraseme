@@ -15,11 +15,15 @@ data brokers. It provides:
 ```bash
 uv sync
 uv pip install -e .
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
 openeraseme init-profile
 openeraseme brokers list --jurisdiction GDPR
 openeraseme plan --jurisdiction GDPR --max 10
 openeraseme execute --campaign initial --batch-size 5
 ```
+
+See `.env.example` for all supported environment variables.
 
 ## Documentation
 
