@@ -8,6 +8,7 @@ from rich.console import Console as _RichConsole
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
+from rich.text import Text
 
 console = _RichConsole()
 
@@ -34,7 +35,7 @@ def print_warning(message: str) -> None:
 
 def print_panel(title: str, content: str, **kwargs: Any) -> None:
     """Print content inside a rich Panel."""
-    panel = Panel(content, title=title, **kwargs)
+    panel = Panel(Text(content), title=title, **kwargs)
     console.print(panel)
 
 

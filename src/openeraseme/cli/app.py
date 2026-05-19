@@ -111,15 +111,16 @@ app.add_typer(schedule_app)
 def _render(output_format: str, result: str, result_obj: CliResult | None = None) -> None:
     """Print the result of a command handler, formatted appropriately.
 
-    For JSON output the raw string is printed as-is.
+    For JSON output the raw string is printed as-is (soft_wrap to avoid
+    rich inserting line breaks into the serialized data).
     For text output the result is wrapped in a rich Panel when the content
     spans multiple lines or carries an error.
     """
     if output_format == "json":
         if result_obj is not None:
-            console.print(result_obj.to_json())
+            console.print(result_obj.to_json(), markup=False, soft_wrap=True)
         else:
-            console.print(result)
+            console.print(result, markup=False, soft_wrap=True)
         return
 
     if result_obj is not None and not result_obj.success:
@@ -128,7 +129,7 @@ def _render(output_format: str, result: str, result_obj: CliResult | None = None
 
     # Single-line responses use plain text
     if "\n" not in result.strip():
-        console.print(result)
+        console.print(result, markup=False, soft_wrap=True)
         return
 
     # Multi-line responses get a panel
@@ -153,7 +154,7 @@ def main(ctx: typer.Context, output: OutputFormat = OutputFormat.text) -> None:
 @app.command()
 def version() -> None:
     result = handle_version()
-    console.print(result)
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @app.command()
@@ -184,7 +185,7 @@ def render_template(
     broker_website: str = typer.Option("", help="Broker website URL"),
 ) -> None:
     result = handle_render_template(template, broker_name, broker_website)
-    console.print(result)
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @accounts_app.command()
@@ -207,7 +208,7 @@ def add(
 def list_cmd() -> None:
     result = handle_account_list()
     if result.startswith("No"):
-        console.print(result)
+        console.print(result, markup=False, soft_wrap=True)
         return
     rows = []
     for line in result.strip().split("\n"):
@@ -217,13 +218,13 @@ def list_cmd() -> None:
     if rows:
         print_table("Accounts", ["Email", "Provider"], rows)
     else:
-        console.print(result)
+        console.print(result, markup=False, soft_wrap=True)
 
 
 @accounts_app.command()
 def remove(email: str = typer.Argument(help="Email address to remove")) -> None:
     result = handle_account_remove(email)
-    console.print(result)
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @plan_app.command()
