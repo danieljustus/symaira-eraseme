@@ -738,14 +738,23 @@ def run_web_form(
     identity_fields: dict[str, str] = {}
     if profile_exists():
         profile = load_profile()
+
+        name_parts = profile.full_name.split(None, 1)
+        first_name = name_parts[0] if name_parts else profile.full_name
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+
         identity_fields = {
             "full_name": profile.full_name,
+            "first_name": first_name,
+            "last_name": last_name,
             "email": profile.email_addresses[0] if profile.email_addresses else "",
+            "phone_number": profile.phone_numbers[0] if profile.phone_numbers else "",
         }
         for i, addr in enumerate(profile.addresses):
             identity_fields[f"address_street_{i}"] = addr.street
             identity_fields[f"address_city_{i}"] = addr.city
             identity_fields[f"address_zip_{i}"] = addr.postal_code
+            identity_fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
             identity_fields[f"address_country_{i}"] = addr.country
 
     typer.echo(f"Running web form for {broker.name} ({url})")

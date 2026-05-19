@@ -1,0 +1,38 @@
+id: verisk-eu
+name: Verisk Analytics (EU)
+website: https://www.verisk.com
+category: analytics
+jurisdictions:
+  - GB
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 4
+priority: medium
+
+opt_out:
+  - type: web_form
+    url: https://www.verisk.com/privacy/opt-out
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#firstName": "${full_name}"
+            "#lastName": "${last_name}"
+            "#emailAddress": "${email}"
+        - select:
+            "#optOutReason": "GDPR Right to Erasure"
+        - click: "#submitOptOut"
+        - wait_for: ".confirmation-panel"
+        - screenshot: "result"
+      timeout_seconds: 45.0
+      rate_limit_delay: 2.0
+
+verification:
+  ack_keywords:
+    - "submitted"
+    - "request received"
+  rejection_keywords:
+    - "cannot process"
+  human_required_keywords:
+    - "identity"
