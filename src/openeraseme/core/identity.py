@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 from pathlib import Path
 
 import keyring
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from openeraseme.registry.schema import IdentityProfile
+
+logger = logging.getLogger(__name__)
 
 SERVICE_NAME = "openeraseme"
 KEYRING_USERNAME = "identity-master-key"
@@ -48,12 +52,12 @@ def save_profile(
     aesgcm = AESGCM(key)
     nonce = os.urandom(NONCE_LENGTH)
 
-    payload = profile.model_dump_json(indent=2).encode("utf-8")
-    ciphertext = aesgcm.encrypt(nonce, payload, None)
-
     header = json.dumps(
         {"version": 1, "nonce": nonce.hex(), "algorithm": "AES-256-GCM"},
     ).encode("utf-8")
+
+    payload = profile.model_dump_json(indent=2).encode("utf-8")
+    ciphertext = aesgcm.encrypt(nonce, payload, header)
 
     with open(target, "wb") as f:
         f.write(header + b"\n" + ciphertext)
@@ -77,7 +81,14 @@ def load_profile(path: str | None = None) -> IdentityProfile:
     header = json.loads(header_bytes)
     nonce = bytes.fromhex(header["nonce"])
 
-    plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+    try:
+        plaintext = aesgcm.decrypt(nonce, ciphertext, header_bytes)
+    except InvalidTag:
+        logger.warning(
+            "AAD verification failed — retrying without AAD for legacy file. "
+            "Re-encrypt the profile to upgrade: openeraseme save-profile",
+        )
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
     data = json.loads(plaintext.decode("utf-8"))
 
     return IdentityProfile.model_validate(data)
