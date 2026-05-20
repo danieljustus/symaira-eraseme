@@ -49,17 +49,9 @@ def _next_status(event_type: str) -> str | None:
     return mapping.get(event_type)
 
 
-def rebuild_state(request_id: int) -> dict[str, Any]:
-    conn = get_connection()
-    events = conn.execute(
-        """SELECT id, event_type, occurred_at, payload_json
-           FROM request_events
-           WHERE request_id = ?
-           ORDER BY occurred_at ASC, id ASC""",
-        (request_id,),
-    ).fetchall()
-
-    state: dict[str, Any] = {
+def _new_blank_state(request_id: int) -> dict[str, Any]:
+    """Return a default/blank state for a request before any events."""
+    return {
         "request_id": request_id,
         "current_status": "PLANNED",
         "last_event_id": 0,
@@ -72,6 +64,14 @@ def rebuild_state(request_id: int) -> dict[str, Any]:
         "reminders_sent": 0,
         "escalation_level": 0,
     }
+
+
+def _accumulate_state(
+    request_id: int,
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build state dict from an ordered list of event dicts."""
+    state = _new_blank_state(request_id)
 
     for event in events:
         event_id = event["id"]
@@ -110,6 +110,18 @@ def rebuild_state(request_id: int) -> dict[str, Any]:
     return state
 
 
+def rebuild_state(request_id: int) -> dict[str, Any]:
+    conn = get_connection()
+    events = conn.execute(
+        """SELECT id, event_type, occurred_at, payload_json
+           FROM request_events
+           WHERE request_id = ?
+           ORDER BY occurred_at ASC, id ASC""",
+        (request_id,),
+    ).fetchall()
+    return _accumulate_state(request_id, events)
+
+
 def upsert_state(request_id: int) -> dict[str, Any]:
     state = rebuild_state(request_id)
     conn = get_connection()
@@ -139,9 +151,55 @@ def upsert_state(request_id: int) -> dict[str, Any]:
 
 def rebuild_all_states() -> int:
     conn = get_connection()
-    request_ids = conn.execute("SELECT id FROM removal_requests").fetchall()
-    count = 0
-    for r in request_ids:
-        upsert_state(r["id"])
-        count += 1
-    return count
+
+    # Single JOIN: get ALL events for ALL requests in O(1) queries
+    rows = conn.execute(
+        """SELECT r.id AS request_id,
+                  e.id AS id,
+                  e.event_type,
+                  e.occurred_at,
+                  e.payload_json
+           FROM removal_requests r
+           LEFT JOIN request_events e ON e.request_id = r.id
+           ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
+    ).fetchall()
+
+    # Bucket events by request_id (same key names as rebuild_state query)
+    buckets: dict[int, list[dict[str, Any]]] = {}
+    for row in rows:
+        rid = row["request_id"]
+        if rid not in buckets:
+            buckets[rid] = []
+        if row["id"] is not None:
+            buckets[rid].append(row)
+
+    # Build all states using the shared accumulation logic
+    states = [_accumulate_state(rid, events) for rid, events in buckets.items()]
+
+    # Bulk upsert via executemany
+    conn.executemany(
+        """INSERT OR REPLACE INTO request_state
+           (request_id, current_status, last_event_id, last_event_at,
+            sent_at, acknowledged_at, resolved_at, deadline_at,
+            next_action_at, reminders_sent, escalation_level)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                s["request_id"],
+                s["current_status"],
+                s["last_event_id"],
+                s["last_event_at"],
+                s["sent_at"],
+                s["acknowledged_at"],
+                s["resolved_at"],
+                s["deadline_at"],
+                s["next_action_at"],
+                s["reminders_sent"],
+                s["escalation_level"],
+            )
+            for s in states
+        ],
+    )
+    conn.commit()
+
+    return len(states)

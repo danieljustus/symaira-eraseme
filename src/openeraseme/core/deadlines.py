@@ -272,7 +272,7 @@ def apply_tick_actions(
         return []
 
     from openeraseme.core.events import append_event
-    from openeraseme.core.projection import upsert_state
+    from openeraseme.core.projection import rebuild_all_states
 
     results: list[dict[str, Any]] = []
     for action in actions:
@@ -296,7 +296,6 @@ def apply_tick_actions(
                 payload=action.payload,
                 source="scheduler",
             )
-            upsert_state(action.request_id)
             results.append(
                 {
                     "request_id": action.request_id,
@@ -319,6 +318,9 @@ def apply_tick_actions(
                     "error": str(e),
                 }
             )
+
+    # Batch-rebuild all states in a single O(1) pass
+    rebuild_all_states()
 
     return results
 
