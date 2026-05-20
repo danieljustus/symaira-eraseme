@@ -155,30 +155,31 @@ def list_removal_requests(
     status: str | None = None,
     broker_id: str | None = None,
 ) -> list[dict[str, Any]]:
+    """List removal requests with optional filters.
+
+    WARNING: The WHERE clause MUST remain a fixed string — never use
+    f-strings or string concatenation to build SQL. Filtering is handled
+    via ``(? IS NULL OR col = ?)`` so the query text never changes.
+    """
     conn = get_connection()
-    conditions: list[str] = []
-    params: list[str] = []
-
-    if campaign_id:
-        conditions.append("r.campaign_id = ?")
-        params.append(campaign_id)
-    if status:
-        conditions.append("s.current_status = ?")
-        params.append(status)
-    if broker_id:
-        conditions.append("r.broker_id = ?")
-        params.append(broker_id)
-
-    where = " AND ".join(conditions) if conditions else "1=1"
     rows = conn.execute(
-        f"""SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                   r.jurisdiction, r.template_id,
-                   s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
-                   s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
-            FROM removal_requests r
-            LEFT JOIN request_state s ON s.request_id = r.id
-            WHERE {where}
-            ORDER BY r.created_at ASC""",
-        params,
+        """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
+                  r.jurisdiction, r.template_id,
+                  s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
+                  s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
+           FROM removal_requests r
+           LEFT JOIN request_state s ON s.request_id = r.id
+           WHERE (? IS NULL OR r.campaign_id = ?)
+             AND (? IS NULL OR s.current_status = ?)
+             AND (? IS NULL OR r.broker_id = ?)
+           ORDER BY r.created_at ASC""",
+        (
+            campaign_id or None,
+            campaign_id or None,
+            status or None,
+            status or None,
+            broker_id or None,
+            broker_id or None,
+        ),
     ).fetchall()
     return [dict(r) for r in rows]
