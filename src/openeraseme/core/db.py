@@ -11,10 +11,12 @@ import atexit
 import hashlib
 import logging
 import os
+import signal
 import sqlite3
 import tempfile
 import threading
 from base64 import urlsafe_b64encode
+from contextlib import contextmanager
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -76,6 +78,7 @@ def _decrypt_to_temp(path: Path) -> Path:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
         tmp.write(decrypted)
         tmp_path = Path(tmp.name)
+    os.chmod(tmp_path, 0o600)
     _DB_TEMP[path.resolve()] = tmp_path
     return tmp_path
 
@@ -96,10 +99,27 @@ def _cleanup_temp_files() -> None:
         try:
             if tmp.exists():
                 _encrypt_file(tmp, orig)
-                tmp.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+        finally:
+            try:
+                if tmp.exists():
+                    tmp.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
+
+
+def _handle_sigterm(signum: int, frame: object) -> None:
+    """SIGTERM handler that cleans up temp files before exit."""
+    logger.info("Received signal %d, cleaning up encrypted DB temp files ...", signum)
+    _cleanup_temp_files()
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+# Register SIGTERM handler (SIGKILL cannot be caught, but SIGTERM can)
+signal.signal(signal.SIGTERM, _handle_sigterm)
 
 
 def _db_path(path: str | None = None) -> Path:
@@ -139,14 +159,37 @@ def close_connection() -> None:
         try:
             if tmp.exists():
                 _encrypt_file(tmp, orig)
-                if tmp != orig:
-                    tmp.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+        finally:
+            try:
+                if tmp.exists() and tmp != orig:
+                    tmp.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
 
     if hasattr(_local, "db_path"):
         _local.db_path = None
+
+
+@contextmanager
+def connection_context(path: str | None = None):
+    """Context manager for DB connections with automatic cleanup.
+
+    When encryption is enabled, the decrypted temp file is
+    re-encrypted and removed when the context exits.
+
+    Usage::
+
+        with connection_context() as conn:
+            conn.execute(...)
+    """
+    conn = get_connection(path)
+    try:
+        yield conn
+    finally:
+        close_connection()
 
 
 def init_db(path: str | None = None) -> Path:
