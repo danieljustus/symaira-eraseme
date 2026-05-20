@@ -1,3 +1,5 @@
+"""Typer CLI application with rich-formatted output."""
+
 from __future__ import annotations
 
 import os
@@ -5,6 +7,8 @@ from enum import StrEnum
 
 import typer
 
+from openeraseme.cli.console import console, print_error, print_panel, print_success, print_table
+from openeraseme.cli.types import CliResult
 from openeraseme.services.account import (
     handle_account_add,
     handle_account_list,
@@ -101,6 +105,46 @@ schedule_app = typer.Typer(
 app.add_typer(schedule_app)
 
 
+# ── helpers ──────────────────────────────────────────────────────────────
+
+
+def _render(output_format: str, result: str, result_obj: CliResult | None = None) -> None:
+    """Print the result of a command handler, formatted appropriately.
+
+    For JSON output the raw string is printed as-is (soft_wrap to avoid
+    rich inserting line breaks into the serialized data).
+    For text output the result is wrapped in a rich Panel when the content
+    spans multiple lines or carries an error.
+    """
+    if output_format == "json":
+        if result_obj is not None:
+            console.print(result_obj.to_json(), markup=False, soft_wrap=True)
+        else:
+            console.print(result, markup=False, soft_wrap=True)
+        return
+
+    if result_obj is not None and not result_obj.success:
+        print_error(result_obj.message)
+        return
+
+    # Single-line responses use plain text
+    if "\n" not in result.strip():
+        console.print(result, markup=False, soft_wrap=True)
+        return
+
+    # Multi-line responses get a panel
+    print_panel("Output", result.strip())
+
+
+def _render_error(message: str) -> None:
+    """Print an error message and exit."""
+    print_error(message)
+    raise typer.Exit(1)
+
+
+# ── commands ─────────────────────────────────────────────────────────────
+
+
 @app.callback()
 def main(ctx: typer.Context, output: OutputFormat = OutputFormat.text) -> None:
     ctx.ensure_object(dict)
@@ -109,7 +153,8 @@ def main(ctx: typer.Context, output: OutputFormat = OutputFormat.text) -> None:
 
 @app.command()
 def version() -> None:
-    typer.echo(handle_version())
+    result = handle_version()
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @app.command()
@@ -117,12 +162,18 @@ def init_profile(
     full_name: str = typer.Option(..., prompt="Full name"),
     email: str = typer.Option(..., prompt="Email address"),
 ) -> None:
-    typer.echo(handle_init_profile(full_name, email))
+    result = handle_init_profile(full_name, email)
+    print_success(result)
 
 
 @app.command()
 def show_profile() -> None:
-    typer.echo(handle_show_profile())
+    try:
+        result = handle_show_profile()
+    except typer.Exit:
+        raise
+    info = "\n".join(line.strip() for line in result.split("\n") if line.strip())
+    print_panel("Profile", info)
 
 
 @app.command()
@@ -133,7 +184,8 @@ def render_template(
     broker_name: str = typer.Option("", help="Name of the data broker"),
     broker_website: str = typer.Option("", help="Broker website URL"),
 ) -> None:
-    typer.echo(handle_render_template(template, broker_name, broker_website))
+    result = handle_render_template(template, broker_name, broker_website)
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @accounts_app.command()
@@ -148,17 +200,31 @@ def add(
         help="OAuth2 client secret",
     ),
 ) -> None:
-    typer.echo(handle_account_add(provider, email, client_id, client_secret))
+    result = handle_account_add(provider, email, client_id, client_secret)
+    print_success(result)
 
 
-@accounts_app.command()
+@accounts_app.command(name="list")
 def list_cmd() -> None:
-    typer.echo(handle_account_list())
+    result = handle_account_list()
+    if result.startswith("No"):
+        console.print(result, markup=False, soft_wrap=True)
+        return
+    rows = []
+    for line in result.strip().split("\n"):
+        line = line.strip()
+        if line:
+            rows.append(line.split(None, 1))
+    if rows:
+        print_table("Accounts", ["Email", "Provider"], rows)
+    else:
+        console.print(result, markup=False, soft_wrap=True)
 
 
 @accounts_app.command()
 def remove(email: str = typer.Argument(help="Email address to remove")) -> None:
-    typer.echo(handle_account_remove(email))
+    result = handle_account_remove(email)
+    console.print(result, markup=False, soft_wrap=True)
 
 
 @plan_app.command()
@@ -183,15 +249,14 @@ def create(
         help="Maximum brokers to plan",
     ),
 ) -> None:
-    typer.echo(
-        handle_plan_create(
-            campaign_id,
-            jurisdiction,
-            priority,
-            max_brokers,
-            ctx.obj["output"],
-        )
+    result = handle_plan_create(
+        campaign_id,
+        jurisdiction,
+        priority,
+        max_brokers,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @plan_app.command(name="show")
@@ -200,7 +265,8 @@ def plan_show(
     campaign_id: str = typer.Option(None, "--campaign", help="Filter by campaign"),
     status: str = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
-    typer.echo(handle_plan_show(campaign_id, status, ctx.obj["output"]))
+    result = handle_plan_show(campaign_id, status, ctx.obj["output"])
+    _render(ctx.obj["output"], result)
 
 
 @app.command()
@@ -233,17 +299,16 @@ def execute(
         help="Pre-issued consent token",
     ),
 ) -> None:
-    typer.echo(
-        handle_execute(
-            campaign_id,
-            account,
-            batch_size,
-            dry_run,
-            yes,
-            consent_token,
-            ctx.obj["output"],
-        )
+    result = handle_execute(
+        campaign_id,
+        account,
+        batch_size,
+        dry_run,
+        yes,
+        consent_token,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command()
@@ -270,16 +335,15 @@ def grant(
         help="List active tokens",
     ),
 ) -> None:
-    typer.echo(
-        handle_grant(
-            command,
-            ttl,
-            revoke,
-            revoke_all,
-            list_tokens,
-            ctx.obj["output"],
-        )
+    result = handle_grant(
+        command,
+        ttl,
+        revoke,
+        revoke_all,
+        list_tokens,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @events_app.command(name="show")
@@ -287,7 +351,8 @@ def events_show(
     ctx: typer.Context,
     request_id: int = typer.Argument(..., help="Request ID"),
 ) -> None:
-    typer.echo(handle_events_show(request_id, ctx.obj["output"]))
+    result = handle_events_show(request_id, ctx.obj["output"])
+    _render(ctx.obj["output"], result)
 
 
 @requests_app.command(name="list")
@@ -305,14 +370,13 @@ def requests_list(
         help="Filter by broker ID",
     ),
 ) -> None:
-    typer.echo(
-        handle_requests_list(
-            campaign_id,
-            status,
-            broker_id,
-            ctx.obj["output"],
-        )
+    result = handle_requests_list(
+        campaign_id,
+        status,
+        broker_id,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="poll-inbox")
@@ -338,18 +402,17 @@ def poll_inbox(
         "IMAP password",
         hide_input=True,
     )
-    typer.echo(
-        handle_poll_inbox(
-            host,
-            port,
-            username,
-            since_days,
-            ssl,
-            campaign_id,
-            password,
-            ctx.obj["output"],
-        )
+    result = handle_poll_inbox(
+        host,
+        port,
+        username,
+        since_days,
+        ssl,
+        campaign_id,
+        password,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command()
@@ -361,7 +424,8 @@ def tick(
         help="Show actions without executing",
     ),
 ) -> None:
-    typer.echo(handle_tick(dry_run, ctx.obj["output"]))
+    result = handle_tick(dry_run, ctx.obj["output"])
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="classify-reply")
@@ -388,15 +452,14 @@ def classify_reply(
         help="Save classification result to DB",
     ),
 ) -> None:
-    typer.echo(
-        handle_classify_reply(
-            request_id,
-            api_key,
-            model,
-            save,
-            ctx.obj["output"],
-        )
+    result = handle_classify_reply(
+        request_id,
+        api_key,
+        model,
+        save,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="run-web-form")
@@ -417,14 +480,13 @@ def run_web_form(
         help="Directory for screenshots",
     ),
 ) -> None:
-    typer.echo(
-        handle_run_web_form(
-            broker_id,
-            headed,
-            screenshot_dir,
-            ctx.obj["output"],
-        )
+    result = handle_run_web_form(
+        broker_id,
+        headed,
+        screenshot_dir,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="auto-confirm")
@@ -450,15 +512,14 @@ def auto_confirm_cmd(
         help="Simulate without clicking",
     ),
 ) -> None:
-    typer.echo(
-        handle_auto_confirm(
-            request_id,
-            headed,
-            screenshot_dir,
-            dry_run,
-            ctx.obj["output"],
-        )
+    result = handle_auto_confirm(
+        request_id,
+        headed,
+        screenshot_dir,
+        dry_run,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="generate-rebuttal")
@@ -485,15 +546,14 @@ def generate_rebuttal_cmd(
         help="Save rebuttal to DB",
     ),
 ) -> None:
-    typer.echo(
-        handle_generate_rebuttal(
-            request_id,
-            api_key,
-            model,
-            save,
-            ctx.obj["output"],
-        )
+    result = handle_generate_rebuttal(
+        request_id,
+        api_key,
+        model,
+        save,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="list")
@@ -510,13 +570,12 @@ def manual_tasks_list(
         help="Filter by request ID",
     ),
 ) -> None:
-    typer.echo(
-        handle_manual_tasks_list(
-            status,
-            request_id,
-            ctx.obj["output"],
-        )
+    result = handle_manual_tasks_list(
+        status,
+        request_id,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="show")
@@ -524,7 +583,8 @@ def manual_tasks_show(
     ctx: typer.Context,
     task_id: int = typer.Argument(..., help="Task ID to show"),
 ) -> None:
-    typer.echo(handle_manual_tasks_show(task_id, ctx.obj["output"]))
+    result = handle_manual_tasks_show(task_id, ctx.obj["output"])
+    _render(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="complete")
@@ -540,13 +600,12 @@ def manual_tasks_complete(
         help="Optional completion notes",
     ),
 ) -> None:
-    typer.echo(
-        handle_manual_tasks_complete(
-            task_id,
-            notes,
-            ctx.obj["output"],
-        )
+    result = handle_manual_tasks_complete(
+        task_id,
+        notes,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="solve-captcha")
@@ -576,15 +635,14 @@ def solve_captcha_cmd(
         help="Page URL where captcha appears",
     ),
 ) -> None:
-    typer.echo(
-        handle_solve_captcha(
-            provider,
-            api_key,
-            site_key,
-            page_url,
-            ctx.obj["output"],
-        )
+    result = handle_solve_captcha(
+        provider,
+        api_key,
+        site_key,
+        page_url,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="generate-scheduler")
@@ -636,20 +694,19 @@ def generate_scheduler_cmd(
         help="Preview files without writing",
     ),
 ) -> None:
-    typer.echo(
-        handle_generate_scheduler(
-            platform,
-            output_dir,
-            tick_hour,
-            tick_minute,
-            poll_hours,
-            project_dir,
-            openeraseme_bin,
-            venv_activate,
-            dry_run,
-            ctx.obj["output"],
-        )
+    result = handle_generate_scheduler(
+        platform,
+        output_dir,
+        tick_hour,
+        tick_minute,
+        poll_hours,
+        project_dir,
+        openeraseme_bin,
+        venv_activate,
+        dry_run,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @schedule_app.command()
@@ -676,15 +733,14 @@ def schedule_install(
         help="Skip confirmation prompt",
     ),
 ) -> None:
-    typer.echo(
-        handle_schedule_install(
-            platform,
-            tick_hour,
-            tick_minute,
-            yes,
-            ctx.obj["output"],
-        )
+    result = handle_schedule_install(
+        platform,
+        tick_hour,
+        tick_minute,
+        yes,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @schedule_app.command(name="uninstall")
@@ -695,7 +751,8 @@ def schedule_uninstall(
         help="Target platform: cron, launchd, systemd (auto-detect)",
     ),
 ) -> None:
-    typer.echo(handle_schedule_uninstall(platform))
+    result = handle_schedule_uninstall(platform)
+    _render("text", result)
 
 
 @schedule_app.command()
@@ -707,7 +764,8 @@ def schedule_status(
         help="Target platform: cron, launchd, systemd (auto-detect)",
     ),
 ) -> None:
-    typer.echo(handle_schedule_status(platform, ctx.obj["output"]))
+    result = handle_schedule_status(platform, ctx.obj["output"])
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="generate-dashboard")
@@ -729,14 +787,13 @@ def generate_dashboard_cmd(
         help="Auto-refresh interval in seconds (0 = none)",
     ),
 ) -> None:
-    typer.echo(
-        handle_generate_dashboard(
-            output,
-            auto_open,
-            auto_refresh,
-            ctx.obj["output"],
-        )
+    result = handle_generate_dashboard(
+        output,
+        auto_open,
+        auto_refresh,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command(name="generate-report")
@@ -763,20 +820,20 @@ def generate_report_cmd(
         help="Include all campaigns (not just specified one)",
     ),
 ) -> None:
-    typer.echo(
-        handle_generate_report(
-            campaign_id,
-            format,
-            output,
-            all_campaigns,
-            ctx.obj["output"],
-        )
+    result = handle_generate_report(
+        campaign_id,
+        format,
+        output,
+        all_campaigns,
+        ctx.obj["output"],
     )
+    _render(ctx.obj["output"], result)
 
 
 @app.command()
 def db_init() -> None:
-    typer.echo(handle_db_init())
+    result = handle_db_init()
+    print_success(result)
 
 
 if __name__ == "__main__":

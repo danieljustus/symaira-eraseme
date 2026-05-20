@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from openeraseme.cli import app
+from openeraseme.cli.types import CliResult
 
 runner = CliRunner()
 
@@ -58,3 +59,36 @@ class TestGrant:
         result = runner.invoke(app, ["grant", "--revoke-all"])
         assert result.exit_code == 0
         assert "No active tokens to revoke" in result.stdout
+
+
+class TestCliResult:
+    """Tests for the structured CliResult type."""
+
+    def test_defaults(self) -> None:
+        r = CliResult()
+        assert r.success is True
+        assert r.data == {}
+        assert r.error is None
+        assert r.message == ""
+
+    def test_with_message(self) -> None:
+        r = CliResult(data={"message": "done"})
+        assert r.message == "done"
+
+    def test_with_error(self) -> None:
+        r = CliResult(success=False, error="something went wrong")
+        assert r.success is False
+        assert r.message == "something went wrong"
+
+    def test_to_json_success(self) -> None:
+        r = CliResult(data={"message": "ok", "count": 3})
+        j = r.to_json()
+        assert '"success": true' in j
+        assert '"message": "ok"' in j
+        assert '"count": 3' in j
+
+    def test_to_json_error(self) -> None:
+        r = CliResult(success=False, error="fail")
+        j = r.to_json()
+        assert '"success": false' in j
+        assert '"error": "fail"' in j

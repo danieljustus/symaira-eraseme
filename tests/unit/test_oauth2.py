@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
+import secrets
+import time
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from openeraseme.adapters.email.oauth2 import (
     OAuth2Error,
+    OAuth2StateError,
     authorize_url,
     exchange_code,
 )
@@ -32,21 +37,122 @@ def _fake_keyring():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _state_file(tmp_path: Path) -> None:
+    state_file = tmp_path / "oauth2_state.json"
+    with (
+        patch("openeraseme.adapters.email.oauth2._get_state_path", return_value=state_file),
+    ):
+        yield
+
+
 class TestAuthorizeUrl:
     def test_generates_gmail_url(self):
         url = authorize_url("gmail", "my-client-id", "http://localhost:8899/callback")
         assert "accounts.google.com" in url
         assert "client_id=my-client-id" in url
         assert "redirect_uri=http%3A%2F%2Flocalhost%3A8899%2Fcallback" in url
+        assert "state=" in url
 
     def test_generates_outlook_url(self):
         url = authorize_url("outlook", "my-client-id", "http://localhost:8899/callback")
         assert "login.microsoftonline.com" in url
         assert "client_id=my-client-id" in url
+        assert "state=" in url
 
     def test_unknown_provider_raises(self):
         with pytest.raises(OAuth2Error, match="Unknown"):
             authorize_url("unknown", "id", "http://localhost/")
+
+    def test_state_is_random(self):
+        url1 = authorize_url("gmail", "id1", "http://localhost:8899/callback")
+        url2 = authorize_url("gmail", "id2", "http://localhost:8899/callback")
+        assert url1 != url2
+        # Extract state values from each URL
+        import urllib.parse
+
+        s1 = urllib.parse.parse_qs(urllib.parse.urlsplit(url1).query).get("state", [""])[0]
+        s2 = urllib.parse.parse_qs(urllib.parse.urlsplit(url2).query).get("state", [""])[0]
+        assert s1 and s2
+        assert s1 != s2
+
+    def test_state_stored_in_file(self):
+        from openeraseme.adapters.email.oauth2 import _get_state_path
+
+        url = authorize_url("gmail", "id", "http://localhost/")
+        state_path = _get_state_path()
+        assert state_path.exists()
+        raw = state_path.read_bytes()
+        assert len(raw) > 0
+        # Verify we can parse it and it has our state
+        import urllib.parse
+
+        state_val = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query).get("state")[0]
+        stored = json.loads(state_path.read_text())
+        assert state_val in stored
+        assert stored[state_val]["provider"] == "gmail"
+        assert stored[state_val]["expires_at"] > time.time()
+
+
+class TestOAuth2StateValidation:
+    def test_valid_state_passes(self):
+        from openeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
+
+        state = secrets.token_urlsafe(16)
+        _store_oauth2_state(state, "gmail")
+        _validate_oauth2_state(state)  # should not raise
+
+    def test_missing_state_raises(self):
+        from openeraseme.adapters.email.oauth2 import _validate_oauth2_state
+
+        with pytest.raises(OAuth2StateError, match="Missing"):
+            _validate_oauth2_state(None)
+
+    def test_empty_state_raises(self):
+        from openeraseme.adapters.email.oauth2 import _validate_oauth2_state
+
+        with pytest.raises(OAuth2StateError, match="Missing"):
+            _validate_oauth2_state("")
+
+    def test_mismatched_state_raises(self):
+        from openeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
+
+        _store_oauth2_state("real-state", "gmail")
+        with pytest.raises(OAuth2StateError, match="mismatch"):
+            _validate_oauth2_state("fake-state")
+
+    def test_expired_state_raises(self):
+        from openeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
+
+        state = secrets.token_urlsafe(16)
+        state_path = _get_state_path()
+        expired_record = {state: {"provider": "gmail", "expires_at": time.time() - 10}}
+        state_path.write_text(json.dumps(expired_record))
+        with pytest.raises(OAuth2StateError, match="expired"):
+            _validate_oauth2_state(state)
+
+    def test_state_cleaned_after_validation(self):
+        from openeraseme.adapters.email.oauth2 import (
+            _get_state_path,
+            _store_oauth2_state,
+            _validate_oauth2_state,
+        )
+
+        state = secrets.token_urlsafe(16)
+        _store_oauth2_state(state, "gmail")
+        _validate_oauth2_state(state)
+        stored = json.loads(_get_state_path().read_text())
+        assert state not in stored
+
+    def test_no_state_file_raises(self):
+        from openeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
+
+        # Ensure the file doesn't exist
+        state_path = _get_state_path()
+        if state_path.exists():
+            state_path.unlink()
+        with pytest.raises(OAuth2StateError, match="No OAuth2 state stored"):
+            _validate_oauth2_state("any-state")
 
 
 class TestExchangeCode:
