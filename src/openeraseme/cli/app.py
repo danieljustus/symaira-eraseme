@@ -9,6 +9,7 @@ import typer
 
 from openeraseme.cli.console import console, print_error, print_panel, print_success, print_table
 from openeraseme.cli.types import CliResult
+from openeraseme.registry.sync import handle_registry_sync
 from openeraseme.services.account import (
     handle_account_add,
     handle_account_list,
@@ -16,6 +17,7 @@ from openeraseme.services.account import (
 )
 from openeraseme.services.auto_confirm import handle_auto_confirm
 from openeraseme.services.broker import handle_brokers_list, handle_brokers_show
+from openeraseme.services.calendar import handle_calendar
 from openeraseme.services.campaign import (
     handle_execute,
     handle_plan_create,
@@ -24,6 +26,7 @@ from openeraseme.services.campaign import (
 from openeraseme.services.captcha import handle_solve_captcha
 from openeraseme.services.consent import handle_grant
 from openeraseme.services.db import handle_db_init
+from openeraseme.services.export import handle_export
 from openeraseme.services.inbox import handle_poll_inbox
 from openeraseme.services.manual_task import (
     handle_manual_tasks_complete,
@@ -54,7 +57,9 @@ from openeraseme.services.scheduler import (
     handle_schedule_status,
     handle_schedule_uninstall,
 )
+from openeraseme.services.status import handle_status
 from openeraseme.services.tick import handle_tick
+from openeraseme.services.validate import handle_validate
 from openeraseme.services.web_form import handle_run_web_form
 
 
@@ -110,6 +115,12 @@ brokers_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(brokers_app)
+registry_app = typer.Typer(
+    name="registry",
+    help="Manage the broker registry (sync)",
+    no_args_is_help=True,
+)
+app.add_typer(registry_app)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────
@@ -878,6 +889,138 @@ def brokers_show_cmd(
     """Show full details of one broker by id."""
     result = handle_brokers_show(broker_id, output_format=ctx.obj["output"])
     _render(ctx.obj["output"], result)
+
+
+@registry_app.command(name="sync")
+def registry_sync_cmd(
+    ctx: typer.Context,
+    verify_signatures: bool = typer.Option(
+        False,
+        "--verify-signatures",
+        help="(v0.2) Verify maintainer GPG signatures on registry HEAD. "
+        "Currently a no-op accepted for forward compatibility.",
+    ),
+) -> None:
+    """Pull the latest broker definitions (git pull --ff-only for source installs)."""
+    result = handle_registry_sync(
+        verify_signatures=verify_signatures,
+        output_format=ctx.obj["output"],
+    )
+    _render(ctx.obj["output"], result)
+
+    if ctx.obj["output"] == "json":
+        import json as _json
+
+        try:
+            ok = bool(_json.loads(result).get("ok"))
+        except Exception:
+            ok = True
+    else:
+        ok = "ok: True" in result or "ok: False" not in result
+
+    if not ok:
+        raise typer.Exit(1)
+
+
+@app.command()
+def status(
+    ctx: typer.Context,
+    campaign: str = typer.Option(
+        None,
+        "--campaign",
+        help="Restrict to one campaign id (default: aggregate across all).",
+    ),
+) -> None:
+    """Show aggregated lifecycle status across removal requests."""
+    result = handle_status(campaign_id=campaign, output_format=ctx.obj["output"])
+    _render(ctx.obj["output"], result)
+
+
+@app.command(name="export")
+def export_cmd(
+    ctx: typer.Context,
+    fmt: str = typer.Option(
+        "json",
+        "--format",
+        help="Output format: json or csv (default: json).",
+    ),
+    output_file: str = typer.Option(
+        None,
+        "--output-file",
+        help="Path to write the export to (default: print to stdout).",
+    ),
+    campaign: str = typer.Option(
+        None,
+        "--campaign",
+        help="Restrict to one campaign id (default: all).",
+    ),
+) -> None:
+    """Export removal requests with full event history (GDPR record-keeping).
+
+    Use --output-file to write the file directly; otherwise the payload is
+    streamed to stdout (raw json/csv when --output text, wrapped when --output json).
+    """
+    if fmt not in ("json", "csv"):
+        _render_error(f"Unsupported --format {fmt!r}. Use 'json' or 'csv'.")
+    result = handle_export(
+        output_file=output_file,
+        fmt=fmt,
+        campaign_id=campaign,
+        output_format=ctx.obj["output"],
+    )
+    # When writing to a file in text mode we get a one-line summary; print raw.
+    # Otherwise raw payload for piping.
+    console.print(result, markup=False, soft_wrap=True)
+
+
+@app.command()
+def calendar(
+    ctx: typer.Context,
+    weeks: int = typer.Option(4, "--weeks", help="Horizon in weeks (default: 4)."),
+    campaign: str = typer.Option(
+        None,
+        "--campaign",
+        help="Restrict to one campaign id (default: all).",
+    ),
+) -> None:
+    """Show upcoming deadlines and scheduled tick actions over the next N weeks."""
+    result = handle_calendar(
+        weeks=weeks,
+        campaign_id=campaign,
+        output_format=ctx.obj["output"],
+    )
+    _render(ctx.obj["output"], result)
+
+
+@app.command()
+def validate(
+    ctx: typer.Context,
+    registry_dir: str = typer.Option(
+        None,
+        "--registry-dir",
+        help="Path to registry/brokers (default: bundled registry).",
+    ),
+) -> None:
+    """Validate every broker YAML against the JSON Schema and Pydantic model.
+
+    Exits non-zero if any file fails validation or duplicate ids are found.
+    """
+    result = handle_validate(registry_dir=registry_dir, output_format=ctx.obj["output"])
+    _render(ctx.obj["output"], result)
+
+    import json as _json
+
+    if ctx.obj["output"] == "json":
+        try:
+            data = _json.loads(result)
+            ok = bool(data.get("ok"))
+        except Exception:
+            ok = True
+    else:
+        ok = "OK — registry is valid." in result
+
+    if not ok:
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
