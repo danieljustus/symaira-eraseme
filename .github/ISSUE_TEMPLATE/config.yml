@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/danieljustus/OpenEraseMe/discussions
+    about: Please ask questions and discuss ideas in GitHub Discussions.
+  - name: Security
+    url: https://github.com/danieljustus/OpenEraseMe/security/policy
+    about: Please report security vulnerabilities privately.
