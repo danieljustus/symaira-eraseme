@@ -32,7 +32,13 @@ class TestIssueToken:
     def test_issue_returns_token_string(self):
         token = issue_token("execute")
         assert isinstance(token, str)
-        assert len(token) == 16
+        assert len(token) > 0
+
+    def test_issue_stores_token_in_payload(self, _isolated_consent_dir):
+        token = issue_token("execute")
+        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        payload = json.loads(token_file.read_text())
+        assert payload["token"] == token
 
     def test_issue_creates_token_file(self, _isolated_consent_dir):
         token = issue_token("execute")
@@ -83,6 +89,32 @@ class TestVerifyToken:
         verify_token("execute", token)
         token_file = _isolated_consent_dir / f"consent_{token}.json"
         assert not token_file.exists()
+
+    def test_token_mismatch_rejected(self, _isolated_consent_dir):
+        """Token stored in payload differs from token provided — forgery attempt."""
+        # Create a token file with a stored token that differs from the filename
+        token = "realtoken1234567890abc"
+        payload = {
+            "command": "execute",
+            "token": "differenttoken12345678",
+            "issued_at": int(time.time()),
+            "expires_at": int(time.time()) + 3600,
+        }
+        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file.write_text(json.dumps(payload))
+        assert verify_token("execute", token) is False
+
+    def test_old_format_token_still_works(self, _isolated_consent_dir):
+        """Backward compat: token file without stored token field still verifies."""
+        token = "oldformatok12345678"
+        payload = {
+            "command": "execute",
+            "issued_at": int(time.time()),
+            "expires_at": int(time.time()) + 3600,
+        }
+        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file.write_text(json.dumps(payload))
+        assert verify_token("execute", token) is True
 
 
 class TestConsumeToken:
@@ -203,18 +235,14 @@ class TestEdgeCases:
         """Token file without a command field should not verify."""
         token = "missingcmd12345678"
         payload = {"not_command": "execute", "expires_at": int(time.time()) + 3600}
-        (_isolated_consent_dir / f"consent_{token}.json").write_text(
-            json.dumps(payload)
-        )
+        (_isolated_consent_dir / f"consent_{token}.json").write_text(json.dumps(payload))
         assert verify_token("execute", token) is False
 
     def test_token_file_with_missing_expiry(self, _isolated_consent_dir):
         """Token file without expires_at should be treated as expired."""
         token = "noexpiry12345678"
         payload = {"command": "execute"}
-        (_isolated_consent_dir / f"consent_{token}.json").write_text(
-            json.dumps(payload)
-        )
+        (_isolated_consent_dir / f"consent_{token}.json").write_text(json.dumps(payload))
         assert verify_token("execute", token) is False
 
     def test_whitespace_token(self):

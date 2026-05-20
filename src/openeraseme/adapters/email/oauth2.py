@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
+import secrets
+import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlencode
 from urllib.request import Request, urlopen
@@ -11,6 +15,8 @@ from urllib.request import Request, urlopen
 import keyring
 
 SERVICE_NAME = "openeraseme-oauth2"
+_STATE_FILE = "~/.local/share/openeraseme/oauth2_state.json"
+_STATE_TTL = 300  # 5 minutes in seconds
 
 PROVIDER_CONFIGS: dict[str, dict[str, str]] = {
     "gmail": {
@@ -33,6 +39,49 @@ PROVIDER_CONFIGS: dict[str, dict[str, str]] = {
 
 class OAuth2Error(Exception):
     pass
+
+
+class OAuth2StateError(OAuth2Error):
+    pass
+
+
+def _get_state_path() -> Path:
+    path = Path(os.path.expanduser(_STATE_FILE))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _store_oauth2_state(state: str, provider: str) -> None:
+    path = _get_state_path()
+    existing: dict[str, dict[str, Any]] = {}
+    if path.exists():
+        with path.open() as f:
+            existing = json.load(f)
+    existing[state] = {"provider": provider, "expires_at": time.time() + _STATE_TTL}
+    with path.open("w") as f:
+        json.dump(existing, f)
+
+
+def _validate_oauth2_state(state: str | None) -> None:
+    path = _get_state_path()
+    if not state:
+        raise OAuth2StateError("Missing OAuth2 state parameter — possible CSRF attack.")
+    if not path.exists():
+        raise OAuth2StateError("No OAuth2 state stored — possible CSRF attack.")
+    with path.open() as f:
+        stored = json.load(f)
+    record = stored.pop(state, None)
+    if record is None:
+        with path.open("w") as f:
+            json.dump(stored, f)
+        raise OAuth2StateError("OAuth2 state mismatch — possible CSRF attack.")
+    if record.get("expires_at", 0) < time.time():
+        with path.open("w") as f:
+            json.dump(stored, f)
+        raise OAuth2StateError("OAuth2 state expired — possible CSRF attack.")
+    # Clean up the consumed state
+    with path.open("w") as f:
+        json.dump(stored, f)
 
 
 @dataclass
@@ -114,6 +163,9 @@ def authorize_url(provider: str, client_id: str, redirect_uri: str) -> str:
         msg = f"Unknown provider: {provider}. Supported: {list(PROVIDER_CONFIGS)}"
         raise OAuth2Error(msg)
 
+    state = secrets.token_urlsafe(16)
+    _store_oauth2_state(state, provider)
+
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
@@ -121,6 +173,7 @@ def authorize_url(provider: str, client_id: str, redirect_uri: str) -> str:
         "scope": cfg["scopes"],
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
     return f"{cfg['auth_url']}?{urlencode(params)}"
 
@@ -190,9 +243,17 @@ _redirect_uri = "http://localhost:8899/callback"
 
 class CallbackHandler(BaseHTTPRequestHandler):
     auth_code: str = ""
+    auth_error: str = ""
 
     def do_GET(self):
         params = parse_qs(self.path.split("?")[1] if "?" in self.path else "")
+        try:
+            state = params.get("state", [None])[0]
+            _validate_oauth2_state(state)
+        except OAuth2StateError as e:
+            CallbackHandler.auth_error = str(e)
+            self._respond(403, str(e))
+            return
         code_list = params.get("code", [])
         if code_list:
             CallbackHandler.auth_code = code_list[0]
@@ -214,8 +275,12 @@ class CallbackHandler(BaseHTTPRequestHandler):
 def run_local_server() -> str:
     server = HTTPServer(("127.0.0.1", 8899), CallbackHandler)
     CallbackHandler.auth_code = ""
+    CallbackHandler.auth_error = ""
     server.timeout = 120
     while not CallbackHandler.auth_code:
+        if CallbackHandler.auth_error:
+            server.server_close()
+            raise OAuth2StateError(CallbackHandler.auth_error)
         server.handle_request()
     server.server_close()
     return CallbackHandler.auth_code

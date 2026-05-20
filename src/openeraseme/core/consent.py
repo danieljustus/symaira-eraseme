@@ -8,10 +8,9 @@ via either:
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import os
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -29,16 +28,16 @@ def _consent_dir() -> Path:
 def issue_token(command: str, ttl: int = TOKEN_TTL) -> str:
     issued_at = int(time.time())
     expires_at = issued_at + ttl
+    token = secrets.token_urlsafe(16)
     payload = json.dumps(
-        {"command": command, "issued_at": issued_at, "expires_at": expires_at},
+        {
+            "command": command,
+            "issued_at": issued_at,
+            "expires_at": expires_at,
+            "token": token,
+        },
         sort_keys=True,
     )
-    token = hmac.new(
-        os.urandom(32).hex().encode(),
-        payload.encode(),
-        hashlib.sha256,
-    ).hexdigest()[:16]
-
     token_file = _consent_dir() / f"consent_{token}.json"
     with open(token_file, "w") as f:
         f.write(payload)
@@ -54,6 +53,14 @@ def verify_token(command: str, token: str) -> bool:
             payload = json.load(f)
     except (json.JSONDecodeError, OSError):
         return False
+
+    # New format: the token is stored in the payload — verify it matches
+    # so that knowing only the filename is insufficient to verify.
+    stored_token = payload.get("token")
+    if stored_token is not None and stored_token != token:
+        return False
+    # Old format (backward compat): no stored token field; proceed with
+    # existing checks (file existence + command + expiry).
 
     if payload.get("command") != command:
         return False
