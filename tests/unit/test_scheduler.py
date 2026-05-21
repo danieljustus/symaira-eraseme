@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import time
 
 from openeraseme.core.scheduler import (
@@ -98,7 +97,9 @@ class TestGenerateLaunchd:
         assert "</plist>" in content
 
     def test_poll_plist_has_multiple_calendar_intervals(self):
-        config = SchedulerConfig(platform="launchd", poll_times=[time(8, 0), time(12, 0), time(16, 0), time(20, 0)])
+        config = SchedulerConfig(
+            platform="launchd", poll_times=[time(8, 0), time(12, 0), time(16, 0), time(20, 0)]
+        )
         files = generate_launchd(config)
         content = files["com.openeraseme.poll.plist"]
         # Should have multiple StartCalendarInterval entries
@@ -195,16 +196,12 @@ class TestGenerateSchedulerConfigs:
             generate_scheduler_configs(platform_name="windows")
 
     def test_custom_tick_time(self):
-        files = generate_scheduler_configs(
-            platform_name="cron", tick_hour=14, tick_minute=30
-        )
+        files = generate_scheduler_configs(platform_name="cron", tick_hour=14, tick_minute=30)
         content = files["crontab.txt"]
         assert "14" in content or "30" in content
 
     def test_custom_poll_hours(self):
-        files = generate_scheduler_configs(
-            platform_name="cron", poll_hours=[6, 18]
-        )
+        files = generate_scheduler_configs(platform_name="cron", poll_hours=[6, 18])
         content = files["openeraseme-poll.sh"]
         assert "06:00" in content or "18:00" in content
 

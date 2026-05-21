@@ -19,9 +19,7 @@ def _seed_db(tmp_path: str) -> None:
     conn = get_connection()
 
     # Campaign 1
-    conn.execute(
-        "INSERT INTO campaigns (id, kind) VALUES ('camp-initial', 'initial')"
-    )
+    conn.execute("INSERT INTO campaigns (id, kind) VALUES ('camp-initial', 'initial')")
 
     conn.execute(
         "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, jurisdiction) "
@@ -54,15 +52,13 @@ def _seed_db(tmp_path: str) -> None:
         "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, jurisdiction) "
         "VALUES (4, 'broker-d', 'email', 'camp-initial', 'GDPR')"
     )
-    conn.execute(
-        "INSERT INTO request_state (request_id, current_status) "
-        "VALUES (4, 'PLANNED')"
-    )
+    conn.execute("INSERT INTO request_state (request_id, current_status) VALUES (4, 'PLANNED')")
 
     # Campaign 2 (for historical comparison - older campaign)
     # Insert as an older campaign so it sorts correctly
     conn.execute(
-        "INSERT INTO campaigns (id, kind, created_at) VALUES ('camp-rescan', 're-scan', '2026-01-01T00:00:00')"
+        "INSERT INTO campaigns (id, kind, created_at) "
+        "VALUES ('camp-rescan', 're-scan', '2026-01-01T00:00:00')"
     )
 
     conn.execute(
@@ -338,8 +334,18 @@ class TestSuccessMetrics:
         from openeraseme.core.reports import _success_metrics
 
         requests = [
-            {"id": 1, "current_status": "CONFIRMED", "sent_at": "2026-06-01T10:00:00", "resolved_at": "2026-06-15T10:00:00"},
-            {"id": 2, "current_status": "CONFIRMED", "sent_at": "2026-06-01T10:00:00", "resolved_at": "2026-06-20T10:00:00"},
+            {
+                "id": 1,
+                "current_status": "CONFIRMED",
+                "sent_at": "2026-06-01T10:00:00",
+                "resolved_at": "2026-06-15T10:00:00",
+            },
+            {
+                "id": 2,
+                "current_status": "CONFIRMED",
+                "sent_at": "2026-06-01T10:00:00",
+                "resolved_at": "2026-06-20T10:00:00",
+            },
         ]
         sm = _success_metrics(requests)
         assert sm["overall_confirmation_rate"] == 100.0
@@ -365,7 +371,12 @@ class TestSuccessMetrics:
         from openeraseme.core.reports import _success_metrics
 
         requests = [
-            {"id": 1, "current_status": "CONFIRMED", "sent_at": "2026-06-01T10:00:00", "resolved_at": "2026-06-11T10:00:00"},
+            {
+                "id": 1,
+                "current_status": "CONFIRMED",
+                "sent_at": "2026-06-01T10:00:00",
+                "resolved_at": "2026-06-11T10:00:00",
+            },
         ]
         sm = _success_metrics(requests)
         assert sm["avg_response_time_days"] == 10.0

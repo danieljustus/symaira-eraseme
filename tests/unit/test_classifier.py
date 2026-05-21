@@ -23,8 +23,15 @@ def load_fixture(name: str) -> str:
 
 def _r(cls_label: str, conf: str, summary: str) -> str:
     return (
-        '{"classification": "' + cls_label + '", "confidence": '
-        + conf + ', "summary": "' + summary + '", ' + _EMPTY_FIELDS + '}'
+        '{"classification": "'
+        + cls_label
+        + '", "confidence": '
+        + conf
+        + ', "summary": "'
+        + summary
+        + '", '
+        + _EMPTY_FIELDS
+        + "}"
     )
 
 
@@ -72,9 +79,7 @@ class TestBuildUserPrompt:
 class TestParseResponse:
     def test_parses_valid_json(self):
         result = _parse_response(
-            '{"classification": "ack", "confidence": 0.95, "summary": "Ack", '
-            + _EMPTY_FIELDS
-            + "}"
+            '{"classification": "ack", "confidence": 0.95, "summary": "Ack", ' + _EMPTY_FIELDS + "}"
         )
         assert result.label == "ack"
         assert result.event_type == "ACK"
@@ -124,7 +129,9 @@ class TestParseResponse:
 
     def test_handles_codeblock_json(self):
         result = _parse_response(
-            "```json\n{" + _ACK + ', "confidence": 0.9, "summary": "ok", '
+            "```json\n{"
+            + _ACK
+            + ', "confidence": 0.9, "summary": "ok", '
             + _EMPTY_FIELDS
             + "}\n```"
         )
@@ -153,9 +160,7 @@ class TestReplyClassifier:
 
     def test_classify_fallback_on_api_error(self):
         classifier = ReplyClassifier(api_key="test-key")
-        with patch.object(
-            classifier._client, "classify", side_effect=Exception("API down")
-        ):
+        with patch.object(classifier._client, "classify", side_effect=Exception("API down")):
             result = classifier.classify(
                 broker_name="TestBroker",
                 reply_subject="Re: request",

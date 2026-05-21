@@ -12,9 +12,12 @@ class TestPollInbox:
         monkeypatch.setenv("IMAP_PASSWORD", "password")
         result = invoke(
             "poll-inbox",
-            "--username", "test@test.com",
-            "--host", "imap.test.com",
-            "--since", "1",
+            "--username",
+            "test@test.com",
+            "--host",
+            "imap.test.com",
+            "--since",
+            "1",
         )
         assert result.exit_code != 0
 
@@ -22,19 +25,26 @@ class TestPollInbox:
         monkeypatch.setenv("IMAP_PASSWORD", "password")
         result = invoke(
             "poll-inbox",
-            "--username", "test@test.com",
-            "--host", "imap.test.com",
-            "--since", "1",
+            "--username",
+            "test@test.com",
+            "--host",
+            "imap.test.com",
+            "--since",
+            "1",
         )
         assert result.exit_code != 0
 
     def test_poll_inbox_rejects_cli_password(self, seeded_db):
         result = invoke(
             "poll-inbox",
-            "--username", "test@test.com",
-            "--password", "should-fail",
-            "--host", "imap.test.com",
-            "--since", "1",
+            "--username",
+            "test@test.com",
+            "--password",
+            "should-fail",
+            "--host",
+            "imap.test.com",
+            "--since",
+            "1",
         )
         assert result.exit_code != 0
         # --password option was removed for security; CLI should reject it
@@ -62,6 +72,7 @@ class TestEvents:
     def test_events_json_output(self, seeded_db):
         result = invoke("--output", "json", "events", "show", "1")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert isinstance(data, list)

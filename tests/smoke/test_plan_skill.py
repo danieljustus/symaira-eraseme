@@ -15,6 +15,7 @@ class TestPlanCreate:
     def test_plan_create_json(self, seeded_db):
         result = invoke("--output", "json", "plan", "create", "--campaign", "plan-json")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert data["campaign_id"] == "plan-json"
@@ -47,6 +48,7 @@ class TestPlanShow:
     def test_plan_show_json(self, seeded_db):
         result = invoke("--output", "json", "plan", "show")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert "total" in data
@@ -74,6 +76,7 @@ class TestRequestsList:
     def test_requests_list_json(self, seeded_db):
         result = invoke("--output", "json", "requests", "list")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert isinstance(data, list)
@@ -97,6 +100,7 @@ class TestEventsShow:
     def test_events_show_json(self, seeded_db):
         result = invoke("--output", "json", "events", "show", "1")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert isinstance(data, list)

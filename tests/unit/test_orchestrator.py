@@ -134,9 +134,7 @@ class TestInboxReply:
         from openeraseme.core.events import create_campaign, create_removal_request, get_events
 
         create_campaign("reply-test")
-        rid = create_removal_request(
-            broker_id="b", campaign_id="reply-test", jurisdiction="GDPR"
-        )
+        rid = create_removal_request(broker_id="b", campaign_id="reply-test", jurisdiction="GDPR")
         submit_inbox_reply(
             "<msg2@test.com>",
             request_id=rid,

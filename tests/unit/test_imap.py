@@ -45,9 +45,7 @@ class TestSubjectMatches:
         assert subject_matches("Data Deletion Request", "Data Deletion Request") is True
 
     def test_reply_match(self):
-        assert (
-            subject_matches("Data Deletion Request", "Re: Data Deletion Request") is True
-        )
+        assert subject_matches("Data Deletion Request", "Re: Data Deletion Request") is True
 
     def test_case_insensitive(self):
         assert subject_matches("Data Deletion", "data deletion") is True

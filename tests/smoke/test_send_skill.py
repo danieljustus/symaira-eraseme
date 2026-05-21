@@ -15,6 +15,7 @@ class TestExecute:
     def test_execute_dry_run_json(self, seeded_db):
         result = invoke("--output", "json", "execute", "--campaign", "smoke-test", "--dry-run")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert data["campaign_id"] == "smoke-test"

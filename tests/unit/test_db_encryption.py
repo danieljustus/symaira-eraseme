@@ -59,9 +59,7 @@ class TestTempFilePermissions:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
@@ -72,9 +70,7 @@ class TestTempFilePermissions:
         assert tmp_path.exists()
 
         perms = os.stat(tmp_path).st_mode & 0o777
-        assert perms == 0o600, (
-            f"Expected 0o600 permissions, got {oct(perms)}"
-        )
+        assert perms == 0o600, f"Expected 0o600 permissions, got {oct(perms)}"
 
         close_connection()
 
@@ -97,9 +93,7 @@ class TestTempFileCleanup:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -108,18 +102,14 @@ class TestTempFileCleanup:
 
         close_connection()
 
-        assert not tmp_path.exists(), (
-            f"Temp file {tmp_path} should have been deleted"
-        )
+        assert not tmp_path.exists(), f"Temp file {tmp_path} should have been deleted"
         assert len(_DB_TEMP) == 0
 
     def test_temp_file_cleaned_on_context_exit(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         tmp_paths: list[Path] = []
 
@@ -130,18 +120,14 @@ class TestTempFileCleanup:
 
         # After context exit, temp files should be gone
         for tp in tmp_paths:
-            assert not tp.exists(), (
-                f"Temp file {tp} should have been deleted after context exit"
-            )
+            assert not tp.exists(), f"Temp file {tp} should have been deleted after context exit"
         assert len(_DB_TEMP) == 0
 
     def test_temp_file_cleaned_on_atexit_cleanup(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -151,18 +137,14 @@ class TestTempFileCleanup:
         # Simulate atexit cleanup
         _cleanup_temp_files()
 
-        assert not tmp_path.exists(), (
-            f"Temp file {tmp_path} should have been deleted by cleanup"
-        )
+        assert not tmp_path.exists(), f"Temp file {tmp_path} should have been deleted by cleanup"
         assert len(_DB_TEMP) == 0
 
     def test_temp_file_unlinked_even_if_reencrypt_fails(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
         # Make re-encryption fail by returning None from key call
         monkeypatch.setattr(
             "openeraseme.core.db._get_db_fernet_key",
@@ -194,18 +176,14 @@ class TestConnectionContext:
         os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
 
         with connection_context() as conn:
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             assert len(tables) >= 0  # empty DB is fine
 
     def test_context_cleans_up_on_normal_exit(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         with connection_context(str(encrypted_db_file)):
             assert len(_DB_TEMP) >= 1
@@ -219,9 +197,7 @@ class TestConnectionContext:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY
-        )
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         with (
             pytest.raises(ValueError, match="test error"),
@@ -252,9 +228,7 @@ class TestBackwardCompatibility:
         )
         conn.commit()
 
-        rows = conn.execute(
-            "SELECT id, kind FROM campaigns"
-        ).fetchall()
+        rows = conn.execute("SELECT id, kind FROM campaigns").fetchall()
         assert len(rows) == 1
         assert rows[0]["id"] == "test-campaign"
 

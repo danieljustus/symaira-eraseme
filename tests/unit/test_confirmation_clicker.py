@@ -102,9 +102,11 @@ class TestAutoConfirmValidation:
     async def test_missing_playwright_raises(self):
         from openeraseme.adapters.web.confirmation_clicker import auto_confirm
 
-        with patch.dict("sys.modules", {"playwright.async_api": None}), \
-                pytest.raises(ConfirmationClickerError, match="Playwright is not installed"):
-                await auto_confirm(1, "https://acxiom.com/confirm")
+        with (
+            patch.dict("sys.modules", {"playwright.async_api": None}),
+            pytest.raises(ConfirmationClickerError, match="Playwright is not installed"),
+        ):
+            await auto_confirm(1, "https://acxiom.com/confirm")
 
     @pytest.mark.asyncio
     async def test_dry_run_returns_immediately(self):

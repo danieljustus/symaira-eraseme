@@ -62,9 +62,7 @@ class TestManualTasks:
             "'multi_step_form', 'Complete opt-out manually', 'pending')"
         )
         conn.commit()
-        task_id = conn.execute(
-            "SELECT id FROM manual_tasks WHERE request_id = 2"
-        ).fetchone()[0]
+        task_id = conn.execute("SELECT id FROM manual_tasks WHERE request_id = 2").fetchone()[0]
         result = invoke("manual-tasks", "complete", str(task_id))
         assert_ok(result)
         assert "marked as completed" in result.stdout

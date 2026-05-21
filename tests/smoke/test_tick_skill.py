@@ -16,6 +16,7 @@ class TestTick:
     def test_tick_dry_run_json(self, seeded_db):
         result = invoke("--output", "json", "tick", "--dry-run")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert "total_actions" in data
@@ -33,6 +34,7 @@ class TestTick:
         )
         conn.commit()
         from openeraseme.core.projection import upsert_state
+
         upsert_state(1)
         result = invoke("tick", "--dry-run")
         assert_ok(result)
@@ -45,6 +47,7 @@ class TestTick:
     def test_tick_json_empty(self, tmp_home):
         result = invoke("--output", "json", "tick", "--dry-run")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert data["total_actions"] == 0
@@ -58,6 +61,7 @@ class TestRequestsByStatus:
     def test_requests_by_status_json(self, seeded_db):
         result = invoke("--output", "json", "requests", "list", "--status", "PLANNED")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert isinstance(data, list)

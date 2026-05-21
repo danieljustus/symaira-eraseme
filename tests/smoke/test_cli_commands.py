@@ -30,6 +30,7 @@ class TestOutputFormat:
     def test_json_from_plan_create(self, seeded_db):
         result = invoke("--output", "json", "plan", "create", "--campaign", "fmt-test")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert data["campaign_id"] == "fmt-test"
@@ -37,6 +38,7 @@ class TestOutputFormat:
     def test_json_from_tick(self, seeded_db):
         result = invoke("--output", "json", "tick", "--dry-run")
         import json
+
         assert_ok(result)
         data = json.loads(result.stdout)
         assert "total_actions" in data
@@ -257,7 +259,8 @@ class TestCalendarCommand:
             broker_id="acxiom", campaign_id="cal-test", jurisdiction="GDPR-DE"
         )
         append_event_and_project(
-            rid, "SENT",
+            rid,
+            "SENT",
             payload={"to": "x@y.com", "expected_response_days": 14},
         )
 
@@ -267,11 +270,7 @@ class TestCalendarCommand:
         data = assert_json_output(result)
         assert data["totals"]["entries"] >= 1
         # Find our request in the entries
-        all_ids = [
-            e["request_id"]
-            for week in data["weeks"]
-            for e in week["entries"]
-        ]
+        all_ids = [e["request_id"] for week in data["weeks"] for e in week["entries"]]
         assert rid in all_ids
 
 
@@ -280,6 +279,7 @@ class TestExportCommand:
         result = invoke("--output", "json", "export")
         assert_ok(result)
         import json as _json
+
         data = _json.loads(result.stdout)
         assert data["totals"]["requests"] == 0
 
@@ -293,6 +293,7 @@ class TestExportCommand:
         assert_ok(result)
         assert out.exists()
         import json as _json
+
         data = _json.loads(out.read_text())
         assert data["schema_version"] == 1
         assert data["totals"]["requests"] == 7
@@ -311,11 +312,10 @@ class TestExportCommand:
 
     def test_export_scoped_to_campaign(self, seeded_db, tmp_path):
         out = tmp_path / "ccpa.json"
-        result = invoke(
-            "export", "--campaign", "smoke-test-ccpa", "--output-file", str(out)
-        )
+        result = invoke("export", "--campaign", "smoke-test-ccpa", "--output-file", str(out))
         assert_ok(result)
         import json as _json
+
         data = _json.loads(out.read_text())
         assert data["scope"]["campaign_id"] == "smoke-test-ccpa"
         assert data["totals"]["requests"] == 2

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import os
-
-import pytest
 
 
 def _seed_db(tmp_path: str) -> None:
@@ -61,10 +58,7 @@ def _seed_db(tmp_path: str) -> None:
         "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, jurisdiction) "
         "VALUES (5, 'broker-d', 'web_form', 'test-camp-1', 'GDPR')"
     )
-    conn.execute(
-        "INSERT INTO request_state (request_id, current_status) "
-        "VALUES (5, 'PLANNED')"
-    )
+    conn.execute("INSERT INTO request_state (request_id, current_status) VALUES (5, 'PLANNED')")
 
     # Add some events
     for req_id in range(1, 6):
@@ -209,8 +203,8 @@ class TestGenerateDashboard:
 
             data = get_dashboard_data()
             html = generate_dashboard(data, auto_refresh_seconds=30)
-            assert "http-equiv=\"refresh\"" in html
-            assert "content=\"30\"" in html
+            assert 'http-equiv="refresh"' in html
+            assert 'content="30"' in html
         finally:
             _clean_db()
 

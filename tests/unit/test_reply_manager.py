@@ -34,9 +34,7 @@ def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
 
 
 def _ensure_request(conn, request_id: int) -> None:
-    cur = conn.execute(
-        "SELECT id FROM removal_requests WHERE id = ?", (request_id,)
-    )
+    cur = conn.execute("SELECT id FROM removal_requests WHERE id = ?", (request_id,))
     if cur.fetchone() is None:
         conn.execute(
             "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, jurisdiction) "
@@ -266,9 +264,7 @@ class TestSendReply:
         )
         append_event(req_id, "PLANNED")
         upsert_state(req_id)
-        rid = _insert_inbox_reply(
-            conn, request_id=req_id, classified_as="verification"
-        )
+        rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="verification")
 
         result = send_reply(rid, dry_run=True)
         assert result["dry_run"] is True
@@ -305,9 +301,7 @@ class TestSendReply:
         )
         append_event(req_id, "PLANNED")
         upsert_state(req_id)
-        rid = _insert_inbox_reply(
-            conn, request_id=req_id, classified_as="ack", from_addr=""
-        )
+        rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="ack", from_addr="")
 
         with pytest.raises(ValueError, match="no sender"):
             send_reply(rid, dry_run=False)

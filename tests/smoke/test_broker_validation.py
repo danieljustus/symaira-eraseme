@@ -67,6 +67,7 @@ class TestBrokerSchemas:
         import json
 
         import jsonschema
+
         with open(schema_path) as f:
             schema = json.load(f)
         brokers_dir = Path("registry/brokers")

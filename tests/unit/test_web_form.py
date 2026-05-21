@@ -70,9 +70,10 @@ class TestCaptureError:
 
 class TestRunWebFormValidation:
     def test_missing_playwright_raises(self):
-        with patch.dict(
-            "sys.modules", {"playwright.async_api": None}
-        ), pytest.raises(PlaywrightRunnerError, match="Playwright is not installed"):
+        with (
+            patch.dict("sys.modules", {"playwright.async_api": None}),
+            pytest.raises(PlaywrightRunnerError, match="Playwright is not installed"),
+        ):
             import asyncio
 
             asyncio.run(
@@ -93,8 +94,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
         mock_page.goto.assert_called_once_with(
             "https://example.com/form",
@@ -109,8 +115,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
         assert mock_page.fill.call_count == 2
         mock_page.fill.assert_any_call("#name", "John Doe", timeout=30000)
@@ -124,8 +135,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields=identity, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields=identity,
+            screenshot_dir=None,
+            step_index=0,
         )
         mock_page.fill.assert_any_call("#name", "Jane Doe", timeout=30000)
         mock_page.fill.assert_any_call("#email", "jane@test.com", timeout=30000)
@@ -137,8 +153,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
         mock_page.click.assert_called_once_with("#submit-btn", timeout=30000)
 
@@ -149,8 +170,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
         mock_page.select_option.assert_called_once_with("#reason", "gdpr", timeout=30000)
 
@@ -161,12 +187,15 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
-        mock_page.wait_for_selector.assert_called_once_with(
-            "#success-message", timeout=30000
-        )
+        mock_page.wait_for_selector.assert_called_once_with("#success-message", timeout=30000)
 
     @pytest.mark.asyncio
     async def test_assert_text_passes(self):
@@ -176,8 +205,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=None, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=None,
+            step_index=0,
         )
         mock_page.text_content.assert_called_once_with("body")
 
@@ -190,8 +224,13 @@ class TestFormStepExecution:
 
         with pytest.raises(PlaywrightRunnerError, match="Assertion failed"):
             await _execute_step(
-                mock_page, step, None, timeout=30.0,
-                identity_fields={}, screenshot_dir=None, step_index=0,
+                mock_page,
+                step,
+                None,
+                timeout=30.0,
+                identity_fields={},
+                screenshot_dir=None,
+                step_index=0,
             )
 
     @pytest.mark.asyncio
@@ -203,8 +242,13 @@ class TestFormStepExecution:
 
         with pytest.raises(PlaywrightRunnerError, match="Assertion failed"):
             await _execute_step(
-                mock_page, step, None, timeout=30.0,
-                identity_fields={}, screenshot_dir=None, step_index=0,
+                mock_page,
+                step,
+                None,
+                timeout=30.0,
+                identity_fields={},
+                screenshot_dir=None,
+                step_index=0,
             )
 
     @pytest.mark.asyncio
@@ -215,8 +259,13 @@ class TestFormStepExecution:
         from openeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
-            mock_page, step, None, timeout=30.0,
-            identity_fields={}, screenshot_dir=tmp_path, step_index=0,
+            mock_page,
+            step,
+            None,
+            timeout=30.0,
+            identity_fields={},
+            screenshot_dir=tmp_path,
+            step_index=0,
         )
         mock_page.screenshot.assert_called_once()
 
@@ -239,9 +288,13 @@ class TestFormStepExecution:
 
         for i, step in enumerate(steps):
             await _execute_step(
-                mock_page, step, "https://example.com/form" if i == 0 else None,
+                mock_page,
+                step,
+                "https://example.com/form" if i == 0 else None,
                 timeout=30.0,
-                identity_fields={}, screenshot_dir=tmp_path, step_index=i,
+                identity_fields={},
+                screenshot_dir=tmp_path,
+                step_index=i,
             )
 
         mock_page.goto.assert_called_once()
