@@ -29,7 +29,26 @@ def _find_git_root(path: Path) -> Path | None:
     return None
 
 
+def _is_detached_head(repo_root: Path) -> bool:
+    result = subprocess.run(
+        ["git", "symbolic-ref", "--quiet", "HEAD"],
+        cwd=str(repo_root),
+        capture_output=True,
+    )
+    # git symbolic-ref returns 1 for detached HEAD, 0 when on a named branch
+    return result.returncode != 0
+
+
 def _run_git_pull(repo_root: Path) -> dict[str, Any]:
+    if _is_detached_head(repo_root):
+        return {
+            "ok": True,
+            "detached_head": True,
+            "stdout": "",
+            "stderr": "",
+            "message": "Detached HEAD — no branch to update. Skipping pull.",
+        }
+
     try:
         result = subprocess.run(
             ["git", "pull", "--ff-only"],

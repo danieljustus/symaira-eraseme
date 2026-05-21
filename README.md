@@ -72,6 +72,37 @@ openeraseme brokers list --jurisdiction GDPR
 openeraseme brokers show --name AcmeDataCorp
 ```
 
+### Demo
+
+```console
+$ openeraseme init-profile
+✓ Profile saved to ~/.config/openeraseme/profile.json
+
+$ openeraseme brokers list --jurisdiction GDPR
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Name         ┃ Website                     ┃ Jurisdiction  ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ AcmeDataCorp │ https://acmedata.example    │ GDPR, CCPA    │
+│ BrokerB      │ https://brokerb.example     │ GDPR          │
+│ DataVault    │ https://datavault.example   │ CCPA          │
+└──────────────┴─────────────────────────────┴───────────────┘
+
+$ openeraseme plan --jurisdiction GDPR --max 3
+✓ Plan created: 3 brokers selected
+  Campaign: initial
+  Output: ~/.config/openeraseme/campaigns/initial/plan.json
+
+$ openeraseme status
+Campaign: initial
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Broker       ┃ Status   ┃ Deadline             ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ AcmeDataCorp │ pending  │ 2026-06-20 (30 days) │
+│ BrokerB      │ pending  │ 2026-06-20 (30 days) │
+│ DataVault    │ sent     │ 2026-06-20 (30 days) │
+└──────────────┴──────────┴──────────────────────┘
+```
+
 ### Planning and execution
 
 ```bash
