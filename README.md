@@ -11,14 +11,15 @@
 OpenEraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It provides:
 
-- **A curated registry** of 74 data brokers with opt-out processes documented
+- **A curated registry** of 600+ data brokers with opt-out processes documented
 - **CLI tools** to plan, send, track, and triage removal requests
 - **Skills** for LLM-powered agents (Claude Code, OpenClaw, etc.)
 - **Lifecycle management** with deadline tracking, reminders, escalation, and re-scans
+- **Automated registry maintenance** via weekly scans of public state broker registries
 
 ## Features
 
-- **Curated broker registry** with YAML-based definitions for 74 data brokers across EU (35), UK (4), and US (33), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
+- **Curated broker registry** with YAML-based definitions for **602 data brokers** across the EU (37), UK (6), and US (559), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
 - **Event-sourced architecture** with an append-only SQLite event store, state projections, and full audit trail for every removal request.
 - **CLI automation** with 30+ commands to plan removal campaigns, send opt-out requests in batches, track progress, monitor deadlines, and triage broker replies from the terminal.
 - **Web-form automation** via Playwright for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and screenshot capture.
@@ -28,6 +29,7 @@ data brokers. It provides:
 - **LLM agent skills** as ready-made skill files for Claude Code, OpenClaw, and other LLM-powered coding agents. These skills let AI assistants work with the tool on your behalf.
 - **Jurisdiction-aware workflows** with support for GDPR (Europe), CCPA (California), CPRA, LGPD, and PIPEDA erasure rights, including jurisdiction-specific templates, timelines, and legal references.
 - **Scheduler integration** that generates cron, launchd, or systemd configurations to run the tick engine, inbox polling, and quarterly re-scans automatically.
+- **Automated registry maintenance** with a weekly GitHub Action that pulls fresh entries from official US state broker registries and opens a PR with the diff, plus a Monday link-check workflow that flags dead broker websites.
 - **Dashboard and reports** for campaign analytics, jurisdiction breakdowns, and GDPR-compliant record-keeping exports.
 
 ## Install
@@ -217,6 +219,24 @@ OpenEraseMe uses an **event-sourced architecture** built on SQLite:
 - **State Projection**: Rebuilds the current state of every request from events
 - **Tick Engine**: Daily scan for deadlines, reminders, and escalations
 - **Triage**: LLM-based classification of broker replies with jurisdiction-aware rebuttal generation
+
+## Registry maintenance
+
+The broker registry is kept fresh by two scheduled GitHub Actions:
+
+- **`registry-scanner`** (Sundays, 00:00 UTC) — fetches the latest data-broker
+  registries published by US states (e.g. California, Vermont, Oregon, Texas),
+  normalizes the records into YAML entries, and opens a pull request for any
+  additions or changes.
+- **`registry-link-check`** (Mondays, 06:00 UTC) — issues a `HEAD` request to
+  every broker's `website` field and reports unreachable URLs so dead entries
+  can be retired or corrected.
+
+You can also run the sync manually:
+
+```bash
+uv run python scripts/registry_sync.py
+```
 
 ## Development
 
