@@ -5,6 +5,7 @@ import secrets
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -49,14 +50,14 @@ def _state_file(tmp_path: Path) -> None:
 class TestAuthorizeUrl:
     def test_generates_gmail_url(self):
         url = authorize_url("gmail", "my-client-id", "http://localhost:8899/callback")
-        assert "accounts.google.com" in url
+        assert urlparse(url).hostname == "accounts.google.com"
         assert "client_id=my-client-id" in url
         assert "redirect_uri=http%3A%2F%2Flocalhost%3A8899%2Fcallback" in url
         assert "state=" in url
 
     def test_generates_outlook_url(self):
         url = authorize_url("outlook", "my-client-id", "http://localhost:8899/callback")
-        assert "login.microsoftonline.com" in url
+        assert urlparse(url).hostname == "login.microsoftonline.com"
         assert "client_id=my-client-id" in url
         assert "state=" in url
 
