@@ -45,17 +45,13 @@ def handle_validate(
         try:
             jsonschema.validate(data, schema)
         except jsonschema.ValidationError as e:
-            failed_files.append(
-                {"file": rel, "stage": "schema", "error": e.message[:300]}
-            )
+            failed_files.append({"file": rel, "stage": "schema", "error": e.message[:300]})
             continue
 
         try:
             broker = Broker.model_validate(data)
         except Exception as e:
-            failed_files.append(
-                {"file": rel, "stage": "pydantic", "error": str(e)[:300]}
-            )
+            failed_files.append({"file": rel, "stage": "pydantic", "error": str(e)[:300]})
             continue
 
         if broker.id in seen_ids:

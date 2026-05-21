@@ -118,9 +118,7 @@ def handle_brokers_show(broker_id: str, output_format: str = "text") -> str:
             lines.append(f"    url:      {channel.url}")
             lines.append(f"    steps:    {len(channel.form_spec.steps)}")
     if broker.verification:
-        lines.append(
-            f"  verification.ack_keywords:        {broker.verification.ack_keywords}"
-        )
+        lines.append(f"  verification.ack_keywords:        {broker.verification.ack_keywords}")
         lines.append(
             f"  verification.rejection_keywords:  {broker.verification.rejection_keywords}"
         )

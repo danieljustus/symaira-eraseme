@@ -101,10 +101,7 @@ def handle_calendar(
             "overdue": sum(1 for e in entries if e["overdue"]),
             "weeks_with_actions": len(buckets),
         },
-        "weeks": [
-            {"week": week, "entries": items}
-            for week, items in sorted(buckets.items())
-        ],
+        "weeks": [{"week": week, "entries": items} for week, items in sorted(buckets.items())],
     }
 
     if output_format == "json":
