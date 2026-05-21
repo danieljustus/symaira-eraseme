@@ -21,12 +21,6 @@ Go to the repository's **Security** tab and use the **Report a vulnerability** f
 to submit a private advisory. This ensures the issue is disclosed responsibly and
 allows us to prepare a fix before public disclosure.
 
-### Alternative: Email
-
-If you cannot use GitHub Security Advisories, send details to:
-
-**daniel@ohmyopen.com**
-
 Please include:
 - A description of the vulnerability
 - Steps to reproduce (if applicable)
