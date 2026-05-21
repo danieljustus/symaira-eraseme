@@ -138,7 +138,7 @@ async def _execute_step(
 
     for selector, value in (step.get("fill") or {}).items():
         filled = _resolve_value(value, identity_fields)
-        logger.debug("Filling %s = %s", selector, filled)
+        logger.debug("Filling %s", selector)
         await page.fill(selector, filled, timeout=step_timeout)
 
     for selector, option in (step.get("select") or {}).items():

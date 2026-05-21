@@ -261,11 +261,6 @@ skills/          — LLM agent skill files (Claude Code, OpenClaw)
 examples/        — Integration examples for Claude Code, OpenClaw, cron
 ```
 
-## Documentation
-
-- [Architecture Plan](docs/architektur-plan-v0.1.md) — Design overview and data flow
-- [Contributing Guide](CONTRIBUTING.md) — How to add brokers, submit changes, and report issues
-
 ## License
 
 MIT

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -30,7 +31,7 @@ class TestExtractConfirmationLinks:
         allowed = frozenset({"acxiom.com"})
         links = extract_confirmation_links(text, allowed_domains=allowed)
         assert len(links) == 1
-        assert "acxiom.com" in links[0]
+        assert urlparse(links[0]).hostname == "acxiom.com"
 
     def test_filters_unknown_domains(self):
         text = "Go to https://unknown-spam-site.com/click"
@@ -119,7 +120,7 @@ class TestAutoConfirmValidation:
         )
         assert result.dry_run
         assert result.success
-        assert "acxiom.com" in result.clicked_url
+        assert urlparse(result.clicked_url).hostname == "acxiom.com"
 
 
 class TestConfirmationResult:
