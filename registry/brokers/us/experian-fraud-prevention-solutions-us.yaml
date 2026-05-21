@@ -9,15 +9,14 @@ laws:
 data_sensitivity: 3
 priority: medium
 opt_out:
-- type: email
-  endpoint: NA
-  template: ccpa-art1798
-  locale: en
-  required_fields:
-  - full_name
-  - email
-  supports_suppression: true
-  expected_response_days: 45
+- type: web_form
+  url: https://www.experian.com
+  form_spec:
+    steps:
+    - goto: .
+    - screenshot: result
+    timeout_seconds: 30.0
+    rate_limit_delay: 2.0
 verification:
   ack_keywords:
   - received

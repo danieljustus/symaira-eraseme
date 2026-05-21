@@ -1,6 +1,6 @@
 id: automation-research-us
 name: Automation Research
-website: https://Inc. d/b/a DataVerify
+website: https://dataverify.com
 category: other
 jurisdictions:
 - US
@@ -9,15 +9,14 @@ laws:
 data_sensitivity: 3
 priority: medium
 opt_out:
-- type: email
-  endpoint: https://dataverify.com
-  template: ccpa-art1798
-  locale: en
-  required_fields:
-  - full_name
-  - email
-  supports_suppression: true
-  expected_response_days: 45
+- type: web_form
+  url: https://dataverify.com
+  form_spec:
+    steps:
+    - goto: .
+    - screenshot: result
+    timeout_seconds: 30.0
+    rate_limit_delay: 2.0
 verification:
   ack_keywords:
   - received

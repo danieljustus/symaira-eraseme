@@ -1,6 +1,6 @@
 id: background-information-services-us
 name: Background Information Services
-website: https://Inc. (BIS)
+website: https://www.bisi.com
 category: other
 jurisdictions:
 - US
@@ -9,15 +9,14 @@ laws:
 data_sensitivity: 3
 priority: medium
 opt_out:
-- type: email
-  endpoint: www.bisi.com
-  template: ccpa-art1798
-  locale: en
-  required_fields:
-  - full_name
-  - email
-  supports_suppression: true
-  expected_response_days: 45
+- type: web_form
+  url: https://www.bisi.com
+  form_spec:
+    steps:
+    - goto: .
+    - screenshot: result
+    timeout_seconds: 30.0
+    rate_limit_delay: 2.0
 verification:
   ack_keywords:
   - received

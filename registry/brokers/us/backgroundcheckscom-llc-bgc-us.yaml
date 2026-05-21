@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: email
-  endpoint: Cathy Klafehn, cklafehn@backgroundchecks.com
+  endpoint: cklafehn@backgroundchecks.com
   template: ccpa-art1798
   locale: en
   required_fields:
