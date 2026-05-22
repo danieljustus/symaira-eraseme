@@ -25,14 +25,22 @@ def handle_classify_reply(
     if req is None:
         import typer
 
-        typer.echo(f"Request #{request_id} not found.", err=True)
+        typer.echo(
+            f"Request #{request_id} not found. "
+            "Run 'openeraseme requests list' to see available requests.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
         import typer
 
-        typer.echo(f"No events found for request #{request_id}.", err=True)
+        typer.echo(
+            f"No events found for request #{request_id}. "
+            "Events are created when a request is planned or sent.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     last_event = events[-1]
@@ -60,7 +68,11 @@ def handle_classify_reply(
     if reply is None:
         import typer
 
-        typer.echo(f"No unclassified inbox reply found for request #{request_id}.", err=True)
+        typer.echo(
+            f"No unclassified inbox reply found for request #{request_id}. "
+            "Run 'openeraseme poll-inbox' to fetch new replies first.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     classifier = ReplyClassifier(api_key=api_key, model=model)
@@ -154,14 +166,22 @@ def handle_generate_rebuttal(
     if req is None:
         import typer
 
-        typer.echo(f"Request #{request_id} not found.", err=True)
+        typer.echo(
+            f"Request #{request_id} not found. "
+            "Run 'openeraseme requests list' to see available requests.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
         import typer
 
-        typer.echo(f"No events found for request #{request_id}.", err=True)
+        typer.echo(
+            f"No events found for request #{request_id}. "
+            "Events are created when a request is planned or sent.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     last_event = events[-1]

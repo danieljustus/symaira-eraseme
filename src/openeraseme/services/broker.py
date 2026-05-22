@@ -83,7 +83,11 @@ def handle_brokers_show(broker_id: str, output_format: str = "text") -> str:
                 broker = b
                 break
         else:
-            typer.echo(f"Broker '{broker_id}' not found in registry.", err=True)
+            typer.echo(
+                f"Broker '{broker_id}' not found in registry. "
+                "Run 'openeraseme brokers list' to see available brokers.",
+                err=True,
+            )
             raise typer.Exit(1) from None
 
     if output_format == "json":

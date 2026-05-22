@@ -27,7 +27,12 @@ def handle_solve_captcha(
             page_url=page_url,
         )
     except CaptchaError as e:
-        typer.echo(f"Captcha solving failed: {e}", err=True)
+        typer.echo(
+            f"Captcha solving failed: {e}. "
+            "Check your API key, site_key, and page_url. "
+            "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var.",
+            err=True,
+        )
         raise typer.Exit(1) from e
 
     if output_format == "json":

@@ -38,7 +38,11 @@ def handle_generate_scheduler(
             venv_activate=venv_activate,
         )
     except ValueError as e:
-        typer.echo(f"Error: {e}", err=True)
+        typer.echo(
+            f"Scheduler error: {e}. "
+            "Use --platform cron|launchd|systemd or ensure the platform is supported.",
+            err=True,
+        )
         raise typer.Exit(1) from e
 
     written = write_scheduler_files(files, output_dir, dry_run=dry_run)

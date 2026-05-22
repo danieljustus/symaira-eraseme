@@ -26,12 +26,20 @@ def handle_run_web_form(
     try:
         broker = load_broker(broker_id)
     except Exception as e:
-        typer.echo(f"Broker '{broker_id}' not found: {e}", err=True)
+        typer.echo(
+            f"Broker '{broker_id}' not found: {e}. "
+            "Run 'openeraseme brokers list' to see available brokers.",
+            err=True,
+        )
         raise typer.Exit(1) from e
 
     web_forms = [c for c in broker.opt_out if c.type == "web_form"]
     if not web_forms:
-        typer.echo(f"Broker '{broker_id}' has no web form opt-out channel.", err=True)
+        typer.echo(
+            f"Broker '{broker_id}' has no web form opt-out channel. "
+            "Check 'openeraseme brokers show {broker_id}' for available channels (email, etc.).",
+            err=True,
+        )
         raise typer.Exit(1)
 
     form = cast(WebFormOptOut, web_forms[0])
@@ -75,7 +83,11 @@ def handle_run_web_form(
             )
         )
     except PlaywrightRunnerError as e:
-        typer.echo(f"Playwright error: {e}", err=True)
+        typer.echo(
+            f"Playwright error: {e}. "
+            "Install with: uv pip install playwright && playwright install chromium",
+            err=True,
+        )
         raise typer.Exit(1) from e
 
     if output_format == "json":
@@ -95,7 +107,8 @@ def handle_run_web_form(
         return f"Web form completed successfully ({result.total_steps} steps)."
 
     typer.echo(
-        f"Web form failed at step {result.step_index + 1}/{result.total_steps}: {result.error}"
+        f"Web form failed at step {result.step_index + 1}/{result.total_steps}: {result.error}. "
+        "A manual task has been created. Run 'openeraseme manual-tasks list' to see it.",
     )
     if result.screenshot_path:
         typer.echo(f"Screenshot saved to: {result.screenshot_path}")

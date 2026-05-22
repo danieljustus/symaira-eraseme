@@ -68,7 +68,10 @@ def save_profile(
 def load_profile(path: str | None = None) -> IdentityProfile:
     target = _profile_path(path)
     if not target.exists():
-        msg = f"Identity profile not found at {target}"
+        msg = (
+            f"Identity profile not found at {target}. "
+            "Run 'openeraseme init-profile' first."
+        )
         raise FileNotFoundError(msg)
 
     key = _get_or_create_master_key()

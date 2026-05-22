@@ -43,7 +43,11 @@ def handle_grant(
             return f"Token revoked: {revoke}"
         import typer
 
-        typer.echo(f"Token not found: {revoke}", err=True)
+        typer.echo(
+            f"Token not found: {revoke}. "
+            "Run 'openeraseme grant --list' to see active tokens.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     if revoke_all:

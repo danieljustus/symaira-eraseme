@@ -38,7 +38,11 @@ def handle_poll_inbox(
     except IMAPError as e:
         import typer
 
-        typer.echo(f"IMAP error: {e}", err=True)
+        typer.echo(
+            f"IMAP error: {e}. "
+            "Check your credentials, ensure IMAP is enabled, and use an app password if 2FA is on.",
+            err=True,
+        )
         raise typer.Exit(1) from e
 
     if messages:

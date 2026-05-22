@@ -22,12 +22,20 @@ def handle_auto_confirm(
 
     req = get_removal_request(request_id)
     if req is None:
-        typer.echo(f"Request #{request_id} not found.", err=True)
+        typer.echo(
+            f"Request #{request_id} not found. "
+            "Run 'openeraseme requests list' to see available requests.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
-        typer.echo(f"No events found for request #{request_id}.", err=True)
+        typer.echo(
+            f"No events found for request #{request_id}. "
+            "Events are created when a request is planned or sent.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     last_event = events[-1]
@@ -111,7 +119,11 @@ def handle_auto_confirm(
             lines.append(f"  Screenshot after: {result.screenshot_after}")
         return "\n".join(lines)
 
-    typer.echo(f"Failed: {result.error}", err=True)
+    typer.echo(
+        f"Auto-confirm failed: {result.error}. "
+        "Check the broker reply manually or retry with --headed to see the browser.",
+        err=True,
+    )
     if result.clicked_url:
         typer.echo(f"  URL: {result.clicked_url}")
     raise typer.Exit(1)

@@ -145,7 +145,10 @@ async def auto_confirm(
     try:
         from playwright.async_api import async_playwright
     except ImportError:
-        msg = "Playwright is not installed"
+        msg = (
+            "Playwright is not installed. "
+            "Install via: uv pip install playwright && playwright install chromium"
+        )
         raise ConfirmationClickerError(msg) from None
 
     screenshot_before_path = ""

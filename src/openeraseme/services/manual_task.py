@@ -38,7 +38,11 @@ def handle_manual_tasks_show(task_id: int, output_format: str = "text") -> str:
     task = get_manual_task(task_id)
 
     if task is None:
-        typer.echo(f"Manual task #{task_id} not found.", err=True)
+        typer.echo(
+            f"Manual task #{task_id} not found. "
+            "Run 'openeraseme manual-tasks list' to see available tasks.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     if output_format == "json":
@@ -71,7 +75,11 @@ def handle_manual_tasks_complete(
     result = resume_from_manual(task_id, notes=notes, completed=True)
 
     if result is None:
-        typer.echo(f"Manual task #{task_id} not found.", err=True)
+        typer.echo(
+            f"Manual task #{task_id} not found. "
+            "Run 'openeraseme manual-tasks list' to see available tasks.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     if output_format == "json":
