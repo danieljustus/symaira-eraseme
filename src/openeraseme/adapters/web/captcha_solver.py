@@ -161,9 +161,7 @@ class CapSolverSolver(CaptchaSolver):
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise CaptchaError(
-                    f"CapSolver task {task_id} timed out after {timeout_seconds}s"
-                )
+                raise CaptchaError(f"CapSolver task {task_id} timed out after {timeout_seconds}s")
             sleep_time = min(_backoff_delay(iteration), remaining)
             time.sleep(sleep_time)
             try:
