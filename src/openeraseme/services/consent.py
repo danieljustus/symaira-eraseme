@@ -52,8 +52,7 @@ def handle_grant(
         import typer
 
         typer.echo(
-            f"Token not found: {revoke}. "
-            "Run 'openeraseme grant --list' to see active tokens.",
+            f"Token not found: {revoke}. Run 'openeraseme grant --list' to see active tokens.",
             err=True,
         )
         raise typer.Exit(1)

@@ -102,8 +102,7 @@ def handle_doctor(output_format: str = "text") -> str:
             {
                 "ok": all_ok,
                 "checks": {
-                    name: {"ok": ok, "detail": detail}
-                    for name, (ok, detail) in checks.items()
+                    name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()
                 },
             },
             indent=2,
