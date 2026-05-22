@@ -183,31 +183,41 @@ def append_event_and_project(
 def rebuild_all_states() -> int:
     conn = get_connection()
 
-    # Single JOIN: get ALL events for ALL requests in O(1) queries
+    dirty_rows = conn.execute(
+        """SELECT DISTINCT r.id AS request_id
+           FROM removal_requests r
+           JOIN request_events e ON e.request_id = r.id
+           LEFT JOIN request_state s ON s.request_id = r.id
+           WHERE s.last_event_id IS NULL OR e.id > s.last_event_id""",
+    ).fetchall()
+    dirty_request_ids = [row["request_id"] for row in dirty_rows]
+
+    if not dirty_request_ids:
+        return 0
+
+    placeholders = ",".join("?" * len(dirty_request_ids))
     rows = conn.execute(
-        """SELECT r.id AS request_id,
+        f"""SELECT r.id AS request_id,
                   e.id AS id,
                   e.event_type,
                   e.occurred_at,
                   e.payload_json
            FROM removal_requests r
-           LEFT JOIN request_events e ON e.request_id = r.id
+           JOIN request_events e ON e.request_id = r.id
+           WHERE r.id IN ({placeholders})
            ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
+        dirty_request_ids,
     ).fetchall()
 
-    # Bucket events by request_id (same key names as rebuild_state query)
     buckets: dict[int, list[dict[str, Any]]] = {}
     for row in rows:
         rid = row["request_id"]
         if rid not in buckets:
             buckets[rid] = []
-        if row["id"] is not None:
-            buckets[rid].append(row)
+        buckets[rid].append(row)
 
-    # Build all states using the shared accumulation logic
     states = [_accumulate_state(rid, events) for rid, events in buckets.items()]
 
-    # Bulk upsert via executemany
     conn.executemany(
         """INSERT OR REPLACE INTO request_state
            (request_id, current_status, last_event_id, last_event_at,
