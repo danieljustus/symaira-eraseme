@@ -6,9 +6,9 @@ from openeraseme.core.db import init_db
 from openeraseme.core.deadlines import apply_tick_actions, run_tick
 
 
-def handle_tick(dry_run: bool = False, output_format: str = "text") -> str:
+def handle_tick(dry_run: bool = False, batch_size: int | None = None, output_format: str = "text") -> str:
     init_db()
-    actions = run_tick(dry_run=dry_run)
+    actions = run_tick(dry_run=dry_run, batch_size=batch_size)
 
     if output_format == "json":
         return json.dumps(

@@ -455,8 +455,13 @@ def tick(
         "--dry-run",
         help="Show actions without executing",
     ),
+    batch_size: int = typer.Option(
+        None,
+        "--batch-size",
+        help="Limit tick to N requests per run",
+    ),
 ) -> None:
-    result = handle_tick(dry_run, ctx.obj["output"])
+    result = handle_tick(dry_run, batch_size, ctx.obj["output"])
     _render(ctx.obj["output"], result)
 
 

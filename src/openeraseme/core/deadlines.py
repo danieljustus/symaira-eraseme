@@ -39,6 +39,7 @@ def run_tick(
     *,
     dry_run: bool = False,
     reference_date: datetime | None = None,
+    batch_size: int | None = None,
 ) -> list[TickAction]:
     """Run one tick cycle.
 
@@ -52,8 +53,7 @@ def run_tick(
 
     conn = get_connection()
 
-    rows = conn.execute(
-        """SELECT r.id, r.broker_id, r.campaign_id, r.jurisdiction,
+    query = """SELECT r.id, r.broker_id, r.campaign_id, r.jurisdiction,
                   s.current_status, s.sent_at, s.deadline_at, s.next_action_at,
                   s.acknowledged_at, s.resolved_at, s.reminders_sent,
                   s.escalation_level
@@ -61,9 +61,14 @@ def run_tick(
            JOIN request_state s ON s.request_id = r.id
            WHERE s.next_action_at IS NULL
               OR s.next_action_at <= ?
-           ORDER BY s.next_action_at ASC""",
-        (now.isoformat(),),
-    ).fetchall()
+           ORDER BY s.next_action_at ASC"""
+    params: list[Any] = [now.isoformat()]
+
+    if batch_size:
+        query += " LIMIT ?"
+        params.append(batch_size)
+
+    rows = conn.execute(query, params).fetchall()
 
     for row in rows:
         req = dict(row)
