@@ -75,7 +75,11 @@ def _decrypt_to_temp(path: Path) -> Path:
     f = Fernet(fernet_key)
     decrypted = f.decrypt(encrypted_data)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
+    # Use the user's data directory instead of /tmp to reduce exposure
+    # on shared systems if SIGKILL leaves the temp file behind.
+    temp_dir = _db_path(path).parent
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db", dir=temp_dir) as tmp:
         tmp.write(decrypted)
         tmp_path = Path(tmp.name)
     os.chmod(tmp_path, 0o600)

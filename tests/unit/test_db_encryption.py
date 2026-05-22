@@ -74,6 +74,25 @@ class TestTempFilePermissions:
 
         close_connection()
 
+    def test_temp_file_in_user_data_dir(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Temp files must be in user data dir, not system /tmp."""
+        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+
+        get_connection(str(encrypted_db_file))
+        assert len(_DB_TEMP) == 1
+        tmp_path = list(_DB_TEMP.values())[0]
+
+        # Should be in user data dir, not /tmp
+        assert "tmp" not in str(tmp_path).lower() or str(tmp_path.parent) == str(
+            encrypted_db_file.parent
+        )
+        assert tmp_path.parent == encrypted_db_file.parent
+
+        close_connection()
+
     def test_encryption_disabled_no_temp_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
