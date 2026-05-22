@@ -11,7 +11,7 @@
 OpenEraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It provides:
 
-- **A curated registry** of 600+ data brokers with opt-out processes documented
+- **A curated registry** of 1,200+ data brokers with opt-out processes documented
 - **CLI tools** to plan, send, track, and triage removal requests
 - **Skills** for LLM-powered agents (Claude Code, OpenClaw, etc.)
 - **Lifecycle management** with deadline tracking, reminders, escalation, and re-scans
@@ -19,7 +19,7 @@ data brokers. It provides:
 
 ## Features
 
-- **Curated broker registry** with YAML-based definitions for **602 data brokers** across the EU (37), UK (6), and US (559), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
+- **Curated broker registry** with YAML-based definitions for **1,277 data brokers** across the EU (121), UK (20), and US (1,138), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
 - **Event-sourced architecture** with an append-only SQLite event store, state projections, and full audit trail for every removal request.
 - **CLI automation** with 30+ commands to plan removal campaigns, send opt-out requests in batches, track progress, monitor deadlines, and triage broker replies from the terminal.
 - **Web-form automation** via Playwright for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and screenshot capture.

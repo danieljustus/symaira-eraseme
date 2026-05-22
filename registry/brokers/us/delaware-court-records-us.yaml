@@ -1,0 +1,36 @@
+id: delaware-court-records-us
+name: Delaware Court Records
+website: https://delawarecourtrecords.org
+category: people-search
+jurisdictions:
+- US
+laws:
+- CCPA
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://delawarecourtrecords.org
+  template: ccpa-deletion
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://delawarecourtrecords.org
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: Optery

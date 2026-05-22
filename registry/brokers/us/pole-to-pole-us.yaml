@@ -1,0 +1,36 @@
+id: pole-to-pole-us
+name: Pole to Pole
+website: https://pole2pole.de
+category: marketing
+jurisdictions:
+- US
+laws:
+- CCPA
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://pole2pole.de
+  template: ccpa-deletion
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://pole2pole.de
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: OneRep

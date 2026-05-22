@@ -1,0 +1,36 @@
+id: completed-us
+name: Completed
+website: https://completed.com
+category: marketing
+jurisdictions:
+- US
+laws:
+- CCPA
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://completed.com
+  template: ccpa-deletion
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://completed.com
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: OneRep

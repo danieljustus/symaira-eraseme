@@ -1,0 +1,36 @@
+id: bt-uk
+name: BT (British Telecom)
+website: https://www.bt.com
+category: people-search
+jurisdictions:
+- UK
+laws:
+- GDPR
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://www.bt.com
+  template: gdpr-art17
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://www.bt.com
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: BT privacy policy

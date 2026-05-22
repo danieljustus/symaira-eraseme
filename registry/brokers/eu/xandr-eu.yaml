@@ -1,0 +1,36 @@
+id: xandr-eu
+name: Xandr (Microsoft)
+website: https://about.ads.microsoft.com/solutions/xandr
+category: marketing
+jurisdictions:
+- EU
+laws:
+- GDPR
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://about.ads.microsoft.com/en/forms/opt-out-personalized-ads-sales-sharing
+  template: gdpr-art17
+  locale: de
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://about.ads.microsoft.com/en/forms/opt-out-personalized-ads-sales-sharing
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: Eigene Recherche (noyb.eu, Microsoft)

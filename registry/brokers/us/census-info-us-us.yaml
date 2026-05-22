@@ -1,0 +1,36 @@
+id: census-info-us-us
+name: Census Info US
+website: https://census-info.us
+category: people-search
+jurisdictions:
+- US
+laws:
+- CCPA
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://census-info.us
+  template: ccpa-deletion
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://census-info.us
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: PRC

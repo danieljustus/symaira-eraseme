@@ -1,0 +1,33 @@
+id: data-american-us
+name: Data American
+website: https://dataamerica.com
+category: marketing
+jurisdictions:
+- US
+laws:
+- CCPA
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: email
+  endpoint: info@dataamerica.com
+  template: ccpa-deletion
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: PRC

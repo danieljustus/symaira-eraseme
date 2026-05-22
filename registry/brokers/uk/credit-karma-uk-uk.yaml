@@ -1,0 +1,33 @@
+id: credit-karma-uk
+name: Credit Karma UK
+website: https://www.creditkarma.co.uk
+category: credit
+jurisdictions:
+- UK
+laws:
+- GDPR
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: email
+  endpoint: privacy@www.creditkarma.co.uk
+  template: gdpr-art17
+  locale: en
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: Intuit privacy statement

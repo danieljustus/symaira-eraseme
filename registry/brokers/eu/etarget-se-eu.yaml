@@ -1,0 +1,36 @@
+id: etarget-se-eu
+name: ETARGET SE
+website: https://etargetnet.com
+category: marketing
+jurisdictions:
+- EU
+laws:
+- GDPR
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://etargetnet.com/policy
+  template: gdpr-art17
+  locale: de
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://etargetnet.com/policy
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: privacyinsightsolutions.com

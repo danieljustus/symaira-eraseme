@@ -1,0 +1,36 @@
+id: dealfront-eu
+name: Dealfront (ehem. Leadfeeder)
+website: https://www.dealfront.com
+category: other
+jurisdictions:
+- EU
+laws:
+- GDPR
+data_sensitivity: 3
+priority: medium
+opt_out:
+- type: web_form
+  url: https://www.leadfeeder.com/privacy/privacy-notice/
+  template: gdpr-art17
+  locale: de
+  required_fields:
+  - full_name
+  - email
+  supports_suppression: false
+  expected_response_days: 45
+  form_spec:
+    steps:
+    - goto: https://www.leadfeeder.com/privacy/privacy-notice/
+verification:
+  ack_keywords:
+  - received
+  - request
+  rejection_keywords:
+  - cannot
+  - denied
+  human_required_keywords:
+  - verify
+  - identification
+added_date: '2026-05-22'
+status: active
+source: privacyinsightsolutions.com
