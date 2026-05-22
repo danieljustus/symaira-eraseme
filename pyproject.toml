@@ -1,6 +1,6 @@
 [project]
 name = "openeraseme"
-version = "0.1.1"
+version = "0.1.2"
 description = "Automated data broker removal tool — close your accounts, erase your data."
 requires-python = ">=3.11"
 license = { text = "MIT" }
