@@ -360,6 +360,11 @@ def grant(
         "--list",
         help="List active tokens",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show token without creating it",
+    ),
 ) -> None:
     result = handle_grant(
         command,
@@ -367,6 +372,7 @@ def grant(
         revoke,
         revoke_all,
         list_tokens,
+        dry_run,
         ctx.obj["output"],
     )
     _render(ctx.obj["output"], result)
@@ -505,11 +511,17 @@ def run_web_form(
         "--screenshots",
         help="Directory for screenshots",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show form steps without executing",
+    ),
 ) -> None:
     result = handle_run_web_form(
         broker_id,
         headed,
         screenshot_dir,
+        dry_run,
         ctx.obj["output"],
     )
     _render(ctx.obj["output"], result)
@@ -660,12 +672,18 @@ def solve_captcha_cmd(
         prompt=True,
         help="Page URL where captcha appears",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show captcha parameters without solving",
+    ),
 ) -> None:
     result = handle_solve_captcha(
         provider,
         api_key,
         site_key,
         page_url,
+        dry_run,
         ctx.obj["output"],
     )
     _render(ctx.obj["output"], result)
@@ -758,12 +776,18 @@ def schedule_install(
         "--yes",
         help="Skip confirmation prompt",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show scheduler configs without installing",
+    ),
 ) -> None:
     result = handle_schedule_install(
         platform,
         tick_hour,
         tick_minute,
         yes,
+        dry_run,
         ctx.obj["output"],
     )
     _render(ctx.obj["output"], result)

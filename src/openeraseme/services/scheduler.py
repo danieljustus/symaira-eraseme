@@ -72,10 +72,40 @@ def handle_schedule_install(
     tick_hour: int = 10,
     tick_minute: int = 0,
     yes: bool = False,
+    dry_run: bool = False,
     output_format: str = "text",
 ) -> str:
     plat = platform or detect_platform()
     output_dir = "./schedules"
+
+    if dry_run:
+        files = generate_scheduler_configs(
+            platform_name=plat,
+            output_dir=output_dir,
+            tick_hour=tick_hour,
+            tick_minute=tick_minute,
+        )
+        if output_format == "json":
+            return json.dumps(
+                {
+                    "platform": plat,
+                    "output_dir": output_dir,
+                    "files": list(files.keys()),
+                    "dry_run": True,
+                },
+                indent=2,
+            )
+        lines = [f"[DRY RUN] Would generate schedule configs for {plat} in {output_dir}:"]
+        for name in files:
+            lines.append(f"  {name}")
+        lines.append("")
+        lines.append("To install:")
+        suffix = "   # (installs crontab entries)" if plat == "cron" else ""
+        lines.append(f"  bash {output_dir}/install.sh{suffix}")
+        lines.append("")
+        lines.append("To uninstall:")
+        lines.append(f"  bash {output_dir}/uninstall.sh")
+        return "\n".join(lines)
 
     if not yes:
         typer.echo(f"Platform detected: {plat}")

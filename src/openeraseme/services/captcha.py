@@ -12,8 +12,25 @@ def handle_solve_captcha(
     api_key: str | None = None,
     site_key: str | None = None,
     page_url: str | None = None,
+    dry_run: bool = False,
     output_format: str = "text",
 ) -> str:
+    if dry_run:
+        if output_format == "json":
+            return json.dumps(
+                {
+                    "provider": provider,
+                    "site_key": site_key,
+                    "page_url": page_url,
+                    "dry_run": True,
+                },
+                indent=2,
+            )
+        lines = [f"[DRY RUN] Would solve captcha via {provider}:"]
+        lines.append(f"  site_key: {site_key}")
+        lines.append(f"  page_url: {page_url}")
+        return "\n".join(lines)
+
     typer.echo(f"Solving captcha via {provider}...")
 
     if site_key is None or page_url is None:

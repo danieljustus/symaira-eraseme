@@ -21,6 +21,7 @@ def handle_run_web_form(
     broker_id: str,
     headed: bool = False,
     screenshot_dir: str = "",
+    dry_run: bool = False,
     output_format: str = "text",
 ) -> str:
     try:
@@ -66,6 +67,19 @@ def handle_run_web_form(
             identity_fields[f"address_zip_{i}"] = addr.postal_code
             identity_fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
             identity_fields[f"address_country_{i}"] = addr.country
+
+    if dry_run:
+        lines = [f"[DRY RUN] Would run web form for {broker.name} ({url})"]
+        lines.append(f"Steps: {len(steps_data)}")
+        for i, step in enumerate(steps_data, 1):
+            action = step.get("action", "unknown")
+            selector = step.get("selector", "")
+            lines.append(f"  Step {i}: {action} {selector}")
+        if identity_fields:
+            lines.append("Identity fields:")
+            for k, v in identity_fields.items():
+                lines.append(f"  {k}: {v}")
+        return "\n".join(lines)
 
     typer.echo(f"Running web form for {broker.name} ({url})")
     typer.echo(f"Steps: {len(steps_data)}")
