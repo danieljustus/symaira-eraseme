@@ -8,7 +8,7 @@ import sys
 
 from openeraseme.core.db import _db_path
 from openeraseme.core.identity import _profile_path
-from openeraseme.registry.loader import _registry_dir
+from openeraseme.registry.loader import _SKIPPED_COUNT, _broker_cache_key, _registry_dir
 
 
 def _check_python_version() -> tuple[bool, str]:
@@ -66,7 +66,12 @@ def _check_registry() -> tuple[bool, str]:
         if not registry_path.exists():
             return False, f"Registry not found at {registry_path}"
         broker_count = len(list(registry_path.rglob("*.yaml")))
-        return True, f"{broker_count} broker definitions found"
+        cache_key = _broker_cache_key(registry_path)
+        skipped = _SKIPPED_COUNT.get(cache_key, 0)
+        msg = f"{broker_count} broker definitions found"
+        if skipped:
+            msg += f" ({skipped} skipped)"
+        return True, msg
     except Exception as e:
         return False, str(e)
 

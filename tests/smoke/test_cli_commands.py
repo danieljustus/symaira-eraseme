@@ -219,6 +219,22 @@ class TestValidateCommand:
         result = invoke("validate", "--registry-dir", str(broken_dir))
         assert_in_output_stderr(result, "broken.yaml")
 
+    def test_validate_failure_json_exits_nonzero(self, tmp_path):
+        """Failing validate with --output json must return non-zero exit code."""
+        broken_dir = tmp_path / "brokers"
+        broken_dir.mkdir()
+        (broken_dir / "broken.yaml").write_text(
+            "id: broken\nname: Broken\nwebsite: not-a-url\n"
+            "category: people-search\njurisdictions: []\nlaws: []\n"
+            "priority: high\nopt_out: []\n"
+        )
+        result = invoke("--output", "json", "validate", "--registry-dir", str(broken_dir))
+        assert result.exit_code != 0
+        import json as _json
+
+        data = _json.loads(result.stdout)
+        assert data["ok"] is False
+
 
 class TestCalendarCommand:
     def test_calendar_empty_db_text(self, tmp_home):

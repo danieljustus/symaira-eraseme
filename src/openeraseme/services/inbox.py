@@ -10,7 +10,7 @@ from openeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
 from openeraseme.core.db import init_db
-from openeraseme.core.events import list_removal_requests
+from openeraseme.core.events import get_events, list_removal_requests
 from openeraseme.core.orchestrator import submit_inbox_reply
 
 
@@ -47,7 +47,19 @@ def handle_poll_inbox(
 
     if messages:
         requests = list_removal_requests(campaign_id=campaign_id)
-        matched = match_reply_to_request(messages, requests)
+        thread_map: dict[str, int] = {}
+        for req in requests:
+            req_id = req.get("id") or req.get("request_id")
+            if not req_id:
+                continue
+            for ev in get_events(req_id):
+                if ev.get("event_type") == "SENT":
+                    payload = ev.get("payload_json", {})
+                    msg_id = payload.get("message_id", "")
+                    if msg_id:
+                        thread_map[msg_id] = req_id
+
+        matched = match_reply_to_request(messages, requests, thread_map)
         for msg in matched:
             submit_inbox_reply(
                 msg.get("message_id", ""),

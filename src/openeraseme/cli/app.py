@@ -127,32 +127,45 @@ app.add_typer(registry_app)
 # ── helpers ──────────────────────────────────────────────────────────────
 
 
-def _render(output_format: str, result: str, result_obj: CliResult | None = None) -> None:
+def _render(
+    output_format: str,
+    result: str | CliResult,
+    result_obj: CliResult | None = None,
+) -> None:
     """Print the result of a command handler, formatted appropriately.
 
     For JSON output the raw string is printed as-is (soft_wrap to avoid
     rich inserting line breaks into the serialized data).
     For text output the result is wrapped in a rich Panel when the content
     spans multiple lines or carries an error.
+
+    Raises typer.Exit(1) when the result indicates failure so every command
+    returns a non-zero exit code uniformly.
     """
+    if isinstance(result, CliResult):
+        result_obj = result
+        result = result.message
+
     if output_format == "json":
         if result_obj is not None:
-            console.print(result_obj.to_json(), markup=False, soft_wrap=True)
+            import json as _json
+
+            console.print(
+                _json.dumps(result_obj.data, indent=2, default=str),
+                markup=False,
+                soft_wrap=True,
+            )
         else:
             console.print(result, markup=False, soft_wrap=True)
-        return
+    elif result_obj is not None and not result_obj.success:
+        print_error(result_obj.message)
+    elif "\n" not in result.strip():
+        console.print(result, markup=False, soft_wrap=True)
+    else:
+        print_panel("Output", result.strip())
 
     if result_obj is not None and not result_obj.success:
-        print_error(result_obj.message)
-        return
-
-    # Single-line responses use plain text
-    if "\n" not in result.strip():
-        console.print(result, markup=False, soft_wrap=True)
-        return
-
-    # Multi-line responses get a panel
-    print_panel("Output", result.strip())
+        raise typer.Exit(1)
 
 
 def _render_error(message: str) -> None:
@@ -945,19 +958,6 @@ def registry_sync_cmd(
     )
     _render(ctx.obj["output"], result)
 
-    if ctx.obj["output"] == "json":
-        import json as _json
-
-        try:
-            ok = bool(_json.loads(result).get("ok"))
-        except Exception:
-            ok = True
-    else:
-        ok = "ok: True" in result or "ok: False" not in result
-
-    if not ok:
-        raise typer.Exit(1)
-
 
 @app.command()
 def status(
@@ -1044,20 +1044,6 @@ def validate(
     """
     result = handle_validate(registry_dir=registry_dir, output_format=ctx.obj["output"])
     _render(ctx.obj["output"], result)
-
-    import json as _json
-
-    if ctx.obj["output"] == "json":
-        try:
-            data = _json.loads(result)
-            ok = bool(data.get("ok"))
-        except Exception:
-            ok = True
-    else:
-        ok = "OK — registry is valid." in result
-
-    if not ok:
-        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

@@ -221,6 +221,45 @@ class TestClassifierIntegration:
             assert len(prompt) > 100
 
 
+class TestAnthropicClientRetry:
+    """Verify that SDK exceptions are properly mapped and trigger retries."""
+
+    def test_rate_limit_error_triggers_retry_and_raises_custom_error(self):
+        """Simulate anthropic.RateLimitError → retry loop → AnthropicClientRateLimitError."""
+        from unittest.mock import MagicMock
+
+        import anthropic
+        import pytest
+
+        from openeraseme.llm.anthropic_client import (
+            AnthropicClient,
+            AnthropicClientRateLimitError,
+        )
+
+        client = AnthropicClient(api_key="test-key", max_retries=3)
+
+        # Bypass lazy init so we can inject a mock client
+        client._client = MagicMock()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        rate_limit_err = anthropic.RateLimitError(
+            message="429 Too Many Requests",
+            response=mock_response,
+            body={"error": {"type": "rate_limit_error", "message": "Rate limited"}},
+        )
+        client._client.messages.create.side_effect = rate_limit_err
+
+        with pytest.raises(AnthropicClientRateLimitError) as exc_info:
+            client.classify(
+                system_prompt="You are helpful.",
+                user_prompt="Hello",
+            )
+
+        assert client._client.messages.create.call_count == 3
+        assert "429 Too Many Requests" in str(exc_info.value)
+
+
 class TestCLassifierCLI:
     def test_classifier_importable(self):
         from openeraseme.adapters.triage import classifier

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 import yaml
 
+from openeraseme.cli.types import CliResult
 from openeraseme.registry.loader import _registry_dir, broker_schema
 from openeraseme.registry.schema import Broker
 
@@ -16,11 +16,10 @@ from openeraseme.registry.schema import Broker
 def handle_validate(
     registry_dir: str | None = None,
     output_format: str = "text",
-) -> str:
+) -> CliResult:
     """Validate every broker YAML against the JSON Schema and the Pydantic model.
 
-    Reports per-file results plus duplicate-id detection. Exit-code logic
-    lives in the CLI layer.
+    Reports per-file results plus duplicate-id detection.
     """
     brokers_dir = _registry_dir() / "brokers" if registry_dir is None else Path(registry_dir)
 
@@ -75,11 +74,9 @@ def handle_validate(
         "failed": failed_files,
         "duplicate_ids": duplicate_ids,
         "valid": valid_files,
-        "ok": len(failed_files) == 0 and len(duplicate_ids) == 0,
     }
 
-    if output_format == "json":
-        return json.dumps(summary, indent=2, default=str)
+    ok = len(failed_files) == 0 and len(duplicate_ids) == 0
 
     lines = [
         f"Registry: {brokers_dir}",
@@ -98,7 +95,35 @@ def handle_validate(
         lines.append("Duplicate broker ids:")
         for d in duplicate_ids:
             lines.append(f"  {d['id']}: {d['file']} (first seen in {d['first_seen_in']})")
-    if summary["ok"]:
+    if ok:
         lines.append("")
         lines.append("OK — registry is valid.")
-    return "\n".join(lines)
+
+    lines = [
+        f"Registry: {brokers_dir}",
+        f"  Checked: {summary['totals']['checked']}",
+        f"  Valid:   {summary['totals']['valid']}",
+        f"  Failed:  {summary['totals']['failed']}",
+        f"  Duplicate ids: {summary['totals']['duplicate_ids']}",
+    ]
+    if failed_files:
+        lines.append("")
+        lines.append("Failures:")
+        for fail in failed_files:
+            lines.append(f"  {fail['file']}  [{fail['stage']}]  {fail['error']}")
+    if duplicate_ids:
+        lines.append("")
+        lines.append("Duplicate broker ids:")
+        for d in duplicate_ids:
+            lines.append(f"  {d['id']}: {d['file']} (first seen in {d['first_seen_in']})")
+    if ok:
+        lines.append("")
+        lines.append("OK — registry is valid.")
+
+    summary["ok"] = ok
+    summary["message"] = "\n".join(lines)
+    return CliResult(
+        success=ok,
+        data=summary,
+        error=None if ok else "Registry validation failed",
+    )

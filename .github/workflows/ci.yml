@@ -89,7 +89,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: TruffleHog secrets scan
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.95.3
         with:
           path: ./
           extra_args: --only-verified

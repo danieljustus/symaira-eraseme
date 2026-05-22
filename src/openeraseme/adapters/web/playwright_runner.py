@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -134,7 +135,7 @@ async def _execute_step(
         if initial_url and target_url == ".":
             target_url = initial_url
         logger.debug("Navigating to %s", target_url)
-        await page.goto(target_url, timeout=step_timeout, wait_until="networkidle")
+        await page.goto(target_url, timeout=step_timeout, wait_until="domcontentloaded")
 
     for selector, value in (step.get("fill") or {}).items():
         filled = _resolve_value(value, identity_fields)
@@ -207,13 +208,18 @@ async def _execute_step(
 
 def _resolve_value(value: str, identity_fields: dict[str, str]) -> str:
     """Resolve template variables in a value string."""
-    if not value or not identity_fields:
+    if not value:
         return value
     result = value
-    for key, val in identity_fields.items():
+    for key, val in (identity_fields or {}).items():
         placeholder = f"${{{key}}}"
         if placeholder in result:
             result = result.replace(placeholder, val)
+    unresolved = re.findall(r"\$\{[^}]+\}", result)
+    if unresolved:
+        keys = ", ".join(sorted(set(unresolved)))
+        msg = f"Unresolved identity placeholder(s): {keys}"
+        raise PlaywrightRunnerError(msg)
     return result
 
 

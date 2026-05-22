@@ -13,7 +13,22 @@ logger = logging.getLogger(__name__)
 
 CAPSOLVER_BASE = "https://api.capsolver.com"
 TWOCAPTCHA_BASE = "https://2captcha.com"
-POLL_INTERVAL = 5
+
+_BACKOFF_SEQUENCE = (1, 2, 3, 5, 8, 10)
+_BACKOFF_CAP = 10
+
+
+def _backoff_delay(iteration: int, cap: int = _BACKOFF_CAP) -> float:
+    """Return the sleep duration for polling iteration `i` (0-indexed).
+
+    The sequence is a Fibonacci-like progression capped at `cap` seconds:
+        1, 2, 3, 5, 8, cap, cap, cap, …
+
+    This reduces API calls over time while bounding the max idle gap.
+    """
+    if iteration < len(_BACKOFF_SEQUENCE):
+        return float(_BACKOFF_SEQUENCE[iteration])
+    return float(cap)
 
 
 class CaptchaError(Exception):
@@ -55,6 +70,7 @@ class CapSolverSolver(CaptchaSolver):
     """CapSolver.com REST API implementation."""
 
     def solve_image(self, image_path: str | Path, **kwargs: Any) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         with open(image_path, "rb") as f:
             import base64
 
@@ -66,9 +82,10 @@ class CapSolverSolver(CaptchaSolver):
         }
         if "module" in kwargs:
             task["module"] = kwargs["module"]
-        return self._solve_task(task)
+        return self._solve_task(task, timeout_seconds=timeout)
 
     def solve_recaptcha_v2(self, site_key: str, page_url: str, **kwargs: Any) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         task: dict[str, Any] = {
             "type": "ReCaptchaV2Task",
             "websiteURL": page_url,
@@ -78,7 +95,7 @@ class CapSolverSolver(CaptchaSolver):
             task["isInvisible"] = kwargs["is_invisible"]
         if "page_action" in kwargs:
             task["pageAction"] = kwargs["page_action"]
-        return self._solve_task(task)
+        return self._solve_task(task, timeout_seconds=timeout)
 
     def solve_recaptcha_v3(
         self,
@@ -88,6 +105,7 @@ class CapSolverSolver(CaptchaSolver):
         min_score: float = 0.3,
         **kwargs: Any,
     ) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         task: dict[str, Any] = {
             "type": "ReCaptchaV3Task",
             "websiteURL": page_url,
@@ -95,11 +113,11 @@ class CapSolverSolver(CaptchaSolver):
             "pageAction": action,
             "minScore": min_score,
         }
-        return self._solve_task(task)
+        return self._solve_task(task, timeout_seconds=timeout)
 
-    def _solve_task(self, task: dict[str, Any]) -> CaptchaSolution:
+    def _solve_task(self, task: dict[str, Any], timeout_seconds: int = 120) -> CaptchaSolution:
         task_id = self._create_task(task)
-        solution = self._await_solution(task_id)
+        solution = self._await_solution(task_id, timeout_seconds=timeout_seconds)
         token = solution.get("gRecaptchaResponse", solution.get("text", ""))
         return CaptchaSolution(token=token, task_id=task_id)
 
@@ -124,15 +142,28 @@ class CapSolverSolver(CaptchaSolver):
             raise CaptchaError(f"CapSolver error: {data.get('errorDescription', 'unknown')}")
         return str(data.get("taskId", ""))
 
-    def _await_solution(self, task_id: str, max_retries: int = 30) -> dict[str, Any]:
+    def _await_solution(self, task_id: str, timeout_seconds: int = 120) -> dict[str, Any]:
+        """Poll CapSolver for a solution using exponential backoff.
+
+        Sleep intervals follow a Fibonacci-like progression capped at 10 s:
+            1, 2, 3, 5, 8, 10, 10, 10, …
+
+        The total wall-clock budget is bounded by *timeout_seconds*.
+        """
         payload = json.dumps(
             {
                 "clientKey": self._api_key,
                 "taskId": task_id,
             }
         ).encode()
-        for _ in range(max_retries):
-            time.sleep(POLL_INTERVAL)
+        deadline = time.monotonic() + timeout_seconds
+        iteration = 0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CaptchaError(f"CapSolver task {task_id} timed out after {timeout_seconds}s")
+            sleep_time = min(_backoff_delay(iteration), remaining)
+            time.sleep(sleep_time)
             try:
                 req = Request(
                     f"{CAPSOLVER_BASE}/getTaskResult",
@@ -147,13 +178,14 @@ class CapSolverSolver(CaptchaSolver):
                 raise CaptchaError(f"CapSolver error: {data.get('errorDescription', 'unknown')}")
             if data.get("status") == "ready":
                 return data.get("solution", {})
-        raise CaptchaError(f"CapSolver task {task_id} timed out")
+            iteration += 1
 
 
 class TwoCaptchaSolver(CaptchaSolver):
     """2captcha.com REST API implementation."""
 
     def solve_image(self, image_path: str | Path, **kwargs: Any) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         with open(image_path, "rb") as f:
             import base64
 
@@ -171,9 +203,10 @@ class TwoCaptchaSolver(CaptchaSolver):
             params["regsense"] = int(kwargs["regsense"])
         if "numeric" in kwargs:
             params["numeric"] = int(kwargs["numeric"])
-        return self._solve(params)
+        return self._solve(params, timeout_seconds=timeout)
 
     def solve_recaptcha_v2(self, site_key: str, page_url: str, **kwargs: Any) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         params: dict[str, Any] = {
             "key": self._api_key,
             "method": "userrecaptcha",
@@ -183,7 +216,7 @@ class TwoCaptchaSolver(CaptchaSolver):
         }
         if "invisible" in kwargs:
             params["invisible"] = int(kwargs["invisible"])
-        return self._solve(params)
+        return self._solve(params, timeout_seconds=timeout)
 
     def solve_recaptcha_v3(
         self,
@@ -193,6 +226,7 @@ class TwoCaptchaSolver(CaptchaSolver):
         min_score: float = 0.3,
         **kwargs: Any,
     ) -> CaptchaSolution:
+        timeout = kwargs.pop("timeout_seconds", 120)
         params: dict[str, Any] = {
             "key": self._api_key,
             "method": "userrecaptcha",
@@ -203,11 +237,11 @@ class TwoCaptchaSolver(CaptchaSolver):
             "json": 1,
             "version": "v3",
         }
-        return self._solve(params)
+        return self._solve(params, timeout_seconds=timeout)
 
-    def _solve(self, params: dict[str, Any]) -> CaptchaSolution:
+    def _solve(self, params: dict[str, Any], timeout_seconds: int = 120) -> CaptchaSolution:
         captcha_id = self._upload(params)
-        solution = self._await_result(captcha_id)
+        solution = self._await_result(captcha_id, timeout_seconds=timeout_seconds)
         return CaptchaSolution(token=solution, task_id=captcha_id)
 
     def _upload(self, params: dict[str, Any]) -> str:
@@ -223,7 +257,14 @@ class TwoCaptchaSolver(CaptchaSolver):
             raise CaptchaError(f"2captcha upload error: {error_text}")
         return str(data.get("request", ""))
 
-    def _await_result(self, captcha_id: str, max_retries: int = 30) -> str:
+    def _await_result(self, captcha_id: str, timeout_seconds: int = 120) -> str:
+        """Poll 2captcha for a result using exponential backoff.
+
+        Sleep intervals follow a Fibonacci-like progression capped at 10 s:
+            1, 2, 3, 5, 8, 10, 10, 10, …
+
+        The total wall-clock budget is bounded by *timeout_seconds*.
+        """
         params = urlencode(
             {
                 "key": self._api_key,
@@ -232,8 +273,16 @@ class TwoCaptchaSolver(CaptchaSolver):
                 "json": 1,
             }
         )
-        for _ in range(max_retries):
-            time.sleep(POLL_INTERVAL)
+        deadline = time.monotonic() + timeout_seconds
+        iteration = 0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CaptchaError(
+                    f"2captcha captcha {captcha_id} timed out after {timeout_seconds}s"
+                )
+            sleep_time = min(_backoff_delay(iteration), remaining)
+            time.sleep(sleep_time)
             try:
                 req = Request(f"{TWOCAPTCHA_BASE}/res.php?{params}")
                 resp = urlopen(req, timeout=30)
@@ -244,7 +293,7 @@ class TwoCaptchaSolver(CaptchaSolver):
                 return str(data.get("request", ""))
             if data.get("request") != "CAPCHA_NOT_READY":
                 raise CaptchaError(f"2captcha error: {data.get('request', 'unknown')}")
-        raise CaptchaError(f"2captcha captcha {captcha_id} timed out")
+            iteration += 1
 
 
 def create_solver(

@@ -116,6 +116,8 @@ class AnthropicClient:
                         wait,
                     )
                     time.sleep(wait)
+                else:
+                    raise
             except AnthropicClientError as e:
                 last_error = e
                 if attempt < self.max_retries:
@@ -161,7 +163,14 @@ class AnthropicClient:
                 }
             ]
 
-        message = self.client.messages.create(**kwargs)
+        import anthropic
+
+        try:
+            message = self.client.messages.create(**kwargs)
+        except anthropic.RateLimitError as e:
+            raise AnthropicClientRateLimitError(str(e)) from e
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            raise AnthropicClientError(str(e)) from e
 
         response_text = ""
         for block in message.content:

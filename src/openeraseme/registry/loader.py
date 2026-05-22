@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from importlib import resources
 from pathlib import Path
 
 import jsonschema
 import yaml
+from pydantic import ValidationError
 
 from openeraseme.registry.schema import Broker
+
+logger = logging.getLogger(__name__)
 
 
 def _registry_dir() -> Path:
@@ -77,6 +81,7 @@ def load_broker(broker_id: str) -> Broker:
 
 
 _BROKER_CACHE: dict[tuple[str, float], list[Broker]] = {}
+_SKIPPED_COUNT: dict[tuple[str, float], int] = {}
 
 
 def _broker_cache_key(registry_dir: Path) -> tuple[str, float]:
@@ -106,15 +111,19 @@ def load_all_brokers(
         brokers = _BROKER_CACHE[cache_key]
     else:
         brokers = []
+        skipped = 0
         for yml in sorted(registry_path.rglob("*.yaml")):
             if yml.name.startswith("_"):
                 continue
             try:
                 broker = load_broker_yaml(yml)
-            except (yaml.YAMLError, jsonschema.ValidationError, Exception):
+            except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+                logger.warning("skipped broker %s: %s", yml, exc)
+                skipped += 1
                 continue
             brokers.append(broker)
         _BROKER_CACHE[cache_key] = brokers
+        _SKIPPED_COUNT[cache_key] = skipped
 
     filtered: list[Broker] = []
     for broker in brokers:

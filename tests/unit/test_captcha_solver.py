@@ -81,16 +81,19 @@ class TestCapSolverSolver:
                 page_url="https://example.com",
             )
 
+    @patch("openeraseme.adapters.web.captcha_solver.time.monotonic")
     @patch("openeraseme.adapters.web.captcha_solver.urlopen")
     @patch("openeraseme.adapters.web.captcha_solver.time.sleep")
-    def test_capsolver_timeout(self, mock_sleep, mock_urlopen):
+    def test_capsolver_timeout(self, mock_sleep, mock_urlopen, mock_monotonic):
         from unittest.mock import Mock
 
         create_resp = Mock()
         create_resp.read.return_value = b'{"errorId": 0, "taskId": "abc-123"}'
         result_resp = Mock()
         result_resp.read.return_value = b'{"errorId": 0, "status": "processing"}'
-        mock_urlopen.side_effect = [create_resp] + [result_resp] * 30
+        mock_urlopen.side_effect = [create_resp, result_resp]
+
+        mock_monotonic.side_effect = [0.0, 1.0, 130.0]
 
         solver = CapSolverSolver("test-key")
         with pytest.raises(CaptchaError, match="timed out"):
@@ -141,16 +144,19 @@ class TestTwoCaptchaSolver:
                 page_url="https://example.com",
             )
 
+    @patch("openeraseme.adapters.web.captcha_solver.time.monotonic")
     @patch("openeraseme.adapters.web.captcha_solver.urlopen")
     @patch("openeraseme.adapters.web.captcha_solver.time.sleep")
-    def test_twocaptcha_timeout(self, mock_sleep, mock_urlopen):
+    def test_twocaptcha_timeout(self, mock_sleep, mock_urlopen, mock_monotonic):
         from unittest.mock import Mock
 
         upload_resp = Mock()
         upload_resp.read.return_value = b'{"status": 1, "request": "captcha-456"}'
         result_resp = Mock()
         result_resp.read.return_value = b'{"status": 0, "request": "CAPCHA_NOT_READY"}'
-        mock_urlopen.side_effect = [upload_resp] + [result_resp] * 30
+        mock_urlopen.side_effect = [upload_resp, result_resp]
+
+        mock_monotonic.side_effect = [0.0, 1.0, 130.0]
 
         solver = TwoCaptchaSolver("test-key")
         with pytest.raises(CaptchaError, match="timed out"):
