@@ -288,6 +288,7 @@ examples/        — Integration examples for Claude Code, OpenClaw, cron
 
 ## Security
 
+- **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.
 - **Database encryption**: When `OPENERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. On open, the database is decrypted to a temporary file in your user data directory (`~/.local/share/openeraseme/`). The temp file has restrictive permissions (`0o600`) and is re-encrypted and removed on normal exit, SIGTERM, or context close. However, a `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind. If this is a concern for your threat model, consider running OpenEraseMe on a single-user system or using full-disk encryption.
 
 ## License

@@ -53,7 +53,7 @@ def save_profile(
     nonce = os.urandom(NONCE_LENGTH)
 
     header = json.dumps(
-        {"version": 1, "nonce": nonce.hex(), "algorithm": "AES-256-GCM"},
+        {"version": 2, "nonce": nonce.hex(), "algorithm": "AES-256-GCM"},
     ).encode("utf-8")
 
     payload = profile.model_dump_json(indent=2).encode("utf-8")
@@ -84,11 +84,15 @@ def load_profile(path: str | None = None) -> IdentityProfile:
     try:
         plaintext = aesgcm.decrypt(nonce, ciphertext, header_bytes)
     except InvalidTag:
-        logger.warning(
-            "AAD verification failed — retrying without AAD for legacy file. "
-            "Re-encrypt the profile to upgrade: openeraseme save-profile",
-        )
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        version = header.get("version", 0)
+        if version == 0:
+            logger.warning(
+                "AAD verification failed — retrying without AAD for legacy file. "
+                "Re-encrypt the profile to upgrade: openeraseme save-profile",
+            )
+            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        else:
+            raise
     data = json.loads(plaintext.decode("utf-8"))
 
     return IdentityProfile.model_validate(data)

@@ -1,5 +1,7 @@
 """Tests for the identity vault (AES-GCM + keyring)."""
 
+import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -121,3 +123,53 @@ class TestIdentityVault:
 
         with pytest.raises(FileNotFoundError):
             vault.load_profile()
+
+    def test_tampered_ciphertext_fails_closed(self, monkeypatch):
+        from cryptography.exceptions import InvalidTag
+
+        import openeraseme.core.identity as vault
+
+        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_tampered.enc")
+        path = Path("/tmp/openeraseme_test_tampered.enc")
+        path.unlink(missing_ok=True)
+
+        profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
+        vault.save_profile(profile)
+
+        raw = path.read_bytes()
+        header_bytes, _, ciphertext = raw.partition(b"\n")
+        tampered = bytearray(ciphertext)
+        tampered[-1] ^= 0xFF
+        path.write_bytes(header_bytes + b"\n" + bytes(tampered))
+
+        with pytest.raises(InvalidTag):
+            vault.load_profile()
+
+        vault.delete_profile()
+
+    def test_legacy_version_0_fallback(self, monkeypatch):
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        import openeraseme.core.identity as vault
+
+        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_legacy.enc")
+        path = Path("/tmp/openeraseme_test_legacy.enc")
+        path.unlink(missing_ok=True)
+
+        key = AESGCM.generate_key(bit_length=256)
+        aesgcm = AESGCM(key)
+        nonce = os.urandom(12)
+        profile = IdentityProfile(full_name="Legacy User", email_addresses=["legacy@example.com"])
+        payload = profile.model_dump_json(indent=2).encode("utf-8")
+        ciphertext = aesgcm.encrypt(nonce, payload, None)
+        header = json.dumps(
+            {"version": 0, "nonce": nonce.hex(), "algorithm": "AES-256-GCM"},
+        ).encode("utf-8")
+        path.write_bytes(header + b"\n" + ciphertext)
+
+        with patch("openeraseme.core.identity.keyring.get_password", return_value=key.hex()):
+            loaded = vault.load_profile()
+
+        assert loaded.full_name == "Legacy User"
+
+        vault.delete_profile()
