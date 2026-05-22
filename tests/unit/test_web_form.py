@@ -110,7 +110,7 @@ class TestFormStepExecution:
         mock_page.goto.assert_called_once_with(
             "https://example.com/form",
             timeout=30000,
-            wait_until="networkidle",
+            wait_until="domcontentloaded",
         )
 
     @pytest.mark.asyncio

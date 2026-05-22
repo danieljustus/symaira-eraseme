@@ -135,7 +135,7 @@ async def _execute_step(
         if initial_url and target_url == ".":
             target_url = initial_url
         logger.debug("Navigating to %s", target_url)
-        await page.goto(target_url, timeout=step_timeout, wait_until="networkidle")
+        await page.goto(target_url, timeout=step_timeout, wait_until="domcontentloaded")
 
     for selector, value in (step.get("fill") or {}).items():
         filled = _resolve_value(value, identity_fields)

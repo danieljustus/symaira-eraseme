@@ -169,7 +169,7 @@ async def auto_confirm(
         result = ConfirmationResult(success=False, clicked_url=target_url)
 
         try:
-            await page.goto(target_url, timeout=30000, wait_until="networkidle")
+            await page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
 
             if rate_limit_delay > 0:
                 await _async_sleep(rate_limit_delay)
