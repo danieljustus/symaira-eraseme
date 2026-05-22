@@ -310,7 +310,7 @@ def send_message(
     bcc: str | None = None,
     account: str | None = None,
     config_path: str | Path | None = None,
-) -> str:
+) -> dict[str, str]:
     _check_himalaya_installed()
     cmd = ["himalaya"]
     if account:
