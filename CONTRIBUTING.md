@@ -79,13 +79,21 @@ If you cannot capture a live site key, set `disabled: true` on that
 `opt_out` entry and add a `notes:` block explaining what's missing.
 A partial entry is better than no entry — maintainers can complete it later.
 
-### Step 5 — Find the acknowledgement text
+### Step 5 — Identity placeholders in form fields
+
+Web-form steps can reference identity fields with `${field_name}` syntax
+(e.g. `${full_name}`, `${email}`). If a referenced field is missing from the
+user's profile, the form runner aborts with an error listing the unresolved
+placeholders. Only reference fields that are guaranteed to exist for the
+broker's target jurisdiction.
+
+### Step 6 — Find the acknowledgement text
 
 After submitting a real opt-out (use a throwaway email), note the exact
 wording of the confirmation message. Add key phrases to `ack_keywords`.
 These are used by the automated triage engine to mark requests as resolved.
 
-### Step 6 — Validate
+### Step 7 — Validate
 
 ```bash
 openeraseme registry validate registry/brokers/us/example-broker-us.yaml
@@ -97,7 +105,7 @@ Or validate the whole registry:
 openeraseme registry validate
 ```
 
-### Step 7 — Open a pull request
+### Step 8 — Open a pull request
 
 Use the PR template. Complete the **Registry Additions** table at the
 bottom. A maintainer will review the opt-out URL/email and merge.

@@ -30,12 +30,17 @@ class TestResolveValue:
         )
         assert result == "John Doe <john@example.com>"
 
-    def test_unknown_placeholder_unchanged(self):
-        result = _resolve_value("Hello ${unknown}", {"name": "World"})
-        assert result == "Hello ${unknown}"
+    def test_unknown_placeholder_raises(self):
+        with pytest.raises(PlaywrightRunnerError, match="Unresolved identity placeholder.*\\${unknown}"):
+            _resolve_value("Hello ${unknown}", {"name": "World"})
 
-    def test_empty_identity_fields(self):
-        assert _resolve_value("Hello ${name}", {}) == "Hello ${name}"
+    def test_multiple_unresolved_placeholders_raises(self):
+        with pytest.raises(PlaywrightRunnerError, match="Unresolved identity placeholder.*\\${missing}"):
+            _resolve_value("${missing} and ${missing}", {"name": "World"})
+
+    def test_empty_identity_fields_raises(self):
+        with pytest.raises(PlaywrightRunnerError, match="Unresolved identity placeholder.*\\${name}"):
+            _resolve_value("Hello ${name}", {})
 
     def test_empty_value(self):
         assert _resolve_value("", {"name": "World"}) == ""
