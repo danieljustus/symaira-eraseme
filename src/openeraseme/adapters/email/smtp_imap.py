@@ -196,25 +196,42 @@ def poll_inbox(
 def match_reply_to_request(
     messages: list[dict[str, Any]],
     requests: list[dict[str, Any]],
+    thread_map: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     """Match IMAP replies to removal requests by thread/subject matching.
 
-    Returns enriched messages with matched request_id.
+    Parameters
+    ----------
+    messages:
+        Inbound email dicts with at least ``subject`` and optionally ``thread_id``.
+    requests:
+        Removal request dicts with at least ``id`` or ``request_id`` and ``broker_id``.
+    thread_map:
+        Optional mapping from Message-ID string to request id. When a reply's
+        ``thread_id`` is present in this map the request is matched immediately
+        via ``match_method="thread"``.
+
+    Returns
+    -------
+    Enriched messages with ``request_id`` and ``match_method`` keys.
     """
     matched: list[dict[str, Any]] = []
+    thread_map = thread_map or {}
 
     for msg in messages:
         found = False
         msg_subject = msg.get("subject", "")
         msg_thread = msg.get("thread_id", "")
 
+        if msg_thread and msg_thread in thread_map:
+            msg["request_id"] = thread_map[msg_thread]
+            msg["match_method"] = "thread"
+            matched.append(msg)
+            continue
+
         for req in requests:
             req_id = req.get("id") or req.get("request_id")
             req_subject = f"Data Deletion Request — {req.get('broker_id', '')}"
-
-            if msg_thread:
-                # Check if any event references this thread
-                pass
 
             if subject_matches(req_subject, msg_subject):
                 msg["request_id"] = req_id

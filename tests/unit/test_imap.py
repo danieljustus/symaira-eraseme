@@ -5,6 +5,7 @@ from __future__ import annotations
 from openeraseme.adapters.email.smtp_imap import (
     decode_mime_header,
     extract_thread_id,
+    match_reply_to_request,
     normalize_subject,
     parse_email_body,
     subject_matches,
@@ -92,3 +93,64 @@ class TestParseEmailBody:
 
     def test_empty(self):
         assert parse_email_body("") == ""
+
+
+class TestMatchReplyToRequest:
+    def test_matches_by_thread_id(self):
+        messages = [
+            {
+                "subject": "Re: Your data deletion request",
+                "thread_id": "<abc123@example.com>",
+            }
+        ]
+        requests = [
+            {"id": 42, "broker_id": "TestBroker"},
+        ]
+        thread_map = {"<abc123@example.com>": 42}
+        matched = match_reply_to_request(messages, requests, thread_map)
+        assert matched[0]["request_id"] == 42
+        assert matched[0]["match_method"] == "thread"
+
+    def test_falls_back_to_subject_match(self):
+        messages = [
+            {
+                "subject": "Re: Data Deletion Request — TestBroker",
+                "thread_id": "",
+            }
+        ]
+        requests = [
+            {"id": 42, "broker_id": "TestBroker"},
+        ]
+        matched = match_reply_to_request(messages, requests)
+        assert matched[0]["request_id"] == 42
+        assert matched[0]["match_method"] == "subject"
+
+    def test_unmatched_when_nothing_fits(self):
+        messages = [
+            {
+                "subject": "Random email",
+                "thread_id": "<unknown@example.com>",
+            }
+        ]
+        requests = [
+            {"id": 42, "broker_id": "TestBroker"},
+        ]
+        matched = match_reply_to_request(messages, requests)
+        assert matched[0]["request_id"] is None
+        assert matched[0]["match_method"] == "unmatched"
+
+    def test_thread_match_takes_priority_over_subject(self):
+        messages = [
+            {
+                "subject": "Data Deletion Request — OtherBroker",
+                "thread_id": "<abc123@example.com>",
+            }
+        ]
+        requests = [
+            {"id": 1, "broker_id": "TestBroker"},
+            {"id": 2, "broker_id": "OtherBroker"},
+        ]
+        thread_map = {"<abc123@example.com>": 1}
+        matched = match_reply_to_request(messages, requests, thread_map)
+        assert matched[0]["request_id"] == 1
+        assert matched[0]["match_method"] == "thread"

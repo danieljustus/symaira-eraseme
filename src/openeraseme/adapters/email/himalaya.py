@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate
+from email.utils import formatdate, make_msgid
 from pathlib import Path
 from typing import Any
 
@@ -188,7 +188,7 @@ class EmailMessage:
     bcc: str | None = None
 
 
-def _build_mime(msg: EmailMessage, from_addr: str) -> str:
+def _build_mime(msg: EmailMessage, from_addr: str) -> tuple[str, str]:
     mime = MIMEMultipart("mixed")
     mime["From"] = from_addr
     mime["To"] = msg.to
@@ -197,10 +197,13 @@ def _build_mime(msg: EmailMessage, from_addr: str) -> str:
     if msg.cc:
         mime["Cc"] = msg.cc
 
+    message_id = make_msgid()
+    mime["Message-ID"] = message_id
+
     part = MIMEText(msg.body, "plain")
     mime.attach(part)
 
-    return mime.as_string()
+    return mime.as_string(), message_id
 
 
 async def send_messages_batch(
@@ -255,7 +258,7 @@ async def send_messages_batch(
 
         for msg in messages:
             try:
-                mime_text = _build_mime(msg, from_addr)
+                mime_text, message_id = _build_mime(msg, from_addr)
                 recipients = [msg.to]
                 if msg.cc:
                     recipients.append(msg.cc)
@@ -268,6 +271,7 @@ async def send_messages_batch(
                         "success": True,
                         "to": msg.to,
                         "subject": msg.subject,
+                        "message_id": message_id,
                     }
                 )
             except Exception as e:
@@ -320,6 +324,7 @@ def send_message(
         cmd.extend(["--bcc", bcc])
 
     logger.debug("Running: %s", " ".join(cmd))
+    message_id = make_msgid()
     try:
         result = subprocess.run(
             cmd,
@@ -337,7 +342,7 @@ def send_message(
         msg = f"Himalaya send failed (exit {result.returncode}): {stderr}"
         raise HimalayaError(msg)
 
-    return result.stdout.strip()
+    return {"result": result.stdout.strip(), "message_id": message_id}
 
 
 def send_raw_email(

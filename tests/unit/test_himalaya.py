@@ -117,7 +117,8 @@ class TestSendMessage:
         mock_run.return_value = _mock_result(stdout="Message sent")
 
         result = send_message(to="test@example.com", subject="Test", body="Hello")
-        assert result == "Message sent"
+        assert result["result"] == "Message sent"
+        assert "message_id" in result
 
     @patch("openeraseme.adapters.email.himalaya.subprocess.run")
     @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")

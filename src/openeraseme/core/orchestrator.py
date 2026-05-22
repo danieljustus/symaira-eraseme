@@ -144,7 +144,7 @@ def execute_request(
             template_id,
             broker_name=broker_name,
         )
-        result = send_message(
+        send_result = send_message(
             to=channel_endpoint,
             subject=f"Data Deletion Request — {broker_name}",
             body=rendered,
@@ -159,9 +159,10 @@ def execute_request(
                 "template": template_id,
                 "account": account or "",
                 "expected_response_days": payload.get("expected_response_days", 30),
+                "message_id": send_result.get("message_id", ""),
             },
         )
-        return {"success": True, "request_id": request_id, "result": result}
+        return {"success": True, "request_id": request_id, "result": send_result}
     except HimalayaError as e:
         append_event_and_project(
             request_id,
