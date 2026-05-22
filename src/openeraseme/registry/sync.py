@@ -12,11 +12,11 @@ final shape immediately.
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from openeraseme.cli.types import CliResult
 from openeraseme.registry.loader import _registry_dir
 
 
@@ -138,8 +138,6 @@ def handle_registry_sync(
     """CLI handler around :func:`sync_registry`. Invalidates the broker cache
     on success so subsequent CLI calls see the new data without restart.
     """
-    from openeraseme.cli.types import CliResult
-
     result = sync_registry(verify_signatures=verify_signatures)
 
     if result["ok"]:

@@ -149,7 +149,11 @@ def _render(
     if output_format == "json":
         if result_obj is not None:
             import json as _json
-            console.print(_json.dumps(result_obj.data, indent=2, default=str), markup=False, soft_wrap=True)
+            console.print(
+                _json.dumps(result_obj.data, indent=2, default=str),
+                markup=False,
+                soft_wrap=True,
+            )
         else:
             console.print(result, markup=False, soft_wrap=True)
     elif result_obj is not None and not result_obj.success:
