@@ -37,14 +37,14 @@ def plan_campaign(
         category=category,
     )
 
-    if max_brokers and len(brokers) > max_brokers:
-        brokers = brokers[:max_brokers]
+    eligible = [b for b in brokers if _select_channel(b) is not None]
+
+    if max_brokers and len(eligible) > max_brokers:
+        eligible = eligible[:max_brokers]
 
     planned: list[dict[str, Any]] = []
-    for broker in brokers:
+    for broker in eligible:
         channel = _select_channel(broker)
-        if not channel:
-            continue
 
         request_id = create_removal_request(
             broker_id=broker.id,
@@ -348,9 +348,6 @@ def _select_channel(broker: Broker) -> dict[str, Any] | None:
                 "locale": getattr(channel, "locale", ""),
                 "expected_response_days": channel.expected_response_days,
             }
-    if broker.opt_out:
-        ch = broker.opt_out[0]
-        return {"type": ch.type}
     return None
 
 

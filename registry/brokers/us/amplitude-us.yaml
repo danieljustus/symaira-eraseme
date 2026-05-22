@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: email
-  endpoint: privacy@amplitude.com / Account settings
+  endpoint: privacy@amplitude.com
   template: ccpa-deletion
   locale: en
   required_fields:
@@ -28,6 +28,7 @@ verification:
   human_required_keywords:
   - verify
   - identification
+notes: Account settings
 added_date: '2026-05-22'
 status: active
 source: amplitude.com privacy policy

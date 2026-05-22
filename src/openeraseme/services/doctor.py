@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from pathlib import Path
 
 from openeraseme.core.db import _db_path
 from openeraseme.core.identity import _profile_path

@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: email
-  endpoint: privacy@mixpanel.com / Account deletion
+  endpoint: privacy@mixpanel.com
   template: ccpa-deletion
   locale: en
   required_fields:
@@ -28,6 +28,7 @@ verification:
   human_required_keywords:
   - verify
   - identification
+notes: Account deletion
 added_date: '2026-05-22'
 status: active
 source: mixpanel.com privacy policy

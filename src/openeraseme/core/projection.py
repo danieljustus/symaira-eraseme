@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from openeraseme.core.datetime_utils import parse_iso_datetime as _parse_ts

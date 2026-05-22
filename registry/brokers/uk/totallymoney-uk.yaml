@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: email
-  endpoint: Privacy settings in app / privacy@totallymoney.com
+  endpoint: privacy@totallymoney.com
   template: gdpr-art17
   locale: en
   required_fields:
@@ -28,6 +28,7 @@ verification:
   human_required_keywords:
   - verify
   - identification
+notes: Privacy settings in app
 added_date: '2026-05-22'
 status: active
 source: totallymoney.com privacy policy

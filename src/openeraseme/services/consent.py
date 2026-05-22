@@ -91,7 +91,7 @@ def handle_grant(
                 indent=2,
             )
         lines = [
-            f"[DRY RUN] Would issue consent token:",
+            "[DRY RUN] Would issue consent token:",
             f"  Command: {command}",
             f"  TTL: {ttl}s",
             f"  Expires: {datetime.fromtimestamp(expires_at).isoformat()}",

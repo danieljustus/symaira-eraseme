@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from openeraseme.core.datetime_utils import parse_iso_datetime as _parse_dt
+
 logger = logging.getLogger(__name__)
 
 JURISDICTION_DEADLINES: dict[str, int] = {
@@ -328,6 +330,3 @@ def apply_tick_actions(
     rebuild_all_states()
 
     return results
-
-
-from openeraseme.core.datetime_utils import parse_iso_datetime as _parse_dt

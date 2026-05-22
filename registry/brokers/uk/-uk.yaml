@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: email
-  endpoint: dpo@118118money.com / 02920 548 118
+  endpoint: dpo@118118money.com
   template: gdpr-art17
   locale: en
   required_fields:
@@ -28,6 +28,7 @@ verification:
   human_required_keywords:
   - verify
   - identification
+notes: Phone 02920 548 118
 added_date: '2026-05-22'
 status: active
 source: 118118money.com privacy policy
