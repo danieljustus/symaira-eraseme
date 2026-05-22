@@ -248,6 +248,11 @@ uv pip install -e ".[dev,web,triage]"
 pre-commit install
 ```
 
+The pre-commit hooks include:
+- **Detect private keys** — checks for hardcoded private keys
+
+CI additionally runs **TruffleHog** for comprehensive secrets scanning on every pull request.
+
 ### Run tests
 
 ```bash
