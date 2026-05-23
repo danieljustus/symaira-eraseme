@@ -485,16 +485,17 @@ def classify_reply(
         ...,
         help="Request ID to classify the reply for",
     ),
-    api_key: str = typer.Option(
+    provider: str = typer.Option(
         None,
-        "--api-key",
-        envvar="ANTHROPIC_API_KEY",
-        help="Anthropic API key",
+        "--provider",
+        envvar="OPENERASEME_LLM_PROVIDER",
+        help="LLM provider: anthropic, openai, ollama",
     ),
     model: str = typer.Option(
-        "claude-3-5-sonnet-latest",
+        None,
         "--model",
-        help="Claude model name",
+        envvar="OPENERASEME_LLM_MODEL",
+        help="Model name (provider-specific)",
     ),
     save: bool = typer.Option(
         True,
@@ -504,7 +505,7 @@ def classify_reply(
 ) -> None:
     result = handle_classify_reply(
         request_id,
-        api_key,
+        provider,
         model,
         save,
         ctx.obj["output"],
@@ -585,16 +586,17 @@ def generate_rebuttal_cmd(
         ...,
         help="Request ID to generate rebuttal for",
     ),
-    api_key: str = typer.Option(
+    provider: str = typer.Option(
         None,
-        "--api-key",
-        envvar="ANTHROPIC_API_KEY",
-        help="Anthropic API key",
+        "--provider",
+        envvar="OPENERASEME_LLM_PROVIDER",
+        help="LLM provider: anthropic, openai, ollama",
     ),
     model: str = typer.Option(
-        "claude-3-5-sonnet-latest",
+        None,
         "--model",
-        help="Claude model name",
+        envvar="OPENERASEME_LLM_MODEL",
+        help="Model name (provider-specific)",
     ),
     save: bool = typer.Option(
         True,
@@ -604,7 +606,7 @@ def generate_rebuttal_cmd(
 ) -> None:
     result = handle_generate_rebuttal(
         request_id,
-        api_key,
+        provider,
         model,
         save,
         ctx.obj["output"],

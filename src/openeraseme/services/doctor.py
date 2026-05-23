@@ -76,9 +76,31 @@ def _check_registry() -> tuple[bool, str]:
         return False, str(e)
 
 
+def _check_llm_config() -> tuple[bool, str]:
+    provider = os.environ.get("OPENERASEME_LLM_PROVIDER", "anthropic")
+    key_map = {
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }
+    pieces = [f"provider={provider}"]
+    if provider == "ollama":
+        pieces.append("(no API key required)")
+    else:
+        key_var = key_map.get(provider, "ANTHROPIC_API_KEY")
+        if os.environ.get(key_var):
+            pieces.append(f"{key_var}=✓")
+        else:
+            pieces.append(f"{key_var}=✗ (not set)")
+    model = os.environ.get("OPENERASEME_LLM_MODEL", "")
+    if model:
+        pieces.append(f"model={model}")
+    return True, ", ".join(pieces)
+
+
 def _check_env_vars() -> tuple[bool, str]:
     optional = [
-        "ANTHROPIC_API_KEY",
+        "OPENERASEME_LLM_PROVIDER",
+        "OPENERASEME_LLM_MODEL",
         "OPENERASEME_ENCRYPT_DB",
         "IMAP_PASSWORD",
         "CAPSOLVER_API_KEY",
@@ -97,6 +119,7 @@ def handle_doctor(output_format: str = "text") -> str:
         "Config directory": _check_config_dir(),
         "Database": _check_database(),
         "Registry": _check_registry(),
+        "LLM config": _check_llm_config(),
         "Environment": _check_env_vars(),
     }
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 from openeraseme.adapters.triage.responder import (
     REJECTION_TEMPLATES,
     RebuttalResult,
@@ -10,6 +12,7 @@ from openeraseme.adapters.triage.responder import (
     _select_fallback_template,
     generate_rebuttal,
 )
+from openeraseme.llm.protocol import LLMClient
 from openeraseme.registry.schema import IdentityProfile
 
 
@@ -156,6 +159,32 @@ class TestRebuttalResult:
         assert result.confidence == 0.95
 
 
+class _UnavailableClient:
+    @staticmethod
+    def is_available() -> bool:
+        return False
+
+    @staticmethod
+    def classify(**kwargs):
+        raise RuntimeError("should not be called")
+
+
+class _ClassifyingClient:
+    def __init__(self, response_text: str = (
+        '{"classification": "address_mismatch", "confidence": 0.92, '
+        '"summary": "Address issue", "key_points": ["old address"], '
+        '"jurisdiction": "GDPR"}'
+    )):
+        self.response_text = response_text
+
+    @staticmethod
+    def is_available() -> bool:
+        return True
+
+    def classify(self, **kwargs):
+        return self.response_text, None
+
+
 class TestGenerateRebuttal:
     def test_fallback_classification_no_api(self):
         """When LLM is unavailable, fallback keyword matching should work."""
@@ -163,13 +192,14 @@ class TestGenerateRebuttal:
             broker_name="Test Broker",
             broker_message="We need your passport for identity verification",
             original_request_template="Subject: GDPR deletion request",
+            client=_UnavailableClient(),
         )
         assert result.template_name is not None
         assert result.rebuttal_body
         assert not result.llm_used
         # Fallback correctly selects identity template based on "passport" keyword
         assert "identity" in result.label.lower()
-        assert result.needs_human_review  # fallback always needs review
+        assert result.needs_human_review
 
     def test_with_profile(self):
         profile = IdentityProfile(
@@ -181,14 +211,17 @@ class TestGenerateRebuttal:
             broker_name="Test Broker",
             broker_message="Your address does not match our records",
             profile=profile,
+            client=_ClassifyingClient(),
         )
         assert result.rebuttal_body
         assert "Jane Doe" in result.rebuttal_body
+        assert result.llm_used
 
     def test_ccpa_fallback(self):
         result = generate_rebuttal(
             broker_name="US Broker",
             broker_message="Under CCPA Section 1798.105 we need to verify your identity",
+            client=_UnavailableClient(),
         )
         assert result.rebuttal_body
         if result.rejection_classification == "ccpa_identity_challenged":
@@ -198,19 +231,35 @@ class TestGenerateRebuttal:
         result = generate_rebuttal(
             broker_name="Test",
             broker_message="Thank you for your request, we will process it shortly",
+            client=_UnavailableClient(),
         )
         assert result.template_name is not None
         assert result.rebuttal_body
-        # Should fall back to a safe generic template
-        assert True
 
     def test_empty_message(self):
         result = generate_rebuttal(
             broker_name="Test",
             broker_message="",
+            client=_UnavailableClient(),
         )
         assert result.rebuttal_body
         assert result.template_name is not None
+
+    def test_responder_uses_factory_by_default(self):
+        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+            mock_client = MagicMock(spec=LLMClient)
+            mock_client.is_available.return_value = False
+            mock_factory.return_value = mock_client
+            result = generate_rebuttal(
+                broker_name="Test",
+                broker_message="Test message",
+            )
+            mock_factory.assert_called_once()
+        assert result.rebuttal_body
+        assert not result.llm_used
+        # Fallback correctly selects identity template based on "passport" keyword
+        assert "identity" in result.label.lower()
+        assert result.needs_human_review  # fallback always needs review
 
 
 class TestRejectionTemplates:

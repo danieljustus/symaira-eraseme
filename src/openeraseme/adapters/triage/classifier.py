@@ -1,7 +1,7 @@
 """LLM-powered classifier for broker reply triage.
 
 Maps incoming broker replies to structured event types using
-the Anthropic Claude API.
+a generic LLM client.
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+from openeraseme.llm.protocol import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -147,17 +149,16 @@ class ReplyClassifier:
     def __init__(
         self,
         *,
-        api_key: str | None = None,
-        model: str = "claude-3-5-sonnet-latest",
+        client: LLMClient | None = None,
         cost_tracker: list | None = None,
     ) -> None:
-        from openeraseme.llm.anthropic_client import AnthropicClient
+        self._client: LLMClient | None = None
+        if client is not None:
+            self._client = client
+        else:
+            from openeraseme.llm.factory import create_llm_client
 
-        self._client: AnthropicClient | None = AnthropicClient(
-            api_key=api_key,
-            model=model,
-            cost_tracker=cost_tracker,
-        )
+            self._client = create_llm_client(cost_tracker=cost_tracker)
 
     def is_available(self) -> bool:
         return self._client is not None and self._client.is_available()
@@ -173,7 +174,6 @@ class ReplyClassifier:
         reply_body: str = "",
         cache_key: str | None = None,
     ) -> ClassificationResult:
-        """Classify a broker reply email."""
         user_prompt = build_user_prompt(
             broker_name=broker_name,
             broker_website=broker_website,

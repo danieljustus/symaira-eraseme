@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from openeraseme.llm.protocol import LLMClient
 from openeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
@@ -166,9 +167,7 @@ def generate_rebuttal(
     original_request_template: str = "",
     original_request_date: str = "",
     profile: IdentityProfile | None = None,
-    api_key: str | None = None,
-    model: str = "claude-3-5-sonnet-latest",
-    cost_tracker: list | None = None,
+    client: LLMClient | None = None,
     templates_dir: str | Path | None = None,
 ) -> RebuttalResult:
     """Generate a rebuttal email for a broker rejection.
@@ -183,11 +182,13 @@ def generate_rebuttal(
     llm_used = False
 
     # Try LLM classification first
-    try:
-        from openeraseme.llm.anthropic_client import AnthropicClient
+    if client is None:
+        from openeraseme.llm.factory import create_llm_client
 
-        client = AnthropicClient(api_key=api_key, model=model, cost_tracker=cost_tracker)
-        if client.is_available():
+        client = create_llm_client()
+
+    if client is not None and client.is_available():
+        try:
             user_prompt = _build_classifier_user_prompt(
                 broker_name=broker_name,
                 broker_message=broker_message,
@@ -204,12 +205,12 @@ def generate_rebuttal(
             )
             llm_used = True
             usage_record = usage
-        else:
-            logger.info("Anthropic API not available, using fallback classification")
+        except Exception as e:
+            logger.warning("LLM classification failed: %s — using fallback", e)
+            rejection_classification = None
             usage_record = None
-    except Exception as e:
-        logger.warning("LLM classification failed: %s — using fallback", e)
-        rejection_classification = None
+    else:
+        logger.info("LLM API not available, using fallback classification")
         usage_record = None
 
     # Step 2: Determine template key

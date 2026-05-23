@@ -6,7 +6,7 @@ Guide an AI agent or user through daily inbox polling and reply classification.
 
 - Email account configured with IMAP access
 - Removal requests sent (at least a few days ago)
-- `ANTHROPIC_API_KEY` environment variable set (for LLM classification)
+- LLM provider configured (set `OPENERASEME_LLM_PROVIDER` and provider-specific API key)
 
 ## Step 1: Poll the inbox
 
@@ -49,7 +49,14 @@ openeraseme poll-inbox ... --output json
 Use the LLM classifier to understand the broker's response:
 
 ```bash
-openeraseme classify-reply 1 --api-key "$ANTHROPIC_API_KEY"
+# Using Anthropic (default)
+openeraseme classify-reply 1
+
+# Using OpenAI
+openeraseme classify-reply 1 --provider openai --model gpt-4o
+
+# Using local Ollama
+openeraseme classify-reply 1 --provider ollama --model llama3.1
 ```
 
 The classifier categorizes replies as:
@@ -116,7 +123,7 @@ Recommended daily schedule:
 1. **Poll daily**: Brokers typically respond within 1-5 business days.
 2. **Check confidence**: Low-confidence classifications (<0.7) may need human review.
 3. **Batch classifications**: Classify all unmatched replies in one session to save API costs.
-4. **Save API keys**: Set `ANTHROPIC_API_KEY` in the environment to avoid passing `--api-key` every time.
+4. **Save API keys**: Set `OPENERASEME_LLM_PROVIDER` and the provider-specific API key (e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) in the environment to avoid passing `--provider` every time.
 
 ## Error handling
 
@@ -124,5 +131,5 @@ Recommended daily schedule:
 |---------|-------|-----|
 | `IMAP error` | Invalid credentials or server | Check email/password; use app-specific password |
 | `No unclassified inbox reply found` | All replies already classified | Check `events show <id>` for existing classifications |
-| `Anthropic API is not available` | API key missing or invalid | Set `ANTHROPIC_API_KEY` environment variable |
+| `LLM provider not available` | Provider or API key not configured | Set `OPENERASEME_LLM_PROVIDER` and provider-specific API key |
 | `No new messages found` | No recent emails | Increase `--since` to look further back |

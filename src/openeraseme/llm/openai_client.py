@@ -1,4 +1,4 @@
-"""Anthropic Claude API client with cost tracking and retry logic."""
+"""OpenAI API client with cost tracking and retry logic."""
 
 from __future__ import annotations
 
@@ -17,20 +17,22 @@ logger = logging.getLogger(__name__)
 # Known model pricing per 1M input tokens and 1M output tokens (USD)
 # As of May 2026
 MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "claude-3-5-sonnet-latest": (3.00, 15.00),
-    "claude-3-5-haiku-latest": (1.00, 5.00),
-    "claude-3-opus-latest": (15.00, 75.00),
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4-turbo": (10.00, 30.00),
+    "gpt-4": (30.00, 60.00),
+    "gpt-3.5-turbo": (0.50, 1.50),
 }
 
 
-class AnthropicClient:
-    """Wrapper around the Anthropic SDK with prompt caching and retry."""
+class OpenAIClient:
+    """Wrapper around the OpenAI SDK with cost tracking and retry."""
 
     def __init__(
         self,
         *,
         api_key: str | None = None,
-        model: str = "claude-3-5-sonnet-latest",
+        model: str = "gpt-4o",
         max_retries: int = 3,
         cost_tracker: list[UsageRecord] | None = None,
     ) -> None:
@@ -45,21 +47,21 @@ class AnthropicClient:
     @property
     def client(self) -> Any:
         if self._client is None:
-            import anthropic
+            import openai
 
-            self._client = anthropic.Anthropic(api_key=self._api_key)
+            self._client = openai.OpenAI(api_key=self._api_key)
         return self._client
 
     def is_available(self) -> bool:
-        """Check if the Anthropic API is available (key set, SDK importable)."""
+        """Check if the OpenAI API is available (key set, SDK importable)."""
         try:
-            import anthropic  # noqa: F401
+            import openai  # noqa: F401
         except ImportError:
             return False
         if self._api_key is None:
             import os
 
-            self._api_key = os.environ.get("ANTHROPIC_API_KEY")
+            self._api_key = os.environ.get("OPENAI_API_KEY")
         return self._api_key is not None and len(self._api_key) > 0
 
     def classify(
@@ -71,14 +73,14 @@ class AnthropicClient:
         temperature: float = 0.0,
         cache_key: str | None = None,
     ) -> tuple[str, UsageRecord]:
-        """Send a classification request to Claude.
+        """Send a classification request to OpenAI.
 
         Returns (response_text, usage_record).
-        Throws AnthropicError on failure.
+        Raises LLMClientError on failure.
         """
         if not self.is_available():
-            msg = "Anthropic API is not available (no API key or SDK not installed)"
-            raise AnthropicClientError(msg)
+            msg = "OpenAI API is not available (no API key or SDK not installed)"
+            raise LLMClientError(msg)
 
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
@@ -90,7 +92,7 @@ class AnthropicClient:
                     temperature=temperature,
                     cache_key=cache_key,
                 )
-            except AnthropicClientRateLimitError as e:
+            except LLMClientRateLimitError as e:
                 last_error = e
                 if attempt < self.max_retries:
                     wait = 2**attempt + (hash(str(cache_key)) % 5)
@@ -103,7 +105,7 @@ class AnthropicClient:
                     time.sleep(wait)
                 else:
                     raise
-            except AnthropicClientError as e:
+            except LLMClientError as e:
                 last_error = e
                 if attempt < self.max_retries:
                     wait = 2**attempt
@@ -119,7 +121,7 @@ class AnthropicClient:
                     raise
 
         msg = f"All {self.max_retries} retries exhausted: {last_error}"
-        raise AnthropicClientError(msg) from last_error
+        raise LLMClientError(msg) from last_error
 
     def _call_api(
         self,
@@ -134,41 +136,39 @@ class AnthropicClient:
             "model": self.model,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "system": [{"type": "text", "text": system_prompt}],
-            "messages": [{"role": "user", "content": user_prompt}],
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
         }
 
-        if cache_key and self._supports_prompt_caching():
-            # Mark the system prompt as ephemeral for caching
-            kwargs["system"] = [
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
+        if cache_key and self._supports_json_mode():
+            kwargs["response_format"] = {"type": "json_object"}
 
-        import anthropic
+        import openai
 
         try:
-            message = self.client.messages.create(**kwargs)
-        except anthropic.RateLimitError as e:
-            raise AnthropicClientRateLimitError(str(e)) from e
-        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
-            raise AnthropicClientError(str(e)) from e
+            response = self.client.chat.completions.create(**kwargs)
+        except openai.RateLimitError as e:
+            raise LLMClientRateLimitError(str(e)) from e
+        except (openai.APIStatusError, openai.APIConnectionError) as e:
+            raise LLMClientError(str(e)) from e
+        except Exception as e:
+            raise LLMClientError(str(e)) from e
 
         response_text = ""
-        for block in message.content:
-            if hasattr(block, "text"):
-                response_text += block.text
+        if response.choices and len(response.choices) > 0:
+            choice = response.choices[0]
+            if choice.message and choice.message.content:
+                response_text = choice.message.content
 
-        usage = message.usage
+        usage = response.usage
         record = UsageRecord(
             model=self.model,
-            input_tokens=usage.input_tokens or 0,
-            output_tokens=usage.output_tokens or 0,
-            cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-            cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            input_tokens=usage.prompt_tokens if usage else 0,
+            output_tokens=usage.completion_tokens if usage else 0,
+            cache_creation_tokens=0,
+            cache_read_tokens=0,
         )
         record.cost = self._compute_cost(record)
         self.cost_tracker.append(record)
@@ -177,25 +177,25 @@ class AnthropicClient:
 
     def _compute_cost(self, record: UsageRecord) -> float:
         """Compute USD cost for a usage record."""
-        pricing = MODEL_PRICING.get(self.model, (3.0, 15.0))
+        # Find the closest matching model in pricing table
+        pricing = None
+        for model_key, prices in MODEL_PRICING.items():
+            if model_key in self.model:
+                pricing = prices
+                break
+
+        if pricing is None:
+            # Default to gpt-4o pricing
+            pricing = MODEL_PRICING["gpt-4o"]
+
         input_price_per_m = pricing[0]
         output_price_per_m = pricing[1]
 
         input_cost = (record.input_tokens / 1_000_000) * input_price_per_m
         output_cost = (record.output_tokens / 1_000_000) * output_price_per_m
 
-        # Cached reads are ~50% cheaper (approximate)
-        cache_read_savings = (record.cache_read_tokens / 1_000_000) * input_price_per_m * 0.5
-        return round(input_cost + output_cost - cache_read_savings, 6)
+        return round(input_cost + output_cost, 6)
 
-    def _supports_prompt_caching(self) -> bool:
-        """Check if the selected model supports prompt caching."""
-        return "sonnet" in self.model or "haiku" in self.model
-
-
-class AnthropicClientError(LLMClientError):
-    pass
-
-
-class AnthropicClientRateLimitError(LLMClientRateLimitError):
-    pass
+    def _supports_json_mode(self) -> bool:
+        """Check if the selected model supports JSON mode."""
+        return "gpt-4" in self.model or "gpt-3.5-turbo" in self.model
