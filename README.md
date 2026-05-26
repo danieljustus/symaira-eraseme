@@ -9,7 +9,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 
 <p align="center">
-  <img src="assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
+  <img src="https://raw.githubusercontent.com/danieljustus/symaira-eraseme/main/assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
 </p>
 
 Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
