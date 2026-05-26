@@ -48,6 +48,11 @@ web = [
 triage = [
     "anthropic>=0.34.0",
 ]
+openai = [
+    "openai>=1.30.0",
+]
+ollama = [
+]
 
 [project.scripts]
 openeraseme = "openeraseme.cli:app"

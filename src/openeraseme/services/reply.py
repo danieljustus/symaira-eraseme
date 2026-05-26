@@ -14,8 +14,8 @@ from openeraseme.registry.loader import load_broker
 
 def handle_classify_reply(
     request_id: int,
-    api_key: str | None = None,
-    model: str = "claude-3-5-sonnet-latest",
+    provider: str | None = None,
+    model: str | None = None,
     save: bool = True,
     output_format: str = "text",
 ) -> str:
@@ -75,12 +75,16 @@ def handle_classify_reply(
         )
         raise typer.Exit(1)
 
-    classifier = ReplyClassifier(api_key=api_key, model=model)
+    from openeraseme.llm.factory import create_llm_client
+
+    client = create_llm_client(provider=provider, model=model)
+    classifier = ReplyClassifier(client=client)
     if not classifier.is_available():
         import typer
 
         typer.echo(
-            "Anthropic API is not available. Set ANTHROPIC_API_KEY or provide --api-key.",
+            "LLM provider not available. Check OPENERASEME_LLM_PROVIDER"
+            " and provider-specific API key.",
             err=True,
         )
         raise typer.Exit(1)
@@ -155,8 +159,8 @@ def handle_classify_reply(
 
 def handle_generate_rebuttal(
     request_id: int,
-    api_key: str | None = None,
-    model: str = "claude-3-5-sonnet-latest",
+    provider: str | None = None,
+    model: str | None = None,
     save: bool = True,
     output_format: str = "text",
 ) -> str:
@@ -208,6 +212,9 @@ def handle_generate_rebuttal(
 
     profile = load_profile() if profile_exists() else None
 
+    from openeraseme.llm.factory import create_llm_client
+
+    client = create_llm_client(provider=provider, model=model)
     result = generate_rebuttal(
         broker_name=broker_name,
         broker_website=broker_website,
@@ -215,8 +222,7 @@ def handle_generate_rebuttal(
         original_request_template=payload.get("template", ""),
         original_request_date=original_request_date,
         profile=profile,
-        api_key=api_key,
-        model=model,
+        client=client,
     )
 
     if output_format == "json":

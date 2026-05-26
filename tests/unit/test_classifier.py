@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from openeraseme.adapters.triage.classifier import (
     CLASSIFICATION_TO_EVENT,
@@ -11,6 +11,7 @@ from openeraseme.adapters.triage.classifier import (
     _parse_response,
     build_user_prompt,
 )
+from openeraseme.llm.protocol import LLMClientError
 
 _EMPTY_FIELDS = '"extracted_fields": {}'
 _ACK = '"classification": "ack"'
@@ -154,25 +155,70 @@ class TestParseResponse:
 
 class TestReplyClassifier:
     def test_available_returns_false_without_key(self):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.is_available.return_value = False
+            mock_factory.return_value = mock_client
             classifier = ReplyClassifier()
             assert classifier.is_available() is False
+            mock_factory.assert_called_once()
 
     def test_classify_fallback_on_api_error(self):
-        classifier = ReplyClassifier(api_key="test-key")
-        with patch.object(classifier._client, "classify", side_effect=Exception("API down")):
-            result = classifier.classify(
-                broker_name="TestBroker",
-                reply_subject="Re: request",
-                reply_body="Hello",
-            )
-            assert result.label == "unclear"
-            assert result.needs_human_review is True
+        class MockClient:
+            @staticmethod
+            def is_available():
+                return True
+
+            @staticmethod
+            def classify(**kwargs):
+                raise LLMClientError("API down")
+
+        classifier = ReplyClassifier(client=MockClient())
+        result = classifier.classify(
+            broker_name="TestBroker",
+            reply_subject="Re: request",
+            reply_body="Hello",
+        )
+        assert result.label == "unclear"
+        assert result.needs_human_review is True
 
     def test_close_sets_client_to_none(self):
-        classifier = ReplyClassifier(api_key="test-key")
+        classifier = ReplyClassifier(client=MagicMock(spec=[]))
         classifier.close()
         assert classifier._client is None
+
+    def test_classifier_uses_factory_by_default(self):
+        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.is_available.return_value = False
+            mock_factory.return_value = mock_client
+            classifier = ReplyClassifier()
+            assert classifier._client is mock_client
+            mock_factory.assert_called_once()
+
+    def test_classifier_accepts_custom_client(self):
+        class AvailableClient:
+            @staticmethod
+            def is_available():
+                return True
+
+            @staticmethod
+            def classify(system_prompt, user_prompt, **kwargs):
+                return (
+                    '{"classification": "confirmed", "confidence": 0.99, '
+                    '"summary": "Done", "extracted_fields": {}}',
+                    None,
+                )
+
+        classifier = ReplyClassifier(client=AvailableClient())
+        assert classifier.is_available() is True
+        result = classifier.classify(
+            broker_name="Test",
+            reply_subject="Re: request",
+            reply_body="Hello",
+        )
+        assert result.label == "confirmed"
+        assert result.confidence == 0.99
 
 
 class TestClassificationEdgeCases:
