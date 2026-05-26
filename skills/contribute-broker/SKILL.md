@@ -1,8 +1,8 @@
-# Contribute Broker to OpenEraseMe Registry
+# Contribute Broker to Symaira EraseMe Registry
 
 **Skill for AI agents (Claude Code, OpenClaw, Cursor, etc.)**
 
-When you discover a data broker that is not in the OpenEraseMe registry, use this workflow to contribute it back via a Pull Request.
+When you discover a data broker that is not in the Symaira EraseMe registry, use this workflow to contribute it back via a Pull Request.
 
 ## When to use this skill
 

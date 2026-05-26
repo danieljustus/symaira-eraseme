@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from openeraseme.llm.protocol import (
+from symeraseme.llm.protocol import (
     LLMClientError,
     LLMClientRateLimitError,
     LLMProviderError,

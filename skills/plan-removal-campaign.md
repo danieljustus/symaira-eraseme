@@ -4,7 +4,7 @@ Guide an AI agent or user through planning a data broker removal campaign.
 
 ## Prerequisites
 
-- [Identity profile created](setup-identity.md) (`openeraseme init-profile`)
+- [Identity profile created](setup-identity.md) (`symeraseme init-profile`)
 - Database initialized (auto-initialized on first command)
 
 ## Overview
@@ -16,7 +16,7 @@ removal requests in the event store.
 ## Step 1: Create a campaign
 
 ```bash
-openeraseme plan create --campaign initial-2026-q2
+symeraseme plan create --campaign initial-2026-q2
 ```
 
 The command scans the broker registry and plans requests for all known brokers.
@@ -25,22 +25,22 @@ The command scans the broker registry and plans requests for all known brokers.
 
 ```bash
 # Plan only GDPR (EU) brokers
-openeraseme plan create --campaign gdpr-only --jurisdiction GDPR
+symeraseme plan create --campaign gdpr-only --jurisdiction GDPR
 
 # Plan only CCPA (US) brokers
-openeraseme plan create --campaign ccpa-only --jurisdiction CCPA
+symeraseme plan create --campaign ccpa-only --jurisdiction CCPA
 
 # Plan by priority (high first)
-openeraseme plan create --campaign high-priority --priority high
+symeraseme plan create --campaign high-priority --priority high
 
 # Limit to 5 brokers
-openeraseme plan create --campaign small-batch --max 5
+symeraseme plan create --campaign small-batch --max 5
 ```
 
 ### JSON output (for AI agents)
 
 ```bash
-openeraseme plan create --campaign initial --output json
+symeraseme plan create --campaign initial --output json
 ```
 
 ```json
@@ -68,21 +68,21 @@ openeraseme plan create --campaign initial --output json
 ## Step 2: Review the plan with the user
 
 ```bash
-openeraseme plan show
+symeraseme plan show
 ```
 
 Filter by campaign or status:
 
 ```bash
-openeraseme plan show --campaign initial
-openeraseme plan show --status PLANNED
-openeraseme plan show --status COMPLETED
+symeraseme plan show --campaign initial
+symeraseme plan show --status PLANNED
+symeraseme plan show --status COMPLETED
 ```
 
 ### JSON output
 
 ```bash
-openeraseme plan show --output json
+symeraseme plan show --output json
 ```
 
 ```json
@@ -102,10 +102,10 @@ openeraseme plan show --output json
 ## Step 3: List removal requests
 
 ```bash
-openeraseme requests list
-openeraseme requests list --campaign initial
-openeraseme requests list --status PENDING
-openeraseme requests list --broker acxiom
+symeraseme requests list
+symeraseme requests list --campaign initial
+symeraseme requests list --status PENDING
+symeraseme requests list --broker acxiom
 ```
 
 ## Best practices

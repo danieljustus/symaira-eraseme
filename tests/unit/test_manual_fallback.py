@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openeraseme.core.manual_fallback import (
+from symeraseme.core.manual_fallback import (
     FALLBACK_REASONS,
     FormState,
     ManualTask,
@@ -96,9 +96,9 @@ class TestInstructionsForReason:
         assert "confirmation" in result.lower() or "verify" in result.lower()
 
 
-@patch("openeraseme.core.manual_fallback._async_get_content")
-@patch("openeraseme.core.manual_fallback._async_extract_form_fields")
-@patch("openeraseme.core.manual_fallback._async_save_screenshot")
+@patch("symeraseme.core.manual_fallback._async_get_content")
+@patch("symeraseme.core.manual_fallback._async_extract_form_fields")
+@patch("symeraseme.core.manual_fallback._async_save_screenshot")
 class TestCaptureFormState:
     def test_captures_url_and_reason(self, mock_save, mock_fields, mock_content):
         mock_page = MagicMock()
@@ -142,7 +142,7 @@ class TestCaptureFormState:
 
 
 class TestCreateManualTask:
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_creates_task_in_db(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -169,7 +169,7 @@ class TestCreateManualTask:
         insert_call = mock_conn.execute.call_args_list[0]
         assert "INSERT INTO manual_tasks" in insert_call[0][0]
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_unknown_reason_normalized(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -184,7 +184,7 @@ class TestCreateManualTask:
         )
         assert task.reason == "generic_error"
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_saves_html_snapshot(self, mock_get_conn, tmp_path):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -193,7 +193,7 @@ class TestCreateManualTask:
         mock_get_conn.return_value = mock_conn
 
         with patch(
-            "openeraseme.core.manual_fallback._tasks_dir",
+            "symeraseme.core.manual_fallback._tasks_dir",
             return_value=tmp_path,
         ):
             task = create_manual_task(
@@ -210,7 +210,7 @@ class TestCreateManualTask:
 
 
 class TestResumeFromManual:
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_completes_task(self, mock_get_conn):
         mock_conn = MagicMock()
         existing_row = {
@@ -236,7 +236,7 @@ class TestResumeFromManual:
         assert result.status == "completed"
         assert result.notes == "Completed manually"
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_cancels_task(self, mock_get_conn):
         mock_conn = MagicMock()
         existing_row = {
@@ -261,7 +261,7 @@ class TestResumeFromManual:
         assert result is not None
         assert result.status == "cancelled"
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_nonexistent_task(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchone.return_value = None
@@ -272,7 +272,7 @@ class TestResumeFromManual:
 
 
 class TestListManualTasks:
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_list_all(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
@@ -316,7 +316,7 @@ class TestListManualTasks:
         assert tasks[0]["status"] == "pending"
         assert tasks[1]["status"] == "completed"
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_filter_by_status(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
@@ -331,7 +331,7 @@ class TestListManualTasks:
         assert "WHERE" in call_args[0]
         assert "status = ?" in call_args[0]
 
-    @patch("openeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.manual_fallback.get_connection")
     def test_empty_result(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = []
@@ -377,7 +377,7 @@ class TestManualTask:
 class TestDbIntegration:
     def test_init_db_creates_manual_tasks_table(self):
         """Verify the manual_tasks table exists after init_db."""
-        from openeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db import close_connection, get_connection, init_db
 
         close_connection()
 

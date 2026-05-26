@@ -6,7 +6,7 @@
 {% if auto_refresh_seconds > 0 %}
 <meta http-equiv="refresh" content="{{ auto_refresh_seconds }}">
 {% endif %}
-<title>OpenEraseMe Dashboard</title>
+<title>Symaira EraseMe Dashboard</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -141,7 +141,7 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.75rem; text-transf
 </head>
 <body>
 <div class="container">
-  <h1>OpenEraseMe Dashboard</h1>
+  <h1>Symaira EraseMe Dashboard</h1>
   <p class="subtitle">
     Generated {{ now.strftime("%Y-%m-%d %H:%M UTC") }}
     &middot; {{ data.total_requests }} requests across {{ data.campaigns|length }} campaign(s)

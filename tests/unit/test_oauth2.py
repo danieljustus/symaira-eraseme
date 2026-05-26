@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from openeraseme.adapters.email.oauth2 import (
+from symeraseme.adapters.email.oauth2 import (
     OAuth2Error,
     OAuth2StateError,
     authorize_url,
@@ -31,9 +31,9 @@ def _fake_keyring():
         fake_store.pop(f"{service}:{username}", None)
 
     with (
-        patch("openeraseme.adapters.email.oauth2.keyring.set_password", fake_set_password),
-        patch("openeraseme.adapters.email.oauth2.keyring.get_password", fake_get_password),
-        patch("openeraseme.adapters.email.oauth2.keyring.delete_password", fake_delete_password),
+        patch("symeraseme.adapters.email.oauth2.keyring.set_password", fake_set_password),
+        patch("symeraseme.adapters.email.oauth2.keyring.get_password", fake_get_password),
+        patch("symeraseme.adapters.email.oauth2.keyring.delete_password", fake_delete_password),
     ):
         yield
 
@@ -42,7 +42,7 @@ def _fake_keyring():
 def _state_file(tmp_path: Path) -> None:
     state_file = tmp_path / "oauth2_state.json"
     with (
-        patch("openeraseme.adapters.email.oauth2._get_state_path", return_value=state_file),
+        patch("symeraseme.adapters.email.oauth2._get_state_path", return_value=state_file),
     ):
         yield
 
@@ -78,7 +78,7 @@ class TestAuthorizeUrl:
         assert s1 != s2
 
     def test_state_stored_in_file(self):
-        from openeraseme.adapters.email.oauth2 import _get_state_path
+        from symeraseme.adapters.email.oauth2 import _get_state_path
 
         url = authorize_url("gmail", "id", "http://localhost/")
         state_path = _get_state_path()
@@ -97,33 +97,33 @@ class TestAuthorizeUrl:
 
 class TestOAuth2StateValidation:
     def test_valid_state_passes(self):
-        from openeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
 
         state = secrets.token_urlsafe(16)
         _store_oauth2_state(state, "gmail")
         _validate_oauth2_state(state)  # should not raise
 
     def test_missing_state_raises(self):
-        from openeraseme.adapters.email.oauth2 import _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _validate_oauth2_state
 
         with pytest.raises(OAuth2StateError, match="Missing"):
             _validate_oauth2_state(None)
 
     def test_empty_state_raises(self):
-        from openeraseme.adapters.email.oauth2 import _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _validate_oauth2_state
 
         with pytest.raises(OAuth2StateError, match="Missing"):
             _validate_oauth2_state("")
 
     def test_mismatched_state_raises(self):
-        from openeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _store_oauth2_state, _validate_oauth2_state
 
         _store_oauth2_state("real-state", "gmail")
         with pytest.raises(OAuth2StateError, match="mismatch"):
             _validate_oauth2_state("fake-state")
 
     def test_expired_state_raises(self):
-        from openeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
 
         state = secrets.token_urlsafe(16)
         state_path = _get_state_path()
@@ -133,7 +133,7 @@ class TestOAuth2StateValidation:
             _validate_oauth2_state(state)
 
     def test_state_cleaned_after_validation(self):
-        from openeraseme.adapters.email.oauth2 import (
+        from symeraseme.adapters.email.oauth2 import (
             _get_state_path,
             _store_oauth2_state,
             _validate_oauth2_state,
@@ -146,7 +146,7 @@ class TestOAuth2StateValidation:
         assert state not in stored
 
     def test_no_state_file_raises(self):
-        from openeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
+        from symeraseme.adapters.email.oauth2 import _get_state_path, _validate_oauth2_state
 
         # Ensure the file doesn't exist
         state_path = _get_state_path()
@@ -157,7 +157,7 @@ class TestOAuth2StateValidation:
 
 
 class TestExchangeCode:
-    @patch("openeraseme.adapters.email.oauth2.urlopen")
+    @patch("symeraseme.adapters.email.oauth2.urlopen")
     def test_successful_exchange(self, mock_urlopen):
         mock_response = MagicMock()
         mock_response.read.return_value = b'{"access_token": "abc", "refresh_token": "xyz"}'
@@ -167,7 +167,7 @@ class TestExchangeCode:
         assert result["access_token"] == "abc"
         assert result["refresh_token"] == "xyz"
 
-    @patch("openeraseme.adapters.email.oauth2.urlopen")
+    @patch("symeraseme.adapters.email.oauth2.urlopen")
     def test_exchange_failure_raises(self, mock_urlopen):
         from urllib.error import URLError
 
@@ -179,7 +179,7 @@ class TestExchangeCode:
 
 class TestCredentialsStorage:
     def test_save_and_load_roundtrip(self):
-        from openeraseme.adapters.email.oauth2 import (
+        from symeraseme.adapters.email.oauth2 import (
             delete_account,
             load_client_credentials,
             save_client_credentials,
@@ -192,7 +192,7 @@ class TestCredentialsStorage:
         delete_account("test@example.com")
 
     def test_load_nonexistent_raises(self):
-        from openeraseme.adapters.email.oauth2 import load_client_credentials
+        from symeraseme.adapters.email.oauth2 import load_client_credentials
 
         with pytest.raises(OAuth2Error, match="No OAuth2 credentials"):
             load_client_credentials("nonexistent@example.com")
@@ -200,7 +200,7 @@ class TestCredentialsStorage:
 
 class TestRefreshToken:
     def test_save_and_load(self):
-        from openeraseme.adapters.email.oauth2 import (
+        from symeraseme.adapters.email.oauth2 import (
             delete_account,
             load_refresh_token,
             save_refresh_token,
@@ -212,7 +212,7 @@ class TestRefreshToken:
         delete_account("test@example.com")
 
     def test_load_nonexistent_raises(self):
-        from openeraseme.adapters.email.oauth2 import load_refresh_token
+        from symeraseme.adapters.email.oauth2 import load_refresh_token
 
         with pytest.raises(OAuth2Error, match="No refresh token"):
             load_refresh_token("nonexistent@example.com")
@@ -220,12 +220,12 @@ class TestRefreshToken:
 
 class TestAccountIndex:
     def test_list_empty(self):
-        from openeraseme.adapters.email.oauth2 import list_accounts
+        from symeraseme.adapters.email.oauth2 import list_accounts
 
         assert list_accounts() == []
 
     def test_add_and_list(self):
-        from openeraseme.adapters.email.oauth2 import (
+        from symeraseme.adapters.email.oauth2 import (
             _remove_from_index,
             _save_account_index,
             list_accounts,

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from openeraseme.adapters.web.confirmation_clicker import (
+from symeraseme.adapters.web.confirmation_clicker import (
     KNOWN_BROKER_DOMAINS,
     ConfirmationClickerError,
     ConfirmationResult,
@@ -101,7 +101,7 @@ class TestAutoConfirmValidation:
 
     @pytest.mark.asyncio
     async def test_missing_playwright_raises(self):
-        from openeraseme.adapters.web.confirmation_clicker import auto_confirm
+        from symeraseme.adapters.web.confirmation_clicker import auto_confirm
 
         with (
             patch.dict("sys.modules", {"playwright.async_api": None}),
@@ -111,7 +111,7 @@ class TestAutoConfirmValidation:
 
     @pytest.mark.asyncio
     async def test_dry_run_returns_immediately(self):
-        from openeraseme.adapters.web.confirmation_clicker import auto_confirm
+        from symeraseme.adapters.web.confirmation_clicker import auto_confirm
 
         result = await auto_confirm(
             1,

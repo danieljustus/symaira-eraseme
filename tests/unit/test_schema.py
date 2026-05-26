@@ -7,8 +7,8 @@ import jsonschema
 import pytest
 import yaml
 
-from openeraseme.registry.loader import load_broker_yaml
-from openeraseme.registry.schema import Broker
+from symeraseme.registry.loader import load_broker_yaml
+from symeraseme.registry.schema import Broker
 
 
 def _repo_root() -> Path:
@@ -63,7 +63,7 @@ class TestBrokerModel:
         assert broker.website
 
     def test_email_opt_out_channel(self):
-        from openeraseme.registry.schema import EmailOptOut
+        from symeraseme.registry.schema import EmailOptOut
 
         yml = _repo_root() / "registry" / "brokers" / "eu" / "acxiom.yaml"
         broker = load_broker_yaml(yml)
@@ -72,7 +72,7 @@ class TestBrokerModel:
         assert "@" in channel.endpoint
 
     def test_web_form_opt_out_channel(self):
-        from openeraseme.registry.schema import WebFormOptOut
+        from symeraseme.registry.schema import WebFormOptOut
 
         yml = _repo_root() / "registry" / "brokers" / "us" / "beenverified.yaml"
         broker = load_broker_yaml(yml)
@@ -83,20 +83,20 @@ class TestBrokerModel:
 
 class TestRegistryLoader:
     def test_load_all_brokers(self):
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         brokers = load_all_brokers()
         assert len(brokers) >= 5
         assert all(isinstance(b, Broker) for b in brokers)
 
     def test_filter_by_jurisdiction(self):
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         brokers = load_all_brokers(jurisdiction="DE")
         assert all("DE" in b.jurisdictions for b in brokers)
 
     def test_filter_by_priority(self):
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         brokers = load_all_brokers(priority="high")
         assert all(b.priority.value == "high" for b in brokers)
@@ -177,7 +177,7 @@ class TestDisabledBrokers:
     """A5/A6: known-broken brokers carry `disabled: true` and are filtered by default."""
 
     def test_disabled_brokers_excluded_by_default(self):
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         active = load_all_brokers()
         assert not any(b.disabled for b in active), (
@@ -185,7 +185,7 @@ class TestDisabledBrokers:
         )
 
     def test_include_disabled_returns_everything(self):
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         active = load_all_brokers()
         all_brokers = load_all_brokers(include_disabled=True)
@@ -193,7 +193,7 @@ class TestDisabledBrokers:
 
     def test_known_disabled_brokers_present(self):
         """beenverified-us, spokeo-eu, whitepages have unverified sitekeys."""
-        from openeraseme.registry.loader import load_all_brokers
+        from symeraseme.registry.loader import load_all_brokers
 
         all_brokers = load_all_brokers(include_disabled=True)
         by_id = {b.id: b for b in all_brokers}

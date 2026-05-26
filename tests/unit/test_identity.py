@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openeraseme.registry.schema import IdentityProfile
+from symeraseme.registry.schema import IdentityProfile
 
 
 class TestIdentityProfile:
@@ -56,17 +56,17 @@ class TestIdentityVault:
             fake_store.pop(f"{service}:{username}", None)
 
         with (
-            patch("openeraseme.core.identity.keyring.set_password", fake_set_password),
-            patch("openeraseme.core.identity.keyring.get_password", fake_get_password),
-            patch("openeraseme.core.identity.keyring.delete_password", fake_delete_password),
+            patch("symeraseme.core.identity.keyring.set_password", fake_set_password),
+            patch("symeraseme.core.identity.keyring.get_password", fake_get_password),
+            patch("symeraseme.core.identity.keyring.delete_password", fake_delete_password),
         ):
             yield
 
     def test_save_and_load_profile(self, monkeypatch):
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_identity.enc")
-        Path("/tmp/openeraseme_test_identity.enc").unlink(missing_ok=True)
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_identity.enc")
+        Path("/tmp/symeraseme_test_identity.enc").unlink(missing_ok=True)
 
         profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
         path = vault.save_profile(profile)
@@ -81,10 +81,10 @@ class TestIdentityVault:
         assert not vault.profile_exists()
 
     def test_encrypted_file_is_not_plaintext(self, monkeypatch):
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_encrypted.enc")
-        Path("/tmp/openeraseme_test_encrypted.enc").unlink(missing_ok=True)
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_encrypted.enc")
+        Path("/tmp/symeraseme_test_encrypted.enc").unlink(missing_ok=True)
 
         profile = IdentityProfile(full_name="Secret User", email_addresses=["secret@example.com"])
         path = vault.save_profile(profile)
@@ -97,10 +97,10 @@ class TestIdentityVault:
         vault.delete_profile()
 
     def test_roundtrip_preserves_all_data(self, monkeypatch):
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_roundtrip.enc")
-        Path("/tmp/openeraseme_test_roundtrip.enc").unlink(missing_ok=True)
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_roundtrip.enc")
+        Path("/tmp/symeraseme_test_roundtrip.enc").unlink(missing_ok=True)
 
         original = IdentityProfile(
             full_name="Jane Doe",
@@ -116,10 +116,10 @@ class TestIdentityVault:
         vault.delete_profile()
 
     def test_load_nonexistent_raises(self, monkeypatch):
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_nonexistent.enc")
-        Path("/tmp/openeraseme_test_nonexistent.enc").unlink(missing_ok=True)
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_nonexistent.enc")
+        Path("/tmp/symeraseme_test_nonexistent.enc").unlink(missing_ok=True)
 
         with pytest.raises(FileNotFoundError):
             vault.load_profile()
@@ -127,10 +127,10 @@ class TestIdentityVault:
     def test_tampered_ciphertext_fails_closed(self, monkeypatch):
         from cryptography.exceptions import InvalidTag
 
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_tampered.enc")
-        path = Path("/tmp/openeraseme_test_tampered.enc")
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_tampered.enc")
+        path = Path("/tmp/symeraseme_test_tampered.enc")
         path.unlink(missing_ok=True)
 
         profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
@@ -150,10 +150,10 @@ class TestIdentityVault:
     def test_legacy_version_0_fallback(self, monkeypatch):
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-        import openeraseme.core.identity as vault
+        import symeraseme.core.identity as vault
 
-        monkeypatch.setenv("OPENERASEME_IDENTITY_PATH", "/tmp/openeraseme_test_legacy.enc")
-        path = Path("/tmp/openeraseme_test_legacy.enc")
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_legacy.enc")
+        path = Path("/tmp/symeraseme_test_legacy.enc")
         path.unlink(missing_ok=True)
 
         key = AESGCM.generate_key(bit_length=256)
@@ -167,7 +167,7 @@ class TestIdentityVault:
         ).encode("utf-8")
         path.write_bytes(header + b"\n" + ciphertext)
 
-        with patch("openeraseme.core.identity.keyring.get_password", return_value=key.hex()):
+        with patch("symeraseme.core.identity.keyring.get_password", return_value=key.hex()):
             loaded = vault.load_profile()
 
         assert loaded.full_name == "Legacy User"

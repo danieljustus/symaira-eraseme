@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openeraseme.adapters.email.himalaya import (
+from symeraseme.adapters.email.himalaya import (
     HimalayaError,
     HimalayaNotInstalledError,
     Message,
@@ -23,18 +23,18 @@ def _mock_result(stdout: str = "", stderr: str = "", returncode: int = 0):
 
 
 class TestHimalayaAvailable:
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_available_when_on_path(self, _mock):
         assert himalaya_available() is True
 
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value=None)
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value=None)
     def test_not_available_when_missing(self, _mock):
         assert himalaya_available() is False
 
 
 class TestListMessages:
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_lists_envelopes(self, _which, mock_run):
         fake_data: list[dict] = [
             {
@@ -62,16 +62,16 @@ class TestListMessages:
         assert result[0].subject == "Hello"
         assert result[1].flags == ["SEEN"]
 
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_empty_inbox(self, _which, mock_run):
         mock_run.return_value = _mock_result(stdout="")
 
         result = list_messages()
         assert result == []
 
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_raises_on_subprocess_error(self, _which, mock_run):
         mock_run.return_value = _mock_result(stderr="connection failed", returncode=1)
 
@@ -80,8 +80,8 @@ class TestListMessages:
 
 
 class TestGetMessage:
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_returns_message(self, _which, mock_run):
         fake_body = "<div>Hello World</div>"
         fake_data = {
@@ -101,8 +101,8 @@ class TestGetMessage:
         assert msg.subject == "Your Request"
         assert msg.body == fake_body
 
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_raises_on_empty_output(self, _which, mock_run):
         mock_run.return_value = _mock_result(stdout="")
 
@@ -111,8 +111,8 @@ class TestGetMessage:
 
 
 class TestSendMessage:
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_sends_successfully(self, _which, mock_run):
         mock_run.return_value = _mock_result(stdout="Message sent")
 
@@ -120,8 +120,8 @@ class TestSendMessage:
         assert result["result"] == "Message sent"
         assert "message_id" in result
 
-    @patch("openeraseme.adapters.email.himalaya.subprocess.run")
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
+    @patch("symeraseme.adapters.email.himalaya.subprocess.run")
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value="/usr/bin/himalaya")
     def test_raises_on_failure(self, _which, mock_run):
         mock_run.return_value = _mock_result(stderr="auth failed", returncode=1)
 
@@ -130,12 +130,12 @@ class TestSendMessage:
 
 
 class TestHimalayaNotInstalled:
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value=None)
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value=None)
     def test_raises_on_list(self, _which):
         with pytest.raises(HimalayaNotInstalledError):
             list_messages()
 
-    @patch("openeraseme.adapters.email.himalaya.shutil.which", return_value=None)
+    @patch("symeraseme.adapters.email.himalaya.shutil.which", return_value=None)
     def test_raises_on_send(self, _which):
         with pytest.raises(HimalayaNotInstalledError):
             send_message(to="a@b.com", subject="test", body="test")

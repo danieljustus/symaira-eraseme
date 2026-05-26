@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from openeraseme.services.reply import handle_classify_reply, handle_generate_rebuttal
+from symeraseme.services.reply import handle_classify_reply, handle_generate_rebuttal
 
-SR = "openeraseme.services.reply"
+SR = "symeraseme.services.reply"
 
 
 class TestHandleClassifyReply:
@@ -15,7 +15,7 @@ class TestHandleClassifyReply:
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
             patch(f"{SR}.get_connection") as conn,
-            patch("openeraseme.llm.factory.create_llm_client") as mock_create,
+            patch("symeraseme.llm.factory.create_llm_client") as mock_create,
             patch(f"{SR}.ReplyClassifier") as mock_cls,
             patch(f"{SR}.submit_inbox_reply"),
             patch(f"{SR}.append_event_and_project"),
@@ -44,7 +44,7 @@ class TestHandleClassifyReply:
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
             patch(f"{SR}.get_connection") as conn,
-            patch("openeraseme.llm.factory.create_llm_client") as mock_create,
+            patch("symeraseme.llm.factory.create_llm_client") as mock_create,
             patch(f"{SR}.ReplyClassifier") as mock_cls,
             patch(f"{SR}.submit_inbox_reply"),
             patch(f"{SR}.append_event_and_project"),
@@ -75,7 +75,7 @@ class TestHandleGenerateRebuttal:
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
             patch(f"{SR}.get_connection") as conn,
-            patch("openeraseme.llm.factory.create_llm_client") as mock_create,
+            patch("symeraseme.llm.factory.create_llm_client") as mock_create,
             patch(f"{SR}.generate_rebuttal") as mock_gen,
             patch(f"{SR}.profile_exists", return_value=False),
             patch(f"{SR}.append_event_and_project"),

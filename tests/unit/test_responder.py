@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from openeraseme.adapters.triage.responder import (
+from symeraseme.adapters.triage.responder import (
     REJECTION_TEMPLATES,
     RebuttalResult,
     _build_classifier_user_prompt,
@@ -12,8 +12,8 @@ from openeraseme.adapters.triage.responder import (
     _select_fallback_template,
     generate_rebuttal,
 )
-from openeraseme.llm.protocol import LLMClient
-from openeraseme.registry.schema import IdentityProfile
+from symeraseme.llm.protocol import LLMClient
+from symeraseme.registry.schema import IdentityProfile
 
 
 class TestSelectFallbackTemplate:
@@ -249,7 +249,7 @@ class TestGenerateRebuttal:
         assert result.template_name is not None
 
     def test_responder_uses_factory_by_default(self):
-        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+        with patch("symeraseme.llm.factory.create_llm_client") as mock_factory:
             mock_client = MagicMock(spec=LLMClient)
             mock_client.is_available.return_value = False
             mock_factory.return_value = mock_client
@@ -298,7 +298,7 @@ class TestRejectionTemplates:
 
 class TestRenderedContent:
     def test_gdpr_rebuttal_address_renders(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         profile = IdentityProfile(
             full_name="John Smith",
@@ -325,7 +325,7 @@ class TestRenderedContent:
         assert "original_request_date" not in result  # variable should be substituted
 
     def test_gdpr_rebuttal_identity_renders(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         profile = IdentityProfile(
             full_name="Jane Doe",
@@ -345,7 +345,7 @@ class TestRenderedContent:
         assert "+1-555-1234" in result
 
     def test_ccpa_rebuttal_deletion_renders(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         profile = IdentityProfile(
             full_name="Alice Wang",
@@ -371,7 +371,7 @@ class TestRenderedContent:
         assert "456 Oak Ave" in result
 
     def test_ccpa_rebuttal_without_address(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         profile = IdentityProfile(
             full_name="Bob",
@@ -387,7 +387,7 @@ class TestRenderedContent:
         assert "CCPA" in result
 
     def test_rebuttal_without_profile(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "gdpr-rebuttal-address.md.j2",

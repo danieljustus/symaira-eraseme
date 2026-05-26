@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from openeraseme.adapters.triage.classifier import (
+from symeraseme.adapters.triage.classifier import (
     CLASSIFICATION_TO_EVENT,
     ReplyClassifier,
     _parse_response,
     build_user_prompt,
 )
-from openeraseme.llm.protocol import LLMClientError
+from symeraseme.llm.protocol import LLMClientError
 
 _EMPTY_FIELDS = '"extracted_fields": {}'
 _ACK = '"classification": "ack"'
@@ -147,7 +147,7 @@ class TestParseResponse:
         assert result.confidence == 0.0
 
     def test_all_labels_have_event(self):
-        from openeraseme.adapters.triage.classifier import CLASSIFICATION_LABELS
+        from symeraseme.adapters.triage.classifier import CLASSIFICATION_LABELS
 
         for label in CLASSIFICATION_LABELS:
             assert label in CLASSIFICATION_TO_EVENT, f"Missing event mapping for {label}"
@@ -155,7 +155,7 @@ class TestParseResponse:
 
 class TestReplyClassifier:
     def test_available_returns_false_without_key(self):
-        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+        with patch("symeraseme.llm.factory.create_llm_client") as mock_factory:
             mock_client = MagicMock()
             mock_client.is_available.return_value = False
             mock_factory.return_value = mock_client
@@ -188,7 +188,7 @@ class TestReplyClassifier:
         assert classifier._client is None
 
     def test_classifier_uses_factory_by_default(self):
-        with patch("openeraseme.llm.factory.create_llm_client") as mock_factory:
+        with patch("symeraseme.llm.factory.create_llm_client") as mock_factory:
             mock_client = MagicMock()
             mock_client.is_available.return_value = False
             mock_factory.return_value = mock_client
@@ -277,7 +277,7 @@ class TestAnthropicClientRetry:
         import anthropic
         import pytest
 
-        from openeraseme.llm.anthropic_client import (
+        from symeraseme.llm.anthropic_client import (
             AnthropicClient,
             AnthropicClientRateLimitError,
         )
@@ -308,6 +308,6 @@ class TestAnthropicClientRetry:
 
 class TestCLassifierCLI:
     def test_classifier_importable(self):
-        from openeraseme.adapters.triage import classifier
+        from symeraseme.adapters.triage import classifier
 
         assert classifier is not None

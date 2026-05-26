@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug to help us improve OpenEraseMe
+description: Report a bug to help us improve Symaira EraseMe
 labels: ["bug"]
 body:
   - type: markdown
@@ -22,7 +22,7 @@ body:
       label: Steps to Reproduce
       description: How can we reproduce this issue?
       placeholder: |
-        1. Run 'openeraseme ...'
+        1. Run 'symeraseme ...'
         2. See error
     validations:
       required: true
@@ -51,7 +51,7 @@ body:
       placeholder: |
         - OS: macOS 14.5
         - Python: 3.12
-        - OpenEraseMe version: 0.1.0
+        - Symaira EraseMe version: 0.1.0
         - Installation method: pip / uv
     validations:
       required: true

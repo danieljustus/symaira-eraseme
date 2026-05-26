@@ -8,11 +8,11 @@ import tempfile
 import pytest
 from typer.testing import CliRunner
 
-from openeraseme.cli import app
-from openeraseme.core.consent import check_consent, issue_token, verify_token
-from openeraseme.core.db import close_connection, init_db
-from openeraseme.core.events import list_removal_requests
-from openeraseme.core.orchestrator import (
+from symeraseme.cli import app
+from symeraseme.core.consent import check_consent, issue_token, verify_token
+from symeraseme.core.db import close_connection, init_db
+from symeraseme.core.events import list_removal_requests
+from symeraseme.core.orchestrator import (
     execute_campaign,
     execute_request,
     get_plan,
@@ -25,14 +25,14 @@ runner = CliRunner()
 
 @pytest.fixture(autouse=True)
 def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
-    os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
-    os.environ["OPENERASEME_DATA_DIR"] = str(tmp_path)
+    os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+    os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
     close_connection()
     init_db(str(tmp_path / "test.db"))
     yield
     close_connection()
-    os.environ.pop("OPENERASEME_DB_DIR", None)
-    os.environ.pop("OPENERASEME_DATA_DIR", None)
+    os.environ.pop("SYMERASEME_DB_DIR", None)
+    os.environ.pop("SYMERASEME_DATA_DIR", None)
 
 
 class TestPlanCampaign:
@@ -107,11 +107,11 @@ class TestConsent:
 
     def test_check_consent_env(self):
         token = issue_token("execute")
-        os.environ["OPENERASEME_CONSENT"] = token
+        os.environ["SYMERASEME_CONSENT"] = token
         try:
             assert check_consent("execute") is True
         finally:
-            os.environ.pop("OPENERASEME_CONSENT", None)
+            os.environ.pop("SYMERASEME_CONSENT", None)
 
     def test_check_consent_no_consent(self):
         assert check_consent("execute") is False
@@ -131,7 +131,7 @@ class TestInboxReply:
         assert result["classified_as"] == "ack"
 
     def test_submit_reply_with_request_triggers_event(self):
-        from openeraseme.core.events import create_campaign, create_removal_request, get_events
+        from symeraseme.core.events import create_campaign, create_removal_request, get_events
 
         create_campaign("reply-test")
         rid = create_removal_request(broker_id="b", campaign_id="reply-test", jurisdiction="GDPR")
@@ -183,7 +183,7 @@ class TestCLIConsent:
         assert result.exit_code == 0
 
     def test_events_show(self):
-        from openeraseme.core.events import create_campaign, create_removal_request
+        from symeraseme.core.events import create_campaign, create_removal_request
 
         create_campaign("evt-test")
         rid = create_removal_request(broker_id="b", campaign_id="evt-test", jurisdiction="GDPR")

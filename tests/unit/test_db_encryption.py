@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from cryptography.fernet import Fernet
 
-from openeraseme.core.db import (
+from symeraseme.core.db import (
     _DB_TEMP,
     _ENC_HEADER,
     _cleanup_temp_files,
@@ -37,7 +37,7 @@ def _reset_db() -> None:
 def encrypted_db_file(tmp_path: Path) -> Path:
     """Create a pre-encrypted DB file for testing."""
     db_file = tmp_path / "test_encrypted.db"
-    os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+    os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
 
     # Create an unencrypted DB first
     init_db(str(db_file))
@@ -58,8 +58,8 @@ class TestTempFilePermissions:
     def test_temp_file_has_restrictive_permissions(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
@@ -78,8 +78,8 @@ class TestTempFilePermissions:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Temp files must be in user data dir, not system /tmp."""
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) == 1
@@ -96,8 +96,8 @@ class TestTempFilePermissions:
     def test_encryption_disabled_no_temp_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_DB_DIR", str(tmp_path))
-        monkeypatch.delenv("OPENERASEME_ENCRYPT_DB", raising=False)
+        monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
+        monkeypatch.delenv("SYMERASEME_ENCRYPT_DB", raising=False)
 
         db_file = tmp_path / "plain.db"
         init_db(str(db_file))
@@ -111,8 +111,8 @@ class TestTempFileCleanup:
     def test_temp_file_cleaned_on_close(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -127,8 +127,8 @@ class TestTempFileCleanup:
     def test_temp_file_cleaned_on_context_exit(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         tmp_paths: list[Path] = []
 
@@ -145,8 +145,8 @@ class TestTempFileCleanup:
     def test_temp_file_cleaned_on_atexit_cleanup(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -162,11 +162,11 @@ class TestTempFileCleanup:
     def test_temp_file_unlinked_even_if_reencrypt_fails(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
         # Make re-encryption fail by returning None from key call
         monkeypatch.setattr(
-            "openeraseme.core.db._get_db_fernet_key",
+            "symeraseme.core.db._get_db_fernet_key",
             lambda: _TEST_FERNET_KEY,
         )
 
@@ -176,7 +176,7 @@ class TestTempFileCleanup:
 
         # Make the encrypt function raise
         with patch(
-            "openeraseme.core.db._encrypt_file",
+            "symeraseme.core.db._encrypt_file",
             side_effect=RuntimeError("simulated failure"),
         ):
             close_connection()
@@ -192,7 +192,7 @@ class TestConnectionContext:
     """connection_context() context manager."""
 
     def test_context_returns_connection(self, tmp_path: Path) -> None:
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
 
         with connection_context() as conn:
             tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
@@ -201,8 +201,8 @@ class TestConnectionContext:
     def test_context_cleans_up_on_normal_exit(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         with connection_context(str(encrypted_db_file)):
             assert len(_DB_TEMP) >= 1
@@ -215,8 +215,8 @@ class TestConnectionContext:
     def test_context_cleans_up_on_exception(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPENERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("openeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: _TEST_FERNET_KEY)
 
         with (
             pytest.raises(ValueError, match="test error"),
@@ -234,8 +234,8 @@ class TestBackwardCompatibility:
     """Existing non-encrypted DB usage must still work."""
 
     def test_plain_db_still_works(self, tmp_path: Path) -> None:
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
-        os.environ.pop("OPENERASEME_ENCRYPT_DB", None)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ.pop("SYMERASEME_ENCRYPT_DB", None)
 
         db_file = tmp_path / "plain.db"
         init_db(str(db_file))
@@ -262,6 +262,6 @@ class TestCleanupRegistration:
         # is applied at import time. Verifying via atexit internals
         # is Python-version-dependent, so we verify indirectly:
         # calling the function directly works and cleans up.
-        from openeraseme.core.db import _cleanup_temp_files
+        from symeraseme.core.db import _cleanup_temp_files
 
         assert callable(_cleanup_temp_files)

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/danieljustus/OpenEraseMe/registry/schemas/broker.schema.json",
+  "$id": "https://github.com/danieljustus/symaira-eraseme/registry/schemas/broker.schema.json",
   "title": "Data Broker Definition",
-  "description": "Schema for YAML broker files in the OpenEraseMe registry.",
+  "description": "Schema for YAML broker files in the Symaira EraseMe registry.",
   "type": "object",
   "required": [
     "id",

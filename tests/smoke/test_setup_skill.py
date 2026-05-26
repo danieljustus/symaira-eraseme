@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from openeraseme.registry.schema import IdentityProfile
+from symeraseme.registry.schema import IdentityProfile
 
 from .conftest import assert_ok, invoke
 
@@ -41,7 +41,7 @@ class TestDbInit:
 
     def test_db_init_creates_tables(self, tmp_home):
         invoke("db-init")
-        from openeraseme.core.db import get_connection
+        from symeraseme.core.db import get_connection
 
         conn = get_connection()
         tables = conn.execute(

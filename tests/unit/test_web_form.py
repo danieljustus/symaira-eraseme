@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from openeraseme.adapters.web.playwright_runner import (
+from symeraseme.adapters.web.playwright_runner import (
     PlaywrightRunnerError,
     _capture_error,
     _resolve_value,
@@ -105,7 +105,7 @@ class TestFormStepExecution:
     async def test_goto_step(self):
         mock_page = AsyncMock()
         step = {"goto": "https://example.com/form"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -126,7 +126,7 @@ class TestFormStepExecution:
     async def test_fill_step(self):
         mock_page = AsyncMock()
         step = {"fill": {"#name": "John Doe", "#email": "john@test.com"}}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -146,7 +146,7 @@ class TestFormStepExecution:
         mock_page = AsyncMock()
         step = {"fill": {"#name": "${full_name}", "#email": "${email}"}}
         identity = {"full_name": "Jane Doe", "email": "jane@test.com"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -164,7 +164,7 @@ class TestFormStepExecution:
     async def test_click_step(self):
         mock_page = AsyncMock()
         step = {"click": "#submit-btn"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -181,7 +181,7 @@ class TestFormStepExecution:
     async def test_select_step(self):
         mock_page = AsyncMock()
         step = {"select": {"#reason": "gdpr"}}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -198,7 +198,7 @@ class TestFormStepExecution:
     async def test_wait_for_step(self):
         mock_page = AsyncMock()
         step = {"wait_for": "#success-message"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -216,7 +216,7 @@ class TestFormStepExecution:
         mock_page = AsyncMock()
         mock_page.text_content.return_value = "Your request has been submitted"
         step = {"assert_text": "submitted"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -234,7 +234,7 @@ class TestFormStepExecution:
         mock_page = AsyncMock()
         mock_page.text_content.return_value = "Something else"
         step = {"assert_text": "success"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         with pytest.raises(PlaywrightRunnerError, match="Assertion failed"):
             await _execute_step(
@@ -252,7 +252,7 @@ class TestFormStepExecution:
         mock_page = AsyncMock()
         mock_page.text_content.return_value = None
         step = {"assert_text": "anything"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         with pytest.raises(PlaywrightRunnerError, match="Assertion failed"):
             await _execute_step(
@@ -270,7 +270,7 @@ class TestFormStepExecution:
         mock_page = AsyncMock()
         mock_page.screenshot.return_value = b"image_data"
         step = {"screenshot": "after-submit"}
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         await _execute_step(
             mock_page,
@@ -298,7 +298,7 @@ class TestFormStepExecution:
             {"screenshot": "success"},
         ]
 
-        from openeraseme.adapters.web.playwright_runner import _execute_step
+        from symeraseme.adapters.web.playwright_runner import _execute_step
 
         for i, step in enumerate(steps):
             await _execute_step(
@@ -321,7 +321,7 @@ class TestFormStepExecution:
 
 class TestFormSchema:
     def test_form_spec_roundtrip(self):
-        from openeraseme.registry.schema import FormSpec, FormStep
+        from symeraseme.registry.schema import FormSpec, FormStep
 
         spec = FormSpec(
             steps=[
@@ -349,7 +349,7 @@ class TestFormSchema:
         assert data["steps"][6]["screenshot"] == "result"
 
     def test_web_form_opt_out_roundtrip(self):
-        from openeraseme.registry.schema import FormSpec, FormStep, WebFormOptOut
+        from symeraseme.registry.schema import FormSpec, FormStep, WebFormOptOut
 
         form = WebFormOptOut(
             url="https://broker.example.com/optout",

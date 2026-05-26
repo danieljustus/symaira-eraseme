@@ -93,8 +93,8 @@ jobs:
           ---
           *This is an automated PR. Please review before merging.*
         commit-message: 'registry: add ${{ steps.scan.outputs.new_count }} new data brokers from state registries'
-        committer: 'OpenEraseMe Bot <bot@openeraseme.dev>'
-        author: 'OpenEraseMe Bot <bot@openeraseme.dev>'
+        committer: 'Symaira EraseMe Bot <bot@symeraseme.dev>'
+        author: 'Symaira EraseMe Bot <bot@symeraseme.dev>'
         labels: |
           registry-update
           automated

@@ -1,14 +1,14 @@
-# OpenEraseMe
+# Symaira EraseMe
 
 **Automated data broker removal tool — close your accounts, erase your data.**
 
 > **Beta** — Core features are stable and tested. Some advanced features (web-form CAPTCHA solving, DPA auto-filing) require manual setup or are event-flagged only.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/OpenEraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/OpenEraseMe/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira EraseMe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 
-OpenEraseMe helps you exercise your GDPR/CCPA right to erasure against
+Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It provides:
 
 - **A curated registry** of 1,200+ data brokers with opt-out processes documented
@@ -37,22 +37,22 @@ data brokers. It provides:
 **End users** (from PyPI):
 
 ```bash
-pip install openeraseme
+pip install symeraseme
 ```
 
 Optional extras:
 
 ```bash
-pip install openeraseme[web]      # Playwright-based browser automation
-pip install openeraseme[triage]   # LLM triage via Anthropic Claude
+pip install symeraseme[web]      # Playwright-based browser automation
+pip install symeraseme[triage]   # LLM triage via Anthropic Claude
 ```
 
 **Developers** (from source):
 
 ```bash
 # Clone the repository
-git clone https://github.com/danieljustus/OpenEraseMe.git
-cd OpenEraseMe
+git clone https://github.com/danieljustus/Symaira EraseMe.git
+cd Symaira EraseMe
 
 # Install dependencies with uv
 uv sync
@@ -71,22 +71,22 @@ See `.env.example` for all supported environment variables.
 
 ```bash
 # Initialize your profile with personal details
-openeraseme init-profile
+symeraseme init-profile
 
 # List all registered brokers, optionally filtered by jurisdiction
-openeraseme brokers list --jurisdiction GDPR
+symeraseme brokers list --jurisdiction GDPR
 
 # Show details for a specific broker
-openeraseme brokers show --name spokeo
+symeraseme brokers show --name spokeo
 ```
 
 ### Demo
 
 ```console
-$ openeraseme init-profile
-✓ Profile saved to ~/.config/openeraseme/profile.json
+$ symeraseme init-profile
+✓ Profile saved to ~/.config/symeraseme/profile.json
 
-$ openeraseme brokers list --jurisdiction GDPR
+$ symeraseme brokers list --jurisdiction GDPR
 ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
 ┃ Name         ┃ Website                     ┃ Jurisdiction  ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
@@ -96,11 +96,11 @@ $ openeraseme brokers list --jurisdiction GDPR
 │ Schufa       │ https://www.schufa.de       │ GDPR          │
 └──────────────┴─────────────────────────────┴───────────────┘
 
-$ openeraseme plan create --campaign initial --jurisdiction GDPR --max 5
+$ symeraseme plan create --campaign initial --jurisdiction GDPR --max 5
 ✓ Plan created: 5 brokers selected
   Campaign: initial
 
-$ openeraseme status
+$ symeraseme status
 Campaign: initial
 ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Broker      ┃ Status      ┃ Deadline             ┃
@@ -117,88 +117,88 @@ Campaign: initial
 
 ```bash
 # Create a removal plan for GDPR brokers (limit to 10)
-openeraseme plan create --campaign initial --jurisdiction GDPR --max 10
+symeraseme plan create --campaign initial --jurisdiction GDPR --max 10
 
 # Review the plan before sending
-openeraseme plan show --campaign initial
+symeraseme plan show --campaign initial
 
 # Execute the plan in batches (respects rate limits, requires consent)
-openeraseme execute --campaign initial --batch-size 5 --delay 30 --yes
+symeraseme execute --campaign initial --batch-size 5 --delay 30 --yes
 
 # Check overall campaign progress
-openeraseme status
+symeraseme status
 
 # View deadline calendar and upcoming tick actions
-openeraseme calendar --weeks 4
+symeraseme calendar --weeks 4
 ```
 
 ### Inbox triage (requires `[triage]` extra)
 
 ```bash
 # Poll your IMAP inbox for broker replies
-openeraseme poll-inbox --username your@email.com
+symeraseme poll-inbox --username your@email.com
 
 # Classify a broker reply via LLM
-openeraseme classify-reply <request_id>
+symeraseme classify-reply <request_id>
 
 # Generate a jurisdiction-aware rebuttal for a rejection
-openeraseme generate-rebuttal <request_id>
+symeraseme generate-rebuttal <request_id>
 ```
 
 ### Web-form automation (requires `[web]` extra)
 
 ```bash
 # Run a broker's web-form opt-out via Playwright
-openeraseme run-web-form <broker_id>
+symeraseme run-web-form <broker_id>
 
 # List manual fallback tasks for forms that couldn't be automated
-openeraseme manual-tasks list
+symeraseme manual-tasks list
 
 # Mark a manual task as completed
-openeraseme manual-tasks complete <task_id>
+symeraseme manual-tasks complete <task_id>
 ```
 
 ### Lifecycle and maintenance
 
 ```bash
 # Run the tick engine (checks deadlines, reminders, escalations)
-openeraseme tick --dry-run
-openeraseme tick
+symeraseme tick --dry-run
+symeraseme tick
 
 # Generate scheduler configs (cron / launchd / systemd)
-openeraseme generate-scheduler --output ./schedules
+symeraseme generate-scheduler --output ./schedules
 
 # Install schedules
-openeraseme schedule install ./schedules
+symeraseme schedule install ./schedules
 
 # Generate a dashboard report
-openeraseme generate-dashboard
+symeraseme generate-dashboard
 
 # Export campaign data for GDPR record-keeping
-openeraseme export --format json --output campaign.json
+symeraseme export --format json --output campaign.json
 ```
 
 ### Other commands
 
 ```bash
 # Validate registry YAML files against the schema
-openeraseme validate
+symeraseme validate
 
 # Show event history for a request
-openeraseme events show <request_id>
+symeraseme events show <request_id>
 
 # List all removal requests
-openeraseme requests list --status pending
+symeraseme requests list --status pending
 
 # Grant consent for destructive operations
-openeraseme grant execute --ttl 3600
+symeraseme grant execute --ttl 3600
 ```
 
-Run `openeraseme --help` for a full list of commands and options.
+Run `symeraseme --help` for a full list of commands and options.
 
 ## Architecture
 
-OpenEraseMe uses an **event-sourced architecture** built on SQLite:
+Symaira EraseMe uses an **event-sourced architecture** built on SQLite:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
@@ -262,9 +262,9 @@ uv run pytest --verbose --tb=short
 ### Lint and type-check
 
 ```bash
-uv run ruff check src/openeraseme/
-uv run ruff format --check src/openeraseme/
-uv run mypy src/openeraseme/
+uv run ruff check src/symeraseme/
+uv run ruff format --check src/symeraseme/
+uv run mypy src/symeraseme/
 ```
 
 All three checks run in CI on every push and pull request to the `main` branch.
@@ -272,7 +272,7 @@ All three checks run in CI on every push and pull request to the `main` branch.
 ### Project structure
 
 ```
-src/openeraseme/
+src/symeraseme/
   cli/           — Typer CLI application
   core/          — Event store, projections, tick engine, templating, scheduler
   registry/      — Broker loader, schema validation
@@ -289,7 +289,7 @@ examples/        — Integration examples for Claude Code, OpenClaw, cron
 ## Security
 
 - **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.
-- **Database encryption**: When `OPENERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. On open, the database is decrypted to a temporary file in your user data directory (`~/.local/share/openeraseme/`). The temp file has restrictive permissions (`0o600`) and is re-encrypted and removed on normal exit, SIGTERM, or context close. However, a `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind. If this is a concern for your threat model, consider running OpenEraseMe on a single-user system or using full-disk encryption.
+- **Database encryption**: When `SYMERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. On open, the database is decrypted to a temporary file in your user data directory (`~/.local/share/symeraseme/`). The temp file has restrictive permissions (`0o600`) and is re-encrypted and removed on normal exit, SIGTERM, or context close. However, a `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind. If this is a concern for your threat model, consider running Symaira EraseMe on a single-user system or using full-disk encryption.
 
 ## License
 

@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from openeraseme.registry.loader import load_all_brokers, load_broker
-from openeraseme.registry.schema import Broker
+from symeraseme.registry.loader import load_all_brokers, load_broker
+from symeraseme.registry.schema import Broker
 
 
 class TestBrokerLoading:

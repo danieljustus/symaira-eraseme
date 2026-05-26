@@ -8,7 +8,7 @@ body:
         ## Adding a Broker to the Registry
 
         Thank you for contributing! Each broker entry is a YAML file in
-        `registry/brokers/<region>/`. A merged entry means OpenEraseMe can
+        `registry/brokers/<region>/`. A merged entry means Symaira EraseMe can
         automatically file opt-out requests on behalf of users.
 
         **Quick guide:**

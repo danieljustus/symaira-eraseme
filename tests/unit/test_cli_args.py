@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from openeraseme.cli import app
+from symeraseme.cli import app
 
 runner = CliRunner()
 

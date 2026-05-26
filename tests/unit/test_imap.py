@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from openeraseme.adapters.email.smtp_imap import (
+from symeraseme.adapters.email.smtp_imap import (
     decode_mime_header,
     extract_thread_id,
     match_reply_to_request,

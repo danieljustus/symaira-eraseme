@@ -5,10 +5,10 @@ import tempfile
 
 import pytest
 
-from openeraseme.core.db import close_connection, get_connection, init_db
-from openeraseme.core.events import append_event, create_removal_request
-from openeraseme.core.projection import upsert_state
-from openeraseme.core.reply_manager import (
+from symeraseme.core.db import close_connection, get_connection, init_db
+from symeraseme.core.events import append_event, create_removal_request
+from symeraseme.core.projection import upsert_state
+from symeraseme.core.reply_manager import (
     CLASSIFICATIONS_NEEDING_REPLY,
     _fallback_rebuttal,
     draft_reply,
@@ -21,16 +21,16 @@ from openeraseme.core.reply_manager import (
 @pytest.fixture(autouse=True)
 def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
     db_file = tmp_path / "test.db"
-    old = os.environ.get("OPENERASEME_DB_DIR")
-    os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+    old = os.environ.get("SYMERASEME_DB_DIR")
+    os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
     close_connection()
     init_db(str(db_file))
     yield
     close_connection()
     if old:
-        os.environ["OPENERASEME_DB_DIR"] = old
+        os.environ["SYMERASEME_DB_DIR"] = old
     else:
-        os.environ.pop("OPENERASEME_DB_DIR", None)
+        os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 def _ensure_request(conn, request_id: int) -> None:
@@ -236,7 +236,7 @@ class TestDraftReply:
         rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="rejected")
 
         draft_reply(rid)
-        from openeraseme.core.events import get_events
+        from symeraseme.core.events import get_events
 
         events = get_events(req_id)
         event_types = [e["event_type"] for e in events]

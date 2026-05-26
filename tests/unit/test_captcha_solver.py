@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openeraseme.adapters.web.captcha_solver import (
+from symeraseme.adapters.web.captcha_solver import (
     CapSolverSolver,
     CaptchaError,
     CaptchaSolution,
@@ -42,7 +42,7 @@ class TestCapSolverSolver:
         solver = CapSolverSolver("test-key")
         assert solver._api_key == "test-key"
 
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
     def test_solve_recaptcha_v2_creates_task(self, mock_urlopen):
         from unittest.mock import Mock
 
@@ -66,7 +66,7 @@ class TestCapSolverSolver:
         assert result.token == "token-xyz"
         assert result.task_id == "abc-123"
 
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
     def test_capsolver_api_error(self, mock_urlopen):
         from unittest.mock import Mock
 
@@ -81,9 +81,9 @@ class TestCapSolverSolver:
                 page_url="https://example.com",
             )
 
-    @patch("openeraseme.adapters.web.captcha_solver.time.monotonic")
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
-    @patch("openeraseme.adapters.web.captcha_solver.time.sleep")
+    @patch("symeraseme.adapters.web.captcha_solver.time.monotonic")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.time.sleep")
     def test_capsolver_timeout(self, mock_sleep, mock_urlopen, mock_monotonic):
         from unittest.mock import Mock
 
@@ -108,7 +108,7 @@ class TestTwoCaptchaSolver:
         solver = TwoCaptchaSolver("test-key")
         assert solver._api_key == "test-key"
 
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
     def test_solve_recaptcha_v2(self, mock_urlopen):
         from unittest.mock import Mock
 
@@ -129,7 +129,7 @@ class TestTwoCaptchaSolver:
         assert result.token == "token-abc"
         assert result.task_id == "captcha-456"
 
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
     def test_twocaptcha_upload_error(self, mock_urlopen):
         from unittest.mock import Mock
 
@@ -144,9 +144,9 @@ class TestTwoCaptchaSolver:
                 page_url="https://example.com",
             )
 
-    @patch("openeraseme.adapters.web.captcha_solver.time.monotonic")
-    @patch("openeraseme.adapters.web.captcha_solver.urlopen")
-    @patch("openeraseme.adapters.web.captcha_solver.time.sleep")
+    @patch("symeraseme.adapters.web.captcha_solver.time.monotonic")
+    @patch("symeraseme.adapters.web.captcha_solver.urlopen")
+    @patch("symeraseme.adapters.web.captcha_solver.time.sleep")
     def test_twocaptcha_timeout(self, mock_sleep, mock_urlopen, mock_monotonic):
         from unittest.mock import Mock
 
@@ -181,7 +181,7 @@ class TestCaptchaSolution:
 class TestPlaywrightIntegration:
     def test_form_step_has_solve_captcha(self):
         """Verify the schema roundtrips solve_captcha correctly."""
-        from openeraseme.registry.schema import FormStep
+        from symeraseme.registry.schema import FormStep
 
         step = FormStep(
             solve_captcha={

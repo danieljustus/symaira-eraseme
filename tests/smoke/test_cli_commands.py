@@ -7,7 +7,7 @@ class TestVersion:
     def test_version_output(self):
         result = invoke("version")
         assert_ok(result)
-        assert "OpenEraseMe" in result.stdout
+        assert "Symaira EraseMe" in result.stdout
 
     def test_version_contains_number(self):
         result = invoke("version")
@@ -265,9 +265,9 @@ class TestCalendarCommand:
 
     def test_calendar_picks_up_deadline(self, tmp_home):
         """Seed a SENT request, run tick to project deadline, calendar must see it."""
-        from openeraseme.core.db import init_db
-        from openeraseme.core.events import create_campaign, create_removal_request
-        from openeraseme.core.projection import append_event_and_project
+        from symeraseme.core.db import init_db
+        from symeraseme.core.events import create_campaign, create_removal_request
+        from symeraseme.core.projection import append_event_and_project
 
         init_db()
         create_campaign("cal-test")
@@ -363,7 +363,7 @@ class TestRegistrySyncCommand:
 
     def test_sync_pip_mode_when_no_git_root(self, monkeypatch):
         """If the registry lives outside any git tree, sync reports pip-install mode."""
-        from openeraseme.registry import sync as sync_mod
+        from symeraseme.registry import sync as sync_mod
 
         monkeypatch.setattr(sync_mod, "_find_git_root", lambda _p: None)
 

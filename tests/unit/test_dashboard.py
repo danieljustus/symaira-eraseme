@@ -7,9 +7,9 @@ import os
 
 def _seed_db(tmp_path: str) -> None:
     """Seed a test database with campaign and request data."""
-    from openeraseme.core.db import close_connection, get_connection, init_db
+    from symeraseme.core.db import close_connection, get_connection, init_db
 
-    os.environ["OPENERASEME_DB_DIR"] = tmp_path
+    os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
     init_db(tmp_path + "/test.db")
 
@@ -72,17 +72,17 @@ def _seed_db(tmp_path: str) -> None:
 
 
 def _clean_db() -> None:
-    from openeraseme.core.db import close_connection
+    from symeraseme.core.db import close_connection
 
     close_connection()
-    os.environ.pop("OPENERASEME_DB_DIR", None)
+    os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 class TestGetDashboardData:
     def test_returns_dict_with_structure(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data()
 
@@ -97,7 +97,7 @@ class TestGetDashboardData:
     def test_returns_correct_counts(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data()
             assert data["total_requests"] >= 5
@@ -109,7 +109,7 @@ class TestGetDashboardData:
     def test_campaign_specific_filter(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data(campaign_id="test-camp-1")
             assert len(data["campaigns"]) == 1
@@ -119,13 +119,13 @@ class TestGetDashboardData:
 
     def test_handles_no_db(self, tmp_path):
         db_path = str(tmp_path / "empty.db")
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
-        from openeraseme.core.db import close_connection, init_db
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        from symeraseme.core.db import close_connection, init_db
 
         close_connection()
         init_db(db_path)
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data()
             assert data["total_requests"] == 0
@@ -136,7 +136,7 @@ class TestGetDashboardData:
     def test_broker_status_aggregation(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data()
             broker_ids = {b["broker_id"] for b in data["broker_status"]}
@@ -149,7 +149,7 @@ class TestGetDashboardData:
     def test_recent_events_included(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import get_dashboard_data
+            from symeraseme.core.dashboard import get_dashboard_data
 
             data = get_dashboard_data()
             assert len(data["recent_events"]) >= 5
@@ -161,7 +161,7 @@ class TestGenerateDashboard:
     def test_returns_html_string(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data)
@@ -173,11 +173,11 @@ class TestGenerateDashboard:
     def test_html_contains_expected_elements(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data)
-            assert "OpenEraseMe Dashboard" in html
+            assert "Symaira EraseMe Dashboard" in html
             assert "Campaigns" in html
             assert "Broker Status" in html
             assert "Recent Events" in html
@@ -187,7 +187,7 @@ class TestGenerateDashboard:
     def test_html_is_valid_doctype(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data)
@@ -199,7 +199,7 @@ class TestGenerateDashboard:
     def test_auto_refresh_meta_included(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data, auto_refresh_seconds=30)
@@ -209,7 +209,7 @@ class TestGenerateDashboard:
             _clean_db()
 
     def test_empty_data_renders_no_error(self):
-        from openeraseme.core.dashboard import generate_dashboard
+        from symeraseme.core.dashboard import generate_dashboard
 
         data = {
             "campaigns": [],
@@ -231,7 +231,7 @@ class TestGenerateDashboard:
     def test_has_dark_mode_support(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data)
@@ -242,7 +242,7 @@ class TestGenerateDashboard:
     def test_has_responsive_viewport(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.dashboard import generate_dashboard, get_dashboard_data
+            from symeraseme.core.dashboard import generate_dashboard, get_dashboard_data
 
             data = get_dashboard_data()
             html = generate_dashboard(data)

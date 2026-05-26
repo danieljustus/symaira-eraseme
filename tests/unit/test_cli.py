@@ -4,8 +4,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from openeraseme.cli import app
-from openeraseme.cli.types import CliResult
+from symeraseme.cli import app
+from symeraseme.cli.types import CliResult
 
 runner = CliRunner()
 
@@ -13,13 +13,13 @@ runner = CliRunner()
 def test_version() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "OpenEraseMe" in result.stdout
+    assert "Symaira EraseMe" in result.stdout
 
 
 def test_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "openeraseme" in result.stdout
+    assert "symeraseme" in result.stdout
 
 
 class TestGrant:
@@ -27,7 +27,7 @@ class TestGrant:
     def _setup(monkeypatch, tmp_path) -> Path:
         consent_dir = tmp_path / "consent"
         consent_dir.mkdir()
-        monkeypatch.setenv("OPENERASEME_DATA_DIR", str(consent_dir))
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(consent_dir))
         return consent_dir
 
     def test_grant_issues_token(self, monkeypatch, tmp_path):

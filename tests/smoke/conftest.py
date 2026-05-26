@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner, Result
 
-from openeraseme.cli import app
-from openeraseme.core.db import close_connection
+from symeraseme.cli import app
+from symeraseme.core.db import close_connection
 
 runner = CliRunner()
 
@@ -19,7 +19,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _clean_env() -> None:
     """Ensure isolated environment state before each test."""
-    keys = ["OPENERASEME_DATA_DIR", "OPENERASEME_DB_DIR", "OPENERASEME_IDENTITY_PATH"]
+    keys = ["SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_IDENTITY_PATH"]
     saved = {k: os.environ.pop(k, None) for k in keys}
     close_connection()
     yield
@@ -36,18 +36,18 @@ def tmp_home(tmp_path: Path) -> Path:
     """Provide an isolated temp directory as the fake home/data dir."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    os.environ["OPENERASEME_DATA_DIR"] = str(data_dir)
-    os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
-    os.environ["OPENERASEME_IDENTITY_PATH"] = str(tmp_path / "identity.enc")
+    os.environ["SYMERASEME_DATA_DIR"] = str(data_dir)
+    os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+    os.environ["SYMERASEME_IDENTITY_PATH"] = str(tmp_path / "identity.enc")
     return tmp_path
 
 
 @pytest.fixture()
 def seeded_db(tmp_home: Path) -> None:
     """Initialize DB with a seeded campaign and some removal requests."""
-    from openeraseme.core.db import init_db
-    from openeraseme.core.events import append_event, create_campaign, create_removal_request
-    from openeraseme.core.projection import upsert_state
+    from symeraseme.core.db import init_db
+    from symeraseme.core.events import append_event, create_campaign, create_removal_request
+    from symeraseme.core.projection import upsert_state
 
     init_db()
     create_campaign("smoke-test", kind="initial", notes="smoke test campaign")

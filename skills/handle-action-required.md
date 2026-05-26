@@ -15,13 +15,13 @@ rejections, and other action-required scenarios.
 Many brokers send a confirmation link that needs to be clicked.
 
 ```bash
-openeraseme auto-confirm 1
+symeraseme auto-confirm 1
 ```
 
 ### Dry-run first
 
 ```bash
-openeraseme auto-confirm 1 --dry-run
+symeraseme auto-confirm 1 --dry-run
 # Output: [DRY RUN] Would click: https://broker.com/verify?token=abc
 ```
 
@@ -29,16 +29,16 @@ openeraseme auto-confirm 1 --dry-run
 
 ```bash
 # Default: headless (no visible browser)
-openeraseme auto-confirm 1
+symeraseme auto-confirm 1
 
 # Show browser for debugging
-openeraseme auto-confirm 1 --headed
+symeraseme auto-confirm 1 --headed
 ```
 
 ### JSON output
 
 ```bash
-openeraseme auto-confirm 1 --output json
+symeraseme auto-confirm 1 --output json
 ```
 
 ```json
@@ -59,7 +59,7 @@ openeraseme auto-confirm 1 --output json
 When a broker rejects a removal request, generate a legal rebuttal:
 
 ```bash
-openeraseme generate-rebuttal 1 --api-key "$ANTHROPIC_API_KEY"
+symeraseme generate-rebuttal 1 --api-key "$ANTHROPIC_API_KEY"
 ```
 
 The LLM analyzes the rejection reason and generates a targeted rebuttal
@@ -68,7 +68,7 @@ based on the appropriate legal framework (GDPR Article 17, CCPA, etc.).
 ### JSON output
 
 ```bash
-openeraseme generate-rebuttal 1 --output json
+symeraseme generate-rebuttal 1 --output json
 ```
 
 ```json
@@ -102,19 +102,19 @@ fallback system:
 
 ```bash
 # List pending manual tasks
-openeraseme manual-tasks list
+symeraseme manual-tasks list
 
 # Show details of a specific task
-openeraseme manual-tasks show 1
+symeraseme manual-tasks show 1
 
 # Mark as completed after manual action
-openeraseme manual-tasks complete 1 --notes "Completed opt-out via manual browser session"
+symeraseme manual-tasks complete 1 --notes "Completed opt-out via manual browser session"
 ```
 
 ### JSON output
 
 ```bash
-openeraseme manual-tasks list --output json
+symeraseme manual-tasks list --output json
 ```
 
 ```json

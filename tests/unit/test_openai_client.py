@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openeraseme.llm.openai_client import OpenAIClient
-from openeraseme.llm.protocol import LLMClientError, LLMClientRateLimitError, UsageRecord
+from symeraseme.llm.openai_client import OpenAIClient
+from symeraseme.llm.protocol import LLMClientError, LLMClientRateLimitError, UsageRecord
 
 
 @pytest.fixture(autouse=True)
@@ -127,7 +127,7 @@ class TestOpenAIClientRetry:
         ]
         fake_openai_module.OpenAI.return_value = mock_client
 
-        with patch("openeraseme.llm.openai_client.time.sleep") as mock_sleep:
+        with patch("symeraseme.llm.openai_client.time.sleep") as mock_sleep:
             client = OpenAIClient(api_key="sk-test", max_retries=3)
             text, record = client.classify("sys", "user")
 
@@ -142,7 +142,7 @@ class TestOpenAIClientRetry:
         )
         fake_openai_module.OpenAI.return_value = mock_client
 
-        with patch("openeraseme.llm.openai_client.time.sleep") as mock_sleep:
+        with patch("symeraseme.llm.openai_client.time.sleep") as mock_sleep:
             client = OpenAIClient(api_key="sk-test", max_retries=2)
             with pytest.raises(LLMClientRateLimitError):
                 client.classify("sys", "user")
@@ -169,7 +169,7 @@ class TestOpenAIClientRetry:
         ]
         fake_openai_module.OpenAI.return_value = mock_client
 
-        with patch("openeraseme.llm.openai_client.time.sleep") as mock_sleep:
+        with patch("symeraseme.llm.openai_client.time.sleep") as mock_sleep:
             client = OpenAIClient(api_key="sk-test", max_retries=3)
             text, record = client.classify("sys", "user")
 

@@ -1,4 +1,4 @@
-# Contributing to OpenEraseMe
+# Contributing to Symaira EraseMe
 
 ## Quick Start
 
@@ -8,14 +8,14 @@
    ```
 2. Install dependencies: `uv sync`
 3. Run tests: `pytest`
-4. Run lints: `ruff check . && mypy src/openeraseme/`
+4. Run lints: `ruff check . && mypy src/symeraseme/`
 5. Open a pull request — use the PR template checklist.
 
 ---
 
 ## Adding a Data Broker (most impactful contribution)
 
-Adding a broker lets OpenEraseMe automatically file opt-out requests
+Adding a broker lets Symaira EraseMe automatically file opt-out requests
 on behalf of users. No Python knowledge required — just a YAML file.
 
 ### Step 1 — Open an issue first (optional but helpful)
@@ -96,13 +96,13 @@ These are used by the automated triage engine to mark requests as resolved.
 ### Step 7 — Validate
 
 ```bash
-openeraseme registry validate registry/brokers/us/example-broker-us.yaml
+symeraseme registry validate registry/brokers/us/example-broker-us.yaml
 ```
 
 Or validate the whole registry:
 
 ```bash
-openeraseme registry validate
+symeraseme registry validate
 ```
 
 ### Step 8 — Open a pull request
@@ -167,6 +167,6 @@ registry/
 
 ## Questions?
 
-Open a [Discussion](https://github.com/danieljustus/OpenEraseMe/discussions)
+Open a [Discussion](https://github.com/danieljustus/Symaira EraseMe/discussions)
 or comment on an existing issue. Security issues go to the
-[Security Policy](https://github.com/danieljustus/OpenEraseMe/security/policy).
+[Security Policy](https://github.com/danieljustus/Symaira EraseMe/security/policy).

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from openeraseme.core.deadlines import (
+from symeraseme.core.deadlines import (
     _check_deadline,
     _check_dpa_escalation,
     _check_reminder,
@@ -155,9 +155,9 @@ class TestRunTick:
     def test_no_requests_returns_empty(self, tmp_path):
         import os
 
-        from openeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db import close_connection, init_db
 
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
         init_db(str(tmp_path / "test.db"))
 
@@ -166,14 +166,14 @@ class TestRunTick:
             assert actions == []
         finally:
             close_connection()
-            os.environ.pop("OPENERASEME_DB_DIR", None)
+            os.environ.pop("SYMERASEME_DB_DIR", None)
 
     def test_dry_run_returns_actions(self, tmp_path):
         import os
 
-        from openeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db import close_connection, get_connection, init_db
 
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
         init_db(str(tmp_path / "test.db"))
 
@@ -200,14 +200,14 @@ class TestRunTick:
             assert actions[0].action_type == "mark_overdue"
         finally:
             close_connection()
-            os.environ.pop("OPENERASEME_DB_DIR", None)
+            os.environ.pop("SYMERASEME_DB_DIR", None)
 
     def test_multiple_states_ticked(self, tmp_path):
         import os
 
-        from openeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db import close_connection, get_connection, init_db
 
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
         init_db(str(tmp_path / "test.db"))
 
@@ -246,16 +246,16 @@ class TestRunTick:
             assert len(actions) >= 1
         finally:
             close_connection()
-            os.environ.pop("OPENERASEME_DB_DIR", None)
+            os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 class TestApplyTickActions:
     def test_empty_actions(self, tmp_path):
         import os
 
-        from openeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db import close_connection, init_db
 
-        os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
         init_db(str(tmp_path / "test.db"))
 
@@ -264,10 +264,10 @@ class TestApplyTickActions:
             assert results == []
         finally:
             close_connection()
-            os.environ.pop("OPENERASEME_DB_DIR", None)
+            os.environ.pop("SYMERASEME_DB_DIR", None)
 
     def test_dry_run_actions_not_executed(self):
-        from openeraseme.core.deadlines import TickAction
+        from symeraseme.core.deadlines import TickAction
 
         actions = [
             TickAction(
@@ -289,14 +289,14 @@ class TestApplyTickActions:
 
 class TestCCPADeadline:
     def test_ccpa_has_45_day_deadline(self):
-        from openeraseme.core.deadlines import JURISDICTION_DEADLINES
+        from symeraseme.core.deadlines import JURISDICTION_DEADLINES
 
         assert JURISDICTION_DEADLINES.get("CCPA") == 45
 
 
 class TestJurisdictionDefaults:
     def test_unknown_jurisdiction_defaults_to_30(self):
-        from openeraseme.core.deadlines import JURISDICTION_DEADLINES
+        from symeraseme.core.deadlines import JURISDICTION_DEADLINES
 
         val = JURISDICTION_DEADLINES.get("UNKNOWN", 30)
         assert val == 30

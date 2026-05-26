@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Registry synchronization script for OpenEraseMe.
+Registry synchronization script for Symaira EraseMe.
 
 Scans official data broker registries (California, Vermont) and compares
 against the local YAML registry. Can generate new broker definitions and
@@ -279,7 +279,7 @@ def validate_all_brokers(registry_dir: str, schema_path: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='OpenEraseMe Registry Sync')
+    parser = argparse.ArgumentParser(description='Symaira EraseMe Registry Sync')
     parser.add_argument('--scan-all', action='store_true', help='Scan all registry CSV files')
     parser.add_argument('--output', help='Output file for scan results (JSON)')
     parser.add_argument('--generate-yaml', action='store_true', help='Generate YAML files from scan results')

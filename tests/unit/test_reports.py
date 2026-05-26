@@ -10,9 +10,9 @@ import pytest
 
 def _seed_db(tmp_path: str) -> None:
     """Seed a test database with multi-campaign data for report testing."""
-    from openeraseme.core.db import close_connection, get_connection, init_db
+    from symeraseme.core.db import close_connection, get_connection, init_db
 
-    os.environ["OPENERASEME_DB_DIR"] = tmp_path
+    os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
     init_db(tmp_path + "/test.db")
 
@@ -91,17 +91,17 @@ def _seed_db(tmp_path: str) -> None:
 
 
 def _clean_db() -> None:
-    from openeraseme.core.db import close_connection
+    from symeraseme.core.db import close_connection
 
     close_connection()
-    os.environ.pop("OPENERASEME_DB_DIR", None)
+    os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 class TestGetReportData:
     def test_returns_dict_with_structure(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data()
             assert "campaigns" in data
@@ -114,7 +114,7 @@ class TestGetReportData:
             _clean_db()
 
     def test_empty_db_returns_empty_report(self):
-        from openeraseme.core.reports import get_report_data
+        from symeraseme.core.reports import get_report_data
 
         data = get_report_data(campaign_id="nonexistent")
         assert data["total_requests"] == 0
@@ -123,7 +123,7 @@ class TestGetReportData:
     def test_specific_campaign(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(campaign_id="camp-initial")
             assert len(data["campaigns"]) == 1
@@ -134,7 +134,7 @@ class TestGetReportData:
     def test_all_campaigns(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(all_campaigns=True)
             assert data["total_campaigns"] == 2
@@ -144,7 +144,7 @@ class TestGetReportData:
     def test_status_breakdown(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(campaign_id="camp-initial")
             sb = data["status_breakdown"]
@@ -158,7 +158,7 @@ class TestGetReportData:
     def test_broker_leaderboard(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(all_campaigns=True)
             assert len(data["broker_leaderboard"]) >= 4
@@ -172,7 +172,7 @@ class TestGetReportData:
     def test_jurisdiction_stats(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(all_campaigns=True)
             jurisdictions = {j["jurisdiction"] for j in data["jurisdiction_stats"]}
@@ -184,7 +184,7 @@ class TestGetReportData:
     def test_success_metrics(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(all_campaigns=True)
             sm = data["success_metrics"]
@@ -197,7 +197,7 @@ class TestGetReportData:
     def test_historical_comparison(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import get_report_data
+            from symeraseme.core.reports import get_report_data
 
             data = get_report_data(all_campaigns=True)
             hc = data["historical_comparison"]
@@ -213,8 +213,8 @@ class TestAggregateCampaign:
     def test_aggregates_counts_correctly(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.events import list_removal_requests
-            from openeraseme.core.reports import _aggregate_campaign
+            from symeraseme.core.events import list_removal_requests
+            from symeraseme.core.reports import _aggregate_campaign
 
             reqs = list_removal_requests(campaign_id="camp-initial")
             camp = {
@@ -232,7 +232,7 @@ class TestAggregateCampaign:
             _clean_db()
 
     def test_empty_campaign_returns_zero_counts(self):
-        from openeraseme.core.reports import _aggregate_campaign
+        from symeraseme.core.reports import _aggregate_campaign
 
         agg = _aggregate_campaign({"id": "empty", "requests": []})
         assert agg["total"] == 0
@@ -244,7 +244,7 @@ class TestExportJson:
     def test_json_is_parseable(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import export_json, get_report_data
+            from symeraseme.core.reports import export_json, get_report_data
 
             data = get_report_data(all_campaigns=True)
             json_str = export_json(data)
@@ -255,7 +255,7 @@ class TestExportJson:
             _clean_db()
 
     def test_json_empty_report(self):
-        from openeraseme.core.reports import _empty_report, export_json
+        from symeraseme.core.reports import _empty_report, export_json
 
         data = _empty_report("nonexistent")
         json_str = export_json(data)
@@ -267,7 +267,7 @@ class TestExportCsv:
     def test_csv_has_header(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import export_csv, get_report_data
+            from symeraseme.core.reports import export_csv, get_report_data
 
             data = get_report_data(all_campaigns=True)
             csv_str = export_csv(data)
@@ -281,7 +281,7 @@ class TestExportCsv:
     def test_csv_contains_data_rows(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import export_csv, get_report_data
+            from symeraseme.core.reports import export_csv, get_report_data
 
             data = get_report_data(all_campaigns=True)
             csv_str = export_csv(data)
@@ -293,7 +293,7 @@ class TestExportCsv:
             _clean_db()
 
     def test_csv_empty_data(self):
-        from openeraseme.core.reports import _empty_report, export_csv
+        from symeraseme.core.reports import _empty_report, export_csv
 
         data = _empty_report("nonexistent")
         csv_str = export_csv(data)
@@ -304,7 +304,7 @@ class TestExportHtml:
     def test_html_template_renders(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import export_html, get_report_data
+            from symeraseme.core.reports import export_html, get_report_data
 
             data = get_report_data(all_campaigns=True)
             html = export_html(data)
@@ -315,7 +315,7 @@ class TestExportHtml:
             _clean_db()
 
     def test_html_empty_data(self):
-        from openeraseme.core.reports import _empty_report, export_html
+        from symeraseme.core.reports import _empty_report, export_html
 
         data = _empty_report("nonexistent")
         html = export_html(data)
@@ -325,13 +325,13 @@ class TestExportHtml:
 
 class TestSuccessMetrics:
     def test_empty_requests(self):
-        from openeraseme.core.reports import _success_metrics
+        from symeraseme.core.reports import _success_metrics
 
         result = _success_metrics([])
         assert result == {}
 
     def test_all_confirmed(self):
-        from openeraseme.core.reports import _success_metrics
+        from symeraseme.core.reports import _success_metrics
 
         requests = [
             {
@@ -354,7 +354,7 @@ class TestSuccessMetrics:
         assert sm["median_response_time_days"] is not None
 
     def test_mixed_statuses(self):
-        from openeraseme.core.reports import _success_metrics
+        from symeraseme.core.reports import _success_metrics
 
         requests = [
             {"id": 1, "current_status": "CONFIRMED"},
@@ -368,7 +368,7 @@ class TestSuccessMetrics:
         assert sm["overdue_rate"] == 25.0
 
     def test_response_time_calculation(self):
-        from openeraseme.core.reports import _success_metrics
+        from symeraseme.core.reports import _success_metrics
 
         requests = [
             {
@@ -384,7 +384,7 @@ class TestSuccessMetrics:
 
 class TestBrokerLeaderboard:
     def test_returns_sorted_by_total(self):
-        from openeraseme.core.reports import _broker_leaderboard
+        from symeraseme.core.reports import _broker_leaderboard
 
         requests = [
             {"id": 1, "broker_id": "broker-a", "current_status": "CONFIRMED"},
@@ -399,14 +399,14 @@ class TestBrokerLeaderboard:
         assert board[1]["success_rate"] == 0.0
 
     def test_empty_requests(self):
-        from openeraseme.core.reports import _broker_leaderboard
+        from symeraseme.core.reports import _broker_leaderboard
 
         assert _broker_leaderboard([]) == []
 
 
 class TestJurisdictionBreakdown:
     def test_gdpr_and_ccpa(self):
-        from openeraseme.core.reports import _jurisdiction_breakdown
+        from symeraseme.core.reports import _jurisdiction_breakdown
 
         requests = [
             {"id": 1, "jurisdiction": "GDPR", "current_status": "CONFIRMED"},
@@ -425,7 +425,7 @@ class TestGenerateReport:
     def test_html_format(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import generate_report, get_report_data
+            from symeraseme.core.reports import generate_report, get_report_data
 
             data = get_report_data(all_campaigns=True)
             result = generate_report(data, format="html")
@@ -437,7 +437,7 @@ class TestGenerateReport:
     def test_json_format(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import generate_report, get_report_data
+            from symeraseme.core.reports import generate_report, get_report_data
 
             data = get_report_data(all_campaigns=True)
             result = generate_report(data, format="json")
@@ -450,7 +450,7 @@ class TestGenerateReport:
     def test_csv_format(self, tmp_path):
         _seed_db(str(tmp_path))
         try:
-            from openeraseme.core.reports import generate_report, get_report_data
+            from symeraseme.core.reports import generate_report, get_report_data
 
             data = get_report_data(all_campaigns=True)
             result = generate_report(data, format="csv")
@@ -460,7 +460,7 @@ class TestGenerateReport:
             _clean_db()
 
     def test_invalid_format_raises(self):
-        from openeraseme.core.reports import generate_report
+        from symeraseme.core.reports import generate_report
 
         with pytest.raises(ValueError, match="Unsupported format"):
             generate_report({"campaigns": []}, format="xml")
@@ -468,21 +468,21 @@ class TestGenerateReport:
 
 class TestMedian:
     def test_odd_count(self):
-        from openeraseme.core.reports import _median
+        from symeraseme.core.reports import _median
 
         assert _median([1.0, 2.0, 3.0]) == 2.0
 
     def test_even_count(self):
-        from openeraseme.core.reports import _median
+        from symeraseme.core.reports import _median
 
         assert _median([1.0, 2.0, 3.0, 4.0]) == 2.5
 
     def test_single_value(self):
-        from openeraseme.core.reports import _median
+        from symeraseme.core.reports import _median
 
         assert _median([42.0]) == 42.0
 
     def test_empty_returns_zero(self):
-        from openeraseme.core.reports import _median
+        from symeraseme.core.reports import _median
 
         assert _median([]) == 0.0

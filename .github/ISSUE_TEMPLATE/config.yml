@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Discussions
-    url: https://github.com/danieljustus/OpenEraseMe/discussions
+    url: https://github.com/danieljustus/symaira-eraseme/discussions
     about: Please ask questions and discuss ideas in GitHub Discussions.
   - name: Security
-    url: https://github.com/danieljustus/OpenEraseMe/security/policy
+    url: https://github.com/danieljustus/symaira-eraseme/security/policy
     about: Please report security vulnerabilities privately.

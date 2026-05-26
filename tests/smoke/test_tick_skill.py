@@ -22,7 +22,7 @@ class TestTick:
         assert "total_actions" in data
 
     def test_tick_with_sent_event(self, seeded_db):
-        from openeraseme.core.db import get_connection, init_db
+        from symeraseme.core.db import get_connection, init_db
 
         init_db()
         conn = get_connection()
@@ -33,7 +33,7 @@ class TestTick:
             (now, now),
         )
         conn.commit()
-        from openeraseme.core.projection import upsert_state
+        from symeraseme.core.projection import upsert_state
 
         upsert_state(1)
         result = invoke("tick", "--dry-run")

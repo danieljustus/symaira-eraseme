@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openeraseme.llm.factory import create_llm_client, list_available_providers
-from openeraseme.llm.protocol import LLMClient, LLMProviderError
+from symeraseme.llm.factory import create_llm_client, list_available_providers
+from symeraseme.llm.protocol import LLMClient, LLMProviderError
 
 
 class TestListAvailableProviders:
@@ -97,7 +97,7 @@ class TestEnvVarFallback:
             assert isinstance(client, LLMClient)
 
     def test_env_var_selects_provider(self):
-        with patch.dict(os.environ, {"OPENERASEME_LLM_PROVIDER": "anthropic"}):
+        with patch.dict(os.environ, {"SYMERASEME_LLM_PROVIDER": "anthropic"}):
             client = create_llm_client(api_key="sk-test-env")
             assert isinstance(client, LLMClient)
 
@@ -106,7 +106,7 @@ class TestEnvVarFallback:
             import anthropic  # noqa: F401
         except ImportError:
             pytest.skip("anthropic SDK not installed")
-        with patch.dict(os.environ, {"OPENERASEME_LLM_MODEL": "claude-3-5-haiku-latest"}):
+        with patch.dict(os.environ, {"SYMERASEME_LLM_MODEL": "claude-3-5-haiku-latest"}):
             client = create_llm_client(api_key="sk-test")
             assert client.model == "claude-3-5-haiku-latest"
 
@@ -162,13 +162,13 @@ class TestCostTrackerPassthrough:
 
 class TestLazyImportError:
     def test_missing_module_raises_provider_error(self):
-        with patch.dict("openeraseme.llm.factory._PROVIDERS", {
+        with patch.dict("symeraseme.llm.factory._PROVIDERS", {
             "broken": ("nonexistent.module.path", "SomeClass", "API_KEY", "model"),
         }), pytest.raises(LLMProviderError, match="Cannot import"):
             create_llm_client(provider="broken")
 
     def test_missing_class_raises_provider_error(self):
-        with patch.dict("openeraseme.llm.factory._PROVIDERS", {
-            "badclass": ("openeraseme.llm.protocol", "DoesNotExist", "API_KEY", "model"),
+        with patch.dict("symeraseme.llm.factory._PROVIDERS", {
+            "badclass": ("symeraseme.llm.protocol", "DoesNotExist", "API_KEY", "model"),
         }), pytest.raises(LLMProviderError, match="has no class"):
             create_llm_client(provider="badclass")

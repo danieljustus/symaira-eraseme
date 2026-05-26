@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openeraseme.llm.ollama_client import OllamaClient
-from openeraseme.llm.protocol import LLMClientError, UsageRecord
+from symeraseme.llm.ollama_client import OllamaClient
+from symeraseme.llm.protocol import LLMClientError, UsageRecord
 
 
 class MockHTTPResponse:

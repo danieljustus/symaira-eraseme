@@ -1,11 +1,11 @@
-# OpenEraseMe: AI Agent Skill Bundle
+# Symaira EraseMe: AI Agent Skill Bundle
 
 **Automated data broker removal tool — close your accounts, erase your data.**
 
 This skill bundle teaches AI agents (Claude Code, OpenClaw, Cursor, etc.) how to
-orchestrate GDPR/CCPA data broker removals using the OpenEraseMe CLI.
+orchestrate GDPR/CCPA data broker removals using the Symaira EraseMe CLI.
 
-## When to use OpenEraseMe
+## When to use Symaira EraseMe
 
 Use this skill when the user wants to:
 
@@ -21,31 +21,31 @@ Use this skill when the user wants to:
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ 1. SETUP IDENTITY                                        │
-│    openeraseme init-profile                              │
+│    symeraseme init-profile                              │
 │    (full name, email)                                    │
 ├──────────────────────────────────────────────────────────┤
 │ 2. PLAN CAMPAIGN                                         │
-│    openeraseme plan create --campaign <id>               │
-│    openeraseme plan show                                 │
+│    symeraseme plan create --campaign <id>               │
+│    symeraseme plan show                                 │
 │    [review plan with user]                               │
 ├──────────────────────────────────────────────────────────┤
 │ 3. EXECUTE REMOVALS                                      │
-│    openeraseme execute --campaign <id> --batch-size 5    │
+│    symeraseme execute --campaign <id> --batch-size 5    │
 │    [consent prompt required for destructive ops]         │
 ├──────────────────────────────────────────────────────────┤
 │ 4. TRIAGE REPLIES (daily)                                │
-│    openeraseme poll-inbox --username <email> ...         │
-│    openeraseme classify-reply <request_id>               │
+│    symeraseme poll-inbox --username <email> ...         │
+│    symeraseme classify-reply <request_id>               │
 ├──────────────────────────────────────────────────────────┤
 │ 5. HANDLE ACTIONS (as needed)                            │
-│    openeraseme auto-confirm <request_id>                 │
-│    openeraseme generate-rebuttal <request_id>            │
+│    symeraseme auto-confirm <request_id>                 │
+│    symeraseme generate-rebuttal <request_id>            │
 ├──────────────────────────────────────────────────────────┤
 │ 6. TICK / MAINTENANCE (daily)                            │
-│    openeraseme tick                                      │
+│    symeraseme tick                                      │
 ├──────────────────────────────────────────────────────────┤
 │ 7. QUARTERLY RE-SCAN                                     │
-│    openeraseme plan create --campaign q2-2026-rescan     │
+│    symeraseme plan create --campaign q2-2026-rescan     │
 │    [repeat from step 3]                                  │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -56,63 +56,63 @@ Use this skill when the user wants to:
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme init-profile` | Create encrypted identity profile |
-| `openeraseme show-profile` | Display current identity |
-| `openeraseme accounts add <provider>` | Configure email account (gmail/outlook) |
-| `openeraseme accounts list` | List configured email accounts |
-| `openeraseme accounts remove <email>` | Remove an email account |
-| `openeraseme db-init` | Initialize the SQLite database |
+| `symeraseme init-profile` | Create encrypted identity profile |
+| `symeraseme show-profile` | Display current identity |
+| `symeraseme accounts add <provider>` | Configure email account (gmail/outlook) |
+| `symeraseme accounts list` | List configured email accounts |
+| `symeraseme accounts remove <email>` | Remove an email account |
+| `symeraseme db-init` | Initialize the SQLite database |
 
 ### Campaign Planning
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme plan create --campaign <id>` | Create a removal campaign plan |
-| `openeraseme plan show` | View the current plan |
-| `openeraseme requests list` | List all removal requests |
-| `openeraseme events show <request_id>` | View event history for a request |
+| `symeraseme plan create --campaign <id>` | Create a removal campaign plan |
+| `symeraseme plan show` | View the current plan |
+| `symeraseme requests list` | List all removal requests |
+| `symeraseme events show <request_id>` | View event history for a request |
 
 ### Execution
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme execute --campaign <id>` | Send removal requests |
-| `openeraseme grant <command>` | Issue consent token for destructive ops |
-| `openeraseme render-template <name>` | Preview a template |
+| `symeraseme execute --campaign <id>` | Send removal requests |
+| `symeraseme grant <command>` | Issue consent token for destructive ops |
+| `symeraseme render-template <name>` | Preview a template |
 
 ### Inbox & Triage
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme poll-inbox` | Fetch and match inbox replies |
-| `openeraseme classify-reply <id>` | Classify a broker reply via LLM |
-| `openeraseme generate-rebuttal <id>` | Generate a rebuttal for a rejection |
-| `openeraseme auto-confirm <id>` | Auto-click confirmation links |
+| `symeraseme poll-inbox` | Fetch and match inbox replies |
+| `symeraseme classify-reply <id>` | Classify a broker reply via LLM |
+| `symeraseme generate-rebuttal <id>` | Generate a rebuttal for a rejection |
+| `symeraseme auto-confirm <id>` | Auto-click confirmation links |
 
 ### Web Forms & CAPTCHAs
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme run-web-form <broker_id>` | Run a broker's web form opt-out |
-| `openeraseme solve-captcha` | Solve a CAPTCHA via external service |
-| `openeraseme manual-tasks list` | List manual fallback tasks |
-| `openeraseme manual-tasks show <id>` | Show manual task details |
-| `openeraseme manual-tasks complete <id>` | Mark manual task as done |
+| `symeraseme run-web-form <broker_id>` | Run a broker's web form opt-out |
+| `symeraseme solve-captcha` | Solve a CAPTCHA via external service |
+| `symeraseme manual-tasks list` | List manual fallback tasks |
+| `symeraseme manual-tasks show <id>` | Show manual task details |
+| `symeraseme manual-tasks complete <id>` | Mark manual task as done |
 
 ### Lifecycle
 
 | Command | Description |
 |---------|-------------|
-| `openeraseme tick` | Run tick engine (deadlines, reminders) |
+| `symeraseme tick` | Run tick engine (deadlines, reminders) |
 
 ### Output Format
 
 All commands support `--output json` for machine-readable output:
 
 ```bash
-openeraseme plan create --campaign initial --output json
-openeraseme tick --dry-run --output json
-openeraseme requests list --status PENDING --output json
+symeraseme plan create --campaign initial --output json
+symeraseme tick --dry-run --output json
+symeraseme requests list --status PENDING --output json
 ```
 
 ## Sub-skills

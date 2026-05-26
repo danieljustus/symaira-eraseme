@@ -6,14 +6,14 @@ Guide an AI agent or user through daily inbox polling and reply classification.
 
 - Email account configured with IMAP access
 - Removal requests sent (at least a few days ago)
-- LLM provider configured (set `OPENERASEME_LLM_PROVIDER` and provider-specific API key)
+- LLM provider configured (set `SYMERASEME_LLM_PROVIDER` and provider-specific API key)
 
 ## Step 1: Poll the inbox
 
 Fetch recent emails and match them against pending removal requests:
 
 ```bash
-openeraseme poll-inbox \
+symeraseme poll-inbox \
   --host imap.gmail.com \
   --port 993 \
   --username jane@gmail.com \
@@ -25,7 +25,7 @@ openeraseme poll-inbox \
 ### JSON output
 
 ```bash
-openeraseme poll-inbox ... --output json
+symeraseme poll-inbox ... --output json
 ```
 
 ```json
@@ -50,13 +50,13 @@ Use the LLM classifier to understand the broker's response:
 
 ```bash
 # Using Anthropic (default)
-openeraseme classify-reply 1
+symeraseme classify-reply 1
 
 # Using OpenAI
-openeraseme classify-reply 1 --provider openai --model gpt-4o
+symeraseme classify-reply 1 --provider openai --model gpt-4o
 
 # Using local Ollama
-openeraseme classify-reply 1 --provider ollama --model llama3.1
+symeraseme classify-reply 1 --provider ollama --model llama3.1
 ```
 
 The classifier categorizes replies as:
@@ -74,7 +74,7 @@ The classifier categorizes replies as:
 ### JSON output
 
 ```bash
-openeraseme classify-reply 1 --output json
+symeraseme classify-reply 1 --output json
 ```
 
 ```json
@@ -100,8 +100,8 @@ openeraseme classify-reply 1 --output json
 ## Step 3: View event history
 
 ```bash
-openeraseme events show 1
-openeraseme events show 1 --output json
+symeraseme events show 1
+symeraseme events show 1 --output json
 ```
 
 ## Daily triage workflow
@@ -123,7 +123,7 @@ Recommended daily schedule:
 1. **Poll daily**: Brokers typically respond within 1-5 business days.
 2. **Check confidence**: Low-confidence classifications (<0.7) may need human review.
 3. **Batch classifications**: Classify all unmatched replies in one session to save API costs.
-4. **Save API keys**: Set `OPENERASEME_LLM_PROVIDER` and the provider-specific API key (e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) in the environment to avoid passing `--provider` every time.
+4. **Save API keys**: Set `SYMERASEME_LLM_PROVIDER` and the provider-specific API key (e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) in the environment to avoid passing `--provider` every time.
 
 ## Error handling
 
@@ -131,5 +131,5 @@ Recommended daily schedule:
 |---------|-------|-----|
 | `IMAP error` | Invalid credentials or server | Check email/password; use app-specific password |
 | `No unclassified inbox reply found` | All replies already classified | Check `events show <id>` for existing classifications |
-| `LLM provider not available` | Provider or API key not configured | Set `OPENERASEME_LLM_PROVIDER` and provider-specific API key |
+| `LLM provider not available` | Provider or API key not configured | Set `SYMERASEME_LLM_PROVIDER` and provider-specific API key |
 | `No new messages found` | No recent emails | Increase `--since` to look further back |

@@ -4,8 +4,8 @@ Guide an AI agent or user through executing a planned removal campaign.
 
 ## Prerequisites
 
-- [Campaign planned](plan-removal-campaign.md) (`openeraseme plan create`)
-- [Email accounts configured](../SKILL.md) (`openeraseme accounts add`)
+- [Campaign planned](plan-removal-campaign.md) (`symeraseme plan create`)
+- [Email accounts configured](../SKILL.md) (`symeraseme accounts add`)
 - Consent token issued for destructive operations
 
 ## Step 1: Dry-run first
@@ -13,7 +13,7 @@ Guide an AI agent or user through executing a planned removal campaign.
 Always validate the plan before sending real requests:
 
 ```bash
-openeraseme execute --campaign initial --dry-run
+symeraseme execute --campaign initial --dry-run
 ```
 
 This simulates sending without actually dispatching emails or submitting forms.
@@ -21,7 +21,7 @@ This simulates sending without actually dispatching emails or submitting forms.
 ### JSON output
 
 ```bash
-openeraseme execute --campaign initial --dry-run --output json
+symeraseme execute --campaign initial --dry-run --output json
 ```
 
 ```json
@@ -47,22 +47,22 @@ Destructive commands require explicit consent. Choose one:
 
 ```bash
 # Option A: Interactive prompt (run without flags)
-openeraseme execute --campaign initial --batch-size 5
+symeraseme execute --campaign initial --batch-size 5
 # You will be prompted: "This is a destructive operation. Continue? [y/N]"
 
 # Option B: Pre-issue a consent token (for automation)
-openeraseme grant execute --ttl 3600
+symeraseme grant execute --ttl 3600
 # Output: Consent token: <token>
-openeraseme execute --campaign initial --consent <token>
+symeraseme execute --campaign initial --consent <token>
 
 # Option C: Skip consent with --yes (interactive only)
-openeraseme execute --campaign initial --yes
+symeraseme execute --campaign initial --yes
 ```
 
 ## Step 3: Execute the campaign
 
 ```bash
-openeraseme execute --campaign initial --batch-size 5
+symeraseme execute --campaign initial --batch-size 5
 ```
 
 ### Batch size recommendations
@@ -79,22 +79,22 @@ Consent tokens allow automated execution without interactive prompts:
 
 ```bash
 # Issue a token valid for 1 hour
-openeraseme grant execute --ttl 3600
+symeraseme grant execute --ttl 3600
 
 # List active tokens
-openeraseme grant --list
+symeraseme grant --list
 
 # Revoke a specific token
-openeraseme grant --revoke <token>
+symeraseme grant --revoke <token>
 
 # Revoke all active tokens
-openeraseme grant --revoke-all
+symeraseme grant --revoke-all
 ```
 
 ### JSON output
 
 ```bash
-openeraseme grant --list --output json
+symeraseme grant --list --output json
 ```
 
 ```json
@@ -114,7 +114,7 @@ openeraseme grant --list --output json
    gradually as brokers respond.
 3. **Short-lived tokens**: Issue tokens with short TTLs (e.g., 3600s = 1 hour)
    for automation scripts.
-4. **Review after execution**: Use `openeraseme requests list` to check
+4. **Review after execution**: Use `symeraseme requests list` to check
    which requests were sent successfully.
 5. **Monitor responses**: Run `poll-inbox` after a few days to catch broker
    replies (see [triage workflow](triage-broker-replies.md)).

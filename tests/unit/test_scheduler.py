@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import time
 
-from openeraseme.core.scheduler import (
+from symeraseme.core.scheduler import (
     SchedulerConfig,
     detect_platform,
     generate_cron,
@@ -26,9 +26,9 @@ class TestGenerateCron:
     def test_returns_dict_with_key_files(self):
         config = SchedulerConfig(platform="cron")
         files = generate_cron(config)
-        assert "openeraseme-tick.sh" in files
-        assert "openeraseme-poll.sh" in files
-        assert "openeraseme-rescan.sh" in files
+        assert "symeraseme-tick.sh" in files
+        assert "symeraseme-poll.sh" in files
+        assert "symeraseme-rescan.sh" in files
         assert "crontab.txt" in files
         assert "install.sh" in files
         assert "uninstall.sh" in files
@@ -36,15 +36,15 @@ class TestGenerateCron:
     def test_tick_wrapper_contains_command(self):
         config = SchedulerConfig(platform="cron")
         files = generate_cron(config)
-        content = files["openeraseme-tick.sh"]
-        assert "openeraseme" in content
+        content = files["symeraseme-tick.sh"]
+        assert "symeraseme" in content
         assert "tick" in content
         assert "#!/usr/bin/env bash" in content
 
     def test_poll_wrapper_checks_times(self):
         config = SchedulerConfig(platform="cron", poll_times=[time(8, 0), time(20, 0)])
         files = generate_cron(config)
-        content = files["openeraseme-poll.sh"]
+        content = files["symeraseme-poll.sh"]
         assert "08:00" in content or "8:00" in content
         assert "20:00" in content
 
@@ -52,7 +52,7 @@ class TestGenerateCron:
         config = SchedulerConfig(platform="cron")
         files = generate_cron(config)
         content = files["crontab.txt"]
-        assert "openeraseme" in content
+        assert "symeraseme" in content
         assert "tick" in content
         assert "poll" in content
         assert "rescan" in content
@@ -66,34 +66,34 @@ class TestGenerateCron:
     def test_venv_block_included_when_set(self):
         config = SchedulerConfig(platform="cron", venv_activate="/path/to/venv/bin/activate")
         files = generate_cron(config)
-        content = files["openeraseme-tick.sh"]
+        content = files["symeraseme-tick.sh"]
         assert "source" in content and "activate" in content
 
     def test_bin_override(self):
-        config = SchedulerConfig(platform="cron", openeraseme_bin="/custom/bin/openeraseme")
+        config = SchedulerConfig(platform="cron", symeraseme_bin="/custom/bin/symeraseme")
         files = generate_cron(config)
-        content = files["openeraseme-tick.sh"]
-        assert "/custom/bin/openeraseme" in content
+        content = files["symeraseme-tick.sh"]
+        assert "/custom/bin/symeraseme" in content
 
 
 class TestGenerateLaunchd:
     def test_returns_dict_with_key_files(self):
         config = SchedulerConfig(platform="launchd")
         files = generate_launchd(config)
-        assert "openeraseme-tick.sh" in files
-        assert "com.openeraseme.tick.plist" in files
-        assert "com.openeraseme.poll.plist" in files
-        assert "com.openeraseme.rescan.plist" in files
+        assert "symeraseme-tick.sh" in files
+        assert "com.symeraseme.tick.plist" in files
+        assert "com.symeraseme.poll.plist" in files
+        assert "com.symeraseme.rescan.plist" in files
         assert "install.sh" in files
         assert "uninstall.sh" in files
 
     def test_tick_plist_is_valid_xml(self):
         config = SchedulerConfig(platform="launchd")
         files = generate_launchd(config)
-        content = files["com.openeraseme.tick.plist"]
+        content = files["com.symeraseme.tick.plist"]
         assert "<?xml" in content
         assert "<plist" in content
-        assert "com.openeraseme.tick" in content
+        assert "com.symeraseme.tick" in content
         assert "</plist>" in content
 
     def test_poll_plist_has_multiple_calendar_intervals(self):
@@ -101,14 +101,14 @@ class TestGenerateLaunchd:
             platform="launchd", poll_times=[time(8, 0), time(12, 0), time(16, 0), time(20, 0)]
         )
         files = generate_launchd(config)
-        content = files["com.openeraseme.poll.plist"]
+        content = files["com.symeraseme.poll.plist"]
         # Should have multiple StartCalendarInterval entries
         assert content.count("<key>Hour</key>") >= 4
 
     def test_rescan_plist_has_quarterly_dates(self):
         config = SchedulerConfig(platform="launchd")
         files = generate_launchd(config)
-        content = files["com.openeraseme.rescan.plist"]
+        content = files["com.symeraseme.rescan.plist"]
         assert "Month" in content
         # Jan, Apr, Jul, Oct
         assert "<integer>1</integer>" in content
@@ -126,13 +126,13 @@ class TestGenerateSystemd:
     def test_returns_dict_with_key_files(self):
         config = SchedulerConfig(platform="systemd")
         files = generate_systemd(config)
-        assert "openeraseme-tick.sh" in files
-        assert "openeraseme-tick.service" in files
-        assert "openeraseme-tick.timer" in files
-        assert "openeraseme-poll.service" in files
-        assert "openeraseme-poll.timer" in files
-        assert "openeraseme-rescan.service" in files
-        assert "openeraseme-rescan.timer" in files
+        assert "symeraseme-tick.sh" in files
+        assert "symeraseme-tick.service" in files
+        assert "symeraseme-tick.timer" in files
+        assert "symeraseme-poll.service" in files
+        assert "symeraseme-poll.timer" in files
+        assert "symeraseme-rescan.service" in files
+        assert "symeraseme-rescan.timer" in files
 
     def test_service_has_unit_section(self):
         config = SchedulerConfig(platform="systemd")
@@ -155,19 +155,19 @@ class TestGenerateSystemd:
     def test_tick_timer_daily(self):
         config = SchedulerConfig(platform="systemd")
         files = generate_systemd(config)
-        content = files["openeraseme-tick.timer"]
+        content = files["symeraseme-tick.timer"]
         assert "Daily" in content
 
     def test_poll_timer_hourly(self):
         config = SchedulerConfig(platform="systemd")
         files = generate_systemd(config)
-        content = files["openeraseme-poll.timer"]
+        content = files["symeraseme-poll.timer"]
         assert "Hourly" in content
 
     def test_rescan_timer_quarterly(self):
         config = SchedulerConfig(platform="systemd")
         files = generate_systemd(config)
-        content = files["openeraseme-rescan.timer"]
+        content = files["symeraseme-rescan.timer"]
         assert "Quarterly" in content
 
 
@@ -202,7 +202,7 @@ class TestGenerateSchedulerConfigs:
 
     def test_custom_poll_hours(self):
         files = generate_scheduler_configs(platform_name="cron", poll_hours=[6, 18])
-        content = files["openeraseme-poll.sh"]
+        content = files["symeraseme-poll.sh"]
         assert "06:00" in content or "18:00" in content
 
 

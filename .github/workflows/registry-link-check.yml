@@ -36,7 +36,7 @@ jobs:
               name = data.get('name', yml.stem)
               try:
                   req = urllib.request.Request(url, method='HEAD')
-                  req.add_header('User-Agent', 'OpenEraseMe-LinkCheck/0.1')
+                  req.add_header('User-Agent', 'Symaira EraseMe-LinkCheck/0.1')
                   urllib.request.urlopen(req, timeout=10)
                   print(f'  ✓ {name} — {url}')
               except HTTPError as e:

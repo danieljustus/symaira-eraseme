@@ -7,8 +7,8 @@ import tempfile
 
 import pytest
 
-from openeraseme.core.db import close_connection, get_connection, init_db
-from openeraseme.core.events import (
+from symeraseme.core.db import close_connection, get_connection, init_db
+from symeraseme.core.events import (
     EVENT_TYPES,
     append_event,
     create_campaign,
@@ -18,7 +18,7 @@ from openeraseme.core.events import (
     list_campaigns,
     list_removal_requests,
 )
-from openeraseme.core.projection import (
+from symeraseme.core.projection import (
     append_event_and_project,
     rebuild_all_states,
     rebuild_state,
@@ -29,16 +29,16 @@ from openeraseme.core.projection import (
 @pytest.fixture(autouse=True)
 def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
     db_file = tmp_path / "test.db"
-    old = os.environ.get("OPENERASEME_DB_DIR")
-    os.environ["OPENERASEME_DB_DIR"] = str(tmp_path)
+    old = os.environ.get("SYMERASEME_DB_DIR")
+    os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
     close_connection()
     init_db(str(db_file))
     yield
     close_connection()
     if old:
-        os.environ["OPENERASEME_DB_DIR"] = old
+        os.environ["SYMERASEME_DB_DIR"] = old
     else:
-        os.environ.pop("OPENERASEME_DB_DIR", None)
+        os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 class TestDBInit:
@@ -264,7 +264,7 @@ class TestAtomicAppendAndProject:
             "SELECT COUNT(*) AS n FROM request_events WHERE request_id = ?", (rid,)
         ).fetchone()["n"]
 
-        from openeraseme.core import projection
+        from symeraseme.core import projection
 
         original_upsert = projection.upsert_state
 

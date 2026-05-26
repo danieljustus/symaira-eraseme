@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from openeraseme.core.consent import (
+from symeraseme.core.consent import (
     TOKEN_TTL,
     check_consent,
     consume_token,
@@ -24,7 +24,7 @@ def _isolated_consent_dir(monkeypatch, tmp_path) -> Path:
     """Use an isolated temp directory for all consent token files."""
     consent_dir = tmp_path / "consent"
     consent_dir.mkdir()
-    monkeypatch.setenv("OPENERASEME_DATA_DIR", str(consent_dir))
+    monkeypatch.setenv("SYMERASEME_DATA_DIR", str(consent_dir))
     return consent_dir
 
 
@@ -54,7 +54,7 @@ class TestIssueToken:
 
     def test_issue_default_ttl(self):
         token = issue_token("execute")
-        dir_path = Path(os.environ["OPENERASEME_DATA_DIR"])
+        dir_path = Path(os.environ["SYMERASEME_DATA_DIR"])
         payload = json.loads((dir_path / f"consent_{token}.json").read_text())
         assert payload["expires_at"] - payload["issued_at"] == TOKEN_TTL
 
@@ -213,27 +213,27 @@ class TestCheckConsent:
 
     def test_valid_env_var_returns_true(self, monkeypatch):
         token = issue_token("execute")
-        monkeypatch.setenv("OPENERASEME_CONSENT", token)
+        monkeypatch.setenv("SYMERASEME_CONSENT", token)
         assert check_consent("execute") is True
 
     def test_wrong_command_env_var_returns_false(self, monkeypatch):
         token = issue_token("execute")
-        monkeypatch.setenv("OPENERASEME_CONSENT", token)
+        monkeypatch.setenv("SYMERASEME_CONSENT", token)
         assert check_consent("send-reply") is False
 
     def test_no_token_returns_false_when_not_interactive(self, monkeypatch):
-        monkeypatch.setattr("openeraseme.core.consent.tty_available", lambda: False)
+        monkeypatch.setattr("symeraseme.core.consent.tty_available", lambda: False)
         assert check_consent("execute", interactive=True) is False
 
     def test_no_token_returns_false_when_interactive_disabled(self):
         assert check_consent("execute", interactive=False) is False
 
     def test_interactive_affirmative(self, monkeypatch):
-        monkeypatch.setattr("openeraseme.core.consent._tty_prompt", lambda _: True)
+        monkeypatch.setattr("symeraseme.core.consent._tty_prompt", lambda _: True)
         assert check_consent("execute", interactive=True) is True
 
     def test_interactive_negative(self, monkeypatch):
-        monkeypatch.setattr("openeraseme.core.consent._tty_prompt", lambda _: False)
+        monkeypatch.setattr("symeraseme.core.consent._tty_prompt", lambda _: False)
         assert check_consent("execute", interactive=True) is False
 
 

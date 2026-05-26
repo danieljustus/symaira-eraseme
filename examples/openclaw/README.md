@@ -1,24 +1,24 @@
 # OpenClaw Integration
 
 This example shows how to configure OpenClaw to orchestrate data broker
-removals using OpenEraseMe.
+removals using Symaira EraseMe.
 
 ## Prerequisites
 
 - [OpenClaw](https://github.com/openclaw/openclaw) installed
-- OpenEraseMe installed (`uv sync`)
+- Symaira EraseMe installed (`uv sync`)
 - Python 3.11+
 
 ## Setup
 
 ### 1. Create the OpenClaw skill
 
-OpenClaw uses a YAML-based skill format. Create `~/.config/openclaw/skills/openeraseme.yaml`:
+OpenClaw uses a YAML-based skill format. Create `~/.config/openclaw/skills/symeraseme.yaml`:
 
 ```yaml
-name: openeraseme
+name: symeraseme
 description: >
-  Automate data broker removals via the OpenEraseMe CLI.
+  Automate data broker removals via the Symaira EraseMe CLI.
   Supports GDPR/CCPA opt-out campaigns with email, web forms,
   inbox triage, and lifecycle management.
 
@@ -26,21 +26,21 @@ commands:
   # Identity
   init_profile:
     description: Create encrypted identity profile
-    command: openeraseme init-profile
+    command: symeraseme init-profile
     inputs:
       full_name: { type: string, prompt: "Full name" }
       email: { type: string, prompt: "Email address" }
 
   show_profile:
     description: Display current identity profile
-    command: openeraseme show-profile
+    command: symeraseme show-profile
     output_format: text
 
   # Planning
   plan_create:
     description: Plan a removal campaign
     command: >
-      openeraseme plan create
+      symeraseme plan create
       --campaign "{{ campaign_id }}"
       {% if jurisdiction %}--jurisdiction {{ jurisdiction }}{% endif %}
       {% if max %}--max {{ max }}{% endif %}
@@ -52,14 +52,14 @@ commands:
 
   plan_show:
     description: Show the current plan
-    command: openeraseme plan show
+    command: symeraseme plan show
     output_format: json
 
   # Execution
   execute:
     description: Send removal requests
     command: >
-      openeraseme execute
+      symeraseme execute
       --campaign "{{ campaign_id }}"
       --batch-size {{ batch_size }}
       {% if dry_run %}--dry-run{% endif %}
@@ -76,7 +76,7 @@ commands:
   poll_inbox:
     description: Poll inbox for broker replies
     command: >
-      openeraseme poll-inbox
+      symeraseme poll-inbox
       --username {{ username }}
       --password "{{ password }}"
       --since {{ since_days }}
@@ -91,7 +91,7 @@ commands:
   classify_reply:
     description: Classify a broker reply
     command: >
-      openeraseme classify-reply {{ request_id }}
+      symeraseme classify-reply {{ request_id }}
       {% if api_key %}--api-key {{ api_key }}{% endif %}
     inputs:
       request_id: { type: integer, prompt: "Request ID" }
@@ -102,7 +102,7 @@ commands:
   tick:
     description: Run tick engine
     command: >
-      openeraseme tick
+      symeraseme tick
       {% if dry_run %}--dry-run{% endif %}
     inputs:
       dry_run: { type: boolean, default: true }
@@ -112,7 +112,7 @@ commands:
   auto_confirm:
     description: Auto-click confirmation link
     command: >
-      openeraseme auto-confirm {{ request_id }}
+      symeraseme auto-confirm {{ request_id }}
       {% if dry_run %}--dry-run{% endif %}
     inputs:
       request_id: { type: integer, prompt: "Request ID" }
@@ -122,7 +122,7 @@ commands:
   generate_rebuttal:
     description: Generate a rebuttal for a rejection
     command: >
-      openeraseme generate-rebuttal {{ request_id }}
+      symeraseme generate-rebuttal {{ request_id }}
       {% if api_key %}--api-key {{ api_key }}{% endif %}
     inputs:
       request_id: { type: integer, prompt: "Request ID" }
@@ -132,7 +132,7 @@ commands:
   # Tokens
   grant:
     description: Issue a consent token
-    command: openeraseme grant {{ command }} --ttl {{ ttl }}
+    command: symeraseme grant {{ command }} --ttl {{ ttl }}
     inputs:
       command: { type: string, default: "execute" }
       ttl: { type: integer, default: 3600 }
@@ -142,38 +142,38 @@ commands:
 ### 2. Load the skill in OpenClaw
 
 ```bash
-openclaw skill load openeraseme
+openclaw skill load symeraseme
 ```
 
 ### 3. Verify
 
 ```bash
 openclaw skill list
-# Should show: openeraseme (Automate data broker removals...)
+# Should show: symeraseme (Automate data broker removals...)
 ```
 
 ## Example workflow
 
 ```bash
 # 1. Initialize identity
-openclaw run openeraseme.init_profile
+openclaw run symeraseme.init_profile
 
 # 2. Plan a campaign
-openclaw run openeraseme.plan_create \
+openclaw run symeraseme.plan_create \
   --inputs '{"campaign_id": "initial", "max": 5}'
 
 # 3. Review the plan
-openclaw run openeraseme.plan_show
+openclaw run symeraseme.plan_show
 
 # 4. Dry-run execution
-openclaw run openeraseme.execute \
+openclaw run symeraseme.execute \
   --inputs '{"campaign_id": "initial", "dry_run": true}'
 
 # 5. Real execution (requires consent)
-openclaw run openeraseme.grant \
+openclaw run symeraseme.grant \
   --inputs '{"command": "execute", "ttl": 3600}'
 
-openclaw run openeraseme.execute \
+openclaw run symeraseme.execute \
   --inputs '{
     "campaign_id": "initial",
     "batch_size": 5,
@@ -181,21 +181,21 @@ openclaw run openeraseme.execute \
   }'
 
 # 6. Daily triage
-openclaw run openeraseme.poll_inbox \
+openclaw run symeraseme.poll_inbox \
   --inputs '{"username": "jane@gmail.com", "password": "..."}'
 
-openclaw run openeraseme.classify_reply \
+openclaw run symeraseme.classify_reply \
   --inputs '{"request_id": 1}'
 
 # 7. Handle actions
-openclaw run openeraseme.auto_confirm \
+openclaw run symeraseme.auto_confirm \
   --inputs '{"request_id": 1}'
 
-openclaw run openeraseme.generate_rebuttal \
+openclaw run symeraseme.generate_rebuttal \
   --inputs '{"request_id": 2, "api_key": "sk-ant-..."}'
 
 # 8. Daily tick
-openclaw run openeraseme.tick \
+openclaw run symeraseme.tick \
   --inputs '{"dry_run": true}'
 ```
 

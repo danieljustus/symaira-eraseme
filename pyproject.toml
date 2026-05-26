@@ -1,5 +1,5 @@
 [project]
-name = "openeraseme"
+name = "symeraseme"
 version = "0.1.2"
 description = "Automated data broker removal tool — close your accounts, erase your data."
 requires-python = ">=3.11"
@@ -55,20 +55,20 @@ ollama = [
 ]
 
 [project.scripts]
-openeraseme = "openeraseme.cli:app"
+symeraseme = "symeraseme.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/danieljustus/OpenEraseMe"
-Repository = "https://github.com/danieljustus/OpenEraseMe"
-Issues = "https://github.com/danieljustus/OpenEraseMe/issues"
-Changelog = "https://github.com/danieljustus/OpenEraseMe/releases"
+Homepage = "https://github.com/danieljustus/symaira-eraseme"
+Repository = "https://github.com/danieljustus/symaira-eraseme"
+Issues = "https://github.com/danieljustus/symaira-eraseme/issues"
+Changelog = "https://github.com/danieljustus/symaira-eraseme/releases"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/openeraseme"]
+packages = ["src/symeraseme"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -93,3 +93,4 @@ exclude = ["tests/", ".venv/"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["src"]

@@ -4,8 +4,8 @@ Guide an AI agent or user through creating and managing their identity vault.
 
 ## Prerequisites
 
-- OpenEraseMe installed (`uv sync` complete)
-- No existing identity profile (run `openeraseme show-profile` to check)
+- Symaira EraseMe installed (`uv sync` complete)
+- No existing identity profile (run `symeraseme show-profile` to check)
 
 ## Creating an identity profile
 
@@ -15,7 +15,7 @@ vault. This data is used to fill in removal request forms and templates.
 ### Step 1: Initialize the profile
 
 ```bash
-openeraseme init-profile
+symeraseme init-profile
 ```
 
 You will be prompted for:
@@ -25,7 +25,7 @@ You will be prompted for:
 ### Step 2: Verify the profile
 
 ```bash
-openeraseme show-profile
+symeraseme show-profile
 ```
 
 Expected output:
@@ -37,7 +37,7 @@ Email: jane@example.com
 ### JSON output (for AI agents)
 
 ```bash
-openeraseme show-profile --output json
+symeraseme show-profile --output json
 ```
 
 ```json
@@ -75,7 +75,7 @@ Update the profile when:
 |---------|-------|-----|
 | `No identity profile found` | Profile not yet created | Run `init-profile` |
 | `File exists` error | Profile already exists | Use `show-profile` to view; update via `init-profile` (overwrites) |
-| Keyring errors | No system keyring available | Set `OPENERASEME_DATA_DIR` to a writable path |
+| Keyring errors | No system keyring available | Set `SYMERASEME_DATA_DIR` to a writable path |
 
 ## Troubleshooting
 

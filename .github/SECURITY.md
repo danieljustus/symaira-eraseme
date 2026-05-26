@@ -12,7 +12,7 @@ receives security patches. No long-term support is provided for older versions.
 
 ## Reporting a Vulnerability
 
-We take security seriously. If you discover a security vulnerability in OpenEraseMe,
+We take security seriously. If you discover a security vulnerability in Symaira EraseMe,
 please report it privately.
 
 ### Preferred: GitHub Security Advisory
@@ -34,4 +34,4 @@ Please include:
 - Once resolved, we will publish a security advisory and credit the reporter
   (unless you prefer to remain anonymous).
 
-Thank you for helping keep OpenEraseMe and its users safe.
+Thank you for helping keep Symaira EraseMe and its users safe.

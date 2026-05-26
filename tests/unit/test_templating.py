@@ -1,6 +1,6 @@
 import pytest
 
-from openeraseme.registry.schema import IdentityProfile
+from symeraseme.registry.schema import IdentityProfile
 
 
 def _fixture_profile() -> IdentityProfile:
@@ -15,14 +15,14 @@ def _fixture_profile() -> IdentityProfile:
 
 class TestTemplatingEngine:
     def test_list_templates(self):
-        from openeraseme.core.templating import list_templates
+        from symeraseme.core.templating import list_templates
 
         templates = list_templates()
         assert len(templates) >= 1
         assert all(t.endswith(".md.j2") for t in templates)
 
     def test_render_gdpr_de(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "gdpr-art17.de.md.j2",
@@ -34,7 +34,7 @@ class TestTemplatingEngine:
         assert "jane@example.com" in result
 
     def test_render_gdpr_en(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "gdpr-art17.en.md.j2",
@@ -46,7 +46,7 @@ class TestTemplatingEngine:
         assert "jane@example.com" in result
 
     def test_render_ccpa_deletion(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "ccpa-deletion.en.md.j2",
@@ -58,7 +58,7 @@ class TestTemplatingEngine:
         assert "CCPA" in result
 
     def test_render_ccpa_opt_out(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "ccpa-opt-out.en.md.j2",
@@ -70,7 +70,7 @@ class TestTemplatingEngine:
         assert "CCPA" in result
 
     def test_render_without_profile(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         result = render_template(
             "gdpr-art17.en.md.j2",
@@ -82,13 +82,13 @@ class TestTemplatingEngine:
     def test_missing_template_raises(self):
         from jinja2 import TemplateNotFound
 
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         with pytest.raises(TemplateNotFound):
             render_template("nonexistent.md.j2", profile=_fixture_profile())
 
     def test_render_with_addresses(self):
-        from openeraseme.core.templating import render_template
+        from symeraseme.core.templating import render_template
 
         profile = IdentityProfile(
             full_name="John Smith",

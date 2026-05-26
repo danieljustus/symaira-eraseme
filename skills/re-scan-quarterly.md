@@ -18,8 +18,8 @@ Data brokers may re-add your information after the initial opt-out period
 First, identify which requests are due for re-scan:
 
 ```bash
-openeraseme requests list --status COMPLETED
-openeraseme requests list --status OVERDUE
+symeraseme requests list --status COMPLETED
+symeraseme requests list --status OVERDUE
 ```
 
 ## Step 2: Plan a new campaign
@@ -27,7 +27,7 @@ openeraseme requests list --status OVERDUE
 Create a fresh campaign for the new quarter:
 
 ```bash
-openeraseme plan create --campaign q3-2026-rescan
+symeraseme plan create --campaign q3-2026-rescan
 ```
 
 This scans all brokers in the registry — including any new brokers added
@@ -37,48 +37,48 @@ since the last plan.
 
 ```bash
 # If only GDPR brokers need re-scanning
-openeraseme plan create --campaign q3-2026-rescan --jurisdiction GDPR
+symeraseme plan create --campaign q3-2026-rescan --jurisdiction GDPR
 
 # If a specific broker re-added data
-openeraseme plan create --campaign rescan-acxiom --max 1
+symeraseme plan create --campaign rescan-acxiom --max 1
 ```
 
 ## Step 3: Review and execute
 
 ```bash
 # Review the plan
-openeraseme plan show --campaign q3-2026-rescan
+symeraseme plan show --campaign q3-2026-rescan
 
 # Execute (after consent)
-openeraseme execute --campaign q3-2026-rescan --batch-size 5
+symeraseme execute --campaign q3-2026-rescan --batch-size 5
 ```
 
 ## Step 4: Compare with previous campaigns
 
 ```bash
 # View previous campaign results
-openeraseme requests list --campaign initial-2026-q1
-openeraseme requests list --campaign initial-2026-q2
+symeraseme requests list --campaign initial-2026-q1
+symeraseme requests list --campaign initial-2026-q2
 ```
 
 ## Complete quarterly workflow
 
 ```bash
 # 1. Plan the re-scan
-openeraseme plan create --campaign q3-2026-rescan
+symeraseme plan create --campaign q3-2026-rescan
 
 # 2. Review with user
-openeraseme plan show --campaign q3-2026-rescan
+symeraseme plan show --campaign q3-2026-rescan
 
 # 3. Execute (after consent)
-openeraseme grant execute --ttl 7200
-openeraseme execute --campaign q3-2026-rescan --batch-size 5 --consent <token>
+symeraseme grant execute --ttl 7200
+symeraseme execute --campaign q3-2026-rescan --batch-size 5 --consent <token>
 
 # 4. Set up daily triage
 # Remind user to run poll-inbox + classify-reply daily
 
 # 5. Run initial tick
-openeraseme tick
+symeraseme tick
 ```
 
 ## Best practices

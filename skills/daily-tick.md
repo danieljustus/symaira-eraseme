@@ -22,7 +22,7 @@ The tick engine is the lifecycle management component. It:
 Always review proposed actions before applying them:
 
 ```bash
-openeraseme tick --dry-run
+symeraseme tick --dry-run
 ```
 
 ### Expected output
@@ -37,7 +37,7 @@ Tick: 3 action(s)
 ### JSON output
 
 ```bash
-openeraseme tick --dry-run --output json
+symeraseme tick --dry-run --output json
 ```
 
 ```json
@@ -71,7 +71,7 @@ openeraseme tick --dry-run --output json
 Once the user approves the plan:
 
 ```bash
-openeraseme tick
+symeraseme tick
 ```
 
 ### Action types
@@ -85,9 +85,9 @@ openeraseme tick
 ## Step 3: View updated request status
 
 ```bash
-openeraseme requests list --status OVERDUE
-openeraseme requests list --status COMPLETED
-openeraseme events show 5
+symeraseme requests list --status OVERDUE
+symeraseme requests list --status COMPLETED
+symeraseme events show 5
 ```
 
 ## Interpreting deadline reports
