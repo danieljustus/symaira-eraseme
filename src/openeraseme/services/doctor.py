@@ -83,14 +83,22 @@ def _check_llm_config() -> tuple[bool, str]:
         "openai": "OPENAI_API_KEY",
     }
     pieces = [f"provider={provider}"]
+
+    # Unknown provider → fail
+    if provider not in key_map and provider != "ollama":
+        pieces.append("unknown provider")
+        return False, ", ".join(pieces)
+
     if provider == "ollama":
         pieces.append("(no API key required)")
     else:
-        key_var = key_map.get(provider, "ANTHROPIC_API_KEY")
+        key_var = key_map[provider]
         if os.environ.get(key_var):
             pieces.append(f"{key_var}=✓")
         else:
             pieces.append(f"{key_var}=✗ (not set)")
+            return False, ", ".join(pieces)
+
     model = os.environ.get("OPENERASEME_LLM_MODEL", "")
     if model:
         pieces.append(f"model={model}")

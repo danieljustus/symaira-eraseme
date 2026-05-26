@@ -170,11 +170,14 @@ class _UnavailableClient:
 
 
 class _ClassifyingClient:
-    def __init__(self, response_text: str = (
-        '{"classification": "address_mismatch", "confidence": 0.92, '
-        '"summary": "Address issue", "key_points": ["old address"], '
-        '"jurisdiction": "GDPR"}'
-    )):
+    def __init__(
+        self,
+        response_text: str = (
+            '{"classification": "address_mismatch", "confidence": 0.92, '
+            '"summary": "Address issue", "key_points": ["old address"], '
+            '"jurisdiction": "GDPR"}'
+        ),
+    ):
         self.response_text = response_text
 
     @staticmethod
@@ -257,7 +260,7 @@ class TestGenerateRebuttal:
             mock_factory.assert_called_once()
         assert result.rebuttal_body
         assert not result.llm_used
-        # Fallback correctly selects identity template based on "passport" keyword
+        # Fallback correctly selects identity template as the default
         assert "identity" in result.label.lower()
         assert result.needs_human_review  # fallback always needs review
 

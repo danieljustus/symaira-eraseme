@@ -82,7 +82,8 @@ def create_llm_client(
         ) from None
 
     if model is None:
-        model = os.environ.get(_ENV_MODEL, default_model)
+        env_model = os.environ.get(_ENV_MODEL, "")
+        model = env_model if env_model else default_model
 
     if api_key is None and key_env:
         api_key = os.environ.get(key_env)

@@ -29,11 +29,20 @@ set -e
 # Detect provider from env
 PROVIDER=${OPENERASEME_LLM_PROVIDER:-anthropic}
 
+# Map provider name to install extra
+# (anthropic deps live under the "triage" extra)
+case "$PROVIDER" in
+    anthropic) EXTRA="triage" ;;
+    openai)    EXTRA="openai" ;;
+    ollama)    EXTRA="ollama" ;;
+    *)         echo "Unknown provider: $PROVIDER"; exit 1 ;;
+esac
+
 # Install OpenEraseMe with the right LLM extra
 if command -v uv &> /dev/null; then
-    uv pip install "openeraseme[${PROVIDER}]"
+    uv pip install "openeraseme[${EXTRA}]"
 else
-    pip install "openeraseme[${PROVIDER}]"
+    pip install "openeraseme[${EXTRA}]"
 fi
 
 # Verify installation
@@ -106,7 +115,7 @@ crontab -e
 Or use a wrapper script:
 
 ```bash
-cat > ~/.local/bin/openeraseme-triage <> 'EOF'
+cat > ~/.local/bin/openeraseme-triage << 'EOF'
 #!/usr/bin/env bash
 set -e
 source ~/.config/openeraseme/.env
