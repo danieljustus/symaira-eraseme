@@ -29,7 +29,10 @@ def _create_env(templates_dir: str | Path | None = None) -> Environment:
     search_path = Path(templates_dir) if templates_dir else _templates_dir()
     return Environment(
         loader=FileSystemLoader(str(search_path)),
-        autoescape=select_autoescape(default_for_string=False, default=False),
+        autoescape=select_autoescape(
+            enabled_extensions=("html", "htm", "xml", "html.j2", "htm.j2", "xml.j2"),
+            default_for_string=True,
+        ),
         trim_blocks=True,
         lstrip_blocks=True,
     )

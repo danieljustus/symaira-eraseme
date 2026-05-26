@@ -110,3 +110,24 @@ class TestTemplatingEngine:
         assert "John Smith" in result
         assert "456 Oak Ave" in result
         assert "Los Angeles" in result
+
+    def test_autoescape_html_j2(self, tmp_path):
+        """Verify that .html.j2 templates have autoescaping enabled."""
+        from symeraseme.core.templating import render_template
+
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+        (template_dir / "test.html.j2").write_text(
+            "<div>{{ user_input }}</div>"
+        )
+
+        result = render_template(
+            "test.html.j2",
+            templates_dir=str(template_dir),
+            extra_vars={"user_input": '<script>alert("xss")</script> & <test>'},
+        )
+        # HTML special chars should be escaped
+        assert "&lt;" in result
+        assert "&amp;" in result
+        # Raw HTML should NOT appear
+        assert "<script>" not in result
