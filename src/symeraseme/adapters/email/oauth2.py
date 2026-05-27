@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
 import contextlib
+import hashlib
 import json
 import os
 import secrets
+import socket
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -157,12 +160,31 @@ def _remove_from_index(email: str) -> None:
     keyring.set_password(SERVICE_NAME, "account_index", json.dumps(accounts))
 
 
-def authorize_url(provider: str, client_id: str, redirect_uri: str) -> str:
+def _generate_pkce_pair() -> tuple[str, str]:
+    code_verifier = secrets.token_urlsafe(64)[:128]
+    code_challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
+        .rstrip(b"=")
+        .decode()
+    )
+    return code_verifier, code_challenge
+
+
+def find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def authorize_url(
+    provider: str, client_id: str, redirect_uri: str
+) -> tuple[str, str]:
     cfg = PROVIDER_CONFIGS.get(provider)
     if not cfg:
         msg = f"Unknown provider: {provider}. Supported: {list(PROVIDER_CONFIGS)}"
         raise OAuth2Error(msg)
 
+    code_verifier, code_challenge = _generate_pkce_pair()
     state = secrets.token_urlsafe(16)
     _store_oauth2_state(state, provider)
 
@@ -174,8 +196,10 @@ def authorize_url(provider: str, client_id: str, redirect_uri: str) -> str:
         "access_type": "offline",
         "prompt": "consent",
         "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
     }
-    return f"{cfg['auth_url']}?{urlencode(params)}"
+    return f"{cfg['auth_url']}?{urlencode(params)}", code_verifier
 
 
 def exchange_code(
@@ -184,21 +208,23 @@ def exchange_code(
     client_id: str,
     client_secret: str,
     redirect_uri: str,
+    code_verifier: str = "",
 ) -> dict[str, Any]:
     cfg = PROVIDER_CONFIGS.get(provider)
     if not cfg:
         msg = f"Unknown provider: {provider}"
         raise OAuth2Error(msg)
 
-    data = urlencode(
-        {
-            "code": code,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }
-    ).encode()
+    token_params: dict[str, str] = {
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    if code_verifier:
+        token_params["code_verifier"] = code_verifier
+    data = urlencode(token_params).encode()
 
     req = Request(cfg["token_url"], data=data, method="POST")
     try:
@@ -238,9 +264,6 @@ def refresh_access_token(
         raise OAuth2Error(msg) from e
 
 
-_redirect_uri = "http://localhost:8899/callback"
-
-
 class CallbackHandler(BaseHTTPRequestHandler):
     auth_code: str = ""
     auth_error: str = ""
@@ -272,8 +295,11 @@ class CallbackHandler(BaseHTTPRequestHandler):
         pass
 
 
-def run_local_server() -> str:
-    server = HTTPServer(("127.0.0.1", 8899), CallbackHandler)
+def run_local_server(port: int | None = None) -> tuple[str, str]:
+    if port is None:
+        port = find_free_port()
+    redirect_uri = f"http://127.0.0.1:{port}/callback"
+    server = HTTPServer(("127.0.0.1", port), CallbackHandler)
     CallbackHandler.auth_code = ""
     CallbackHandler.auth_error = ""
     server.timeout = 120
@@ -283,4 +309,4 @@ def run_local_server() -> str:
             raise OAuth2StateError(CallbackHandler.auth_error)
         server.handle_request()
     server.server_close()
-    return CallbackHandler.auth_code
+    return CallbackHandler.auth_code, redirect_uri

@@ -48,15 +48,34 @@ def _state_file(tmp_path: Path) -> None:
 
 
 class TestAuthorizeUrl:
+    def _parse_qs(self, url: str) -> dict[str, list[str]]:
+        import urllib.parse
+        return urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+
     def test_generates_gmail_url(self):
-        url = authorize_url("gmail", "my-client-id", "http://localhost:8899/callback")
+        url, _ = authorize_url("gmail", "my-client-id", "http://localhost:8899/callback")
         assert urlparse(url).hostname == "accounts.google.com"
         assert "client_id=my-client-id" in url
         assert "redirect_uri=http%3A%2F%2Flocalhost%3A8899%2Fcallback" in url
         assert "state=" in url
 
+    def test_includes_pkce_params(self):
+        url, verifier = authorize_url("gmail", "id", "http://localhost/")
+        qs = self._parse_qs(url)
+        assert "code_challenge" in qs
+        assert qs["code_challenge_method"] == ["S256"]
+        assert len(verifier) >= 43
+        assert len(verifier) <= 128
+
+    def test_code_challenge_is_sha256_of_verifier(self):
+        import base64, hashlib
+        url, verifier = authorize_url("gmail", "id", "http://localhost/")
+        qs = self._parse_qs(url)
+        expected = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+        assert qs["code_challenge"][0] == expected
+
     def test_generates_outlook_url(self):
-        url = authorize_url("outlook", "my-client-id", "http://localhost:8899/callback")
+        url, _ = authorize_url("outlook", "my-client-id", "http://localhost:8899/callback")
         assert urlparse(url).hostname == "login.microsoftonline.com"
         assert "client_id=my-client-id" in url
         assert "state=" in url
@@ -66,29 +85,28 @@ class TestAuthorizeUrl:
             authorize_url("unknown", "id", "http://localhost/")
 
     def test_state_is_random(self):
-        url1 = authorize_url("gmail", "id1", "http://localhost:8899/callback")
-        url2 = authorize_url("gmail", "id2", "http://localhost:8899/callback")
+        url1, _ = authorize_url("gmail", "id1", "http://localhost:8899/callback")
+        url2, _ = authorize_url("gmail", "id2", "http://localhost:8899/callback")
         assert url1 != url2
-        # Extract state values from each URL
-        import urllib.parse
-
-        s1 = urllib.parse.parse_qs(urllib.parse.urlsplit(url1).query).get("state", [""])[0]
-        s2 = urllib.parse.parse_qs(urllib.parse.urlsplit(url2).query).get("state", [""])[0]
+        s1 = self._parse_qs(url1).get("state", [""])[0]
+        s2 = self._parse_qs(url2).get("state", [""])[0]
         assert s1 and s2
         assert s1 != s2
+
+    def test_code_verifier_is_random(self):
+        _, v1 = authorize_url("gmail", "id1", "http://localhost/")
+        _, v2 = authorize_url("gmail", "id2", "http://localhost/")
+        assert v1 != v2
 
     def test_state_stored_in_file(self):
         from symeraseme.adapters.email.oauth2 import _get_state_path
 
-        url = authorize_url("gmail", "id", "http://localhost/")
+        url, _ = authorize_url("gmail", "id", "http://localhost/")
         state_path = _get_state_path()
         assert state_path.exists()
         raw = state_path.read_bytes()
         assert len(raw) > 0
-        # Verify we can parse it and it has our state
-        import urllib.parse
-
-        state_val = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query).get("state")[0]
+        state_val = self._parse_qs(url).get("state")[0]
         stored = json.loads(state_path.read_text())
         assert state_val in stored
         assert stored[state_val]["provider"] == "gmail"
@@ -163,9 +181,31 @@ class TestExchangeCode:
         mock_response.read.return_value = b'{"access_token": "abc", "refresh_token": "xyz"}'
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
-        result = exchange_code("gmail", "auth-code", "client-id", "secret", "http://localhost/")
+        result = exchange_code(
+            "gmail", "auth-code", "client-id", "secret", "http://localhost/", "test-verifier"
+        )
         assert result["access_token"] == "abc"
         assert result["refresh_token"] == "xyz"
+
+    @patch("symeraseme.adapters.email.oauth2.urlopen")
+    def test_code_verifier_included_in_request(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"access_token": "abc"}'
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        exchange_code("gmail", "code", "id", "secret", "http://localhost/", "my-verifier")
+        call_data = mock_urlopen.call_args[0][0].data.decode()
+        assert "code_verifier=my-verifier" in call_data
+
+    @patch("symeraseme.adapters.email.oauth2.urlopen")
+    def test_code_verifier_omitted_when_empty(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"access_token": "abc"}'
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        exchange_code("gmail", "code", "id", "secret", "http://localhost/")
+        call_data = mock_urlopen.call_args[0][0].data.decode()
+        assert "code_verifier" not in call_data
 
     @patch("symeraseme.adapters.email.oauth2.urlopen")
     def test_exchange_failure_raises(self, mock_urlopen):
