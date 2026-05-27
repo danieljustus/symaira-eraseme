@@ -16,12 +16,20 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-class HimalayaError(Exception):
-    pass
+class EmailError(Exception):
+    """Base exception for all email sending errors."""
+
+
+class HimalayaError(EmailError):
+    """Raised when the Himalaya CLI subprocess fails."""
 
 
 class HimalayaNotInstalledError(HimalayaError):
-    pass
+    """Raised when the Himalaya CLI is not found on PATH."""
+
+
+class SmtpError(EmailError):
+    """Raised when SMTP sending fails."""
 
 
 @dataclass
@@ -343,6 +351,117 @@ def send_message(
         raise HimalayaError(msg)
 
     return {"result": result.stdout.strip(), "message_id": message_id}
+
+
+def send_message_smtp(
+    to: str,
+    subject: str,
+    body: str,
+    *,
+    cc: str | None = None,
+    bcc: str | None = None,
+    smtp_config: SmtpConfig | None = None,
+) -> dict[str, str]:
+    """Send a single email via SMTP (synchronous, stdlib smtplib).
+
+    Falls back to environment variables via :func:`load_smtp_config` when
+    *smtp_config* is ``None``.
+    """
+    import smtplib
+
+    if smtp_config is None:
+        smtp_config = load_smtp_config()
+
+    from_addr = smtp_config.from_addr
+    if not from_addr:
+        raise SmtpError(
+            "SYMERASEME_SMTP_FROM is not configured. Set it in your environment or .env file."
+        )
+
+    recipients = [to]
+    if cc:
+        recipients.append(cc)
+    if bcc:
+        recipients.append(bcc)
+
+    mime_text, message_id = _build_mime(
+        EmailMessage(to=to, subject=subject, body=body, cc=cc, bcc=bcc),
+        from_addr,
+    )
+
+    try:
+        with smtplib.SMTP(smtp_config.host, smtp_config.port, timeout=30) as smtp:
+            if smtp_config.use_tls:
+                smtp.starttls()
+            if smtp_config.username and smtp_config.password:
+                smtp.login(smtp_config.username, smtp_config.password)
+            smtp.sendmail(from_addr, recipients, mime_text)
+    except smtplib.SMTPException as e:
+        raise SmtpError(str(e)) from e
+    except OSError as e:
+        raise SmtpError(str(e)) from e
+
+    return {"result": "Message sent", "message_id": message_id}
+
+
+def get_email_backend() -> str:
+    """Return the configured email backend (``smtp`` or ``himalaya``).
+
+    Reads the ``SYMERASEME_EMAIL_BACKEND`` environment variable.
+    Defaults to ``smtp`` when unset.
+    """
+    backend = os.environ.get("SYMERASEME_EMAIL_BACKEND", "smtp").lower().strip()
+    if backend not in ("smtp", "himalaya"):
+        logger.warning(
+            "Unknown SYMERASEME_EMAIL_BACKEND=%r, falling back to smtp",
+            backend,
+        )
+        return "smtp"
+    return backend
+
+
+def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    *,
+    cc: str | None = None,
+    bcc: str | None = None,
+    account: str | None = None,
+    config_path: str | Path | None = None,
+    smtp_config: SmtpConfig | None = None,
+    backend: str | None = None,
+) -> dict[str, str]:
+    """Send an email via the configured backend (SMTP by default).
+
+    Dispatches to :func:`send_message_smtp` or :func:`send_message`
+    (Himalaya CLI subprocess) based on *backend* or the
+    ``SYMERASEME_EMAIL_BACKEND`` environment variable.
+
+    Raises :class:`EmailError` (or subclass) on failure.
+    """
+    if backend is None:
+        backend = get_email_backend()
+
+    if backend == "himalaya":
+        return send_message(
+            to=to,
+            subject=subject,
+            body=body,
+            cc=cc,
+            bcc=bcc,
+            account=account,
+            config_path=config_path,
+        )
+
+    return send_message_smtp(
+        to=to,
+        subject=subject,
+        body=body,
+        cc=cc,
+        bcc=bcc,
+        smtp_config=smtp_config,
+    )
 
 
 def send_raw_email(

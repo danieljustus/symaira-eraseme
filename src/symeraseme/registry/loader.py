@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -80,12 +81,55 @@ def load_broker(broker_id: str) -> Broker:
     raise FileNotFoundError(msg)
 
 
-_BROKER_CACHE: dict[tuple[str, float], list[Broker]] = {}
-_SKIPPED_COUNT: dict[tuple[str, float], int] = {}
+_BROKER_CACHE: dict[tuple[str, str], list[Broker]] = {}
+_SKIPPED_COUNT: dict[tuple[str, str], int] = {}
 
 
-def _broker_cache_key(registry_dir: Path) -> tuple[str, float]:
-    return (str(registry_dir), registry_dir.stat().st_mtime)
+def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
+    """Content-hash-based cache key derived from all YAML file mtimes.
+
+    Hashes sorted (relative_path, mtime, size) tuples so the global
+    cache invalidates when any YAML file is added, removed, renamed,
+    or has its content changed (mtime update).
+    """
+    yaml_files = sorted(registry_dir.rglob("*.yaml"))
+    parts: list[str] = []
+    for yml in yaml_files:
+        st = yml.stat()
+        rel = yml.relative_to(registry_dir).as_posix()
+        parts.append(f"{rel}:{st.st_mtime}:{st.st_size}")
+    digest = hashlib.sha256("|".join(parts).encode()).hexdigest()
+    return (str(registry_dir), digest)
+
+
+def _quick_parse_meta(yml_path: Path) -> dict | None:
+    """Lightweight YAML parse: extract only filterable fields, no validation."""
+    try:
+        with open(yml_path) as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _meta_matches_filters(
+    meta: dict,
+    jurisdiction: str | None,
+    priority: str | None,
+    category: str | None,
+    include_disabled: bool,
+) -> bool:
+    if not include_disabled and meta.get("disabled", False):
+        return False
+    if jurisdiction and jurisdiction not in meta.get("jurisdictions", []):
+        return False
+    if priority and meta.get("priority") != priority:
+        return False
+    if category and meta.get("category") != category:  # noqa: SIM103
+        return False
+    return True
 
 
 def load_all_brokers(
@@ -100,20 +144,49 @@ def load_all_brokers(
     Disabled brokers (``disabled: true`` in YAML) are excluded by default
     so the default plan never targets known-broken broker entries.
     Pass ``include_disabled=True`` to get everything (used by ``brokers list``).
+
+    When filters are active and the global cache is cold, only YAML files
+    matching the filters are loaded — avoiding full parse of all ~1,279
+    files for targeted queries like ``--jurisdiction GDPR --max 5``.
     """
     if registry_dir is None:
         registry_dir = _registry_dir() / "brokers"
 
     registry_path = Path(registry_dir)
     cache_key = _broker_cache_key(registry_path)
+    has_filters = bool(jurisdiction or priority or category)
 
+    # Warm cache: filter from cached brokers.
     if cache_key in _BROKER_CACHE:
-        brokers = _BROKER_CACHE[cache_key]
-    else:
-        brokers = []
+        return _filter_brokers(
+            _BROKER_CACHE[cache_key],
+            jurisdiction=jurisdiction,
+            priority=priority,
+            category=category,
+            include_disabled=include_disabled,
+        )
+
+    yaml_files = sorted(registry_path.rglob("*.yaml"))
+
+    if has_filters:
+        # Cold cache + filters: lazy-load only matching files.
+        brokers: list[Broker] = []
         skipped = 0
-        for yml in sorted(registry_path.rglob("*.yaml")):
+        for yml in yaml_files:
             if yml.name.startswith("_"):
+                continue
+            meta = _quick_parse_meta(yml)
+            if meta is None:
+                logger.warning("skipped broker %s: unparseable YAML", yml)
+                skipped += 1
+                continue
+            if not _meta_matches_filters(
+                meta,
+                jurisdiction=jurisdiction,
+                priority=priority,
+                category=category,
+                include_disabled=include_disabled,
+            ):
                 continue
             try:
                 broker = load_broker_yaml(yml)
@@ -122,9 +195,56 @@ def load_all_brokers(
                 skipped += 1
                 continue
             brokers.append(broker)
-        _BROKER_CACHE[cache_key] = brokers
-        _SKIPPED_COUNT[cache_key] = skipped
+        # Opportunistically cache the full load so subsequent calls
+        # (filtered or unfiltered) can use the warm cache.
+        all_brokers: list[Broker] = []
+        all_skipped = 0
+        for yml in yaml_files:
+            if yml.name.startswith("_"):
+                continue
+            try:
+                broker = load_broker_yaml(yml)
+            except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+                logger.warning("skipped broker %s: %s", yml, exc)
+                all_skipped += 1
+                continue
+            all_brokers.append(broker)
+        _BROKER_CACHE[cache_key] = all_brokers
+        _SKIPPED_COUNT[cache_key] = all_skipped
+        return brokers
 
+    # Cold cache, no filters: load everything and cache it.
+    brokers = []
+    skipped = 0
+    for yml in yaml_files:
+        if yml.name.startswith("_"):
+            continue
+        try:
+            broker = load_broker_yaml(yml)
+        except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+            logger.warning("skipped broker %s: %s", yml, exc)
+            skipped += 1
+            continue
+        brokers.append(broker)
+    _BROKER_CACHE[cache_key] = brokers
+    _SKIPPED_COUNT[cache_key] = skipped
+    return _filter_brokers(
+        brokers,
+        jurisdiction=jurisdiction,
+        priority=priority,
+        category=category,
+        include_disabled=include_disabled,
+    )
+
+
+def _filter_brokers(
+    brokers: list[Broker],
+    *,
+    jurisdiction: str | None = None,
+    priority: str | None = None,
+    category: str | None = None,
+    include_disabled: bool = False,
+) -> list[Broker]:
     filtered: list[Broker] = []
     for broker in brokers:
         if not include_disabled and broker.disabled:
