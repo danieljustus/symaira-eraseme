@@ -57,25 +57,32 @@ def handle_export(
 
     requests: list[dict[str, Any]] = []
     flat_events: list[dict[str, Any]] = []
+
+    req_ids = [r["id"] for r in request_rows]
+    if req_ids:
+        ev_rows = conn.execute(
+            f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
+                       payload_json, source
+                FROM request_events
+                WHERE request_id IN ({",".join("?" * len(req_ids))})
+                ORDER BY occurred_at ASC, id ASC""",
+            req_ids,
+        ).fetchall()
+        events_by_rid: dict[int, list[dict]] = {}
+        for ev in ev_rows:
+            evd = dict(ev)
+            try:
+                evd["payload"] = json.loads(evd.pop("payload_json") or "{}")
+            except json.JSONDecodeError:
+                evd["payload"] = {}
+            events_by_rid.setdefault(evd["request_id"], []).append(evd)
+            flat_events.append({"request_id": evd["request_id"], **evd})
+    else:
+        events_by_rid = {}
+
     for r in request_rows:
         req = dict(r)
-        events = conn.execute(
-            """SELECT id, occurred_at, recorded_at, event_type, payload_json, source
-               FROM request_events
-               WHERE request_id = ?
-               ORDER BY occurred_at ASC, id ASC""",
-            (req["id"],),
-        ).fetchall()
-        event_dicts = []
-        for e in events:
-            ed = dict(e)
-            try:
-                ed["payload"] = json.loads(ed.pop("payload_json") or "{}")
-            except json.JSONDecodeError:
-                ed["payload"] = {}
-            event_dicts.append(ed)
-            flat_events.append({"request_id": req["id"], **ed})
-        req["events"] = event_dicts
+        req["events"] = events_by_rid.get(req["id"], [])
         requests.append(req)
 
     if fmt == "json":

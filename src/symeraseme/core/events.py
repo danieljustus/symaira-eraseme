@@ -114,6 +114,27 @@ def append_event(
     return eid
 
 
+def get_events_for_requests(request_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    conn = get_connection()
+    if not request_ids:
+        return {}
+    placeholders = ",".join("?" * len(request_ids))
+    rows = conn.execute(
+        f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
+                  payload_json, source
+           FROM request_events
+           WHERE request_id IN ({placeholders})
+           ORDER BY occurred_at ASC, id ASC""",
+        request_ids,
+    ).fetchall()
+    result: dict[int, list[dict[str, Any]]] = {rid: [] for rid in request_ids}
+    for r in rows:
+        row = dict(r)
+        row["payload_json"] = json.loads(row["payload_json"])
+        result[row["request_id"]].append(row)
+    return result
+
+
 def get_events(
     request_id: int,
     *,

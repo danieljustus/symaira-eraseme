@@ -9,6 +9,7 @@ from symeraseme.core.events import (
     create_campaign,
     create_removal_request,
     get_events,
+    get_events_for_requests,
     get_removal_request,
     list_removal_requests,
 )
@@ -348,12 +349,15 @@ async def execute_campaign_async(
     email_messages: list[EmailMessage] = []
     request_map: dict[str, int] = {}
 
+    batch_ids = [r["id"] for r in batch]
+    events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
+
     for req in batch:
         req_id = req["id"]
         broker_name = req["broker_id"]
-        events = get_events(req_id)
+        events = events_by_rid.get(req_id, [])
         last_event = events[-1] if events else {}
-        payload = last_event.get("payload_json", {})
+        payload = last_event.get("payload_json", {}) if isinstance(last_event, dict) else {}
         channel_endpoint = payload.get("endpoint", "")
         template_id = req.get("template_id", "")
 

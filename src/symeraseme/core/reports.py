@@ -76,16 +76,25 @@ def get_report_data(
         reqs = [dict(r) for r in requests]
         all_requests.extend(reqs)
 
-        for req in reqs:
-            events = conn.execute(
-                """SELECT id, event_type, occurred_at, source
-                   FROM request_events
-                   WHERE request_id = ?
-                   ORDER BY occurred_at ASC""",
-                (req["id"],),
+        request_ids = [r["id"] for r in reqs]
+        if request_ids:
+            ev_rows = conn.execute(
+                f"""SELECT id, request_id, event_type, occurred_at, source
+                    FROM request_events
+                    WHERE request_id IN ({",".join("?" * len(request_ids))})
+                    ORDER BY occurred_at ASC""",
+                request_ids,
             ).fetchall()
-            req["events"] = [dict(e) for e in events]
-            all_events.extend(req["events"])
+            events_by_rid: dict[int, list[dict]] = {}
+            for ev in ev_rows:
+                evd = dict(ev)
+                events_by_rid.setdefault(evd["request_id"], []).append(evd)
+            for req in reqs:
+                req["events"] = events_by_rid.get(req["id"], [])
+                all_events.extend(req["events"])
+        else:
+            for req in reqs:
+                req["events"] = []
 
         camp["requests"] = reqs
         campaigns_data.append(camp)

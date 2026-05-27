@@ -381,7 +381,7 @@ class TestInboxReply:
         assert result["reply_id"] > 0
         assert result["classified_as"] == "ack"
 
-    def test_submit_reply_with_request_triggers_event(self):
+    def test_submit_reply_does_not_create_event(self):
         from symeraseme.core.events import create_campaign, create_removal_request, get_events
 
         create_campaign("reply-test")
@@ -395,7 +395,7 @@ class TestInboxReply:
             classified_as="confirmed",
         )
         events = get_events(rid)
-        assert any(e["event_type"] == "CONFIRMED" for e in events)
+        assert not any(e["event_type"] == "CONFIRMED" for e in events)
 
 
 class TestCLIConsent:

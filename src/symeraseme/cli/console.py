@@ -17,6 +17,7 @@ from rich.text import Text
 from symeraseme.cli.types import CliResult
 
 console = _RichConsole()
+_error_console = _RichConsole(stderr=True)
 
 
 def print_success(message: str) -> None:
@@ -26,7 +27,7 @@ def print_success(message: str) -> None:
 
 def print_error(message: str) -> None:
     """Print an error message in red to stderr."""
-    console.print(f"[red]✗[/red] {message}", style="red")
+    _error_console.print(f"[red]✗[/red] {message}", style="red")
 
 
 def print_info(message: str) -> None:
