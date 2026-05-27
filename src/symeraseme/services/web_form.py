@@ -18,6 +18,103 @@ from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
 
 
+def run_web_form_for_broker(
+    broker_id: str,
+    *,
+    headed: bool = False,
+    screenshot_dir: str = "",
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    broker = load_broker(broker_id)
+    web_forms = [c for c in broker.opt_out if c.type == "web_form"]
+    if not web_forms:
+        return {
+            "success": False,
+            "error": f"Broker '{broker_id}' has no web form opt-out channel.",
+        }
+
+    form = cast(WebFormOptOut, web_forms[0])
+    url = form.url
+    steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
+
+    identity_fields: dict[str, str] = {}
+    if profile_exists():
+        profile = load_profile()
+        name_parts = profile.full_name.split(None, 1)
+        first_name = name_parts[0] if name_parts else profile.full_name
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+        identity_fields = {
+            "full_name": profile.full_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": profile.email_addresses[0] if profile.email_addresses else "",
+            "phone_number": profile.phone_numbers[0] if profile.phone_numbers else "",
+        }
+        for i, addr in enumerate(profile.addresses):
+            identity_fields[f"address_street_{i}"] = addr.street
+            identity_fields[f"address_city_{i}"] = addr.city
+            identity_fields[f"address_zip_{i}"] = addr.postal_code
+            identity_fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
+            identity_fields[f"address_country_{i}"] = addr.country
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "broker_id": broker_id,
+            "broker_name": broker.name,
+            "url": url,
+            "steps": steps_data,
+            "identity_fields": identity_fields,
+        }
+
+    try:
+        result = asyncio.run(
+            _run_form(
+                url=url,
+                steps=steps_data,
+                headless=not headed,
+                timeout_seconds=form.form_spec.timeout_seconds,
+                rate_limit_delay=form.form_spec.rate_limit_delay,
+                screenshot_dir=screenshot_dir or None,
+                identity_fields=identity_fields,
+            )
+        )
+    except PlaywrightRunnerError as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "broker_id": broker_id,
+            "broker_name": broker.name,
+        }
+
+    task_id = None
+    if not result.success:
+        task = create_manual_task(
+            broker_id=broker_id,
+            broker_name=broker.name,
+            form_url=url,
+            reason="generic_error",
+            screenshot_path=result.screenshot_path or "",
+            step_index=result.step_index,
+            total_steps=result.total_steps,
+            error_message=result.error,
+        )
+        task_id = task.id
+
+    return {
+        "success": result.success,
+        "broker_id": broker_id,
+        "broker_name": broker.name,
+        "step_index": result.step_index,
+        "total_steps": result.total_steps,
+        "error": result.error,
+        "screenshot_path": result.screenshot_path,
+        "task_id": task_id,
+    }
+
+
 def handle_run_web_form(
     broker_id: str,
     headed: bool = False,

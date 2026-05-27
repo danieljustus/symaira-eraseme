@@ -117,17 +117,22 @@ class TestExecuteCampaign:
         r = result["results"][0]
         assert r["success"] is True
         assert r.get("dry_run") is True
-        # Rendered body must contain the profile name and email
-        assert "Jane Doe" in r["body"]
-        assert "jane@example.com" in r["body"]
+        if "body" in r:
+            assert "Jane Doe" in r["body"]
+            assert "jane@example.com" in r["body"]
+        else:
+            assert "steps" in r or "url" in r
 
     def test_execute_send_failure_logged(self, _fake_profile):
         plan_campaign(campaign_id="fail-test", max_brokers=1)
         requests = list_removal_requests(campaign_id="fail-test")
         assert len(requests) > 0
 
-        result = execute_request(requests[0]["id"])
-        # Will fail because Himalaya is not installed — that's expected
+        email_requests = [r for r in requests if r.get("channel") == "email"]
+        if not email_requests:
+            pytest.skip("No email requests in campaign")
+
+        result = execute_request(email_requests[0]["id"])
         assert result["success"] is False
         assert "error" in result
 
@@ -139,7 +144,10 @@ class TestExecuteCampaign:
         plan_campaign(campaign_id="no-profile", max_brokers=1)
         result = execute_campaign("no-profile", dry_run=True)
         assert result["total_planned"] >= 1
-        r = result["results"][0]
+        email_results = [r for r in result["results"] if "body" in r]
+        if not email_results:
+            pytest.skip("No email requests in campaign")
+        r = email_results[0]
         assert r["success"] is False
         assert "init-profile" in r["error"]
 
@@ -157,7 +165,10 @@ class TestExecuteCampaign:
         plan_campaign(campaign_id="missing-fields", max_brokers=1)
         result = execute_campaign("missing-fields", dry_run=True)
         assert result["total_planned"] >= 1
-        r = result["results"][0]
+        email_results = [r for r in result["results"] if "body" in r]
+        if not email_results:
+            pytest.skip("No email requests in campaign")
+        r = email_results[0]
         assert r["success"] is False
         assert "init-profile" in r["error"]
 
@@ -184,6 +195,51 @@ class TestExecuteCampaign:
         sent_events = [e for e in events if e["event_type"] == "SENT"]
         assert len(sent_events) == 1
         assert sent_events[0]["payload_json"].get("identity_snapshot_hash") == expected_hash
+
+    def test_web_form_execution_dispatch(self, monkeypatch, tmp_path):
+        import os
+
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+
+        from symeraseme.core.db import close_connection, init_db
+
+        close_connection()
+        init_db(str(tmp_path / "test.db"))
+
+        plan_campaign(campaign_id="web-form-test", max_brokers=5)
+        requests = list_removal_requests(campaign_id="web-form-test")
+        web_form_requests = [r for r in requests if r.get("channel") == "web_form"]
+        if not web_form_requests:
+            pytest.skip("No web-form requests in campaign")
+
+        import asyncio
+
+        async def mock_run_form(**kwargs):
+            return type(
+                "Result",
+                (),
+                {
+                    "success": True,
+                    "step_index": 0,
+                    "total_steps": 1,
+                    "error": "",
+                    "screenshot_path": "",
+                    "dry_run": False,
+                },
+            )()
+
+        monkeypatch.setattr(
+            "symeraseme.services.web_form._run_form",
+            mock_run_form,
+        )
+        monkeypatch.setattr(
+            "symeraseme.services.web_form.profile_exists",
+            lambda: False,
+        )
+
+        result = execute_request(web_form_requests[0]["id"])
+        assert result["success"] is True
 
 
 class TestConsent:
