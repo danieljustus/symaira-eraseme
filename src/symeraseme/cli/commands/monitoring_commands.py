@@ -41,16 +41,19 @@ def poll_inbox(
         "IMAP password",
         hide_input=True,
     )
-    result = handle_poll_inbox(
-        host,
-        port,
-        username,
-        since_days,
-        ssl,
-        campaign_id,
-        password,
-        ctx.obj["output"],
-    )
+    from symeraseme.cli.console import show_spinner
+
+    with show_spinner("Polling inbox..."):
+        result = handle_poll_inbox(
+            host,
+            port,
+            username,
+            since_days,
+            ssl,
+            campaign_id,
+            password,
+            ctx.obj["output"],
+        )
     render_result(ctx.obj["output"], result)
 
 
@@ -78,13 +81,16 @@ def classify_reply(
         help="Save classification result to DB",
     ),
 ) -> None:
-    result = handle_classify_reply(
-        request_id,
-        provider,
-        model,
-        save,
-        ctx.obj["output"],
-    )
+    from symeraseme.cli.console import show_spinner
+
+    with show_spinner("Classifying reply via LLM..."):
+        result = handle_classify_reply(
+            request_id,
+            provider,
+            model,
+            save,
+            ctx.obj["output"],
+        )
     render_result(ctx.obj["output"], result)
 
 
@@ -112,13 +118,16 @@ def generate_rebuttal_cmd(
         help="Save rebuttal to DB",
     ),
 ) -> None:
-    result = handle_generate_rebuttal(
-        request_id,
-        provider,
-        model,
-        save,
-        ctx.obj["output"],
-    )
+    from symeraseme.cli.console import show_spinner
+
+    with show_spinner("Generating rebuttal via LLM..."):
+        result = handle_generate_rebuttal(
+            request_id,
+            provider,
+            model,
+            save,
+            ctx.obj["output"],
+        )
     render_result(ctx.obj["output"], result)
 
 

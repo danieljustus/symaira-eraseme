@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import Any
 
@@ -67,6 +69,28 @@ def spinner_progress(description: str = "Working...") -> Progress:
     )
     progress.add_task(description=description, total=None)
     return progress
+
+
+@contextmanager
+def show_spinner(description: str = "Working...") -> Generator[Progress, None, None]:
+    """Show a transient spinner during a long-running operation.
+
+    Usage::
+
+        with show_spinner("Processing..."):
+            result = long_running_operation()
+
+    The spinner is hidden automatically when the block exits.
+    """
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        transient=True,
+        console=console,
+    )
+    with progress:
+        progress.add_task(description=description, total=None)
+        yield progress
 
 
 class OutputFormat(StrEnum):

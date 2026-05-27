@@ -44,13 +44,16 @@ def run_web_form(
         help="Show form steps without executing",
     ),
 ) -> None:
-    result = handle_run_web_form(
-        broker_id,
-        headed,
-        screenshot_dir,
-        dry_run,
-        ctx.obj["output"],
-    )
+    from symeraseme.cli.console import show_spinner
+
+    with show_spinner("Running web form..."):
+        result = handle_run_web_form(
+            broker_id,
+            headed,
+            screenshot_dir,
+            dry_run,
+            ctx.obj["output"],
+        )
     render_result(ctx.obj["output"], result)
 
 

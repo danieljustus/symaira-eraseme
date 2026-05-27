@@ -111,17 +111,18 @@ def execute(
         symeraseme execute --campaign initial --batch-size 5 --yes
         symeraseme execute --campaign initial --account gmail --dry-run
     """
-    result = handle_execute(
-        campaign_id,
-        account,
-        batch_size,
-        dry_run,
-        yes,
-        consent_token,
-        ctx.obj["output"],
-    )
-    from symeraseme.cli.console import render_result
+    from symeraseme.cli.console import render_result, show_spinner
 
+    with show_spinner("Sending removal requests..."):
+        result = handle_execute(
+            campaign_id,
+            account,
+            batch_size,
+            dry_run,
+            yes,
+            consent_token,
+            ctx.obj["output"],
+        )
     render_result(ctx.obj["output"], result)
 
 
