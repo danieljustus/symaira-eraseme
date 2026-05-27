@@ -176,9 +176,7 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def authorize_url(
-    provider: str, client_id: str, redirect_uri: str
-) -> tuple[str, str]:
+def authorize_url(provider: str, client_id: str, redirect_uri: str) -> tuple[str, str]:
     cfg = PROVIDER_CONFIGS.get(provider)
     if not cfg:
         msg = f"Unknown provider: {provider}. Supported: {list(PROVIDER_CONFIGS)}"

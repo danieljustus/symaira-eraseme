@@ -19,8 +19,14 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _clean_env() -> None:
     """Ensure isolated environment state before each test."""
-    keys = ["SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_IDENTITY_PATH"]
+    keys = [
+        "SYMERASEME_DATA_DIR",
+        "SYMERASEME_DB_DIR",
+        "SYMERASEME_IDENTITY_PATH",
+        "SYMERASEME_LLM_CONSENT",
+    ]
     saved = {k: os.environ.pop(k, None) for k in keys}
+    os.environ["SYMERASEME_LLM_CONSENT"] = "1"
     close_connection()
     yield
     close_connection()
