@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import email
 import email.utils
 import imaplib
@@ -248,10 +249,8 @@ def list_messages(
         date_str = headers.get("Date", "")
         date = None
         if date_str:
-            try:
+            with contextlib.suppress(Exception):
                 date = email.utils.parsedate_to_datetime(date_str)
-            except Exception:
-                pass
         envelopes.append(
             Envelope(
                 id=msg.get("imap_uid", ""),
@@ -306,10 +305,8 @@ def get_message(
         date_str = headers.get("Date", "")
         date = None
         if date_str:
-            try:
+            with contextlib.suppress(Exception):
                 date = email.utils.parsedate_to_datetime(date_str)
-            except Exception:
-                pass
         mail.logout()
         return Message(
             id=message_id,
