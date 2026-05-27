@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 
-import typer
-
+from symeraseme.cli.console import render_error
 from symeraseme.registry.loader import load_all_brokers, load_broker
 from symeraseme.registry.schema import EmailOptOut, WebFormOptOut
 
@@ -86,12 +85,10 @@ def handle_brokers_show(broker_id: str, output_format: str = "text") -> str:
                 broker = b
                 break
         else:
-            typer.echo(
+            render_error(
                 f"Broker '{broker_id}' not found in registry. "
-                "Run 'symeraseme brokers list' to see available brokers.",
-                err=True,
+                "Run 'symeraseme brokers list' to see available brokers."
             )
-            raise typer.Exit(1) from None
 
     if output_format == "json":
         return json.dumps(

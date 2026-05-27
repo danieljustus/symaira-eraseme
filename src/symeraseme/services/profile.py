@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 
-import typer
-
 from symeraseme import __version__
+from symeraseme.cli.console import render_error
 from symeraseme.core.identity import load_profile, profile_exists, save_profile
 from symeraseme.core.templating import render_template as _render
 from symeraseme.registry.schema import IdentityProfile
@@ -28,9 +27,7 @@ def handle_init_profile(full_name: str, email: str) -> str:
 
 def handle_show_profile(output_format: str = "text") -> str:
     if not profile_exists():
-        msg = "No identity profile found. Run 'symeraseme init-profile' first."
-        typer.echo(msg, err=True)
-        raise typer.Exit(1)
+        render_error("No identity profile found. Run 'symeraseme init-profile' first.")
 
     profile = load_profile()
     if output_format == "json":

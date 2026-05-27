@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
+from symeraseme.cli.console import render_error
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db import init_db
 from symeraseme.core.orchestrator import (
@@ -70,14 +71,9 @@ def handle_execute(
     output_format: str = "text",
 ) -> str:
     if not dry_run and not check_consent("execute", yes=yes, consent_token=consent_token):
-        import typer
-
-        typer.echo(
-            "Error: Destructive command requires consent. "
-            "Use --yes or issue a token via 'grant' command.",
-            err=True,
+        render_error(
+            "Destructive command requires consent. Use --yes or issue a token via 'grant' command."
         )
-        raise typer.Exit(1)
 
     init_db()
 

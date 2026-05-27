@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 
-import typer
-
+from symeraseme.cli.console import render_error
 from symeraseme.core.db import init_db
 from symeraseme.core.manual_fallback import get_manual_task, list_manual_tasks, resume_from_manual
 
@@ -38,12 +37,10 @@ def handle_manual_tasks_show(task_id: int, output_format: str = "text") -> str:
     task = get_manual_task(task_id)
 
     if task is None:
-        typer.echo(
+        render_error(
             f"Manual task #{task_id} not found. "
-            "Run 'symeraseme manual-tasks list' to see available tasks.",
-            err=True,
+            "Run 'symeraseme manual-tasks list' to see available tasks."
         )
-        raise typer.Exit(1)
 
     if output_format == "json":
         return json.dumps(task, indent=2, default=str)
@@ -75,12 +72,10 @@ def handle_manual_tasks_complete(
     result = resume_from_manual(task_id, notes=notes, completed=True)
 
     if result is None:
-        typer.echo(
+        render_error(
             f"Manual task #{task_id} not found. "
-            "Run 'symeraseme manual-tasks list' to see available tasks.",
-            err=True,
+            "Run 'symeraseme manual-tasks list' to see available tasks."
         )
-        raise typer.Exit(1)
 
     if output_format == "json":
         return json.dumps(result.__dict__, indent=2, default=str)

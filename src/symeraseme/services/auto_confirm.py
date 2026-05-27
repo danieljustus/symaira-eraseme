@@ -6,6 +6,7 @@ import json
 import typer
 
 from symeraseme.adapters.web.confirmation_clicker import auto_confirm
+from symeraseme.cli.console import render_error
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.projection import append_event_and_project
@@ -22,21 +23,17 @@ def handle_auto_confirm(
 
     req = get_removal_request(request_id)
     if req is None:
-        typer.echo(
+        render_error(
             f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests.",
-            err=True,
+            "Run 'symeraseme requests list' to see available requests."
         )
-        raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
-        typer.echo(
+        render_error(
             f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent.",
-            err=True,
+            "Events are created when a request is planned or sent."
         )
-        raise typer.Exit(1)
 
     last_event = events[-1]
     payload = last_event.get("payload_json", {}) or {}
@@ -119,11 +116,10 @@ def handle_auto_confirm(
             lines.append(f"  Screenshot after: {result.screenshot_after}")
         return "\n".join(lines)
 
-    typer.echo(
+    msg = (
         f"Auto-confirm failed: {result.error}. "
-        "Check the broker reply manually or retry with --headed to see the browser.",
-        err=True,
+        "Check the broker reply manually or retry with --headed to see the browser."
     )
     if result.clicked_url:
-        typer.echo(f"  URL: {result.clicked_url}")
-    raise typer.Exit(1)
+        msg += f"\n  URL: {result.clicked_url}"
+    render_error(msg)

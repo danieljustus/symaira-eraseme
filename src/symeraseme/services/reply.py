@@ -5,6 +5,7 @@ import json
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
+from symeraseme.cli.console import render_error
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
@@ -28,8 +29,7 @@ def _ensure_llm_consent(yes: bool = False) -> None:
     )
     granted = typer.confirm("Do you consent to sending this data to the LLM provider?")
     if not granted:
-        typer.echo("LLM consent denied. Use --yes to grant non-interactively.")
-        raise typer.Exit(1)
+        render_error("LLM consent denied. Use --yes to grant non-interactively.")
     grant_llm_consent()
     typer.echo("LLM consent granted. This will not be asked again.")
 
@@ -47,25 +47,17 @@ def handle_classify_reply(
 
     req = get_removal_request(request_id)
     if req is None:
-        import typer
-
-        typer.echo(
+        render_error(
             f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests.",
-            err=True,
+            "Run 'symeraseme requests list' to see available requests."
         )
-        raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
-        import typer
-
-        typer.echo(
+        render_error(
             f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent.",
-            err=True,
+            "Events are created when a request is planned or sent."
         )
-        raise typer.Exit(1)
 
     last_event = events[-1]
     payload = last_event.get("payload_json", {})
@@ -90,28 +82,20 @@ def handle_classify_reply(
     ).fetchone()
 
     if reply is None:
-        import typer
-
-        typer.echo(
+        render_error(
             f"No unclassified inbox reply found for request #{request_id}. "
-            "Run 'symeraseme poll-inbox' to fetch new replies first.",
-            err=True,
+            "Run 'symeraseme poll-inbox' to fetch new replies first."
         )
-        raise typer.Exit(1)
 
     from symeraseme.llm.factory import create_llm_client
 
     client = create_llm_client(provider=provider, model=model)
     classifier = ReplyClassifier(client=client)
     if not classifier.is_available():
-        import typer
-
-        typer.echo(
+        render_error(
             "LLM provider not available. Check SYMERASEME_LLM_PROVIDER"
-            " and provider-specific API key.",
-            err=True,
+            " and provider-specific API key."
         )
-        raise typer.Exit(1)
 
     result = classifier.classify(
         broker_name=broker_name,
@@ -194,25 +178,17 @@ def handle_generate_rebuttal(
 
     req = get_removal_request(request_id)
     if req is None:
-        import typer
-
-        typer.echo(
+        render_error(
             f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests.",
-            err=True,
+            "Run 'symeraseme requests list' to see available requests."
         )
-        raise typer.Exit(1)
 
     events = get_events(request_id)
     if not events:
-        import typer
-
-        typer.echo(
+        render_error(
             f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent.",
-            err=True,
+            "Events are created when a request is planned or sent."
         )
-        raise typer.Exit(1)
 
     last_event = events[-1]
     payload = last_event.get("payload_json", {})

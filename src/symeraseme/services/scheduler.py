@@ -4,6 +4,7 @@ import json
 
 import typer
 
+from symeraseme.cli.console import render_error
 from symeraseme.core.scheduler import (
     detect_platform,
     generate_scheduler_configs,
@@ -38,12 +39,10 @@ def handle_generate_scheduler(
             venv_activate=venv_activate,
         )
     except ValueError as e:
-        typer.echo(
+        render_error(
             f"Scheduler error: {e}. "
-            "Use --platform cron|launchd|systemd or ensure the platform is supported.",
-            err=True,
+            "Use --platform cron|launchd|systemd or ensure the platform is supported."
         )
-        raise typer.Exit(1) from e
 
     written = write_scheduler_files(files, output_dir, dry_run=dry_run)
 

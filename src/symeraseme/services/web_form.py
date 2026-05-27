@@ -12,6 +12,7 @@ from symeraseme.adapters.web.playwright_runner import (
 from symeraseme.adapters.web.playwright_runner import (
     run_web_form as _run_form,
 )
+from symeraseme.cli.console import render_error
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.registry.loader import load_broker
@@ -134,21 +135,17 @@ def handle_run_web_form(
     try:
         broker = load_broker(broker_id)
     except Exception as e:
-        typer.echo(
+        render_error(
             f"Broker '{broker_id}' not found: {e}. "
-            "Run 'symeraseme brokers list' to see available brokers.",
-            err=True,
+            "Run 'symeraseme brokers list' to see available brokers."
         )
-        raise typer.Exit(1) from e
 
     web_forms = [c for c in broker.opt_out if c.type == "web_form"]
     if not web_forms:
-        typer.echo(
+        render_error(
             f"Broker '{broker_id}' has no web form opt-out channel. "
-            "Check 'symeraseme brokers show {broker_id}' for available channels (email, etc.).",
-            err=True,
+            "Check 'symeraseme brokers show {broker_id}' for available channels (email, etc.)."
         )
-        raise typer.Exit(1)
 
     form = cast(WebFormOptOut, web_forms[0])
     url = form.url
@@ -204,12 +201,10 @@ def handle_run_web_form(
             )
         )
     except PlaywrightRunnerError as e:
-        typer.echo(
+        render_error(
             f"Playwright error: {e}. "
-            "Install with: uv pip install playwright && playwright install chromium",
-            err=True,
+            "Install with: uv pip install playwright && playwright install chromium"
         )
-        raise typer.Exit(1) from e
 
     task = None
     if not result.success:
@@ -247,7 +242,6 @@ def handle_run_web_form(
         f"{result.error}. Manual task #{task_id} created. "
         "Run 'symeraseme manual-tasks list' to see it."
     )
-    typer.echo(msg)
     if result.screenshot_path:
-        typer.echo(f"Screenshot saved to: {result.screenshot_path}")
-    raise typer.Exit(1)
+        msg += f"\nScreenshot saved to: {result.screenshot_path}"
+    render_error(msg)

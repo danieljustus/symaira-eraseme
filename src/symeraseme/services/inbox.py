@@ -9,6 +9,7 @@ from symeraseme.adapters.email.smtp_imap import (
 from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
+from symeraseme.cli.console import render_error
 from symeraseme.core.db import init_db
 from symeraseme.core.events import get_events, list_removal_requests
 from symeraseme.core.orchestrator import submit_inbox_reply
@@ -36,14 +37,10 @@ def handle_poll_inbox(
             since_days=since_days,
         )
     except IMAPError as e:
-        import typer
-
-        typer.echo(
+        render_error(
             f"IMAP error: {e}. "
-            "Check your credentials, ensure IMAP is enabled, and use an app password if 2FA is on.",
-            err=True,
+            "Check your credentials, ensure IMAP is enabled, and use an app password if 2FA is on."
         )
-        raise typer.Exit(1) from e
 
     if messages:
         requests = list_removal_requests(campaign_id=campaign_id)

@@ -5,6 +5,7 @@ import json
 import typer
 
 from symeraseme.adapters.web.captcha_solver import CaptchaError, create_solver
+from symeraseme.cli.console import render_error
 
 
 def handle_solve_captcha(
@@ -34,8 +35,7 @@ def handle_solve_captcha(
     typer.echo(f"Solving captcha via {provider}...")
 
     if site_key is None or page_url is None:
-        typer.echo("site_key and page_url are required", err=True)
-        raise typer.Exit(1)
+        render_error("site_key and page_url are required")
 
     try:
         solver = create_solver(provider, api_key=api_key)
@@ -44,13 +44,11 @@ def handle_solve_captcha(
             page_url=page_url,
         )
     except CaptchaError as e:
-        typer.echo(
+        render_error(
             f"Captcha solving failed: {e}. "
             "Check your API key, site_key, and page_url. "
-            "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var.",
-            err=True,
+            "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var."
         )
-        raise typer.Exit(1) from e
 
     if output_format == "json":
         return json.dumps(

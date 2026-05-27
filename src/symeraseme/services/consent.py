@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime
 
+from symeraseme.cli.console import render_error
 from symeraseme.core.consent import (
     consume_token,
     issue_token,
@@ -49,13 +50,9 @@ def handle_grant(
             return f"[DRY RUN] Would revoke token: {revoke}"
         if revoke_token(revoke):
             return f"Token revoked: {revoke}"
-        import typer
-
-        typer.echo(
-            f"Token not found: {revoke}. Run 'symeraseme grant --list' to see active tokens.",
-            err=True,
+        render_error(
+            f"Token not found: {revoke}. Run 'symeraseme grant --list' to see active tokens."
         )
-        raise typer.Exit(1)
 
     if revoke_all:
         if dry_run:
