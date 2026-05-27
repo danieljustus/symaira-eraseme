@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
+import typer
 from rich.console import Console as _RichConsole
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.text import Text
+
+from symeraseme.cli.types import CliResult
 
 console = _RichConsole()
 
@@ -63,3 +67,55 @@ def spinner_progress(description: str = "Working...") -> Progress:
     )
     progress.add_task(description=description, total=None)
     return progress
+
+
+class OutputFormat(StrEnum):
+    text = "text"
+    json = "json"
+
+
+def render_result(
+    output_format: str,
+    result: str | CliResult,
+    result_obj: CliResult | None = None,
+) -> None:
+    """Print the result of a command handler, formatted appropriately.
+
+    For JSON output the raw string is printed as-is (soft_wrap to avoid
+    rich inserting line breaks into the serialized data).
+    For text output the result is wrapped in a rich Panel when the content
+    spans multiple lines or carries an error.
+
+    Raises typer.Exit(1) when the result indicates failure so every command
+    returns a non-zero exit code uniformly.
+    """
+    if isinstance(result, CliResult):
+        result_obj = result
+        result = result.message
+
+    if output_format == "json":
+        if result_obj is not None:
+            import json as _json
+
+            console.print(
+                _json.dumps(result_obj.data, indent=2, default=str),
+                markup=False,
+                soft_wrap=True,
+            )
+        else:
+            console.print(result, markup=False, soft_wrap=True)
+    elif result_obj is not None and not result_obj.success:
+        print_error(result_obj.message)
+    elif "\n" not in result.strip():
+        console.print(result, markup=False, soft_wrap=True)
+    else:
+        print_panel("Output", result.strip())
+
+    if result_obj is not None and not result_obj.success:
+        raise typer.Exit(1)
+
+
+def render_error(message: str) -> None:
+    """Print an error message and exit."""
+    print_error(message)
+    raise typer.Exit(1)
