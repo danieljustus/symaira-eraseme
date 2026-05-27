@@ -291,7 +291,7 @@ def send_reply(
     config_path: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Send a drafted reply via Himalaya.
+    """Send a drafted reply via the configured email backend (SMTP by default).
 
     If no draft exists, creates one first.  Idempotent if already sent.
     Returns send result.
@@ -347,7 +347,7 @@ def send_reply(
             "body": draft_body,
         }
 
-    from symeraseme.adapters.email.himalaya import HimalayaError, send_message
+    from symeraseme.adapters.email.himalaya import EmailError, send_email
 
     from_addr = reply.get("from_addr", "")
     if not from_addr:
@@ -355,14 +355,14 @@ def send_reply(
         raise ValueError(msg)
 
     try:
-        send_message(
+        send_email(
             to=from_addr,
             subject=draft_subject,
             body=draft_body,
             account=account,
             config_path=config_path,
         )
-    except HimalayaError as e:
+    except EmailError as e:
         logger.error("Failed to send reply #%d: %s", reply_id, e)
         return {"success": False, "error": str(e), "reply_id": reply_id}
 

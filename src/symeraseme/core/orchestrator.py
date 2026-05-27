@@ -109,12 +109,16 @@ def execute_request(
     config_path: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Execute a single removal request by sending an email via Himalaya."""
+    """Execute a single removal request by sending an email via the configured backend.
+
+    The default backend is SMTP (``SYMERASEME_EMAIL_BACKEND=smtp``).
+    Set ``SYMERASEME_EMAIL_BACKEND=himalaya`` to use the Himalaya CLI instead.
+    """
     req = get_removal_request(request_id)
     if req is None:
         return {"success": False, "error": f"Request {request_id} not found"}
 
-    from symeraseme.adapters.email.himalaya import HimalayaError, send_message
+    from symeraseme.adapters.email.himalaya import EmailError, send_email
     from symeraseme.core.templating import render_template
 
     broker_name = req["broker_id"]
@@ -144,7 +148,7 @@ def execute_request(
             template_id,
             broker_name=broker_name,
         )
-        send_result = send_message(
+        send_result = send_email(
             to=channel_endpoint,
             subject=f"Data Deletion Request — {broker_name}",
             body=rendered,
@@ -163,7 +167,7 @@ def execute_request(
             },
         )
         return {"success": True, "request_id": request_id, "result": send_result}
-    except HimalayaError as e:
+    except EmailError as e:
         append_event_and_project(
             request_id,
             "SEND_FAILED",

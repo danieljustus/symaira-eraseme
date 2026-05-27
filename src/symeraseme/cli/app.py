@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import os
-from enum import StrEnum
 
 import typer
 
-from symeraseme.cli.console import console, print_error, print_panel, print_success, print_table
-from symeraseme.cli.types import CliResult
+from symeraseme.cli.console import (
+    OutputFormat,
+    console,
+    print_panel,
+    print_success,
+    print_table,
+    render_error,
+    render_result,
+)
 from symeraseme.registry.sync import handle_registry_sync
 from symeraseme.services.account import (
     handle_account_add,
@@ -63,116 +69,72 @@ from symeraseme.services.tick import handle_tick
 from symeraseme.services.validate import handle_validate
 from symeraseme.services.web_form import handle_run_web_form
 
-
-class OutputFormat(StrEnum):
-    text = "text"
-    json = "json"
-
-
 app = typer.Typer(
     name="symeraseme",
     help="Automated data broker removal tool",
     no_args_is_help=True,
+    epilog=(
+        "Quick Start:\n"
+        "  1. symeraseme init-profile                       Create your identity profile\n"
+        "  2. symeraseme brokers list --jurisdiction EU      Browse the broker registry\n"
+        "  3. symeraseme plan create --campaign initial \\\n"
+        "     --jurisdiction EU --max 10                     Plan a removal campaign\n"
+        "  4. symeraseme execute --campaign initial \\\n"
+        "     --batch-size 5 --yes                           Send opt-out requests\n"
+        "  5. symeraseme tick                                Process deadlines & reminders\n"
+        "  6. symeraseme status                              Check campaign progress\n"
+        "\n"
+        "Run 'symeraseme <command> --help' for detailed options."
+    ),
 )
 accounts_app = typer.Typer(
     name="accounts",
     help="Manage email accounts (OAuth2 setup, list, remove)",
     no_args_is_help=True,
 )
-app.add_typer(accounts_app)
+app.add_typer(accounts_app, rich_help_panel="Account & Profile")
 plan_app = typer.Typer(
     name="plan",
     help="Plan a removal campaign (scan registry, create events)",
     no_args_is_help=True,
 )
-app.add_typer(plan_app)
+app.add_typer(plan_app, rich_help_panel="Planning & Execution")
 events_app = typer.Typer(
     name="events",
     help="View removal request event history",
     no_args_is_help=True,
 )
-app.add_typer(events_app)
+app.add_typer(events_app, rich_help_panel="Inspection & Diagnostics")
 requests_app = typer.Typer(
     name="requests",
     help="List and manage removal requests",
     no_args_is_help=True,
 )
-app.add_typer(requests_app)
+app.add_typer(requests_app, rich_help_panel="Inspection & Diagnostics")
 manual_tasks_app = typer.Typer(
     name="manual-tasks",
     help="List and manage manual fallback tasks for web forms",
     no_args_is_help=True,
 )
-app.add_typer(manual_tasks_app)
+app.add_typer(manual_tasks_app, rich_help_panel="Web-form Automation")
 schedule_app = typer.Typer(
     name="schedule",
     help="Manage scheduler configuration (install, uninstall, status)",
     no_args_is_help=True,
 )
-app.add_typer(schedule_app)
+app.add_typer(schedule_app, rich_help_panel="Maintenance")
 brokers_app = typer.Typer(
     name="brokers",
     help="Discover brokers in the registry (list, show)",
     no_args_is_help=True,
 )
-app.add_typer(brokers_app)
+app.add_typer(brokers_app, rich_help_panel="Inspection & Diagnostics")
 registry_app = typer.Typer(
     name="registry",
     help="Manage the broker registry (sync)",
     no_args_is_help=True,
 )
-app.add_typer(registry_app)
-
-
-# ── helpers ──────────────────────────────────────────────────────────────
-
-
-def _render(
-    output_format: str,
-    result: str | CliResult,
-    result_obj: CliResult | None = None,
-) -> None:
-    """Print the result of a command handler, formatted appropriately.
-
-    For JSON output the raw string is printed as-is (soft_wrap to avoid
-    rich inserting line breaks into the serialized data).
-    For text output the result is wrapped in a rich Panel when the content
-    spans multiple lines or carries an error.
-
-    Raises typer.Exit(1) when the result indicates failure so every command
-    returns a non-zero exit code uniformly.
-    """
-    if isinstance(result, CliResult):
-        result_obj = result
-        result = result.message
-
-    if output_format == "json":
-        if result_obj is not None:
-            import json as _json
-
-            console.print(
-                _json.dumps(result_obj.data, indent=2, default=str),
-                markup=False,
-                soft_wrap=True,
-            )
-        else:
-            console.print(result, markup=False, soft_wrap=True)
-    elif result_obj is not None and not result_obj.success:
-        print_error(result_obj.message)
-    elif "\n" not in result.strip():
-        console.print(result, markup=False, soft_wrap=True)
-    else:
-        print_panel("Output", result.strip())
-
-    if result_obj is not None and not result_obj.success:
-        raise typer.Exit(1)
-
-
-def _render_error(message: str) -> None:
-    """Print an error message and exit."""
-    print_error(message)
-    raise typer.Exit(1)
-
+app.add_typer(registry_app, rich_help_panel="Maintenance")
 
 # ── commands ─────────────────────────────────────────────────────────────
 
@@ -183,20 +145,20 @@ def main(ctx: typer.Context, output: OutputFormat = OutputFormat.text) -> None:
     ctx.obj["output"] = output
 
 
-@app.command()
+@app.command(rich_help_panel="Inspection & Diagnostics")
 def version() -> None:
     result = handle_version()
     console.print(result, markup=False, soft_wrap=True)
 
 
-@app.command()
+@app.command(rich_help_panel="Inspection & Diagnostics")
 def doctor(ctx: typer.Context) -> None:
     """Run environment checks and report status."""
     result = handle_doctor(ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Account & Profile")
 def init_profile(
     full_name: str = typer.Option(..., prompt="Full name"),
     email: str = typer.Option(..., prompt="Email address"),
@@ -205,7 +167,7 @@ def init_profile(
     print_success(result)
 
 
-@app.command()
+@app.command(rich_help_panel="Account & Profile")
 def show_profile() -> None:
     try:
         result = handle_show_profile()
@@ -215,7 +177,7 @@ def show_profile() -> None:
     print_panel("Profile", info)
 
 
-@app.command()
+@app.command(rich_help_panel="Account & Profile")
 def render_template(
     template: str = typer.Argument(
         help="Template name (e.g. gdpr-art17.de.md.j2)",
@@ -288,6 +250,12 @@ def create(
         help="Maximum brokers to plan",
     ),
 ) -> None:
+    """Scan the broker registry and create a removal campaign.
+
+    Examples:
+        symeraseme plan create --campaign initial --jurisdiction GDPR --max 10
+        symeraseme plan create --campaign ccpa-batch --jurisdiction US --priority high
+    """
     result = handle_plan_create(
         campaign_id,
         jurisdiction,
@@ -295,7 +263,7 @@ def create(
         max_brokers,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @plan_app.command(name="show")
@@ -305,10 +273,10 @@ def plan_show(
     status: str = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
     result = handle_plan_show(campaign_id, status, ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Planning & Execution")
 def execute(
     ctx: typer.Context,
     campaign_id: str = typer.Option(
@@ -338,6 +306,12 @@ def execute(
         help="Pre-issued consent token",
     ),
 ) -> None:
+    """Send removal requests for a campaign.
+
+    Examples:
+        symeraseme execute --campaign initial --batch-size 5 --yes
+        symeraseme execute --campaign initial --account gmail --dry-run
+    """
     result = handle_execute(
         campaign_id,
         account,
@@ -347,10 +321,10 @@ def execute(
         consent_token,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Account & Profile")
 def grant(
     ctx: typer.Context,
     command: str = typer.Argument(
@@ -388,7 +362,7 @@ def grant(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @events_app.command(name="show")
@@ -397,7 +371,7 @@ def events_show(
     request_id: int = typer.Argument(..., help="Request ID"),
 ) -> None:
     result = handle_events_show(request_id, ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @requests_app.command(name="list")
@@ -421,10 +395,10 @@ def requests_list(
         broker_id,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="poll-inbox")
+@app.command(name="poll-inbox", rich_help_panel="Monitoring & Reports")
 def poll_inbox(
     ctx: typer.Context,
     host: str = typer.Option("imap.gmail.com", "--host", help="IMAP server"),
@@ -457,10 +431,10 @@ def poll_inbox(
         password,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Planning & Execution")
 def tick(
     ctx: typer.Context,
     dry_run: bool = typer.Option(
@@ -474,11 +448,18 @@ def tick(
         help="Limit tick to N requests per run",
     ),
 ) -> None:
+    """Process deadlines, reminders, and escalations for active requests.
+
+    Examples:
+        symeraseme tick
+        symeraseme tick --dry-run
+        symeraseme tick --batch-size 10
+    """
     result = handle_tick(dry_run, batch_size, ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="classify-reply")
+@app.command(name="classify-reply", rich_help_panel="Monitoring & Reports")
 def classify_reply(
     ctx: typer.Context,
     request_id: int = typer.Argument(
@@ -510,10 +491,10 @@ def classify_reply(
         save,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="run-web-form")
+@app.command(name="run-web-form", rich_help_panel="Web-form Automation")
 def run_web_form(
     ctx: typer.Context,
     broker_id: str = typer.Argument(
@@ -543,10 +524,10 @@ def run_web_form(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="auto-confirm")
+@app.command(name="auto-confirm", rich_help_panel="Web-form Automation")
 def auto_confirm_cmd(
     ctx: typer.Context,
     request_id: int = typer.Argument(
@@ -576,10 +557,10 @@ def auto_confirm_cmd(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="generate-rebuttal")
+@app.command(name="generate-rebuttal", rich_help_panel="Monitoring & Reports")
 def generate_rebuttal_cmd(
     ctx: typer.Context,
     request_id: int = typer.Argument(
@@ -611,7 +592,7 @@ def generate_rebuttal_cmd(
         save,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="list")
@@ -633,7 +614,7 @@ def manual_tasks_list(
         request_id,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="show")
@@ -642,7 +623,7 @@ def manual_tasks_show(
     task_id: int = typer.Argument(..., help="Task ID to show"),
 ) -> None:
     result = handle_manual_tasks_show(task_id, ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @manual_tasks_app.command(name="complete")
@@ -663,10 +644,10 @@ def manual_tasks_complete(
         notes,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="solve-captcha")
+@app.command(name="solve-captcha", rich_help_panel="Web-form Automation")
 def solve_captcha_cmd(
     ctx: typer.Context,
     provider: str = typer.Option(
@@ -706,10 +687,10 @@ def solve_captcha_cmd(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="generate-scheduler")
+@app.command(name="generate-scheduler", rich_help_panel="Maintenance")
 def generate_scheduler_cmd(
     ctx: typer.Context,
     platform: str = typer.Option(
@@ -770,7 +751,7 @@ def generate_scheduler_cmd(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @schedule_app.command()
@@ -810,7 +791,7 @@ def schedule_install(
         dry_run,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @schedule_app.command(name="uninstall")
@@ -822,7 +803,7 @@ def schedule_uninstall(
     ),
 ) -> None:
     result = handle_schedule_uninstall(platform)
-    _render("text", result)
+    render_result("text", result)
 
 
 @schedule_app.command()
@@ -835,10 +816,10 @@ def schedule_status(
     ),
 ) -> None:
     result = handle_schedule_status(platform, ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="generate-dashboard")
+@app.command(name="generate-dashboard", rich_help_panel="Monitoring & Reports")
 def generate_dashboard_cmd(
     ctx: typer.Context,
     output: str = typer.Option(
@@ -863,10 +844,10 @@ def generate_dashboard_cmd(
         auto_refresh,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="generate-report")
+@app.command(name="generate-report", rich_help_panel="Monitoring & Reports")
 def generate_report_cmd(
     ctx: typer.Context,
     campaign_id: str = typer.Option(
@@ -897,10 +878,10 @@ def generate_report_cmd(
         all_campaigns,
         ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Maintenance")
 def db_init() -> None:
     result = handle_db_init()
     print_success(result)
@@ -930,7 +911,7 @@ def brokers_list_cmd(
         include_disabled=include_disabled,
         output_format=ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @brokers_app.command(name="show")
@@ -940,7 +921,7 @@ def brokers_show_cmd(
 ) -> None:
     """Show full details of one broker by id."""
     result = handle_brokers_show(broker_id, output_format=ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 @registry_app.command(name="sync")
@@ -958,10 +939,10 @@ def registry_sync_cmd(
         verify_signatures=verify_signatures,
         output_format=ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Planning & Execution")
 def status(
     ctx: typer.Context,
     campaign: str = typer.Option(
@@ -970,12 +951,17 @@ def status(
         help="Restrict to one campaign id (default: aggregate across all).",
     ),
 ) -> None:
-    """Show aggregated lifecycle status across removal requests."""
+    """Show aggregated lifecycle status across removal requests.
+
+    Examples:
+        symeraseme status
+        symeraseme status --campaign initial
+    """
     result = handle_status(campaign_id=campaign, output_format=ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command(name="export")
+@app.command(name="export", rich_help_panel="Maintenance")
 def export_cmd(
     ctx: typer.Context,
     fmt: str = typer.Option(
@@ -1000,7 +986,7 @@ def export_cmd(
     streamed to stdout (raw json/csv when --output text, wrapped when --output json).
     """
     if fmt not in ("json", "csv"):
-        _render_error(f"Unsupported --format {fmt!r}. Use 'json' or 'csv'.")
+        render_error(f"Unsupported --format {fmt!r}. Use 'json' or 'csv'.")
     result = handle_export(
         output_file=output_file,
         fmt=fmt,
@@ -1012,7 +998,7 @@ def export_cmd(
     console.print(result, markup=False, soft_wrap=True)
 
 
-@app.command()
+@app.command(rich_help_panel="Monitoring & Reports")
 def calendar(
     ctx: typer.Context,
     weeks: int = typer.Option(4, "--weeks", help="Horizon in weeks (default: 4)."),
@@ -1028,10 +1014,10 @@ def calendar(
         campaign_id=campaign,
         output_format=ctx.obj["output"],
     )
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
-@app.command()
+@app.command(rich_help_panel="Maintenance")
 def validate(
     ctx: typer.Context,
     registry_dir: str = typer.Option(
@@ -1045,7 +1031,7 @@ def validate(
     Exits non-zero if any file fails validation or duplicate ids are found.
     """
     result = handle_validate(registry_dir=registry_dir, output_format=ctx.obj["output"])
-    _render(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], result)
 
 
 if __name__ == "__main__":
