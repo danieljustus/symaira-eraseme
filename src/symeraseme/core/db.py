@@ -40,9 +40,9 @@ def _db_encryption_enabled() -> bool:
 
 def _get_db_fernet_key() -> bytes | None:
     try:
-        from symeraseme.core.identity import _get_or_create_master_key
+        from symeraseme.core.identity import _get_existing_master_key
 
-        master_key = _get_or_create_master_key()
+        master_key = _get_existing_master_key()
     except Exception as exc:
         logger.debug("DB encryption key unavailable: %s", exc)
         return None

@@ -74,6 +74,19 @@ class TestTempFilePermissions:
 
         close_connection()
 
+    def test_encrypted_db_open_without_key_fails(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Opening an encrypted DB when the master key is missing must fail fast."""
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        # Simulate missing key by making _get_db_fernet_key return None
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda: None)
+
+        with pytest.raises(RuntimeError, match="master key is not available"):
+            get_connection(str(encrypted_db_file))
+
+        close_connection()
+
     def test_temp_file_in_user_data_dir(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

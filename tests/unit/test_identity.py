@@ -147,6 +147,43 @@ class TestIdentityVault:
 
         vault.delete_profile()
 
+    def test_load_with_missing_key_fails_fast(self, monkeypatch):
+        """A missing keyring entry on load must not mint a new key."""
+        import symeraseme.core.identity as vault
+
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_missing_key.enc")
+        path = Path("/tmp/symeraseme_test_missing_key.enc")
+        path.unlink(missing_ok=True)
+
+        # Save with a key, then delete the key
+        profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
+        vault.save_profile(profile)
+        vault._delete_master_key()
+
+        with pytest.raises(RuntimeError, match="master key not found"):
+            vault.load_profile()
+
+        vault.delete_profile()
+
+    def test_save_creates_key_when_missing(self, monkeypatch):
+        """Save path must auto-create a missing master key."""
+        import symeraseme.core.identity as vault
+
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_save_create.enc")
+        path = Path("/tmp/symeraseme_test_save_create.enc")
+        path.unlink(missing_ok=True)
+
+        # Ensure no key exists
+        vault._delete_master_key()
+
+        profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
+        vault.save_profile(profile)
+
+        assert vault.profile_exists()
+        assert vault.load_profile().full_name == "Test User"
+
+        vault.delete_profile()
+
     def test_legacy_version_0_fallback(self, monkeypatch):
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
