@@ -12,6 +12,7 @@ from symeraseme.core.events import (
     get_removal_request,
     list_removal_requests,
 )
+from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project, rebuild_all_states
 from symeraseme.registry.loader import load_all_brokers
 from symeraseme.registry.schema import Broker
@@ -39,6 +40,12 @@ def plan_campaign(
         category=category,
     )
 
+    try:
+        profile = load_profile()
+        identity_hash = hash_profile(profile)
+    except FileNotFoundError:
+        identity_hash = ""
+
     channels: list[tuple[Broker, dict[str, Any]]] = []
     for broker in brokers:
         ch = _select_channel(broker)
@@ -57,7 +64,7 @@ def plan_campaign(
             campaign_id=campaign_id,
             jurisdiction=_resolve_jurisdiction(broker, jurisdiction),
             template_id=template_id,
-            identity_snapshot_hash="",
+            identity_snapshot_hash=identity_hash,
         )
         append_event(
             request_id,
@@ -121,7 +128,6 @@ def execute_request(
         return {"success": False, "error": f"Request {request_id} not found"}
 
     from symeraseme.adapters.email.himalaya import EmailError, send_email
-    from symeraseme.core.identity import load_profile
     from symeraseme.core.templating import render_template
     from symeraseme.registry.schema import IdentityProfile
 
@@ -137,6 +143,7 @@ def execute_request(
     # Load identity profile for template rendering
     try:
         profile = load_profile()
+        identity_hash = hash_profile(profile)
     except FileNotFoundError:
         return {
             "success": False,
@@ -147,7 +154,6 @@ def execute_request(
             "request_id": request_id,
         }
 
-    # Validate required identity fields
     missing = []
     profile_vars = profile.model_dump()
     for field in required_fields:
@@ -201,6 +207,7 @@ def execute_request(
                 "account": account or "",
                 "expected_response_days": payload.get("expected_response_days", 30),
                 "message_id": send_result.get("message_id", ""),
+                "identity_snapshot_hash": identity_hash,
             },
         )
         return {"success": True, "request_id": request_id, "result": send_result}

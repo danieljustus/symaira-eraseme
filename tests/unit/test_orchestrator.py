@@ -52,6 +52,10 @@ def _fake_profile(monkeypatch):
         "symeraseme.core.identity.load_profile",
         lambda: profile,
     )
+    monkeypatch.setattr(
+        "symeraseme.core.orchestrator.load_profile",
+        lambda: profile,
+    )
     return profile
 
 
@@ -70,6 +74,26 @@ class TestPlanCampaign:
         plan_campaign(campaign_id="test-state", max_brokers=3)
         requests = list_removal_requests(campaign_id="test-state")
         assert all(r.get("current_status") == "PLANNED" for r in requests)
+
+    def test_plan_populates_identity_hash(self, _fake_profile):
+        from symeraseme.core.identity import hash_profile
+
+        profile = _fake_profile
+        expected_hash = hash_profile(profile)
+        plan_campaign(campaign_id="test-hash", max_brokers=2)
+        requests = list_removal_requests(campaign_id="test-hash")
+        assert len(requests) > 0
+        assert all(r.get("identity_snapshot_hash") == expected_hash for r in requests)
+
+    def test_plan_without_profile_has_empty_hash(self, monkeypatch):
+        monkeypatch.setattr(
+            "symeraseme.core.identity.load_profile",
+            lambda: (_ for _ in ()).throw(FileNotFoundError("no profile")),
+        )
+        plan_campaign(campaign_id="test-no-hash", max_brokers=2)
+        requests = list_removal_requests(campaign_id="test-no-hash")
+        assert len(requests) > 0
+        assert all(r.get("identity_snapshot_hash") == "" for r in requests)
 
     def test_plan_show(self):
         plan_campaign(campaign_id="show-test", max_brokers=2)
@@ -136,6 +160,30 @@ class TestExecuteCampaign:
         r = result["results"][0]
         assert r["success"] is False
         assert "init-profile" in r["error"]
+
+    def test_execute_includes_identity_hash_in_event(self, _fake_profile, monkeypatch):
+        from symeraseme.core.events import get_events
+        from symeraseme.core.identity import hash_profile
+
+        profile = _fake_profile
+        expected_hash = hash_profile(profile)
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.send_email",
+            lambda **_: {"message_id": "<test@msg>"},
+        )
+
+        plan_campaign(campaign_id="hash-test", max_brokers=1)
+        requests = list_removal_requests(campaign_id="hash-test")
+        assert len(requests) > 0
+
+        result = execute_request(requests[0]["id"])
+        assert result["success"] is True
+
+        events = get_events(requests[0]["id"])
+        sent_events = [e for e in events if e["event_type"] == "SENT"]
+        assert len(sent_events) == 1
+        assert sent_events[0]["payload_json"].get("identity_snapshot_hash") == expected_hash
 
 
 class TestConsent:

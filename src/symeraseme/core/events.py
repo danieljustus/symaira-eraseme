@@ -172,7 +172,7 @@ def list_removal_requests(
     conn = get_connection()
     rows = conn.execute(
         """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                  r.jurisdiction, r.template_id,
+                  r.jurisdiction, r.template_id, r.identity_snapshot_hash,
                   s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
                   s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
            FROM removal_requests r

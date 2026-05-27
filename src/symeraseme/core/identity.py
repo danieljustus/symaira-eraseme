@@ -127,3 +127,16 @@ def delete_profile(path: str | None = None) -> None:
 
 def profile_exists(path: str | None = None) -> bool:
     return _profile_path(path).exists()
+
+
+def hash_profile(profile: IdentityProfile) -> str:
+    """Return a deterministic, non-reversible hash of the profile contents.
+
+    Used for audit trails to prove which identity profile version was used
+    for a request without leaking the profile itself.
+    """
+    import hashlib
+    import json
+
+    canonical = json.dumps(profile.model_dump(mode="json"), sort_keys=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
