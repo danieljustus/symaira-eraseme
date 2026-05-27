@@ -25,9 +25,15 @@ def _templates_dir() -> Path:
     raise FileNotFoundError(msg)
 
 
+_ENV_CACHE: dict[str, Environment] = {}
+
+
 def _create_env(templates_dir: str | Path | None = None) -> Environment:
     search_path = Path(templates_dir) if templates_dir else _templates_dir()
-    return Environment(
+    key = str(search_path)
+    if key in _ENV_CACHE:
+        return _ENV_CACHE[key]
+    env = Environment(
         loader=FileSystemLoader(str(search_path)),
         autoescape=select_autoescape(
             enabled_extensions=("html", "htm", "xml", "html.j2", "htm.j2", "xml.j2"),
@@ -36,6 +42,8 @@ def _create_env(templates_dir: str | Path | None = None) -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    _ENV_CACHE[key] = env
+    return env
 
 
 def _profile_vars(profile: IdentityProfile) -> dict[str, Any]:
