@@ -101,15 +101,11 @@ app.command(rich_help_panel="Inspection & Diagnostics")(doctor)
 # ── Monitoring & Reports ─────────────────────────────────────────────────
 app.command(name="poll-inbox", rich_help_panel="Monitoring & Reports")(poll_inbox)
 app.command(name="classify-reply", rich_help_panel="Monitoring & Reports")(classify_reply)
-app.command(name="generate-rebuttal", rich_help_panel="Monitoring & Reports")(
-    generate_rebuttal_cmd
-)
+app.command(name="generate-rebuttal", rich_help_panel="Monitoring & Reports")(generate_rebuttal_cmd)
 app.command(name="generate-dashboard", rich_help_panel="Monitoring & Reports")(
     generate_dashboard_cmd
 )
-app.command(name="generate-report", rich_help_panel="Monitoring & Reports")(
-    generate_report_cmd
-)
+app.command(name="generate-report", rich_help_panel="Monitoring & Reports")(generate_report_cmd)
 app.command(rich_help_panel="Monitoring & Reports")(calendar)
 
 # ── Web-form Automation ───────────────────────────────────────────────────

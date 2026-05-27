@@ -134,4 +134,5 @@ def grant(
         ctx.obj["output"],
     )
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)

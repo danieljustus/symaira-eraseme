@@ -55,6 +55,7 @@ def create(
         ctx.obj["output"],
     )
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)
 
 
@@ -66,6 +67,7 @@ def plan_show(
 ) -> None:
     result = handle_plan_show(campaign_id, status, ctx.obj["output"])
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)
 
 
@@ -114,6 +116,7 @@ def execute(
         ctx.obj["output"],
     )
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)
 
 
@@ -139,6 +142,7 @@ def tick(
     """
     result = handle_tick(dry_run, batch_size, ctx.obj["output"])
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)
 
 
@@ -158,4 +162,5 @@ def status(
     """
     result = handle_status(campaign_id=campaign, output_format=ctx.obj["output"])
     from symeraseme.cli.console import render_result
+
     render_result(ctx.obj["output"], result)
