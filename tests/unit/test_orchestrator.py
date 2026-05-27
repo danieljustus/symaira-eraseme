@@ -242,6 +242,72 @@ class TestExecuteCampaign:
         assert result["success"] is True
 
 
+class TestHandleExecuteRouting:
+    def test_routes_to_async_when_no_account(self, monkeypatch, tmp_path):
+        import os
+
+        from symeraseme.services.campaign import handle_execute
+
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+
+        from symeraseme.core.db import close_connection, init_db
+
+        close_connection()
+        init_db(str(tmp_path / "test.db"))
+
+        async_called = []
+
+        async def mock_execute_campaign_async(campaign_id, **kwargs):
+            async_called.append(True)
+            return {
+                "campaign_id": campaign_id,
+                "total_planned": 0,
+                "batch_size": 0,
+                "results": [],
+            }
+
+        monkeypatch.setattr(
+            "symeraseme.core.orchestrator.execute_campaign_async",
+            mock_execute_campaign_async,
+        )
+
+        handle_execute("test-campaign", yes=True)
+        assert len(async_called) == 1
+
+    def test_routes_to_sync_when_account_given(self, monkeypatch, tmp_path):
+        import os
+
+        from symeraseme.services.campaign import handle_execute
+
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+
+        from symeraseme.core.db import close_connection, init_db
+
+        close_connection()
+        init_db(str(tmp_path / "test.db"))
+
+        sync_called = []
+
+        def mock_execute_campaign(*args, **kwargs):
+            sync_called.append(True)
+            return {
+                "campaign_id": kwargs.get("campaign_id", "test"),
+                "total_planned": 0,
+                "batch_size": 0,
+                "results": [],
+            }
+
+        monkeypatch.setattr(
+            "symeraseme.services.campaign.execute_campaign",
+            mock_execute_campaign,
+        )
+
+        handle_execute("test-campaign", account="gmail", yes=True)
+        assert len(sync_called) == 1
+
+
 class TestConsent:
     def test_issue_and_verify(self):
         token = issue_token("execute")

@@ -74,12 +74,25 @@ def handle_execute(
         raise typer.Exit(1)
 
     init_db()
-    result = execute_campaign(
-        campaign_id,
-        account=account,
-        batch_size=batch_size,
-        dry_run=dry_run,
-    )
+
+    if account:
+        result = execute_campaign(
+            campaign_id,
+            account=account,
+            batch_size=batch_size,
+            dry_run=dry_run,
+        )
+    else:
+        import asyncio
+        from symeraseme.core.orchestrator import execute_campaign_async
+
+        result = asyncio.run(
+            execute_campaign_async(
+                campaign_id,
+                batch_size=batch_size,
+                dry_run=dry_run,
+            )
+        )
 
     if output_format == "json":
         return json.dumps(result, indent=2, default=str)
