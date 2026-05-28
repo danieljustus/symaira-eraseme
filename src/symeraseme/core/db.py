@@ -46,7 +46,7 @@ def _get_secure_temp_dir() -> Path:
         secure_dir = Path("/dev/shm") / "symeraseme-db"
     else:
         secure_dir = Path(tempfile.gettempdir()) / "symeraseme-db"
-    secure_dir.mkdir(parents=True, exist_ok=True)
+    secure_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     return secure_dir
 
 

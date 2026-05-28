@@ -24,9 +24,10 @@ def _ensure_llm_consent(yes: bool = False) -> None:
     from symeraseme.cli.console import render_error
 
     typer.echo(
-        "WARNING: LLM operations may send PII (email addresses, phone numbers, names) "
+        "WARNING: LLM operations may send PII (email addresses, phone numbers, SSNs) "
         "to third-party LLM providers. A PII scrubber is active, but network "
-        "transmission of scrubbed metadata still occurs."
+        "transmission of scrubbed metadata still occurs.",
+        err=True,
     )
     granted = typer.confirm("Do you consent to sending this data to the LLM provider?")
     if not granted:

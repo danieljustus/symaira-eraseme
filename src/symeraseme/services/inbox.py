@@ -46,12 +46,10 @@ def handle_poll_inbox(
         requests = list_removal_requests(campaign_id=campaign_id)
         thread_map: dict[str, int] = {}
         req_ids = []
-        id_map: dict[int, int] = {}
         for req in requests:
             req_id = req.get("id") or req.get("request_id")
             if req_id:
                 req_ids.append(req_id)
-                id_map[req_id] = req_id
         if req_ids:
             events_by_rid = get_events_for_requests(req_ids)
             for rid, evs in events_by_rid.items():

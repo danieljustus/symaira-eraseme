@@ -87,7 +87,7 @@ def show_spinner(description: str = "Working...") -> Generator[Progress, None, N
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         transient=True,
-        console=console,
+        console=_error_console,
     )
     with progress:
         progress.add_task(description=description, total=None)
