@@ -9,11 +9,14 @@ via either:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import sys
 import time
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 CONSENT_DIR = "~/.local/share/symeraseme"
 TOKEN_TTL = 86400  # 24 hours in seconds
@@ -148,16 +151,57 @@ def _tty_prompt(message: str = "Are you sure?") -> bool:
         return False
 
 
+def _read_consent_file(path: str | Path) -> str | None:
+    """Read a consent token from a file, with permission and sanity checks."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        logger.warning("Consent file %s does not exist", p)
+        return None
+    try:
+        st = p.stat()
+        if st.st_mode & 0o777 != 0o600:
+            logger.warning(
+                "Consent file %s has permissions %o, expected 0o600", p, st.st_mode & 0o777
+            )
+        # Check this is a regular file, not a symlink (unless /dev/stdin)
+        if not p.is_file() and str(p) not in ("/dev/stdin", "/dev/fd/0"):
+            logger.warning("Consent path %s is not a regular file", p)
+            return None
+    except OSError:
+        pass
+    try:
+        token = p.read_text().strip().split("\n")[0]
+    except OSError as exc:
+        logger.warning("Failed to read consent file %s: %s", p, exc)
+        return None
+    if not token:
+        logger.warning("Consent file %s is empty", p)
+        return None
+    return token
+
+
 def check_consent(
     command: str,
     yes: bool = False,
     consent_token: str | None = None,
+    consent_file: str | None = None,
     interactive: bool = True,
 ) -> bool:
     if yes:
         return True
     if consent_token:
         return verify_token(command, consent_token)
+    if consent_file:
+        token = _read_consent_file(consent_file)
+        if token:
+            return verify_token(command, token)
+        return False
+    consent_file_env = os.environ.get("SYMERASEME_CONSENT_FILE", "")
+    if consent_file_env:
+        token = _read_consent_file(consent_file_env)
+        if token:
+            return verify_token(command, token)
+        return False
     env_token = os.environ.get("SYMERASEME_CONSENT", "")
     if env_token:
         return verify_token(command, env_token)

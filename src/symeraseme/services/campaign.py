@@ -68,10 +68,13 @@ def handle_execute(
     dry_run: bool = False,
     yes: bool = False,
     consent_token: str | None = None,
+    consent_file: str | None = None,
     output_format: str = "text",
     web_form_runner=None,
 ) -> str:
-    if not dry_run and not check_consent("execute", yes=yes, consent_token=consent_token):
+    if not dry_run and not check_consent(
+        "execute", yes=yes, consent_token=consent_token, consent_file=consent_file
+    ):
         render_error(
             "Destructive command requires consent. Use --yes or issue a token via 'grant' command."
         )

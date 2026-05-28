@@ -105,12 +105,18 @@ def execute(
         "--consent",
         help="Pre-issued consent token",
     ),
+    consent_file: str = typer.Option(
+        None,
+        "--consent-file",
+        help="Read consent token from a file (supports /dev/stdin for pipe input)",
+    ),
 ) -> None:
     """Send removal requests for a campaign.
 
     Examples:
         symeraseme execute --campaign initial --batch-size 5 --yes
-        symeraseme execute --campaign initial --account gmail --dry-run
+        symeraseme execute --campaign initial --consent-file /tmp/token
+        echo $TOKEN | symeraseme execute --campaign initial --consent-file /dev/stdin
     """
     from symeraseme.cli.console import render_result, show_spinner
 
@@ -122,6 +128,7 @@ def execute(
             dry_run,
             yes,
             consent_token,
+            consent_file,
             ctx.obj["output"],
         )
     render_result(ctx.obj["output"], result)
