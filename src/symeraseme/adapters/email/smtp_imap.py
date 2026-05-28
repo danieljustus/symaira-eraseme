@@ -350,6 +350,13 @@ def match_reply_to_request(
     matched: list[dict[str, Any]] = []
     thread_map = thread_map or {}
 
+    # Pre-build a subject-to-request lookup index for O(1) matching
+    subject_index: dict[str, Any] = {}
+    for req in requests:
+        req_id = req.get("id") or req.get("request_id")
+        req_subject_raw = f"Data Deletion Request \u2014 {req.get('broker_id', '')}"
+        subject_index[normalize_subject(req_subject_raw).lower()] = req_id
+
     for msg in messages:
         found = False
         msg_subject = msg.get("subject", "")
@@ -361,16 +368,13 @@ def match_reply_to_request(
             matched.append(msg)
             continue
 
-        for req in requests:
-            req_id = req.get("id") or req.get("request_id")
-            req_subject = f"Data Deletion Request — {req.get('broker_id', '')}"
-
-            if subject_matches(req_subject, msg_subject):
-                msg["request_id"] = req_id
-                msg["match_method"] = "subject"
-                found = True
-                matched.append(msg)
-                break
+        msg_subject_normalized = normalize_subject(msg_subject).lower()
+        matched_req_id = subject_index.get(msg_subject_normalized)
+        if matched_req_id is not None:
+            msg["request_id"] = matched_req_id
+            msg["match_method"] = "subject"
+            found = True
+            matched.append(msg)
 
         if not found:
             msg["request_id"] = None
