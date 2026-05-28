@@ -120,7 +120,7 @@ def _wrapper_script(
     if not venv_activate:
         venv_activate = _resolve_venv()
 
-    venv_block = f'source {shlex.quote(venv_activate)}' if venv_activate else ""
+    venv_block = f"source {shlex.quote(venv_activate)}" if venv_activate else ""
 
     return WRAPPER_HEADER.format(
         venv_block=venv_block,
