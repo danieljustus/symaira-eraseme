@@ -14,6 +14,7 @@ from symeraseme.core.orchestrator import (
     get_plan,
     plan_campaign,
 )
+from symeraseme.services.web_form import run_web_form_for_broker
 
 
 def handle_plan_create(
@@ -70,7 +71,7 @@ def handle_execute(
     consent_token: str | None = None,
     consent_file: str | None = None,
     output_format: str = "text",
-    web_form_runner=None,
+    web_form_runner=run_web_form_for_broker,
 ) -> str:
     if not dry_run and not check_consent(
         "execute", yes=yes, consent_token=consent_token, consent_file=consent_file

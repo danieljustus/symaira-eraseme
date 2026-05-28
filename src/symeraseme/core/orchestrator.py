@@ -137,9 +137,11 @@ def execute_request(
 
     if channel_type == "web_form":
         if web_form_runner is None:
-            from symeraseme.services.web_form import run_web_form_for_broker
-
-            web_form_runner = run_web_form_for_broker
+            msg = (
+                "web_form_runner is required for web_form requests. "
+                "Pass a concrete WebFormRunner to execute_request()."
+            )
+            raise ValueError(msg)
 
         result = web_form_runner(
             broker_name,
