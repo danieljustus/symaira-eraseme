@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import typer
 
+from symeraseme.core.db import init_db
+from symeraseme.core.deadlines import apply_tick_actions, run_tick
+from symeraseme.core.reports import get_campaign_status
 from symeraseme.services.campaign import (
     handle_execute,
     handle_plan_create,
     handle_plan_show,
 )
-from symeraseme.services.status import handle_status
-from symeraseme.services.tick import handle_tick
 
 plan_app = typer.Typer(
     name="plan",
@@ -146,8 +147,36 @@ def tick(
         symeraseme tick --dry-run
         symeraseme tick --batch-size 10
     """
-    result = handle_tick(dry_run, batch_size, ctx.obj["output"])
+    import json
+
     from symeraseme.cli.console import render_result
+
+    init_db()
+    actions = run_tick(dry_run=dry_run, batch_size=batch_size)
+
+    if ctx.obj["output"] == "json":
+        result = json.dumps(
+            {
+                "total_actions": len(actions),
+                "actions": [a.__dict__ for a in actions],
+            },
+            indent=2,
+            default=str,
+        )
+    else:
+        if not actions:
+            result = "Tick: no actions needed."
+        else:
+            lines = [f"Tick: {len(actions)} action(s)"]
+            for a in actions:
+                dry_tag = " (DRY RUN)" if a.dry_run else ""
+                lines.append(f"  #{a.request_id} [{a.action_type}] {a.description}{dry_tag}")
+
+            if not dry_run:
+                results = apply_tick_actions(actions)
+                executed = sum(1 for r in results if r["executed"])
+                lines.append(f"Executed {executed}/{len(results)} actions.")
+            result = "\n".join(lines)
 
     render_result(ctx.obj["output"], result)
 
@@ -166,7 +195,37 @@ def status(
         symeraseme status
         symeraseme status --campaign initial
     """
-    result = handle_status(campaign_id=campaign, output_format=ctx.obj["output"])
+    import json
+
     from symeraseme.cli.console import render_result
+
+    summary = get_campaign_status(campaign_id=campaign)
+
+    if ctx.obj["output"] == "json":
+        result = json.dumps(summary, indent=2, default=str)
+    else:
+        scope = f"campaign={campaign}" if campaign else "all campaigns"
+        lines = [
+            f"Status ({scope}) as of {summary['as_of']}",
+            f"  Total: {summary['totals']['requests']}   Resolved: {summary['totals']['resolved']}   Open: {summary['totals']['open']}",
+        ]
+        if summary["by_status"]:
+            lines.append("  By status:")
+            for status, count in sorted(summary["by_status"].items(), key=lambda kv: -kv[1]):
+                lines.append(f"    {status:<22} {count}")
+        if summary["by_channel"]:
+            lines.append("  By channel:")
+            for channel, count in sorted(summary["by_channel"].items()):
+                lines.append(f"    {channel:<22} {count}")
+        lines.append("  Escalation:")
+        lines.append(f"    none           {summary['escalation']['none']}")
+        lines.append(f"    reminder sent  {summary['escalation']['reminder']}")
+        lines.append(f"    dpa pending    {summary['escalation']['dpa_pending']}")
+        lines.append("  Upcoming:")
+        lines.append(f"    overdue              {summary['upcoming']['overdue']}")
+        lines.append(f"    deadline within 7d   {summary['upcoming']['deadline_due_within_7d']}")
+        lines.append(f"    deadline within 30d  {summary['upcoming']['deadline_due_within_30d']}")
+        lines.append(f"    tick actions ready   {summary['upcoming']['tick_actions_ready']}")
+        result = "\n".join(lines)
 
     render_result(ctx.obj["output"], result)
