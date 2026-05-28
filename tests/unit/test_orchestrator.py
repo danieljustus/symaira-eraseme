@@ -111,7 +111,15 @@ class TestPlanCampaign:
 class TestExecuteCampaign:
     def test_dry_run_returns_body(self, _fake_profile):
         plan_campaign(campaign_id="dry-test", max_brokers=1)
-        result = execute_campaign("dry-test", dry_run=True)
+        result = execute_campaign(
+            "dry-test",
+            dry_run=True,
+            web_form_runner=lambda _b, dry_run=False: {
+                "success": True,
+                "url": "http://example.com",
+                "dry_run": dry_run,
+            },
+        )
         assert result["total_planned"] >= 1
         assert len(result["results"]) >= 1
         r = result["results"][0]
@@ -142,7 +150,15 @@ class TestExecuteCampaign:
             lambda: (_ for _ in ()).throw(FileNotFoundError("no profile")),
         )
         plan_campaign(campaign_id="no-profile", max_brokers=1)
-        result = execute_campaign("no-profile", dry_run=True)
+        result = execute_campaign(
+            "no-profile",
+            dry_run=True,
+            web_form_runner=lambda _b, dry_run=False: {
+                "success": True,
+                "url": "http://example.com",
+                "dry_run": dry_run,
+            },
+        )
         assert result["total_planned"] >= 1
         email_results = [r for r in result["results"] if "to" in r]
         if not email_results:
@@ -163,7 +179,15 @@ class TestExecuteCampaign:
             lambda: profile,
         )
         plan_campaign(campaign_id="missing-fields", max_brokers=1)
-        result = execute_campaign("missing-fields", dry_run=True)
+        result = execute_campaign(
+            "missing-fields",
+            dry_run=True,
+            web_form_runner=lambda _b, dry_run=False: {
+                "success": True,
+                "url": "http://example.com",
+                "dry_run": dry_run,
+            },
+        )
         assert result["total_planned"] >= 1
         email_results = [r for r in result["results"] if "to" in r]
         if not email_results:
@@ -217,32 +241,17 @@ class TestExecuteCampaign:
         if not web_form_requests:
             pytest.skip("No web-form requests in campaign")
 
-        import asyncio
+        def mock_run_form(_broker_name, dry_run=False):
+            return {
+                "success": True,
+                "url": "http://example.com",
+                "dry_run": dry_run,
+            }
 
-        async def mock_run_form(**kwargs):
-            return type(
-                "Result",
-                (),
-                {
-                    "success": True,
-                    "step_index": 0,
-                    "total_steps": 1,
-                    "error": "",
-                    "screenshot_path": "",
-                    "dry_run": False,
-                },
-            )()
-
-        monkeypatch.setattr(
-            "symeraseme.services.web_form._run_form",
-            mock_run_form,
+        result = execute_request(
+            web_form_requests[0]["id"],
+            web_form_runner=mock_run_form,
         )
-        monkeypatch.setattr(
-            "symeraseme.services.web_form.profile_exists",
-            lambda: False,
-        )
-
-        result = execute_request(web_form_requests[0]["id"])
         assert result["success"] is True
 
 

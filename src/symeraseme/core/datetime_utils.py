@@ -51,9 +51,7 @@ def parse_iso_datetime(value: Any) -> datetime | None:
     return None
 
 
-def parse_date_pair(
-    sent_str: Any, resolved_str: Any
-) -> tuple[datetime, datetime] | None:
+def parse_date_pair(sent_str: Any, resolved_str: Any) -> tuple[datetime, datetime] | None:
     """Parse a sent/resolved timestamp pair into UTC datetimes.
 
     Both strings are parsed with :func:`parse_iso_datetime`.  Returns
