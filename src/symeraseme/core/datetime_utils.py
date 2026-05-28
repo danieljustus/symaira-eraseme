@@ -49,3 +49,19 @@ def parse_iso_datetime(value: Any) -> datetime | None:
                 except ValueError:
                     continue
     return None
+
+
+def parse_date_pair(
+    sent_str: Any, resolved_str: Any
+) -> tuple[datetime, datetime] | None:
+    """Parse a sent/resolved timestamp pair into UTC datetimes.
+
+    Both strings are parsed with :func:`parse_iso_datetime`.  Returns
+    ``(sent_dt, resolved_dt)`` when both are valid, or ``None`` when
+    either is missing or unparseable.
+    """
+    sent_dt = parse_iso_datetime(str(sent_str) if sent_str else None)
+    resolved_dt = parse_iso_datetime(str(resolved_str) if resolved_str else None)
+    if sent_dt is None or resolved_dt is None:
+        return None
+    return sent_dt, resolved_dt

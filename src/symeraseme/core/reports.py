@@ -11,6 +11,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from symeraseme.core.datetime_utils import parse_date_pair
+
 # ---------------------------------------------------------------------------
 # Data collection
 # ---------------------------------------------------------------------------
@@ -164,24 +166,9 @@ def _aggregate_campaign(camp: dict[str, Any]) -> dict[str, Any]:
     # Response times
     response_times: list[float] = []
     for r in reqs:
-        sent = r.get("sent_at")
-        resolved = r.get("resolved_at")
-        if sent and resolved:
-            for fmt in (
-                "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S%z",
-                "%Y-%m-%d %H:%M:%S",
-            ):
-                try:
-                    sent_dt = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
-                    resolved_dt = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(
-                        tzinfo=UTC
-                    )
-                    diff = (resolved_dt - sent_dt).total_seconds() / 86400
-                    response_times.append(diff)
-                    break
-                except ValueError:
-                    continue
+        pair = parse_date_pair(r.get("sent_at"), r.get("resolved_at"))
+        if pair:
+            response_times.append((pair[1] - pair[0]).total_seconds() / 86400)
 
     avg_response_time = sum(response_times) / len(response_times) if response_times else None
 
@@ -239,21 +226,9 @@ def _broker_leaderboard(
             bd["pending"] += 1
 
         # Response time
-        sent = r.get("sent_at")
-        resolved = r.get("resolved_at")
-        if sent and resolved:
-            for fmt in (
-                "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S%z",
-                "%Y-%m-%d %H:%M:%S",
-            ):
-                try:
-                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
-                    res = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(tzinfo=UTC)
-                    bd["response_times"].append((res - s).total_seconds() / 86400)
-                    break
-                except ValueError:
-                    continue
+        pair = parse_date_pair(r.get("sent_at"), r.get("resolved_at"))
+        if pair:
+            bd["response_times"].append((pair[1] - pair[0]).total_seconds() / 86400)
 
     result = []
     for _bid, bd in broker_data.items():
@@ -383,21 +358,9 @@ def _success_metrics(
 
     response_times: list[float] = []
     for r in requests:
-        sent = r.get("sent_at")
-        resolved = r.get("resolved_at")
-        if sent and resolved:
-            for fmt in (
-                "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S%z",
-                "%Y-%m-%d %H:%M:%S",
-            ):
-                try:
-                    s = datetime.strptime(str(sent).rstrip("Z"), fmt).replace(tzinfo=UTC)
-                    res = datetime.strptime(str(resolved).rstrip("Z"), fmt).replace(tzinfo=UTC)
-                    response_times.append((res - s).total_seconds() / 86400)
-                    break
-                except ValueError:
-                    continue
+        pair = parse_date_pair(r.get("sent_at"), r.get("resolved_at"))
+        if pair:
+            response_times.append((pair[1] - pair[0]).total_seconds() / 86400)
 
     return {
         "total_requests": total,
