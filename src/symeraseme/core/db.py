@@ -141,6 +141,10 @@ def _cleanup_temp_files() -> None:
             try:
                 if tmp.exists():
                     tmp.unlink(missing_ok=True)
+                for suffix in ("-wal", "-shm"):
+                    sibling = tmp.with_suffix(tmp.suffix + suffix)
+                    if sibling.exists():
+                        sibling.unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
@@ -179,7 +183,10 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
 
         conn = sqlite3.connect(str(db_file))
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        if should_encrypt:
+            conn.execute("PRAGMA journal_mode=DELETE")
+        else:
+            conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
         _local.db_path = str(_db_path(path)) if not should_encrypt else str(db_file)
@@ -201,6 +208,10 @@ def close_connection() -> None:
             try:
                 if tmp.exists() and tmp != orig:
                     tmp.unlink(missing_ok=True)
+                for suffix in ("-wal", "-shm"):
+                    sibling = tmp.with_suffix(tmp.suffix + suffix)
+                    if sibling.exists():
+                        sibling.unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
