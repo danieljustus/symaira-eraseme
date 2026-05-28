@@ -16,5 +16,4 @@ class WebFormRunner(Protocol):
         headed: bool = False,
         screenshot_dir: str = "",
         dry_run: bool = False,
-    ) -> dict[str, Any]:
-        ...
+    ) -> dict[str, Any]: ...
