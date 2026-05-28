@@ -333,6 +333,14 @@ async def execute_campaign_async(
     )
     from symeraseme.core.templating import render_template
 
+    # Load the identity profile once before the template-rendering loop so
+    # that every rendered email contains the user's actual profile data
+    # (full name, email addresses, phone numbers, addresses, etc.).
+    try:
+        profile = load_profile()
+    except FileNotFoundError:
+        profile = None
+
     if dry_run:
         results: list[dict[str, Any]] = []
         for req in batch:
@@ -377,6 +385,7 @@ async def execute_campaign_async(
         body = render_template(
             template_id,
             broker_name=broker_name,
+            profile=profile,
         )
 
         email_messages.append(

@@ -14,6 +14,7 @@ from symeraseme.core.db import close_connection, init_db
 from symeraseme.core.events import list_removal_requests
 from symeraseme.core.orchestrator import (
     execute_campaign,
+    execute_campaign_async,
     execute_request,
     get_plan,
     plan_campaign,
@@ -244,6 +245,58 @@ class TestExecuteCampaign:
 
         result = execute_request(web_form_requests[0]["id"])
         assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_async_batch_renders_profile_data(self, _fake_profile, monkeypatch):
+        """Regression test: execute_campaign_async must pass profile to render_template."""
+        plan_campaign(campaign_id="async-profile", max_brokers=5)
+        requests = list_removal_requests(campaign_id="async-profile")
+        email_requests = [r for r in requests if r.get("channel") == "email"]
+        if not email_requests:
+            pytest.skip("No email requests in campaign")
+
+        sent_messages: list[tuple[str, str]] = []
+
+        async def mock_send_batch(messages, **kwargs):
+            for msg in messages:
+                sent_messages.append((msg.to, msg.body))
+            return [{"to": to, "success": True} for to, _ in sent_messages]
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.send_messages_batch",
+            mock_send_batch,
+        )
+
+        from symeraseme.adapters.email.himalaya import SmtpConfig
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.load_smtp_config",
+            lambda: SmtpConfig(
+                host="localhost",
+                port=1025,
+                username="",
+                password="",
+                use_tls=False,
+                from_addr="test@example.com",
+            ),
+        )
+
+        monkeypatch.setattr(
+            "symeraseme.core.orchestrator.list_removal_requests",
+            lambda campaign_id=None, status=None: email_requests,
+        )
+
+        result = await execute_campaign_async("async-profile", batch_size=5)
+        assert result["total_planned"] >= 1
+        assert result["batch_size"] >= 1
+        assert len(sent_messages) >= 1
+
+        profile = _fake_profile
+        for to_addr, body in sent_messages:
+            assert profile.full_name in body, (
+                f"Rendered email to {to_addr} does not contain user's full name "
+                f"({profile.full_name!r}). Body: {body[:200]!r}"
+            )
 
 
 class TestHandleExecuteRouting:
