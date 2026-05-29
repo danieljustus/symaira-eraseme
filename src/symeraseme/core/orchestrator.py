@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from symeraseme.core.protocols import WebFormRunner
 
 from symeraseme.core.events import (
-    append_event,
     create_campaign,
     create_removal_request,
     get_events,
@@ -18,7 +17,7 @@ from symeraseme.core.events import (
     list_removal_requests,
 )
 from symeraseme.core.identity import hash_profile, load_profile
-from symeraseme.core.projection import append_event_and_project, rebuild_all_states
+from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
 from symeraseme.registry.schema import Broker
 
@@ -71,7 +70,7 @@ def plan_campaign(
             template_id=template_id,
             identity_snapshot_hash=identity_hash,
         )
-        append_event(
+        append_event_and_project(
             request_id,
             "PLANNED",
             payload={
@@ -94,7 +93,6 @@ def plan_campaign(
             }
         )
 
-    rebuild_all_states()
     return {
         "campaign_id": campaign_id,
         "total_brokers": len(brokers),
