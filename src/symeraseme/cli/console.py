@@ -61,17 +61,6 @@ def print_table(title: str, columns: list[str], rows: list[list[str]]) -> None:
     console.print(make_table(title, columns, rows))
 
 
-def spinner_progress(description: str = "Working...") -> Progress:
-    """Return a Progress with a spinner for indeterminate progress."""
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=True,
-    )
-    progress.add_task(description=description, total=None)
-    return progress
-
-
 @contextmanager
 def show_spinner(description: str = "Working...") -> Generator[Progress, None, None]:
     """Show a transient spinner during a long-running operation.

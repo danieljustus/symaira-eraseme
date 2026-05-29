@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -335,6 +336,14 @@ async def execute_campaign_async(
     )
     from symeraseme.core.templating import render_template
 
+    # Load the identity profile once before the template-rendering loop so
+    # that every rendered email contains the user's actual profile data
+    # (full name, email addresses, phone numbers, addresses, etc.).
+    try:
+        profile = load_profile()
+    except FileNotFoundError:
+        profile = None
+
     if dry_run:
         results: list[dict[str, Any]] = []
         for req in batch:
@@ -359,7 +368,10 @@ async def execute_campaign_async(
         )
 
     email_messages: list[EmailMessage] = []
-    request_map: dict[str, int] = {}
+    # Multi-map: one endpoint may serve multiple requests (e.g. same broker
+    # in different campaigns, or duplicate entries).  Store every req_id
+    # and consume them in FIFO order when processing SMTP results.
+    endpoint_ids: defaultdict[str, list[int]] = defaultdict(list)
 
     batch_ids = [r["id"] for r in batch]
     events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
@@ -379,6 +391,7 @@ async def execute_campaign_async(
         body = render_template(
             template_id,
             broker_name=broker_name,
+            profile=profile,
         )
 
         email_messages.append(
@@ -388,7 +401,7 @@ async def execute_campaign_async(
                 body=body,
             )
         )
-        request_map[channel_endpoint] = req_id
+        endpoint_ids[channel_endpoint].append(req_id)
 
     if not email_messages:
         return {
@@ -404,9 +417,16 @@ async def execute_campaign_async(
     )
 
     results = []
+    # Track how many results we have consumed per endpoint so we can
+    # match each result to the correct request when duplicates exist.
+    consumed: dict[str, int] = {}
     for sr in send_results:
         to_addr = sr["to"]
-        req_id = request_map.get(to_addr)
+        idx = consumed.get(to_addr, 0)
+        ids = endpoint_ids.get(to_addr, [])
+        req_id = ids[idx] if idx < len(ids) else None
+        if req_id is not None:
+            consumed[to_addr] = idx + 1
 
         if sr["success"] and req_id is not None:
             append_event_and_project(

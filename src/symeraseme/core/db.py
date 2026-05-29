@@ -4,10 +4,15 @@ When ``SYMERASEME_ENCRYPT_DB=1`` is set (or the database file is already
 encrypted), the file is transparently encrypted at rest using AES-256-GCM
 (Fernet) with a key derived from the identity master key in the system keyring.
 
-The decrypted temp file is placed in a tmpfs-backed directory so that no
+The decrypted temp file is placed in a memory-backed directory so that no
 plaintext data remains on persistent storage after SIGKILL, OOM kill, or
-system crash. A startup scavenger cleans up any stale temp files from
-previous aborted runs.
+system crash:
+
+- Linux:   ``/dev/shm`` (tmpfs, always memory-backed)
+- macOS:   ``/tmp`` (RAM disk on modern macOS; verified on APFS volumes)
+- Windows: OS temp directory (disk-backed — see README for mitigation)
+
+A startup scavenger cleans up any stale temp files from previous aborted runs.
 """
 
 from __future__ import annotations
@@ -47,9 +52,19 @@ _local = threading.local()
 
 
 def _get_secure_temp_dir() -> Path:
-    if platform.system() == "Linux" and Path("/dev/shm").exists():
+    system = platform.system()
+    if system == "Linux" and Path("/dev/shm").exists():
         secure_dir = Path("/dev/shm") / "symeraseme-db"
+    elif system == "Darwin":
+        # macOS mounts /tmp as a RAM disk (tmpfs) on modern APFS volumes.
+        # Using /tmp directly avoids the disk-backed default from
+        # tempfile.gettempdir(), which delegates to a per-user TMPDIR
+        # that may live on persistent storage.
+        secure_dir = Path("/tmp") / "symeraseme-db"
     else:
+        # Windows and other platforms: fall back to the OS temp directory.
+        # On Windows this is disk-backed; see the README security section
+        # for mitigation strategies.
         secure_dir = Path(tempfile.gettempdir()) / "symeraseme-db"
     secure_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     return secure_dir
@@ -157,6 +172,10 @@ def _cleanup_temp_files() -> None:
             try:
                 if tmp.exists():
                     tmp.unlink(missing_ok=True)
+                for suffix in ("-wal", "-shm"):
+                    sibling = tmp.with_suffix(tmp.suffix + suffix)
+                    if sibling.exists():
+                        sibling.unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
@@ -195,7 +214,10 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
 
         conn = sqlite3.connect(str(db_file))
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        if should_encrypt:
+            conn.execute("PRAGMA journal_mode=DELETE")
+        else:
+            conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
         _local.db_path = str(_db_path(path)) if not should_encrypt else str(db_file)
@@ -217,6 +239,10 @@ def close_connection() -> None:
             try:
                 if tmp.exists() and tmp != orig:
                     tmp.unlink(missing_ok=True)
+                for suffix in ("-wal", "-shm"):
+                    sibling = tmp.with_suffix(tmp.suffix + suffix)
+                    if sibling.exists():
+                        sibling.unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
@@ -297,6 +323,8 @@ def init_db(path: str | None = None) -> Path:
             reminders_sent  INTEGER NOT NULL DEFAULT 0,
             escalation_level INTEGER NOT NULL DEFAULT 0
         );
+        CREATE INDEX IF NOT EXISTS idx_request_state_next_action
+            ON request_state(next_action_at, current_status);
 
         CREATE TABLE IF NOT EXISTS inbox_replies (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,

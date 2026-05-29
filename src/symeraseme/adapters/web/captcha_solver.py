@@ -6,6 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -136,7 +137,7 @@ class CapSolverSolver(CaptchaSolver):
         try:
             resp = urlopen(req, timeout=30)
             data = json.loads(resp.read().decode())
-        except Exception as e:
+        except (TimeoutError, HTTPError, URLError) as e:
             raise CaptchaError(f"CapSolver createTask failed: {e}") from e
         if data.get("errorId", 0) != 0:
             raise CaptchaError(f"CapSolver error: {data.get('errorDescription', 'unknown')}")
@@ -172,7 +173,7 @@ class CapSolverSolver(CaptchaSolver):
                 )
                 resp = urlopen(req, timeout=30)
                 data = json.loads(resp.read().decode())
-            except Exception as e:
+            except (TimeoutError, HTTPError, URLError) as e:
                 raise CaptchaError(f"CapSolver getTaskResult failed: {e}") from e
             if data.get("errorId", 0) != 0:
                 raise CaptchaError(f"CapSolver error: {data.get('errorDescription', 'unknown')}")
@@ -250,7 +251,7 @@ class TwoCaptchaSolver(CaptchaSolver):
             req = Request(url)
             resp = urlopen(req, timeout=30)
             data = json.loads(resp.read().decode())
-        except Exception as e:
+        except (TimeoutError, HTTPError, URLError) as e:
             raise CaptchaError(f"2captcha in.php failed: {e}") from e
         if data.get("status") != 1:
             error_text = data.get("request", "unknown")
@@ -287,7 +288,7 @@ class TwoCaptchaSolver(CaptchaSolver):
                 req = Request(f"{TWOCAPTCHA_BASE}/res.php?{params}")
                 resp = urlopen(req, timeout=30)
                 data = json.loads(resp.read().decode())
-            except Exception as e:
+            except (TimeoutError, HTTPError, URLError) as e:
                 raise CaptchaError(f"2captcha res.php failed: {e}") from e
             if data.get("status") == 1:
                 return str(data.get("request", ""))
