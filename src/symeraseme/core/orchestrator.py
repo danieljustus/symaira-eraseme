@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from symeraseme.core.protocols import WebFormRunner
 
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+
 from symeraseme.core.events import (
     create_campaign,
     create_removal_request,
@@ -20,6 +23,8 @@ from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
 from symeraseme.registry.schema import Broker
+
+_PROGRESS_CONSOLE = Console(stderr=True)
 
 _BATCH_LIMIT = 10
 
@@ -352,108 +357,133 @@ async def execute_campaign_async(
     except FileNotFoundError:
         profile = None
 
-    if dry_run:
-        results: list[dict[str, Any]] = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.completed]{task.completed}/{task.total}"),
+        transient=True,
+        console=_PROGRESS_CONSOLE,
+    ) as progress:
+        task = progress.add_task("Sending removal requests...", total=len(batch))
+
+        if dry_run:
+            results: list[dict[str, Any]] = []
+            for req in batch:
+                progress.update(task, description=f"Processing {req['broker_id']}...")
+                r = execute_request(
+                    req["id"], dry_run=True, web_form_runner=web_form_runner
+                )
+                results.append(r)
+                progress.advance(task)
+            return {
+                "campaign_id": campaign_id,
+                "total_planned": len(requests),
+                "batch_size": len(batch),
+                "results": results,
+            }
+
+        smtp_config = load_smtp_config()
+        if smtp_skip_tls:
+            smtp_config = SmtpConfig(
+                host=smtp_config.host,
+                port=smtp_config.port,
+                username=smtp_config.username,
+                password=smtp_config.password,
+                use_tls=False,
+                from_addr=smtp_config.from_addr,
+            )
+
+        email_messages: list[EmailMessage] = []
+        # Multi-map: one endpoint may serve multiple requests (e.g. same broker
+        # in different campaigns, or duplicate entries).  Store every req_id
+        # and consume them in FIFO order when processing SMTP results.
+        endpoint_ids: defaultdict[str, list[int]] = defaultdict(list)
+
+        batch_ids = [r["id"] for r in batch]
+        events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
+
         for req in batch:
-            r = execute_request(req["id"], dry_run=True, web_form_runner=web_form_runner)
-            results.append(r)
-        return {
-            "campaign_id": campaign_id,
-            "total_planned": len(requests),
-            "batch_size": len(batch),
-            "results": results,
-        }
-
-    smtp_config = load_smtp_config()
-    if smtp_skip_tls:
-        smtp_config = SmtpConfig(
-            host=smtp_config.host,
-            port=smtp_config.port,
-            username=smtp_config.username,
-            password=smtp_config.password,
-            use_tls=False,
-            from_addr=smtp_config.from_addr,
-        )
-
-    email_messages: list[EmailMessage] = []
-    # Multi-map: one endpoint may serve multiple requests (e.g. same broker
-    # in different campaigns, or duplicate entries).  Store every req_id
-    # and consume them in FIFO order when processing SMTP results.
-    endpoint_ids: defaultdict[str, list[int]] = defaultdict(list)
-
-    batch_ids = [r["id"] for r in batch]
-    events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
-
-    for req in batch:
-        req_id = req["id"]
-        broker_name = req["broker_id"]
-        events = events_by_rid.get(req_id, [])
-        last_event = events[-1] if events else {}
-        payload = last_event.get("payload_json", {}) if isinstance(last_event, dict) else {}
-        channel_endpoint = payload.get("endpoint", "")
-        template_id = req.get("template_id", "")
-
-        if not channel_endpoint:
-            continue
-
-        body = render_template(
-            template_id,
-            broker_name=broker_name,
-            profile=profile,
-        )
-
-        email_messages.append(
-            EmailMessage(
-                to=channel_endpoint,
-                subject=f"Data Deletion Request \u2014 {broker_name}",
-                body=body,
+            req_id = req["id"]
+            broker_name = req["broker_id"]
+            progress.update(task, description=f"Preparing {broker_name}...")
+            events = events_by_rid.get(req_id, [])
+            last_event = events[-1] if events else {}
+            payload = (
+                last_event.get("payload_json", {})
+                if isinstance(last_event, dict)
+                else {}
             )
-        )
-        endpoint_ids[channel_endpoint].append(req_id)
+            channel_endpoint = payload.get("endpoint", "")
+            template_id = req.get("template_id", "")
 
-    if not email_messages:
-        return {
-            "campaign_id": campaign_id,
-            "total_planned": len(requests),
-            "batch_size": len(batch),
-            "results": [],
-        }
+            if not channel_endpoint:
+                progress.advance(task)
+                continue
 
-    send_results = await send_messages_batch(
-        email_messages,
-        smtp_config=smtp_config,
-    )
-
-    results = []
-    # Track how many results we have consumed per endpoint so we can
-    # match each result to the correct request when duplicates exist.
-    consumed: dict[str, int] = {}
-    for sr in send_results:
-        to_addr = sr["to"]
-        idx = consumed.get(to_addr, 0)
-        ids = endpoint_ids.get(to_addr, [])
-        req_id = ids[idx] if idx < len(ids) else None
-        if req_id is not None:
-            consumed[to_addr] = idx + 1
-
-        if sr["success"] and req_id is not None:
-            append_event_and_project(
-                req_id,
-                "SENT",
-                payload={
-                    "to": to_addr,
-                    "account": "smtp",
-                    "expected_response_days": 30,
-                },
-            )
-        elif req_id is not None:
-            append_event_and_project(
-                req_id,
-                "SEND_FAILED",
-                payload={"error": sr.get("error", ""), "to": to_addr},
+            body = render_template(
+                template_id,
+                broker_name=broker_name,
+                profile=profile,
             )
 
-        results.append(sr)
+            email_messages.append(
+                EmailMessage(
+                    to=channel_endpoint,
+                    subject=f"Data Deletion Request \u2014 {broker_name}",
+                    body=body,
+                )
+            )
+            endpoint_ids[channel_endpoint].append(req_id)
+            progress.advance(task)
+
+        if not email_messages:
+            return {
+                "campaign_id": campaign_id,
+                "total_planned": len(requests),
+                "batch_size": len(batch),
+                "results": [],
+            }
+
+        progress.update(
+            task, description="Sending batch via SMTP...", completed=len(batch)
+        )
+        send_results = await send_messages_batch(
+            email_messages,
+            smtp_config=smtp_config,
+        )
+
+        results = []
+        # Track how many results we have consumed per endpoint so we can
+        # match each result to the correct request when duplicates exist.
+        consumed: dict[str, int] = {}
+        for sr in send_results:
+            to_addr = sr["to"]
+            progress.update(task, description=f"Recording result for {to_addr}...")
+            idx = consumed.get(to_addr, 0)
+            ids = endpoint_ids.get(to_addr, [])
+            req_id = ids[idx] if idx < len(ids) else None
+            if req_id is not None:
+                consumed[to_addr] = idx + 1
+
+            if sr["success"] and req_id is not None:
+                append_event_and_project(
+                    req_id,
+                    "SENT",
+                    payload={
+                        "to": to_addr,
+                        "account": "smtp",
+                        "expected_response_days": 30,
+                    },
+                )
+            elif req_id is not None:
+                append_event_and_project(
+                    req_id,
+                    "SEND_FAILED",
+                    payload={"error": sr.get("error", ""), "to": to_addr},
+                )
+
+            results.append(sr)
 
     return {
         "campaign_id": campaign_id,
