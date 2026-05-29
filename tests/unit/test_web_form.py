@@ -377,7 +377,8 @@ class TestLocalFixtureForm:
 
 
 class TestHandleRunWebForm:
-    def test_failure_creates_manual_task(self, monkeypatch, tmp_path):
+    @pytest.mark.asyncio
+    async def test_failure_creates_manual_task(self, monkeypatch, tmp_path):
         import json
         import os
 
@@ -451,7 +452,7 @@ class TestHandleRunWebForm:
             lambda: False,
         )
 
-        result = handle_run_web_form(
+        result = await handle_run_web_form(
             "test-broker",
             output_format="json",
         )
@@ -464,7 +465,7 @@ class TestHandleRunWebForm:
         from typer import Exit
 
         with pytest.raises(Exit) as exc_info:
-            handle_run_web_form(
+            await handle_run_web_form(
                 "test-broker",
                 output_format="text",
             )

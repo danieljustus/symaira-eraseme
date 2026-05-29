@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import Any, cast
 
@@ -19,7 +18,7 @@ from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
 
 
-def run_web_form_for_broker(
+async def run_web_form_for_broker(
     broker_id: str,
     *,
     headed: bool = False,
@@ -80,16 +79,14 @@ def run_web_form_for_broker(
         }
 
     try:
-        result = asyncio.run(
-            _run_form(
-                url=url,
-                steps=steps_data,
-                headless=not headed,
-                timeout_seconds=form.form_spec.timeout_seconds,
-                rate_limit_delay=form.form_spec.rate_limit_delay,
-                screenshot_dir=screenshot_dir or None,
-                identity_fields=identity_fields,
-            )
+        result = await _run_form(
+            url=url,
+            steps=steps_data,
+            headless=not headed,
+            timeout_seconds=form.form_spec.timeout_seconds,
+            rate_limit_delay=form.form_spec.rate_limit_delay,
+            screenshot_dir=screenshot_dir or None,
+            identity_fields=identity_fields,
         )
     except PlaywrightRunnerError as e:
         return {
@@ -125,7 +122,7 @@ def run_web_form_for_broker(
     }
 
 
-def handle_run_web_form(
+async def handle_run_web_form(
     broker_id: str,
     headed: bool = False,
     screenshot_dir: str = "",
@@ -189,16 +186,14 @@ def handle_run_web_form(
     typer.echo(f"Steps: {len(steps_data)}")
 
     try:
-        result = asyncio.run(
-            _run_form(
-                url=url,
-                steps=steps_data,
-                headless=not headed,
-                timeout_seconds=form.form_spec.timeout_seconds,
-                rate_limit_delay=form.form_spec.rate_limit_delay,
-                screenshot_dir=screenshot_dir or None,
-                identity_fields=identity_fields,
-            )
+        result = await _run_form(
+            url=url,
+            steps=steps_data,
+            headless=not headed,
+            timeout_seconds=form.form_spec.timeout_seconds,
+            rate_limit_delay=form.form_spec.rate_limit_delay,
+            screenshot_dir=screenshot_dir or None,
+            identity_fields=identity_fields,
         )
     except PlaywrightRunnerError as e:
         render_error(

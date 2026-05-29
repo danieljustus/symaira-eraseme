@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import typer
 
 from symeraseme.cli.console import render_result
@@ -47,12 +49,14 @@ def run_web_form(
     from symeraseme.cli.console import show_spinner
 
     with show_spinner("Running web form..."):
-        result = handle_run_web_form(
-            broker_id,
-            headed,
-            screenshot_dir,
-            dry_run,
-            ctx.obj["output"],
+        result = asyncio.run(
+            handle_run_web_form(
+                broker_id,
+                headed,
+                screenshot_dir,
+                dry_run,
+                ctx.obj["output"],
+            )
         )
     render_result(ctx.obj["output"], result)
 
