@@ -160,14 +160,37 @@ def tick(
         symeraseme tick --dry-run
         symeraseme tick --batch-size 10
     """
-    from symeraseme.cli.console import render_result
-    from symeraseme.services.tick import handle_tick
+    import json
 
-    result = handle_tick(
-        dry_run=dry_run,
-        batch_size=batch_size,
-        output_format=ctx.obj["output"],
-    )
+    from symeraseme.cli.console import render_result
+    from symeraseme.core.db import init_db
+    from symeraseme.core.deadlines import apply_tick_actions, run_tick
+
+    init_db()
+    actions = run_tick(dry_run=dry_run, batch_size=batch_size)
+
+    if ctx.obj["output"] == "json":
+        result = json.dumps(
+            {
+                "total_actions": len(actions),
+                "actions": [a.__dict__ for a in actions],
+            },
+            indent=2,
+            default=str,
+        )
+    elif not actions:
+        result = "Tick: no actions needed."
+    else:
+        lines = [f"Tick: {len(actions)} action(s)"]
+        for a in actions:
+            dry_tag = " (DRY RUN)" if a.dry_run else ""
+            lines.append(f"  #{a.request_id} [{a.action_type}] {a.description}{dry_tag}")
+        if not dry_run:
+            results = apply_tick_actions(actions)
+            executed = sum(1 for r in results if r["executed"])
+            lines.append(f"Executed {executed}/{len(results)} actions.")
+        result = "\n".join(lines)
+
     render_result(ctx.obj["output"], result)
 
 

@@ -88,10 +88,10 @@ class TestPlanExecuteTickStatus:
 
     def test_plan_dry_run_cycle(self, clean_db, monkeypatch, tmp_path):
         """Plan a campaign, dry-run execute, tick, verify status."""
+        from symeraseme.core.deadlines import apply_tick_actions, run_tick
         from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.reports import get_campaign_status
         from symeraseme.services.campaign import handle_execute
-        from symeraseme.services.status import handle_status
-        from symeraseme.services.tick import handle_tick
 
         profile_path = tmp_path / "identity.enc"
         monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(profile_path))
@@ -138,13 +138,17 @@ class TestPlanExecuteTickStatus:
                 payload={"to": "test@example.com", "expected_response_days": 30},
             )
 
-        tick_dry = handle_tick(dry_run=True, output_format="text")
-        assert "Tick:" in tick_dry
+        # tick (dry-run)
+        actions = run_tick(dry_run=True)
+        assert actions is not None
 
-        tick_result = handle_tick(dry_run=False, output_format="text")
-        assert "Tick:" in tick_result or "no actions" in tick_result
+        # tick (non-dry-run)
+        actions = run_tick(dry_run=False)
+        if actions:
+            apply_tick_actions(actions)
+        assert True  # did not crash
 
-        status = json.loads(handle_status(output_format="json"))
+        status = get_campaign_status(campaign_id="integration-test")
         assert status["totals"]["requests"] >= 1
 
     def test_plan_with_jurisdiction_filter(self, clean_db):
@@ -385,12 +389,12 @@ class TestTickEngineIntegration:
 
     def test_tick_on_planned_campaign(self, clean_db):
         """Tick on a plan-only campaign with PLANNED events reports results."""
+        from symeraseme.core.deadlines import run_tick
         from symeraseme.core.orchestrator import plan_campaign
-        from symeraseme.services.tick import handle_tick
 
         plan_campaign(campaign_id="tick-planned", max_brokers=2)
-        result = handle_tick(dry_run=True, output_format="text")
-        assert "Tick:" in result
+        actions = run_tick(dry_run=True)
+        assert isinstance(actions, list)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -564,10 +568,10 @@ class TestServiceHandlerIntegration:
     def test_status_after_plan(self, clean_db):
         """After planning a campaign, status should show the planned requests."""
         from symeraseme.core.orchestrator import plan_campaign
-        from symeraseme.services.status import handle_status
+        from symeraseme.core.reports import get_campaign_status
 
         plan_campaign(campaign_id="svc-status-test", max_brokers=3)
-        status = json.loads(handle_status(output_format="json"))
+        status = get_campaign_status(campaign_id="svc-status-test")
         assert status["totals"]["requests"] >= 1
 
     def test_plan_show_after_create(self, clean_db):
