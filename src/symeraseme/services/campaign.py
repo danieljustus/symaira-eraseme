@@ -70,6 +70,7 @@ def handle_execute(
     consent_token: str | None = None,
     output_format: str = "text",
     web_form_runner=None,
+    backend: str | None = None,
 ) -> str:
     if not dry_run and not check_consent("execute", yes=yes, consent_token=consent_token):
         render_error(
@@ -78,10 +79,18 @@ def handle_execute(
 
     init_db()
 
-    if account:
+    if backend is None:
+        backend = "himalaya" if account else "smtp"
+
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info("Using %s backend for campaign execution", backend)
+
+    if backend == "himalaya":
         result = execute_campaign(
             campaign_id,
-            account=account,
+            account=account or "",
             batch_size=batch_size,
             dry_run=dry_run,
             web_form_runner=web_form_runner,

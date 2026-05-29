@@ -278,7 +278,6 @@ def apply_tick_actions(
     if not actions:
         return []
 
-    from symeraseme.core.events import append_event
     from symeraseme.core.projection import rebuild_all_states
 
     results: list[dict[str, Any]] = []
@@ -297,7 +296,9 @@ def apply_tick_actions(
             continue
 
         try:
-            append_event(
+            from symeraseme.core.projection import append_event_and_project
+
+            append_event_and_project(
                 action.request_id,
                 action.event_type,
                 payload=action.payload,

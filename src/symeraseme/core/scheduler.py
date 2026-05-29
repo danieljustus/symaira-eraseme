@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import shlex
 import stat
 from dataclasses import dataclass, field
 from datetime import datetime, time
@@ -102,7 +103,7 @@ set -euo pipefail
 export SYMERASEME_HEADLESS=1
 export PATH="${{PATH}}:/usr/local/bin:/opt/homebrew/bin"
 
-cd "{project_dir}"
+cd {project_dir}
 
 {command}
 """
@@ -119,11 +120,11 @@ def _wrapper_script(
     if not venv_activate:
         venv_activate = _resolve_venv()
 
-    venv_block = f'source "{venv_activate}"' if venv_activate else ""
+    venv_block = f"source {shlex.quote(venv_activate)}" if venv_activate else ""
 
     return WRAPPER_HEADER.format(
         venv_block=venv_block,
-        project_dir=project_dir,
+        project_dir=shlex.quote(project_dir),
         command=command,
     )
 
