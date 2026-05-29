@@ -92,3 +92,37 @@ class TestCliResult:
         j = r.to_json()
         assert '"success": false' in j
         assert '"error": "fail"' in j
+
+
+class TestVerboseLogging:
+    def _reset_logging(self):
+        import logging
+
+        logging.root.setLevel(logging.WARNING)
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+        logging.getLogger("symeraseme").setLevel(logging.NOTSET)
+
+    def test_verbose_scopes_debug_to_symeraseme(self):
+        import logging
+
+        self._reset_logging()
+        runner = CliRunner()
+        result = runner.invoke(app, ["--verbose", "version"])
+        assert result.exit_code == 0
+        symeraseme_logger = logging.getLogger("symeraseme")
+        assert symeraseme_logger.level == logging.DEBUG, (
+            f"Expected DEBUG (10), got {symeraseme_logger.level} "
+            f"(effective: {symeraseme_logger.getEffectiveLevel()})"
+        )
+        library_logger = logging.getLogger("urllib3")
+        assert library_logger.level != logging.DEBUG
+
+    def test_no_verbose_keeps_warning(self):
+        import logging
+
+        self._reset_logging()
+        runner = CliRunner()
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        assert logging.getLogger("symeraseme").level != logging.DEBUG

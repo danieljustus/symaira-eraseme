@@ -180,7 +180,14 @@ def append_event_and_project(
     return eid, state
 
 
-def rebuild_all_states() -> int:
+def rebuild_all_states(chunk_size: int = 100) -> int:
+    """Rebuild request_state for every dirty request, processing in chunks.
+
+    When a campaign contains 1,000+ brokers, loading every event into a
+    single in-memory dict can exhaust RAM.  Chunking keeps memory bounded
+    regardless of campaign size while preserving event order and state
+    consistency per request.
+    """
     conn = get_connection()
 
     dirty_rows = conn.execute(
@@ -195,52 +202,56 @@ def rebuild_all_states() -> int:
     if not dirty_request_ids:
         return 0
 
-    placeholders = ",".join("?" * len(dirty_request_ids))
-    rows = conn.execute(
-        f"""SELECT r.id AS request_id,
-                  e.id AS id,
-                  e.event_type,
-                  e.occurred_at,
-                  e.payload_json
-           FROM removal_requests r
-           JOIN request_events e ON e.request_id = r.id
-           WHERE r.id IN ({placeholders})
-           ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
-        dirty_request_ids,
-    ).fetchall()
+    total_states = 0
+    for start in range(0, len(dirty_request_ids), chunk_size):
+        chunk = dirty_request_ids[start : start + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""SELECT r.id AS request_id,
+                      e.id AS id,
+                      e.event_type,
+                      e.occurred_at,
+                      e.payload_json
+               FROM removal_requests r
+               JOIN request_events e ON e.request_id = r.id
+               WHERE r.id IN ({placeholders})
+               ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
+            chunk,
+        ).fetchall()
 
-    buckets: dict[int, list[dict[str, Any]]] = {}
-    for row in rows:
-        rid = row["request_id"]
-        if rid not in buckets:
-            buckets[rid] = []
-        buckets[rid].append(row)
+        buckets: dict[int, list[dict[str, Any]]] = {}
+        for row in rows:
+            rid = row["request_id"]
+            if rid not in buckets:
+                buckets[rid] = []
+            buckets[rid].append(row)
 
-    states = [_accumulate_state(rid, events) for rid, events in buckets.items()]
+        states = [_accumulate_state(rid, events) for rid, events in buckets.items()]
 
-    conn.executemany(
-        """INSERT OR REPLACE INTO request_state
-           (request_id, current_status, last_event_id, last_event_at,
-            sent_at, acknowledged_at, resolved_at, deadline_at,
-            next_action_at, reminders_sent, escalation_level)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        [
-            (
-                s["request_id"],
-                s["current_status"],
-                s["last_event_id"],
-                s["last_event_at"],
-                s["sent_at"],
-                s["acknowledged_at"],
-                s["resolved_at"],
-                s["deadline_at"],
-                s["next_action_at"],
-                s["reminders_sent"],
-                s["escalation_level"],
-            )
-            for s in states
-        ],
-    )
-    conn.commit()
+        conn.executemany(
+            """INSERT OR REPLACE INTO request_state
+               (request_id, current_status, last_event_id, last_event_at,
+                sent_at, acknowledged_at, resolved_at, deadline_at,
+                next_action_at, reminders_sent, escalation_level)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    s["request_id"],
+                    s["current_status"],
+                    s["last_event_id"],
+                    s["last_event_at"],
+                    s["sent_at"],
+                    s["acknowledged_at"],
+                    s["resolved_at"],
+                    s["deadline_at"],
+                    s["next_action_at"],
+                    s["reminders_sent"],
+                    s["escalation_level"],
+                )
+                for s in states
+            ],
+        )
+        conn.commit()
+        total_states += len(states)
 
-    return len(states)
+    return total_states
