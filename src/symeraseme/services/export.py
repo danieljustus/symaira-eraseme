@@ -5,43 +5,21 @@ from __future__ import annotations
 import csv
 import io
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
 from symeraseme.core.db import get_connection, init_db
 
 
-def handle_export(
-    output_file: str | None = None,
-    fmt: str = "json",
-    campaign_id: str | None = None,
-    output_format: str = "text",
-) -> str:
-    """Export every removal request with its full event history.
+def _collect_export_data(
+    conn: sqlite3.Connection,
+    campaign_id: str | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Query removal requests and events, building the canonical export structures.
 
-    Lets the user keep an offline audit trail for GDPR record-keeping
-    purposes. Supports JSON (default) and CSV (events flattened).
-
-    Parameters
-    ----------
-    output_file : str | None
-        Path to write the exported data to. When None, the serialized
-        payload is returned in the result string (json) or summary text.
-    fmt : {"json", "csv"}
-        Export format.
-    campaign_id : str | None
-        Optional campaign filter.
-    output_format : str
-        ``text`` returns a human summary; ``json`` returns the export
-        payload wrapped in a structured envelope.
+    Returns (requests, flat_events) where each request has its events attached.
     """
-    init_db()
-    if fmt not in ("json", "csv"):
-        msg = f"Unsupported export format: {fmt}. Use 'json' or 'csv'."
-        raise ValueError(msg)
-
-    conn = get_connection()
-
     request_rows = conn.execute(
         """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
                   r.jurisdiction, r.template_id, r.identity_snapshot_hash,
@@ -85,76 +63,113 @@ def handle_export(
         req["events"] = events_by_rid.get(req["id"], [])
         requests.append(req)
 
-    if fmt == "json":
-        payload = {
-            "schema_version": 1,
-            "scope": {"campaign_id": campaign_id or "all"},
-            "totals": {
-                "requests": len(requests),
-                "events": sum(len(r["events"]) for r in requests),
-            },
-            "requests": requests,
-        }
-        serialized = json.dumps(payload, indent=2, default=str)
+    return requests, flat_events
+
+
+def _format_export_json(
+    requests: list[dict[str, Any]],
+    campaign_id: str | None,
+) -> str:
+    """Serialize the export payload as JSON."""
+    payload = {
+        "schema_version": 1,
+        "scope": {"campaign_id": campaign_id or "all"},
+        "totals": {
+            "requests": len(requests),
+            "events": sum(len(r["events"]) for r in requests),
+        },
+        "requests": requests,
+    }
+    return json.dumps(payload, indent=2, default=str)
+
+
+def _format_export_csv(
+    requests: list[dict[str, Any]],
+    flat_events: list[dict[str, Any]],
+) -> str:
+    """Flatten the event log into CSV rows (one row per event)."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "request_id",
+            "broker_id",
+            "campaign_id",
+            "jurisdiction",
+            "current_status",
+            "event_id",
+            "occurred_at",
+            "event_type",
+            "source",
+            "payload_json",
+        ]
+    )
+    req_by_id = {r["id"]: r for r in requests}
+    if not flat_events:
+        for req in requests:
+            writer.writerow(
+                [
+                    req["id"],
+                    req["broker_id"],
+                    req["campaign_id"],
+                    req["jurisdiction"],
+                    req.get("current_status", ""),
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
     else:
-        # CSV: flatten the event log; one row per event.
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(
-            [
-                "request_id",
-                "broker_id",
-                "campaign_id",
-                "jurisdiction",
-                "current_status",
-                "event_id",
-                "occurred_at",
-                "event_type",
-                "source",
-                "payload_json",
-            ]
-        )
-        req_by_id = {r["id"]: r for r in requests}
-        if not flat_events:
-            # Still write request rows (without events) so the export isn't empty.
-            for req in requests:
-                writer.writerow(
-                    [
-                        req["id"],
-                        req["broker_id"],
-                        req["campaign_id"],
-                        req["jurisdiction"],
-                        req.get("current_status", ""),
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                    ]
-                )
-        else:
-            for e in flat_events:
-                req = req_by_id.get(e["request_id"], {})
-                writer.writerow(
-                    [
-                        e["request_id"],
-                        req.get("broker_id", ""),
-                        req.get("campaign_id", ""),
-                        req.get("jurisdiction", ""),
-                        req.get("current_status", ""),
-                        e["id"],
-                        e["occurred_at"],
-                        e["event_type"],
-                        e["source"],
-                        json.dumps(e.get("payload", {}), default=str),
-                    ]
-                )
-        serialized = buf.getvalue()
+        for e in flat_events:
+            req = req_by_id.get(e["request_id"], {})
+            writer.writerow(
+                [
+                    e["request_id"],
+                    req.get("broker_id", ""),
+                    req.get("campaign_id", ""),
+                    req.get("jurisdiction", ""),
+                    req.get("current_status", ""),
+                    e["id"],
+                    e["occurred_at"],
+                    e["event_type"],
+                    e["source"],
+                    json.dumps(e.get("payload", {}), default=str),
+                ]
+            )
+    return buf.getvalue()
+
+
+def _write_export_file(output_file: str, serialized: str) -> None:
+    """Write the serialized export payload to *output_file*."""
+    path = Path(output_file).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(serialized, encoding="utf-8")
+
+
+def handle_export(
+    output_file: str | None = None,
+    fmt: str = "json",
+    campaign_id: str | None = None,
+    output_format: str = "text",
+) -> str:
+    """Export every removal request with its full event history."""
+    init_db()
+    if fmt not in ("json", "csv"):
+        msg = f"Unsupported export format: {fmt}. Use 'json' or 'csv'."
+        raise ValueError(msg)
+
+    conn = get_connection()
+    requests, flat_events = _collect_export_data(conn, campaign_id)
+
+    if fmt == "json":
+        serialized = _format_export_json(requests, campaign_id)
+    else:
+        serialized = _format_export_csv(requests, flat_events)
 
     if output_file:
-        path = Path(output_file).expanduser().resolve()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(serialized, encoding="utf-8")
+        _write_export_file(output_file, serialized)
 
     summary: dict[str, Any] = {
         "schema_version": 1,
@@ -170,11 +185,9 @@ def handle_export(
     if output_format == "json":
         if output_file:
             return json.dumps(summary, indent=2, default=str)
-        # No output file: embed the serialized payload too.
         summary["payload"] = serialized
         return json.dumps(summary, indent=2, default=str)
 
-    # text
     if output_file:
         return (
             f"Exported {summary['totals']['requests']} request(s) "

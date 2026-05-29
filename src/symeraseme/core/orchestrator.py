@@ -307,6 +307,112 @@ def execute_campaign(
     }
 
 
+def _load_smtp_config(smtp_skip_tls: bool = False) -> Any:
+    """Load SMTP configuration, optionally disabling TLS."""
+    from symeraseme.adapters.email.himalaya import SmtpConfig, load_smtp_config
+
+    smtp_config = load_smtp_config()
+    if smtp_skip_tls:
+        smtp_config = SmtpConfig(
+            host=smtp_config.host,
+            port=smtp_config.port,
+            username=smtp_config.username,
+            password=smtp_config.password,
+            use_tls=False,
+            from_addr=smtp_config.from_addr,
+        )
+    return smtp_config
+
+
+def _gather_email_messages(
+    batch: list[dict[str, Any]],
+    events_by_rid: dict[int, list[dict[str, Any]]],
+    profile: Any,
+    progress: Any,
+    task: Any,
+) -> tuple[list[Any], defaultdict[str, list[int]]]:
+    """Render email messages for a batch of requests.
+
+    Returns (email_messages, endpoint_ids) where endpoint_ids maps
+    each recipient address to its associated request IDs (for FIFO
+    matching when processing SMTP results).
+    """
+    from symeraseme.adapters.email.himalaya import EmailMessage
+    from symeraseme.core.templating import render_template
+
+    email_messages: list[Any] = []
+    endpoint_ids: defaultdict[str, list[int]] = defaultdict(list)
+
+    for req in batch:
+        req_id = req["id"]
+        broker_name = req["broker_id"]
+        progress.update(task, description=f"Preparing {broker_name}...")
+        events = events_by_rid.get(req_id, [])
+        last_event = events[-1] if events else {}
+        payload = last_event.get("payload_json", {}) if isinstance(last_event, dict) else {}
+        channel_endpoint = payload.get("endpoint", "")
+        template_id = req.get("template_id", "")
+
+        if not channel_endpoint:
+            progress.advance(task)
+            continue
+
+        body = render_template(
+            template_id,
+            broker_name=broker_name,
+            profile=profile,
+        )
+        email_messages.append(
+            EmailMessage(
+                to=channel_endpoint,
+                subject=f"Data Deletion Request \u2014 {broker_name}",
+                body=body,
+            )
+        )
+        endpoint_ids[channel_endpoint].append(req_id)
+        progress.advance(task)
+
+    return email_messages, endpoint_ids
+
+
+def _apply_batch_results(
+    send_results: list[dict[str, Any]],
+    endpoint_ids: defaultdict[str, list[int]],
+    progress: Any,
+    task: Any,
+) -> list[dict[str, Any]]:
+    """Process SMTP batch results: match to request IDs and record events."""
+    results: list[dict[str, Any]] = []
+    consumed: dict[str, int] = {}
+    for sr in send_results:
+        to_addr = sr["to"]
+        progress.update(task, description=f"Recording result for {to_addr}...")
+        idx = consumed.get(to_addr, 0)
+        ids = endpoint_ids.get(to_addr, [])
+        req_id = ids[idx] if idx < len(ids) else None
+        if req_id is not None:
+            consumed[to_addr] = idx + 1
+
+        if sr["success"] and req_id is not None:
+            append_event_and_project(
+                req_id,
+                "SENT",
+                payload={
+                    "to": to_addr,
+                    "account": "smtp",
+                    "expected_response_days": 30,
+                },
+            )
+        elif req_id is not None:
+            append_event_and_project(
+                req_id,
+                "SEND_FAILED",
+                payload={"error": sr.get("error", ""), "to": to_addr},
+            )
+        results.append(sr)
+    return results
+
+
 async def execute_campaign_async(
     campaign_id: str,
     *,
@@ -315,43 +421,12 @@ async def execute_campaign_async(
     smtp_skip_tls: bool = False,
     web_form_runner: WebFormRunner | None = None,
 ) -> dict[str, Any]:
-    """Execute a campaign using direct SMTP for batched sending.
+    """Execute a campaign using direct SMTP for batched sending."""
+    from symeraseme.adapters.email.himalaya import send_messages_batch
 
-    Collects all PLANNED removal requests, renders email templates,
-    and sends them over a single SMTP connection instead of spawning
-    a Himalaya CLI process per message.
-
-    Parameters
-    ----------
-    campaign_id : str
-        The campaign to execute.
-    batch_size : int
-        Max number of messages to send (default 10).
-    dry_run : bool
-        When true, renders templates without sending.
-    smtp_skip_tls : bool
-        When true, disables STARTTLS (for testing with local SMTP
-        servers that don't support TLS).
-
-    Returns
-    -------
-    dict[str, Any]
-        Campaign execution summary with results per request.
-    """
     requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
     batch = requests[:batch_size]
 
-    from symeraseme.adapters.email.himalaya import (
-        EmailMessage,
-        SmtpConfig,
-        load_smtp_config,
-        send_messages_batch,
-    )
-    from symeraseme.core.templating import render_template
-
-    # Load the identity profile once before the template-rendering loop so
-    # that every rendered email contains the user's actual profile data
-    # (full name, email addresses, phone numbers, addresses, etc.).
     try:
         profile = load_profile()
     except FileNotFoundError:
@@ -381,55 +456,13 @@ async def execute_campaign_async(
                 "results": results,
             }
 
-        smtp_config = load_smtp_config()
-        if smtp_skip_tls:
-            smtp_config = SmtpConfig(
-                host=smtp_config.host,
-                port=smtp_config.port,
-                username=smtp_config.username,
-                password=smtp_config.password,
-                use_tls=False,
-                from_addr=smtp_config.from_addr,
-            )
-
-        email_messages: list[EmailMessage] = []
-        # Multi-map: one endpoint may serve multiple requests (e.g. same broker
-        # in different campaigns, or duplicate entries).  Store every req_id
-        # and consume them in FIFO order when processing SMTP results.
-        endpoint_ids: defaultdict[str, list[int]] = defaultdict(list)
-
+        smtp_config = _load_smtp_config(smtp_skip_tls)
         batch_ids = [r["id"] for r in batch]
         events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
 
-        for req in batch:
-            req_id = req["id"]
-            broker_name = req["broker_id"]
-            progress.update(task, description=f"Preparing {broker_name}...")
-            events = events_by_rid.get(req_id, [])
-            last_event = events[-1] if events else {}
-            payload = last_event.get("payload_json", {}) if isinstance(last_event, dict) else {}
-            channel_endpoint = payload.get("endpoint", "")
-            template_id = req.get("template_id", "")
-
-            if not channel_endpoint:
-                progress.advance(task)
-                continue
-
-            body = render_template(
-                template_id,
-                broker_name=broker_name,
-                profile=profile,
-            )
-
-            email_messages.append(
-                EmailMessage(
-                    to=channel_endpoint,
-                    subject=f"Data Deletion Request \u2014 {broker_name}",
-                    body=body,
-                )
-            )
-            endpoint_ids[channel_endpoint].append(req_id)
-            progress.advance(task)
+        email_messages, endpoint_ids = _gather_email_messages(
+            batch, events_by_rid, profile, progress, task
+        )
 
         if not email_messages:
             return {
@@ -440,42 +473,8 @@ async def execute_campaign_async(
             }
 
         progress.update(task, description="Sending batch via SMTP...", completed=len(batch))
-        send_results = await send_messages_batch(
-            email_messages,
-            smtp_config=smtp_config,
-        )
-
-        results = []
-        # Track how many results we have consumed per endpoint so we can
-        # match each result to the correct request when duplicates exist.
-        consumed: dict[str, int] = {}
-        for sr in send_results:
-            to_addr = sr["to"]
-            progress.update(task, description=f"Recording result for {to_addr}...")
-            idx = consumed.get(to_addr, 0)
-            ids = endpoint_ids.get(to_addr, [])
-            req_id = ids[idx] if idx < len(ids) else None
-            if req_id is not None:
-                consumed[to_addr] = idx + 1
-
-            if sr["success"] and req_id is not None:
-                append_event_and_project(
-                    req_id,
-                    "SENT",
-                    payload={
-                        "to": to_addr,
-                        "account": "smtp",
-                        "expected_response_days": 30,
-                    },
-                )
-            elif req_id is not None:
-                append_event_and_project(
-                    req_id,
-                    "SEND_FAILED",
-                    payload={"error": sr.get("error", ""), "to": to_addr},
-                )
-
-            results.append(sr)
+        send_results = await send_messages_batch(email_messages, smtp_config=smtp_config)
+        results = _apply_batch_results(send_results, endpoint_ids, progress, task)
 
     return {
         "campaign_id": campaign_id,

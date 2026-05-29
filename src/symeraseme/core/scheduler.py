@@ -265,17 +265,8 @@ rm -f "$TEMP"
 # ---------------------------------------------------------------------------
 
 
-def _plist_content(
-    label: str,
-    wrapper_path: str,
-    schedule_interval: str,
-    description: str = "",
-) -> str:
-    """Generate a launchd .plist file content.
-
-    schedule_interval: e.g. "<hourly/>" or "<daily/>" or a calendar interval dict.
-    """
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
+_LAUNCHD_PLIST_TEMPLATE = """\
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -288,7 +279,7 @@ def _plist_content(
         <string>{wrapper_path}</string>
     </array>
     <key>StartCalendarInterval</key>
-    {schedule_interval}
+{interval_xml}
     <key>StandardOutPath</key>
     <string>/tmp/{label}.log</string>
     <key>StandardErrorPath</key>
@@ -306,6 +297,30 @@ def _plist_content(
 </plist>"""
 
 
+def _plist_content(
+    label: str,
+    wrapper_path: str,
+    schedule_interval: str,
+    description: str = "",
+    *,
+    wrap_array: bool = False,
+) -> str:
+    """Generate a launchd .plist file content.
+
+    schedule_interval: e.g. "<hourly/>" or "<daily/>" or a calendar interval dict.
+    When *wrap_array* is true the interval XML is wrapped in an <array> element.
+    """
+    if wrap_array:
+        interval_xml = f"    <array>\n{schedule_interval}\n    </array>"
+    else:
+        interval_xml = f"    {schedule_interval}"
+    return _LAUNCHD_PLIST_TEMPLATE.format(
+        label=label,
+        wrapper_path=wrapper_path,
+        interval_xml=interval_xml,
+    )
+
+
 def _plist_calendar(hour: int, minute: int) -> str:
     return f"""    <dict>
         <key>Hour</key>
@@ -315,124 +330,27 @@ def _plist_calendar(hour: int, minute: int) -> str:
     </dict>"""
 
 
-def generate_launchd(
-    config: SchedulerConfig,
-    project_dir: str = "",
-) -> dict[str, str]:
-    """Generate launchd .plist files and wrapper scripts.
+def _launchd_quarter_dates(hour: int, minute: int) -> str:
+    """Calendar entries for quarterly execution (Jan 1, Apr 1, Jul 1, Oct 1)."""
+    entries = []
+    for m in (1, 4, 7, 10):
+        entries.append(
+            f"    <dict>\n"
+            f"        <key>Month</key>\n"
+            f"        <integer>{m}</integer>\n"
+            f"        <key>Day</key>\n"
+            f"        <integer>1</integer>\n"
+            f"        <key>Hour</key>\n"
+            f"        <integer>{hour}</integer>\n"
+            f"        <key>Minute</key>\n"
+            f"        <integer>{minute}</integer>\n"
+            f"    </dict>"
+        )
+    return "\n".join(entries)
 
-    Returns a dict mapping filename -> content.
-    """
-    bin_path = config.symeraseme_bin or _resolve_bin()
-    venv = config.venv_activate or _resolve_venv()
-    out: dict[str, str] = {}
 
-    # ── tick (daily) ──
-    tick_cmd = f"{bin_path} tick --output json"
-    tick_sh = _wrapper_script(tick_cmd, project_dir=project_dir, venv_activate=venv)
-    out["symeraseme-tick.sh"] = tick_sh
-
-    tick_calendar = _plist_calendar(config.tick_time.hour, config.tick_time.minute)
-    out["com.symeraseme.tick.plist"] = _plist_content(
-        label="com.symeraseme.tick",
-        wrapper_path="__WRAPPER_DIR__/symeraseme-tick.sh",
-        schedule_interval=tick_calendar,
-        description="Symaira EraseMe daily tick",
-    )
-
-    # ── poll-inbox (multiple times daily) ──
-    poll_cmd = f"{bin_path} poll-inbox --output json"
-    poll_sh = _wrapper_script(poll_cmd, project_dir=project_dir, venv_activate=venv)
-    out["symeraseme-poll.sh"] = poll_sh
-
-    # launchd supports StartCalendarInterval as an array of dicts
-    poll_entries = "\n".join(_plist_calendar(t.hour, t.minute) for t in config.poll_times)
-    out["com.symeraseme.poll.plist"] = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.symeraseme.poll</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>__WRAPPER_DIR__/symeraseme-poll.sh</string>
-    </array>
-    <key>StartCalendarInterval</key>
-    <array>
-{poll_entries}
-    </array>
-    <key>StandardOutPath</key>
-    <string>/tmp/com.symeraseme.poll.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/com.symeraseme.poll.err</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>SYMERASEME_HEADLESS</key>
-        <string>1</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <false/>
-    <key>KeepAlive</key>
-    <false/>
-</dict>
-</plist>"""
-
-    # ── re-scan (quarterly) ──
-    rescan_cmd = f"{bin_path} tick --output json"
-    rescan_sh = _wrapper_script(rescan_cmd, project_dir=project_dir, venv_activate=venv)
-    out["symeraseme-rescan.sh"] = rescan_sh
-
-    # Quarterly: Jan 1, Apr 1, Jul 1, Oct 1
-    quarter_dates = [
-        f"""    <dict>
-        <key>Month</key>
-        <integer>{m}</integer>
-        <key>Day</key>
-        <integer>1</integer>
-        <key>Hour</key>
-        <integer>{config.tick_time.hour}</integer>
-        <key>Minute</key>
-        <integer>{config.tick_time.minute}</integer>
-    </dict>"""
-        for m in [1, 4, 7, 10]
-    ]
-
-    out["com.symeraseme.rescan.plist"] = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.symeraseme.rescan</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>__WRAPPER_DIR__/symeraseme-rescan.sh</string>
-    </array>
-    <key>StartCalendarInterval</key>
-    <array>
-{chr(10).join(quarter_dates)}
-    </array>
-    <key>StandardOutPath</key>
-    <string>/tmp/com.symeraseme.rescan.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/com.symeraseme.rescan.err</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>SYMERASEME_HEADLESS</key>
-        <string>1</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <false/>
-    <key>KeepAlive</key>
-    <false/>
-</dict>
-</plist>"""
-
-    # ── Install / uninstall helpers ──
-    install_script = """#!/usr/bin/env bash
+def _launchd_install_script() -> str:
+    return """#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -462,9 +380,10 @@ echo ""
 echo "launchd jobs installed. Wrappers in: $SCRIPT_DIR"
 echo "Logs: /tmp/com.symeraseme.*.log"
 """
-    out["install.sh"] = install_script
 
-    uninstall_script = """#!/usr/bin/env bash
+
+def _launchd_uninstall_script() -> str:
+    return """#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -481,8 +400,62 @@ for plist in "$SCRIPT_DIR"/*.plist; do
 done
 echo "launchd jobs uninstalled."
 """
-    out["uninstall.sh"] = uninstall_script
 
+
+def generate_launchd(
+    config: SchedulerConfig,
+    project_dir: str = "",
+) -> dict[str, str]:
+    """Generate launchd .plist files and wrapper scripts."""
+    bin_path = config.symeraseme_bin or _resolve_bin()
+    venv = config.venv_activate or _resolve_venv()
+    out: dict[str, str] = {}
+
+    # ── tick (daily) ──
+    out["symeraseme-tick.sh"] = _wrapper_script(
+        f"{bin_path} tick --output json",
+        project_dir=project_dir,
+        venv_activate=venv,
+    )
+    out["com.symeraseme.tick.plist"] = _plist_content(
+        label="com.symeraseme.tick",
+        wrapper_path="__WRAPPER_DIR__/symeraseme-tick.sh",
+        schedule_interval=_plist_calendar(config.tick_time.hour, config.tick_time.minute),
+    )
+
+    # ── poll-inbox (multiple times daily) ──
+    out["symeraseme-poll.sh"] = _wrapper_script(
+        f"{bin_path} poll-inbox --output json",
+        project_dir=project_dir,
+        venv_activate=venv,
+    )
+    poll_entries = "\n".join(
+        _plist_calendar(t.hour, t.minute) for t in config.poll_times
+    )
+    out["com.symeraseme.poll.plist"] = _plist_content(
+        label="com.symeraseme.poll",
+        wrapper_path="__WRAPPER_DIR__/symeraseme-poll.sh",
+        schedule_interval=poll_entries,
+        wrap_array=True,
+    )
+
+    # ── re-scan (quarterly) ──
+    out["symeraseme-rescan.sh"] = _wrapper_script(
+        f"{bin_path} tick --output json",
+        project_dir=project_dir,
+        venv_activate=venv,
+    )
+    out["com.symeraseme.rescan.plist"] = _plist_content(
+        label="com.symeraseme.rescan",
+        wrapper_path="__WRAPPER_DIR__/symeraseme-rescan.sh",
+        schedule_interval=_launchd_quarter_dates(
+            config.tick_time.hour, config.tick_time.minute
+        ),
+        wrap_array=True,
+    )
+
+    out["install.sh"] = _launchd_install_script()
+    out["uninstall.sh"] = _launchd_uninstall_script()
     return out
 
 
