@@ -86,9 +86,11 @@ def main(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug-level logging"),
 ) -> None:
     logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.WARNING,
+        level=logging.WARNING,
         format="%(levelname)s:%(name)s:%(message)s",
     )
+    if verbose:
+        logging.getLogger("symeraseme").setLevel(logging.DEBUG)
     ctx.ensure_object(dict)
     ctx.obj["output"] = output
 

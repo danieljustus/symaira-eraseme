@@ -24,30 +24,48 @@ jobs:
       - name: Check broker website URLs
         run: |
           uv run python -c "
-          import urllib.request, yaml, sys
-          from urllib.error import HTTPError, URLError
+          import sys, time
+          from concurrent.futures import ThreadPoolExecutor, as_completed
           from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
 
-          errors = []
+          import yaml
+
+          urls = []
           for yml in sorted(Path('registry/brokers').rglob('*.yaml')):
               with open(yml) as f:
                   data = yaml.safe_load(f)
               url = data.get('website', '')
               name = data.get('name', yml.stem)
+              urls.append((name, url))
+
+          errors: list[str] = []
+          checked = 0
+
+          def check(name: str, url: str) -> tuple[str, str, str]:
               try:
-                  req = urllib.request.Request(url, method='HEAD')
+                  req = Request(url, method='HEAD')
                   req.add_header('User-Agent', 'Symaira EraseMe-LinkCheck/0.1')
-                  urllib.request.urlopen(req, timeout=10)
-                  print(f'  ✓ {name} — {url}')
+                  urlopen(req, timeout=10)
+                  return (name, 'ok', f'  \u2713 {name} \u2014 {url}')
               except HTTPError as e:
                   if e.code == 403:
-                      print(f'  ~ {name} — {url} (HTTP {e.code}, skipping)')
-                  else:
-                      errors.append(f'{name}: HTTP {e.code} — {url}')
-                      print(f'  ✗ {name} — {url} (HTTP {e.code})')
+                      return (name, 'skip', f'  ~ {name} \u2014 {url} (HTTP {e.code}, skipping)')
+                  return (name, 'err', f'{name}: HTTP {e.code} \u2014 {url}')
               except (URLError, ValueError, OSError) as e:
-                  errors.append(f'{name}: {e} — {url}')
-                  print(f'  ✗ {name} — {url} ({e})')
+                  return (name, 'err', f'{name}: {e} \u2014 {url}')
+
+          with ThreadPoolExecutor(max_workers=30) as executor:
+              futures = {executor.submit(check, n, u): n for n, u in urls}
+              for future in as_completed(futures):
+                  name, status, msg = future.result()
+                  checked += 1
+                  print(msg)
+                  if status == 'err':
+                      errors.append(msg)
+                  if checked % 50 == 0:
+                      time.sleep(0.2)
 
           if errors:
               print(f'\n{len(errors)} link(s) failed:')

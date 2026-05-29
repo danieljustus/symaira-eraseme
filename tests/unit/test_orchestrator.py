@@ -14,6 +14,7 @@ from symeraseme.core.db import close_connection, init_db
 from symeraseme.core.events import list_removal_requests
 from symeraseme.core.orchestrator import (
     execute_campaign,
+    execute_campaign_async,
     execute_request,
     get_plan,
     plan_campaign,
@@ -38,8 +39,6 @@ def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
 @pytest.fixture()
 def _fake_profile(monkeypatch):
     """Provide a mock identity profile for execute tests."""
-    from unittest.mock import MagicMock
-
     from symeraseme.registry.schema import IdentityProfile
 
     profile = IdentityProfile(
@@ -217,8 +216,6 @@ class TestExecuteCampaign:
         if not web_form_requests:
             pytest.skip("No web-form requests in campaign")
 
-        import asyncio
-
         async def mock_run_form(**kwargs):
             return type(
                 "Result",
@@ -244,6 +241,136 @@ class TestExecuteCampaign:
 
         result = execute_request(web_form_requests[0]["id"])
         assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_async_batch_renders_profile_data(self, _fake_profile, monkeypatch):
+        """Regression test: execute_campaign_async must pass profile to render_template."""
+        plan_campaign(campaign_id="async-profile", max_brokers=5)
+        requests = list_removal_requests(campaign_id="async-profile")
+        email_requests = [r for r in requests if r.get("channel") == "email"]
+        if not email_requests:
+            pytest.skip("No email requests in campaign")
+
+        sent_messages: list[tuple[str, str]] = []
+
+        async def mock_send_batch(messages, **kwargs):
+            for msg in messages:
+                sent_messages.append((msg.to, msg.body))
+            return [{"to": to, "success": True} for to, _ in sent_messages]
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.send_messages_batch",
+            mock_send_batch,
+        )
+
+        from symeraseme.adapters.email.himalaya import SmtpConfig
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.load_smtp_config",
+            lambda: SmtpConfig(
+                host="localhost",
+                port=1025,
+                username="",
+                password="",
+                use_tls=False,
+                from_addr="test@example.com",
+            ),
+        )
+
+        monkeypatch.setattr(
+            "symeraseme.core.orchestrator.list_removal_requests",
+            lambda campaign_id=None, status=None: email_requests,
+        )
+
+        result = await execute_campaign_async("async-profile", batch_size=5)
+        assert result["total_planned"] >= 1
+        assert result["batch_size"] >= 1
+        assert len(sent_messages) >= 1
+
+        profile = _fake_profile
+        for to_addr, body in sent_messages:
+            assert profile.full_name in body, (
+                f"Rendered email to {to_addr} does not contain user's full name "
+                f"({profile.full_name!r}). Body: {body[:200]!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_async_batch_duplicate_endpoint(self, monkeypatch):
+        """Regression test: duplicate endpoints must not overwrite request_map entries."""
+        from symeraseme.core.events import (
+            append_event,
+            create_campaign,
+            create_removal_request,
+            get_events,
+        )
+        from symeraseme.core.projection import rebuild_all_states
+
+        create_campaign("dup-endpoint")
+        rid1 = create_removal_request(
+            broker_id="broker-a", campaign_id="dup-endpoint", jurisdiction="GDPR"
+        )
+        rid2 = create_removal_request(
+            broker_id="broker-b", campaign_id="dup-endpoint", jurisdiction="GDPR"
+        )
+
+        # Both requests share the same endpoint — the situation that
+        # would previously cause request_map[addr] = rid2 to overwrite
+        # the entry for rid1.
+        shared_endpoint = "shared@broker.example"
+        append_event(rid1, "PLANNED", payload={"endpoint": shared_endpoint, "template": "t1"})
+        append_event(rid2, "PLANNED", payload={"endpoint": shared_endpoint, "template": "t2"})
+        rebuild_all_states()
+
+        async def mock_send_batch(messages, **_kw):
+            return [
+                {"to": shared_endpoint, "success": True},
+                {"to": shared_endpoint, "success": True},
+            ]
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.send_messages_batch",
+            mock_send_batch,
+        )
+        from symeraseme.adapters.email.himalaya import SmtpConfig
+
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.load_smtp_config",
+            lambda: SmtpConfig(
+                host="localhost",
+                port=1025,
+                username="",
+                password="",
+                use_tls=False,
+                from_addr="test@example.com",
+            ),
+        )
+
+        # Mock render_template so the batch loop doesn't fail on missing templates.
+        monkeypatch.setattr(
+            "symeraseme.core.templating.render_template",
+            lambda template_id, broker_name="", profile=None: f"Body for {broker_name}",
+        )
+
+        from symeraseme.registry.schema import IdentityProfile
+
+        monkeypatch.setattr(
+            "symeraseme.core.orchestrator.load_profile",
+            lambda: IdentityProfile(
+                full_name="Test User",
+                email_addresses=["t@t.com"],
+            ),
+        )
+
+        result = await execute_campaign_async("dup-endpoint", batch_size=5)
+        assert result["batch_size"] == 2
+
+        events1 = get_events(rid1)
+        sent1 = [e for e in events1 if e["event_type"] == "SENT"]
+        assert len(sent1) == 1, f"rid1 should have exactly one SENT event, got {len(sent1)}"
+
+        events2 = get_events(rid2)
+        sent2 = [e for e in events2 if e["event_type"] == "SENT"]
+        assert len(sent2) == 1, f"rid2 should have exactly one SENT event, got {len(sent2)}"
 
 
 class TestHandleExecuteRouting:

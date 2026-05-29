@@ -20,6 +20,27 @@ _PHONE_PATTERN = re.compile(r"(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4
 
 _SSN_PATTERN = re.compile(r"\b(?!000|666|9\d{2})\d{3}[- ]?(?!00)\d{2}[- ]?(?!0000)\d{4}\b")
 
+# EU PII patterns — extend beyond US-centric coverage for GDPR-focused tooling.
+# IBAN: ISO 13616 format (country code + check digits + up to 30 alphanumeric chars).
+_IBAN_PATTERN = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b")
+
+# German Personalausweis (national ID): one letter (A–L), 8 digits, optional letter.
+_DE_ID_PATTERN = re.compile(r"\b[A-L]\d{8}[A-Z]?\b")
+
+# French NIR (numéro de sécurité sociale): 13 digits with embedded birth metadata.
+_FR_ID_PATTERN = re.compile(r"\b[12]\d{2}(0[1-9]|1[0-2])\d{5}\d{3}(\d{2})?\b")
+
+# Spanish DNI: 8 digits followed by a checksum letter (I, Ñ, O, U excluded).
+_ES_ID_PATTERN = re.compile(r"\b\d{8}[A-HJ-NP-TV-Z]\b")
+
+# Passport numbers: 6–9 uppercase alphanumeric chars with word boundaries.
+# Preceded by a hint keyword to reduce false positives in free text.
+_PASSPORT_PATTERN = re.compile(
+    r"(?:passport|travel\s*document|reisedokument)\s*(?:#|no|num|number)?\s*[:.]?\s*"
+    r"([A-Z0-9]{6,9})\b",
+    re.IGNORECASE,
+)
+
 
 def _scrub_email(match: re.Match) -> str:
     local, domain = match.group(0).split("@", 1)
@@ -46,10 +67,37 @@ def _scrub_ssn(match: re.Match) -> str:
     return "***-**-****"
 
 
+def _scrub_iban(match: re.Match) -> str:
+    raw = match.group(0)
+    return raw[:2] + "**" + "*" * max(0, len(raw) - 4) + raw[-4:]
+
+
+def _scrub_de_id(match: re.Match) -> str:
+    return "*******" + match.group(0)[-2:]
+
+
+def _scrub_fr_id(match: re.Match) -> str:
+    return "***" + match.group(0)[-3:]
+
+
+def _scrub_es_id(match: re.Match) -> str:
+    return "****-****-" + match.group(0)[-1]
+
+
+def _scrub_passport(match: re.Match) -> str:
+    pn = match.group(1)
+    return match.group(0).replace(pn, "*" * max(3, len(pn) - 2) + pn[-2:])
+
+
 _SCRUBBERS: list[tuple[re.Pattern, Callable]] = [
+    (_IBAN_PATTERN, _scrub_iban),
+    (_DE_ID_PATTERN, _scrub_de_id),
+    (_FR_ID_PATTERN, _scrub_fr_id),
+    (_ES_ID_PATTERN, _scrub_es_id),
+    (_PASSPORT_PATTERN, _scrub_passport),
+    (_SSN_PATTERN, _scrub_ssn),
     (_EMAIL_PATTERN, _scrub_email),
     (_PHONE_PATTERN, _scrub_phone),
-    (_SSN_PATTERN, _scrub_ssn),
 ]
 
 
