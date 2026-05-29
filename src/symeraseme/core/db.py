@@ -22,6 +22,7 @@ import hashlib
 import logging
 import os
 import platform
+import secrets
 import signal
 import sqlite3
 import tempfile
@@ -38,7 +39,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_DB_DIR = "~/.local/share/symeraseme"
 DEFAULT_DB_NAME = "symeraseme.db"
 
-_ENC_HEADER = b"SYMERASEME_ENCv1\n"
+_ENC_HEADER_V1 = b"SYMERASEME_ENCv1\n"
+_ENC_MAGIC_V2 = b"SYMERASEME_ENCv2\n"
+_ENC_SALT_LEN = 16
+_PBKDF2_ITERATIONS = 600_000
+_PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
 _STALE_SCAVENGE_AGE = 86400
@@ -86,7 +91,7 @@ def _db_encryption_enabled() -> bool:
     return val in ("1", "true", "yes")
 
 
-def _get_db_fernet_key() -> bytes | None:
+def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
     try:
         from symeraseme.core.identity import _get_existing_master_key
 
@@ -98,8 +103,8 @@ def _get_db_fernet_key() -> bytes | None:
     derived = hashlib.pbkdf2_hmac(
         "sha256",
         master_key,
-        b"symeraseme-db-encryption-v1",
-        100_000,
+        salt if salt else _PBKDF2_FIXED_SALT,
+        _PBKDF2_ITERATIONS,
     )
     return urlsafe_b64encode(derived)
 
@@ -107,13 +112,23 @@ def _get_db_fernet_key() -> bytes | None:
 def _is_encrypted(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
-    return path.read_bytes()[: len(_ENC_HEADER)] == _ENC_HEADER
+    head = path.read_bytes()[: max(len(_ENC_HEADER_V1), len(_ENC_MAGIC_V2) + _ENC_SALT_LEN)]
+    return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2)
 
 
 def _decrypt_to_temp(path: Path) -> Path:
     raw = path.read_bytes()
-    encrypted_data = raw[len(_ENC_HEADER) :]
-    fernet_key = _get_db_fernet_key()
+    if raw.startswith(_ENC_HEADER_V1):
+        header_len = len(_ENC_HEADER_V1)
+        salt = None
+    elif raw.startswith(_ENC_MAGIC_V2):
+        header_len = len(_ENC_MAGIC_V2) + _ENC_SALT_LEN
+        salt = raw[len(_ENC_MAGIC_V2) : header_len]
+    else:
+        msg = f"Unrecognized encryption header in {path}"
+        raise RuntimeError(msg)
+    encrypted_data = raw[header_len:]
+    fernet_key = _get_db_fernet_key(salt=salt)
     if fernet_key is None:
         msg = (
             f"Cannot decrypt DB {path} \u2014 identity master key is not available. "
@@ -135,13 +150,14 @@ def _decrypt_to_temp(path: Path) -> Path:
 
 
 def _encrypt_file(source: Path, target: Path) -> None:
-    fernet_key = _get_db_fernet_key()
+    salt = secrets.token_bytes(_ENC_SALT_LEN)
+    fernet_key = _get_db_fernet_key(salt=salt)
     if fernet_key is None:
         logger.warning("Cannot encrypt DB \u2014 identity master key is not available.")
         return
     f = Fernet(fernet_key)
     encrypted = f.encrypt(source.read_bytes())
-    target.write_bytes(_ENC_HEADER + encrypted)
+    target.write_bytes(_ENC_MAGIC_V2 + salt + encrypted)
 
 
 @atexit.register

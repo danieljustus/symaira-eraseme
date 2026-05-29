@@ -99,27 +99,6 @@ def handle_validate(
         lines.append("")
         lines.append("OK — registry is valid.")
 
-    lines = [
-        f"Registry: {brokers_dir}",
-        f"  Checked: {summary['totals']['checked']}",
-        f"  Valid:   {summary['totals']['valid']}",
-        f"  Failed:  {summary['totals']['failed']}",
-        f"  Duplicate ids: {summary['totals']['duplicate_ids']}",
-    ]
-    if failed_files:
-        lines.append("")
-        lines.append("Failures:")
-        for fail in failed_files:
-            lines.append(f"  {fail['file']}  [{fail['stage']}]  {fail['error']}")
-    if duplicate_ids:
-        lines.append("")
-        lines.append("Duplicate broker ids:")
-        for d in duplicate_ids:
-            lines.append(f"  {d['id']}: {d['file']} (first seen in {d['first_seen_in']})")
-    if ok:
-        lines.append("")
-        lines.append("OK — registry is valid.")
-
     summary["ok"] = ok
     summary["message"] = "\n".join(lines)
     return CliResult(

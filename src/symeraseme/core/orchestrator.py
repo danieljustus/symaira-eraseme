@@ -138,9 +138,21 @@ def execute_request(
 
     if channel_type == "web_form":
         if web_form_runner is None:
-            from symeraseme.services.web_form import run_web_form_for_broker
-
-            web_form_runner = run_web_form_for_broker
+            if dry_run:
+                # Dry-run without a runner: return a mock result so the
+                # campaign flow can still be exercised end-to-end.
+                return {
+                    "success": True,
+                    "request_id": request_id,
+                    "dry_run": True,
+                    "url": "",
+                    "body": f"[dry-run web form for {broker_name}]",
+                }
+            msg = (
+                "web_form_runner is required for web_form requests. "
+                "Pass a concrete WebFormRunner to execute_request()."
+            )
+            raise ValueError(msg)
 
         result = web_form_runner(
             broker_name,

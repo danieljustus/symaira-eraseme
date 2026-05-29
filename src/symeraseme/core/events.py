@@ -183,32 +183,46 @@ def list_removal_requests(
     campaign_id: str | None = None,
     status: str | None = None,
     broker_id: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> list[dict[str, Any]]:
     """List removal requests with optional filters.
 
     WARNING: The WHERE clause MUST remain a fixed string — never use
     f-strings or string concatenation to build SQL. Filtering is handled
     via ``(? IS NULL OR col = ?)`` so the query text never changes.
+
+    Args:
+        limit: Max rows to return (None = unlimited).
+        offset: Row offset for pagination (requires limit).
     """
     conn = get_connection()
-    rows = conn.execute(
-        """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                  r.jurisdiction, r.template_id, r.identity_snapshot_hash,
-                  s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
-                  s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
-           FROM removal_requests r
-           LEFT JOIN request_state s ON s.request_id = r.id
-           WHERE (? IS NULL OR r.campaign_id = ?)
-             AND (? IS NULL OR s.current_status = ?)
-             AND (? IS NULL OR r.broker_id = ?)
-           ORDER BY r.created_at ASC""",
-        (
-            campaign_id or None,
-            campaign_id or None,
-            status or None,
-            status or None,
-            broker_id or None,
-            broker_id or None,
-        ),
-    ).fetchall()
+    query = """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
+              r.jurisdiction, r.template_id, r.identity_snapshot_hash,
+              s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
+              s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
+       FROM removal_requests r
+       LEFT JOIN request_state s ON s.request_id = r.id
+       WHERE (? IS NULL OR r.campaign_id = ?)
+         AND (? IS NULL OR s.current_status = ?)
+         AND (? IS NULL OR r.broker_id = ?)
+       ORDER BY r.created_at ASC"""
+    params: list = [
+        campaign_id or None,
+        campaign_id or None,
+        status or None,
+        status or None,
+        broker_id or None,
+        broker_id or None,
+    ]
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+        if offset is not None:
+            query += " OFFSET ?"
+            params.append(offset)
+    elif offset is not None:
+        query += " LIMIT -1 OFFSET ?"
+        params.append(offset)
+    rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]

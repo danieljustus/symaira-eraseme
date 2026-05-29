@@ -87,7 +87,8 @@ def extract_confirmation_links(
         seen.add(url)
         try:
             parsed = urlparse(url)
-        except Exception:
+        except ValueError:
+            logger.debug("Failed to parse URL: %s", url)
             continue
         domain = parsed.netloc.lower()
         if domain.startswith("www."):
@@ -120,8 +121,8 @@ async def auto_confirm(
         try:
             broker_domain = from_addr.split("@")[-1]
             allowed_domains = KNOWN_BROKER_DOMAINS | {broker_domain}
-        except Exception:
-            pass
+        except (ValueError, IndexError):
+            logger.debug("Failed to extract domain from %s", from_addr)
 
     links = extract_confirmation_links(reply_body, allowed_domains=allowed_domains)
     if not links:
@@ -207,6 +208,7 @@ async def auto_confirm(
                         result.step = f"clicked_{selector}"
                         break
                 except Exception:
+                    logger.debug("Selector %s not found or not clickable", selector)
                     continue
 
             if not clicked:
@@ -217,7 +219,7 @@ async def auto_confirm(
                         clicked = True
                         result.step = "clicked_fallback_link"
                 except Exception:
-                    pass
+                    logger.debug("Fallback link click failed")
 
             if not clicked:
                 result.error = "No clickable confirmation element found"

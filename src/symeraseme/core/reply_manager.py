@@ -228,7 +228,8 @@ def draft_reply(
 
     try:
         identity_profile = load_profile() if profile_exists() else None
-    except Exception:
+    except (FileNotFoundError, OSError, ValueError):
+        logger.warning("Failed to load identity profile, proceeding without it")
         identity_profile = None
 
     try:
@@ -239,9 +240,9 @@ def draft_reply(
             broker_website=broker_website,
             extra_vars=rebuttal_context,
         )
-    except Exception:
+    except (FileNotFoundError, OSError, ValueError, LookupError):
         logger.warning(
-            "Template %s not found in registry/laws/, using fallback",
+            "Template %s not found or renderable, using fallback",
             template_name,
         )
         user_name = identity_profile.full_name if identity_profile else "Your Name"

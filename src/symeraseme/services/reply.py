@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
@@ -11,6 +12,8 @@ from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.orchestrator import submit_inbox_reply
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_broker
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_llm_consent(yes: bool = False) -> None:
@@ -70,6 +73,7 @@ def handle_classify_reply(
     try:
         broker = load_broker(broker_id)
     except Exception:
+        logger.warning("Failed to load broker %s", broker_id)
         broker = None
 
     broker_name = broker.name if broker else broker_id
@@ -203,6 +207,7 @@ def handle_generate_rebuttal(
     try:
         broker = load_broker(broker_id)
     except Exception:
+        logger.warning("Failed to load broker %s", broker_id)
         broker = None
 
     broker_name = broker.name if broker else broker_id

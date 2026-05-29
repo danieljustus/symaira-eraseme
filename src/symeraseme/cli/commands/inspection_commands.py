@@ -64,11 +64,23 @@ def requests_list(
         "--broker",
         help="Filter by broker ID",
     ),
+    page: int = typer.Option(
+        None,
+        "--page",
+        help="Page number (1-based, requires --page-size, default 250)",
+    ),
+    page_size: int = typer.Option(
+        250,
+        "--page-size",
+        help="Number of results per page (default: 250)",
+    ),
 ) -> None:
     result = handle_requests_list(
         campaign_id,
         status,
         broker_id,
+        page,
+        page_size,
         ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)

@@ -46,8 +46,6 @@ class OllamaClient:
                 )
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             return False
-        except Exception:
-            return False
 
     def classify(
         self,

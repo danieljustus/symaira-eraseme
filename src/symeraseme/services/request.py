@@ -26,13 +26,19 @@ def handle_requests_list(
     campaign_id: str | None = None,
     status: str | None = None,
     broker_id: str | None = None,
+    page: int | None = None,
+    page_size: int = 250,
     output_format: str = "text",
 ) -> str:
     init_db()
+    limit = page_size if page is not None else None
+    offset = (page - 1) * page_size if page is not None else None
     requests = list_removal_requests(
         campaign_id=campaign_id,
         status=status,
         broker_id=broker_id,
+        limit=limit,
+        offset=offset,
     )
 
     if output_format == "json":
