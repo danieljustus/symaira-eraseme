@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
-
 import typer
 
 from symeraseme.adapters.web.captcha_solver import CaptchaError, create_solver
 from symeraseme.cli.console import render_error
+from symeraseme.core.result_types import CliResult
 
 
 def handle_solve_captcha(
@@ -14,23 +13,18 @@ def handle_solve_captcha(
     site_key: str | None = None,
     page_url: str | None = None,
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     if dry_run:
-        if output_format == "json":
-            return json.dumps(
-                {
-                    "provider": provider,
-                    "site_key": site_key,
-                    "page_url": page_url,
-                    "dry_run": True,
-                },
-                indent=2,
-            )
-        lines = [f"[DRY RUN] Would solve captcha via {provider}:"]
-        lines.append(f"  site_key: {site_key}")
-        lines.append(f"  page_url: {page_url}")
-        return "\n".join(lines)
+        return CliResult(
+            success=True,
+            data={
+                "provider": provider,
+                "site_key": site_key,
+                "page_url": page_url,
+                "dry_run": True,
+                "message": f"[DRY RUN] Would solve captcha via {provider}:\n  site_key: {site_key}\n  page_url: {page_url}",
+            },
+        )
 
     typer.echo(f"Solving captcha via {provider}...")
 
@@ -50,14 +44,12 @@ def handle_solve_captcha(
             "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var."
         )
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "provider": provider,
-                "task_id": result.task_id,
-                "token": result.token,
-            },
-            indent=2,
-        )
-
-    return f"Captcha solved (task: {result.task_id})\nToken: {result.token[:50]}..."
+    return CliResult(
+        success=True,
+        data={
+            "provider": provider,
+            "task_id": result.task_id,
+            "token": result.token,
+            "message": f"Captcha solved (task: {result.task_id})\nToken: {result.token[:50]}...",
+        },
+    )

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from symeraseme.adapters.email.smtp_imap import (
     IMAPError,
     match_reply_to_request,
@@ -10,6 +8,7 @@ from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
 from symeraseme.cli.console import render_error
+from symeraseme.core.result_types import CliResult
 from symeraseme.core.db import init_db
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
 from symeraseme.core.orchestrator import submit_inbox_reply
@@ -23,8 +22,7 @@ def handle_poll_inbox(
     ssl: bool,
     campaign_id: str | None,
     password: str,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     init_db()
 
     try:
@@ -72,16 +70,14 @@ def handle_poll_inbox(
     else:
         matched = []
 
-    if output_format == "json":
-        output = {
-            "total_fetched": len(messages),
-            "total_matched": sum(1 for m in matched if m.get("request_id") is not None),
-            "messages": matched,
-        }
-        return json.dumps(output, indent=2, default=str)
+    matched_count = sum(1 for m in matched if m.get("request_id") is not None)
+    result = {
+        "total_fetched": len(messages),
+        "total_matched": matched_count,
+        "messages": matched,
+    }
 
     lines = [f"Fetched {len(messages)} messages from inbox"]
-    matched_count = sum(1 for m in matched if m.get("request_id") is not None)
     lines.append(f"Matched to requests: {matched_count}")
     for m in matched:
         req_id = m.get("request_id", "unmatched")
@@ -90,4 +86,5 @@ def handle_poll_inbox(
     if not messages:
         lines.append("No new messages found.")
 
-    return "\n".join(lines)
+    result["message"] = "\n".join(lines)
+    return CliResult(success=True, data=result)

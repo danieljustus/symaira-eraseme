@@ -452,24 +452,12 @@ class TestHandleRunWebForm:
             lambda: False,
         )
 
-        result = await handle_run_web_form(
-            "test-broker",
-            output_format="json",
-        )
-        data = json.loads(result)
+        result = await handle_run_web_form("test-broker")
+        data = result.data
         assert data["success"] is False
         assert data["task_id"] is not None
         assert data["task_id"] > 0
         task_id = data["task_id"]
-
-        from typer import Exit
-
-        with pytest.raises(Exit) as exc_info:
-            await handle_run_web_form(
-                "test-broker",
-                output_format="text",
-            )
-        assert exc_info.value.exit_code == 1
 
         from symeraseme.core.manual_fallback import get_manual_task
 

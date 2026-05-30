@@ -54,7 +54,6 @@ def poll_inbox(
             ssl,
             campaign_id,
             password,
-            ctx.obj["output"],
         )
     render_result(ctx.obj["output"], result)
 
@@ -91,7 +90,6 @@ def classify_reply(
             provider,
             model,
             save,
-            ctx.obj["output"],
         )
     render_result(ctx.obj["output"], result)
 
@@ -128,7 +126,6 @@ def generate_rebuttal_cmd(
             provider,
             model,
             save,
-            ctx.obj["output"],
         )
     render_result(ctx.obj["output"], result)
 
@@ -155,7 +152,6 @@ def generate_dashboard_cmd(
         output,
         auto_open,
         auto_refresh,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -188,7 +184,6 @@ def generate_report_cmd(
         format,
         output,
         all_campaigns,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 

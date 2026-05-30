@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime
 
 from symeraseme.cli.console import render_error
+from symeraseme.core.result_types import CliResult
 from symeraseme.core.consent import (
     consume_token,
     issue_token,
@@ -22,15 +22,11 @@ def handle_grant(
     revoke_all: bool = False,
     list_tokens: bool = False,
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     if list_tokens:
         tokens = _list_tokens()
         if not tokens:
-            return "No active tokens."
-
-        if output_format == "json":
-            return json.dumps(tokens, indent=2, default=str)
+            return CliResult(success=True, data={"tokens": [], "message": "No active tokens."})
 
         lines = []
         for t in tokens:
@@ -38,84 +34,86 @@ def handle_grant(
                 f"  {t['token']}  cmd={t['command']}  "
                 f"expires={datetime.fromtimestamp(t['expires_at']).isoformat()}"
             )
-        return "\n".join(lines)
+        return CliResult(
+            success=True,
+            data={"tokens": tokens, "message": "\n".join(lines)},
+        )
 
     if revoke:
         if dry_run:
-            if output_format == "json":
-                return json.dumps(
-                    {"revoke": revoke, "dry_run": True},
-                    indent=2,
-                )
-            return f"[DRY RUN] Would revoke token: {revoke}"
+            return CliResult(
+                success=True,
+                data={"revoke": revoke, "dry_run": True, "message": f"[DRY RUN] Would revoke token: {revoke}"},
+            )
         if revoke_token(revoke):
-            return f"Token revoked: {revoke}"
+            return CliResult(
+                success=True,
+                data={"revoke": revoke, "message": f"Token revoked: {revoke}"},
+            )
         render_error(
             f"Token not found: {revoke}. Run 'symeraseme grant --list' to see active tokens."
         )
 
     if revoke_all:
-        if dry_run:
-            tokens = _list_tokens()
-            if output_format == "json":
-                return json.dumps(
-                    {
-                        "revoke_all": True,
-                        "token_count": len(tokens),
-                        "dry_run": True,
-                    },
-                    indent=2,
-                )
-            return f"[DRY RUN] Would revoke {len(tokens)} token(s)."
         tokens = _list_tokens()
+        if dry_run:
+            return CliResult(
+                success=True,
+                data={
+                    "revoke_all": True,
+                    "token_count": len(tokens),
+                    "dry_run": True,
+                    "message": f"[DRY RUN] Would revoke {len(tokens)} token(s).",
+                },
+            )
         if not tokens:
-            return "No active tokens to revoke."
+            return CliResult(
+                success=True,
+                data={"revoke_all": True, "message": "No active tokens to revoke."},
+            )
         for t in tokens:
             consume_token(t["token"])
-        return f"Revoked {len(tokens)} token(s)."
+        return CliResult(
+            success=True,
+            data={"revoke_all": True, "revoked_count": len(tokens), "message": f"Revoked {len(tokens)} token(s)."},
+        )
 
     if dry_run:
         expires_at = int(time.time()) + ttl
-        if output_format == "json":
-            return json.dumps(
-                {
-                    "command": command,
-                    "ttl": ttl,
-                    "expires_at": expires_at,
-                    "dry_run": True,
-                },
-                indent=2,
-            )
+        result = {
+            "command": command,
+            "ttl": ttl,
+            "expires_at": expires_at,
+            "dry_run": True,
+        }
         lines = [
             "[DRY RUN] Would issue consent token:",
             f"  Command: {command}",
             f"  TTL: {ttl}s",
             f"  Expires: {datetime.fromtimestamp(expires_at).isoformat()}",
             "",
-            f"Use: SYMERASEME_CONSENT=\u003ctoken\u003e symeraseme {command} ...",
+            f"Use: SYMERASEME_CONSENT=<token> symeraseme {command} ...",
         ]
-        return "\n".join(lines)
+        result["message"] = "\n".join(lines)
+        return CliResult(success=True, data=result)
 
     token = issue_token(command, ttl=ttl)
+    expires_at = int(time.time()) + ttl
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "token": token,
-                "command": command,
-                "ttl": ttl,
-                "expires_at": int(time.time()) + ttl,
-            },
-            indent=2,
-        )
-
+    result = {
+        "token": token,
+        "command": command,
+        "ttl": ttl,
+        "expires_at": expires_at,
+    }
     lines = [
         f"Consent token: {token}",
         f"  Command: {command}",
         f"  TTL: {ttl}s",
-        f"  Expires: {datetime.fromtimestamp(int(time.time()) + ttl).isoformat()}",
+        f"  Expires: {datetime.fromtimestamp(expires_at).isoformat()}",
         "",
         f"Use: SYMERASEME_CONSENT={token} symeraseme {command} ...",
         f"Or:  symeraseme {command} ... --consent {token}",
     ]
-    return "\n".join(lines)
+    result["message"] = "\n".join(lines)
+    return CliResult(success=True, data=result)

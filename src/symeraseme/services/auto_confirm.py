@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 
 import typer
 
 from symeraseme.adapters.web.confirmation_clicker import auto_confirm
 from symeraseme.cli.console import render_error
+from symeraseme.core.result_types import CliResult
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.projection import append_event_and_project
@@ -17,8 +17,7 @@ def handle_auto_confirm(
     headed: bool = False,
     screenshot_dir: str = "",
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     init_db()
 
     req = get_removal_request(request_id)
@@ -88,24 +87,20 @@ def handle_auto_confirm(
             source="system",
         )
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "request_id": request_id,
-                "success": result.success,
-                "step": result.step,
-                "clicked_url": result.clicked_url,
-                "error": result.error,
-                "dry_run": result.dry_run,
-                "screenshot_before": result.screenshot_before,
-                "screenshot_after": result.screenshot_after,
-            },
-            indent=2,
-            default=str,
-        )
+    data = {
+        "request_id": request_id,
+        "success": result.success,
+        "step": result.step,
+        "clicked_url": result.clicked_url,
+        "error": result.error,
+        "dry_run": result.dry_run,
+        "screenshot_before": result.screenshot_before,
+        "screenshot_after": result.screenshot_after,
+    }
 
     if result.dry_run:
-        return f"[DRY RUN] Would click: {result.clicked_url}"
+        data["message"] = f"[DRY RUN] Would click: {result.clicked_url}"
+        return CliResult(success=True, data=data)
 
     if result.success:
         lines = [f"Confirmation link clicked: {result.clicked_url}"]
@@ -114,7 +109,8 @@ def handle_auto_confirm(
             lines.append(f"  Screenshot before: {result.screenshot_before}")
         if result.screenshot_after:
             lines.append(f"  Screenshot after: {result.screenshot_after}")
-        return "\n".join(lines)
+        data["message"] = "\n".join(lines)
+        return CliResult(success=True, data=data)
 
     msg = (
         f"Auto-confirm failed: {result.error}. "
@@ -122,4 +118,5 @@ def handle_auto_confirm(
     )
     if result.clicked_url:
         msg += f"\n  URL: {result.clicked_url}"
-    render_error(msg)
+    data["message"] = msg
+    return CliResult(success=False, data=data, error=msg)

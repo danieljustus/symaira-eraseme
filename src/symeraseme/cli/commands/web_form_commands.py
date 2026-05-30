@@ -55,7 +55,6 @@ def run_web_form(
                 headed,
                 screenshot_dir,
                 dry_run,
-                ctx.obj["output"],
             )
         )
     render_result(ctx.obj["output"], result)
@@ -88,7 +87,6 @@ def auto_confirm_cmd(
         headed,
         screenshot_dir,
         dry_run,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -130,7 +128,6 @@ def solve_captcha_cmd(
         site_key,
         page_url,
         dry_run,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -152,7 +149,6 @@ def manual_tasks_list(
     result = handle_manual_tasks_list(
         status,
         request_id,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -162,7 +158,7 @@ def manual_tasks_show(
     ctx: typer.Context,
     task_id: int = typer.Argument(..., help="Task ID to show"),
 ) -> None:
-    result = handle_manual_tasks_show(task_id, ctx.obj["output"])
+    result = handle_manual_tasks_show(task_id)
     render_result(ctx.obj["output"], result)
 
 
@@ -182,7 +178,6 @@ def manual_tasks_complete(
     result = handle_manual_tasks_complete(
         task_id,
         notes,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -198,6 +193,5 @@ def manual_tasks_cleanup(
 ) -> None:
     result = handle_manual_tasks_cleanup(
         dry_run,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
