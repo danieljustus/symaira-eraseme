@@ -56,7 +56,6 @@ def create(
         law,
         priority,
         max_brokers,
-        ctx.obj["output"],
     )
     from symeraseme.cli.console import render_result
 
@@ -69,7 +68,7 @@ def plan_show(
     campaign_id: str = typer.Option(None, "--campaign", help="Filter by campaign"),
     status: str = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
-    result = handle_plan_show(campaign_id, status, ctx.obj["output"])
+    result = handle_plan_show(campaign_id, status)
     from symeraseme.cli.console import render_result
 
     render_result(ctx.obj["output"], result)
@@ -133,7 +132,6 @@ def execute(
             yes,
             consent_token,
             consent_file,
-            ctx.obj["output"],
             backend=backend,
         )
     render_result(ctx.obj["output"], result)

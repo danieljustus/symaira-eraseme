@@ -8,14 +8,13 @@ from typing import Any
 import jsonschema
 import yaml
 
-from symeraseme.cli.types import CliResult
+from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import _registry_dir, broker_schema
 from symeraseme.registry.schema import Broker
 
 
 def handle_validate(
     registry_dir: str | None = None,
-    output_format: str = "text",
 ) -> CliResult:
     """Validate every broker YAML against the JSON Schema and the Pydantic model.
 

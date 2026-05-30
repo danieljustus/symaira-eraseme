@@ -16,7 +16,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from symeraseme.cli.types import CliResult
+from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import _registry_dir
 
 
@@ -133,7 +133,6 @@ def sync_registry(verify_signatures: bool = False) -> dict[str, Any]:
 
 def handle_registry_sync(
     verify_signatures: bool = False,
-    output_format: str = "text",
 ) -> CliResult:
     """CLI handler around :func:`sync_registry`. Invalidates the broker cache
     on success so subsequent CLI calls see the new data without restart.

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import json
 import logging
 
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
+from symeraseme.cli.console import render_error
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.orchestrator import submit_inbox_reply
 from symeraseme.core.projection import append_event_and_project
+from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,6 @@ def _ensure_llm_consent(yes: bool = False) -> None:
         grant_llm_consent()
         return
     import typer
-
-    from symeraseme.cli.console import render_error
 
     typer.echo(
         "WARNING: LLM operations may send PII (email addresses, phone numbers, SSNs) "
@@ -44,11 +43,8 @@ def handle_classify_reply(
     provider: str | None = None,
     model: str | None = None,
     save: bool = True,
-    output_format: str = "text",
     yes: bool = False,
-) -> str:
-    from symeraseme.cli.console import render_error
-
+) -> CliResult:
     _ensure_llm_consent(yes=yes)
     init_db()
 
@@ -115,37 +111,34 @@ def handle_classify_reply(
         cache_key=f"broker:{broker_id}",
     )
 
-    if output_format == "json":
-        output = {
-            "request_id": request_id,
-            "reply_id": reply["id"],
-            "classification": result.label,
-            "event_type": result.event_type,
-            "confidence": result.confidence,
-            "summary": result.summary,
-            "needs_human_review": result.needs_human_review,
-            "extracted_fields": result.extracted_fields,
-        }
-        if result.usage_record:
-            output["usage"] = result.usage_record.record()
-        output_str = json.dumps(output, indent=2, default=str)
-    else:
-        lines = [f"Classification for request #{request_id}:"]
-        lines.append(f"  Label:      {result.label}")
-        lines.append(f"  Event:      {result.event_type}")
-        lines.append(f"  Confidence: {result.confidence:.2f}")
-        lines.append(f"  Summary:    {result.summary}")
-        if result.extracted_fields:
-            lines.append(f"  Extracted:  {result.extracted_fields}")
-        if result.needs_human_review:
-            lines.append("  *** Needs human review ***")
-        if result.usage_record:
-            usage = result.usage_record.record()
-            lines.append(
-                f"  Cost:       ${usage['cost']:.6f}"
-                f" ({usage['input_tokens']} in / {usage['output_tokens']} out)"
-            )
-        output_str = "\n".join(lines)
+    data = {
+        "request_id": request_id,
+        "reply_id": reply["id"],
+        "classification": result.label,
+        "event_type": result.event_type,
+        "confidence": result.confidence,
+        "summary": result.summary,
+        "needs_human_review": result.needs_human_review,
+        "extracted_fields": result.extracted_fields,
+    }
+    if result.usage_record:
+        data["usage"] = result.usage_record.record()
+
+    lines = [f"Classification for request #{request_id}:"]
+    lines.append(f"  Label:      {result.label}")
+    lines.append(f"  Event:      {result.event_type}")
+    lines.append(f"  Confidence: {result.confidence:.2f}")
+    lines.append(f"  Summary:    {result.summary}")
+    if result.extracted_fields:
+        lines.append(f"  Extracted:  {result.extracted_fields}")
+    if result.needs_human_review:
+        lines.append("  *** Needs human review ***")
+    if result.usage_record:
+        usage = result.usage_record.record()
+        lines.append(
+            f"  Cost:       ${usage['cost']:.6f}"
+            f" ({usage['input_tokens']} in / {usage['output_tokens']} out)"
+        )
 
     if save:
         submit_inbox_reply(
@@ -168,9 +161,10 @@ def handle_classify_reply(
             },
             source="system",
         )
-        output_str += "\nClassification saved to database."
+        lines.append("Classification saved to database.")
 
-    return output_str
+    data["message"] = "\n".join(lines)
+    return CliResult(success=True, data=data)
 
 
 def handle_generate_rebuttal(
@@ -178,11 +172,8 @@ def handle_generate_rebuttal(
     provider: str | None = None,
     model: str | None = None,
     save: bool = True,
-    output_format: str = "text",
     yes: bool = False,
-) -> str:
-    from symeraseme.cli.console import render_error
-
+) -> CliResult:
     _ensure_llm_consent(yes=yes)
     init_db()
 
@@ -238,38 +229,35 @@ def handle_generate_rebuttal(
         client=client,
     )
 
-    if output_format == "json":
-        output = {
-            "request_id": request_id,
-            "template_name": result.template_name,
-            "label": result.label,
-            "jurisdiction": result.jurisdiction,
-            "rejection_classification": result.rejection_classification,
-            "confidence": result.confidence,
-            "needs_human_review": result.needs_human_review,
-            "llm_used": result.llm_used,
-            "rebuttal_body": result.rebuttal_body,
-        }
-        if result.usage_record:
-            output["usage"] = result.usage_record.record()
-        output_str = json.dumps(output, indent=2)
-    else:
-        lines = [f"Rebuttal for request #{request_id}:"]
-        lines.append(f"  Template:   {result.label}")
-        lines.append(f"  Jurisdiction: {result.jurisdiction}")
-        lines.append(f"  Confidence: {result.confidence:.2f}")
-        lines.append(f"  LLM used:   {result.llm_used}")
-        if result.needs_human_review:
-            lines.append("  *** Needs human review ***")
-        if result.usage_record:
-            usage = result.usage_record.record()
-            lines.append(
-                f"  Cost:       ${usage['cost']:.6f}"
-                f" ({usage['input_tokens']} in / {usage['output_tokens']} out)"
-            )
-        lines.append("")
-        lines.append(result.rebuttal_body)
-        output_str = "\n".join(lines)
+    data = {
+        "request_id": request_id,
+        "template_name": result.template_name,
+        "label": result.label,
+        "jurisdiction": result.jurisdiction,
+        "rejection_classification": result.rejection_classification,
+        "confidence": result.confidence,
+        "needs_human_review": result.needs_human_review,
+        "llm_used": result.llm_used,
+        "rebuttal_body": result.rebuttal_body,
+    }
+    if result.usage_record:
+        data["usage"] = result.usage_record.record()
+
+    lines = [f"Rebuttal for request #{request_id}:"]
+    lines.append(f"  Template:   {result.label}")
+    lines.append(f"  Jurisdiction: {result.jurisdiction}")
+    lines.append(f"  Confidence: {result.confidence:.2f}")
+    lines.append(f"  LLM used:   {result.llm_used}")
+    if result.needs_human_review:
+        lines.append("  *** Needs human review ***")
+    if result.usage_record:
+        usage = result.usage_record.record()
+        lines.append(
+            f"  Cost:       ${usage['cost']:.6f}"
+            f" ({usage['input_tokens']} in / {usage['output_tokens']} out)"
+        )
+    lines.append("")
+    lines.append(result.rebuttal_body)
 
     if save:
         append_event_and_project(
@@ -284,6 +272,7 @@ def handle_generate_rebuttal(
             },
             source="system",
         )
-        output_str += "\nREBUTTAL_SENT event saved to database."
+        lines.append("REBUTTAL_SENT event saved to database.")
 
-    return output_str
+    data["message"] = "\n".join(lines)
+    return CliResult(success=True, data=data)

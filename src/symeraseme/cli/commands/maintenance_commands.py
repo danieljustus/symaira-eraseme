@@ -97,7 +97,6 @@ def generate_scheduler_cmd(
         symeraseme_bin,
         venv_activate,
         dry_run,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -137,7 +136,6 @@ def schedule_install(
         tick_minute,
         yes,
         dry_run,
-        ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -163,7 +161,7 @@ def schedule_status(
         help="Target platform: cron, launchd, systemd (auto-detect)",
     ),
 ) -> None:
-    result = handle_schedule_status(platform, ctx.obj["output"])
+    result = handle_schedule_status(platform)
     render_result(ctx.obj["output"], result)
 
 
@@ -180,7 +178,6 @@ def registry_sync_cmd(
     """Pull the latest broker definitions (git pull --ff-only for source installs)."""
     result = handle_registry_sync(
         verify_signatures=verify_signatures,
-        output_format=ctx.obj["output"],
     )
     render_result(ctx.obj["output"], result)
 
@@ -404,5 +401,5 @@ def validate(
 
     Exits non-zero if any file fails validation or duplicate ids are found.
     """
-    result = handle_validate(registry_dir=registry_dir, output_format=ctx.obj["output"])
+    result = handle_validate(registry_dir=registry_dir)
     render_result(ctx.obj["output"], result)

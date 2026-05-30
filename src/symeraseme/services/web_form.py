@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, cast
 
 import typer
@@ -14,6 +13,7 @@ from symeraseme.adapters.web.playwright_runner import (
 from symeraseme.cli.console import render_error
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.manual_fallback import create_manual_task
+from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
 
@@ -59,7 +59,7 @@ async def run_web_form_for_broker(
             identity_fields[f"address_country_{i}"] = addr.country
 
     if dry_run:
-        body = json.dumps(
+        body = __import__("json").dumps(
             {
                 "url": url,
                 "steps": steps_data,
@@ -127,8 +127,7 @@ async def handle_run_web_form(
     headed: bool = False,
     screenshot_dir: str = "",
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     try:
         broker = load_broker(broker_id)
     except (FileNotFoundError, ValueError, RuntimeError, OSError) as e:
@@ -180,7 +179,15 @@ async def handle_run_web_form(
             lines.append("Identity fields:")
             for k, v in identity_fields.items():
                 lines.append(f"  {k}: {v}")
-        return "\n".join(lines)
+        return CliResult(
+            success=True,
+            data={
+                "broker_id": broker_id,
+                "broker_name": broker.name,
+                "dry_run": True,
+                "message": "\n".join(lines),
+            },
+        )
 
     typer.echo(f"Running web form for {broker.name} ({url})")
     typer.echo(f"Steps: {len(steps_data)}")
@@ -214,22 +221,19 @@ async def handle_run_web_form(
             error_message=result.error,
         )
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "broker_id": broker_id,
-                "success": result.success,
-                "step_index": result.step_index,
-                "total_steps": result.total_steps,
-                "error": result.error,
-                "screenshot_path": result.screenshot_path,
-                "task_id": task.id if task else None,
-            },
-            indent=2,
-        )
+    data = {
+        "broker_id": broker_id,
+        "success": result.success,
+        "step_index": result.step_index,
+        "total_steps": result.total_steps,
+        "error": result.error,
+        "screenshot_path": result.screenshot_path,
+        "task_id": task.id if task else None,
+    }
 
     if result.success:
-        return f"Web form completed successfully ({result.total_steps} steps)."
+        data["message"] = f"Web form completed successfully ({result.total_steps} steps)."
+        return CliResult(success=True, data=data)
 
     task_id = task.id if task else "N/A"
     msg = (
@@ -239,4 +243,5 @@ async def handle_run_web_form(
     )
     if result.screenshot_path:
         msg += f"\nScreenshot saved to: {result.screenshot_path}"
-    render_error(msg)
+    data["message"] = msg
+    return CliResult(success=False, data=data, error=msg)

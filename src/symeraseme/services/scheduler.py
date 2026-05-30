@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
-
 import typer
 
 from symeraseme.cli.console import render_error
+from symeraseme.core.result_types import CliResult
 from symeraseme.core.scheduler import (
     detect_platform,
     generate_scheduler_configs,
@@ -23,8 +22,7 @@ def handle_generate_scheduler(
     symeraseme_bin: str = "",
     venv_activate: str = "",
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     poll_hours_list = [int(h.strip()) for h in poll_hours.split(",") if h.strip()]
 
     try:
@@ -46,16 +44,12 @@ def handle_generate_scheduler(
 
     written = write_scheduler_files(files, output_dir, dry_run=dry_run)
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "platform": platform or "auto",
-                "output_dir": output_dir,
-                "files": written,
-                "dry_run": dry_run,
-            },
-            indent=2,
-        )
+    result = {
+        "platform": platform or "auto",
+        "output_dir": output_dir,
+        "files": written,
+        "dry_run": dry_run,
+    }
 
     if dry_run:
         lines = [f"[dry-run] Would generate {len(files)} file(s) for {platform or 'auto'}:"]
@@ -63,7 +57,9 @@ def handle_generate_scheduler(
         lines = [f"Generated {len(written)} file(s) in {output_dir}:"]
     for f in written:
         lines.append(f"  {f}")
-    return "\n".join(lines)
+
+    result["message"] = "\n".join(lines)
+    return CliResult(success=True, data=result)
 
 
 def handle_schedule_install(
@@ -72,8 +68,7 @@ def handle_schedule_install(
     tick_minute: int = 0,
     yes: bool = False,
     dry_run: bool = False,
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     plat = platform or detect_platform()
     output_dir = "./schedules"
 
@@ -84,16 +79,12 @@ def handle_schedule_install(
             tick_hour=tick_hour,
             tick_minute=tick_minute,
         )
-        if output_format == "json":
-            return json.dumps(
-                {
-                    "platform": plat,
-                    "output_dir": output_dir,
-                    "files": list(files.keys()),
-                    "dry_run": True,
-                },
-                indent=2,
-            )
+        result = {
+            "platform": plat,
+            "output_dir": output_dir,
+            "files": list(files.keys()),
+            "dry_run": True,
+        }
         lines = [f"[DRY RUN] Would generate schedule configs for {plat} in {output_dir}:"]
         for name in files:
             lines.append(f"  {name}")
@@ -104,7 +95,8 @@ def handle_schedule_install(
         lines.append("")
         lines.append("To uninstall:")
         lines.append(f"  bash {output_dir}/uninstall.sh")
-        return "\n".join(lines)
+        result["message"] = "\n".join(lines)
+        return CliResult(success=True, data=result)
 
     if not yes:
         typer.echo(f"Platform detected: {plat}")
@@ -120,16 +112,11 @@ def handle_schedule_install(
     )
     written = write_scheduler_files(files, output_dir)
 
-    if output_format == "json":
-        return json.dumps(
-            {
-                "platform": plat,
-                "output_dir": output_dir,
-                "files": written,
-            },
-            indent=2,
-        )
-
+    result = {
+        "platform": plat,
+        "output_dir": output_dir,
+        "files": written,
+    }
     lines = [f"Schedule configs generated for {plat} in {output_dir}.", ""]
     lines.append("To install:")
     suffix = "   # (installs crontab entries)" if plat == "cron" else ""
@@ -137,10 +124,11 @@ def handle_schedule_install(
     lines.append("")
     lines.append("To uninstall:")
     lines.append(f"  bash {output_dir}/uninstall.sh")
-    return "\n".join(lines)
+    result["message"] = "\n".join(lines)
+    return CliResult(success=True, data=result)
 
 
-def handle_schedule_uninstall(platform: str = "") -> str:
+def handle_schedule_uninstall(platform: str = "") -> CliResult:
     plat = platform or detect_platform()
     lines = [f"Platform: {plat}"]
     lines.append("To uninstall, run the uninstall script from your schedules directory:")
@@ -153,18 +141,18 @@ def handle_schedule_uninstall(platform: str = "") -> str:
                 f"  launchctl unload ~/Library/LaunchAgents/{label}.plist 2>/dev/null; "
                 f"rm -f ~/Library/LaunchAgents/{label}.plist"
             )
-    return "\n".join(lines)
+
+    return CliResult(
+        success=True,
+        data={"platform": plat, "message": "\n".join(lines)},
+    )
 
 
 def handle_schedule_status(
     platform: str = "",
-    output_format: str = "text",
-) -> str:
+) -> CliResult:
     plat = platform or detect_platform()
     status = get_schedule_status(platform_name=plat)
-
-    if output_format == "json":
-        return json.dumps(status, indent=2, default=str)
 
     lines = [f"Platform: {status['platform']}", "Installed services:"]
     for svc in status["installed"]:
@@ -176,4 +164,6 @@ def handle_schedule_status(
             lines.append(f"    Path: {path}")
         if svc.get("error"):
             lines.append(f"    Error: {svc['error']}")
-    return "\n".join(lines)
+
+    status["message"] = "\n".join(lines)
+    return CliResult(success=True, data=status)

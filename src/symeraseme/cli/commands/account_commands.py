@@ -173,7 +173,6 @@ def grant(
         revoke_all,
         list_tokens,
         dry_run,
-        ctx.obj["output"],
     )
     from symeraseme.cli.console import render_result
 

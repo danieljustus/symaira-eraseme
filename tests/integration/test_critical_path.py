@@ -118,9 +118,8 @@ class TestPlanExecuteTickStatus:
             "integration-test",
             dry_run=True,
             yes=True,
-            output_format="json",
         )
-        dry_data = json.loads(dry_result)
+        dry_data = dry_result.data
         assert dry_data["campaign_id"] == "integration-test"
         assert dry_data["total_planned"] >= 1
         for r in dry_data["results"]:
@@ -580,9 +579,9 @@ class TestServiceHandlerIntegration:
         from symeraseme.services.campaign import handle_plan_show
 
         plan_campaign(campaign_id="svc-show-test", max_brokers=2)
-        plan_json = json.loads(handle_plan_show("svc-show-test", output_format="json"))
-        assert plan_json["campaign_id"] == "svc-show-test"
-        assert plan_json["total"] >= 1
+        plan_result = handle_plan_show("svc-show-test")
+        assert plan_result.data["campaign_id"] == "svc-show-test"
+        assert plan_result.data["total"] >= 1
 
 
 # ──────────────────────────────────────────────────────────────
