@@ -50,8 +50,7 @@ def clean_db(db_path):
     """Initialised empty database in a temporary directory."""
     from symeraseme.core.db import init_db
 
-    db_file = db_path / "test.db"
-    init_db(str(db_file))
+    init_db()
     return db_path
 
 
