@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from symeraseme.adapters.web._compat import PlaywrightError
 from symeraseme.core.db import get_connection
 from symeraseme.registry.schema import IdentityProfile
 
@@ -158,17 +159,12 @@ def capture_form_state(
         nonlocal html_snapshot, form_fields, field_selectors, screenshot_path
         try:
             html_snapshot = await _async_get_content(page)
-        except Exception as e:
-            # _async_get_content wraps a Playwright page method; Playwright
-            # exceptions (e.g. playwright._impl._errors.Error) cannot be
-            # referenced without importing the optional [web] dependency.
+        except PlaywrightError as e:
             logger.warning("Failed to capture HTML snapshot: %s", e)
 
         try:
             form_fields, field_selectors = await _async_extract_form_fields(page)
-        except Exception as e:
-            # _async_extract_form_fields wraps Playwright's page.evaluate;
-            # Playwright exception types are not importable here.
+        except PlaywrightError as e:
             logger.warning("Failed to extract form fields: %s", e)
 
         if screenshot_dir:
@@ -176,9 +172,7 @@ def capture_form_state(
                 screenshot_path = await _async_save_screenshot(
                     page, Path(screenshot_dir), "manual_fallback"
                 )
-            except Exception as e:
-                # _async_save_screenshot wraps Playwright's page.screenshot;
-                # Playwright exception types are not importable here.
+            except PlaywrightError as e:
                 logger.warning("Failed to save screenshot: %s", e)
 
     asyncio.run(_capture())
