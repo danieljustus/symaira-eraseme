@@ -23,9 +23,15 @@ def get_dashboard_data(
 
     conn = get_connection()
 
-    campaigns_rows = conn.execute(
-        "SELECT id, created_at, kind FROM campaigns ORDER BY created_at DESC"
-    ).fetchall()
+    if campaign_id:
+        campaigns_rows = conn.execute(
+            "SELECT id, created_at, kind FROM campaigns WHERE id = ? ORDER BY created_at DESC",
+            (campaign_id,),
+        ).fetchall()
+    else:
+        campaigns_rows = conn.execute(
+            "SELECT id, created_at, kind FROM campaigns ORDER BY created_at DESC"
+        ).fetchall()
 
     campaigns: list[dict[str, Any]] = []
     all_requests: list[dict[str, Any]] = []
@@ -33,8 +39,6 @@ def get_dashboard_data(
 
     for c in campaigns_rows:
         camp = dict(c)
-        if campaign_id and camp["id"] != campaign_id:
-            continue
 
         requests_rows = conn.execute(
             """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
