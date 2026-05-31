@@ -90,6 +90,20 @@ _SKIPPED_COUNT: dict[tuple[str, str], int] = {}
 _BROKER_ID_INDEX: dict[str, Path] = {}
 
 
+def clear_registry_cache() -> None:
+    """Clear all in-memory broker caches.
+
+    Call this after a registry sync so that subsequent operations
+    see the updated data without requiring a process restart.
+    """
+    global _BROKER_ID_INDEX, _BROKER_SCHEMA
+    _BROKER_CACHE.clear()
+    _BROKER_FILE_CACHE.clear()
+    _BROKER_ID_INDEX = {}
+    _SKIPPED_COUNT.clear()
+    _BROKER_SCHEMA = None
+
+
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
     dir_stat = registry_dir.stat()
     key_data = f"{registry_dir}:{dir_stat.st_mtime}:{dir_stat.st_size}"

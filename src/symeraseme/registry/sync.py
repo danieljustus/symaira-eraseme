@@ -143,7 +143,7 @@ def handle_registry_sync(
         # Invalidate the in-process broker cache so the next call re-reads disk.
         from symeraseme.registry import loader as _loader
 
-        _loader._BROKER_CACHE.clear()
+        _loader.clear_registry_cache()
 
     lines = [f"Registry sync — mode: {result['mode']}"]
     lines.append(f"  ok: {result['ok']}")
