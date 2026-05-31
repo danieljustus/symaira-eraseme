@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -19,6 +21,8 @@ from symeraseme.services.reporting import (
     handle_generate_dashboard,
     handle_generate_report,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def poll_inbox(
@@ -38,6 +42,16 @@ def poll_inbox(
         "--campaign",
         help="Campaign to match replies against",
     ),
+    retries: int = typer.Option(
+        3,
+        "--retries",
+        help="Number of retries on transient failures",
+    ),
+    retry_delay: int = typer.Option(
+        5,
+        "--retry-delay",
+        help="Base delay in seconds between retries",
+    ),
 ) -> None:
     password = os.environ.get("IMAP_PASSWORD") or typer.prompt(
         "IMAP password",
@@ -45,17 +59,38 @@ def poll_inbox(
     )
     from symeraseme.cli.console import show_spinner
 
-    with show_spinner("Polling inbox..."):
-        result = handle_poll_inbox(
-            host,
-            port,
-            username,
-            since_days,
-            ssl,
-            campaign_id,
-            password,
-        )
-    render_result(ctx.obj["output"], result)
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            with show_spinner(f"Polling inbox... (attempt {attempt + 1}/{retries + 1})"):
+                result = handle_poll_inbox(
+                    host,
+                    port,
+                    username,
+                    since_days,
+                    ssl,
+                    campaign_id,
+                    password,
+                )
+            render_result(ctx.obj["output"], result)
+            return
+        except (TimeoutError, OSError) as exc:
+            last_error = exc
+            if attempt < retries:
+                delay = retry_delay * (2 ** attempt)
+                logger.info(
+                    "Inbox poll failed (attempt %d/%d): %s. Retrying in %ds...",
+                    attempt + 1,
+                    retries + 1,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.error("Inbox poll failed after %d attempts: %s", retries + 1, exc)
+
+    if last_error is not None:
+        raise typer.Exit(code=1) from last_error
 
 
 def classify_reply(
