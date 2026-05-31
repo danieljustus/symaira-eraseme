@@ -202,7 +202,13 @@ def _db_path(path: str | None = None) -> Path:
 
 
 def get_connection(path: str | None = None) -> sqlite3.Connection:
-    if not hasattr(_local, "conn") or _local.conn is None:
+    requested_path = str(_db_path(path))
+    if (
+        not hasattr(_local, "conn")
+        or _local.conn is None
+        or not hasattr(_local, "db_path")
+        or _local.db_path != requested_path
+    ):
         db_file = _db_path(path)
 
         should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
@@ -220,7 +226,7 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
             conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
-        _local.db_path = str(_db_path(path)) if not should_encrypt else str(db_file)
+        _local.db_path = requested_path
     return _local.conn
 
 
