@@ -122,6 +122,7 @@ class TestCaptureFormState:
     def test_unknown_reason_normalized(self, mock_save, mock_fields, mock_content):
         mock_page = MagicMock()
         mock_page.url = "https://example.com"
+        mock_fields.return_value = ({}, [])
         state = capture_form_state(mock_page, reason="some_crazy_error")
         assert state.reason == "generic_error"
 
@@ -129,15 +130,19 @@ class TestCaptureFormState:
         mock_page = MagicMock()
         mock_page.url = "https://example.com"
         mock_save.return_value = str(tmp_path / "screenshot.png")
+        mock_fields.return_value = ({}, [])
 
         state = capture_form_state(mock_page, screenshot_dir=tmp_path)
         assert state.screenshot_path is not None
         mock_save.assert_called_once()
 
     def test_failed_content_does_not_crash(self, mock_save, mock_fields, mock_content):
+        from symeraseme.adapters.web._compat import PlaywrightError
+
         mock_page = MagicMock()
         mock_page.url = "https://example.com"
-        mock_content.side_effect = Exception("Failed to get content")
+        mock_content.side_effect = PlaywrightError("Failed to get content")
+        mock_fields.return_value = ({}, [])
 
         state = capture_form_state(mock_page)
         assert state.html_snapshot == ""

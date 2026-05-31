@@ -20,11 +20,10 @@ from symeraseme.core.reply_manager import (
 
 @pytest.fixture(autouse=True)
 def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
-    db_file = tmp_path / "test.db"
     old = os.environ.get("SYMERASEME_DB_DIR")
     os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
     close_connection()
-    init_db(str(db_file))
+    init_db()
     yield
     close_connection()
     if old:

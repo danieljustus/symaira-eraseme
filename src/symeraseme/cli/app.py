@@ -55,6 +55,7 @@ from symeraseme.cli.commands.web_form_commands import (
     solve_captcha_cmd,
 )
 from symeraseme.cli.console import OutputFormat
+from symeraseme.core.db import close_connection
 
 app = typer.Typer(
     name="symeraseme",
@@ -99,6 +100,7 @@ def main(
         logging.getLogger("symeraseme").setLevel(logging.DEBUG)
     ctx.ensure_object(dict)
     ctx.obj["output"] = output
+    ctx.call_on_close(close_connection)
 
 
 # ── Account & Profile ─────────────────────────────────────────────────────
