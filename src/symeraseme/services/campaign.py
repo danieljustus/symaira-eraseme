@@ -106,12 +106,15 @@ def handle_execute(
         )
 
     lines = []
+    any_failure = False
     for r in result["results"]:
         status = "OK" if r["success"] else "FAIL"
+        if not r["success"]:
+            any_failure = True
         extra = r.get("dry_run", False) and " (dry-run)" or ""
         lines.append(f"  #{r['request_id']} {status}{extra}")
         if not r["success"]:
             lines.append(f"    Error: {r.get('error', 'unknown')}")
 
     result["message"] = "\n".join(lines)
-    return CliResult(success=True, data=result)
+    return CliResult(success=not any_failure, data=result)
