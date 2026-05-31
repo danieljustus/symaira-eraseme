@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
+from importlib import resources
+from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -120,6 +123,27 @@ def get_dashboard_data(
     }
 
 
+def _dashboard_templates_dir() -> Path:
+    """Find the dashboard template directory.
+
+    Supports both source checkouts and PyPI-installed packages by
+    using importlib.resources, falling back to parent-directory
+    traversal for editable installs.
+    """
+    env_dir = os.environ.get("SYMERASEME_RESOURCES")
+    if env_dir:
+        return Path(env_dir) / "registry" / "templates"
+    pkg_root = resources.files("symeraseme")
+    candidate = Path(str(pkg_root)) / "registry" / "templates"
+    if candidate.exists() and any(candidate.iterdir()):
+        return candidate
+    for parent in Path(str(pkg_root)).parents:
+        if (parent / "registry" / "templates").exists():
+            return parent / "registry" / "templates"
+    msg = "Could not find dashboard templates directory (registry/templates)"
+    raise FileNotFoundError(msg)
+
+
 def generate_dashboard(
     data: dict[str, Any],
     *,
@@ -134,15 +158,7 @@ def generate_dashboard(
     Returns:
         Self-contained HTML string.
     """
-    import pathlib
-
-    # Navigate from dashboard.py -> core -> symeraseme -> src -> project root
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent
-    loader = FileSystemLoader(
-        searchpath=[
-            str(project_root / "registry" / "templates"),
-        ]
-    )
+    loader = FileSystemLoader(str(_dashboard_templates_dir()))
     env = Environment(loader=loader, autoescape=select_autoescape(["html"]))
 
     template = env.get_template("dashboard.html.j2")
