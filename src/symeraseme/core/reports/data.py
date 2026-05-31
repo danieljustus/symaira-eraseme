@@ -1,21 +1,12 @@
-"""Aggregated campaign reports — per-campaign statistics and exports."""
+"""Report data collection and aggregation from the event store."""
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from symeraseme.core.datetime_utils import parse_date_pair
-
-# ---------------------------------------------------------------------------
-# Data collection
-# ---------------------------------------------------------------------------
 
 
 def get_report_data(
@@ -23,20 +14,11 @@ def get_report_data(
     *,
     all_campaigns: bool = False,
 ) -> dict[str, Any]:
-    """Collect and aggregate report data from the event store.
-
-    Args:
-        campaign_id: Specific campaign to report on.
-        all_campaigns: If True, include all campaigns (ignores campaign_id).
-
-    Returns:
-        Aggregated report data.
-    """
+    """Collect and aggregate report data from the event store."""
     from symeraseme.core.db import get_connection
 
     conn = get_connection()
 
-    # Gather campaigns
     if all_campaigns:
         campaigns_rows = conn.execute(
             "SELECT id, created_at, kind, notes FROM campaigns ORDER BY created_at DESC"
@@ -47,7 +29,6 @@ def get_report_data(
             (campaign_id,),
         ).fetchall()
     else:
-        # Default: most recent campaign
         campaigns_rows = conn.execute(
             "SELECT id, created_at, kind, notes FROM campaigns ORDER BY created_at DESC LIMIT 1"
         ).fetchall()
@@ -101,25 +82,13 @@ def get_report_data(
         camp["requests"] = reqs
         campaigns_data.append(camp)
 
-    # Aggregate per campaign
     campaigns_agg = [_aggregate_campaign(c) for c in campaigns_data]
-
-    # Broker leaderboard
     broker_stats = _broker_leaderboard(all_requests)
-
-    # Jurisdiction breakdown
     jurisdiction_stats = _jurisdiction_breakdown(all_requests)
-
-    # Timeline
     timeline = _build_timeline(all_events)
-
-    # Historical comparison
     comparison = _historical_comparison(campaigns_agg) if len(campaigns_agg) >= 2 else {}
-
-    # Success metrics
     success_metrics = _success_metrics(all_requests)
 
-    # Status breakdown for all requests
     status_counts: dict[str, int] = {}
     for r in all_requests:
         s = (r.get("current_status") or "PLANNED").upper()
@@ -156,14 +125,12 @@ def _empty_report(campaign_id: str) -> dict[str, Any]:
 
 
 def _aggregate_campaign(camp: dict[str, Any]) -> dict[str, Any]:
-    """Aggregate stats for a single campaign."""
     reqs = camp.get("requests", [])
     total = len(reqs)
     status_counts: dict[str, int] = Counter(
         (r.get("current_status") or "PLANNED").upper() for r in reqs
     )
 
-    # Response times
     response_times: list[float] = []
     for r in reqs:
         pair = parse_date_pair(r.get("sent_at"), r.get("resolved_at"))
@@ -198,7 +165,6 @@ def _aggregate_campaign(camp: dict[str, Any]) -> dict[str, Any]:
 def _broker_leaderboard(
     requests: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Build per-broker success statistics."""
     broker_data: dict[str, dict[str, Any]] = {}
     for r in requests:
         bid = r.get("broker_id", "unknown")
@@ -225,7 +191,6 @@ def _broker_leaderboard(
         else:
             bd["pending"] += 1
 
-        # Response time
         pair = parse_date_pair(r.get("sent_at"), r.get("resolved_at"))
         if pair:
             bd["response_times"].append((pair[1] - pair[0]).total_seconds() / 86400)
@@ -256,7 +221,6 @@ def _broker_leaderboard(
 def _jurisdiction_breakdown(
     requests: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Break down stats by jurisdiction."""
     jdata: dict[str, dict[str, Any]] = {}
     for r in requests:
         jur = (r.get("jurisdiction") or "UNKNOWN").upper()
@@ -289,7 +253,6 @@ def _jurisdiction_breakdown(
 def _build_timeline(
     events: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Build a timeline of events over time (by day)."""
     daily: dict[str, dict[str, int]] = {}
     for e in events:
         ts = e.get("occurred_at", "")
@@ -311,7 +274,6 @@ def _build_timeline(
 def _historical_comparison(
     campaigns_agg: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Compare the most recent two campaigns."""
     if len(campaigns_agg) < 2:
         return {}
     latest = campaigns_agg[0]
@@ -345,7 +307,6 @@ def _historical_comparison(
 def _success_metrics(
     requests: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Calculate overall success metrics."""
     total = len(requests)
     if total == 0:
         return {}
@@ -383,95 +344,10 @@ def _median(sorted_values: list[float]) -> float:
     return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
 
 
-# ---------------------------------------------------------------------------
-# Export formats
-# ---------------------------------------------------------------------------
-
-
-def export_json(data: dict[str, Any]) -> str:
-    """Export report data as JSON string."""
-    return json.dumps(data, indent=2, default=str, ensure_ascii=False)
-
-
-def export_csv(data: dict[str, Any]) -> str:
-    """Export campaign request data as CSV string."""
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # Header
-    writer.writerow(
-        [
-            "campaign_id",
-            "request_id",
-            "broker_id",
-            "jurisdiction",
-            "channel",
-            "status",
-            "sent_at",
-            "acknowledged_at",
-            "resolved_at",
-            "deadline_at",
-            "reminders_sent",
-            "escalation_level",
-        ]
-    )
-
-    for camp in data.get("campaigns", []):
-        for req in camp.get("requests", []):
-            writer.writerow(
-                [
-                    camp["campaign_id"],
-                    req.get("id", ""),
-                    req.get("broker_id", ""),
-                    req.get("jurisdiction", ""),
-                    req.get("channel", ""),
-                    req.get("current_status", ""),
-                    req.get("sent_at", ""),
-                    req.get("acknowledged_at", ""),
-                    req.get("resolved_at", ""),
-                    req.get("deadline_at", ""),
-                    req.get("reminders_sent", 0),
-                    req.get("escalation_level", 0),
-                ]
-            )
-
-    return output.getvalue()
-
-
-def export_html(data: dict[str, Any]) -> str:
-    """Export report as an HTML page using Jinja2."""
-    import pathlib
-
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent
-    loader = FileSystemLoader(
-        searchpath=[
-            str(project_root / "registry" / "templates"),
-        ]
-    )
-    env = Environment(loader=loader, autoescape=select_autoescape(["html"]))
-
-    template = env.get_template("report.html.j2")
-    html = template.render(
-        data=data,
-        now=datetime.now(UTC),
-    )
-    return html
-
-
-# ---------------------------------------------------------------------------
-# Main API
-# ---------------------------------------------------------------------------
-
-
 def get_campaign_status(
     campaign_id: str | None = None,
 ) -> dict[str, Any]:
-    """Return aggregated lifecycle status across removal requests.
-
-    Reports counts per current_status, escalation level, channel, and an
-    upcoming-action horizon (deadlines, reminders due, escalations pending).
-    Optionally scoped to one campaign id.
-    """
+    """Return aggregated lifecycle status across removal requests."""
     from symeraseme.core.db import get_connection, init_db
 
     init_db()
@@ -571,10 +447,11 @@ def get_campaign_status(
     next_tick_ready = next_tick_row["n"] if next_tick_row else 0
 
     resolved_row = conn.execute(
-        f"""SELECT COUNT(*) AS n
-            FROM removal_requests r
-            JOIN request_state s ON s.request_id = r.id
-            {where} AND s.resolved_at IS NOT NULL""",
+        (
+            "SELECT COUNT(*) AS n FROM removal_requests r "
+            f"JOIN request_state s ON s.request_id = r.id {where} "
+            "AND s.resolved_at IS NOT NULL"
+        ),
         params,
     ).fetchone()
     resolved = resolved_row["n"] if resolved_row else 0
@@ -602,28 +479,3 @@ def get_campaign_status(
             "tick_actions_ready": next_tick_ready,
         },
     }
-
-
-def generate_report(
-    data: dict[str, Any],
-    format: str = "html",
-) -> str | dict[str, Any]:
-    """Generate a report in the requested format.
-
-    Args:
-        data: Report data from get_report_data().
-        format: Output format: "html", "json", or "csv".
-
-    Returns:
-        String (HTML/CSV) or dict (JSON).
-    """
-    format = format.lower()
-    if format == "json":
-        return export_json(data)
-    elif format == "csv":
-        return export_csv(data)
-    elif format == "html":
-        return export_html(data)
-    else:
-        msg = f"Unsupported format: {format}. Choose html, json, or csv."
-        raise ValueError(msg)
