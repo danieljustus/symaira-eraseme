@@ -29,7 +29,7 @@ def _db(tmp_path: tempfile.TemporaryDirectory) -> None:
     os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
     os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
     close_connection()
-    init_db(str(tmp_path / "test.db"))
+    init_db()
     yield
     close_connection()
     os.environ.pop("SYMERASEME_DB_DIR", None)
@@ -232,7 +232,7 @@ class TestExecuteCampaign:
         from symeraseme.core.db import close_connection, init_db
 
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         plan_campaign(campaign_id="web-form-test", max_brokers=5)
         requests = list_removal_requests(campaign_id="web-form-test")
@@ -396,7 +396,7 @@ class TestHandleExecuteRouting:
         from symeraseme.core.db import close_connection, init_db
 
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         async_called = []
 
@@ -428,7 +428,7 @@ class TestHandleExecuteRouting:
         from symeraseme.core.db import close_connection, init_db
 
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         sync_called = []
 

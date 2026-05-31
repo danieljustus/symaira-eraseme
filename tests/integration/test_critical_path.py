@@ -7,7 +7,6 @@ integrity, registry loading and schema validation.
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -653,7 +652,7 @@ class TestCliSmoke:
         from symeraseme.core.db import close_connection, get_connection, init_db
 
         close_connection()
-        init_db(str(db_path / "test.db"))
+        init_db()
         conn = get_connection()
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"

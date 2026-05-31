@@ -14,7 +14,7 @@ def _seed_db(tmp_path: str) -> None:
 
     os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
-    init_db(tmp_path + "/test.db")
+    init_db()
 
     conn = get_connection()
 

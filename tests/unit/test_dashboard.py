@@ -11,7 +11,7 @@ def _seed_db(tmp_path: str) -> None:
 
     os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
-    init_db(tmp_path + "/test.db")
+    init_db()
 
     conn = get_connection()
 
@@ -118,12 +118,11 @@ class TestGetDashboardData:
             _clean_db()
 
     def test_handles_no_db(self, tmp_path):
-        db_path = str(tmp_path / "empty.db")
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         from symeraseme.core.db import close_connection, init_db
 
         close_connection()
-        init_db(db_path)
+        init_db()
         try:
             from symeraseme.core.dashboard import get_dashboard_data
 

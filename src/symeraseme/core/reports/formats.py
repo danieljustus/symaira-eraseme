@@ -61,7 +61,7 @@ def export_csv(data: dict[str, Any]) -> str:
 def export_html(data: dict[str, Any]) -> str:
     import pathlib
 
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
     loader = FileSystemLoader(
         searchpath=[
             str(project_root / "registry" / "templates"),

@@ -159,7 +159,7 @@ class TestRunTick:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         try:
             actions = run_tick()
@@ -175,7 +175,7 @@ class TestRunTick:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         now = datetime(2026, 7, 1, tzinfo=UTC)
         sent = now - timedelta(days=10)
@@ -209,7 +209,7 @@ class TestRunTick:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         now = datetime(2026, 7, 1, tzinfo=UTC)
         sent = now - timedelta(days=10)
@@ -257,7 +257,7 @@ class TestApplyTickActions:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         try:
             results = apply_tick_actions([])

@@ -379,7 +379,6 @@ class TestLocalFixtureForm:
 class TestHandleRunWebForm:
     @pytest.mark.asyncio
     async def test_failure_creates_manual_task(self, monkeypatch, tmp_path):
-        import json
         import os
 
         from symeraseme.services.web_form import handle_run_web_form
@@ -390,7 +389,7 @@ class TestHandleRunWebForm:
         from symeraseme.core.db import close_connection, init_db
 
         close_connection()
-        init_db(str(tmp_path / "test.db"))
+        init_db()
 
         mock_broker = type(
             "Broker",
