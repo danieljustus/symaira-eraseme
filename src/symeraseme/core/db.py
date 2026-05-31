@@ -316,6 +316,8 @@ def init_db(path: str | None = None) -> Path:
         );
         CREATE INDEX IF NOT EXISTS idx_events_request
             ON request_events(request_id, occurred_at);
+        CREATE INDEX IF NOT EXISTS idx_events_occurred_at
+            ON request_events(occurred_at DESC);
 
         CREATE TABLE IF NOT EXISTS request_state (
             request_id      INTEGER PRIMARY KEY REFERENCES removal_requests(id),
