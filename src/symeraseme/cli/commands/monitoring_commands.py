@@ -77,7 +77,7 @@ def poll_inbox(
         except (TimeoutError, OSError) as exc:
             last_error = exc
             if attempt < retries:
-                delay = retry_delay * (2 ** attempt)
+                delay = retry_delay * (2**attempt)
                 logger.info(
                     "Inbox poll failed (attempt %d/%d): %s. Retrying in %ds...",
                     attempt + 1,
