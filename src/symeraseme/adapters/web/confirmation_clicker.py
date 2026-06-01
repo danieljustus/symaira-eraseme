@@ -41,6 +41,8 @@ KNOWN_BROKER_DOMAINS: frozenset[str] = frozenset(
 
 
 class ConfirmationClickerError(Exception):
+    """ConfirmationClicker error."""
+
     pass
 
 

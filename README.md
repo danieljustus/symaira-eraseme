@@ -63,7 +63,7 @@ brew install symeraseme
 ```bash
 # Clone the repository
 git clone https://github.com/danieljustus/Symaira-EraseMe.git
-cd Symaira EraseMe
+cd symaira-eraseme
 
 # Install dependencies with uv
 uv sync
@@ -300,7 +300,7 @@ examples/        — Integration examples for Claude Code, OpenClaw, cron
 ## Security
 
 - **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.
-- **Database encryption**: When `SYMERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. On open, the database is decrypted to a temporary file with restrictive permissions (`0o600`). The temp file is placed in a memory-backed directory where the platform supports it (Linux: `/dev/shm`; macOS: `/tmp` RAM disk; Windows: OS temp directory on disk). On normal exit, SIGTERM, or context close, the temp file is re-encrypted and removed. A `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind. On Linux and macOS the temp file resides in memory and is lost on reboot; on Windows it may persist on disk. If this is a concern for your threat model, consider running Symaira EraseMe on a single-user system or using full-disk encryption.
+- **Database encryption**: When `SYMERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. Databases created before v0.1.5 used a fixed PBKDF2 salt (V1 format); newer databases use a per-file random salt (V2 format). On open, any V1 database is automatically re-encrypted to V2 transparently — no manual migration is required. On open, the database is decrypted to a temporary file with restrictive permissions (`0o600`). The temp file is placed in a memory-backed directory where the platform supports it (Linux: `/dev/shm`; macOS: `/tmp` RAM disk; Windows: OS temp directory on disk). On normal exit, SIGTERM, or context close, the temp file is re-encrypted and removed. A `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind. On Linux and macOS the temp file resides in memory and is lost on reboot; on Windows it may persist on disk. If this is a concern for your threat model, consider running Symaira EraseMe on a single-user system or using full-disk encryption.
 - **Consent tokens**: Consent tokens passed via `--consent` or the `SYMERASEME_CONSENT` environment variable are visible in process listings (`ps aux`), shell history, and crash dumps. On shared systems or CI runners, prefer `--consent-file` or `SYMERASEME_CONSENT_FILE` to read the token from a file with `0o600` permissions. The file is read once and the token is consumed (`consume_token`) after verification. Pipe-based input is supported: `echo $TOKEN | symeraseme plan execute --consent-file /dev/stdin`.
 
 ## License

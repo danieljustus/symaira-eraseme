@@ -33,6 +33,8 @@ def _backoff_delay(iteration: int, cap: int = _BACKOFF_CAP) -> float:
 
 
 class CaptchaError(Exception):
+    """Captcha error."""
+
     pass
 
 
@@ -138,6 +140,7 @@ class CapSolverSolver(CaptchaSolver):
             resp = urlopen(req, timeout=30)
             data = json.loads(resp.read().decode())
         except (TimeoutError, HTTPError, URLError) as e:
+            logger.warning("CapSolver createTask failed: %s", e)
             raise CaptchaError(f"CapSolver createTask failed: {e}") from e
         if data.get("errorId", 0) != 0:
             raise CaptchaError(f"CapSolver error: {data.get('errorDescription', 'unknown')}")

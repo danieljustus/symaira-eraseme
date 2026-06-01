@@ -14,6 +14,7 @@ def handle_solve_captcha(
     page_url: str | None = None,
     dry_run: bool = False,
 ) -> CliResult:
+    """Solve a CAPTCHA challenge via an external provider."""
     if dry_run:
         return CliResult(
             success=True,

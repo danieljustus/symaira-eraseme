@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import timedelta
 from typing import Any
 
 from symeraseme.core.datetime_utils import parse_iso_datetime as _parse_ts
 from symeraseme.core.db import get_connection
 from symeraseme.core.events import append_event
+
+logger = logging.getLogger(__name__)
 
 
 def _next_status(event_type: str) -> str | None:
@@ -162,6 +165,7 @@ def append_event_and_project(
     tuple[int, dict[str, Any]]
         The newly created event id and the resulting projection state.
     """
+    logger.debug("Projecting event %s for request %s", event_type, request_id)
     conn = get_connection()
     try:
         eid = append_event(

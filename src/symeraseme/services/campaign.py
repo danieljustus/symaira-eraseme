@@ -23,6 +23,7 @@ def handle_plan_create(
     max_brokers: int = 30,
 ) -> CliResult:
     init_db()
+    """plan create."""
     result = plan_campaign(
         campaign_id=campaign_id,
         jurisdiction=jurisdiction,
@@ -46,6 +47,7 @@ def handle_plan_show(
     status: str | None = None,
 ) -> CliResult:
     init_db()
+    """plan show."""
     result = get_plan(campaign_id=campaign_id, status=status)
 
     lines = [f"Plan: {result['campaign_id']} ({result['total']} requests)"]
@@ -69,7 +71,11 @@ def handle_execute(
     backend: str | None = None,
 ) -> CliResult:
     if not dry_run and not check_consent(
-        "execute", yes=yes, consent_token=consent_token, consent_file=consent_file
+        """execute."""
+        "execute",
+        yes=yes,
+        consent_token=consent_token,
+        consent_file=consent_file,
     ):
         from symeraseme.cli.console import render_error
 

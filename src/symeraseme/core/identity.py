@@ -14,6 +14,8 @@ from symeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
 
+_PROFILE_CACHE: dict[str, IdentityProfile] = {}
+
 SERVICE_NAME = "symeraseme"
 KEYRING_USERNAME = "identity-master-key"
 KEY_LENGTH = 32  # AES-256
@@ -82,13 +84,21 @@ def save_profile(
     with open(target, "wb") as f:
         f.write(header + b"\n" + ciphertext)
 
+    # Invalidate cache so the next load reads the fresh file.
+    _PROFILE_CACHE.pop(str(target), None)
+
     return target
 
 
 def load_profile(path: str | None = None) -> IdentityProfile:
     target = _profile_path(path)
+    cache_key = str(target)
+    if cache_key in _PROFILE_CACHE:
+        return _PROFILE_CACHE[cache_key]
+
     if not target.exists():
-        msg = f"Identity profile not found at {target}. Run 'symeraseme init-profile' first."
+        logger.debug("Identity profile not found at %s", target)
+        msg = "Identity profile not found. Run 'symeraseme init-profile' first."
         raise FileNotFoundError(msg)
 
     key = _get_existing_master_key()
@@ -115,7 +125,9 @@ def load_profile(path: str | None = None) -> IdentityProfile:
             raise
     data = json.loads(plaintext.decode("utf-8"))
 
-    return IdentityProfile.model_validate(data)
+    profile = IdentityProfile.model_validate(data)
+    _PROFILE_CACHE[cache_key] = profile
+    return profile
 
 
 def delete_profile(path: str | None = None) -> None:

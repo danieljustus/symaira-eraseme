@@ -210,3 +210,43 @@ class TestIdentityVault:
         assert loaded.full_name == "Legacy User"
 
         vault.delete_profile()
+
+    def test_load_uses_cache_after_first_call(self, monkeypatch):
+        import symeraseme.core.identity as vault
+
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_cache.enc")
+        path = Path("/tmp/symeraseme_test_cache.enc")
+        path.unlink(missing_ok=True)
+
+        profile = IdentityProfile(full_name="Cached User", email_addresses=["cache@example.com"])
+        vault.save_profile(profile)
+
+        vault._PROFILE_CACHE.clear()
+        loaded1 = vault.load_profile()
+        loaded2 = vault.load_profile()
+        assert loaded1 is loaded2
+        assert len(vault._PROFILE_CACHE) == 1
+
+        vault.delete_profile()
+
+    def test_save_invalidates_cache(self, monkeypatch):
+        import symeraseme.core.identity as vault
+
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_inval.enc")
+        path = Path("/tmp/symeraseme_test_inval.enc")
+        path.unlink(missing_ok=True)
+
+        profile = IdentityProfile(full_name="Original", email_addresses=["orig@example.com"])
+        vault.save_profile(profile)
+
+        vault._PROFILE_CACHE.clear()
+        loaded1 = vault.load_profile()
+
+        updated = IdentityProfile(full_name="Updated", email_addresses=["upd@example.com"])
+        vault.save_profile(updated)
+
+        loaded2 = vault.load_profile()
+        assert loaded2.full_name == "Updated"
+        assert loaded1 is not loaded2
+
+        vault.delete_profile()

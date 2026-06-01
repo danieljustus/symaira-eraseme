@@ -4,6 +4,7 @@ import base64
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import secrets
 import socket
@@ -17,6 +18,9 @@ from urllib.parse import parse_qs, urlencode
 from urllib.request import Request, urlopen
 
 import keyring
+
+logger = logging.getLogger(__name__)
+
 
 SERVICE_NAME = "symeraseme-oauth2"
 _STATE_FILE = "~/.local/share/symeraseme/oauth2_state.json"
@@ -42,6 +46,8 @@ PROVIDER_CONFIGS: dict[str, dict[str, str]] = {
 
 
 class OAuth2Error(Exception):
+    """OAuth2 error."""
+
     pass
 
 
@@ -230,6 +236,7 @@ def exchange_code(
         with urlopen(req, timeout=30) as resp:
             return dict(json.loads(resp.read()))
     except (URLError, OSError, json.JSONDecodeError, ValueError) as e:
+        logger.warning("OAuth2 token exchange failed: %s", e)
         msg = f"Token exchange failed: {e}"
         raise OAuth2Error(msg) from e
 

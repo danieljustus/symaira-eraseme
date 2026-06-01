@@ -10,10 +10,13 @@ logger = logging.getLogger(__name__)
 
 _LLM_CONSENT_FILE = Path("~/.config/symeraseme/.llm_consent_granted").expanduser()
 
+# Bounded quantifiers prevent catastrophic backtracking on pathological
+# input (long strings of dots/hyphens).  126 labels is far beyond any
+# real domain while keeping the match linear in input length.
 _EMAIL_PATTERN = re.compile(
-    r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]"
+    r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-zA-Z0-9]"
     r"(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?"
-    r"(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
+    r"(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?){0,126}"
 )
 
 _PHONE_PATTERN = re.compile(r"(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")

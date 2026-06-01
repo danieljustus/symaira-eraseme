@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from symeraseme.core.protocols import WebFormRunner
 
+import logging
+
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
@@ -23,6 +25,9 @@ from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
 from symeraseme.registry.schema import Broker
+
+logger = logging.getLogger(__name__)
+
 
 _PROGRESS_CONSOLE = Console(stderr=True)
 
@@ -40,6 +45,7 @@ def plan_campaign(
     notes: str | None = None,
 ) -> dict[str, Any]:
     """Scan registry, create PLANNED events for matching brokers."""
+    logger.debug("Planning campaign %s (jurisdiction=%s law=%s)", campaign_id, jurisdiction, law)
     create_campaign(campaign_id, kind="initial", notes=notes)
 
     brokers = load_all_brokers(
@@ -268,6 +274,7 @@ def execute_request(
         )
         return {"success": True, "request_id": request_id, "result": send_result}
     except EmailError as e:
+        logger.warning("Send failed for %s: %s", request_id, e)
         append_event_and_project(
             request_id,
             "SEND_FAILED",

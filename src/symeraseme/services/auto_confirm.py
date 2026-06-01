@@ -19,6 +19,7 @@ def handle_auto_confirm(
     dry_run: bool = False,
 ) -> CliResult:
     init_db()
+    """auto confirm."""
 
     req = get_removal_request(request_id)
     if req is None:

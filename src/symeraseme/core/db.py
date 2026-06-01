@@ -46,6 +46,7 @@ _PBKDF2_ITERATIONS = 600_000
 _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
+_FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
 _STALE_SCAVENGE_AGE = 86400
 
 _local = threading.local()
@@ -93,6 +94,10 @@ def _db_encryption_enabled() -> bool:
 
 
 def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
+    cache_key = salt if salt else b""
+    if cache_key in _FERNET_KEY_CACHE:
+        return _FERNET_KEY_CACHE[cache_key]
+
     try:
         from symeraseme.core.identity import _get_existing_master_key
 
@@ -107,7 +112,9 @@ def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
         salt if salt else _PBKDF2_FIXED_SALT,
         _PBKDF2_ITERATIONS,
     )
-    return urlsafe_b64encode(derived)
+    key = urlsafe_b64encode(derived)
+    _FERNET_KEY_CACHE[cache_key] = key
+    return key
 
 
 def _is_encrypted(path: Path) -> bool:
@@ -115,6 +122,22 @@ def _is_encrypted(path: Path) -> bool:
         return False
     head = path.read_bytes()[: max(len(_ENC_HEADER_V1), len(_ENC_MAGIC_V2) + _ENC_SALT_LEN)]
     return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2)
+
+
+def _migrate_v1_to_v2(path: Path) -> None:
+    """Transparently re-encrypt a V1-format DB to V2 on open."""
+    logger.info("Migrating V1-encrypted DB to V2 format: %s", path)
+    tmp = _decrypt_to_temp(path)
+    try:
+        _encrypt_file(tmp, path)
+        logger.info("V1→V2 migration complete: %s", path)
+    finally:
+        # Clean up the temporary decrypted file
+        try:
+            if tmp.exists() and tmp != path:
+                tmp.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("Failed to remove temp file %s: %s", tmp, exc)
 
 
 def _decrypt_to_temp(path: Path) -> Path:
@@ -126,13 +149,15 @@ def _decrypt_to_temp(path: Path) -> Path:
         header_len = len(_ENC_MAGIC_V2) + _ENC_SALT_LEN
         salt = raw[len(_ENC_MAGIC_V2) : header_len]
     else:
-        msg = f"Unrecognized encryption header in {path}"
+        logger.debug("Unrecognized encryption header in %s", path)
+        msg = "Unrecognized encryption header in database file."
         raise RuntimeError(msg)
     encrypted_data = raw[header_len:]
     fernet_key = _get_db_fernet_key(salt=salt)
     if fernet_key is None:
+        logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
-            f"Cannot decrypt DB {path} \u2014 identity master key is not available. "
+            "Cannot decrypt database — identity master key is not available. "
             "Run `symeraseme init-profile` first."
         )
         raise RuntimeError(msg)
@@ -215,6 +240,9 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
 
         if should_encrypt and db_file.exists() and _is_encrypted(db_file):
+            raw = db_file.read_bytes()
+            if raw.startswith(_ENC_HEADER_V1):
+                _migrate_v1_to_v2(db_file)
             db_file = _decrypt_to_temp(db_file)
         elif should_encrypt and not db_file.exists():
             _DB_TEMP[db_file.resolve()] = db_file

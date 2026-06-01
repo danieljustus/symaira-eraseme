@@ -60,7 +60,7 @@ class TestCaptureError:
         exc = TimeoutError("Navigation timed out after 30s")
         msg = _capture_error(exc, "https://example.com")
         assert "timed out" in msg
-        assert "example.com" in msg
+        assert "example.com" not in msg
 
     def test_network_error(self):
         exc = Exception("net::ERR_CONNECTION_REFUSED")

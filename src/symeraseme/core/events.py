@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
 from symeraseme.core.db import get_connection
+
+logger = logging.getLogger(__name__)
+
 
 EVENT_TYPES = frozenset(
     {
@@ -100,6 +104,7 @@ def append_event(
         msg = f"Unknown source: {source}. Valid: {sorted(VALID_SOURCES)}"
         raise ValueError(msg)
 
+    logger.debug("Appending event %s for request %s", event_type, request_id)
     conn = get_connection()
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
     cur = conn.execute(
