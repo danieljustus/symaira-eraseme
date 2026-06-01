@@ -226,11 +226,12 @@ def _resolve_value(value: str, identity_fields: dict[str, str]) -> str:
 def _capture_error(exc: Exception, current_url: str) -> str:
     """Capture a user-friendly error message."""
     msg = str(exc) or type(exc).__name__
+    logger.debug("Playwright error at %s: %s", current_url, msg)
     if "Timeout" in msg or "timed out" in msg.lower():
-        return f"Timeout error at {current_url}: {msg[:200]}"
+        return f"Timeout error: {msg[:200]}"
     if "net::" in msg:
-        return f"Network error at {current_url}: {msg[:200]}"
-    return f"Error at {current_url}: {msg[:200]}"
+        return f"Network error: {msg[:200]}"
+    return f"Browser automation error: {msg[:200]}"
 
 
 async def _save_screenshot(page: Any, directory: Path, name: str) -> Path:

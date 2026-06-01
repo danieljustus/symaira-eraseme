@@ -126,13 +126,15 @@ def _decrypt_to_temp(path: Path) -> Path:
         header_len = len(_ENC_MAGIC_V2) + _ENC_SALT_LEN
         salt = raw[len(_ENC_MAGIC_V2) : header_len]
     else:
-        msg = f"Unrecognized encryption header in {path}"
+        logger.debug("Unrecognized encryption header in %s", path)
+        msg = "Unrecognized encryption header in database file."
         raise RuntimeError(msg)
     encrypted_data = raw[header_len:]
     fernet_key = _get_db_fernet_key(salt=salt)
     if fernet_key is None:
+        logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
-            f"Cannot decrypt DB {path} \u2014 identity master key is not available. "
+            "Cannot decrypt database — identity master key is not available. "
             "Run `symeraseme init-profile` first."
         )
         raise RuntimeError(msg)

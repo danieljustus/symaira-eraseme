@@ -148,14 +148,16 @@ def poll_inbox(
     try:
         mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
     except (OSError, imaplib.IMAP4.error) as e:
-        msg = f"Failed to connect to {host}:{port}: {e}"
+        logger.debug("Failed to connect to %s:%s: %s", host, port, e)
+        msg = f"Failed to connect to mail server: {e}"
         raise IMAPError(msg) from e
 
     try:
         mail.login(username, password)
     except (OSError, imaplib.IMAP4.error) as e:
         mail.logout()
-        msg = f"IMAP login failed for {username}: {e}"
+        logger.debug("IMAP login failed for %s: %s", username, e)
+        msg = f"IMAP login failed: {e}"
         raise IMAPError(msg) from e
 
     try:
@@ -164,7 +166,8 @@ def poll_inbox(
         status, message_ids = mail.search(None, f"SINCE {since_date}")
     except (OSError, imaplib.IMAP4.error) as e:
         mail.logout()
-        msg = f"IMAP search failed: {e}"
+        logger.debug("IMAP login failed for %s: %s", username, e)
+        msg = f"IMAP login failed: {e}"
         raise IMAPError(msg) from e
 
     if status != "OK":
@@ -278,14 +281,16 @@ def get_message(
     try:
         mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
     except (OSError, imaplib.IMAP4.error) as e:
-        msg = f"Failed to connect to {host}:{port}: {e}"
+        logger.debug("Failed to connect to %s:%s: %s", host, port, e)
+        msg = f"Failed to connect to mail server: {e}"
         raise IMAPError(msg) from e
 
     try:
         mail.login(username, password)
     except (OSError, imaplib.IMAP4.error) as e:
         mail.logout()
-        msg = f"IMAP login failed for {username}: {e}"
+        logger.debug("IMAP login failed for %s: %s", username, e)
+        msg = f"IMAP login failed: {e}"
         raise IMAPError(msg) from e
 
     try:

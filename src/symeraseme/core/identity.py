@@ -88,7 +88,8 @@ def save_profile(
 def load_profile(path: str | None = None) -> IdentityProfile:
     target = _profile_path(path)
     if not target.exists():
-        msg = f"Identity profile not found at {target}. Run 'symeraseme init-profile' first."
+        logger.debug("Identity profile not found at %s", target)
+        msg = "Identity profile not found. Run 'symeraseme init-profile' first."
         raise FileNotFoundError(msg)
 
     key = _get_existing_master_key()
