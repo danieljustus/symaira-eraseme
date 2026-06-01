@@ -71,8 +71,11 @@ def handle_execute(
     backend: str | None = None,
 ) -> CliResult:
     if not dry_run and not check_consent(
-    """execute."""
-        "execute", yes=yes, consent_token=consent_token, consent_file=consent_file
+        """execute."""
+        "execute",
+        yes=yes,
+        consent_token=consent_token,
+        consent_file=consent_file,
     ):
         from symeraseme.cli.console import render_error
 

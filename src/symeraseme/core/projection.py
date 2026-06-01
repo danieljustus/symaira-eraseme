@@ -14,7 +14,6 @@ from symeraseme.core.events import append_event
 logger = logging.getLogger(__name__)
 
 
-
 def _next_status(event_type: str) -> str | None:
     mapping: dict[str, str | None] = {
         "PLANNED": "PLANNED",

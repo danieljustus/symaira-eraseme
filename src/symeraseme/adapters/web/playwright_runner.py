@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class PlaywrightRunnerError(Exception):
     """PlaywrightRunner error."""
+
     pass
 
 
