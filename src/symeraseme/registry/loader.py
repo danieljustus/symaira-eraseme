@@ -127,11 +127,21 @@ def _save_persistent_cache(
     registry_dir: Path,
     cache_key: tuple[str, str],
     brokers: list[Broker],
+    id_index: dict[str, Path],
 ) -> None:
     path = _persistent_cache_path(registry_dir)
+    relative_index: dict[str, str] = {}
+    for broker_id, broker_path in id_index.items():
+        try:
+            relative_index[broker_id] = str(broker_path.relative_to(registry_dir))
+        except ValueError:
+            relative_index[broker_id] = str(broker_path)
     try:
         with open(path, "wb") as f:
-            pickle.dump({"cache_key": cache_key, "brokers": brokers}, f)
+            pickle.dump(
+                {"cache_key": cache_key, "brokers": brokers, "id_index": relative_index},
+                f,
+            )
     except OSError as e:
         logger.warning("Failed to save persistent broker cache: %s", e)
 
@@ -139,7 +149,7 @@ def _save_persistent_cache(
 def _load_persistent_cache(
     registry_dir: Path,
     cache_key: tuple[str, str],
-) -> list[Broker] | None:
+) -> tuple[list[Broker], dict[str, Path]] | None:
     path = _persistent_cache_path(registry_dir)
     if not path.exists():
         return None
@@ -155,8 +165,16 @@ def _load_persistent_cache(
     brokers = data.get("brokers", [])
     if not brokers:
         return None
+    raw_index = data.get("id_index")
+    if isinstance(raw_index, dict) and raw_index:
+        id_index = {
+            str(broker_id): registry_dir / str(index_path)
+            for broker_id, index_path in raw_index.items()
+        }
+    else:
+        id_index = _build_broker_id_index(registry_dir)
     logger.debug("Loaded %d brokers from persistent cache", len(brokers))
-    return brokers
+    return brokers, id_index
 
 
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
@@ -251,10 +269,11 @@ def load_all_brokers(
     if not has_filters:
         cached = _load_persistent_cache(registry_path, cache_key)
         if cached is not None:
-            _BROKER_CACHE[cache_key] = cached
-            _BROKER_ID_INDEX = {b.id: registry_path / f"{b.id}.yaml" for b in cached}
+            cached_brokers, cached_index = cached
+            _BROKER_CACHE[cache_key] = cached_brokers
+            _BROKER_ID_INDEX = cached_index
             return _filter_brokers(
-                cached,
+                cached_brokers,
                 jurisdiction=jurisdiction,
                 law=law,
                 priority=priority,
@@ -311,7 +330,7 @@ def load_all_brokers(
     _BROKER_ID_INDEX = id_index
     _BROKER_CACHE[cache_key] = brokers
     _SKIPPED_COUNT[cache_key] = skipped
-    _save_persistent_cache(registry_path, cache_key, brokers)
+    _save_persistent_cache(registry_path, cache_key, brokers, id_index)
     return _filter_brokers(
         brokers,
         jurisdiction=jurisdiction,

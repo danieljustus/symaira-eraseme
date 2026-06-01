@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.2.0] – 2026-06-01
+
+- Hardened encrypted database storage with per-file salts, safer temporary files, automatic V1-to-V2 migration, and reduced PBKDF2 overhead.
+- Improved consent token handling with hashed filenames, atomic `0o600` file creation, and `--consent-file` / `SYMERASEME_CONSENT_FILE` support.
+- Fixed batch execution failures, dashboard packaging and permissions, request-event indexing, and campaign dashboard query performance.
+- Added profile-aware batch templating, jurisdiction-aware PII scrubber coverage, quieter verbose logging, and faster registry link checks.
+- Added Homebrew installation documentation and corrected installation/repository links.
+- Refactored scheduler, report generation, service handlers, LLM clients, and registry loading for better maintainability and cold-start performance.
+
 ## [v0.1.4] – 2026-05-28
 
 - release: v0.1.4 (#154)
@@ -99,4 +108,3 @@ All notable changes to this project are documented in this file.
 ## [v0.1.0] – 2026-05-21
 
 _No conventional commits found._
-

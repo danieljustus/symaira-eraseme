@@ -20,4 +20,4 @@ warnings.warn(
 from symeraseme import *  # noqa: F403
 from symeraseme import __version__  # noqa: F401
 
-__version__ = "0.1.4 (redirect to symeraseme)"
+__version__ = "0.2.0 (redirect to symeraseme)"
