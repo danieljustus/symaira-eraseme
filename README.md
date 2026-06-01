@@ -4,7 +4,7 @@
 
 > **Beta** — Core features are stable and tested. Some advanced features (web-form CAPTCHA solving, DPA auto-filing) require manual setup or are event-flagged only.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira%20EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira%20EraseMe/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira-EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira-EraseMe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 
@@ -55,7 +55,7 @@ pip install symeraseme[triage]   # LLM triage via Anthropic Claude
 
 ```bash
 # Clone the repository
-git clone https://github.com/danieljustus/Symaira%20EraseMe.git
+git clone https://github.com/danieljustus/Symaira-EraseMe.git
 cd Symaira EraseMe
 
 # Install dependencies with uv
