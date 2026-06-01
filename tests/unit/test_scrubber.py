@@ -60,3 +60,30 @@ class TestEuPiIScrubbing:
         assert "DE89370400440532013000" not in result
         assert "12345678Z" not in result
         assert "L12345678" not in result
+
+
+class TestReDoSPrevention:
+    def test_long_dot_string_does_not_hang(self):
+        import time
+
+        text = "user@" + "." * 5000
+        start = time.perf_counter()
+        result = scrub_pii(text)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 1.0
+        assert "user@" in result
+
+    def test_long_hyphen_string_does_not_hang(self):
+        import time
+
+        text = "user@" + "a-" * 2000
+        start = time.perf_counter()
+        result = scrub_pii(text)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 1.0
+
+    def test_normal_email_still_scrubbed_after_regex_change(self):
+        result = scrub_pii("Reach me at alice.smith@company.co.uk")
+        assert "alice.smith@company.co.uk" not in result
+        assert "a****" in result
+        assert "@" in result
