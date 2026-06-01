@@ -84,6 +84,8 @@ class Verification(BaseModel):
 
 
 class Broker(BaseModel):
+    """A data broker with opt-out channels, jurisdiction and verification rules."""
+
     id: str = Field(pattern=r"^[a-z0-9-]+$")
     name: str
     website: str

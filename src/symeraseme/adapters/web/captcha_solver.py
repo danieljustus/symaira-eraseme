@@ -33,6 +33,7 @@ def _backoff_delay(iteration: int, cap: int = _BACKOFF_CAP) -> float:
 
 
 class CaptchaError(Exception):
+    """Captcha error."""
     pass
 
 

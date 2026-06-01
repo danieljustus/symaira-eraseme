@@ -46,6 +46,7 @@ PROVIDER_CONFIGS: dict[str, dict[str, str]] = {
 
 
 class OAuth2Error(Exception):
+    """OAuth2 error."""
     pass
 
 

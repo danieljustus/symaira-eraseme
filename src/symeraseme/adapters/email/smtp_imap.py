@@ -25,6 +25,7 @@ RE_MESSAGE_ID = re.compile(r"<[^>]+>")
 
 
 class IMAPError(Exception):
+    """IMAP error."""
     pass
 
 

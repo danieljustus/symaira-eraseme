@@ -16,6 +16,7 @@ def handle_generate_dashboard(
     auto_refresh: int = 0,
 ) -> CliResult:
     data = get_dashboard_data()
+    """generate dashboard."""
     html = generate_dashboard(data, auto_refresh_seconds=auto_refresh)
     Path(output).write_text(html)
     os.chmod(output, 0o600)
@@ -47,6 +48,7 @@ def handle_generate_report(
     output: str = "",
     all_campaigns: bool = False,
 ) -> CliResult:
+    """Generate a campaign report in the requested format."""
     data = get_report_data(
         campaign_id=campaign_id,
         all_campaigns=all_campaigns,
