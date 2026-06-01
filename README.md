@@ -51,6 +51,13 @@ pip install symeraseme[web]      # Playwright-based browser automation
 pip install symeraseme[triage]   # LLM triage via Anthropic Claude
 ```
 
+**macOS users** (via Homebrew):
+
+```bash
+brew tap danieljustus/symaira
+brew install symeraseme
+```
+
 **Developers** (from source):
 
 ```bash
