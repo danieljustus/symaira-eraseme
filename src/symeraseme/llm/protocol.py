@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,3 +84,107 @@ class LLMClient(Protocol):
             LLMClientRateLimitError: when the provider rate-limits the call.
         """
         ...
+
+
+class BaseLLMClient(ABC):
+    """Abstract base class for LLM clients with shared retry, cost tracking, and rate-limit handling.
+
+    Subclasses must implement:
+        - is_available()
+        - _call_api()
+
+    The classify() method provides a unified retry loop with exponential backoff.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        max_retries: int = 3,
+        cost_tracker: list[UsageRecord] | None = None,
+    ) -> None:
+        self.model = model
+        self.max_retries = max_retries
+        self.cost_tracker = cost_tracker if cost_tracker is not None else []
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Return True if the client is ready to make API calls."""
+        ...
+
+    @abstractmethod
+    def _call_api(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int,
+        temperature: float,
+        cache_key: str | None,
+    ) -> tuple[str, UsageRecord]:
+        """Make the provider-specific API call.
+
+        Must raise LLMClientRateLimitError for rate-limit errors
+        and LLMClientError for other API errors.
+        """
+        ...
+
+    def classify(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        max_tokens: int = 512,
+        temperature: float = 0.0,
+        cache_key: str | None = None,
+    ) -> tuple[str, UsageRecord]:
+        """Send a classification request with retry logic.
+
+        Returns (response_text, usage_record).
+        Raises LLMClientError on failure.
+        """
+        if not self.is_available():
+            raise LLMClientError(
+                f"{self.__class__.__name__} is not available (no API key or SDK not installed)"
+            )
+
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return self._call_api(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    cache_key=cache_key,
+                )
+            except LLMClientRateLimitError as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    wait = 2**attempt + (hash(str(cache_key)) % 5)
+                    logger.warning(
+                        "Rate limited (attempt %d/%d), retrying in %ds",
+                        attempt,
+                        self.max_retries,
+                        wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+            except LLMClientError as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    wait = 2**attempt
+                    logger.warning(
+                        "API error (attempt %d/%d): %s. Retrying in %ds",
+                        attempt,
+                        self.max_retries,
+                        e,
+                        wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+
+        msg = f"All {self.max_retries} retries exhausted: {last_error}"
+        raise LLMClientError(msg) from last_error
