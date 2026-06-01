@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
 from symeraseme.core.db import get_connection
-import logging
 
 logger = logging.getLogger(__name__)
 

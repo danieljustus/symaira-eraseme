@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from symeraseme.core.protocols import WebFormRunner
 
+import logging
+
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
@@ -23,7 +25,6 @@ from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
 from symeraseme.registry.schema import Broker
-import logging
 
 logger = logging.getLogger(__name__)
 

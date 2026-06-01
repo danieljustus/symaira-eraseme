@@ -4,6 +4,7 @@ import base64
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import secrets
 import socket
@@ -17,7 +18,6 @@ from urllib.parse import parse_qs, urlencode
 from urllib.request import Request, urlopen
 
 import keyring
-import logging
 
 logger = logging.getLogger(__name__)
 
