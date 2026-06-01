@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import json
+import os
+import sys
+
 import typer
 
 from symeraseme import __version__
 from symeraseme.cli.console import console, render_error, render_result
-from symeraseme.core.db import init_db
+from symeraseme.core.db import _db_path, init_db
 from symeraseme.core.events import get_events, list_removal_requests
-from symeraseme.registry.loader import load_all_brokers, load_broker
+from symeraseme.core.identity import _profile_path
+from symeraseme.registry.loader import (
+    _SKIPPED_COUNT,
+    _broker_cache_key,
+    _registry_dir,
+    load_all_brokers,
+    load_broker,
+)
 from symeraseme.registry.schema import EmailOptOut, WebFormOptOut
 
 events_app = typer.Typer(
@@ -32,109 +43,108 @@ def version() -> None:
     console.print(f"Symaira EraseMe v{__version__}", markup=False, soft_wrap=True)
 
 
+def _check_python_version() -> tuple[bool, str]:
+    version_info = sys.version_info
+    ok = version_info >= (3, 11)
+    return ok, f"Python {version_info.major}.{version_info.minor}.{version_info.micro}"
+
+
+def _check_deps() -> tuple[bool, str]:
+    required = [
+        "typer",
+        "rich",
+        "pydantic",
+        "yaml",
+        "cryptography",
+        "jinja2",
+        "jsonschema",
+    ]
+    missing = []
+    for pkg in required:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        return False, f"Missing: {', '.join(missing)}"
+    return True, "All required packages installed"
+
+
+def _check_config() -> tuple[bool, str]:
+    try:
+        pp = _profile_path()
+        pp.parent.mkdir(parents=True, exist_ok=True)
+        test_file = pp.parent / ".write_test"
+        test_file.write_text("")
+        test_file.unlink()
+        return True, str(pp.parent)
+    except OSError as e:
+        return False, str(e)
+
+
+def _check_database() -> tuple[bool, str]:
+    try:
+        db_path = _db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return True, str(db_path)
+    except OSError as e:
+        return False, str(e)
+
+
+def _check_registry() -> tuple[bool, str]:
+    try:
+        rp = _registry_dir()
+        if not rp.exists():
+            return False, f"Registry not found at {rp}"
+        broker_count = len(list(rp.rglob("*.yaml")))
+        cache_key = _broker_cache_key(rp)
+        skipped = _SKIPPED_COUNT.get(cache_key, 0)
+        msg = f"{broker_count} broker definitions found"
+        if skipped:
+            msg += f" ({skipped} skipped)"
+        return True, msg
+    except OSError as e:
+        return False, str(e)
+
+
+def _check_llm() -> tuple[bool, str]:
+    provider = os.environ.get("SYMERASEME_LLM_PROVIDER", "anthropic")
+    key_map = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+    pieces = [f"provider={provider}"]
+    if provider not in key_map and provider != "ollama":
+        pieces.append("unknown provider")
+        return False, ", ".join(pieces)
+    if provider == "ollama":
+        pieces.append("(no API key required)")
+    else:
+        key_var = key_map[provider]
+        if os.environ.get(key_var):
+            pieces.append(f"{key_var}=✓")
+        else:
+            pieces.append(f"{key_var}=✗ (not set)")
+            return False, ", ".join(pieces)
+    model = os.environ.get("SYMERASEME_LLM_MODEL", "")
+    if model:
+        pieces.append(f"model={model}")
+    return True, ", ".join(pieces)
+
+
+def _check_env() -> tuple[bool, str]:
+    optional = [
+        "SYMERASEME_LLM_PROVIDER",
+        "SYMERASEME_LLM_MODEL",
+        "SYMERASEME_ENCRYPT_DB",
+        "IMAP_PASSWORD",
+        "CAPSOLVER_API_KEY",
+    ]
+    set_vars = [v for v in optional if os.environ.get(v)]
+    if set_vars:
+        return True, f"Set: {', '.join(set_vars)}"
+    return True, "None set (optional)"
+
+
 def doctor(ctx: typer.Context) -> None:
     """Run environment checks and report status."""
-    import json
-    import os
-    import sys
-
-    from symeraseme.core.db import _db_path
-    from symeraseme.core.identity import _profile_path
-    from symeraseme.registry.loader import _SKIPPED_COUNT, _broker_cache_key, _registry_dir
-
-    def _check_python_version() -> tuple[bool, str]:
-        version_info = sys.version_info
-        ok = version_info >= (3, 11)
-        return ok, f"Python {version_info.major}.{version_info.minor}.{version_info.micro}"
-
-    def _check_deps() -> tuple[bool, str]:
-        required = [
-            "typer",
-            "rich",
-            "pydantic",
-            "yaml",
-            "cryptography",
-            "jinja2",
-            "jsonschema",
-        ]
-        missing = []
-        for pkg in required:
-            try:
-                __import__(pkg)
-            except ImportError:
-                missing.append(pkg)
-        if missing:
-            return False, f"Missing: {', '.join(missing)}"
-        return True, "All required packages installed"
-
-    def _check_config() -> tuple[bool, str]:
-        try:
-            pp = _profile_path()
-            pp.parent.mkdir(parents=True, exist_ok=True)
-            test_file = pp.parent / ".write_test"
-            test_file.write_text("")
-            test_file.unlink()
-            return True, str(pp.parent)
-        except OSError as e:
-            return False, str(e)
-
-    def _check_database() -> tuple[bool, str]:
-        try:
-            db_path = _db_path()
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            return True, str(db_path)
-        except OSError as e:
-            return False, str(e)
-
-    def _check_registry() -> tuple[bool, str]:
-        try:
-            rp = _registry_dir()
-            if not rp.exists():
-                return False, f"Registry not found at {rp}"
-            broker_count = len(list(rp.rglob("*.yaml")))
-            cache_key = _broker_cache_key(rp)
-            skipped = _SKIPPED_COUNT.get(cache_key, 0)
-            msg = f"{broker_count} broker definitions found"
-            if skipped:
-                msg += f" ({skipped} skipped)"
-            return True, msg
-        except OSError as e:
-            return False, str(e)
-
-    def _check_llm() -> tuple[bool, str]:
-        provider = os.environ.get("SYMERASEME_LLM_PROVIDER", "anthropic")
-        key_map = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
-        pieces = [f"provider={provider}"]
-        if provider not in key_map and provider != "ollama":
-            pieces.append("unknown provider")
-            return False, ", ".join(pieces)
-        if provider == "ollama":
-            pieces.append("(no API key required)")
-        else:
-            key_var = key_map[provider]
-            if os.environ.get(key_var):
-                pieces.append(f"{key_var}=✓")
-            else:
-                pieces.append(f"{key_var}=✗ (not set)")
-                return False, ", ".join(pieces)
-        model = os.environ.get("SYMERASEME_LLM_MODEL", "")
-        if model:
-            pieces.append(f"model={model}")
-        return True, ", ".join(pieces)
-
-    def _check_env() -> tuple[bool, str]:
-        optional = [
-            "SYMERASEME_LLM_PROVIDER",
-            "SYMERASEME_LLM_MODEL",
-            "SYMERASEME_ENCRYPT_DB",
-            "IMAP_PASSWORD",
-            "CAPSOLVER_API_KEY",
-        ]
-        set_vars = [v for v in optional if os.environ.get(v)]
-        if set_vars:
-            return True, f"Set: {', '.join(set_vars)}"
-        return True, "None set (optional)"
-
     checks = {
         "Python version": _check_python_version(),
         "Dependencies": _check_deps(),

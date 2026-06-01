@@ -145,114 +145,50 @@ async def auto_confirm(
             dry_run=True,
         )
 
+    pw, browser, page = await _setup_browser(headless=headless)
+    result = ConfirmationResult(success=False, clicked_url=target_url)
+
     try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        msg = (
-            "Playwright is not installed. "
-            "Install via: uv pip install playwright && playwright install chromium"
-        )
-        raise ConfirmationClickerError(msg) from None
+        await page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
 
-    screenshot_before_path = ""
-    screenshot_after_path = ""
+        if rate_limit_delay > 0:
+            await _async_sleep(rate_limit_delay)
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=headless)
-        context = await browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
-        )
-        page = await context.new_page()
+        if screenshot_dir_path:
+            result.screenshot_before = str(
+                await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_before")
+            )
 
-        result = ConfirmationResult(success=False, clicked_url=target_url)
+        clicked, step = await _process_clicks(page)
+        if clicked:
+            result.success = True
+            result.step = step
+        else:
+            result.error = "No clickable confirmation element found"
+            result.step = "no_element"
 
-        try:
-            await page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
+        if rate_limit_delay > 0:
+            await _async_sleep(rate_limit_delay)
 
-            if rate_limit_delay > 0:
-                await _async_sleep(rate_limit_delay)
-
-            if screenshot_dir_path:
-                screenshot_before_path = str(
-                    await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_before")
+        if screenshot_dir_path:
+            suffix = "success" if result.success else "failed"
+            result.screenshot_after = str(
+                await _save_screenshot(
+                    page,
+                    screenshot_dir_path,
+                    f"req{request_id}_after_{suffix}",
                 )
-                result.screenshot_before = screenshot_before_path
-
-            click_selectors = [
-                "a[href*='confirm']",
-                "a[href*='verify']",
-                "a[href*='unsubscribe']",
-                "button:has-text('Confirm')",
-                "button:has-text('Yes')",
-                "button:has-text('Verify')",
-                "button:has-text('Unsubscribe')",
-                "a:has-text('Confirm')",
-                "a:has-text('Yes')",
-                "a:has-text('Verify')",
-                "a:has-text('Click here')",
-                "input[type='submit']",
-                "button[type='submit']",
-            ]
-
-            clicked = False
-            for selector in click_selectors:
-                try:
-                    el = await page.wait_for_selector(selector, timeout=3000)
-                    if el:
-                        logger.debug("Clicking %s", selector)
-                        await el.click()
-                        clicked = True
-                        result.step = f"clicked_{selector}"
-                        break
-                except (RuntimeError, ValueError):
-                    logger.debug("Selector %s not found or not clickable", selector)
-                    continue
-
-            if not clicked:
-                try:
-                    first_link = await page.wait_for_selector("a", timeout=2000)
-                    if first_link:
-                        await first_link.click()
-                        clicked = True
-                        result.step = "clicked_fallback_link"
-                except (RuntimeError, ValueError):
-                    logger.debug("Fallback link click failed")
-
-            if not clicked:
-                result.error = "No clickable confirmation element found"
-                result.step = "no_element"
-            else:
-                result.success = True
-
-            if rate_limit_delay > 0:
-                await _async_sleep(rate_limit_delay)
-
-            if screenshot_dir_path:
-                suffix = "success" if result.success else "failed"
-                screenshot_after_path = str(
-                    await _save_screenshot(
-                        page,
-                        screenshot_dir_path,
-                        f"req{request_id}_after_{suffix}",
-                    )
-                )
-                result.screenshot_after = screenshot_after_path
-
-        except (RuntimeError, ValueError, OSError) as e:
-            result.error = _capture_clicker_error(e, page.url if page else target_url)
-            if screenshot_dir_path:
-                screenshot_after_path = str(
-                    await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_error")
-                )
-                result.screenshot_after = screenshot_after_path
-            logger.warning("Auto-confirm failed: %s", result.error)
-        finally:
-            await browser.close()
+            )
+    except (RuntimeError, ValueError, OSError) as e:
+        result.error = _capture_clicker_error(e, page.url if page else target_url)
+        if screenshot_dir_path:
+            result.screenshot_after = str(
+                await _save_screenshot(page, screenshot_dir_path, f"req{request_id}_error")
+            )
+        logger.warning("Auto-confirm failed: %s", result.error)
+    finally:
+        await browser.close()
+        await pw.stop()
 
     return result
 
@@ -282,3 +218,72 @@ async def _async_sleep(seconds: float) -> None:
     import asyncio
 
     await asyncio.sleep(seconds)
+
+
+async def _setup_browser(headless: bool = True) -> tuple[Any, Any, Any]:
+    """Initialize Playwright with a Chromium browser and return (playwright, browser, page)."""
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        msg = (
+            "Playwright is not installed. "
+            "Install via: uv pip install playwright && playwright install chromium"
+        )
+        raise ConfirmationClickerError(msg) from None
+
+    pw = await async_playwright().start()
+    browser = await pw.chromium.launch(headless=headless)
+    context = await browser.new_context(
+        viewport={"width": 1280, "height": 800},
+        user_agent=(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/125.0.0.0 Safari/537.36"
+        ),
+    )
+    page = await context.new_page()
+    return pw, browser, page
+
+
+async def _process_clicks(page: Any) -> tuple[bool, str]:
+    """Try to click confirmation elements on the page.
+
+    Returns (clicked, step_description).
+    """
+    click_selectors = [
+        "a[href*='confirm']",
+        "a[href*='verify']",
+        "a[href*='unsubscribe']",
+        "button:has-text('Confirm')",
+        "button:has-text('Yes')",
+        "button:has-text('Verify')",
+        "button:has-text('Unsubscribe')",
+        "a:has-text('Confirm')",
+        "a:has-text('Yes')",
+        "a:has-text('Verify')",
+        "a:has-text('Click here')",
+        "input[type='submit']",
+        "button[type='submit']",
+    ]
+
+    for selector in click_selectors:
+        try:
+            el = await page.wait_for_selector(selector, timeout=3000)
+            if el:
+                logger.debug("Clicking %s", selector)
+                await el.click()
+                return True, f"clicked_{selector}"
+        except (RuntimeError, ValueError):
+            logger.debug("Selector %s not found or not clickable", selector)
+            continue
+
+    # Fallback: try any link on the page
+    try:
+        first_link = await page.wait_for_selector("a", timeout=2000)
+        if first_link:
+            await first_link.click()
+            return True, "clicked_fallback_link"
+    except (RuntimeError, ValueError):
+        logger.debug("Fallback link click failed")
+
+    return False, "no_element"

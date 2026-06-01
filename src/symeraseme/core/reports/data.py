@@ -344,6 +344,22 @@ def _median(sorted_values: list[float]) -> float:
     return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
 
 
+def _count_where(
+    conn,
+    where: str,
+    params: tuple,
+    *,
+    join_clause: str = "",
+    additional_where: str = "",
+    additional_params: tuple = (),
+) -> int:
+    row = conn.execute(
+        f"SELECT COUNT(*) AS n FROM removal_requests r {join_clause} {where} {additional_where}",
+        (*params, *additional_params),
+    ).fetchone()
+    return row["n"] if row else 0
+
+
 def get_campaign_status(
     campaign_id: str | None = None,
 ) -> dict[str, Any]:
@@ -360,10 +376,7 @@ def get_campaign_status(
     where = "WHERE (? IS NULL OR r.campaign_id = ?)"
     params: tuple = (campaign_id or None, campaign_id or None)
 
-    total_row = conn.execute(
-        f"SELECT COUNT(*) AS n FROM removal_requests r {where}", params
-    ).fetchone()
-    total = total_row["n"] if total_row else 0
+    total = _count_where(conn, where, params)
 
     status_counts: dict[str, int] = {}
     if total:
@@ -398,63 +411,58 @@ def get_campaign_status(
         for row in rows:
             escalation_counts[int(row["level"])] = row["n"]
 
-    overdue_row = conn.execute(
-        f"""SELECT COUNT(*) AS n
-            FROM removal_requests r
-            JOIN request_state s ON s.request_id = r.id
-            {where}
-              AND s.deadline_at IS NOT NULL
-              AND s.deadline_at <= ?
-              AND s.resolved_at IS NULL""",
-        (*params, now_iso),
-    ).fetchone()
-    overdue = overdue_row["n"] if overdue_row else 0
+    _join = "JOIN request_state s ON s.request_id = r.id"
+    _resolved_null = "AND s.resolved_at IS NULL"
 
-    due_7_row = conn.execute(
-        f"""SELECT COUNT(*) AS n
-            FROM removal_requests r
-            JOIN request_state s ON s.request_id = r.id
-            {where}
-              AND s.deadline_at IS NOT NULL
-              AND s.deadline_at BETWEEN ? AND ?
-              AND s.resolved_at IS NULL""",
-        (*params, now_iso, horizon_7),
-    ).fetchone()
-    due_within_7d = due_7_row["n"] if due_7_row else 0
-
-    due_30_row = conn.execute(
-        f"""SELECT COUNT(*) AS n
-            FROM removal_requests r
-            JOIN request_state s ON s.request_id = r.id
-            {where}
-              AND s.deadline_at IS NOT NULL
-              AND s.deadline_at BETWEEN ? AND ?
-              AND s.resolved_at IS NULL""",
-        (*params, now_iso, horizon_30),
-    ).fetchone()
-    due_within_30d = due_30_row["n"] if due_30_row else 0
-
-    next_tick_row = conn.execute(
-        f"""SELECT COUNT(*) AS n
-            FROM removal_requests r
-            JOIN request_state s ON s.request_id = r.id
-            {where}
-              AND s.next_action_at IS NOT NULL
-              AND s.next_action_at <= ?
-              AND s.resolved_at IS NULL""",
-        (*params, now_iso),
-    ).fetchone()
-    next_tick_ready = next_tick_row["n"] if next_tick_row else 0
-
-    resolved_row = conn.execute(
-        (
-            "SELECT COUNT(*) AS n FROM removal_requests r "
-            f"JOIN request_state s ON s.request_id = r.id {where} "
-            "AND s.resolved_at IS NOT NULL"
-        ),
+    overdue = _count_where(
+        conn,
+        where,
         params,
-    ).fetchone()
-    resolved = resolved_row["n"] if resolved_row else 0
+        join_clause=_join,
+        additional_where=(f"AND s.deadline_at IS NOT NULL AND s.deadline_at <= ? {_resolved_null}"),
+        additional_params=(now_iso,),
+    )
+
+    due_within_7d = _count_where(
+        conn,
+        where,
+        params,
+        join_clause=_join,
+        additional_where=(
+            f"AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? {_resolved_null}"
+        ),
+        additional_params=(now_iso, horizon_7),
+    )
+
+    due_within_30d = _count_where(
+        conn,
+        where,
+        params,
+        join_clause=_join,
+        additional_where=(
+            f"AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? {_resolved_null}"
+        ),
+        additional_params=(now_iso, horizon_30),
+    )
+
+    next_tick_ready = _count_where(
+        conn,
+        where,
+        params,
+        join_clause=_join,
+        additional_where=(
+            f"AND s.next_action_at IS NOT NULL AND s.next_action_at <= ? {_resolved_null}"
+        ),
+        additional_params=(now_iso,),
+    )
+
+    resolved = _count_where(
+        conn,
+        where,
+        params,
+        join_clause="JOIN request_state s ON s.request_id = r.id",
+        additional_where="AND s.resolved_at IS NOT NULL",
+    )
 
     return {
         "schema_version": 1,

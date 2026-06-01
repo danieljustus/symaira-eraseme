@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import pickle
 from importlib import resources
 from pathlib import Path
 
@@ -91,7 +92,7 @@ _BROKER_ID_INDEX: dict[str, Path] = {}
 
 
 def clear_registry_cache() -> None:
-    """Clear all in-memory broker caches.
+    """Clear all in-memory and persistent broker caches.
 
     Call this after a registry sync so that subsequent operations
     see the updated data without requiring a process restart.
@@ -102,6 +103,60 @@ def clear_registry_cache() -> None:
     _BROKER_ID_INDEX = {}
     _SKIPPED_COUNT.clear()
     _BROKER_SCHEMA = None
+    import contextlib
+
+    _cache_dir = Path.home() / ".cache" / "symeraseme"
+    if _cache_dir.exists():
+        for f in _cache_dir.glob("brokers_*.pkl"):
+            with contextlib.suppress(OSError):
+                f.unlink()
+
+
+def _cache_dir() -> Path:
+    cache = Path.home() / ".cache" / "symeraseme"
+    cache.mkdir(parents=True, exist_ok=True)
+    return cache
+
+
+def _persistent_cache_path(registry_dir: Path) -> Path:
+    dir_hash = hashlib.sha256(str(registry_dir).encode()).hexdigest()[:16]
+    return _cache_dir() / f"brokers_{dir_hash}.pkl"
+
+
+def _save_persistent_cache(
+    registry_dir: Path,
+    cache_key: tuple[str, str],
+    brokers: list[Broker],
+) -> None:
+    path = _persistent_cache_path(registry_dir)
+    try:
+        with open(path, "wb") as f:
+            pickle.dump({"cache_key": cache_key, "brokers": brokers}, f)
+    except OSError as e:
+        logger.warning("Failed to save persistent broker cache: %s", e)
+
+
+def _load_persistent_cache(
+    registry_dir: Path,
+    cache_key: tuple[str, str],
+) -> list[Broker] | None:
+    path = _persistent_cache_path(registry_dir)
+    if not path.exists():
+        return None
+    try:
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+    except (OSError, pickle.PickleError, EOFError) as e:
+        logger.debug("Persistent broker cache unreadable (%s), rebuilding", e)
+        return None
+    if data.get("cache_key") != cache_key:
+        logger.debug("Persistent broker cache key mismatch, rebuilding")
+        return None
+    brokers = data.get("brokers", [])
+    if not brokers:
+        return None
+    logger.debug("Loaded %d brokers from persistent cache", len(brokers))
+    return brokers
 
 
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
@@ -173,6 +228,7 @@ def load_all_brokers(
     matching the filters are loaded — avoiding full parse of all ~1,279
     files for targeted queries like ``--jurisdiction GDPR --max 5``.
     """
+    global _BROKER_ID_INDEX
     if registry_dir is None:
         registry_dir = _registry_dir() / "brokers"
 
@@ -180,7 +236,7 @@ def load_all_brokers(
     cache_key = _broker_cache_key(registry_path)
     has_filters = bool(jurisdiction or law or priority or category)
 
-    # Warm cache: filter from cached brokers.
+    # Warm in-memory cache: filter from cached brokers.
     if cache_key in _BROKER_CACHE:
         return _filter_brokers(
             _BROKER_CACHE[cache_key],
@@ -190,6 +246,21 @@ def load_all_brokers(
             category=category,
             include_disabled=include_disabled,
         )
+
+    # Persistent cache: only when no filters are applied (full load).
+    if not has_filters:
+        cached = _load_persistent_cache(registry_path, cache_key)
+        if cached is not None:
+            _BROKER_CACHE[cache_key] = cached
+            _BROKER_ID_INDEX = {b.id: registry_path / f"{b.id}.yaml" for b in cached}
+            return _filter_brokers(
+                cached,
+                jurisdiction=jurisdiction,
+                law=law,
+                priority=priority,
+                category=category,
+                include_disabled=include_disabled,
+            )
 
     yaml_files = sorted(registry_path.rglob("*.yaml"))
 
@@ -237,10 +308,10 @@ def load_all_brokers(
             continue
         brokers.append(broker)
         id_index[broker.id] = yml
-    global _BROKER_ID_INDEX
     _BROKER_ID_INDEX = id_index
     _BROKER_CACHE[cache_key] = brokers
     _SKIPPED_COUNT[cache_key] = skipped
+    _save_persistent_cache(registry_path, cache_key, brokers)
     return _filter_brokers(
         brokers,
         jurisdiction=jurisdiction,

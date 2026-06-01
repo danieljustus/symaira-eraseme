@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-import time
+import time  # noqa: F401
 from typing import Any
 
 from symeraseme.llm.protocol import (
+    BaseLLMClient,
     LLMClientError,
     LLMClientRateLimitError,
     UsageRecord,
@@ -25,7 +26,7 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
 }
 
 
-class OpenAIClient:
+class OpenAIClient(BaseLLMClient):
     """Wrapper around the OpenAI SDK with cost tracking and retry."""
 
     def __init__(
@@ -36,12 +37,8 @@ class OpenAIClient:
         max_retries: int = 3,
         cost_tracker: list[UsageRecord] | None = None,
     ) -> None:
-        self.model = model
-        self.max_retries = max_retries
-        self.cost_tracker = cost_tracker if cost_tracker is not None else []
+        super().__init__(model=model, max_retries=max_retries, cost_tracker=cost_tracker)
         self._client: Any = None
-
-        # Lazy import to avoid hard dependency at module level
         self._api_key = api_key
 
     @property
@@ -63,65 +60,6 @@ class OpenAIClient:
 
             self._api_key = os.environ.get("OPENAI_API_KEY")
         return self._api_key is not None and len(self._api_key) > 0
-
-    def classify(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        *,
-        max_tokens: int = 512,
-        temperature: float = 0.0,
-        cache_key: str | None = None,
-    ) -> tuple[str, UsageRecord]:
-        """Send a classification request to OpenAI.
-
-        Returns (response_text, usage_record).
-        Raises LLMClientError on failure.
-        """
-        if not self.is_available():
-            msg = "OpenAI API is not available (no API key or SDK not installed)"
-            raise LLMClientError(msg)
-
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                return self._call_api(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    cache_key=cache_key,
-                )
-            except LLMClientRateLimitError as e:
-                last_error = e
-                if attempt < self.max_retries:
-                    wait = 2**attempt + (hash(str(cache_key)) % 5)
-                    logger.warning(
-                        "Rate limited (attempt %d/%d), retrying in %ds",
-                        attempt,
-                        self.max_retries,
-                        wait,
-                    )
-                    time.sleep(wait)
-                else:
-                    raise
-            except LLMClientError as e:
-                last_error = e
-                if attempt < self.max_retries:
-                    wait = 2**attempt
-                    logger.warning(
-                        "API error (attempt %d/%d): %s. Retrying in %ds",
-                        attempt,
-                        self.max_retries,
-                        e,
-                        wait,
-                    )
-                    time.sleep(wait)
-                else:
-                    raise
-
-        msg = f"All {self.max_retries} retries exhausted: {last_error}"
-        raise LLMClientError(msg) from last_error
 
     def _call_api(
         self,
