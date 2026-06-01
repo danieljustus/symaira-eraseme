@@ -8,6 +8,7 @@ via either:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -20,6 +21,34 @@ logger = logging.getLogger(__name__)
 
 CONSENT_DIR = "~/.local/share/symeraseme"
 TOKEN_TTL = 86400  # 24 hours in seconds
+
+
+def _token_filename(token: str) -> str:
+    """Derive a non-reversible filename from a consent token.
+
+    Uses a truncated SHA-256 hash so that the raw token value does
+    not appear in directory listings.
+    """
+    h = hashlib.sha256(token.encode()).hexdigest()[:16]
+    return f"consent_{h}.json"
+
+
+def _find_token_file(token: str) -> Path | None:
+    """Find a token file on disk.
+
+    Tries the hashed filename first, then falls back to the old
+    raw-token filename so that tokens issued before the hash-based
+    naming change remain valid for their remaining TTL.
+    """
+    consent_dir = _consent_dir()
+    hashed = consent_dir / _token_filename(token)
+    if hashed.exists():
+        return hashed
+    # Backward compatibility: old tokens used the raw token in the filename.
+    legacy = consent_dir / f"consent_{token}.json"
+    if legacy.exists():
+        return legacy
+    return None
 
 
 def _consent_dir() -> Path:
@@ -41,16 +70,16 @@ def issue_token(command: str, ttl: int = TOKEN_TTL) -> str:
         },
         sort_keys=True,
     )
-    token_file = _consent_dir() / f"consent_{token}.json"
-    with open(token_file, "w") as f:
+    token_file = _consent_dir() / _token_filename(token)
+    fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)
+    with open(fd, "w") as f:
         f.write(payload)
-    os.chmod(token_file, 0o600)
     return token
 
 
 def verify_token(command: str, token: str) -> bool:
-    token_file = _consent_dir() / f"consent_{token}.json"
-    if not token_file.exists():
+    token_file = _find_token_file(token)
+    if token_file is None:
         return False
     try:
         with open(token_file) as f:
@@ -85,8 +114,9 @@ def verify_token(command: str, token: str) -> bool:
 
 
 def consume_token(token: str) -> None:
-    token_file = _consent_dir() / f"consent_{token}.json"
-    token_file.unlink(missing_ok=True)
+    token_file = _find_token_file(token)
+    if token_file is not None:
+        token_file.unlink(missing_ok=True)
 
 
 def revoke_token(token: str) -> bool:
@@ -94,8 +124,8 @@ def revoke_token(token: str) -> bool:
 
     Returns True if the token existed and was revoked, False otherwise.
     """
-    token_file = _consent_dir() / f"consent_{token}.json"
-    if not token_file.exists():
+    token_file = _find_token_file(token)
+    if token_file is None:
         return False
     token_file.unlink(missing_ok=True)
     return True
@@ -117,7 +147,9 @@ def list_tokens() -> list[dict]:
         if now > expiry:
             f.unlink(missing_ok=True)
             continue
-        token_id = f.stem.replace("consent_", "")
+        # Read the token from the payload so that the returned ID is
+        # the actual token value, not the hashed filename prefix.
+        token_id = payload.get("token", f.stem.replace("consent_", ""))
         # Ensure restrictive permissions on existing token files
         try:
             if f.stat().st_mode & 0o777 != 0o600:

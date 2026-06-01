@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
+from importlib import resources
+from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -37,35 +40,44 @@ def get_dashboard_data(
     all_requests: list[dict[str, Any]] = []
     recent_events: list[dict[str, Any]] = []
 
-    for c in campaigns_rows:
-        camp = dict(c)
-
+    if campaigns_rows:
+        # Fetch all request data in a single query, then group by campaign
+        # to avoid the N+1 per-campaign query pattern.
+        campaign_ids = [c["id"] for c in campaigns_rows]
+        placeholders = ",".join("?" for _ in campaign_ids)
         requests_rows = conn.execute(
-            """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                      r.jurisdiction, r.template_id,
-                      s.current_status, s.last_event_at, s.sent_at,
-                      s.acknowledged_at, s.resolved_at, s.deadline_at,
-                      s.reminders_sent, s.escalation_level
-               FROM removal_requests r
-               LEFT JOIN request_state s ON s.request_id = r.id
-               WHERE r.campaign_id = ?
-               ORDER BY r.created_at ASC""",
-            (camp["id"],),
+            f"""SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
+                       r.jurisdiction, r.template_id,
+                       s.current_status, s.last_event_at, s.sent_at,
+                       s.acknowledged_at, s.resolved_at, s.deadline_at,
+                       s.reminders_sent, s.escalation_level
+                FROM removal_requests r
+                LEFT JOIN request_state s ON s.request_id = r.id
+                WHERE r.campaign_id IN ({placeholders})
+                ORDER BY r.created_at ASC""",
+            campaign_ids,
         ).fetchall()
 
-        requests = [dict(r) for r in requests_rows]
-        all_requests.extend(requests)
+        requests_by_campaign: dict[str, list[dict[str, Any]]] = {cid: [] for cid in campaign_ids}
+        for row in requests_rows:
+            r = dict(row)
+            cid = r["campaign_id"]
+            requests_by_campaign.setdefault(cid, []).append(r)
 
-        camp["requests"] = requests
-        camp["total"] = len(requests)
-        camp["planned"] = _get_status_count(requests, "PLANNED")
-        camp["sent"] = _get_status_count(requests, "SENT")
-        camp["awaiting_ack"] = _get_status_count(requests, "AWAITING_ACK")
-        camp["awaiting_response"] = _get_status_count(requests, "AWAITING_RESPONSE")
-        camp["confirmed"] = _get_status_count(requests, "CONFIRMED")
-        camp["rejected"] = _get_status_count(requests, "REJECTED_FINAL")
-        camp["overdue"] = _get_status_count(requests, "OVERDUE")
-        campaigns.append(camp)
+        for c in campaigns_rows:
+            camp = dict(c)
+            requests = requests_by_campaign.get(camp["id"], [])
+            all_requests.extend(requests)
+            camp["requests"] = requests
+            camp["total"] = len(requests)
+            camp["planned"] = _get_status_count(requests, "PLANNED")
+            camp["sent"] = _get_status_count(requests, "SENT")
+            camp["awaiting_ack"] = _get_status_count(requests, "AWAITING_ACK")
+            camp["awaiting_response"] = _get_status_count(requests, "AWAITING_RESPONSE")
+            camp["confirmed"] = _get_status_count(requests, "CONFIRMED")
+            camp["rejected"] = _get_status_count(requests, "REJECTED_FINAL")
+            camp["overdue"] = _get_status_count(requests, "OVERDUE")
+            campaigns.append(camp)
 
     # Recent events
     events_rows = conn.execute(
@@ -120,6 +132,27 @@ def get_dashboard_data(
     }
 
 
+def _dashboard_templates_dir() -> Path:
+    """Find the dashboard template directory.
+
+    Supports both source checkouts and PyPI-installed packages by
+    using importlib.resources, falling back to parent-directory
+    traversal for editable installs.
+    """
+    env_dir = os.environ.get("SYMERASEME_RESOURCES")
+    if env_dir:
+        return Path(env_dir) / "registry" / "templates"
+    pkg_root = resources.files("symeraseme")
+    candidate = Path(str(pkg_root)) / "registry" / "templates"
+    if candidate.exists() and any(candidate.iterdir()):
+        return candidate
+    for parent in Path(str(pkg_root)).parents:
+        if (parent / "registry" / "templates").exists():
+            return parent / "registry" / "templates"
+    msg = "Could not find dashboard templates directory (registry/templates)"
+    raise FileNotFoundError(msg)
+
+
 def generate_dashboard(
     data: dict[str, Any],
     *,
@@ -134,15 +167,7 @@ def generate_dashboard(
     Returns:
         Self-contained HTML string.
     """
-    import pathlib
-
-    # Navigate from dashboard.py -> core -> symeraseme -> src -> project root
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent
-    loader = FileSystemLoader(
-        searchpath=[
-            str(project_root / "registry" / "templates"),
-        ]
-    )
+    loader = FileSystemLoader(str(_dashboard_templates_dir()))
     env = Environment(loader=loader, autoescape=select_autoescape(["html"]))
 
     template = env.get_template("dashboard.html.j2")

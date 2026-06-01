@@ -9,6 +9,7 @@ import pytest
 
 from symeraseme.core.consent import (
     TOKEN_TTL,
+    _token_filename,
     check_consent,
     consume_token,
     issue_token,
@@ -36,18 +37,18 @@ class TestIssueToken:
 
     def test_issue_stores_token_in_payload(self, _isolated_consent_dir):
         token = issue_token("execute")
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         payload = json.loads(token_file.read_text())
         assert payload["token"] == token
 
     def test_issue_creates_token_file(self, _isolated_consent_dir):
         token = issue_token("execute")
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         assert token_file.exists()
 
     def test_issue_stores_payload(self, _isolated_consent_dir):
         token = issue_token("send-reply", ttl=3600)
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         payload = json.loads(token_file.read_text())
         assert payload["command"] == "send-reply"
         assert payload["expires_at"] - payload["issued_at"] == 3600
@@ -55,7 +56,7 @@ class TestIssueToken:
     def test_issue_default_ttl(self):
         token = issue_token("execute")
         dir_path = Path(os.environ["SYMERASEME_DATA_DIR"])
-        payload = json.loads((dir_path / f"consent_{token}.json").read_text())
+        payload = json.loads((dir_path / _token_filename(token)).read_text())
         assert payload["expires_at"] - payload["issued_at"] == TOKEN_TTL
 
     def test_multiple_tokens_are_unique(self):
@@ -65,7 +66,7 @@ class TestIssueToken:
 
     def test_issue_sets_file_permissions(self, _isolated_consent_dir):
         token = issue_token("execute")
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         mode = token_file.stat().st_mode & 0o777
         assert mode == 0o600
 
@@ -93,7 +94,7 @@ class TestVerifyToken:
         _now = int(time.time())
         monkeypatch.setattr(time, "time", lambda: _now + 10)
         verify_token("execute", token)
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         assert not token_file.exists()
 
     def test_token_mismatch_rejected(self, _isolated_consent_dir):
@@ -125,7 +126,7 @@ class TestVerifyToken:
     def test_verify_fixes_permissions(self, _isolated_consent_dir):
         """verify_token should fix permissions on existing token files."""
         token = issue_token("execute")
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         os.chmod(token_file, 0o644)
         assert verify_token("execute", token) is True
         mode = token_file.stat().st_mode & 0o777
@@ -136,7 +137,7 @@ class TestConsumeToken:
     def test_consume_removes_token_file(self, _isolated_consent_dir):
         token = issue_token("execute")
         consume_token(token)
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         assert not token_file.exists()
 
     def test_consume_nonexistent_does_not_raise(self):
@@ -151,7 +152,7 @@ class TestRevokeToken:
     def test_revoke_existing_removes_file(self, _isolated_consent_dir):
         token = issue_token("execute")
         revoke_token(token)
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         assert not token_file.exists()
 
     def test_revoke_nonexistent_returns_false(self):
@@ -193,7 +194,7 @@ class TestListTokens:
     def test_list_fixes_permissions(self, _isolated_consent_dir):
         """list_tokens should fix permissions on existing token files."""
         token = issue_token("execute")
-        token_file = _isolated_consent_dir / f"consent_{token}.json"
+        token_file = _isolated_consent_dir / _token_filename(token)
         os.chmod(token_file, 0o644)
         list_tokens()
         mode = token_file.stat().st_mode & 0o777

@@ -52,20 +52,21 @@ _local = threading.local()
 
 
 def _get_secure_temp_dir() -> Path:
+    uid = os.getuid()
     system = platform.system()
     if system == "Linux" and Path("/dev/shm").exists():
-        secure_dir = Path("/dev/shm") / "symeraseme-db"
+        secure_dir = Path("/dev/shm") / f"symeraseme-db-{uid}"
     elif system == "Darwin":
         # macOS mounts /tmp as a RAM disk (tmpfs) on modern APFS volumes.
         # Using /tmp directly avoids the disk-backed default from
         # tempfile.gettempdir(), which delegates to a per-user TMPDIR
         # that may live on persistent storage.
-        secure_dir = Path("/tmp") / "symeraseme-db"
+        secure_dir = Path("/tmp") / f"symeraseme-db-{uid}"
     else:
         # Windows and other platforms: fall back to the OS temp directory.
         # On Windows this is disk-backed; see the README security section
         # for mitigation strategies.
-        secure_dir = Path(tempfile.gettempdir()) / "symeraseme-db"
+        secure_dir = Path(tempfile.gettempdir()) / f"symeraseme-db-{uid}"
     secure_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     return secure_dir
 
@@ -315,6 +316,8 @@ def init_db(path: str | None = None) -> Path:
         );
         CREATE INDEX IF NOT EXISTS idx_events_request
             ON request_events(request_id, occurred_at);
+        CREATE INDEX IF NOT EXISTS idx_events_occurred_at
+            ON request_events(occurred_at DESC);
 
         CREATE TABLE IF NOT EXISTS request_state (
             request_id      INTEGER PRIMARY KEY REFERENCES removal_requests(id),

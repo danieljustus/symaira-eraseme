@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ def handle_generate_dashboard(
     data = get_dashboard_data()
     html = generate_dashboard(data, auto_refresh_seconds=auto_refresh)
     Path(output).write_text(html)
+    os.chmod(output, 0o600)
 
     result: dict[str, Any] = {
         "output_file": str(Path(output).resolve()),

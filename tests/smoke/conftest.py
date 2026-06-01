@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner, Result
@@ -37,6 +38,27 @@ def _clean_env() -> None:
             os.environ.pop(k, None)
 
 
+@pytest.fixture(autouse=True)
+def _fake_keyring() -> None:
+    store: dict[str, str] = {}
+
+    def set_pass(service: str, username: str, password: str) -> None:
+        store[f"{service}:{username}"] = password
+
+    def get_pass(service: str, username: str) -> str | None:
+        return store.get(f"{service}:{username}")
+
+    def del_pass(service: str, username: str) -> None:
+        store.pop(f"{service}:{username}", None)
+
+    with (
+        patch("symeraseme.core.identity.keyring.set_password", set_pass),
+        patch("symeraseme.core.identity.keyring.get_password", get_pass),
+        patch("symeraseme.core.identity.keyring.delete_password", del_pass),
+    ):
+        yield
+
+
 @pytest.fixture()
 def tmp_home(tmp_path: Path) -> Path:
     """Provide an isolated temp directory as the fake home/data dir."""
@@ -53,7 +75,16 @@ def seeded_db(tmp_home: Path) -> None:
     """Initialize DB with a seeded campaign and some removal requests."""
     from symeraseme.core.db import init_db
     from symeraseme.core.events import append_event, create_campaign, create_removal_request
+    from symeraseme.core.identity import save_profile
     from symeraseme.core.projection import upsert_state
+    from symeraseme.registry.schema import IdentityProfile
+
+    save_profile(
+        IdentityProfile(
+            full_name="Smoke Test",
+            email_addresses=["smoke@test.com"],
+        )
+    )
 
     init_db()
     create_campaign("smoke-test", kind="initial", notes="smoke test campaign")
