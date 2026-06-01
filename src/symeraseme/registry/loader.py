@@ -103,13 +103,13 @@ def clear_registry_cache() -> None:
     _BROKER_ID_INDEX = {}
     _SKIPPED_COUNT.clear()
     _BROKER_SCHEMA = None
+    import contextlib
+
     _cache_dir = Path.home() / ".cache" / "symeraseme"
     if _cache_dir.exists():
         for f in _cache_dir.glob("brokers_*.pkl"):
-            try:
+            with contextlib.suppress(OSError):
                 f.unlink()
-            except OSError:
-                pass
 
 
 def _cache_dir() -> Path:

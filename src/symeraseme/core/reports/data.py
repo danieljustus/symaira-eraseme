@@ -411,31 +411,46 @@ def get_campaign_status(
         for row in rows:
             escalation_counts[int(row["level"])] = row["n"]
 
+    _join = "JOIN request_state s ON s.request_id = r.id"
+    _resolved_null = "AND s.resolved_at IS NULL"
+
     overdue = _count_where(
         conn, where, params,
-        join_clause="JOIN request_state s ON s.request_id = r.id",
-        additional_where="AND s.deadline_at IS NOT NULL AND s.deadline_at <= ? AND s.resolved_at IS NULL",
+        join_clause=_join,
+        additional_where=(
+            "AND s.deadline_at IS NOT NULL AND s.deadline_at <= ? "
+            f"{_resolved_null}"
+        ),
         additional_params=(now_iso,),
     )
 
     due_within_7d = _count_where(
         conn, where, params,
-        join_clause="JOIN request_state s ON s.request_id = r.id",
-        additional_where="AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? AND s.resolved_at IS NULL",
+        join_clause=_join,
+        additional_where=(
+            "AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? "
+            f"{_resolved_null}"
+        ),
         additional_params=(now_iso, horizon_7),
     )
 
     due_within_30d = _count_where(
         conn, where, params,
-        join_clause="JOIN request_state s ON s.request_id = r.id",
-        additional_where="AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? AND s.resolved_at IS NULL",
+        join_clause=_join,
+        additional_where=(
+            "AND s.deadline_at IS NOT NULL AND s.deadline_at BETWEEN ? AND ? "
+            f"{_resolved_null}"
+        ),
         additional_params=(now_iso, horizon_30),
     )
 
     next_tick_ready = _count_where(
         conn, where, params,
-        join_clause="JOIN request_state s ON s.request_id = r.id",
-        additional_where="AND s.next_action_at IS NOT NULL AND s.next_action_at <= ? AND s.resolved_at IS NULL",
+        join_clause=_join,
+        additional_where=(
+            "AND s.next_action_at IS NOT NULL AND s.next_action_at <= ? "
+            f"{_resolved_null}"
+        ),
         additional_params=(now_iso,),
     )
 

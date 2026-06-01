@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import time
+import time  # noqa: F401
 from typing import Any
 
 from symeraseme.llm.protocol import (

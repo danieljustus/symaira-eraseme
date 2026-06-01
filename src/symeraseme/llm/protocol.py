@@ -87,7 +87,8 @@ class LLMClient(Protocol):
 
 
 class BaseLLMClient(ABC):
-    """Abstract base class for LLM clients with shared retry, cost tracking, and rate-limit handling.
+    """Abstract base class for LLM clients with shared retry, cost tracking,
+    and rate-limit handling.
 
     Subclasses must implement:
         - is_available()
