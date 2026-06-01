@@ -63,7 +63,7 @@ brew install symeraseme
 ```bash
 # Clone the repository
 git clone https://github.com/danieljustus/Symaira-EraseMe.git
-cd Symaira EraseMe
+cd symaira-eraseme
 
 # Install dependencies with uv
 uv sync
