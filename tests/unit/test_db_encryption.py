@@ -266,6 +266,29 @@ class TestBackwardCompatibility:
         close_connection()
 
 
+class TestV1Migration:
+    """V1-format DB files must be transparently migrated to V2."""
+
+    def test_v1_file_migrated_to_v2_on_open(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        # Verify the fixture starts as V1
+        assert encrypted_db_file.read_bytes().startswith(_ENC_HEADER_V1)
+
+        conn = get_connection(str(encrypted_db_file))
+        assert conn is not None
+        close_connection()
+
+        # After close, the file should be rewritten as V2
+        raw = encrypted_db_file.read_bytes()
+        from symeraseme.core.db import _ENC_MAGIC_V2
+
+        assert raw.startswith(_ENC_MAGIC_V2), "V1 file should have been migrated to V2"
+
+
 class TestCleanupRegistration:
     """Verify _cleanup_temp_files is registered as atexit handler."""
 

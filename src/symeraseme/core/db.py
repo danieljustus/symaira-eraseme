@@ -117,6 +117,22 @@ def _is_encrypted(path: Path) -> bool:
     return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2)
 
 
+def _migrate_v1_to_v2(path: Path) -> None:
+    """Transparently re-encrypt a V1-format DB to V2 on open."""
+    logger.info("Migrating V1-encrypted DB to V2 format: %s", path)
+    tmp = _decrypt_to_temp(path)
+    try:
+        _encrypt_file(tmp, path)
+        logger.info("V1→V2 migration complete: %s", path)
+    finally:
+        # Clean up the temporary decrypted file
+        try:
+            if tmp.exists() and tmp != path:
+                tmp.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+
+
 def _decrypt_to_temp(path: Path) -> Path:
     raw = path.read_bytes()
     if raw.startswith(_ENC_HEADER_V1):
@@ -217,6 +233,9 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
 
         if should_encrypt and db_file.exists() and _is_encrypted(db_file):
+            raw = db_file.read_bytes()
+            if raw.startswith(_ENC_HEADER_V1):
+                _migrate_v1_to_v2(db_file)
             db_file = _decrypt_to_temp(db_file)
         elif should_encrypt and not db_file.exists():
             _DB_TEMP[db_file.resolve()] = db_file
