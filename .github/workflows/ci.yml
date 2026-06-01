@@ -35,6 +35,8 @@ jobs:
             exit 1
           fi
           echo "OK: No raw typer.echo error emissions found."
+      - name: Check render_error() terminal placement
+        run: uv run python scripts/check_render_error_terminal.py
 
   test:
     runs-on: ubuntu-latest
