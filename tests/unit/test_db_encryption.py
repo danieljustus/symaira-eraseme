@@ -289,6 +289,38 @@ class TestV1Migration:
         assert raw.startswith(_ENC_MAGIC_V2), "V1 file should have been migrated to V2"
 
 
+class TestFernetKeyCache:
+    """Derived Fernet keys must be cached to avoid redundant PBKDF2 work."""
+
+    def test_fernet_key_caches_after_first_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "symeraseme.core.identity._get_existing_master_key",
+            lambda: b"x" * 32,
+        )
+        from symeraseme.core.db import _FERNET_KEY_CACHE, _get_db_fernet_key
+
+        _FERNET_KEY_CACHE.clear()
+        key1 = _get_db_fernet_key(salt=b"test-salt")
+        key2 = _get_db_fernet_key(salt=b"test-salt")
+        assert key1 == key2
+        assert len(_FERNET_KEY_CACHE) == 1
+
+    def test_different_salts_get_different_cache_entries(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "symeraseme.core.identity._get_existing_master_key",
+            lambda: b"x" * 32,
+        )
+        from symeraseme.core.db import _FERNET_KEY_CACHE, _get_db_fernet_key
+
+        _FERNET_KEY_CACHE.clear()
+        key1 = _get_db_fernet_key(salt=b"salt-a")
+        key2 = _get_db_fernet_key(salt=b"salt-b")
+        assert key1 != key2
+        assert len(_FERNET_KEY_CACHE) == 2
+
+
 class TestCleanupRegistration:
     """Verify _cleanup_temp_files is registered as atexit handler."""
 

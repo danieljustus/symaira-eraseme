@@ -46,6 +46,7 @@ _PBKDF2_ITERATIONS = 600_000
 _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
+_FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
 _STALE_SCAVENGE_AGE = 86400
 
 _local = threading.local()
@@ -93,6 +94,10 @@ def _db_encryption_enabled() -> bool:
 
 
 def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
+    cache_key = salt if salt else b""
+    if cache_key in _FERNET_KEY_CACHE:
+        return _FERNET_KEY_CACHE[cache_key]
+
     try:
         from symeraseme.core.identity import _get_existing_master_key
 
@@ -107,7 +112,9 @@ def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
         salt if salt else _PBKDF2_FIXED_SALT,
         _PBKDF2_ITERATIONS,
     )
-    return urlsafe_b64encode(derived)
+    key = urlsafe_b64encode(derived)
+    _FERNET_KEY_CACHE[cache_key] = key
+    return key
 
 
 def _is_encrypted(path: Path) -> bool:
