@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -118,6 +119,21 @@ def _cache_dir() -> Path:
     return cache
 
 
+def _integrity_key() -> bytes | None:
+    key_path = _cache_dir() / ".integrity.key"
+    if key_path.exists():
+        return key_path.read_bytes()
+    key = os.urandom(32)
+    key_path.write_bytes(key)
+    os.chmod(key_path, 0o600)
+    return key
+
+
+def _compute_hmac(payload: dict, key: bytes) -> str:
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def _persistent_cache_path(registry_dir: Path) -> Path:
     dir_hash = hashlib.sha256(str(registry_dir).encode()).hexdigest()[:16]
     return _cache_dir() / f"brokers_{dir_hash}.json"
@@ -136,16 +152,17 @@ def _save_persistent_cache(
             relative_index[broker_id] = str(broker_path.relative_to(registry_dir))
         except ValueError:
             relative_index[broker_id] = str(broker_path)
+    payload = {
+        "cache_key": cache_key,
+        "brokers": [b.model_dump(mode="json") for b in brokers],
+        "id_index": relative_index,
+    }
+    key = _integrity_key()
+    if key is not None:
+        payload["integrity"] = _compute_hmac(payload, key)
     try:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "cache_key": cache_key,
-                    "brokers": [b.model_dump(mode="json") for b in brokers],
-                    "id_index": relative_index,
-                },
-                f,
-            )
+            json.dump(payload, f)
     except OSError as e:
         logger.warning("Failed to save persistent broker cache: %s", e)
 
@@ -166,6 +183,14 @@ def _load_persistent_cache(
     if data.get("cache_key") != cache_key:
         logger.debug("Persistent broker cache key mismatch, rebuilding")
         return None
+
+    stored_hmac = data.pop("integrity", None)
+    key = _integrity_key()
+    if key is not None and stored_hmac is not None:
+        if not hmac.compare_digest(stored_hmac, _compute_hmac(data, key)):
+            logger.warning("Persistent broker cache integrity check failed, rebuilding")
+            return None
+
     raw_brokers = data.get("brokers", [])
     if not raw_brokers:
         return None
