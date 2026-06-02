@@ -87,32 +87,40 @@ def handle_execute(
 
     if backend == "himalaya":
         if not account:
-            return CliResult(
-                success=False,
-                message="Himalaya backend requires --account. Use --account <name> or switch to SMTP with --backend smtp.",
+            msg = (
+                "Himalaya backend requires --account. "
+                "Use --account <name> or switch to SMTP with --backend smtp."
             )
-        from symeraseme.adapters.email.himalaya import himalaya_available
+            return CliResult(success=False, data={"message": msg})
+        if not dry_run:
+            from symeraseme.adapters.email.himalaya import himalaya_available
 
-        if not himalaya_available():
-            return CliResult(
-                success=False,
-                message="Himalaya CLI is not installed. Install it via 'cargo install himalaya' or 'brew install himalaya', or use --backend smtp.",
-            )
+            if not himalaya_available():
+                msg = (
+                    "Himalaya CLI is not installed. "
+                    "Install it via 'cargo install himalaya' "
+                    "or 'brew install himalaya', or use --backend smtp."
+                )
+                return CliResult(success=False, data={"message": msg})
         logger.info("Using Himalaya backend (account=%s)", account)
     elif backend == "smtp":
-        from symeraseme.adapters.email.himalaya import load_smtp_config
+        if not dry_run:
+            from symeraseme.adapters.email.himalaya import load_smtp_config
 
-        smtp_config = load_smtp_config()
-        if not smtp_config.from_addr:
-            return CliResult(
-                success=False,
-                message="SMTP backend requires SYMERASEME_SMTP_FROM to be set. Configure it in your environment or .env file.",
-            )
-        logger.info("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
+            smtp_config = load_smtp_config()
+            if not smtp_config.from_addr:
+                msg = (
+                    "SMTP backend requires SYMERASEME_SMTP_FROM "
+                    "to be set. Configure it in your environment or .env file."
+                )
+                return CliResult(success=False, data={"message": msg})
+            logger.info("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
+        else:
+            logger.info("Using SMTP backend (dry-run)")
     else:
         return CliResult(
             success=False,
-            message=f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'.",
+            data={"message": f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'."},
         )
 
     if backend == "himalaya":

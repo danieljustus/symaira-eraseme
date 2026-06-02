@@ -422,6 +422,7 @@ class TestHandleExecuteRouting:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_SMTP_FROM"] = "test@example.com"
 
         from symeraseme.core.db import close_connection, init_db
 

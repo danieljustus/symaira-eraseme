@@ -60,7 +60,7 @@ def capture_form_state(
     broker_id: str = "",
     screenshot_dir: str | Path | None = None,
 ) -> Any:
-    from symeraseme.core.manual_fallback import FormState, FALLBACK_REASONS
+    from symeraseme.core.manual_fallback import FALLBACK_REASONS, FormState
 
     captured_url = url or getattr(page, "url", "")
     html_snapshot = ""
@@ -89,7 +89,7 @@ def capture_form_state(
                 logger.warning("Failed to save screenshot: %s", e)
 
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
         asyncio.run(_capture())
     else:
