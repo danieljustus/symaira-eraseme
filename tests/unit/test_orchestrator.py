@@ -152,7 +152,13 @@ class TestExecuteCampaign:
         if not email_requests:
             pytest.skip("No email requests in campaign")
 
-        result = execute_request(email_requests[0]["id"])
+        def failing_sender(**_kwargs):
+            raise RuntimeError("simulated send failure")
+
+        result = execute_request(
+            email_requests[0]["id"],
+            email_sender=failing_sender,
+        )
         assert result["success"] is False
         assert "error" in result
 
@@ -225,17 +231,12 @@ class TestExecuteCampaign:
         assert r["success"] is False
         assert "init-profile" in r["error"]
 
-    def test_execute_includes_identity_hash_in_event(self, _fake_profile, monkeypatch):
+    def test_execute_includes_identity_hash_in_event(self, _fake_profile):
         from symeraseme.core.events import get_events
         from symeraseme.core.identity import hash_profile
 
         profile = _fake_profile
         expected_hash = hash_profile(profile)
-
-        monkeypatch.setattr(
-            "symeraseme.core.execution.send_email",
-            lambda **_: {"message_id": "<test@msg>"},
-        )
 
         plan_campaign(campaign_id="hash-test", max_brokers=3)
         requests = list_removal_requests(campaign_id="hash-test")
@@ -245,7 +246,10 @@ class TestExecuteCampaign:
         if not email_requests:
             pytest.skip("No email requests in campaign")
 
-        result = execute_request(email_requests[0]["id"])
+        result = execute_request(
+            email_requests[0]["id"],
+            email_sender=lambda **_: {"message_id": "<test@msg>"},
+        )
         assert result["success"] is True
 
         events = get_events(email_requests[0]["id"])
