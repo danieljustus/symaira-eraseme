@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from symeraseme.cli.types import CliResult
+from symeraseme.core.exceptions import SymerasemeError
 
 console = _RichConsole()
 _error_console = _RichConsole(stderr=True)
@@ -90,7 +91,7 @@ class OutputFormat(StrEnum):
 
 def render_result(
     output_format: str,
-    result: str | CliResult,
+    result: str | CliResult | Exception,
     result_obj: CliResult | None = None,
 ) -> None:
     """Print the result of a command handler, formatted appropriately.
@@ -103,6 +104,10 @@ def render_result(
     Raises typer.Exit(1) when the result indicates failure so every command
     returns a non-zero exit code uniformly.
     """
+    if isinstance(result, Exception):
+        print_error(str(result))
+        raise typer.Exit(1)
+
     if isinstance(result, CliResult):
         result_obj = result
         result = result.message

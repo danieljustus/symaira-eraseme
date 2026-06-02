@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from symeraseme.core.protocols import WebFormRunner
 from symeraseme.adapters.email.himalaya import EmailError, send_email
 from symeraseme.core.events import get_events, get_removal_request
+from symeraseme.core.exceptions import ExecutionError, ProfileError, RequestNotFoundError
 from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.core.templating import render_template
@@ -84,15 +85,11 @@ def _execute_email_request(
     try:
         profile = load_profile()
         identity_hash = hash_profile(profile)
-    except FileNotFoundError:
-        return {
-            "success": False,
-            "error": (
-                "Identity profile not found. "
-                "Run 'symeraseme init-profile' first to create your identity profile."
-            ),
-            "request_id": request_id,
-        }
+    except FileNotFoundError as e:
+        raise ProfileError(
+            "Identity profile not found. "
+            "Run 'symeraseme init-profile' first to create your identity profile."
+        ) from e
 
     missing = []
     profile_vars = profile.model_dump()
@@ -101,14 +98,10 @@ def _execute_email_request(
         if value is None or value == [] or value == {} or value == "":
             missing.append(field)
     if missing:
-        return {
-            "success": False,
-            "error": (
-                f"Missing required identity fields: {', '.join(missing)}. "
-                f"Run 'symeraseme init-profile' to update your profile."
-            ),
-            "request_id": request_id,
-        }
+        raise ProfileError(
+            f"Missing required identity fields: {', '.join(missing)}. "
+            "Run 'symeraseme init-profile' to update your profile."
+        )
 
     if dry_run:
         rendered = render_template(
@@ -158,7 +151,7 @@ def _execute_email_request(
             "SEND_FAILED",
             payload={"error": str(e), "to": channel_endpoint},
         )
-        return {"success": False, "error": str(e), "request_id": request_id}
+        raise ExecutionError(str(e), request_id=request_id) from e
 
 def execute_request(
     request_id: int,
@@ -171,7 +164,7 @@ def execute_request(
     """Execute a single removal request by sending an email or running a web form."""
     req = get_removal_request(request_id)
     if req is None:
-        return {"success": False, "error": f"Request {request_id} not found"}
+        raise RequestNotFoundError(request_id)
 
     broker_name = req["broker_id"]
     events = get_events(request_id)

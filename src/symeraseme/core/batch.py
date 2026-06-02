@@ -15,6 +15,7 @@ from symeraseme.adapters.email.himalaya import (
     send_messages_batch,
 )
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
+from symeraseme.core.exceptions import SymerasemeError
 from symeraseme.core.execution import execute_request
 from symeraseme.core.identity import load_profile
 from symeraseme.core.projection import append_event_and_project
@@ -37,13 +38,16 @@ def execute_campaign(
     batch = requests[:batch_size]
     results: list[dict[str, Any]] = []
     for req in batch:
-        result = execute_request(
-            req["id"],
-            account=account,
-            config_path=config_path,
-            dry_run=dry_run,
-            web_form_runner=web_form_runner,
-        )
+        try:
+            result = execute_request(
+                req["id"],
+                account=account,
+                config_path=config_path,
+                dry_run=dry_run,
+                web_form_runner=web_form_runner,
+            )
+        except SymerasemeError as e:
+            result = {"success": False, "error": str(e), "request_id": req["id"]}
         results.append(result)
     return {
         "campaign_id": campaign_id,
@@ -166,7 +170,10 @@ async def execute_campaign_async(
             results: list[dict[str, Any]] = []
             for req in batch:
                 progress.update(task, description=f"Processing {req['broker_id']}...")
-                r = execute_request(req["id"], dry_run=True, web_form_runner=web_form_runner)
+                try:
+                    r = execute_request(req["id"], dry_run=True, web_form_runner=web_form_runner)
+                except SymerasemeError as e:
+                    r = {"success": False, "error": str(e), "request_id": req["id"]}
                 results.append(r)
                 progress.advance(task)
             return {
