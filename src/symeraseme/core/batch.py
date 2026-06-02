@@ -25,6 +25,7 @@ logger = __import__("logging").getLogger(__name__)
 _PROGRESS_CONSOLE = Console(stderr=True)
 _BATCH_LIMIT = 10
 
+
 def execute_campaign(
     campaign_id: str,
     *,
@@ -55,6 +56,8 @@ def execute_campaign(
         "batch_size": len(batch),
         "results": results,
     }
+
+
 def _load_smtp_config(smtp_skip_tls: bool = False) -> Any:
     smtp_config = load_smtp_config()
     if smtp_skip_tls:
@@ -67,6 +70,8 @@ def _load_smtp_config(smtp_skip_tls: bool = False) -> Any:
             from_addr=smtp_config.from_addr,
         )
     return smtp_config
+
+
 def _gather_email_messages(
     batch: list[dict[str, Any]],
     events_by_rid: dict[int, list[dict[str, Any]]],
@@ -109,6 +114,8 @@ def _gather_email_messages(
         endpoint_ids[channel_endpoint].append(req_id)
         progress.advance(task)
     return email_messages, endpoint_ids
+
+
 def _apply_batch_results(
     send_results: list[dict[str, Any]],
     endpoint_ids: defaultdict[str, list[int]],
@@ -143,6 +150,8 @@ def _apply_batch_results(
             )
         results.append(sr)
     return results
+
+
 async def execute_campaign_async(
     campaign_id: str,
     *,

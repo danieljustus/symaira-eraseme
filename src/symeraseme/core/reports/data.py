@@ -56,9 +56,7 @@ def get_report_data(
     else:
         requests_rows = []
 
-    requests_by_campaign: dict[str, list[dict[str, Any]]] = {
-        cid: [] for cid in campaign_ids
-    }
+    requests_by_campaign: dict[str, list[dict[str, Any]]] = {cid: [] for cid in campaign_ids}
     all_requests: list[dict[str, Any]] = []
     request_ids: list[int] = []
     for row in requests_rows:

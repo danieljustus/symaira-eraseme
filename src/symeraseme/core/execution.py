@@ -16,6 +16,7 @@ from symeraseme.core.templating import render_template
 
 logger = logging.getLogger(__name__)
 
+
 def _execute_webform_request(
     request_id: int,
     broker_name: str,
@@ -67,6 +68,7 @@ def _execute_webform_request(
             },
         )
     return {"success": result["success"], "request_id": request_id, **result}
+
 
 def _execute_email_request(
     request_id: int,
@@ -152,6 +154,7 @@ def _execute_email_request(
             payload={"error": str(e), "to": channel_endpoint},
         )
         raise ExecutionError(str(e), request_id=request_id) from e
+
 
 def execute_request(
     request_id: int,
