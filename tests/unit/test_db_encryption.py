@@ -321,6 +321,49 @@ class TestFernetKeyCache:
         assert len(_FERNET_KEY_CACHE) == 2
 
 
+class TestStaleScavengerAge:
+    """Stale scavenger must use a short 5-minute window."""
+
+    def test_scavenge_age_is_five_minutes(self) -> None:
+        from symeraseme.core.db import _STALE_SCAVENGE_AGE
+
+        assert _STALE_SCAVENGE_AGE == 300, (
+            f"Expected _STALE_SCAVENGE_AGE to be 300s, got {_STALE_SCAVENGE_AGE}s"
+        )
+
+
+class TestSecureTempDir:
+    """Secure temp directory selection."""
+
+    def test_darwin_uses_standard_temp_dir(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """macOS must use tempfile.gettempdir(), not hardcoded /tmp."""
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        monkeypatch.setattr("os.getuid", lambda: 42)
+        monkeypatch.setattr("tempfile.gettempdir", lambda: "/mock/tmp")
+        from symeraseme.core.db import _get_secure_temp_dir
+
+        with monkeypatch.context():
+            monkeypatch.setattr(
+                Path, "exists", lambda self, *a, **k: str(self) != "/dev/shm"
+            )
+            monkeypatch.setattr(Path, "mkdir", lambda *a, **k: None)
+            secure_dir = _get_secure_temp_dir()
+            assert str(secure_dir) == "/mock/tmp/symeraseme-db-42"
+
+    def test_linux_uses_dev_shm_when_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("platform.system", lambda: "Linux")
+        monkeypatch.setattr("os.getuid", lambda: 42)
+        from symeraseme.core.db import _get_secure_temp_dir
+
+        with monkeypatch.context():
+            monkeypatch.setattr(
+                Path, "exists", lambda self, *a, **k: str(self) == "/dev/shm"
+            )
+            monkeypatch.setattr(Path, "mkdir", lambda *a, **k: None)
+            secure_dir = _get_secure_temp_dir()
+            assert str(secure_dir) == "/dev/shm/symeraseme-db-42"
+
+
 class TestCleanupRegistration:
     """Verify _cleanup_temp_files is registered as atexit handler."""
 

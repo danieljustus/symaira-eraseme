@@ -4,13 +4,11 @@ When ``SYMERASEME_ENCRYPT_DB=1`` is set (or the database file is already
 encrypted), the file is transparently encrypted at rest using AES-256-GCM
 (Fernet) with a key derived from the identity master key in the system keyring.
 
-The decrypted temp file is placed in a memory-backed directory so that no
-plaintext data remains on persistent storage after SIGKILL, OOM kill, or
-system crash:
-
-- Linux:   ``/dev/shm`` (tmpfs, always memory-backed)
-- macOS:   ``/tmp`` (RAM disk on modern macOS; verified on APFS volumes)
-- Windows: OS temp directory (disk-backed — see README for mitigation)
+The decrypted temp file is placed in a secure temporary directory with
+restrictive permissions. On Linux ``/dev/shm`` (tmpfs, memory-backed) is used
+when available. On macOS and other platforms the OS temp directory is used
+(which may be disk-backed). A startup scavenger cleans up stale temp files
+from previous aborted runs after a short grace period.
 
 A startup scavenger cleans up any stale temp files from previous aborted runs.
 """
@@ -47,7 +45,7 @@ _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
 _FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
-_STALE_SCAVENGE_AGE = 86400
+_STALE_SCAVENGE_AGE = 300
 
 _local = threading.local()
 
@@ -58,11 +56,11 @@ def _get_secure_temp_dir() -> Path:
     if system == "Linux" and Path("/dev/shm").exists():
         secure_dir = Path("/dev/shm") / f"symeraseme-db-{uid}"
     elif system == "Darwin":
-        # macOS mounts /tmp as a RAM disk (tmpfs) on modern APFS volumes.
-        # Using /tmp directly avoids the disk-backed default from
-        # tempfile.gettempdir(), which delegates to a per-user TMPDIR
-        # that may live on persistent storage.
-        secure_dir = Path("/tmp") / f"symeraseme-db-{uid}"
+        # On macOS /tmp is not a RAM disk — it is persistent storage.
+        # Use the standard temp directory (respects TMPDIR) and rely on
+        # the short stale-scavenger window (300 s) plus atexit/SIGTERM
+        # cleanup to minimise exposure.
+        secure_dir = Path(tempfile.gettempdir()) / f"symeraseme-db-{uid}"
     else:
         # Windows and other platforms: fall back to the OS temp directory.
         # On Windows this is disk-backed; see the README security section
