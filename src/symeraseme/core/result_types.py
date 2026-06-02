@@ -39,7 +39,16 @@ class CliResult:
         return self._message or self.error or ""
 
     def to_json(self) -> str:
-        """Serialize data payload to JSON string."""
+        """Serialize result to JSON string."""
         import json
 
-        return json.dumps(self.data, indent=2, default=str)
+        payload: dict[str, Any] = {"success": self.success}
+        if self.error:
+            payload["error"] = self.error
+        else:
+            payload["message"] = self.message
+        if isinstance(self.data, dict):
+            payload.update(self.data)
+        elif self.data:
+            payload["data"] = self.data
+        return json.dumps(payload, indent=2, default=str)
