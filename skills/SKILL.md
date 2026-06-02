@@ -1,9 +1,33 @@
+---
+name: symaira-eraseme
+description: >
+  Orchestrate GDPR/CCPA data broker removals using the Symaira EraseMe CLI.
+  Automates opt-out campaigns, inbox triage, deadline tracking, and legal
+  rebuttal generation against 1,200+ data brokers.
+version: 1.0.0
+author: Symaira
+license: MIT
+platforms: [macos, linux, windows]
+required_environment_variables:
+  - ANTHROPIC_API_KEY
+  - SYMERASEME_DATA_DIR
+metadata:
+  hermes:
+    tags: [privacy, gdpr, ccpa, data-brokers, automation]
+    category: privacy-tools
+  cursor:
+    paths: ["**/*.md", "**/*.yaml", "**/*.json"]
+  windsurf:
+    alwaysApply: false
+---
+
 # Symaira EraseMe: AI Agent Skill Bundle
 
 **Automated data broker removal tool — close your accounts, erase your data.**
 
-This skill bundle teaches AI agents (Claude Code, OpenClaw, Cursor, etc.) how to
-orchestrate GDPR/CCPA data broker removals using the Symaira EraseMe CLI.
+This skill bundle teaches AI agents (Claude Code, OpenClaw, Cursor, Windsurf,
+Hermes, GitHub Copilot, Codex, etc.) how to orchestrate GDPR/CCPA data broker
+removals using the Symaira EraseMe CLI.
 
 ## When to use Symaira EraseMe
 
@@ -142,3 +166,33 @@ symeraseme requests list --status PENDING --output json
 4. **Daily triage**: Run `poll-inbox` + `classify-reply` daily to catch broker responses.
 5. **Review plans**: Always `plan show` and review with the user before executing.
 6. **Quarterly re-scans**: Run `plan create` with a new campaign ID every quarter to catch new brokers.
+
+## Agent-specific integration notes
+
+### Claude Code
+Skills auto-discovered from `.claude/skills/` symlink in project root.
+See [examples/claude-code/](../examples/claude-code/) for setup.
+
+### OpenClaw
+Skills loaded via YAML definitions in `~/.config/openclaw/skills/`.
+See [examples/openclaw/](../examples/openclaw/) for setup.
+
+### Hermes
+Install to `~/.hermes/skills/privacy-tools/symaira-eraseme/`.
+Supports progressive disclosure (metadata → full skill → references).
+
+### GitHub Copilot / Codex CLI
+Auto-discovered from `.agents/skills/` or `~/.agents/skills/`.
+Use `/skills reload` to refresh. Verify with `/skills info symaira-eraseme`.
+
+### Cursor
+Auto-discovered from `.cursor/skills/` or `.agents/skills/`.
+Skills invoked automatically based on description matching or via `/symaira-eraseme`.
+
+### Windsurf
+Auto-discovered from `.windsurf/skills/` or `.agents/skills/`.
+Invoke via `@symaira-eraseme` or automatic agent detection.
+
+### Continue, Cline, Aider
+These agents do not support SKILL.md natively. See [AGENTS.md](../AGENTS.md)
+for adapter files and setup instructions.

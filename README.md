@@ -30,7 +30,7 @@ data brokers. It provides:
 - **Inbox triage** via IMAP polling to fetch broker replies, classify them with an LLM (Claude), and generate jurisdiction-aware rebuttals for rejections.
 - **Deadline tracking** with automatic jurisdiction-aware deadline monitoring (GDPR: 30 days, CCPA: 45 days). The tick engine checks daily for overdue requests and triggers reminders with exponential backoff.
 - **Escalation workflows** that flag requests for DPA complaints after brokers miss the legal response window.
-- **LLM agent skills** as ready-made skill files for Claude Code, OpenClaw, and other LLM-powered coding agents. These skills let AI assistants work with the tool on your behalf.
+- **LLM agent skills** as ready-made skill files for Claude Code, Cursor, Windsurf, Hermes, GitHub Copilot, Codex, and other LLM-powered coding agents. These skills let AI assistants work with the tool on your behalf. See [AGENTS.md](AGENTS.md) for setup instructions.
 - **Jurisdiction-aware workflows** with support for GDPR (Europe), CCPA (California), CPRA, LGPD, and PIPEDA erasure rights, including jurisdiction-specific templates, timelines, and legal references.
 - **Scheduler integration** that generates cron, launchd, or systemd configurations to run the tick engine, inbox polling, and quarterly re-scans automatically.
 - **Automated registry maintenance** with a weekly GitHub Action that pulls fresh entries from official US state broker registries and opens a PR with the diff, plus a Monday link-check workflow that flags dead broker websites.
@@ -293,8 +293,9 @@ registry/
   brokers/       — YAML broker definitions (eu/, uk/, us/)
   laws/          — Jinja2 legal templates (GDPR, CCPA, rebuttals)
   schemas/       — JSON Schema for broker validation
-skills/          — LLM agent skill files (Claude Code, OpenClaw)
-examples/        — Integration examples for Claude Code, OpenClaw, cron
+skills/          — LLM agent skill files (Claude Code, Cursor, Windsurf, Hermes, Copilot, Codex)
+examples/        — Integration examples for all supported AI agents
+AGENTS.md        — Setup guide for all AI agent integrations
 ```
 
 ## Security
