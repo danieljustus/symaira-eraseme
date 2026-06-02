@@ -68,7 +68,7 @@ def save_profile(
     path: str | None = None,
 ) -> Path:
     target = _profile_path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     key = _get_or_create_master_key()
     aesgcm = AESGCM(key)
@@ -83,6 +83,7 @@ def save_profile(
 
     with open(target, "wb") as f:
         f.write(header + b"\n" + ciphertext)
+    os.chmod(target, 0o600)
 
     # Invalidate cache so the next load reads the fresh file.
     _PROFILE_CACHE.pop(str(target), None)
