@@ -10,11 +10,11 @@ from .conftest import (
 
 class TestTick:
     def test_tick_dry_run(self, seeded_db):
-        result = invoke("tick", "--dry-run")
+        result = invoke("plan", "tick", "--dry-run")
         assert_ok(result)
 
     def test_tick_dry_run_json(self, seeded_db):
-        result = invoke("--output", "json", "tick", "--dry-run")
+        result = invoke("--output", "json", "plan", "tick", "--dry-run")
         import json
 
         assert_ok(result)
@@ -36,16 +36,16 @@ class TestTick:
         from symeraseme.core.projection import upsert_state
 
         upsert_state(1)
-        result = invoke("tick", "--dry-run")
+        result = invoke("plan", "tick", "--dry-run")
         assert_ok(result)
 
     def test_tick_no_actions(self, tmp_home):
-        result = invoke("tick", "--dry-run")
+        result = invoke("plan", "tick", "--dry-run")
         assert_ok(result)
         assert "no actions needed" in result.stdout
 
     def test_tick_json_empty(self, tmp_home):
-        result = invoke("--output", "json", "tick", "--dry-run")
+        result = invoke("--output", "json", "plan", "tick", "--dry-run")
         import json
 
         assert_ok(result)

@@ -9,11 +9,14 @@ from .conftest import (
 
 class TestExecute:
     def test_execute_dry_run(self, seeded_db):
-        result = invoke("execute", "--campaign", "smoke-test", "--dry-run")
+        result = invoke("plan", "execute", "--campaign", "smoke-test", "--dry-run")
         assert_ok(result)
 
     def test_execute_dry_run_json(self, seeded_db):
-        result = invoke("--output", "json", "execute", "--campaign", "smoke-test", "--dry-run")
+        result = invoke(
+            "--output", "json", "plan", "execute",
+            "--campaign", "smoke-test", "--dry-run",
+        )
         import json
 
         assert_ok(result)
@@ -21,16 +24,19 @@ class TestExecute:
         assert data["campaign_id"] == "smoke-test"
 
     def test_execute_dry_run_batch_size(self, seeded_db):
-        result = invoke("execute", "--campaign", "smoke-test", "--dry-run", "--batch-size", "3")
+        result = invoke(
+            "plan", "execute", "--campaign", "smoke-test",
+            "--dry-run", "--batch-size", "3",
+        )
         assert_ok(result)
 
     def test_execute_without_consent_fails(self, seeded_db):
-        result = invoke("execute", "--campaign", "smoke-test")
+        result = invoke("plan", "execute", "--campaign", "smoke-test")
         assert result.exit_code != 0
         assert_in_output_stderr(result, "consent")
 
     def test_execute_nonexistent_campaign(self, seeded_db):
-        result = invoke("execute", "--campaign", "nonexistent", "--dry-run")
+        result = invoke("plan", "execute", "--campaign", "nonexistent", "--dry-run")
         assert_ok(result)
 
 

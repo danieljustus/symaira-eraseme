@@ -36,7 +36,7 @@ class TestOutputFormat:
         assert data["campaign_id"] == "fmt-test"
 
     def test_json_from_tick(self, seeded_db):
-        result = invoke("--output", "json", "tick", "--dry-run")
+        result = invoke("--output", "json", "plan", "tick", "--dry-run")
         import json
 
         assert_ok(result)
@@ -153,14 +153,14 @@ class TestBrokersShow:
 
 class TestStatusCommand:
     def test_status_empty_db_text(self, tmp_home):
-        result = invoke("status")
+        result = invoke("plan", "status")
         assert_ok(result)
         assert "Total: 0" in result.stdout
 
     def test_status_empty_db_json(self, tmp_home):
         from .conftest import assert_json_output
 
-        result = invoke("--output", "json", "status")
+        result = invoke("--output", "json", "plan", "status")
         data = assert_json_output(result)
         assert data["schema_version"] == 1
         assert data["totals"]["requests"] == 0
@@ -171,7 +171,7 @@ class TestStatusCommand:
     def test_status_with_seeded_data(self, seeded_db):
         from .conftest import assert_json_output
 
-        result = invoke("--output", "json", "status")
+        result = invoke("--output", "json", "plan", "status")
         data = assert_json_output(result)
         assert data["totals"]["requests"] == 7  # 5 + 2 from seeded_db
         assert data["by_status"].get("PLANNED", 0) == 7
@@ -180,7 +180,7 @@ class TestStatusCommand:
     def test_status_scoped_to_campaign(self, seeded_db):
         from .conftest import assert_json_output
 
-        result = invoke("--output", "json", "status", "--campaign", "smoke-test-ccpa")
+        result = invoke("--output", "json", "plan", "status", "--campaign", "smoke-test-ccpa")
         data = assert_json_output(result)
         assert data["scope"]["campaign_id"] == "smoke-test-ccpa"
         assert data["totals"]["requests"] == 2
@@ -188,7 +188,7 @@ class TestStatusCommand:
     def test_status_unknown_campaign_is_zero(self, seeded_db):
         from .conftest import assert_json_output
 
-        result = invoke("--output", "json", "status", "--campaign", "does-not-exist")
+        result = invoke("--output", "json", "plan", "status", "--campaign", "does-not-exist")
         data = assert_json_output(result)
         assert data["totals"]["requests"] == 0
 
