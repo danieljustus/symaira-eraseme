@@ -52,7 +52,15 @@ def _fake_profile(monkeypatch):
         lambda: profile,
     )
     monkeypatch.setattr(
-        "symeraseme.core.orchestrator.load_profile",
+        "symeraseme.core.planning.load_profile",
+        lambda: profile,
+    )
+    monkeypatch.setattr(
+        "symeraseme.core.execution.load_profile",
+        lambda: profile,
+    )
+    monkeypatch.setattr(
+        "symeraseme.core.batch.load_profile",
         lambda: profile,
     )
     return profile
@@ -85,9 +93,14 @@ class TestPlanCampaign:
         assert all(r.get("identity_snapshot_hash") == expected_hash for r in requests)
 
     def test_plan_without_profile_has_empty_hash(self, monkeypatch):
+        no_profile = lambda: (_ for _ in ()).throw(FileNotFoundError("no profile"))
         monkeypatch.setattr(
             "symeraseme.core.identity.load_profile",
-            lambda: (_ for _ in ()).throw(FileNotFoundError("no profile")),
+            no_profile,
+        )
+        monkeypatch.setattr(
+            "symeraseme.core.planning.load_profile",
+            no_profile,
         )
         plan_campaign(campaign_id="test-no-hash", max_brokers=2)
         requests = list_removal_requests(campaign_id="test-no-hash")
@@ -144,9 +157,18 @@ class TestExecuteCampaign:
         assert "error" in result
 
     def test_dry_run_without_profile_fails(self, monkeypatch):
+        no_profile = lambda: (_ for _ in ()).throw(FileNotFoundError("no profile"))
         monkeypatch.setattr(
             "symeraseme.core.identity.load_profile",
-            lambda: (_ for _ in ()).throw(FileNotFoundError("no profile")),
+            no_profile,
+        )
+        monkeypatch.setattr(
+            "symeraseme.core.planning.load_profile",
+            no_profile,
+        )
+        monkeypatch.setattr(
+            "symeraseme.core.execution.load_profile",
+            no_profile,
         )
         plan_campaign(campaign_id="no-profile", max_brokers=1)
         result = execute_campaign(
@@ -177,6 +199,14 @@ class TestExecuteCampaign:
             "symeraseme.core.identity.load_profile",
             lambda: profile,
         )
+        monkeypatch.setattr(
+            "symeraseme.core.planning.load_profile",
+            lambda: profile,
+        )
+        monkeypatch.setattr(
+            "symeraseme.core.execution.load_profile",
+            lambda: profile,
+        )
         plan_campaign(campaign_id="missing-fields", max_brokers=1)
         result = execute_campaign(
             "missing-fields",
@@ -203,7 +233,7 @@ class TestExecuteCampaign:
         expected_hash = hash_profile(profile)
 
         monkeypatch.setattr(
-            "symeraseme.adapters.email.himalaya.send_email",
+            "symeraseme.core.execution.send_email",
             lambda **_: {"message_id": "<test@msg>"},
         )
 
@@ -270,14 +300,14 @@ class TestExecuteCampaign:
             return [{"to": to, "success": True} for to, _ in sent_messages]
 
         monkeypatch.setattr(
-            "symeraseme.adapters.email.himalaya.send_messages_batch",
+            "symeraseme.core.batch.send_messages_batch",
             mock_send_batch,
         )
 
         from symeraseme.adapters.email.himalaya import SmtpConfig
 
         monkeypatch.setattr(
-            "symeraseme.adapters.email.himalaya.load_smtp_config",
+            "symeraseme.core.batch.load_smtp_config",
             lambda: SmtpConfig(
                 host="localhost",
                 port=1025,
@@ -289,7 +319,7 @@ class TestExecuteCampaign:
         )
 
         monkeypatch.setattr(
-            "symeraseme.core.orchestrator.list_removal_requests",
+            "symeraseme.core.batch.list_removal_requests",
             lambda campaign_id=None, status=None: email_requests,
         )
 
@@ -339,13 +369,13 @@ class TestExecuteCampaign:
             ]
 
         monkeypatch.setattr(
-            "symeraseme.adapters.email.himalaya.send_messages_batch",
+            "symeraseme.core.batch.send_messages_batch",
             mock_send_batch,
         )
         from symeraseme.adapters.email.himalaya import SmtpConfig
 
         monkeypatch.setattr(
-            "symeraseme.adapters.email.himalaya.load_smtp_config",
+            "symeraseme.core.batch.load_smtp_config",
             lambda: SmtpConfig(
                 host="localhost",
                 port=1025,
@@ -358,14 +388,14 @@ class TestExecuteCampaign:
 
         # Mock render_template so the batch loop doesn't fail on missing templates.
         monkeypatch.setattr(
-            "symeraseme.core.templating.render_template",
+            "symeraseme.core.batch.render_template",
             lambda template_id, broker_name="", profile=None: f"Body for {broker_name}",
         )
 
         from symeraseme.registry.schema import IdentityProfile
 
         monkeypatch.setattr(
-            "symeraseme.core.orchestrator.load_profile",
+            "symeraseme.core.batch.load_profile",
             lambda: IdentityProfile(
                 full_name="Test User",
                 email_addresses=["t@t.com"],

@@ -111,7 +111,7 @@ class TestVerboseLogging:
         result = runner.invoke(app, ["--verbose", "version"])
         assert result.exit_code == 0
         symeraseme_logger = logging.getLogger("symeraseme")
-        assert symeraseme_logger.level == logging.DEBUG, (
+        assert symeraseme_logger.getEffectiveLevel() == logging.DEBUG, (
             f"Expected DEBUG (10), got {symeraseme_logger.level} "
             f"(effective: {symeraseme_logger.getEffectiveLevel()})"
         )
