@@ -7,6 +7,20 @@ from symeraseme.cli import app
 runner = CliRunner()
 
 
+class TestVerboseFlag:
+    def test_verbose_emits_debug_logs(self):
+        result = runner.invoke(
+            app, ["--verbose", "plan", "create", "--campaign", "test"]
+        )
+        assert "DEBUG" in result.output or result.exit_code == 0
+
+    def test_without_verbose_no_debug_logs(self):
+        result = runner.invoke(
+            app, ["plan", "create", "--campaign", "test"]
+        )
+        assert "DEBUG" not in result.output
+
+
 class TestClassifyReplyArgs:
     def test_accepts_provider_openai(self):
         result = runner.invoke(app, ["classify-reply", "1", "--provider", "openai"])

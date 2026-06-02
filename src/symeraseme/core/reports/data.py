@@ -37,55 +37,62 @@ def get_report_data(
         return _empty_report(campaign_id or "none")
 
     campaigns_data: list[dict[str, Any]] = []
-    all_requests: list[dict[str, Any]] = []
-    all_events: list[dict[str, Any]] = []
 
-    for c_row in campaigns_rows:
-        camp = dict(c_row)
-
-        requests = conn.execute(
-            """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
+    campaign_ids = [c["id"] for c in campaigns_rows]
+    if campaign_ids:
+        placeholders = ",".join("?" for _ in campaign_ids)
+        requests_rows = conn.execute(
+            f"""SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
                       r.jurisdiction, r.template_id,
                       s.current_status, s.sent_at, s.acknowledged_at,
                       s.resolved_at, s.deadline_at, s.reminders_sent,
                       s.escalation_level
                FROM removal_requests r
                LEFT JOIN request_state s ON s.request_id = r.id
-               WHERE r.campaign_id = ?
+               WHERE r.campaign_id IN ({placeholders})
                ORDER BY r.created_at ASC""",
-            (camp["id"],),
+            campaign_ids,
         ).fetchall()
+    else:
+        requests_rows = []
 
-        reqs = [dict(r) for r in requests]
-        all_requests.extend(reqs)
+    requests_by_campaign: dict[str, list[dict[str, Any]]] = {cid: [] for cid in campaign_ids}
+    all_requests: list[dict[str, Any]] = []
+    request_ids: list[int] = []
+    for row in requests_rows:
+        req = dict(row)
+        all_requests.append(req)
+        requests_by_campaign.setdefault(req["campaign_id"], []).append(req)
+        request_ids.append(req["id"])
 
-        request_ids = [r["id"] for r in reqs]
-        if request_ids:
-            ev_rows = conn.execute(
-                f"""SELECT id, request_id, event_type, occurred_at, source
-                    FROM request_events
-                    WHERE request_id IN ({",".join("?" * len(request_ids))})
-                    ORDER BY occurred_at ASC""",
-                request_ids,
-            ).fetchall()
-            events_by_rid: dict[int, list[dict]] = {}
-            for ev in ev_rows:
-                evd = dict(ev)
-                events_by_rid.setdefault(evd["request_id"], []).append(evd)
-            for req in reqs:
-                req["events"] = events_by_rid.get(req["id"], [])
-                all_events.extend(req["events"])
-        else:
-            for req in reqs:
-                req["events"] = []
+    if request_ids:
+        ev_placeholders = ",".join("?" for _ in request_ids)
+        ev_rows = conn.execute(
+            f"""SELECT id, request_id, event_type, occurred_at, source
+                FROM request_events
+                WHERE request_id IN ({ev_placeholders})
+                ORDER BY occurred_at ASC""",
+            request_ids,
+        ).fetchall()
+        events_by_rid: dict[int, list[dict[str, Any]]] = {}
+        for ev in ev_rows:
+            evd = dict(ev)
+            events_by_rid.setdefault(evd["request_id"], []).append(evd)
+        for req in all_requests:
+            req["events"] = events_by_rid.get(req["id"], [])
+    else:
+        for req in all_requests:
+            req["events"] = []
 
-        camp["requests"] = reqs
+    for c_row in campaigns_rows:
+        camp = dict(c_row)
+        camp["requests"] = requests_by_campaign.get(camp["id"], [])
         campaigns_data.append(camp)
 
     campaigns_agg = [_aggregate_campaign(c) for c in campaigns_data]
     broker_stats = _broker_leaderboard(all_requests)
     jurisdiction_stats = _jurisdiction_breakdown(all_requests)
-    timeline = _build_timeline(all_events)
+    timeline = _build_timeline(events_by_rid)
     comparison = _historical_comparison(campaigns_agg) if len(campaigns_agg) >= 2 else {}
     success_metrics = _success_metrics(all_requests)
 
@@ -251,15 +258,16 @@ def _jurisdiction_breakdown(
 
 
 def _build_timeline(
-    events: list[dict[str, Any]],
+    events_by_rid: dict[int, list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     daily: dict[str, dict[str, int]] = {}
-    for e in events:
-        ts = e.get("occurred_at", "")
-        day = ts[:10] if ts else "unknown"
-        if day not in daily:
-            daily[day] = Counter()
-        daily[day][e.get("event_type", "UNKNOWN")] += 1
+    for events in events_by_rid.values():
+        for e in events:
+            ts = e.get("occurred_at", "")
+            day = ts[:10] if ts else "unknown"
+            if day not in daily:
+                daily[day] = Counter()
+            daily[day][e.get("event_type", "UNKNOWN")] += 1
 
     return [
         {
