@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 from importlib import resources
 from pathlib import Path
 
@@ -107,9 +106,10 @@ def clear_registry_cache() -> None:
 
     _cache_dir = Path.home() / ".cache" / "symeraseme"
     if _cache_dir.exists():
-        for f in _cache_dir.glob("brokers_*.pkl"):
-            with contextlib.suppress(OSError):
-                f.unlink()
+        for ext in ("*.pkl", "*.json"):
+            for f in _cache_dir.glob(f"brokers_{ext}"):
+                with contextlib.suppress(OSError):
+                    f.unlink()
 
 
 def _cache_dir() -> Path:
@@ -120,7 +120,7 @@ def _cache_dir() -> Path:
 
 def _persistent_cache_path(registry_dir: Path) -> Path:
     dir_hash = hashlib.sha256(str(registry_dir).encode()).hexdigest()[:16]
-    return _cache_dir() / f"brokers_{dir_hash}.pkl"
+    return _cache_dir() / f"brokers_{dir_hash}.json"
 
 
 def _save_persistent_cache(
@@ -137,9 +137,13 @@ def _save_persistent_cache(
         except ValueError:
             relative_index[broker_id] = str(broker_path)
     try:
-        with open(path, "wb") as f:
-            pickle.dump(
-                {"cache_key": cache_key, "brokers": brokers, "id_index": relative_index},
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "cache_key": cache_key,
+                    "brokers": [b.model_dump(mode="json") for b in brokers],
+                    "id_index": relative_index,
+                },
                 f,
             )
     except OSError as e:
@@ -154,17 +158,18 @@ def _load_persistent_cache(
     if not path.exists():
         return None
     try:
-        with open(path, "rb") as f:
-            data = pickle.load(f)
-    except (OSError, pickle.PickleError, EOFError) as e:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
         logger.debug("Persistent broker cache unreadable (%s), rebuilding", e)
         return None
     if data.get("cache_key") != cache_key:
         logger.debug("Persistent broker cache key mismatch, rebuilding")
         return None
-    brokers = data.get("brokers", [])
-    if not brokers:
+    raw_brokers = data.get("brokers", [])
+    if not raw_brokers:
         return None
+    brokers = [Broker.model_validate(b) for b in raw_brokers]
     raw_index = data.get("id_index")
     if isinstance(raw_index, dict) and raw_index:
         id_index = {
