@@ -98,9 +98,9 @@ class TestInstructionsForReason:
         assert "confirmation" in result.lower() or "verify" in result.lower()
 
 
-@patch("symeraseme.core.manual_fallback._async_get_content")
-@patch("symeraseme.core.manual_fallback._async_extract_form_fields")
-@patch("symeraseme.core.manual_fallback._async_save_screenshot")
+@patch("symeraseme.adapters.web._fallback._async_get_content")
+@patch("symeraseme.adapters.web._fallback._async_extract_form_fields")
+@patch("symeraseme.adapters.web._fallback._async_save_screenshot")
 class TestCaptureFormState:
     def test_captures_url_and_reason(self, mock_save, mock_fields, mock_content):
         mock_page = MagicMock()
