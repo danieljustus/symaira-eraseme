@@ -32,6 +32,8 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 
+from symeraseme.core.config import get_config
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_DB_DIR = "~/.local/share/symeraseme"
@@ -220,9 +222,10 @@ signal.signal(signal.SIGTERM, _handle_sigterm)
 def _db_path(path: str | None = None) -> Path:
     if path:
         return Path(path).expanduser().resolve()
-    db_dir = Path(os.environ.get("SYMERASEME_DB_DIR", DEFAULT_DB_DIR)).expanduser()
+    config = get_config()
+    db_dir = config.db_dir
     db_dir.mkdir(parents=True, exist_ok=True)
-    return db_dir / DEFAULT_DB_NAME
+    return config.db_path
 
 
 def get_connection(path: str | None = None) -> sqlite3.Connection:

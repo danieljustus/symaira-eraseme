@@ -10,6 +10,7 @@ import keyring
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from symeraseme.core.config import get_config
 from symeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,9 @@ DEFAULT_PROFILE_PATH = "~/.config/symeraseme/identity.enc"
 
 
 def _profile_path(path: str | None = None) -> Path:
-    raw = path or os.environ.get("SYMERASEME_IDENTITY_PATH") or DEFAULT_PROFILE_PATH
-    return Path(raw).expanduser().resolve()
+    if path:
+        return Path(path).expanduser().resolve()
+    return get_config().identity_path
 
 
 def _get_existing_master_key() -> bytes:

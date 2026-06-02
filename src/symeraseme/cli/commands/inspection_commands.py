@@ -86,6 +86,9 @@ def _check_database() -> tuple[bool, str]:
     try:
         db_path = _db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        test_file = db_path.parent / ".write_test"
+        test_file.write_text("")
+        test_file.unlink()
         return True, str(db_path)
     except OSError as e:
         return False, str(e)
