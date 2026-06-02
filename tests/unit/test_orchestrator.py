@@ -449,6 +449,33 @@ class TestHandleExecuteRouting:
         handle_execute("test-campaign", account="gmail", yes=True)
         assert len(sync_called) == 1
 
+    def test_passes_execute_not_execute_dot_execute(self, monkeypatch, tmp_path):
+        import os
+
+        from symeraseme.services.campaign import handle_execute
+
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+
+        from symeraseme.core.db import close_connection, init_db
+
+        close_connection()
+        init_db()
+
+        captured_commands = []
+
+        def mock_check_consent(command, **kwargs):
+            captured_commands.append(command)
+            return True
+
+        monkeypatch.setattr(
+            "symeraseme.services.campaign.check_consent",
+            mock_check_consent,
+        )
+
+        handle_execute("test-campaign", yes=True)
+        assert captured_commands == ["execute"]
+
 
 class TestBrokerIdIndex:
     def test_load_broker_uses_index(self, monkeypatch):
