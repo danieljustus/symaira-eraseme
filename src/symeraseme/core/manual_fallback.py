@@ -175,7 +175,31 @@ def capture_form_state(
             except PlaywrightError as e:
                 logger.warning("Failed to save screenshot: %s", e)
 
-    asyncio.run(_capture())
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_capture())
+    else:
+        import threading
+
+        exception: BaseException | None = None
+
+        def _run_in_thread() -> None:
+            nonlocal exception
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                new_loop.run_until_complete(_capture())
+            except BaseException as exc:
+                exception = exc
+            finally:
+                new_loop.close()
+
+        t = threading.Thread(target=_run_in_thread)
+        t.start()
+        t.join()
+        if exception is not None:
+            raise exception
 
     return FormState(
         url=captured_url,
