@@ -175,8 +175,7 @@ async def execute_campaign_async(
     web_form_runner=None,
     email_sender=None,
 ) -> dict[str, Any]:
-    requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
-    batch = requests[:batch_size]
+    requests, batch = _prepare_batch(campaign_id, batch_size)
     try:
         profile = load_profile()
     except FileNotFoundError:
@@ -205,12 +204,7 @@ async def execute_campaign_async(
                     r = {"success": False, "error": str(e), "request_id": req["id"]}
                 results.append(r)
                 progress.advance(task)
-            return {
-                "campaign_id": campaign_id,
-                "total_planned": len(requests),
-                "batch_size": len(batch),
-                "results": results,
-            }
+            return _build_result(campaign_id, requests, batch, results)
         smtp_config = _load_smtp_config(smtp_skip_tls)
         batch_ids = [r["id"] for r in batch]
         events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
@@ -227,9 +221,4 @@ async def execute_campaign_async(
         progress.update(task, description="Sending batch via SMTP...", completed=len(batch))
         send_results = await send_messages_batch(email_messages, smtp_config=smtp_config)
         results = _apply_batch_results(send_results, endpoint_ids, progress, task)
-    return {
-        "campaign_id": campaign_id,
-        "total_planned": len(requests),
-        "batch_size": len(batch),
-        "results": results,
-    }
+    return _build_result(campaign_id, requests, batch, results)
