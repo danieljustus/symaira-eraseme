@@ -408,6 +408,18 @@ def init_db(path: str | None = None) -> Path:
             ON manual_tasks(status);
         CREATE INDEX IF NOT EXISTS idx_manual_tasks_request
             ON manual_tasks(request_id);
+
+        CREATE INDEX IF NOT EXISTS idx_removal_requests_campaign
+            ON removal_requests(campaign_id);
+        CREATE INDEX IF NOT EXISTS idx_removal_requests_broker
+            ON removal_requests(broker_id);
+        CREATE INDEX IF NOT EXISTS idx_removal_requests_jurisdiction
+            ON removal_requests(jurisdiction);
+
+        CREATE INDEX IF NOT EXISTS idx_inbox_replies_request
+            ON inbox_replies(request_id);
+        CREATE INDEX IF NOT EXISTS idx_inbox_replies_classified
+            ON inbox_replies(classified_as);
     """)
     conn.commit()
     return db_file
