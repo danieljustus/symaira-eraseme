@@ -19,7 +19,6 @@ def handle_plan_create(
     max_brokers: int = 30,
 ) -> CliResult:
     init_db()
-    """plan create."""
     result = plan_campaign(
         campaign_id=campaign_id,
         jurisdiction=jurisdiction,
@@ -43,7 +42,6 @@ def handle_plan_show(
     status: str | None = None,
 ) -> CliResult:
     init_db()
-    """plan show."""
     result = get_plan(campaign_id=campaign_id, status=status)
 
     lines = [f"Plan: {result['campaign_id']} ({result['total']} requests)"]
@@ -86,7 +84,36 @@ def handle_execute(
     import logging
 
     logger = logging.getLogger(__name__)
-    logger.info("Using %s backend for campaign execution", backend)
+
+    if backend == "himalaya":
+        if not account:
+            return CliResult(
+                success=False,
+                message="Himalaya backend requires --account. Use --account <name> or switch to SMTP with --backend smtp.",
+            )
+        from symeraseme.adapters.email.himalaya import himalaya_available
+
+        if not himalaya_available():
+            return CliResult(
+                success=False,
+                message="Himalaya CLI is not installed. Install it via 'cargo install himalaya' or 'brew install himalaya', or use --backend smtp.",
+            )
+        logger.info("Using Himalaya backend (account=%s)", account)
+    elif backend == "smtp":
+        from symeraseme.adapters.email.himalaya import load_smtp_config
+
+        smtp_config = load_smtp_config()
+        if not smtp_config.from_addr:
+            return CliResult(
+                success=False,
+                message="SMTP backend requires SYMERASEME_SMTP_FROM to be set. Configure it in your environment or .env file.",
+            )
+        logger.info("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
+    else:
+        return CliResult(
+            success=False,
+            message=f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'.",
+        )
 
     if backend == "himalaya":
         result = execute_campaign(
