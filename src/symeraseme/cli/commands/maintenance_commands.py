@@ -11,7 +11,7 @@ from typing import Any
 
 import typer
 
-from symeraseme.cli.console import console, print_success, render_error, render_result
+from symeraseme.cli.console import print_success, render_error, render_result
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.registry.sync import handle_registry_sync
 from symeraseme.services.scheduler import (
@@ -224,6 +224,8 @@ def export_cmd(
     if output_file:
         _write_export_file(output_file, serialized)
 
+    from symeraseme.core.result_types import CliResult
+
     summary: dict[str, Any] = {
         "schema_version": 1,
         "format": fmt,
@@ -235,22 +237,18 @@ def export_cmd(
         "output_file": str(Path(output_file).expanduser().resolve()) if output_file else None,
     }
 
-    if ctx.obj["output"] == "json":
-        if output_file:
-            result = json.dumps(summary, indent=2, default=str)
-        else:
-            summary["payload"] = serialized
-            result = json.dumps(summary, indent=2, default=str)
-    elif output_file:
-        result = (
+    if output_file:
+        message = (
             f"Exported {summary['totals']['requests']} request(s) "
             f"and {summary['totals']['events']} event(s) "
             f"to {summary['output_file']} ({fmt})."
         )
+        data = summary
     else:
-        result = serialized
+        message = serialized
+        data = {**summary, "payload": serialized}
 
-    console.print(result, markup=False, soft_wrap=True)
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
 def _collect_export_data(

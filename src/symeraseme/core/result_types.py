@@ -16,24 +16,30 @@ class CliResult:
     """
 
     success: bool = True
-    data: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] | list[Any] = field(default_factory=dict)
     error: str | None = None
+
+    def __init__(
+        self,
+        success: bool = True,
+        data: dict[str, Any] | list[Any] | None = None,
+        error: str | None = None,
+        message: str = "",
+    ) -> None:
+        self.success = success
+        self.data = data if data is not None else {}
+        self.error = error
+        self._message = message
 
     @property
     def message(self) -> str:
         """Human-readable summary string."""
-        return self.data.get("message", "") or self.error or ""
+        if isinstance(self.data, dict):
+            return self._message or self.data.get("message", "") or self.error or ""
+        return self._message or self.error or ""
 
     def to_json(self) -> str:
-        """Serialize to JSON string."""
+        """Serialize data payload to JSON string."""
         import json
 
-        return json.dumps(
-            {
-                "success": self.success,
-                "data": self.data,
-                "error": self.error,
-            },
-            indent=2,
-            default=str,
-        )
+        return json.dumps(self.data, indent=2, default=str)

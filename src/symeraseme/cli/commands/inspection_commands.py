@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 
@@ -13,6 +12,7 @@ from symeraseme.cli.console import console, render_error, render_result
 from symeraseme.core.db import _db_path, init_db
 from symeraseme.core.events import get_events, list_removal_requests
 from symeraseme.core.identity import _profile_path
+from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import (
     _SKIPPED_COUNT,
     _broker_cache_key,
@@ -156,26 +156,21 @@ def doctor(ctx: typer.Context) -> None:
     }
 
     all_ok = all(ok for ok, _ in checks.values())
+    data = {
+        "ok": all_ok,
+        "checks": {
+            name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()
+        },
+    }
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(
-            {
-                "ok": all_ok,
-                "checks": {
-                    name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()
-                },
-            },
-            indent=2,
-        )
-    else:
-        lines = []
-        for name, (ok, detail) in checks.items():
-            status = "✓" if ok else "✗"
-            lines.append(f"  {status} {name:<20} {detail}")
-        header = "Environment check passed" if all_ok else "Environment check failed"
-        result = f"{header}\n" + "\n".join(lines)
+    lines = []
+    for name, (ok, detail) in checks.items():
+        status = "✓" if ok else "✗"
+        lines.append(f"  {status} {name:<20} {detail}")
+    header = "Environment check passed" if all_ok else "Environment check failed"
+    message = f"{header}\n" + "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
 @events_app.command(name="show")
@@ -183,24 +178,20 @@ def events_show(
     ctx: typer.Context,
     request_id: int = typer.Argument(..., help="Request ID"),
 ) -> None:
-    import json
-
     init_db()
     events = get_events(request_id)
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(events, indent=2, default=str)
-    elif not events:
-        result = f"No events found for request #{request_id}"
+    if not events:
+        message = f"No events found for request #{request_id}"
     else:
         lines = [f"Events for request #{request_id}:"]
         for e in events:
             lines.append(
                 f"  #{e['id']} {e['event_type']} @ {e['occurred_at']} (source: {e['source']})"
             )
-        result = "\n".join(lines)
+        message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data={"events": events}, message=message))
 
 
 @requests_app.command(name="list")
@@ -228,8 +219,6 @@ def requests_list(
         help="Number of results per page (default: 250)",
     ),
 ) -> None:
-    import json
-
     init_db()
     limit = page_size if page is not None else None
     offset = (page - 1) * page_size if page is not None else None
@@ -241,10 +230,8 @@ def requests_list(
         offset=offset,
     )
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(requests, indent=2, default=str)
-    elif not requests:
-        result = "No requests found."
+    if not requests:
+        message = "No requests found."
     else:
         lines = []
         for r in requests:
@@ -252,9 +239,9 @@ def requests_list(
                 f"  #{r['id']} [{r.get('current_status', 'N/A')}] "
                 f"{r['broker_id']} ({r['campaign_id']})"
             )
-        result = "\n".join(lines)
+        message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=requests, message=message))
 
 
 @brokers_app.command(name="list")
@@ -278,8 +265,6 @@ def brokers_list_cmd(
     ),
 ) -> None:
     """List brokers in the registry, optionally filtered."""
-    import json
-
     brokers = load_all_brokers(
         jurisdiction=jurisdiction,
         law=law,
@@ -288,36 +273,35 @@ def brokers_list_cmd(
         include_disabled=include_disabled,
     )
 
-    if ctx.obj["output"] == "json":
-        payload = {
-            "schema_version": 1,
-            "filters": {
-                "jurisdiction": jurisdiction,
-                "law": law,
-                "priority": priority,
-                "category": category,
-                "include_disabled": include_disabled,
-            },
-            "count": len(brokers),
-            "brokers": [
-                {
-                    "id": b.id,
-                    "name": b.name,
-                    "website": b.website,
-                    "category": b.category.value,
-                    "jurisdictions": b.jurisdictions,
-                    "laws": [law.value for law in b.laws],
-                    "priority": b.priority.value,
-                    "data_sensitivity": b.data_sensitivity,
-                    "disabled": b.disabled,
-                    "opt_out_channels": [ch.type for ch in b.opt_out],
-                }
-                for b in brokers
-            ],
-        }
-        result = json.dumps(payload, indent=2, default=str)
-    elif not brokers:
-        result = "No brokers match the given filters."
+    data = {
+        "schema_version": 1,
+        "filters": {
+            "jurisdiction": jurisdiction,
+            "law": law,
+            "priority": priority,
+            "category": category,
+            "include_disabled": include_disabled,
+        },
+        "count": len(brokers),
+        "brokers": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "website": b.website,
+                "category": b.category.value,
+                "jurisdictions": b.jurisdictions,
+                "laws": [law.value for law in b.laws],
+                "priority": b.priority.value,
+                "data_sensitivity": b.data_sensitivity,
+                "disabled": b.disabled,
+                "opt_out_channels": [ch.type for ch in b.opt_out],
+            }
+            for b in brokers
+        ],
+    }
+
+    if not brokers:
+        message = "No brokers match the given filters."
     else:
         lines = [f"{len(brokers)} broker(s):"]
         for b in brokers:
@@ -328,9 +312,9 @@ def brokers_list_cmd(
                 f"  {b.id:<28} {b.priority.value:<6} {b.category.value:<18} "
                 f"{juris:<12} {channels}{flag}"
             )
-        result = "\n".join(lines)
+        message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
 @brokers_app.command(name="show")
@@ -339,8 +323,6 @@ def brokers_show_cmd(
     broker_id: str = typer.Argument(help="Broker id (e.g. acxiom-eu, spokeo)"),
 ) -> None:
     """Show full details of one broker by id."""
-    import json
-
     try:
         broker = load_broker(broker_id)
     except FileNotFoundError:
@@ -354,46 +336,41 @@ def brokers_show_cmd(
                 "Run 'symeraseme brokers list' to see available brokers."
             )
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(
-            {
-                "schema_version": 1,
-                "broker": broker.model_dump(mode="json", exclude_none=True),
-            },
-            indent=2,
-            default=str,
-        )
-    else:
-        lines = [
-            f"Broker: {broker.name}",
-            f"  id:               {broker.id}",
-            f"  website:          {broker.website}",
-            f"  category:         {broker.category.value}",
-            f"  priority:         {broker.priority.value}",
-            f"  data_sensitivity: {broker.data_sensitivity}",
-            f"  jurisdictions:    {', '.join(broker.jurisdictions)}",
-            f"  laws:             {', '.join(law.value for law in broker.laws)}",
-            f"  disabled:         {broker.disabled}",
-        ]
-        for i, channel in enumerate(broker.opt_out, 1):
-            lines.append(f"  opt_out[{i}]: {channel.type}")
-            if isinstance(channel, EmailOptOut):
-                lines.append(f"    endpoint: {channel.endpoint}")
-                lines.append(f"    template: {channel.template}")
-                lines.append(f"    locale:   {channel.locale}")
-                lines.append(f"    expected_response_days: {channel.expected_response_days}")
-            elif isinstance(channel, WebFormOptOut):
-                lines.append(f"    url:      {channel.url}")
-                lines.append(f"    steps:    {len(channel.form_spec.steps)}")
-        if broker.verification:
-            lines.append(f"  verification.ack_keywords:        {broker.verification.ack_keywords}")
-            lines.append(
-                f"  verification.rejection_keywords:  {broker.verification.rejection_keywords}"
-            )
-        if broker.notes:
-            lines.append("  notes:")
-            for nl in broker.notes.strip().splitlines():
-                lines.append(f"    {nl}")
-        result = "\n".join(lines)
+    data = {
+        "schema_version": 1,
+        "broker": broker.model_dump(mode="json", exclude_none=True),
+    }
 
-    render_result(ctx.obj["output"], result)
+    lines = [
+        f"Broker: {broker.name}",
+        f"  id:               {broker.id}",
+        f"  website:          {broker.website}",
+        f"  category:         {broker.category.value}",
+        f"  priority:         {broker.priority.value}",
+        f"  data_sensitivity: {broker.data_sensitivity}",
+        f"  jurisdictions:    {', '.join(broker.jurisdictions)}",
+        f"  laws:             {', '.join(law.value for law in broker.laws)}",
+        f"  disabled:         {broker.disabled}",
+    ]
+    for i, channel in enumerate(broker.opt_out, 1):
+        lines.append(f"  opt_out[{i}]: {channel.type}")
+        if isinstance(channel, EmailOptOut):
+            lines.append(f"    endpoint: {channel.endpoint}")
+            lines.append(f"    template: {channel.template}")
+            lines.append(f"    locale:   {channel.locale}")
+            lines.append(f"    expected_response_days: {channel.expected_response_days}")
+        elif isinstance(channel, WebFormOptOut):
+            lines.append(f"    url:      {channel.url}")
+            lines.append(f"    steps:    {len(channel.form_spec.steps)}")
+    if broker.verification:
+        lines.append(f"  verification.ack_keywords:        {broker.verification.ack_keywords}")
+        lines.append(
+            f"  verification.rejection_keywords:  {broker.verification.rejection_keywords}"
+        )
+    if broker.notes:
+        lines.append("  notes:")
+        for nl in broker.notes.strip().splitlines():
+            lines.append(f"    {nl}")
+    message = "\n".join(lines)
+
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
