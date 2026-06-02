@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import getpass
+import json
 import logging
 import os
 import re
@@ -111,13 +113,36 @@ def scrub_pii(text: str) -> str:
 
 
 def llm_consent_granted() -> bool:
-    if _LLM_CONSENT_FILE.exists():
-        return True
     env = os.environ.get("SYMERASEME_LLM_CONSENT", "").strip().lower()
-    return env in ("1", "true", "yes")
+    if env in ("1", "true", "yes"):
+        return True
+    if not _LLM_CONSENT_FILE.exists():
+        return False
+    try:
+        data = json.loads(_LLM_CONSENT_FILE.read_text(encoding="utf-8"))
+        return bool(data.get("granted", False))
+    except (json.JSONDecodeError, OSError):
+        # Legacy empty touch file — treat as granted for backward compatibility
+        return True
 
 
 def grant_llm_consent() -> None:
-    _LLM_CONSENT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _LLM_CONSENT_FILE.touch()
+    _LLM_CONSENT_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    record = {
+        "granted": True,
+        "user": getpass.getuser(),
+        "granted_at": int(os.path.getmtime(_LLM_CONSENT_FILE))
+        if _LLM_CONSENT_FILE.exists()
+        else int(__import__("time").time()),
+        "scope": "llm_pii",
+    }
+    fd = os.open(_LLM_CONSENT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)
+    with open(fd, "w", encoding="utf-8") as f:
+        json.dump(record, f, indent=2)
     logger.info("LLM PII consent granted via %s", _LLM_CONSENT_FILE)
+
+
+def revoke_llm_consent() -> None:
+    if _LLM_CONSENT_FILE.exists():
+        _LLM_CONSENT_FILE.unlink(missing_ok=True)
+        logger.info("LLM PII consent revoked (%s removed)", _LLM_CONSENT_FILE)

@@ -109,6 +109,15 @@ app.command(rich_help_panel="Account & Profile")(render_template)
 app.command(rich_help_panel="Account & Profile")(grant)
 
 
+@app.command(rich_help_panel="Account & Profile")
+def revoke_llm_consent_cmd() -> None:
+    """Revoke previously granted LLM PII consent."""
+    from symeraseme.adapters.triage.scrubber import revoke_llm_consent
+
+    revoke_llm_consent()
+    typer.echo("LLM PII consent revoked.")
+
+
 # ── Planning & Execution (deprecated top-level aliases) ───────────────────
 @app.command(rich_help_panel="Planning & Execution", deprecated=True)
 def execute(
