@@ -606,14 +606,14 @@ class TestCLIConsent:
     def test_execute_dry_run(self):
         result = runner.invoke(
             app,
-            ["execute", "--campaign", "cli-dry", "--dry-run", "--yes"],
+            ["plan", "execute", "--campaign", "cli-dry", "--dry-run", "--yes"],
         )
         assert result.exit_code == 0
 
     def test_execute_refuses_without_consent(self):
         result = runner.invoke(
             app,
-            ["execute", "--campaign", "no-consent"],
+            ["plan", "execute", "--campaign", "no-consent"],
         )
         assert result.exit_code != 0
         output = (result.stdout + result.stderr).lower()
