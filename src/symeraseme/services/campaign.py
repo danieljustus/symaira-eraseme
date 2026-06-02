@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
+from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db import init_db
-from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
 

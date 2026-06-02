@@ -15,7 +15,6 @@ from rich.table import Table
 from rich.text import Text
 
 from symeraseme.cli.types import CliResult
-from symeraseme.core.exceptions import SymerasemeError
 
 console = _RichConsole()
 _error_console = _RichConsole(stderr=True)
