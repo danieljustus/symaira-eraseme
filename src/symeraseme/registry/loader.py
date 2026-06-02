@@ -7,6 +7,7 @@ import logging
 import os
 from importlib import resources
 from pathlib import Path
+from typing import Any
 
 import jsonschema
 import yaml
@@ -189,10 +190,13 @@ def _load_persistent_cache(
 
     stored_hmac = data.pop("integrity", None)
     key = _integrity_key()
-    if key is not None and stored_hmac is not None:
-        if not hmac.compare_digest(stored_hmac, _compute_hmac(data, key)):
-            logger.warning("Persistent broker cache integrity check failed, rebuilding")
-            return None
+    if (
+        key is not None
+        and stored_hmac is not None
+        and not hmac.compare_digest(stored_hmac, _compute_hmac(data, key))
+    ):
+        logger.warning("Persistent broker cache integrity check failed, rebuilding")
+        return None
 
     raw_brokers = data.get("brokers", [])
     if not raw_brokers:

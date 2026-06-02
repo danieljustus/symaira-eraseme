@@ -132,13 +132,10 @@ def _lazy_import(module: str, name: str) -> Any:
     return getattr(mod, name)
 
 
-def capture_form_state(*args: Any, **kwargs: Any) -> Any:
-    from symeraseme.adapters.web._fallback import capture_form_state as _impl
-    return _impl(*args, **kwargs)
-
-
 _async_get_content = _lazy_import("symeraseme.adapters.web._fallback", "_async_get_content")
-_async_extract_form_fields = _lazy_import("symeraseme.adapters.web._fallback", "_async_extract_form_fields")
+_async_extract_form_fields = _lazy_import(
+    "symeraseme.adapters.web._fallback", "_async_extract_form_fields"
+)
 _async_save_screenshot = _lazy_import("symeraseme.adapters.web._fallback", "_async_save_screenshot")
 
 
