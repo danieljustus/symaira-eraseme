@@ -320,9 +320,9 @@ def load_all_brokers(
         if meta_index is not None:
             brokers: list[Broker] = []
             skipped = 0
-            for broker_id, meta in meta_index.items():
+            for broker_id, meta_entry in meta_index.items():
                 if not _meta_matches_filters(
-                    meta,
+                    meta_entry,
                     jurisdiction=jurisdiction,
                     law=law,
                     priority=priority,
@@ -377,7 +377,7 @@ def load_all_brokers(
     brokers = []
     skipped = 0
     id_index: dict[str, Path] = {}
-    meta_index: dict[str, dict[str, Any]] = {}
+    cold_meta_index: dict[str, dict[str, Any]] = {}
     for yml in yaml_files:
         if yml.name.startswith("_"):
             continue
@@ -389,7 +389,7 @@ def load_all_brokers(
             continue
         brokers.append(broker)
         id_index[broker.id] = yml
-        meta_index[broker.id] = {
+        cold_meta_index[broker.id] = {
             "jurisdictions": broker.jurisdictions,
             "laws": [law_item.value for law_item in broker.laws],
             "priority": broker.priority.value,
@@ -397,9 +397,7 @@ def load_all_brokers(
             "disabled": broker.disabled,
         }
     _BROKER_ID_INDEX = id_index
-    _BROKER_CACHE[cache_key] = brokers
-    _SKIPPED_COUNT[cache_key] = skipped
-    _save_persistent_cache(registry_path, cache_key, brokers, id_index, meta_index)
+    _save_persistent_cache(registry_path, cache_key, brokers, id_index, cold_meta_index)
     return _filter_brokers(
         brokers,
         jurisdiction=jurisdiction,
