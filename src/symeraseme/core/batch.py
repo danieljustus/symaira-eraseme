@@ -34,6 +34,7 @@ def execute_campaign(
     batch_size: int = 5,
     dry_run: bool = False,
     web_form_runner=None,
+    email_sender=None,
 ) -> dict[str, Any]:
     requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
     batch = requests[:batch_size]
@@ -46,6 +47,7 @@ def execute_campaign(
                 config_path=config_path,
                 dry_run=dry_run,
                 web_form_runner=web_form_runner,
+                email_sender=email_sender,
             )
         except SymerasemeError as e:
             result = {"success": False, "error": str(e), "request_id": req["id"]}
@@ -159,6 +161,7 @@ async def execute_campaign_async(
     dry_run: bool = False,
     smtp_skip_tls: bool = False,
     web_form_runner=None,
+    email_sender=None,
 ) -> dict[str, Any]:
     requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
     batch = requests[:batch_size]
@@ -180,7 +183,12 @@ async def execute_campaign_async(
             for req in batch:
                 progress.update(task, description=f"Processing {req['broker_id']}...")
                 try:
-                    r = execute_request(req["id"], dry_run=True, web_form_runner=web_form_runner)
+                    r = execute_request(
+                        req["id"],
+                        dry_run=True,
+                        web_form_runner=web_form_runner,
+                        email_sender=email_sender,
+                    )
                 except SymerasemeError as e:
                     r = {"success": False, "error": str(e), "request_id": req["id"]}
                 results.append(r)

@@ -63,6 +63,7 @@ def handle_execute(
     consent_file: str | None = None,
     web_form_runner=None,
     backend: str | None = None,
+    email_sender=None,
 ) -> CliResult:
     if not dry_run and not check_consent(
         "execute",
@@ -123,6 +124,11 @@ def handle_execute(
             data={"message": f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'."},
         )
 
+    if email_sender is None and backend == "himalaya":
+        from symeraseme.adapters.email.himalaya import send_email
+
+        email_sender = send_email
+
     if backend == "himalaya":
         result = execute_campaign(
             campaign_id,
@@ -130,6 +136,7 @@ def handle_execute(
             batch_size=batch_size,
             dry_run=dry_run,
             web_form_runner=web_form_runner,
+            email_sender=email_sender,
         )
     else:
         result = asyncio.run(
@@ -138,6 +145,7 @@ def handle_execute(
                 batch_size=batch_size,
                 dry_run=dry_run,
                 web_form_runner=web_form_runner,
+                email_sender=email_sender,
             )
         )
 
