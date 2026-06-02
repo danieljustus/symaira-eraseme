@@ -253,7 +253,7 @@ def list_messages(
         return []
 
     envelopes: list[Envelope] = []
-    for msg_id in ids[-(page_size * page):]:
+    for msg_id in ids[-(page_size * page) :]:
         try:
             status, data = mail.fetch(msg_id, "(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)")
             if status != "OK" or not data or not data[0]:
@@ -290,7 +290,7 @@ def _parse_envelope_response(response: str) -> dict[str, Any] | None:
         if not match:
             return None
         envelope_str = match.group(1)
-        parts = envelope_str.split("\"")
+        parts = envelope_str.split('"')
         if len(parts) >= 6:
             date_str = parts[0].strip()
             date = None

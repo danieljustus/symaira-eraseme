@@ -476,6 +476,10 @@ class TestHandleExecuteRouting:
             "symeraseme.services.campaign.execute_campaign",
             mock_execute_campaign,
         )
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.himalaya_available",
+            lambda: True,
+        )
 
         handle_execute("test-campaign", account="gmail", yes=True)
         assert len(sync_called) == 1
