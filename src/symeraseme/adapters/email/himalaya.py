@@ -5,13 +5,15 @@ import logging
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
 from pathlib import Path
 from typing import Any
+
+from symeraseme.adapters.email._types import Envelope, Message, SmtpConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,27 +32,6 @@ class HimalayaNotInstalledError(HimalayaError):
 
 class SmtpError(EmailError):
     """Raised when SMTP sending fails."""
-
-
-@dataclass
-class Envelope:
-    id: str
-    subject: str
-    from_: str
-    to: str
-    date: datetime | None = None
-    flags: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Message:
-    id: str
-    subject: str
-    from_: str
-    to: str
-    date: datetime | None = None
-    body: str = ""
-    flags: list[str] = field(default_factory=list)
 
 
 def _check_himalaya_installed() -> str:
@@ -154,16 +135,6 @@ def list_messages(
         envelopes.append(env)
 
     return envelopes
-
-
-@dataclass
-class SmtpConfig:
-    host: str = "localhost"
-    port: int = 587
-    username: str = ""
-    password: str = ""
-    use_tls: bool = True
-    from_addr: str = ""
 
 
 def load_smtp_config() -> SmtpConfig:

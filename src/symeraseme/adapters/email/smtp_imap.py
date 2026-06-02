@@ -8,10 +8,11 @@ import email.utils
 import imaplib
 import logging
 import re
-from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from email.header import decode_header
 from typing import Any
+
+from symeraseme.adapters.email._types import Envelope, Message
 
 logger = logging.getLogger(__name__)
 
@@ -199,27 +200,6 @@ def poll_inbox(
 
     mail.logout()
     return messages
-
-
-@dataclass
-class Envelope:
-    id: str
-    subject: str
-    from_: str
-    to: str
-    date: datetime | None = None
-    flags: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Message:
-    id: str
-    subject: str
-    from_: str
-    to: str
-    date: datetime | None = None
-    body: str = ""
-    flags: list[str] = field(default_factory=list)
 
 
 def list_messages(
