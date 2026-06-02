@@ -422,6 +422,7 @@ class TestHandleExecuteRouting:
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_SMTP_FROM"] = "test@example.com"
 
         from symeraseme.core.db import close_connection, init_db
 
@@ -474,6 +475,10 @@ class TestHandleExecuteRouting:
         monkeypatch.setattr(
             "symeraseme.services.campaign.execute_campaign",
             mock_execute_campaign,
+        )
+        monkeypatch.setattr(
+            "symeraseme.adapters.email.himalaya.himalaya_available",
+            lambda: True,
         )
 
         handle_execute("test-campaign", account="gmail", yes=True)

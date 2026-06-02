@@ -146,7 +146,7 @@ class TestRegistryLoader:
 
         loaded = _load_persistent_cache(registry_dir, data["cache_key"])
         assert loaded is not None
-        loaded_brokers, loaded_index = loaded
+        loaded_brokers, loaded_index, _meta_index = loaded
         assert len(loaded_brokers) == len(brokers)
         assert loaded_index
 

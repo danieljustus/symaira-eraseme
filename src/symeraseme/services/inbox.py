@@ -24,7 +24,6 @@ def handle_poll_inbox(
     password: str,
 ) -> CliResult:
     init_db()
-    """poll inbox."""
 
     try:
         messages = _poll(

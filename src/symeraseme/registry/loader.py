@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
 from importlib import resources
 from pathlib import Path
+from typing import Any
 
 import jsonschema
 import yaml
@@ -118,6 +120,21 @@ def _cache_dir() -> Path:
     return cache
 
 
+def _integrity_key() -> bytes | None:
+    key_path = _cache_dir() / ".integrity.key"
+    if key_path.exists():
+        return key_path.read_bytes()
+    key = os.urandom(32)
+    key_path.write_bytes(key)
+    os.chmod(key_path, 0o600)
+    return key
+
+
+def _compute_hmac(payload: dict, key: bytes) -> str:
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def _persistent_cache_path(registry_dir: Path) -> Path:
     dir_hash = hashlib.sha256(str(registry_dir).encode()).hexdigest()[:16]
     return _cache_dir() / f"brokers_{dir_hash}.json"
@@ -128,6 +145,7 @@ def _save_persistent_cache(
     cache_key: tuple[str, str],
     brokers: list[Broker],
     id_index: dict[str, Path],
+    meta_index: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     path = _persistent_cache_path(registry_dir)
     relative_index: dict[str, str] = {}
@@ -136,16 +154,19 @@ def _save_persistent_cache(
             relative_index[broker_id] = str(broker_path.relative_to(registry_dir))
         except ValueError:
             relative_index[broker_id] = str(broker_path)
+    payload: dict[str, Any] = {
+        "cache_key": cache_key,
+        "brokers": [b.model_dump(mode="json") for b in brokers],
+        "id_index": relative_index,
+    }
+    if meta_index is not None:
+        payload["meta_index"] = meta_index
+    key = _integrity_key()
+    if key is not None:
+        payload["integrity"] = _compute_hmac(payload, key)
     try:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "cache_key": cache_key,
-                    "brokers": [b.model_dump(mode="json") for b in brokers],
-                    "id_index": relative_index,
-                },
-                f,
-            )
+            json.dump(payload, f)
     except OSError as e:
         logger.warning("Failed to save persistent broker cache: %s", e)
 
@@ -153,7 +174,7 @@ def _save_persistent_cache(
 def _load_persistent_cache(
     registry_dir: Path,
     cache_key: tuple[str, str],
-) -> tuple[list[Broker], dict[str, Path]] | None:
+) -> tuple[list[Broker], dict[str, Path], dict[str, dict[str, Any]] | None] | None:
     path = _persistent_cache_path(registry_dir)
     if not path.exists():
         return None
@@ -166,6 +187,17 @@ def _load_persistent_cache(
     if data.get("cache_key") != cache_key:
         logger.debug("Persistent broker cache key mismatch, rebuilding")
         return None
+
+    stored_hmac = data.pop("integrity", None)
+    key = _integrity_key()
+    if (
+        key is not None
+        and stored_hmac is not None
+        and not hmac.compare_digest(stored_hmac, _compute_hmac(data, key))
+    ):
+        logger.warning("Persistent broker cache integrity check failed, rebuilding")
+        return None
+
     raw_brokers = data.get("brokers", [])
     if not raw_brokers:
         return None
@@ -178,8 +210,9 @@ def _load_persistent_cache(
         }
     else:
         id_index = _build_broker_id_index(registry_dir)
+    meta_index = data.get("meta_index")
     logger.debug("Loaded %d brokers from persistent cache", len(brokers))
-    return brokers, id_index
+    return brokers, id_index, meta_index
 
 
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
@@ -270,13 +303,12 @@ def load_all_brokers(
             include_disabled=include_disabled,
         )
 
-    # Persistent cache: only when no filters are applied (full load).
-    if not has_filters:
-        cached = _load_persistent_cache(registry_path, cache_key)
-        if cached is not None:
-            cached_brokers, cached_index = cached
+    cached = _load_persistent_cache(registry_path, cache_key)
+    if cached is not None:
+        cached_brokers, cached_index, meta_index = cached
+        _BROKER_ID_INDEX = cached_index
+        if not has_filters:
             _BROKER_CACHE[cache_key] = cached_brokers
-            _BROKER_ID_INDEX = cached_index
             return _filter_brokers(
                 cached_brokers,
                 jurisdiction=jurisdiction,
@@ -285,12 +317,36 @@ def load_all_brokers(
                 category=category,
                 include_disabled=include_disabled,
             )
+        if meta_index is not None:
+            brokers: list[Broker] = []
+            skipped = 0
+            for broker_id, meta_entry in meta_index.items():
+                if not _meta_matches_filters(
+                    meta_entry,
+                    jurisdiction=jurisdiction,
+                    law=law,
+                    priority=priority,
+                    category=category,
+                    include_disabled=include_disabled,
+                ):
+                    continue
+                yml = cached_index.get(broker_id)
+                if yml is None:
+                    continue
+                try:
+                    broker = load_broker_yaml(yml)
+                except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+                    logger.warning("skipped broker %s: %s", yml, exc)
+                    skipped += 1
+                    continue
+                brokers.append(broker)
+            return brokers
 
     yaml_files = sorted(registry_path.rglob("*.yaml"))
 
     if has_filters:
         # Cold cache + filters: lazy-load only matching files.
-        brokers: list[Broker] = []
+        brokers = []
         skipped = 0
         for yml in yaml_files:
             if yml.name.startswith("_"):
@@ -321,6 +377,7 @@ def load_all_brokers(
     brokers = []
     skipped = 0
     id_index: dict[str, Path] = {}
+    cold_meta_index: dict[str, dict[str, Any]] = {}
     for yml in yaml_files:
         if yml.name.startswith("_"):
             continue
@@ -332,10 +389,15 @@ def load_all_brokers(
             continue
         brokers.append(broker)
         id_index[broker.id] = yml
+        cold_meta_index[broker.id] = {
+            "jurisdictions": broker.jurisdictions,
+            "laws": [law_item.value for law_item in broker.laws],
+            "priority": broker.priority.value,
+            "category": broker.category.value,
+            "disabled": broker.disabled,
+        }
     _BROKER_ID_INDEX = id_index
-    _BROKER_CACHE[cache_key] = brokers
-    _SKIPPED_COUNT[cache_key] = skipped
-    _save_persistent_cache(registry_path, cache_key, brokers, id_index)
+    _save_persistent_cache(registry_path, cache_key, brokers, id_index, cold_meta_index)
     return _filter_brokers(
         brokers,
         jurisdiction=jurisdiction,
