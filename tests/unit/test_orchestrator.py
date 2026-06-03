@@ -12,14 +12,10 @@ from symeraseme.cli import app
 from symeraseme.core.consent import check_consent, issue_token, verify_token
 from symeraseme.core.db import close_connection, init_db
 from symeraseme.core.events import list_removal_requests
-from symeraseme.core.orchestrator import (
-    execute_campaign,
-    execute_campaign_async,
-    execute_request,
-    get_plan,
-    plan_campaign,
-    submit_inbox_reply,
-)
+from symeraseme.core.batch import execute_campaign, execute_campaign_async
+from symeraseme.core.execution import execute_request
+from symeraseme.core.inbox import submit_inbox_reply
+from symeraseme.core.planning import get_plan, plan_campaign
 
 runner = CliRunner()
 
