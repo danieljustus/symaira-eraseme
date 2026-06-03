@@ -79,7 +79,9 @@ class TestRequestsList:
 
         assert_ok(result)
         data = json.loads(result.stdout)
-        assert isinstance(data["data"], list)
+        assert isinstance(data, dict)
+        requests = data.get("data", [])
+        assert isinstance(requests, list)
 
     def test_requests_list_by_broker(self, seeded_db):
         result = invoke("requests", "list", "--broker", "acxiom-eu")

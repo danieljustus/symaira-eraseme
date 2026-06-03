@@ -14,13 +14,8 @@ class TestExecute:
 
     def test_execute_dry_run_json(self, seeded_db):
         result = invoke(
-            "--output",
-            "json",
-            "plan",
-            "execute",
-            "--campaign",
-            "smoke-test",
-            "--dry-run",
+            "--output", "json", "plan", "execute",
+            "--campaign", "smoke-test", "--dry-run",
         )
         import json
 
@@ -30,13 +25,8 @@ class TestExecute:
 
     def test_execute_dry_run_batch_size(self, seeded_db):
         result = invoke(
-            "plan",
-            "execute",
-            "--campaign",
-            "smoke-test",
-            "--dry-run",
-            "--batch-size",
-            "3",
+            "plan", "execute", "--campaign", "smoke-test",
+            "--dry-run", "--batch-size", "3",
         )
         assert_ok(result)
 

@@ -18,7 +18,9 @@ class TestLlmConsent:
     @pytest.fixture(autouse=True)
     def _clean_consent(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         consent_file = tmp_path / ".llm_consent_granted"
-        monkeypatch.setattr("symeraseme.adapters.triage.scrubber._LLM_CONSENT_FILE", consent_file)
+        monkeypatch.setattr(
+            "symeraseme.adapters.triage.scrubber._LLM_CONSENT_FILE", consent_file
+        )
         monkeypatch.delenv("SYMERASEME_LLM_CONSENT", raising=False)
         consent_file.unlink(missing_ok=True)
         yield

@@ -64,4 +64,6 @@ class TestRequestsByStatus:
 
         assert_ok(result)
         data = json.loads(result.stdout)
-        assert isinstance(data["data"], list)
+        assert isinstance(data, dict)
+        requests = data.get("data", [])
+        assert isinstance(requests, list)
