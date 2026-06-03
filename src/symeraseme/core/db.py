@@ -89,9 +89,6 @@ def _scavenge_stale_temp_dbs() -> None:
                     entry.unlink(missing_ok=True)
 
 
-_scavenge_stale_temp_dbs()
-
-
 def _db_encryption_enabled() -> bool:
     val = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower()
     return val in ("1", "true", "yes")
@@ -239,6 +236,7 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         or not hasattr(_local, "db_path")
         or _local.db_path != requested_path
     ):
+        _scavenge_stale_temp_dbs()
         db_file = _db_path(path)
 
         should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
