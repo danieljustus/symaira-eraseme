@@ -117,11 +117,8 @@ class TestRegistryLoader:
         import json
 
         from symeraseme.registry.loader import (
-            _broker_cache_key,
-            _cache_dir,
             _load_persistent_cache,
             _persistent_cache_path,
-            _save_persistent_cache,
             clear_registry_cache,
             load_all_brokers,
         )
@@ -156,9 +153,7 @@ class TestRegistryLoader:
 
         from symeraseme.registry.loader import (
             _broker_cache_key,
-            _cache_dir,
             _load_persistent_cache,
-            _persistent_cache_path,
             clear_registry_cache,
         )
 
