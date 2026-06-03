@@ -2,15 +2,35 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
-from symeraseme.core.db import get_connection
+from symeraseme.core.repositories import (
+    append_event as _repo_append_event,
+)
+from symeraseme.core.repositories import (
+    create_campaign as _repo_create_campaign,
+)
+from symeraseme.core.repositories import (
+    create_removal_request as _repo_create_removal_request,
+)
+from symeraseme.core.repositories import (
+    get_events as _repo_get_events,
+)
+from symeraseme.core.repositories import (
+    get_events_for_requests as _repo_get_events_for_requests,
+)
+from symeraseme.core.repositories import (
+    get_removal_request as _repo_get_removal_request,
+)
+from symeraseme.core.repositories import (
+    list_campaigns as _repo_list_campaigns,
+)
+from symeraseme.core.repositories import (
+    list_removal_requests as _repo_list_removal_requests,
+)
 
 logger = logging.getLogger(__name__)
-
 
 EVENT_TYPES = frozenset(
     {
@@ -45,20 +65,11 @@ def create_campaign(
     kind: str = "initial",
     notes: str | None = None,
 ) -> None:
-    conn = get_connection()
-    conn.execute(
-        "INSERT OR IGNORE INTO campaigns (id, kind, notes) VALUES (?, ?, ?)",
-        (campaign_id, kind, notes),
-    )
-    conn.commit()
+    _repo_create_campaign(campaign_id, kind=kind, notes=notes)
 
 
 def list_campaigns() -> list[dict[str, Any]]:
-    conn = get_connection()
-    rows = conn.execute(
-        "SELECT id, created_at, kind, notes FROM campaigns ORDER BY created_at DESC"
-    ).fetchall()
-    return [dict(r) for r in rows]
+    return _repo_list_campaigns()
 
 
 def create_removal_request(
@@ -70,16 +81,14 @@ def create_removal_request(
     template_id: str = "",
     identity_snapshot_hash: str = "",
 ) -> int:
-    conn = get_connection()
-    cur = conn.execute(
-        """INSERT INTO removal_requests
-           (broker_id, channel, campaign_id, jurisdiction, template_id, identity_snapshot_hash)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (broker_id, channel, campaign_id, jurisdiction, template_id, identity_snapshot_hash),
+    return _repo_create_removal_request(
+        broker_id=broker_id,
+        channel=channel,
+        campaign_id=campaign_id,
+        jurisdiction=jurisdiction,
+        template_id=template_id,
+        identity_snapshot_hash=identity_snapshot_hash,
     )
-    conn.commit()
-    rid: int = cur.lastrowid  # type: ignore[assignment]
-    return rid
 
 
 def append_event(
@@ -105,39 +114,18 @@ def append_event(
         raise ValueError(msg)
 
     logger.debug("Appending event %s for request %s", event_type, request_id)
-    conn = get_connection()
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
-    cur = conn.execute(
-        """INSERT INTO request_events
-           (request_id, occurred_at, recorded_at, event_type, payload_json, source)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (request_id, occurred_at or now, now, event_type, json.dumps(payload or {}), source),
+    return _repo_append_event(
+        request_id,
+        event_type,
+        payload=payload,
+        source=source,
+        occurred_at=occurred_at,
+        commit=commit,
     )
-    if commit:
-        conn.commit()
-    eid: int = cur.lastrowid  # type: ignore[assignment]
-    return eid
 
 
 def get_events_for_requests(request_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
-    conn = get_connection()
-    if not request_ids:
-        return {}
-    placeholders = ",".join("?" * len(request_ids))
-    rows = conn.execute(
-        f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
-                  payload_json, source
-           FROM request_events
-           WHERE request_id IN ({placeholders})
-           ORDER BY occurred_at ASC, id ASC""",
-        request_ids,
-    ).fetchall()
-    result: dict[int, list[dict[str, Any]]] = {rid: [] for rid in request_ids}
-    for r in rows:
-        row = dict(r)
-        row["payload_json"] = json.loads(row["payload_json"])
-        result[row["request_id"]].append(row)
-    return result
+    return _repo_get_events_for_requests(request_ids)
 
 
 def get_events(
@@ -145,42 +133,11 @@ def get_events(
     *,
     after_event_id: int | None = None,
 ) -> list[dict[str, Any]]:
-    conn = get_connection()
-    if after_event_id:
-        rows = conn.execute(
-            """SELECT id, request_id, occurred_at, recorded_at, event_type,
-                      payload_json, source
-               FROM request_events
-               WHERE request_id = ? AND id > ?
-               ORDER BY occurred_at ASC, id ASC""",
-            (request_id, after_event_id),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            """SELECT id, request_id, occurred_at, recorded_at, event_type,
-                      payload_json, source
-               FROM request_events
-               WHERE request_id = ?
-               ORDER BY occurred_at ASC, id ASC""",
-            (request_id,),
-        ).fetchall()
-
-    result = []
-    for r in rows:
-        row = dict(r)
-        row["payload_json"] = json.loads(row["payload_json"])
-        result.append(row)
-    return result
+    return _repo_get_events(request_id, after_event_id=after_event_id)
 
 
 def get_removal_request(request_id: int) -> dict[str, Any] | None:
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT id, broker_id, channel, campaign_id, created_at, jurisdiction, "
-        "template_id, identity_snapshot_hash FROM removal_requests WHERE id = ?",
-        (request_id,),
-    ).fetchone()
-    return dict(row) if row else None
+    return _repo_get_removal_request(request_id)
 
 
 def list_removal_requests(
@@ -191,43 +148,10 @@ def list_removal_requests(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
-    """List removal requests with optional filters.
-
-    WARNING: The WHERE clause MUST remain a fixed string — never use
-    f-strings or string concatenation to build SQL. Filtering is handled
-    via ``(? IS NULL OR col = ?)`` so the query text never changes.
-
-    Args:
-        limit: Max rows to return (None = unlimited).
-        offset: Row offset for pagination (requires limit).
-    """
-    conn = get_connection()
-    query = """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-              r.jurisdiction, r.template_id, r.identity_snapshot_hash,
-              s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
-              s.resolved_at, s.deadline_at, s.reminders_sent, s.escalation_level
-       FROM removal_requests r
-       LEFT JOIN request_state s ON s.request_id = r.id
-       WHERE (? IS NULL OR r.campaign_id = ?)
-         AND (? IS NULL OR s.current_status = ?)
-         AND (? IS NULL OR r.broker_id = ?)
-       ORDER BY r.created_at ASC"""
-    params: list = [
-        campaign_id or None,
-        campaign_id or None,
-        status or None,
-        status or None,
-        broker_id or None,
-        broker_id or None,
-    ]
-    if limit is not None:
-        query += " LIMIT ?"
-        params.append(limit)
-        if offset is not None:
-            query += " OFFSET ?"
-            params.append(offset)
-    elif offset is not None:
-        query += " LIMIT -1 OFFSET ?"
-        params.append(offset)
-    rows = conn.execute(query, params).fetchall()
-    return [dict(r) for r in rows]
+    return _repo_list_removal_requests(
+        campaign_id=campaign_id,
+        status=status,
+        broker_id=broker_id,
+        limit=limit,
+        offset=offset,
+    )
