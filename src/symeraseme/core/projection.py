@@ -182,7 +182,9 @@ def append_event_and_project(
     except (sqlite3.Error, KeyError, ValueError) as exc:
         logger.error(
             "Projection rebuild failed for request %d: %s",
-            request_id, exc, exc_info=True,
+            request_id,
+            exc,
+            exc_info=True,
         )
         conn.rollback()
         raise

@@ -144,7 +144,6 @@ class TestVerboseLogging:
 
 
 class TestJsonOutput:
-
     def test_version_json(self) -> None:
         result = runner.invoke(app, ["--output", "json", "version"])
         assert result.exit_code == 0
