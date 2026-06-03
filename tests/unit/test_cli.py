@@ -118,7 +118,7 @@ class TestVerboseLogging:
         library_logger = logging.getLogger("urllib3")
         assert library_logger.level != logging.DEBUG
 
-    def test_no_verbose_keeps_warning(self):
+    def test_no_verbose_uses_info(self):
         import logging
 
         self._reset_logging()

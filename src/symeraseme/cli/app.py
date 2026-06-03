@@ -81,7 +81,7 @@ def main(
     output: OutputFormat = OutputFormat.text,
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug-level logging"),
 ) -> None:
-    level = logging.DEBUG if verbose else logging.WARNING
+    level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
         format="%(levelname)s:%(name)s:%(message)s",
