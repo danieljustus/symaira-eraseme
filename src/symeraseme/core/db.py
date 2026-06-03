@@ -261,13 +261,15 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         _scavenge_stale_temp_dbs()
         db_file = _db_path(path)
 
-        should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
+        should_encrypt = _db_encryption_enabled()
 
-        if should_encrypt and db_file.exists() and _is_encrypted(db_file):
+        if should_encrypt and db_file.exists():
             raw = db_file.read_bytes()
-            if raw.startswith(_ENC_HEADER_V1):
-                _migrate_v1_to_v2(db_file)
-            db_file = _decrypt_to_temp(db_file)
+            is_enc = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
+            if is_enc:
+                if raw.startswith(_ENC_HEADER_V1):
+                    _migrate_v1_to_v2(db_file)
+                db_file = _decrypt_to_temp(db_file)
         elif should_encrypt and not db_file.exists():
             _DB_TEMP[db_file.resolve()] = db_file
 
