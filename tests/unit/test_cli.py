@@ -1,5 +1,6 @@
 """Basic CLI smoke tests."""
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -93,6 +94,20 @@ class TestCliResult:
         assert '"success": false' in j
         assert '"error": "fail"' in j
 
+    def test_to_json_serializes_dataclass(self) -> None:
+        from dataclasses import dataclass
+
+        @dataclass
+        class Broker:
+            name: str
+            count: int
+
+        r = CliResult(data={"brokers": [Broker(name="A", count=1)]})
+        j = r.to_json()
+        parsed = json.loads(j)
+        assert parsed["brokers"][0]["name"] == "A"
+        assert parsed["brokers"][0]["count"] == 1
+
 
 class TestVerboseLogging:
     def _reset_logging(self):
@@ -126,3 +141,19 @@ class TestVerboseLogging:
         result = runner.invoke(app, ["version"])
         assert result.exit_code == 0
         assert logging.getLogger("symeraseme").level != logging.DEBUG
+
+
+class TestJsonOutput:
+
+    def test_version_json(self) -> None:
+        result = runner.invoke(app, ["--output", "json", "version"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert "success" in parsed
+        assert parsed["success"] is True
+
+    def test_brokers_list_json(self) -> None:
+        result = runner.invoke(app, ["--output", "json", "brokers", "list"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert "success" in parsed

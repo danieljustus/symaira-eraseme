@@ -2,8 +2,28 @@
 
 from __future__ import annotations
 
+import dataclasses
+import datetime
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+
+def _json_default(obj: Any) -> Any:
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return dataclasses.asdict(obj)
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(mode="json")
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    if hasattr(obj, "__str__"):
+        return str(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 @dataclass
@@ -40,8 +60,6 @@ class CliResult:
 
     def to_json(self) -> str:
         """Serialize result to JSON string."""
-        import json
-
         payload: dict[str, Any] = {"success": self.success}
         if self.error:
             payload["error"] = self.error
@@ -51,4 +69,4 @@ class CliResult:
             payload.update(self.data)
         elif self.data:
             payload["data"] = self.data
-        return json.dumps(payload, indent=2, default=str)
+        return json.dumps(payload, indent=2, default=_json_default)
