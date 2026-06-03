@@ -54,7 +54,10 @@ _local = threading.local()
 
 
 def _get_secure_temp_dir() -> Path:
-    uid = os.getuid()
+    try:
+        uid = os.getuid()
+    except AttributeError:
+        uid = os.getpid()
     system = platform.system()
     if system == "Linux" and Path("/dev/shm").exists():
         secure_dir = Path("/dev/shm") / f"symeraseme-db-{uid}"
