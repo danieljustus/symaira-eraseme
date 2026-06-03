@@ -115,7 +115,7 @@ def handle_execute(
                     "to be set. Configure it in your environment or .env file."
                 )
                 return CliResult(success=False, data={"message": msg})
-            logger.info("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
+            logger.debug("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
         else:
             logger.info("Using SMTP backend (dry-run)")
     else:
