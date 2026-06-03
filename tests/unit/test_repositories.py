@@ -39,9 +39,9 @@ class TestCampaignRepository:
         camps = list_campaigns()
         assert any(c["id"] == "repo-campaign" for c in camps)
 
-    def test_create_duplicate_is_ignored(self):
-        create_campaign("dup-repo")
-        create_campaign("dup-repo")
+    def test_create_duplicate_is_detected(self):
+        assert create_campaign("dup-repo") is True
+        assert create_campaign("dup-repo") is False
         camps = list_campaigns()
         assert sum(1 for c in camps if c["id"] == "dup-repo") == 1
 
@@ -78,6 +78,46 @@ class TestRequestRepository:
         results = list_removal_requests(broker_id="broker-a")
         assert len(results) == 1
         assert results[0]["broker_id"] == "broker-a"
+
+    def test_pagination_limit(self):
+        create_campaign("pag-camp")
+        for i in range(10):
+            create_removal_request(broker_id=f"b{i}", campaign_id="pag-camp", jurisdiction="GDPR")
+        results = list_removal_requests(campaign_id="pag-camp", limit=5)
+        assert len(results) == 5
+        # Verify stable ordering (oldest first)
+        assert results[0]["broker_id"] == "b0"
+        assert results[4]["broker_id"] == "b4"
+
+    def test_pagination_offset(self):
+        create_campaign("pag-off")
+        for i in range(10):
+            create_removal_request(broker_id=f"b{i}", campaign_id="pag-off", jurisdiction="GDPR")
+        results = list_removal_requests(campaign_id="pag-off", limit=3, offset=3)
+        assert len(results) == 3
+        assert results[0]["broker_id"] == "b3"
+        assert results[2]["broker_id"] == "b5"
+
+    def test_pagination_offset_without_limit_uses_negative_one(self):
+        create_campaign("pag-nolimit")
+        for i in range(5):
+            create_removal_request(broker_id=f"b{i}", campaign_id="pag-nolimit", jurisdiction="GDPR")
+        results = list_removal_requests(campaign_id="pag-nolimit", offset=2)
+        assert len(results) == 3
+        assert results[0]["broker_id"] == "b2"
+
+    def test_pagination_limit_zero(self):
+        create_campaign("pag-zero")
+        create_removal_request(broker_id="b0", campaign_id="pag-zero", jurisdiction="GDPR")
+        results = list_removal_requests(campaign_id="pag-zero", limit=0)
+        assert len(results) == 0
+
+    def test_pagination_offset_beyond_results(self):
+        create_campaign("pag-beyond")
+        for i in range(3):
+            create_removal_request(broker_id=f"b{i}", campaign_id="pag-beyond", jurisdiction="GDPR")
+        results = list_removal_requests(campaign_id="pag-beyond", limit=5, offset=10)
+        assert len(results) == 0
 
 
 class TestEventRepository:

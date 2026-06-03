@@ -64,8 +64,8 @@ def create_campaign(
     campaign_id: str,
     kind: str = "initial",
     notes: str | None = None,
-) -> None:
-    _repo_create_campaign(campaign_id, kind=kind, notes=notes)
+) -> bool:
+    return _repo_create_campaign(campaign_id, kind=kind, notes=notes)
 
 
 def list_campaigns() -> list[dict[str, Any]]:

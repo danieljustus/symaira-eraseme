@@ -26,7 +26,12 @@ def plan_campaign(
 ) -> dict[str, Any]:
     """Scan registry, create PLANNED events for matching brokers."""
     logger.debug("Planning campaign %s (jurisdiction=%s law=%s)", campaign_id, jurisdiction, law)
-    create_campaign(campaign_id, kind="initial", notes=notes)
+    if not create_campaign(campaign_id, kind="initial", notes=notes):
+        logger.warning(
+            "Campaign '%s' already exists — appending new removal requests to "
+            "the existing campaign.",
+            campaign_id,
+        )
 
     brokers = load_all_brokers(
         jurisdiction=jurisdiction,
