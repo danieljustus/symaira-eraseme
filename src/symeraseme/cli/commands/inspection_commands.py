@@ -8,7 +8,7 @@ import sys
 import typer
 
 from symeraseme import __version__
-from symeraseme.cli.console import console, render_error, render_result
+from symeraseme.cli.console import render_error, render_result
 from symeraseme.core.db import _db_path, init_db
 from symeraseme.core.events import get_events, list_removal_requests
 from symeraseme.core.identity import _profile_path
@@ -39,8 +39,12 @@ brokers_app = typer.Typer(
 )
 
 
-def version() -> None:
-    console.print(f"Symaira EraseMe v{__version__}", markup=False, soft_wrap=True)
+def version(ctx: typer.Context) -> None:
+    data = {"version": __version__, "name": "Symaira EraseMe"}
+    render_result(
+        ctx.obj["output"],
+        CliResult(data=data, message=f"Symaira EraseMe v{__version__}"),
+    )
 
 
 def _check_python_version() -> tuple[bool, str]:
