@@ -5,14 +5,13 @@ from __future__ import annotations
 import csv
 import io
 import json
-import sqlite3
 from pathlib import Path
 from typing import Any
 
 import typer
 
 from symeraseme.cli.console import print_success, render_error, render_result
-from symeraseme.core.db import get_connection, init_db
+from symeraseme.core.db import init_db
 from symeraseme.registry.sync import handle_registry_sync
 from symeraseme.services.scheduler import (
     handle_generate_scheduler,
@@ -211,10 +210,9 @@ def export_cmd(
 
     init_db()
     campaign_id: str | None = campaign
-    conn = get_connection()
 
     # Collect export data
-    reqs, flat_events = _collect_export_data(conn, campaign_id)
+    reqs, flat_events = _collect_export_data(campaign_id)
 
     # Serialize
     if fmt == "json":
@@ -253,48 +251,31 @@ def export_cmd(
 
 
 def _collect_export_data(
-    conn: sqlite3.Connection,
     campaign_id: str | None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Query removal requests and events, building the canonical export structures.
+    """Query removal requests and events via the repository layer.
 
     Returns (requests, flat_events) where each request has its events attached.
     """
-    request_rows = conn.execute(
-        """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                  r.jurisdiction, r.template_id, r.identity_snapshot_hash,
-                  s.current_status, s.sent_at, s.acknowledged_at, s.resolved_at,
-                  s.deadline_at, s.next_action_at, s.reminders_sent,
-                  s.escalation_level, s.last_event_at
-           FROM removal_requests r
-           LEFT JOIN request_state s ON s.request_id = r.id
-           WHERE (? IS NULL OR r.campaign_id = ?)
-           ORDER BY r.id ASC""",
-        (campaign_id or None, campaign_id or None),
-    ).fetchall()
+    from symeraseme.core.repositories import get_events_for_requests, list_removal_requests
+
+    request_rows = list_removal_requests(campaign_id=campaign_id)
 
     requests: list[dict[str, Any]] = []
     flat_events: list[dict[str, Any]] = []
 
     req_ids = [r["id"] for r in request_rows]
     if req_ids:
-        ev_rows = conn.execute(
-            f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
-                       payload_json, source
-                FROM request_events
-                WHERE request_id IN ({",".join("?" * len(req_ids))})
-                ORDER BY occurred_at ASC, id ASC""",
-            req_ids,
-        ).fetchall()
+        events_by_rid_raw = get_events_for_requests(req_ids)
         events_by_rid: dict[int, list[dict]] = {}
-        for ev in ev_rows:
-            evd = dict(ev)
-            try:
-                evd["payload"] = json.loads(evd.pop("payload_json") or "{}")
-            except json.JSONDecodeError:
-                evd["payload"] = {}
-            events_by_rid.setdefault(evd["request_id"], []).append(evd)
-            flat_events.append({"request_id": evd["request_id"], **evd})
+        for rid, evs in events_by_rid_raw.items():
+            transformed = []
+            for ev in evs:
+                evd = dict(ev)
+                evd["payload"] = evd.pop("payload_json", {})
+                transformed.append(evd)
+                flat_events.append({"request_id": rid, **evd})
+            events_by_rid[rid] = transformed
     else:
         events_by_rid = {}
 
