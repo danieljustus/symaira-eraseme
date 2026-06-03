@@ -79,7 +79,7 @@ class TestRequestsList:
 
         assert_ok(result)
         data = json.loads(result.stdout)
-        assert isinstance(data, list)
+        assert isinstance(data["data"], list)
 
     def test_requests_list_by_broker(self, seeded_db):
         result = invoke("requests", "list", "--broker", "acxiom-eu")
@@ -103,8 +103,10 @@ class TestEventsShow:
 
         assert_ok(result)
         data = json.loads(result.stdout)
-        assert isinstance(data, list)
-        for event in data:
+        assert isinstance(data, dict)
+        events = data["events"]
+        assert isinstance(events, list)
+        for event in events:
             assert "event_type" in event
 
     def test_events_show_nonexistent(self):

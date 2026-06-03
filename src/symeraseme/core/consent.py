@@ -17,6 +17,8 @@ import sys
 import time
 from pathlib import Path
 
+from symeraseme.core.config import get_config
+
 logger = logging.getLogger(__name__)
 
 CONSENT_DIR = "~/.local/share/symeraseme"
@@ -52,7 +54,7 @@ def _find_token_file(token: str) -> Path | None:
 
 
 def _consent_dir() -> Path:
-    d = Path(os.environ.get("SYMERASEME_DATA_DIR", CONSENT_DIR)).expanduser()
+    d = get_config().consent_dir
     d.mkdir(parents=True, exist_ok=True)
     return d
 

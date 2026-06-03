@@ -10,6 +10,7 @@ import keyring
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from symeraseme.core.config import get_config
 from symeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,9 @@ DEFAULT_PROFILE_PATH = "~/.config/symeraseme/identity.enc"
 
 
 def _profile_path(path: str | None = None) -> Path:
-    raw = path or os.environ.get("SYMERASEME_IDENTITY_PATH") or DEFAULT_PROFILE_PATH
-    return Path(raw).expanduser().resolve()
+    if path:
+        return Path(path).expanduser().resolve()
+    return get_config().identity_path
 
 
 def _get_existing_master_key() -> bytes:
@@ -68,7 +70,7 @@ def save_profile(
     path: str | None = None,
 ) -> Path:
     target = _profile_path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     key = _get_or_create_master_key()
     aesgcm = AESGCM(key)
@@ -83,6 +85,7 @@ def save_profile(
 
     with open(target, "wb") as f:
         f.write(header + b"\n" + ciphertext)
+    os.chmod(target, 0o600)
 
     # Invalidate cache so the next load reads the fresh file.
     _PROFILE_CACHE.pop(str(target), None)

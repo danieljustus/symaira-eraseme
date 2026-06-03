@@ -36,18 +36,7 @@ from symeraseme.cli.commands.monitoring_commands import (
     generate_report_cmd,
     poll_inbox,
 )
-from symeraseme.cli.commands.plan_commands import (
-    execute as execute_plan,
-)
-from symeraseme.cli.commands.plan_commands import (
-    plan_app,
-)
-from symeraseme.cli.commands.plan_commands import (
-    status as status_plan,
-)
-from symeraseme.cli.commands.plan_commands import (
-    tick as tick_plan,
-)
+from symeraseme.cli.commands.plan_commands import plan_app
 from symeraseme.cli.commands.web_form_commands import (
     auto_confirm_cmd,
     manual_tasks_app,
@@ -109,105 +98,13 @@ app.command(rich_help_panel="Account & Profile")(render_template)
 app.command(rich_help_panel="Account & Profile")(grant)
 
 
-# ── Planning & Execution (deprecated top-level aliases) ───────────────────
-@app.command(rich_help_panel="Planning & Execution", deprecated=True)
-def execute(
-    ctx: typer.Context,
-    campaign_id: str = typer.Option(
-        ...,
-        "--campaign",
-        help="Campaign to execute",
-    ),
-    account: str = typer.Option(
-        None,
-        "--account",
-        help="Himalaya account name",
-    ),
-    batch_size: int = typer.Option(
-        5,
-        "--batch-size",
-        help="Number to send",
-    ),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Simulate only"),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        help="Skip consent prompt (destructive)",
-    ),
-    consent_token: str = typer.Option(
-        None,
-        "--consent",
-        help="Pre-issued consent token",
-    ),
-    consent_file: str = typer.Option(
-        None,
-        "--consent-file",
-        help="Read consent token from a file (supports /dev/stdin for pipe input)",
-    ),
-    backend: str = typer.Option(
-        None,
-        "--backend",
-        help="Execution backend: smtp (batch) or himalaya (CLI)",
-    ),
-) -> None:
-    """[DEPRECATED] Use 'plan execute' instead."""
-    typer.secho(
-        "Warning: 'execute' is deprecated. Use 'plan execute' instead.",
-        err=True,
-        fg=typer.colors.YELLOW,
-    )
-    return execute_plan(
-        ctx,
-        campaign_id,
-        account,
-        batch_size,
-        dry_run,
-        yes,
-        consent_token,
-        consent_file,
-        backend,
-    )
+@app.command(rich_help_panel="Account & Profile")
+def revoke_llm_consent_cmd() -> None:
+    """Revoke previously granted LLM PII consent."""
+    from symeraseme.adapters.triage.scrubber import revoke_llm_consent
 
-
-@app.command(rich_help_panel="Planning & Execution", deprecated=True)
-def tick(
-    ctx: typer.Context,
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Show actions without executing",
-    ),
-    batch_size: int = typer.Option(
-        None,
-        "--batch-size",
-        help="Limit tick to N requests per run",
-    ),
-) -> None:
-    """[DEPRECATED] Use 'plan tick' instead."""
-    typer.secho(
-        "Warning: 'tick' is deprecated. Use 'plan tick' instead.",
-        err=True,
-        fg=typer.colors.YELLOW,
-    )
-    return tick_plan(ctx, dry_run, batch_size)
-
-
-@app.command(rich_help_panel="Planning & Execution", deprecated=True)
-def status(
-    ctx: typer.Context,
-    campaign: str = typer.Option(
-        None,
-        "--campaign",
-        help="Restrict to one campaign id (default: aggregate across all).",
-    ),
-) -> None:
-    """[DEPRECATED] Use 'plan status' instead."""
-    typer.secho(
-        "Warning: 'status' is deprecated. Use 'plan status' instead.",
-        err=True,
-        fg=typer.colors.YELLOW,
-    )
-    return status_plan(ctx, campaign)
+    revoke_llm_consent()
+    typer.echo("LLM PII consent revoked.")
 
 
 # ── Inspection & Diagnostics ──────────────────────────────────────────────

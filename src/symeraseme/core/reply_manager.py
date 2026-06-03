@@ -292,6 +292,7 @@ def send_reply(
     account: str | None = None,
     config_path: str | None = None,
     dry_run: bool = False,
+    email_sender=None,
 ) -> dict[str, Any]:
     """Send a drafted reply via the configured email backend (SMTP by default).
 
@@ -349,22 +350,25 @@ def send_reply(
             "body": draft_body,
         }
 
-    from symeraseme.adapters.email.himalaya import EmailError, send_email
-
     from_addr = reply.get("from_addr", "")
     if not from_addr:
         msg = f"Reply #{reply_id} has no sender address"
         raise ValueError(msg)
 
+    if email_sender is None:
+        from symeraseme.adapters.email.himalaya import send_email as default_email_sender
+
+        email_sender = default_email_sender
+
     try:
-        send_email(
+        email_sender(
             to=from_addr,
             subject=draft_subject,
             body=draft_body,
             account=account,
             config_path=config_path,
         )
-    except EmailError as e:
+    except Exception as e:
         logger.error("Failed to send reply #%d: %s", reply_id, e)
         return {"success": False, "error": str(e), "reply_id": reply_id}
 

@@ -117,18 +117,13 @@ class TestRegistryLoader:
         import json
 
         from symeraseme.registry.loader import (
-            _broker_cache_key,
-            _cache_dir,
             _load_persistent_cache,
             _persistent_cache_path,
-            _save_persistent_cache,
             clear_registry_cache,
             load_all_brokers,
         )
 
-        monkeypatch.setattr(
-            "symeraseme.registry.loader._cache_dir", lambda: tmp_path
-        )
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
 
         clear_registry_cache()
         brokers = load_all_brokers(include_disabled=True)
@@ -156,15 +151,11 @@ class TestRegistryLoader:
 
         from symeraseme.registry.loader import (
             _broker_cache_key,
-            _cache_dir,
             _load_persistent_cache,
-            _persistent_cache_path,
             clear_registry_cache,
         )
 
-        monkeypatch.setattr(
-            "symeraseme.registry.loader._cache_dir", lambda: tmp_path
-        )
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
         clear_registry_cache()
 
         registry_dir = _repo_root() / "registry" / "brokers"
@@ -172,9 +163,7 @@ class TestRegistryLoader:
 
         pkl_path = tmp_path / "brokers_old.pkl"
         with open(pkl_path, "wb") as f:
-            pickle.dump(
-                {"cache_key": cache_key, "brokers": [], "id_index": {}}, f
-            )
+            pickle.dump({"cache_key": cache_key, "brokers": [], "id_index": {}}, f)
 
         loaded = _load_persistent_cache(registry_dir, cache_key)
         assert loaded is None

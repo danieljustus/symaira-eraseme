@@ -158,26 +158,21 @@ def tick(
         symeraseme tick --dry-run
         symeraseme tick --batch-size 10
     """
-    import json
-
     from symeraseme.cli.console import render_result
     from symeraseme.core.db import init_db
     from symeraseme.core.deadlines import apply_tick_actions, run_tick
+    from symeraseme.core.result_types import CliResult
 
     init_db()
     actions = run_tick(dry_run=dry_run, batch_size=batch_size)
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(
-            {
-                "total_actions": len(actions),
-                "actions": [a.__dict__ for a in actions],
-            },
-            indent=2,
-            default=str,
-        )
-    elif not actions:
-        result = "Tick: no actions needed."
+    data = {
+        "total_actions": len(actions),
+        "actions": [a.__dict__ for a in actions],
+    }
+
+    if not actions:
+        message = "Tick: no actions needed."
     else:
         lines = [f"Tick: {len(actions)} action(s)"]
         for a in actions:
@@ -187,9 +182,9 @@ def tick(
             results = apply_tick_actions(actions)
             executed = sum(1 for r in results if r["executed"])
             lines.append(f"Executed {executed}/{len(results)} actions.")
-        result = "\n".join(lines)
+        message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
 @plan_app.command()
@@ -207,39 +202,35 @@ def status(
         symeraseme status
         symeraseme status --campaign initial
     """
-    import json
-
     from symeraseme.cli.console import render_result
+    from symeraseme.core.result_types import CliResult
 
     summary = get_campaign_status(campaign_id=campaign)
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(summary, indent=2, default=str)
-    else:
-        scope = f"campaign={campaign}" if campaign else "all campaigns"
-        lines = [
-            f"Status ({scope}) as of {summary['as_of']}",
-            f"  Total: {summary['totals']['requests']}   "
-            f"Resolved: {summary['totals']['resolved']}   "
-            f"Open: {summary['totals']['open']}",
-        ]
-        if summary["by_status"]:
-            lines.append("  By status:")
-            for status, count in sorted(summary["by_status"].items(), key=lambda kv: -kv[1]):
-                lines.append(f"    {status:<22} {count}")
-        if summary["by_channel"]:
-            lines.append("  By channel:")
-            for channel, count in sorted(summary["by_channel"].items()):
-                lines.append(f"    {channel:<22} {count}")
-        lines.append("  Escalation:")
-        lines.append(f"    none           {summary['escalation']['none']}")
-        lines.append(f"    reminder sent  {summary['escalation']['reminder']}")
-        lines.append(f"    dpa pending    {summary['escalation']['dpa_pending']}")
-        lines.append("  Upcoming:")
-        lines.append(f"    overdue              {summary['upcoming']['overdue']}")
-        lines.append(f"    deadline within 7d   {summary['upcoming']['deadline_due_within_7d']}")
-        lines.append(f"    deadline within 30d  {summary['upcoming']['deadline_due_within_30d']}")
-        lines.append(f"    tick actions ready   {summary['upcoming']['tick_actions_ready']}")
-        result = "\n".join(lines)
+    scope = f"campaign={campaign}" if campaign else "all campaigns"
+    lines = [
+        f"Status ({scope}) as of {summary['as_of']}",
+        f"  Total: {summary['totals']['requests']}   "
+        f"Resolved: {summary['totals']['resolved']}   "
+        f"Open: {summary['totals']['open']}",
+    ]
+    if summary["by_status"]:
+        lines.append("  By status:")
+        for status, count in sorted(summary["by_status"].items(), key=lambda kv: -kv[1]):
+            lines.append(f"    {status:<22} {count}")
+    if summary["by_channel"]:
+        lines.append("  By channel:")
+        for channel, count in sorted(summary["by_channel"].items()):
+            lines.append(f"    {channel:<22} {count}")
+    lines.append("  Escalation:")
+    lines.append(f"    none           {summary['escalation']['none']}")
+    lines.append(f"    reminder sent  {summary['escalation']['reminder']}")
+    lines.append(f"    dpa pending    {summary['escalation']['dpa_pending']}")
+    lines.append("  Upcoming:")
+    lines.append(f"    overdue              {summary['upcoming']['overdue']}")
+    lines.append(f"    deadline within 7d   {summary['upcoming']['deadline_due_within_7d']}")
+    lines.append(f"    deadline within 30d  {summary['upcoming']['deadline_due_within_30d']}")
+    lines.append(f"    tick actions ready   {summary['upcoming']['tick_actions_ready']}")
+    message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=summary, message=message))

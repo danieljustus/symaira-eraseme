@@ -229,6 +229,24 @@ class TestIdentityVault:
 
         vault.delete_profile()
 
+    def test_save_profile_sets_restrictive_permissions(self, monkeypatch, tmp_path):
+        """Saved identity file must be 0o600 and parent directory 0o700."""
+        import symeraseme.core.identity as vault
+
+        identity_path = tmp_path / "identity.enc"
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(identity_path))
+
+        profile = IdentityProfile(full_name="Test User", email_addresses=["test@example.com"])
+        vault.save_profile(profile)
+
+        file_perms = identity_path.stat().st_mode & 0o777
+        assert file_perms == 0o600, f"Expected 0o600, got {oct(file_perms)}"
+
+        dir_perms = identity_path.parent.stat().st_mode & 0o777
+        assert dir_perms == 0o700, f"Expected 0o700, got {oct(dir_perms)}"
+
+        vault.delete_profile()
+
     def test_save_invalidates_cache(self, monkeypatch):
         import symeraseme.core.identity as vault
 

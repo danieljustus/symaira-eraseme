@@ -266,6 +266,176 @@ def _meta_matches_filters(
     return True
 
 
+def _filter_and_validate_ymls(
+    yml_paths: list[Path],
+    *,
+    jurisdiction: str | None = None,
+    law: str | None = None,
+    priority: str | None = None,
+    category: str | None = None,
+    include_disabled: bool = False,
+) -> tuple[list[Broker], int]:
+    """Load, filter, and validate a list of broker YAML paths.
+
+    Returns (brokers, skipped_count).
+    """
+    brokers: list[Broker] = []
+    skipped = 0
+    for yml in yml_paths:
+        if yml.name.startswith("_"):
+            continue
+        meta = _quick_parse_meta(yml)
+        if meta is None:
+            logger.warning("skipped broker %s: unparseable YAML", yml)
+            skipped += 1
+            continue
+        if not _meta_matches_filters(
+            meta,
+            jurisdiction=jurisdiction,
+            law=law,
+            priority=priority,
+            category=category,
+            include_disabled=include_disabled,
+        ):
+            continue
+        try:
+            broker = load_broker_yaml(yml)
+        except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+            logger.warning("skipped broker %s: %s", yml, exc)
+            skipped += 1
+            continue
+        brokers.append(broker)
+    return brokers, skipped
+
+
+def _load_from_warm_cache(
+    cache_key: tuple[str, str],
+    *,
+    jurisdiction: str | None = None,
+    law: str | None = None,
+    priority: str | None = None,
+    category: str | None = None,
+    include_disabled: bool = False,
+) -> list[Broker]:
+    return _filter_brokers(
+        _BROKER_CACHE[cache_key],
+        jurisdiction=jurisdiction,
+        law=law,
+        priority=priority,
+        category=category,
+        include_disabled=include_disabled,
+    )
+
+
+def _load_from_persistent_cache(
+    registry_path: Path,
+    cache_key: tuple[str, str],
+    has_filters: bool,
+    *,
+    jurisdiction: str | None = None,
+    law: str | None = None,
+    priority: str | None = None,
+    category: str | None = None,
+    include_disabled: bool = False,
+) -> list[Broker] | None:
+    cached = _load_persistent_cache(registry_path, cache_key)
+    if cached is None:
+        return None
+    cached_brokers, cached_index, meta_index = cached
+    global _BROKER_ID_INDEX
+    _BROKER_ID_INDEX = cached_index
+    if not has_filters:
+        _BROKER_CACHE[cache_key] = cached_brokers
+        return _filter_brokers(
+            cached_brokers,
+            jurisdiction=jurisdiction,
+            law=law,
+            priority=priority,
+            category=category,
+            include_disabled=include_disabled,
+        )
+    if meta_index is not None:
+        brokers: list[Broker] = []
+        for broker_id, meta_entry in meta_index.items():
+            if not _meta_matches_filters(
+                meta_entry,
+                jurisdiction=jurisdiction,
+                law=law,
+                priority=priority,
+                category=category,
+                include_disabled=include_disabled,
+            ):
+                continue
+            yml = cached_index.get(broker_id)
+            if yml is None:
+                continue
+            try:
+                broker = load_broker_yaml(yml)
+            except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+                logger.warning("skipped broker %s: %s", yml, exc)
+                continue
+            brokers.append(broker)
+        return brokers
+    return None
+
+
+def _load_cold(
+    registry_path: Path,
+    cache_key: tuple[str, str],
+    has_filters: bool,
+    *,
+    jurisdiction: str | None = None,
+    law: str | None = None,
+    priority: str | None = None,
+    category: str | None = None,
+    include_disabled: bool = False,
+) -> list[Broker]:
+    yaml_files = sorted(registry_path.rglob("*.yaml"))
+
+    if has_filters:
+        filtered_brokers, _ = _filter_and_validate_ymls(
+            yaml_files,
+            jurisdiction=jurisdiction,
+            law=law,
+            priority=priority,
+            category=category,
+            include_disabled=include_disabled,
+        )
+        return filtered_brokers
+
+    all_brokers: list[Broker] = []
+    id_index: dict[str, Path] = {}
+    cold_meta_index: dict[str, dict[str, Any]] = {}
+    for yml in yaml_files:
+        if yml.name.startswith("_"):
+            continue
+        try:
+            broker = load_broker_yaml(yml)
+        except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
+            logger.warning("skipped broker %s: %s", yml, exc)
+            continue
+        all_brokers.append(broker)
+        id_index[broker.id] = yml
+        cold_meta_index[broker.id] = {
+            "jurisdictions": broker.jurisdictions,
+            "laws": [law_item.value for law_item in broker.laws],
+            "priority": broker.priority.value,
+            "category": broker.category.value,
+            "disabled": broker.disabled,
+        }
+    global _BROKER_ID_INDEX
+    _BROKER_ID_INDEX = id_index
+    _save_persistent_cache(registry_path, cache_key, all_brokers, id_index, cold_meta_index)
+    return _filter_brokers(
+        all_brokers,
+        jurisdiction=jurisdiction,
+        law=law,
+        priority=priority,
+        category=category,
+        include_disabled=include_disabled,
+    )
+
+
 def load_all_brokers(
     registry_dir: str | Path | None = None,
     jurisdiction: str | None = None,
@@ -284,7 +454,6 @@ def load_all_brokers(
     matching the filters are loaded — avoiding full parse of all ~1,279
     files for targeted queries like ``--jurisdiction GDPR --max 5``.
     """
-    global _BROKER_ID_INDEX
     if registry_dir is None:
         registry_dir = _registry_dir() / "brokers"
 
@@ -292,10 +461,9 @@ def load_all_brokers(
     cache_key = _broker_cache_key(registry_path)
     has_filters = bool(jurisdiction or law or priority or category)
 
-    # Warm in-memory cache: filter from cached brokers.
     if cache_key in _BROKER_CACHE:
-        return _filter_brokers(
-            _BROKER_CACHE[cache_key],
+        return _load_from_warm_cache(
+            cache_key,
             jurisdiction=jurisdiction,
             law=law,
             priority=priority,
@@ -303,103 +471,23 @@ def load_all_brokers(
             include_disabled=include_disabled,
         )
 
-    cached = _load_persistent_cache(registry_path, cache_key)
-    if cached is not None:
-        cached_brokers, cached_index, meta_index = cached
-        _BROKER_ID_INDEX = cached_index
-        if not has_filters:
-            _BROKER_CACHE[cache_key] = cached_brokers
-            return _filter_brokers(
-                cached_brokers,
-                jurisdiction=jurisdiction,
-                law=law,
-                priority=priority,
-                category=category,
-                include_disabled=include_disabled,
-            )
-        if meta_index is not None:
-            brokers: list[Broker] = []
-            skipped = 0
-            for broker_id, meta_entry in meta_index.items():
-                if not _meta_matches_filters(
-                    meta_entry,
-                    jurisdiction=jurisdiction,
-                    law=law,
-                    priority=priority,
-                    category=category,
-                    include_disabled=include_disabled,
-                ):
-                    continue
-                yml = cached_index.get(broker_id)
-                if yml is None:
-                    continue
-                try:
-                    broker = load_broker_yaml(yml)
-                except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
-                    logger.warning("skipped broker %s: %s", yml, exc)
-                    skipped += 1
-                    continue
-                brokers.append(broker)
-            return brokers
+    result = _load_from_persistent_cache(
+        registry_path,
+        cache_key,
+        has_filters,
+        jurisdiction=jurisdiction,
+        law=law,
+        priority=priority,
+        category=category,
+        include_disabled=include_disabled,
+    )
+    if result is not None:
+        return result
 
-    yaml_files = sorted(registry_path.rglob("*.yaml"))
-
-    if has_filters:
-        # Cold cache + filters: lazy-load only matching files.
-        brokers = []
-        skipped = 0
-        for yml in yaml_files:
-            if yml.name.startswith("_"):
-                continue
-            meta = _quick_parse_meta(yml)
-            if meta is None:
-                logger.warning("skipped broker %s: unparseable YAML", yml)
-                skipped += 1
-                continue
-            if not _meta_matches_filters(
-                meta,
-                jurisdiction=jurisdiction,
-                law=law,
-                priority=priority,
-                category=category,
-                include_disabled=include_disabled,
-            ):
-                continue
-            try:
-                broker = load_broker_yaml(yml)
-            except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
-                logger.warning("skipped broker %s: %s", yml, exc)
-                skipped += 1
-                continue
-            brokers.append(broker)
-        return brokers
-
-    brokers = []
-    skipped = 0
-    id_index: dict[str, Path] = {}
-    cold_meta_index: dict[str, dict[str, Any]] = {}
-    for yml in yaml_files:
-        if yml.name.startswith("_"):
-            continue
-        try:
-            broker = load_broker_yaml(yml)
-        except (yaml.YAMLError, jsonschema.ValidationError, ValidationError) as exc:
-            logger.warning("skipped broker %s: %s", yml, exc)
-            skipped += 1
-            continue
-        brokers.append(broker)
-        id_index[broker.id] = yml
-        cold_meta_index[broker.id] = {
-            "jurisdictions": broker.jurisdictions,
-            "laws": [law_item.value for law_item in broker.laws],
-            "priority": broker.priority.value,
-            "category": broker.category.value,
-            "disabled": broker.disabled,
-        }
-    _BROKER_ID_INDEX = id_index
-    _save_persistent_cache(registry_path, cache_key, brokers, id_index, cold_meta_index)
-    return _filter_brokers(
-        brokers,
+    return _load_cold(
+        registry_path,
+        cache_key,
+        has_filters,
         jurisdiction=jurisdiction,
         law=law,
         priority=priority,

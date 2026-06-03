@@ -79,12 +79,6 @@ def _tasks_dir() -> Path:
     return tasks_dir
 
 
-def capture_form_state(*args: Any, **kwargs: Any) -> Any:
-    from symeraseme.adapters.web._fallback import capture_form_state as _impl
-
-    return _impl(*args, **kwargs)
-
-
 def _redact_identity_values(html: str, profile: IdentityProfile | None = None) -> str:
     """Redact known identity values from an HTML snapshot.
 
@@ -125,20 +119,6 @@ def _redact_identity_values(html: str, profile: IdentityProfile | None = None) -
 
 def _task_file_path(task_id: int) -> Path:
     return _tasks_dir() / f"manual_task_{task_id}.json"
-
-
-def _lazy_import(module: str, name: str) -> Any:
-    import importlib
-
-    mod = importlib.import_module(module)
-    return getattr(mod, name)
-
-
-_async_get_content = _lazy_import("symeraseme.adapters.web._fallback", "_async_get_content")
-_async_extract_form_fields = _lazy_import(
-    "symeraseme.adapters.web._fallback", "_async_extract_form_fields"
-)
-_async_save_screenshot = _lazy_import("symeraseme.adapters.web._fallback", "_async_save_screenshot")
 
 
 def _instructions_for_reason(reason: str, broker_name: str, form_url: str) -> str:

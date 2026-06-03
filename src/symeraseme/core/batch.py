@@ -26,6 +26,29 @@ _PROGRESS_CONSOLE = Console(stderr=True)
 _BATCH_LIMIT = 10
 
 
+def _prepare_batch(
+    campaign_id: str, batch_size: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fetch planned requests and slice to the requested batch size."""
+    requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
+    return requests, requests[:batch_size]
+
+
+def _build_result(
+    campaign_id: str,
+    requests: list[dict[str, Any]],
+    batch: list[dict[str, Any]],
+    results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Return the standard campaign execution result dict."""
+    return {
+        "campaign_id": campaign_id,
+        "total_planned": len(requests),
+        "batch_size": len(batch),
+        "results": results,
+    }
+
+
 def execute_campaign(
     campaign_id: str,
     *,
@@ -34,9 +57,9 @@ def execute_campaign(
     batch_size: int = 5,
     dry_run: bool = False,
     web_form_runner=None,
+    email_sender=None,
 ) -> dict[str, Any]:
-    requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
-    batch = requests[:batch_size]
+    requests, batch = _prepare_batch(campaign_id, batch_size)
     results: list[dict[str, Any]] = []
     for req in batch:
         try:
@@ -46,16 +69,12 @@ def execute_campaign(
                 config_path=config_path,
                 dry_run=dry_run,
                 web_form_runner=web_form_runner,
+                email_sender=email_sender,
             )
         except SymerasemeError as e:
             result = {"success": False, "error": str(e), "request_id": req["id"]}
         results.append(result)
-    return {
-        "campaign_id": campaign_id,
-        "total_planned": len(requests),
-        "batch_size": len(batch),
-        "results": results,
-    }
+    return _build_result(campaign_id, requests, batch, results)
 
 
 def _load_smtp_config(smtp_skip_tls: bool = False) -> Any:
@@ -159,9 +178,9 @@ async def execute_campaign_async(
     dry_run: bool = False,
     smtp_skip_tls: bool = False,
     web_form_runner=None,
+    email_sender=None,
 ) -> dict[str, Any]:
-    requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
-    batch = requests[:batch_size]
+    requests, batch = _prepare_batch(campaign_id, batch_size)
     try:
         profile = load_profile()
     except FileNotFoundError:
@@ -180,17 +199,17 @@ async def execute_campaign_async(
             for req in batch:
                 progress.update(task, description=f"Processing {req['broker_id']}...")
                 try:
-                    r = execute_request(req["id"], dry_run=True, web_form_runner=web_form_runner)
+                    r = execute_request(
+                        req["id"],
+                        dry_run=True,
+                        web_form_runner=web_form_runner,
+                        email_sender=email_sender,
+                    )
                 except SymerasemeError as e:
                     r = {"success": False, "error": str(e), "request_id": req["id"]}
                 results.append(r)
                 progress.advance(task)
-            return {
-                "campaign_id": campaign_id,
-                "total_planned": len(requests),
-                "batch_size": len(batch),
-                "results": results,
-            }
+            return _build_result(campaign_id, requests, batch, results)
         smtp_config = _load_smtp_config(smtp_skip_tls)
         batch_ids = [r["id"] for r in batch]
         events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
@@ -207,9 +226,4 @@ async def execute_campaign_async(
         progress.update(task, description="Sending batch via SMTP...", completed=len(batch))
         send_results = await send_messages_batch(email_messages, smtp_config=smtp_config)
         results = _apply_batch_results(send_results, endpoint_ids, progress, task)
-    return {
-        "campaign_id": campaign_id,
-        "total_planned": len(requests),
-        "batch_size": len(batch),
-        "results": results,
-    }
+    return _build_result(campaign_id, requests, batch, results)

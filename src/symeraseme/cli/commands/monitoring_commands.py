@@ -12,6 +12,7 @@ import typer
 
 from symeraseme.cli.console import render_result
 from symeraseme.core.db import get_connection, init_db
+from symeraseme.core.result_types import CliResult
 from symeraseme.services.inbox import handle_poll_inbox
 from symeraseme.services.reply import (
     handle_classify_reply,
@@ -233,8 +234,6 @@ def calendar(
     ),
 ) -> None:
     """Show upcoming deadlines and scheduled tick actions over the next N weeks."""
-    import json
-
     campaign_id: str | None = campaign
     if weeks < 1:
         weeks = 1
@@ -307,7 +306,7 @@ def calendar(
         week_key = f"{iso.year}-W{iso.week:02d}"
         buckets.setdefault(week_key, []).append(e)
 
-    payload: dict[str, Any] = {
+    data: dict[str, Any] = {
         "schema_version": 1,
         "as_of": now_iso,
         "horizon_weeks": weeks,
@@ -321,34 +320,31 @@ def calendar(
         "weeks": [{"week": week, "entries": items} for week, items in sorted(buckets.items())],
     }
 
-    if ctx.obj["output"] == "json":
-        result = json.dumps(payload, indent=2, default=str)
+    scope = f"campaign={campaign_id}" if campaign_id else "all campaigns"
+    lines = [
+        f"Calendar ({scope}) — next {weeks} weeks (until {horizon_iso[:10]})",
+        f"  Total upcoming entries: {len(entries)}  Overdue: {data['totals']['overdue']}",
+    ]
+    if not entries:
+        lines.append("")
+        lines.append("Nothing scheduled in the horizon.")
+        message = "\n".join(lines)
     else:
-        scope = f"campaign={campaign_id}" if campaign_id else "all campaigns"
-        lines = [
-            f"Calendar ({scope}) — next {weeks} weeks (until {horizon_iso[:10]})",
-            f"  Total upcoming entries: {len(entries)}  Overdue: {payload['totals']['overdue']}",
-        ]
-        if not entries:
+        for bucket in data["weeks"]:
             lines.append("")
-            lines.append("Nothing scheduled in the horizon.")
-            result = "\n".join(lines)
-        else:
-            for bucket in payload["weeks"]:
-                lines.append("")
-                lines.append(f"Week {bucket['week']} ({len(bucket['entries'])} entries):")
-                for e in bucket["entries"]:
-                    flag = " OVERDUE" if e["overdue"] else ""
-                    marker_short = (e["marker_at"] or "")[:16]
-                    lines.append(
-                        f"  #{e['request_id']:<5} {e['broker_id']:<24} "
-                        f"{e['current_status']:<20} "
-                        f"{e['marker']:<11} @ {marker_short} "
-                        f"({e['days_from_now']:+d}d){flag}"
-                    )
-            result = "\n".join(lines)
+            lines.append(f"Week {bucket['week']} ({len(bucket['entries'])} entries):")
+            for e in bucket["entries"]:
+                flag = " OVERDUE" if e["overdue"] else ""
+                marker_short = (e["marker_at"] or "")[:16]
+                lines.append(
+                    f"  #{e['request_id']:<5} {e['broker_id']:<24} "
+                    f"{e['current_status']:<20} "
+                    f"{e['marker']:<11} @ {marker_short} "
+                    f"({e['days_from_now']:+d}d){flag}"
+                )
+        message = "\n".join(lines)
 
-    render_result(ctx.obj["output"], result)
+    render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
 def _safe_parse(value: str | None) -> datetime | None:

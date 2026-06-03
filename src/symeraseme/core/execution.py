@@ -6,8 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from symeraseme.core.protocols import WebFormRunner
-from symeraseme.adapters.email.himalaya import EmailError, send_email
+    from symeraseme.core.protocols import EmailSender, WebFormRunner
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.exceptions import ExecutionError, ProfileError, RequestNotFoundError
 from symeraseme.core.identity import hash_profile, load_profile
@@ -79,6 +78,7 @@ def _execute_email_request(
     config_path: str | None = None,
     dry_run: bool = False,
     template_id: str = "",
+    email_sender: EmailSender | None = None,
 ) -> dict[str, Any]:
     """Execute an email-based removal request."""
     channel_endpoint = payload.get("endpoint", "")
@@ -116,9 +116,16 @@ def _execute_email_request(
             "dry_run": True,
             "request_id": request_id,
             "to": channel_endpoint,
-            "subject": f"Data Deletion Request \u2014 {broker_name}",
+            "subject": f"Data Deletion Request — {broker_name}",
             "body": rendered,
         }
+
+    if email_sender is None:
+        msg = (
+            "email_sender is required for email-based requests. "
+            "Pass a concrete EmailSender to execute_request()."
+        )
+        raise ValueError(msg)
 
     try:
         rendered = render_template(
@@ -126,9 +133,9 @@ def _execute_email_request(
             profile=profile,
             broker_name=broker_name,
         )
-        send_result = send_email(
+        send_result = email_sender(
             to=channel_endpoint,
-            subject=f"Data Deletion Request \u2014 {broker_name}",
+            subject=f"Data Deletion Request — {broker_name}",
             body=rendered,
             account=account,
             config_path=config_path,
@@ -146,7 +153,7 @@ def _execute_email_request(
             },
         )
         return {"success": True, "request_id": request_id, "result": send_result}
-    except EmailError as e:
+    except Exception as e:
         logger.warning("Send failed for %s: %s", request_id, e)
         append_event_and_project(
             request_id,
@@ -163,6 +170,7 @@ def execute_request(
     config_path: str | None = None,
     dry_run: bool = False,
     web_form_runner: WebFormRunner | None = None,
+    email_sender: EmailSender | None = None,
 ) -> dict[str, Any]:
     """Execute a single removal request by sending an email or running a web form."""
     req = get_removal_request(request_id)
@@ -192,4 +200,5 @@ def execute_request(
         config_path=config_path,
         dry_run=dry_run,
         template_id=req.get("template_id", ""),
+        email_sender=email_sender,
     )
