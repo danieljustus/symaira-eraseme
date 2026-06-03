@@ -89,9 +89,6 @@ def _scavenge_stale_temp_dbs() -> None:
                     entry.unlink(missing_ok=True)
 
 
-_scavenge_stale_temp_dbs()
-
-
 def _db_encryption_enabled() -> bool:
     val = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower()
     return val in ("1", "true", "yes")
@@ -190,11 +187,29 @@ def _encrypt_file(source: Path, target: Path) -> None:
     target.write_bytes(_ENC_MAGIC_V2 + salt + encrypted)
 
 
+def _checkpoint_and_cleanup_wal(db_path: Path) -> None:
+    """Checkpoint WAL files so they can be safely removed."""
+    for suffix in ("-wal", "-shm"):
+        sibling = db_path.with_suffix(db_path.suffix + suffix)
+        if sibling.exists():
+            try:
+                sibling.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning("Failed to remove WAL sibling %s: %s", sibling, exc)
+
+
 @atexit.register
 def _cleanup_temp_files() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
         try:
             if tmp.exists():
+                # Checkpoint WAL before re-encrypting so the DB file is complete.
+                try:
+                    conn = sqlite3.connect(str(tmp))
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    conn.close()
+                except OSError:
+                    pass
                 _encrypt_file(tmp, orig)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
@@ -202,10 +217,7 @@ def _cleanup_temp_files() -> None:
             try:
                 if tmp.exists():
                     tmp.unlink(missing_ok=True)
-                for suffix in ("-wal", "-shm"):
-                    sibling = tmp.with_suffix(tmp.suffix + suffix)
-                    if sibling.exists():
-                        sibling.unlink(missing_ok=True)
+                _checkpoint_and_cleanup_wal(tmp)
             except OSError as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()
@@ -239,6 +251,7 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         or not hasattr(_local, "db_path")
         or _local.db_path != requested_path
     ):
+        _scavenge_stale_temp_dbs()
         db_file = _db_path(path)
 
         should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
@@ -253,10 +266,7 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
 
         conn = sqlite3.connect(str(db_file))
         conn.row_factory = sqlite3.Row
-        if should_encrypt:
-            conn.execute("PRAGMA journal_mode=DELETE")
-        else:
-            conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
         _local.db_path = requested_path
@@ -271,6 +281,12 @@ def close_connection() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
         try:
             if tmp.exists():
+                try:
+                    conn = sqlite3.connect(str(tmp))
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    conn.close()
+                except OSError:
+                    pass
                 _encrypt_file(tmp, orig)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
@@ -278,10 +294,7 @@ def close_connection() -> None:
             try:
                 if tmp.exists() and tmp != orig:
                     tmp.unlink(missing_ok=True)
-                for suffix in ("-wal", "-shm"):
-                    sibling = tmp.with_suffix(tmp.suffix + suffix)
-                    if sibling.exists():
-                        sibling.unlink(missing_ok=True)
+                _checkpoint_and_cleanup_wal(tmp)
             except OSError as exc:
                 logger.warning("Failed to remove temp file %s: %s", tmp, exc)
     _DB_TEMP.clear()

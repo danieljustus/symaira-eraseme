@@ -87,7 +87,7 @@ class TestPlanExecuteTickStatus:
     def test_plan_dry_run_cycle(self, clean_db, monkeypatch, tmp_path):
         """Plan a campaign, dry-run execute, tick, verify status."""
         from symeraseme.core.deadlines import apply_tick_actions, run_tick
-        from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.planning import plan_campaign
         from symeraseme.core.reports import get_campaign_status
         from symeraseme.services.campaign import handle_execute
 
@@ -150,7 +150,7 @@ class TestPlanExecuteTickStatus:
 
     def test_plan_with_jurisdiction_filter(self, clean_db):
         """Plan a campaign filtered by EU jurisdiction."""
-        from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.planning import plan_campaign
 
         result = plan_campaign(
             campaign_id="eu-only",
@@ -387,7 +387,7 @@ class TestTickEngineIntegration:
     def test_tick_on_planned_campaign(self, clean_db):
         """Tick on a plan-only campaign with PLANNED events reports results."""
         from symeraseme.core.deadlines import run_tick
-        from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.planning import plan_campaign
 
         plan_campaign(campaign_id="tick-planned", max_brokers=2)
         actions = run_tick(dry_run=True)
@@ -564,7 +564,7 @@ class TestServiceHandlerIntegration:
 
     def test_status_after_plan(self, clean_db):
         """After planning a campaign, status should show the planned requests."""
-        from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.planning import plan_campaign
         from symeraseme.core.reports import get_campaign_status
 
         plan_campaign(campaign_id="svc-status-test", max_brokers=3)
@@ -573,7 +573,7 @@ class TestServiceHandlerIntegration:
 
     def test_plan_show_after_create(self, clean_db):
         """Handle plan show after creating a campaign."""
-        from symeraseme.core.orchestrator import plan_campaign
+        from symeraseme.core.planning import plan_campaign
         from symeraseme.services.campaign import handle_plan_show
 
         plan_campaign(campaign_id="svc-show-test", max_brokers=2)
