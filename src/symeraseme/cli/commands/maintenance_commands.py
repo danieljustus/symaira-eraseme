@@ -142,6 +142,7 @@ def schedule_install(
 
 @schedule_app.command(name="uninstall")
 def schedule_uninstall(
+    ctx: typer.Context,
     platform: str = typer.Option(
         "",
         "--platform",
@@ -149,7 +150,7 @@ def schedule_uninstall(
     ),
 ) -> None:
     result = handle_schedule_uninstall(platform)
-    render_result("text", result)
+    render_result(ctx.obj["output"], result)
 
 
 @schedule_app.command()
