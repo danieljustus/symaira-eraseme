@@ -81,12 +81,19 @@ def _scavenge_stale_temp_dbs() -> None:
     if not secure_dir.exists():
         return
     now = time.time()
-    for entry in secure_dir.iterdir():
-        if entry.name.startswith("symeraseme_decrypted_") and entry.is_file():
-            age = now - entry.stat().st_mtime
-            if age > _STALE_SCAVENGE_AGE:
+    for entry in sorted(secure_dir.iterdir()):
+        if not entry.name.startswith("symeraseme_decrypted_"):
+            continue
+        if not entry.is_file():
+            continue
+        age = now - entry.stat().st_mtime
+        if age > _STALE_SCAVENGE_AGE:
+            with suppress(OSError):
+                entry.unlink(missing_ok=True)
+            for suffix in ("-wal", "-shm"):
+                sibling = entry.with_suffix(entry.suffix + suffix)
                 with suppress(OSError):
-                    entry.unlink(missing_ok=True)
+                    sibling.unlink(missing_ok=True)
 
 
 def _db_encryption_enabled() -> bool:
