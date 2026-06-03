@@ -48,6 +48,9 @@ def _find_token_file(token: str) -> Path | None:
         return hashed
     # Backward compatibility: old tokens used the raw token in the filename.
     legacy = consent_dir / f"consent_{token}.json"
+    if legacy.resolve().parent != consent_dir.resolve():
+        logger.warning("Legacy consent token resolved outside consent directory")
+        return None
     if legacy.exists():
         return legacy
     return None
