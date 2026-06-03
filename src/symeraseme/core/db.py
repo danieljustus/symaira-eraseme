@@ -23,6 +23,7 @@ import platform
 import secrets
 import signal
 import sqlite3
+import sys
 import tempfile
 import threading
 import time
@@ -211,8 +212,7 @@ def _handle_sigterm(signum: int, frame: object) -> None:
     """SIGTERM handler that cleans up temp files before exit."""
     logger.info("Received signal %d, cleaning up encrypted DB temp files ...", signum)
     _cleanup_temp_files()
-    signal.signal(signum, signal.SIG_DFL)
-    os.kill(os.getpid(), signum)
+    sys.exit(128 + signum)
 
 
 # Register SIGTERM handler (SIGKILL cannot be caught, but SIGTERM can)
