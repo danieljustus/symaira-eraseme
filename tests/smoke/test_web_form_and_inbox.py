@@ -10,9 +10,7 @@ from .conftest import assert_ok, invoke
 
 class TestRunWebForm:
     def test_run_web_form_dry_run(self, seeded_db):
-        with patch(
-            "symeraseme.cli.commands.web_form_commands.handle_run_web_form"
-        ) as mock_handler:
+        with patch("symeraseme.cli.commands.web_form_commands.handle_run_web_form") as mock_handler:
             from symeraseme.core.result_types import CliResult
 
             mock_handler.return_value = CliResult(
@@ -24,9 +22,7 @@ class TestRunWebForm:
             assert "acxiom-eu" in result.stdout
 
     def test_run_web_form_dry_run_json(self, seeded_db):
-        with patch(
-            "symeraseme.cli.commands.web_form_commands.handle_run_web_form"
-        ) as mock_handler:
+        with patch("symeraseme.cli.commands.web_form_commands.handle_run_web_form") as mock_handler:
             from symeraseme.core.result_types import CliResult
 
             mock_handler.return_value = CliResult(
@@ -43,9 +39,7 @@ class TestRunWebForm:
 
 class TestAutoConfirm:
     def test_auto_confirm_dry_run(self, seeded_db):
-        with patch(
-            "symeraseme.cli.commands.web_form_commands.handle_auto_confirm"
-        ) as mock_handler:
+        with patch("symeraseme.cli.commands.web_form_commands.handle_auto_confirm") as mock_handler:
             from symeraseme.core.result_types import CliResult
 
             mock_handler.return_value = CliResult(
@@ -111,9 +105,7 @@ class TestManualTasks:
 
 class TestPollInbox:
     def test_poll_inbox_dry_run_mocked(self, tmp_home):
-        with patch(
-            "symeraseme.cli.commands.monitoring_commands.handle_poll_inbox"
-        ) as mock_handler:
+        with patch("symeraseme.cli.commands.monitoring_commands.handle_poll_inbox") as mock_handler:
             from symeraseme.core.result_types import CliResult
 
             mock_handler.return_value = CliResult(
@@ -132,9 +124,7 @@ class TestPollInbox:
             assert "poll complete" in result.stdout.lower()
 
     def test_poll_inbox_json(self, tmp_home):
-        with patch(
-            "symeraseme.cli.commands.monitoring_commands.handle_poll_inbox"
-        ) as mock_handler:
+        with patch("symeraseme.cli.commands.monitoring_commands.handle_poll_inbox") as mock_handler:
             from symeraseme.core.result_types import CliResult
 
             mock_handler.return_value = CliResult(

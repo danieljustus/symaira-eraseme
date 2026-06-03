@@ -343,9 +343,7 @@ class TestSecureTempDir:
         from symeraseme.core.db import _get_secure_temp_dir
 
         with monkeypatch.context():
-            monkeypatch.setattr(
-                Path, "exists", lambda self, *a, **k: str(self) != "/dev/shm"
-            )
+            monkeypatch.setattr(Path, "exists", lambda self, *a, **k: str(self) != "/dev/shm")
             monkeypatch.setattr(Path, "mkdir", lambda *a, **k: None)
             secure_dir = _get_secure_temp_dir()
             assert str(secure_dir) == "/mock/tmp/symeraseme-db-42"
@@ -356,9 +354,7 @@ class TestSecureTempDir:
         from symeraseme.core.db import _get_secure_temp_dir
 
         with monkeypatch.context():
-            monkeypatch.setattr(
-                Path, "exists", lambda self, *a, **k: str(self) == "/dev/shm"
-            )
+            monkeypatch.setattr(Path, "exists", lambda self, *a, **k: str(self) == "/dev/shm")
             monkeypatch.setattr(Path, "mkdir", lambda *a, **k: None)
             secure_dir = _get_secure_temp_dir()
             assert str(secure_dir) == "/dev/shm/symeraseme-db-42"

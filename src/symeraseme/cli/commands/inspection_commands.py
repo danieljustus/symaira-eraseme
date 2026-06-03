@@ -161,9 +161,7 @@ def doctor(ctx: typer.Context) -> None:
     all_ok = all(ok for ok, _ in checks.values())
     data = {
         "ok": all_ok,
-        "checks": {
-            name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()
-        },
+        "checks": {name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()},
     }
 
     lines = []
