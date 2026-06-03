@@ -26,14 +26,19 @@ _PROGRESS_CONSOLE = Console(stderr=True)
 _BATCH_LIMIT = 10
 
 
-def _prepare_batch(campaign_id: str, batch_size: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _prepare_batch(
+    campaign_id: str, batch_size: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Fetch planned requests and slice to the requested batch size."""
     requests = list_removal_requests(campaign_id=campaign_id, status="PLANNED")
     return requests, requests[:batch_size]
 
 
 def _build_result(
-    campaign_id: str, requests: list[dict[str, Any]], batch: list[dict[str, Any]], results: list[dict[str, Any]]
+    campaign_id: str,
+    requests: list[dict[str, Any]],
+    batch: list[dict[str, Any]],
+    results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Return the standard campaign execution result dict."""
     return {
