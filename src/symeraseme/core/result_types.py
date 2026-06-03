@@ -21,8 +21,6 @@ def _json_default(obj: Any) -> Any:
         return obj.isoformat()
     if isinstance(obj, Path):
         return str(obj)
-    if hasattr(obj, "__str__"):
-        return str(obj)
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
