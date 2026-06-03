@@ -93,7 +93,9 @@ class TestPlanCampaign:
         assert all(r.get("identity_snapshot_hash") == expected_hash for r in requests)
 
     def test_plan_without_profile_has_empty_hash(self, monkeypatch):
-        no_profile = lambda: (_ for _ in ()).throw(FileNotFoundError("no profile"))
+        def no_profile():
+            raise FileNotFoundError("no profile")
+
         monkeypatch.setattr(
             "symeraseme.core.identity.load_profile",
             no_profile,
@@ -163,7 +165,9 @@ class TestExecuteCampaign:
         assert "error" in result
 
     def test_dry_run_without_profile_fails(self, monkeypatch):
-        no_profile = lambda: (_ for _ in ()).throw(FileNotFoundError("no profile"))
+        def no_profile():
+            raise FileNotFoundError("no profile")
+
         monkeypatch.setattr(
             "symeraseme.core.identity.load_profile",
             no_profile,

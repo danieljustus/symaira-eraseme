@@ -78,7 +78,7 @@ class TestReDoSPrevention:
 
         text = "user@" + "a-" * 2000
         start = time.perf_counter()
-        result = scrub_pii(text)
+        scrub_pii(text)
         elapsed = time.perf_counter() - start
         assert elapsed < 1.0
 
