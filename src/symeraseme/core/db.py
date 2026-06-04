@@ -81,12 +81,19 @@ def _scavenge_stale_temp_dbs() -> None:
     if not secure_dir.exists():
         return
     now = time.time()
-    for entry in secure_dir.iterdir():
-        if entry.name.startswith("symeraseme_decrypted_") and entry.is_file():
-            age = now - entry.stat().st_mtime
-            if age > _STALE_SCAVENGE_AGE:
+    for entry in sorted(secure_dir.iterdir()):
+        if not entry.name.startswith("symeraseme_decrypted_"):
+            continue
+        if not entry.is_file():
+            continue
+        age = now - entry.stat().st_mtime
+        if age > _STALE_SCAVENGE_AGE:
+            with suppress(OSError):
+                entry.unlink(missing_ok=True)
+            for suffix in ("-wal", "-shm"):
+                sibling = entry.with_suffix(entry.suffix + suffix)
                 with suppress(OSError):
-                    entry.unlink(missing_ok=True)
+                    sibling.unlink(missing_ok=True)
 
 
 def _db_encryption_enabled() -> bool:
@@ -253,13 +260,15 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         _scavenge_stale_temp_dbs()
         db_file = _db_path(path)
 
-        should_encrypt = _db_encryption_enabled() or _is_encrypted(db_file)
+        should_encrypt = _db_encryption_enabled()
 
-        if should_encrypt and db_file.exists() and _is_encrypted(db_file):
+        if should_encrypt and db_file.exists():
             raw = db_file.read_bytes()
-            if raw.startswith(_ENC_HEADER_V1):
-                _migrate_v1_to_v2(db_file)
-            db_file = _decrypt_to_temp(db_file)
+            is_enc = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
+            if is_enc:
+                if raw.startswith(_ENC_HEADER_V1):
+                    _migrate_v1_to_v2(db_file)
+                db_file = _decrypt_to_temp(db_file)
         elif should_encrypt and not db_file.exists():
             _DB_TEMP[db_file.resolve()] = db_file
 
