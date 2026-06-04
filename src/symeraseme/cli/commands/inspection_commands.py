@@ -114,6 +114,23 @@ def _check_registry() -> tuple[bool, str]:
         return False, str(e)
 
 
+def _check_keyring() -> tuple[bool, str]:
+    try:
+        import keyring
+    except ImportError:
+        return False, "keyring package not installed"
+
+    try:
+        backend = keyring.get_keyring()
+        backend_name = type(backend).__name__
+        _unreliable = {"fail", "PlaintextKeyring", "ChainerBackend"}
+        if backend_name in _unreliable:
+            return False, f"{backend_name} (no secure keyring available)"
+        return True, f"{backend_name} (available)"
+    except Exception:
+        return False, "keyring backend unavailable or errored"
+
+
 def _check_llm() -> tuple[bool, str]:
     provider = os.environ.get("SYMERASEME_LLM_PROVIDER", "anthropic")
     key_map = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -163,6 +180,7 @@ def doctor(ctx: typer.Context) -> None:
         "Config directory": _check_config(),
         "Database": _check_database(),
         "Registry": _check_registry(),
+        "Keyring": _check_keyring(),
         "LLM config": _check_llm(),
         "Environment": _check_env(),
     }
