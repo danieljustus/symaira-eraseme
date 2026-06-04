@@ -136,17 +136,22 @@ def _check_llm() -> tuple[bool, str]:
     return True, ", ".join(pieces)
 
 
+_ENV_LABELS: dict[str, str] = {
+    "SYMERASEME_LLM_PROVIDER": "LLM provider",
+    "SYMERASEME_LLM_MODEL": "LLM model",
+    "SYMERASEME_ENCRYPT_DB": "DB encryption",
+    "IMAP_PASSWORD": "IMAP password",
+    "CAPSOLVER_API_KEY": "CAPSOLVER API key",
+}
+
+
 def _check_env() -> tuple[bool, str]:
-    optional = [
-        "SYMERASEME_LLM_PROVIDER",
-        "SYMERASEME_LLM_MODEL",
-        "SYMERASEME_ENCRYPT_DB",
-        "IMAP_PASSWORD",
-        "CAPSOLVER_API_KEY",
+    optional = list(_ENV_LABELS)
+    set_vars = [
+        _ENV_LABELS.get(v, v) for v in optional if os.environ.get(v)
     ]
-    set_vars = [v for v in optional if os.environ.get(v)]
     if set_vars:
-        return True, f"Set: {', '.join(set_vars)}"
+        return True, "Configured: " + ", ".join(set_vars)
     return True, "None set (optional)"
 
 
