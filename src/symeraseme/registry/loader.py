@@ -225,11 +225,10 @@ def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
 def _build_broker_id_index(registry_dir: Path) -> dict[str, Path]:
     index: dict[str, Path] = {}
     for yml in registry_dir.rglob("*.yaml"):
-        if yml.name.startswith("_"):
+        stem = yml.stem
+        if not stem or stem.startswith("-") or yml.name.startswith("_"):
             continue
-        meta = _quick_parse_meta(yml)
-        if meta is not None and "id" in meta:
-            index[meta["id"]] = yml
+        index[stem] = yml
     return index
 
 
