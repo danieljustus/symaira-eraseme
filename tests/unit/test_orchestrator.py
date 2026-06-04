@@ -324,7 +324,7 @@ class TestExecuteCampaign:
 
         monkeypatch.setattr(
             "symeraseme.core.batch.list_removal_requests",
-            lambda campaign_id=None, status=None: email_requests,
+            lambda campaign_id=None, status=None, **kwargs: email_requests,
         )
 
         result = await execute_campaign_async("async-profile", batch_size=5)

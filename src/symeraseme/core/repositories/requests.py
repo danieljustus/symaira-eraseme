@@ -87,3 +87,23 @@ def list_removal_requests(
         params.append(offset)
     rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
+
+
+def count_removal_requests(
+    *,
+    campaign_id: str | None = None,
+    status: str | None = None,
+) -> int:
+    conn = get_connection()
+    query = """SELECT COUNT(*) FROM removal_requests r
+               LEFT JOIN request_state s ON s.request_id = r.id
+               WHERE (? IS NULL OR r.campaign_id = ?)
+                 AND (? IS NULL OR s.current_status = ?)"""
+    params: list = [
+        campaign_id or None,
+        campaign_id or None,
+        status or None,
+        status or None,
+    ]
+    row = conn.execute(query, params).fetchone()
+    return row[0] if row else 0

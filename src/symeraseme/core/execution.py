@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from symeraseme.core.protocols import EmailSender, WebFormRunner
 from symeraseme.core.events import get_events, get_removal_request
-from symeraseme.core.exceptions import ExecutionError, ProfileError, RequestNotFoundError
+from symeraseme.core.exceptions import (
+    ExecutionError,
+    ProfileError,
+    RequestNotFoundError,
+    SymerasemeError,
+)
 from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.core.templating import render_template
@@ -153,7 +158,7 @@ def _execute_email_request(
             },
         )
         return {"success": True, "request_id": request_id, "result": send_result}
-    except Exception as e:
+    except (SymerasemeError, OSError) as e:
         logger.warning("Send failed for %s: %s", request_id, e)
         append_event_and_project(
             request_id,

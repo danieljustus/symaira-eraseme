@@ -114,6 +114,23 @@ def _check_registry() -> tuple[bool, str]:
         return False, str(e)
 
 
+def _check_keyring() -> tuple[bool, str]:
+    try:
+        import keyring
+    except ImportError:
+        return False, "keyring package not installed"
+
+    try:
+        backend = keyring.get_keyring()
+        backend_name = type(backend).__name__
+        _unreliable = {"fail", "PlaintextKeyring", "ChainerBackend"}
+        if backend_name in _unreliable:
+            return False, f"{backend_name} (no secure keyring available)"
+        return True, f"{backend_name} (available)"
+    except Exception:
+        return False, "keyring backend unavailable or errored"
+
+
 def _check_llm() -> tuple[bool, str]:
     provider = os.environ.get("SYMERASEME_LLM_PROVIDER", "anthropic")
     key_map = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -136,17 +153,20 @@ def _check_llm() -> tuple[bool, str]:
     return True, ", ".join(pieces)
 
 
+_ENV_LABELS: dict[str, str] = {
+    "SYMERASEME_LLM_PROVIDER": "LLM provider",
+    "SYMERASEME_LLM_MODEL": "LLM model",
+    "SYMERASEME_ENCRYPT_DB": "DB encryption",
+    "IMAP_PASSWORD": "IMAP password",
+    "CAPSOLVER_API_KEY": "CAPSOLVER API key",
+}
+
+
 def _check_env() -> tuple[bool, str]:
-    optional = [
-        "SYMERASEME_LLM_PROVIDER",
-        "SYMERASEME_LLM_MODEL",
-        "SYMERASEME_ENCRYPT_DB",
-        "IMAP_PASSWORD",
-        "CAPSOLVER_API_KEY",
-    ]
-    set_vars = [v for v in optional if os.environ.get(v)]
+    optional = list(_ENV_LABELS)
+    set_vars = [_ENV_LABELS.get(v, v) for v in optional if os.environ.get(v)]
     if set_vars:
-        return True, f"Set: {', '.join(set_vars)}"
+        return True, "Configured: " + ", ".join(set_vars)
     return True, "None set (optional)"
 
 
@@ -158,6 +178,7 @@ def doctor(ctx: typer.Context) -> None:
         "Config directory": _check_config(),
         "Database": _check_database(),
         "Registry": _check_registry(),
+        "Keyring": _check_keyring(),
         "LLM config": _check_llm(),
         "Environment": _check_env(),
     }
