@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import secrets
+import stat
 import sys
 import time
 from pathlib import Path
@@ -48,6 +49,9 @@ def _find_token_file(token: str) -> Path | None:
         return hashed
     # Backward compatibility: old tokens used the raw token in the filename.
     legacy = consent_dir / f"consent_{token}.json"
+    if legacy.resolve().parent != consent_dir.resolve():
+        logger.warning("Legacy consent token resolved outside consent directory")
+        return None
     if legacy.exists():
         return legacy
     return None
@@ -84,10 +88,15 @@ def verify_token(command: str, token: str) -> bool:
     if token_file is None:
         return False
     try:
-        with open(token_file) as f:
-            payload = json.load(f)
-    except (json.JSONDecodeError, OSError):
+        fd = os.open(token_file, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
         return False
+    try:
+        payload = json.loads(os.read(fd, 65536).decode())
+    except (json.JSONDecodeError, OSError, ValueError):
+        return False
+    finally:
+        os.close(fd)
 
     # New format: the token is stored in the payload — verify it matches
     # so that knowing only the filename is insufficient to verify.
@@ -188,26 +197,29 @@ def _tty_prompt(message: str = "Are you sure?") -> bool:
 def _read_consent_file(path: str | Path) -> str | None:
     """Read a consent token from a file, with permission and sanity checks."""
     p = Path(path).expanduser()
-    if not p.exists():
-        logger.warning("Consent file %s does not exist", p)
-        return None
     try:
-        st = p.stat()
+        fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        logger.warning("Consent file %s does not exist or cannot be opened", p)
+        return None
+
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) and str(p) not in ("/dev/stdin", "/dev/fd/0"):
+            logger.warning("Consent path %s is not a regular file", p)
+            return None
         if st.st_mode & 0o777 != 0o600:
             logger.warning(
                 "Consent file %s has permissions %o, expected 0o600", p, st.st_mode & 0o777
             )
-        # Check this is a regular file, not a symlink (unless /dev/stdin)
-        if not p.is_file() and str(p) not in ("/dev/stdin", "/dev/fd/0"):
-            logger.warning("Consent path %s is not a regular file", p)
-            return None
-    except OSError:
-        pass
-    try:
-        token = p.read_text().strip().split("\n")[0]
+        data = os.read(fd, 65536)
+        token = data.decode().strip().split("\n")[0]
     except OSError as exc:
         logger.warning("Failed to read consent file %s: %s", p, exc)
         return None
+    finally:
+        os.close(fd)
+
     if not token:
         logger.warning("Consent file %s is empty", p)
         return None
