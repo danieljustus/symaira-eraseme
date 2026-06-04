@@ -42,15 +42,11 @@ def insert_manual_task(
 
 def get_manual_task(task_id: int) -> dict[str, Any] | None:
     conn = get_connection()
-    row = conn.execute(
-        "SELECT * FROM manual_tasks WHERE id = ?", (task_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM manual_tasks WHERE id = ?", (task_id,)).fetchone()
     return dict(row) if row else None
 
 
-def update_manual_task_status(
-    task_id: int, status: str, completed_at: str, notes: str
-) -> None:
+def update_manual_task_status(task_id: int, status: str, completed_at: str, notes: str) -> None:
     conn = get_connection()
     conn.execute(
         "UPDATE manual_tasks SET status = ?, completed_at = ?, notes = ? WHERE id = ?",

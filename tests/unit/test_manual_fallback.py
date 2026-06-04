@@ -98,7 +98,7 @@ class TestInstructionsForReason:
 
 
 class TestCreateManualTask:
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_creates_task_in_db(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -125,7 +125,7 @@ class TestCreateManualTask:
         insert_call = mock_conn.execute.call_args_list[0]
         assert "INSERT INTO manual_tasks" in insert_call[0][0]
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_unknown_reason_normalized(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -140,7 +140,7 @@ class TestCreateManualTask:
         )
         assert task.reason == "generic_error"
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_saves_html_snapshot(self, mock_get_conn, tmp_path):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -166,7 +166,7 @@ class TestCreateManualTask:
 
 
 class TestResumeFromManual:
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_completes_task(self, mock_get_conn):
         mock_conn = MagicMock()
         existing_row = {
@@ -192,7 +192,7 @@ class TestResumeFromManual:
         assert result.status == "completed"
         assert result.notes == "Completed manually"
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_cancels_task(self, mock_get_conn):
         mock_conn = MagicMock()
         existing_row = {
@@ -217,7 +217,7 @@ class TestResumeFromManual:
         assert result is not None
         assert result.status == "cancelled"
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_nonexistent_task(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchone.return_value = None
@@ -228,7 +228,7 @@ class TestResumeFromManual:
 
 
 class TestListManualTasks:
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_list_all(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
@@ -272,7 +272,7 @@ class TestListManualTasks:
         assert tasks[0]["status"] == "pending"
         assert tasks[1]["status"] == "completed"
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_filter_by_status(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
@@ -287,7 +287,7 @@ class TestListManualTasks:
         assert "WHERE" in call_args[0]
         assert "status = ?" in call_args[0]
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_empty_result(self, mock_get_conn):
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = []
@@ -407,7 +407,7 @@ class TestRedactionAndPermissions:
             perms = tasks_dir.stat().st_mode & 0o777
             assert perms == 0o700, f"Expected 0o700 permissions, got {oct(perms)}"
 
-    @patch("symeraseme.core.manual_fallback.get_connection")
+    @patch("symeraseme.core.repositories.manual_tasks.get_connection")
     def test_html_snapshot_has_restrictive_permissions(self, mock_get_conn, tmp_path):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()

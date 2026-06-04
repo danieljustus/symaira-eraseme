@@ -164,9 +164,7 @@ _ENV_LABELS: dict[str, str] = {
 
 def _check_env() -> tuple[bool, str]:
     optional = list(_ENV_LABELS)
-    set_vars = [
-        _ENV_LABELS.get(v, v) for v in optional if os.environ.get(v)
-    ]
+    set_vars = [_ENV_LABELS.get(v, v) for v in optional if os.environ.get(v)]
     if set_vars:
         return True, "Configured: " + ", ".join(set_vars)
     return True, "None set (optional)"

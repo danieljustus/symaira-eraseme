@@ -26,13 +26,9 @@ _PROGRESS_CONSOLE = Console(stderr=True)
 _BATCH_LIMIT = 10
 
 
-def _prepare_batch(
-    campaign_id: str, batch_size: int
-) -> list[dict[str, Any]]:
+def _prepare_batch(campaign_id: str, batch_size: int) -> list[dict[str, Any]]:
     """Fetch planned requests, limited to the requested batch size."""
-    return list_removal_requests(
-        campaign_id=campaign_id, status="PLANNED", limit=batch_size
-    )
+    return list_removal_requests(campaign_id=campaign_id, status="PLANNED", limit=batch_size)
 
 
 def _build_result(
@@ -61,9 +57,7 @@ def execute_campaign(
     email_sender=None,
 ) -> dict[str, Any]:
     if batch_size > _BATCH_LIMIT:
-        logger.warning(
-            "batch_size %d exceeds limit %d, clamping", batch_size, _BATCH_LIMIT
-        )
+        logger.warning("batch_size %d exceeds limit %d, clamping", batch_size, _BATCH_LIMIT)
         batch_size = _BATCH_LIMIT
     from symeraseme.core.repositories.requests import count_removal_requests
 
