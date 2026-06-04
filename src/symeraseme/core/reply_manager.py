@@ -295,7 +295,7 @@ def send_reply(
             account=account,
             config_path=config_path,
         )
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         logger.error("Failed to send reply #%d: %s", reply_id, e)
         return {"success": False, "error": str(e), "reply_id": reply_id}
 
