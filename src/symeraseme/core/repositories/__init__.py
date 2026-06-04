@@ -18,12 +18,14 @@ from symeraseme.core.repositories.manual_tasks import (
     update_manual_task_status,
 )
 from symeraseme.core.repositories.requests import (
+    count_removal_requests,
     create_removal_request,
     get_removal_request,
     list_removal_requests,
 )
 
 __all__ = [
+    "count_removal_requests",
     "create_campaign",
     "list_campaigns",
     "create_removal_request",
