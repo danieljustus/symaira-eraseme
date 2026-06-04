@@ -59,6 +59,11 @@ def execute_campaign(
     web_form_runner=None,
     email_sender=None,
 ) -> dict[str, Any]:
+    if batch_size > _BATCH_LIMIT:
+        logger.warning(
+            "batch_size %d exceeds limit %d, clamping", batch_size, _BATCH_LIMIT
+        )
+        batch_size = _BATCH_LIMIT
     requests, batch = _prepare_batch(campaign_id, batch_size)
     results: list[dict[str, Any]] = []
     for req in batch:
