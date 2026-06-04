@@ -157,16 +157,26 @@ _ENV_LABELS: dict[str, str] = {
     "SYMERASEME_LLM_PROVIDER": "LLM provider",
     "SYMERASEME_LLM_MODEL": "LLM model",
     "SYMERASEME_ENCRYPT_DB": "DB encryption",
+}
+
+_SENSITIVE_ENV_VARS: dict[str, str] = {
     "IMAP_PASSWORD": "IMAP password",
     "CAPSOLVER_API_KEY": "CAPSOLVER API key",
 }
 
 
 def _check_env() -> tuple[bool, str]:
-    optional = list(_ENV_LABELS)
-    set_vars = [_ENV_LABELS.get(v, v) for v in optional if os.environ.get(v)]
+    set_vars = [label for var, label in _ENV_LABELS.items() if os.environ.get(var)]
+    sensitive_set = any(os.environ.get(var) for var in _SENSITIVE_ENV_VARS)
+
+    pieces: list[str] = []
     if set_vars:
-        return True, "Configured: " + ", ".join(set_vars)
+        pieces.extend(set_vars)
+    if sensitive_set:
+        pieces.append("credentials: configured")
+
+    if pieces:
+        return True, "Configured: " + ", ".join(pieces)
     return True, "None set (optional)"
 
 
