@@ -6,7 +6,6 @@ from typing import Any
 
 from symeraseme.core.db import get_connection
 
-
 _CLASSIFICATIONS_NEEDING_REPLY = frozenset(
     {"rejected", "verification", "human_required", "unclear"}
 )
@@ -49,13 +48,9 @@ def list_replies(
             "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
         )
     elif status == "drafted":
-        conditions.append(
-            "r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)"
-        )
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)")
     elif status == "sent":
-        conditions.append(
-            "r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
-        )
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)")
     elif status == "classified":
         conditions.append("r.classified_as IS NOT NULL")
     elif status == "unclassified":
