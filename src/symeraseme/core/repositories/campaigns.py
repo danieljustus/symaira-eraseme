@@ -11,13 +11,17 @@ def create_campaign(
     campaign_id: str,
     kind: str = "initial",
     notes: str | None = None,
-) -> None:
+) -> bool:
     conn = get_connection()
+    exists = conn.execute("SELECT 1 FROM campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    if exists:
+        return False
     conn.execute(
-        "INSERT OR IGNORE INTO campaigns (id, kind, notes) VALUES (?, ?, ?)",
+        "INSERT INTO campaigns (id, kind, notes) VALUES (?, ?, ?)",
         (campaign_id, kind, notes),
     )
     conn.commit()
+    return True
 
 
 def list_campaigns() -> list[dict[str, Any]]:

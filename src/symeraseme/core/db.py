@@ -231,9 +231,8 @@ def _cleanup_temp_files() -> None:
 
 
 def _handle_sigterm(signum: int, frame: object) -> None:
-    """SIGTERM handler that cleans up temp files before exit."""
-    logger.info("Received signal %d, cleaning up encrypted DB temp files ...", signum)
-    _cleanup_temp_files()
+    """SIGTERM handler that exits via sys.exit, letting atexit clean up temp files."""
+    logger.info("Received signal %d, exiting ...", signum)
     sys.exit(128 + signum)
 
 

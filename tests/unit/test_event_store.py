@@ -66,9 +66,9 @@ class TestCampaigns:
         assert camps[0]["id"] == "test-campaign"
         assert camps[0]["kind"] == "initial"
 
-    def test_create_duplicate_is_ignored(self):
-        create_campaign("dup")
-        create_campaign("dup")  # no error
+    def test_create_duplicate_is_detected(self):
+        assert create_campaign("dup") is True
+        assert create_campaign("dup") is False  # already exists
         camps = list_campaigns()
         assert sum(1 for c in camps if c["id"] == "dup") == 1
 
