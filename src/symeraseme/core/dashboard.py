@@ -22,41 +22,21 @@ def get_dashboard_data(
 
     Returns a dict with all data needed for the dashboard template.
     """
-    from symeraseme.core.db import get_connection
+    from symeraseme.core.repositories.dashboard import (
+        fetch_campaigns,
+        fetch_recent_events,
+        fetch_requests_for_campaigns,
+    )
 
-    conn = get_connection()
-
-    if campaign_id:
-        campaigns_rows = conn.execute(
-            "SELECT id, created_at, kind FROM campaigns WHERE id = ? ORDER BY created_at DESC",
-            (campaign_id,),
-        ).fetchall()
-    else:
-        campaigns_rows = conn.execute(
-            "SELECT id, created_at, kind FROM campaigns ORDER BY created_at DESC"
-        ).fetchall()
+    campaigns_rows = fetch_campaigns(campaign_id)
 
     campaigns: list[dict[str, Any]] = []
     all_requests: list[dict[str, Any]] = []
     recent_events: list[dict[str, Any]] = []
 
     if campaigns_rows:
-        # Fetch all request data in a single query, then group by campaign
-        # to avoid the N+1 per-campaign query pattern.
         campaign_ids = [c["id"] for c in campaigns_rows]
-        placeholders = ",".join("?" for _ in campaign_ids)
-        requests_rows = conn.execute(
-            f"""SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
-                       r.jurisdiction, r.template_id,
-                       s.current_status, s.last_event_at, s.sent_at,
-                       s.acknowledged_at, s.resolved_at, s.deadline_at,
-                       s.reminders_sent, s.escalation_level
-                FROM removal_requests r
-                LEFT JOIN request_state s ON s.request_id = r.id
-                WHERE r.campaign_id IN ({placeholders})
-                ORDER BY r.created_at ASC""",
-            campaign_ids,
-        ).fetchall()
+        requests_rows = fetch_requests_for_campaigns(campaign_ids)
 
         requests_by_campaign: dict[str, list[dict[str, Any]]] = {cid: [] for cid in campaign_ids}
         for row in requests_rows:
@@ -80,14 +60,7 @@ def get_dashboard_data(
             campaigns.append(camp)
 
     # Recent events
-    events_rows = conn.execute(
-        """SELECT e.id, e.request_id, e.occurred_at, e.event_type,
-                  e.source, r.broker_id
-           FROM request_events e
-           LEFT JOIN removal_requests r ON r.id = e.request_id
-           ORDER BY e.occurred_at DESC
-           LIMIT 50"""
-    ).fetchall()
+    events_rows = fetch_recent_events(50)
 
     recent_events = [dict(e) for e in events_rows]
 

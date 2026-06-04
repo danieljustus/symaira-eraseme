@@ -52,26 +52,9 @@ def run_tick(
     actions: list[TickAction] = []
     now = reference_date or datetime.now(UTC)
 
-    from symeraseme.core.db import get_connection
+    from symeraseme.core.repositories.deadlines import fetch_tick_candidates
 
-    conn = get_connection()
-
-    query = """SELECT r.id, r.broker_id, r.campaign_id, r.jurisdiction,
-                  s.current_status, s.sent_at, s.deadline_at, s.next_action_at,
-                  s.acknowledged_at, s.resolved_at, s.reminders_sent,
-                  s.escalation_level
-           FROM removal_requests r
-           JOIN request_state s ON s.request_id = r.id
-           WHERE s.next_action_at IS NULL
-              OR s.next_action_at <= ?
-           ORDER BY s.next_action_at ASC"""
-    params: list[Any] = [now.isoformat()]
-
-    if batch_size:
-        query += " LIMIT ?"
-        params.append(batch_size)
-
-    rows = conn.execute(query, params).fetchall()
+    rows = fetch_tick_candidates(now.isoformat(), batch_size=batch_size)
 
     for row in rows:
         req = dict(row)

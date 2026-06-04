@@ -18,7 +18,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from symeraseme.core.db import get_connection
 from symeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
@@ -215,26 +214,19 @@ def create_manual_task(
         except OSError as e:
             logger.warning("Failed to save HTML snapshot: %s", e)
 
-    conn = get_connection()
-    cur = conn.execute(
-        """INSERT INTO manual_tasks
-           (request_id, broker_id, broker_name, form_url, reason, instructions,
-            screenshot_path, html_snapshot_path, form_fields_json, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')""",
-        (
-            request_id,
-            broker_id,
-            broker_name,
-            form_url,
-            reason,
-            instructions,
-            screenshot_path,
-            html_path,
-            json.dumps(form_fields or {}),
-        ),
+    from symeraseme.core.repositories.manual_tasks import insert_manual_task
+
+    task_id = insert_manual_task(
+        request_id=request_id,
+        broker_id=broker_id,
+        broker_name=broker_name,
+        form_url=form_url,
+        reason=reason,
+        instructions=instructions,
+        screenshot_path=screenshot_path,
+        html_path=html_path,
+        form_fields_json=json.dumps(form_fields or {}),
     )
-    conn.commit()
-    task_id: int = cur.lastrowid  # type: ignore[assignment]
 
     # Append HUMAN_ACTION_REQUIRED event + atomic projection update
     if request_id:
@@ -283,8 +275,12 @@ def resume_from_manual(
     completed: bool = True,
 ) -> ManualTask | None:
     """Mark a manual task as completed (or cancelled) after user action."""
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM manual_tasks WHERE id = ?", (task_id,)).fetchone()
+    from symeraseme.core.repositories.manual_tasks import (
+        get_manual_task,
+        update_manual_task_status,
+    )
+
+    row = get_manual_task(task_id)
 
     if row is None:
         logger.warning("Manual task %d not found", task_id)
@@ -293,11 +289,7 @@ def resume_from_manual(
     new_status = "completed" if completed else "cancelled"
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
-    conn.execute(
-        "UPDATE manual_tasks SET status = ?, completed_at = ?, notes = ? WHERE id = ?",
-        (new_status, now, notes, task_id),
-    )
-    conn.commit()
+    update_manual_task_status(task_id, new_status, now, notes)
 
     # Append NOTE_ADDED event for the request + atomic projection update
     request_id = row["request_id"]
@@ -342,27 +334,13 @@ def list_manual_tasks(
     request_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """List manual tasks, optionally filtered by status or request ID."""
-    conn = get_connection()
-    conditions: list[str] = []
-    params: list[Any] = []
+    from symeraseme.core.repositories.manual_tasks import list_manual_tasks as _list_manual_tasks
 
-    if status:
-        conditions.append("status = ?")
-        params.append(status)
-    if request_id is not None:
-        conditions.append("request_id = ?")
-        params.append(request_id)
-
-    where = " AND ".join(conditions) if conditions else "1=1"
-    rows = conn.execute(
-        f"SELECT * FROM manual_tasks WHERE {where} ORDER BY created_at DESC",
-        params,
-    ).fetchall()
-    return [dict(r) for r in rows]
+    return _list_manual_tasks(status=status, request_id=request_id)
 
 
 def get_manual_task(task_id: int) -> dict[str, Any] | None:
     """Get a single manual task by ID."""
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM manual_tasks WHERE id = ?", (task_id,)).fetchone()
-    return dict(row) if row else None
+    from symeraseme.core.repositories.manual_tasks import get_manual_task as _get_manual_task
+
+    return _get_manual_task(task_id)
