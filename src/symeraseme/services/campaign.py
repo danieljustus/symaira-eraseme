@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+from symeraseme.cli.console import render_error
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db import init_db
@@ -71,8 +72,6 @@ def handle_execute(
         consent_token=consent_token,
         consent_file=consent_file,
     ):
-        from symeraseme.cli.console import render_error
-
         render_error(
             "Destructive command requires consent. Use --yes or issue a token via 'grant' command."
         )
