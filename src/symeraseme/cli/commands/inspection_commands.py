@@ -362,15 +362,10 @@ def brokers_show_cmd(
     try:
         broker = load_broker(broker_id)
     except FileNotFoundError:
-        for b in load_all_brokers(include_disabled=True):
-            if b.id == broker_id:
-                broker = b
-                break
-        else:
-            render_error(
-                f"Broker '{broker_id}' not found in registry. "
-                "Run 'symeraseme brokers list' to see available brokers."
-            )
+        render_error(
+            f"Broker '{broker_id}' not found in registry. "
+            "Run 'symeraseme brokers list' to see available brokers."
+        )
 
     data = {
         "schema_version": 1,
