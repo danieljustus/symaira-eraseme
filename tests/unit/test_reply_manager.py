@@ -8,8 +8,8 @@ import pytest
 from symeraseme.core.db import close_connection, get_connection, init_db
 from symeraseme.core.events import append_event, create_removal_request
 from symeraseme.core.projection import upsert_state
+from symeraseme.core.repositories.replies import _CLASSIFICATIONS_NEEDING_REPLY
 from symeraseme.core.reply_manager import (
-    CLASSIFICATIONS_NEEDING_REPLY,
     _fallback_rebuttal,
     draft_reply,
     get_reply,
@@ -357,9 +357,9 @@ class TestFallbackRebutal:
 
 class TestClassificationsNeedingReply:
     def test_contains_expected(self):
-        assert "rejected" in CLASSIFICATIONS_NEEDING_REPLY
-        assert "verification" in CLASSIFICATIONS_NEEDING_REPLY
-        assert "human_required" in CLASSIFICATIONS_NEEDING_REPLY
-        assert "unclear" in CLASSIFICATIONS_NEEDING_REPLY
-        assert "ack" not in CLASSIFICATIONS_NEEDING_REPLY
-        assert "confirmed" not in CLASSIFICATIONS_NEEDING_REPLY
+        assert "rejected" in _CLASSIFICATIONS_NEEDING_REPLY
+        assert "verification" in _CLASSIFICATIONS_NEEDING_REPLY
+        assert "human_required" in _CLASSIFICATIONS_NEEDING_REPLY
+        assert "unclear" in _CLASSIFICATIONS_NEEDING_REPLY
+        assert "ack" not in _CLASSIFICATIONS_NEEDING_REPLY
+        assert "confirmed" not in _CLASSIFICATIONS_NEEDING_REPLY

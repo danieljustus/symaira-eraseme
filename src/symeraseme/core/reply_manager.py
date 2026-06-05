@@ -10,15 +10,6 @@ from symeraseme.core.templating import render_template
 
 logger = logging.getLogger(__name__)
 
-CLASSIFICATIONS_NEEDING_REPLY = frozenset(
-    {
-        "rejected",
-        "verification",
-        "human_required",
-        "unclear",
-    }
-)
-
 
 def list_replies(
     *,
@@ -38,37 +29,7 @@ def list_replies(
     """
     from symeraseme.core.repositories.replies import list_replies as _list_replies
 
-    conditions: list[str] = []
-    params: list[str] = []
-
-    if request_id is not None:
-        conditions.append("r.request_id = ?")
-        params.append(str(request_id))
-
-    if status == "needs_reply":
-        placeholders = ",".join("?" for _ in CLASSIFICATIONS_NEEDING_REPLY)
-        conditions.append(f"r.classified_as IN ({placeholders})")
-        params.extend(CLASSIFICATIONS_NEEDING_REPLY)
-        conditions.append(
-            "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
-        )
-    elif status == "needs_verification":
-        conditions.append("r.classified_as = ?")
-        params.append("verification")
-        conditions.append(
-            "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
-        )
-    elif status == "drafted":
-        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)")
-    elif status == "sent":
-        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)")
-    elif status == "classified":
-        conditions.append("r.classified_as IS NOT NULL")
-    elif status == "unclassified":
-        conditions.append("r.classified_as IS NULL")
-
-    where = " AND ".join(conditions) if conditions else "1=1"
-    return _list_replies(where, params)
+    return _list_replies(status=status, request_id=request_id)
 
 
 def get_reply(reply_id: int) -> dict[str, Any] | None:
@@ -295,7 +256,7 @@ def send_reply(
             account=account,
             config_path=config_path,
         )
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         logger.error("Failed to send reply #%d: %s", reply_id, e)
         return {"success": False, "error": str(e), "reply_id": reply_id}
 

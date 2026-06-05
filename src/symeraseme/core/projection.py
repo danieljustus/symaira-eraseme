@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 from datetime import timedelta
 from typing import Any
 
@@ -67,36 +66,46 @@ def _accumulate_state(
     for event in events:
         event_id = event["id"]
         event_type = event["event_type"]
-        occurred = _parse_ts(event["occurred_at"])
-        payload = json.loads(event["payload_json"]) if event["payload_json"] else {}
+        try:
+            occurred = _parse_ts(event["occurred_at"])
+            payload = json.loads(event["payload_json"]) if event["payload_json"] else {}
 
-        new_status = _next_status(event_type)
-        if new_status is not None:
-            state["current_status"] = new_status
+            new_status = _next_status(event_type)
+            if new_status is not None:
+                state["current_status"] = new_status
 
-        state["last_event_id"] = event_id
-        state["last_event_at"] = occurred.isoformat() if occurred else None
+            state["last_event_id"] = event_id
+            state["last_event_at"] = occurred.isoformat() if occurred else None
 
-        if event_type == "SENT":
-            state["sent_at"] = occurred.isoformat() if occurred else None
-            deadline_days = payload.get("expected_response_days", 30)
-            if occurred:
-                state["deadline_at"] = (occurred + timedelta(days=deadline_days)).isoformat()
+            if event_type == "SENT":
+                state["sent_at"] = occurred.isoformat() if occurred else None
+                deadline_days = payload.get("expected_response_days", 30)
+                if occurred:
+                    state["deadline_at"] = (occurred + timedelta(days=deadline_days)).isoformat()
 
-        elif event_type == "ACK":
-            state["acknowledged_at"] = occurred.isoformat() if occurred else None
+            elif event_type == "ACK":
+                state["acknowledged_at"] = occurred.isoformat() if occurred else None
 
-        elif event_type in ("CONFIRMED", "REJECTED_FINAL"):
-            state["resolved_at"] = occurred.isoformat() if occurred else None
+            elif event_type in ("CONFIRMED", "REJECTED_FINAL"):
+                state["resolved_at"] = occurred.isoformat() if occurred else None
 
-        elif event_type == "REMINDER_SENT":
-            state["reminders_sent"] = int(payload.get("count", 0)) or 1
+            elif event_type == "REMINDER_SENT":
+                state["reminders_sent"] = int(payload.get("count", 0)) or 1
 
-        elif event_type == "DEADLINE_REACHED":
-            state["escalation_level"] = 1
+            elif event_type == "DEADLINE_REACHED":
+                state["escalation_level"] = 1
 
-        elif event_type == "DPA_COMPLAINT_DRAFTED":
-            state["escalation_level"] = 2
+            elif event_type == "DPA_COMPLAINT_DRAFTED":
+                state["escalation_level"] = 2
+        except Exception:
+            logger.error(
+                "Event replay failed for request %d event_id=%s event_type=%s: skipping event",
+                request_id,
+                event_id,
+                event_type,
+                exc_info=True,
+            )
+            continue
 
     return state
 
@@ -179,16 +188,14 @@ def append_event_and_project(
         )
         state = upsert_state(request_id, commit=False)
         conn.commit()
-    except (sqlite3.Error, KeyError, ValueError) as exc:
+    except Exception as exc:
         logger.error(
-            "Projection rebuild failed for request %d: %s",
+            "Projection failed for request %d event=%s: %s",
             request_id,
+            event_type,
             exc,
             exc_info=True,
         )
-        conn.rollback()
-        raise
-    except Exception:
         conn.rollback()
         raise
     return eid, state

@@ -6,11 +6,58 @@ from typing import Any
 
 from symeraseme.core.db import get_connection
 
+_CLASSIFICATIONS_NEEDING_REPLY = frozenset(
+    {"rejected", "verification", "human_required", "unclear"}
+)
+
 
 def list_replies(
-    where_clause: str,
-    params: list[str],
+    *,
+    status: str | None = None,
+    request_id: int | None = None,
 ) -> list[dict[str, Any]]:
+    """List inbox replies with optional filters.
+
+    Status values:
+      - ``needs_reply``: classified replies needing a response
+      - ``needs_verification``: replies classified as verification
+      - ``drafted``: has an unsent draft
+      - ``sent``: draft has been sent
+      - ``classified``: has a classification label
+      - ``unclassified``: no classification yet
+      - ``all`` / ``None``: no filter
+    """
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if request_id is not None:
+        conditions.append("r.request_id = ?")
+        params.append(request_id)
+
+    if status == "needs_reply":
+        placeholders = ",".join("?" for _ in _CLASSIFICATIONS_NEEDING_REPLY)
+        conditions.append(f"r.classified_as IN ({placeholders})")
+        params.extend(_CLASSIFICATIONS_NEEDING_REPLY)
+        conditions.append(
+            "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
+        )
+    elif status == "needs_verification":
+        conditions.append("r.classified_as = ?")
+        params.append("verification")
+        conditions.append(
+            "r.id NOT IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)"
+        )
+    elif status == "drafted":
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NULL)")
+    elif status == "sent":
+        conditions.append("r.id IN (SELECT reply_id FROM reply_drafts WHERE sent_at IS NOT NULL)")
+    elif status == "classified":
+        conditions.append("r.classified_as IS NOT NULL")
+    elif status == "unclassified":
+        conditions.append("r.classified_as IS NULL")
+
+    where = " AND ".join(conditions) if conditions else "1=1"
+
     conn = get_connection()
     rows = conn.execute(
         f"""SELECT r.id, r.request_id, r.message_id, r.thread_id,
@@ -26,7 +73,7 @@ def list_replies(
                     WHERE d2.reply_id = r.id
                     ORDER BY d2.created_at DESC LIMIT 1
                 )
-            WHERE {where_clause}
+            WHERE {where}
             ORDER BY r.received_at DESC""",
         params,
     ).fetchall()
