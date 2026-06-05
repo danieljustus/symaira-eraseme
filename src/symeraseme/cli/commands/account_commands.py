@@ -9,6 +9,7 @@ from symeraseme.cli.console import (
     print_panel,
     print_success,
     print_table,
+    render_error,
 )
 from symeraseme.core.identity import load_profile, profile_exists, save_profile
 from symeraseme.core.templating import render_template as _render
@@ -105,8 +106,6 @@ def init_profile(
 
 def show_profile() -> None:
     if not profile_exists():
-        from symeraseme.cli.console import render_error
-
         render_error("No identity profile found. Run 'symeraseme init-profile' first.")
 
     profile = load_profile()
