@@ -11,7 +11,6 @@ def handle_manual_tasks_list(
     request_id: int | None = None,
 ) -> CliResult:
     init_db()
-    """manual tasks list."""
     tasks = list_manual_tasks(status=status, request_id=request_id)
 
     if not tasks:
@@ -30,7 +29,6 @@ def handle_manual_tasks_list(
 
 
 def handle_manual_tasks_show(task_id: int) -> CliResult:
-    """manual tasks show."""
     init_db()
     task = get_manual_task(task_id)
 
@@ -65,7 +63,6 @@ def handle_manual_tasks_complete(
     notes: str = "",
 ) -> CliResult:
     init_db()
-    """manual tasks complete."""
     result = resume_from_manual(task_id, notes=notes, completed=True)
 
     if result is None:

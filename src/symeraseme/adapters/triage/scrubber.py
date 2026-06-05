@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -131,9 +132,7 @@ def grant_llm_consent() -> None:
     record = {
         "granted": True,
         "user": getpass.getuser(),
-        "granted_at": int(os.path.getmtime(_LLM_CONSENT_FILE))
-        if _LLM_CONSENT_FILE.exists()
-        else int(__import__("time").time()),
+        "granted_at": int(time.time()),
         "scope": "llm_pii",
     }
     fd = os.open(_LLM_CONSENT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)

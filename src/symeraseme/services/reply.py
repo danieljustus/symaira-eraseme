@@ -46,7 +46,6 @@ def handle_classify_reply(
     yes: bool = False,
 ) -> CliResult:
     _ensure_llm_consent(yes=yes)
-    """classify reply."""
     init_db()
 
     req = get_removal_request(request_id)
@@ -176,7 +175,6 @@ def handle_generate_rebuttal(
     yes: bool = False,
 ) -> CliResult:
     _ensure_llm_consent(yes=yes)
-    """generate rebuttal."""
     init_db()
 
     req = get_removal_request(request_id)
