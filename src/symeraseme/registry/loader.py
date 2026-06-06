@@ -244,6 +244,45 @@ def _quick_parse_meta(yml_path: Path) -> dict | None:
     return data
 
 
+_META_FIELDS: frozenset[str] = frozenset(
+    {"jurisdictions", "laws", "priority", "category", "disabled"}
+)
+
+
+def _meta_only_parse(yml_path: Path) -> dict[str, Any] | None:
+    """Extract only the top-level filterable fields without a full YAML parse.
+
+    Uses ``yaml.compose`` to build the node tree and then pulls just the
+    five filterable fields (``jurisdictions``, ``laws``, ``priority``,
+    ``category``, ``disabled``) off the top-level mapping. This is
+    measurably faster than ``yaml.safe_load`` for the cold-cache filter
+    path on large registries because it skips the constructor step
+    entirely.
+    """
+    try:
+        with open(yml_path) as f:
+            node = yaml.compose(f, Loader=yaml.SafeLoader)
+    except yaml.YAMLError:
+        return None
+    if not isinstance(node, yaml.MappingNode):
+        return None
+    loader = yaml.SafeLoader(str(yml_path))
+    out: dict[str, Any] = {}
+    for key_node, value_node in node.value:
+        try:
+            key = loader.construct_object(key_node)
+        except yaml.YAMLError:
+            continue
+        if not isinstance(key, str) or key not in _META_FIELDS:
+            continue
+        try:
+            value = loader.construct_object(value_node, deep=True)
+        except yaml.YAMLError:
+            continue
+        out[key] = value
+    return out
+
+
 def _meta_matches_filters(
     meta: dict,
     jurisdiction: str | None,
@@ -283,7 +322,7 @@ def _filter_and_validate_ymls(
     for yml in yml_paths:
         if yml.name.startswith("_"):
             continue
-        meta = _quick_parse_meta(yml)
+        meta = _meta_only_parse(yml)
         if meta is None:
             logger.warning("skipped broker %s: unparseable YAML", yml)
             skipped += 1

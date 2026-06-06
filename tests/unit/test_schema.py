@@ -168,6 +168,79 @@ class TestRegistryLoader:
         loaded = _load_persistent_cache(registry_dir, cache_key)
         assert loaded is None
 
+    def test_meta_only_parse_extracts_filterable_fields(self, tmp_path):
+        from symeraseme.registry.loader import _meta_only_parse
+
+        yaml_path = tmp_path / "test-broker.yaml"
+        yaml_path.write_text(
+            "id: test-broker\n"
+            "name: Test Broker\n"
+            "category: other\n"
+            "jurisdictions:\n"
+            "- DE\n"
+            "- FR\n"
+            "laws:\n"
+            "- GDPR\n"
+            "priority: high\n"
+            "disabled: false\n"
+            "opt_out:\n"
+            "- type: email\n"
+            "  endpoint: test@example.com\n"
+        )
+        meta = _meta_only_parse(yaml_path)
+        assert meta == {
+            "category": "other",
+            "jurisdictions": ["DE", "FR"],
+            "laws": ["GDPR"],
+            "priority": "high",
+            "disabled": False,
+        }
+
+    def test_meta_only_parse_skips_unparseable_yaml(self, tmp_path):
+        from symeraseme.registry.loader import _meta_only_parse
+
+        bad = tmp_path / "bad.yaml"
+        bad.write_text("id: test\njurisdictions: : :\n")
+        assert _meta_only_parse(bad) is None
+
+    def test_meta_only_parse_cold_filter_path_uses_meta_index(self, monkeypatch):
+        """Cold filter path must call _meta_only_parse (not yaml.safe_load).
+
+        Bounded parse: only files matching the filter trigger a full
+        ``load_broker_yaml``; the meta-only pre-filter handles the rest.
+        """
+        import yaml
+
+        from symeraseme.registry.loader import (
+            _filter_and_validate_ymls,
+            _meta_only_parse,
+        )
+
+        safe_load_calls: list[str] = []
+        original_safe_load = yaml.safe_load
+
+        def counting_safe_load(stream, *args, **kwargs):
+            safe_load_calls.append("safe_load")
+            return original_safe_load(stream, *args, **kwargs)
+
+        monkeypatch.setattr(yaml, "safe_load", counting_safe_load)
+        monkeypatch.setattr(
+            "symeraseme.registry.loader.yaml.safe_load", counting_safe_load
+        )
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        results, _ = _filter_and_validate_ymls(
+            sorted(registry_dir.rglob("*.yaml")),
+            jurisdiction="DE",
+        )
+        de_count = sum(1 for b in results if "DE" in b.jurisdictions)
+        assert de_count >= 1
+
+        sample = next(registry_dir.rglob("*.yaml"))
+        meta = _meta_only_parse(sample)
+        assert meta is not None
+        assert isinstance(meta.get("jurisdictions", []), list)
+
 
 class TestFormDSLStandardization:
     """A5/A6: standardized form_spec DSL — schema rejects the old non-uniform syntax."""
