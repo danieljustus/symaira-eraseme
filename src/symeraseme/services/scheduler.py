@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import typer
 
-from symeraseme.cli.console import render_error
 from symeraseme.core.result_types import CliResult
 from symeraseme.core.scheduler import (
     detect_platform,
@@ -37,9 +36,12 @@ def handle_generate_scheduler(
             venv_activate=venv_activate,
         )
     except ValueError as e:
-        render_error(
-            f"Scheduler error: {e}. "
-            "Use --platform cron|launchd|systemd or ensure the platform is supported."
+        return CliResult(
+            success=False,
+            error=(
+                f"Scheduler error: {e}. "
+                "Use --platform cron|launchd|systemd or ensure the platform is supported."
+            ),
         )
 
     written = write_scheduler_files(files, output_dir, dry_run=dry_run)

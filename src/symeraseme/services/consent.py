@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from symeraseme.cli.console import render_error
 from symeraseme.core.consent import (
     consume_token,
     issue_token,
@@ -54,8 +53,11 @@ def handle_grant(
                 success=True,
                 data={"revoke": revoke, "message": f"Token revoked: {revoke}"},
             )
-        render_error(
-            f"Token not found: {revoke}. Run 'symeraseme grant --list' to see active tokens."
+        return CliResult(
+            success=False,
+            error=(
+                f"Token not found: {revoke}. Run 'symeraseme grant --list' to see active tokens."
+            ),
         )
 
     if revoke_all:
