@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from symeraseme.adapters.email.smtp_imap import (
     IMAPError,
     match_reply_to_request,
@@ -7,11 +9,12 @@ from symeraseme.adapters.email.smtp_imap import (
 from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
-from symeraseme.cli.console import render_error
 from symeraseme.core.db import init_db
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
 from symeraseme.core.inbox import submit_inbox_reply
 from symeraseme.core.result_types import CliResult
+
+logger = logging.getLogger(__name__)
 
 
 def handle_poll_inbox(
@@ -35,9 +38,14 @@ def handle_poll_inbox(
             since_days=since_days,
         )
     except IMAPError as e:
-        render_error(
-            f"IMAP error: {e}. "
-            "Check your credentials, ensure IMAP is enabled, and use an app password if 2FA is on."
+        logger.debug("IMAP poll failed", exc_info=True)
+        return CliResult(
+            success=False,
+            error=(
+                f"IMAP error: {e}. "
+                "Check your credentials, ensure IMAP is enabled, "
+                "and use an app password if 2FA is on."
+            ),
         )
 
     if messages:

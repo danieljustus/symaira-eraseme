@@ -24,7 +24,6 @@ def handle_generate_scheduler(
     dry_run: bool = False,
 ) -> CliResult:
     poll_hours_list = [int(h.strip()) for h in poll_hours.split(",") if h.strip()]
-    """generate scheduler."""
 
     try:
         files = generate_scheduler_configs(
@@ -71,7 +70,6 @@ def handle_schedule_install(
     dry_run: bool = False,
 ) -> CliResult:
     plat = platform or detect_platform()
-    """schedule install."""
     output_dir = "./schedules"
 
     if dry_run:
@@ -131,7 +129,6 @@ def handle_schedule_install(
 
 
 def handle_schedule_uninstall(platform: str = "") -> CliResult:
-    """schedule uninstall."""
     plat = platform or detect_platform()
     lines = [f"Platform: {plat}"]
     lines.append("To uninstall, run the uninstall script from your schedules directory:")
@@ -155,7 +152,6 @@ def handle_schedule_status(
     platform: str = "",
 ) -> CliResult:
     plat = platform or detect_platform()
-    """schedule status."""
     status = get_schedule_status(platform_name=plat)
 
     lines = [f"Platform: {status['platform']}", "Installed services:"]

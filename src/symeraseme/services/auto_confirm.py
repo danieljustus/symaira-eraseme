@@ -5,7 +5,6 @@ import asyncio
 import typer
 
 from symeraseme.adapters.web.confirmation_clicker import auto_confirm
-from symeraseme.cli.console import render_error
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.projection import append_event_and_project
@@ -19,20 +18,25 @@ def handle_auto_confirm(
     dry_run: bool = False,
 ) -> CliResult:
     init_db()
-    """auto confirm."""
 
     req = get_removal_request(request_id)
     if req is None:
-        render_error(
-            f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests."
+        return CliResult(
+            success=False,
+            error=(
+                f"Request #{request_id} not found. "
+                "Run 'symeraseme requests list' to see available requests."
+            ),
         )
 
     events = get_events(request_id)
     if not events:
-        render_error(
-            f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent."
+        return CliResult(
+            success=False,
+            error=(
+                f"No events found for request #{request_id}. "
+                "Events are created when a request is planned or sent."
+            ),
         )
 
     last_event = events[-1]

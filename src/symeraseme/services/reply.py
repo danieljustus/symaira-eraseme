@@ -46,21 +46,26 @@ def handle_classify_reply(
     yes: bool = False,
 ) -> CliResult:
     _ensure_llm_consent(yes=yes)
-    """classify reply."""
     init_db()
 
     req = get_removal_request(request_id)
     if req is None:
-        render_error(
-            f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests."
+        return CliResult(
+            success=False,
+            error=(
+                f"Request #{request_id} not found. "
+                "Run 'symeraseme requests list' to see available requests."
+            ),
         )
 
     events = get_events(request_id)
     if not events:
-        render_error(
-            f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent."
+        return CliResult(
+            success=False,
+            error=(
+                f"No events found for request #{request_id}. "
+                "Events are created when a request is planned or sent."
+            ),
         )
 
     last_event = events[-1]
@@ -87,9 +92,12 @@ def handle_classify_reply(
     ).fetchone()
 
     if reply is None:
-        render_error(
-            f"No unclassified inbox reply found for request #{request_id}. "
-            "Run 'symeraseme poll-inbox' to fetch new replies first."
+        return CliResult(
+            success=False,
+            error=(
+                f"No unclassified inbox reply found for request #{request_id}. "
+                "Run 'symeraseme poll-inbox' to fetch new replies first."
+            ),
         )
 
     from symeraseme.llm.factory import create_llm_client
@@ -97,9 +105,12 @@ def handle_classify_reply(
     client = create_llm_client(provider=provider, model=model)
     classifier = ReplyClassifier(client=client)
     if not classifier.is_available():
-        render_error(
-            "LLM provider not available. Check SYMERASEME_LLM_PROVIDER"
-            " and provider-specific API key."
+        return CliResult(
+            success=False,
+            error=(
+                "LLM provider not available. Check SYMERASEME_LLM_PROVIDER"
+                " and provider-specific API key."
+            ),
         )
 
     result = classifier.classify(
@@ -176,21 +187,26 @@ def handle_generate_rebuttal(
     yes: bool = False,
 ) -> CliResult:
     _ensure_llm_consent(yes=yes)
-    """generate rebuttal."""
     init_db()
 
     req = get_removal_request(request_id)
     if req is None:
-        render_error(
-            f"Request #{request_id} not found. "
-            "Run 'symeraseme requests list' to see available requests."
+        return CliResult(
+            success=False,
+            error=(
+                f"Request #{request_id} not found. "
+                "Run 'symeraseme requests list' to see available requests."
+            ),
         )
 
     events = get_events(request_id)
     if not events:
-        render_error(
-            f"No events found for request #{request_id}. "
-            "Events are created when a request is planned or sent."
+        return CliResult(
+            success=False,
+            error=(
+                f"No events found for request #{request_id}. "
+                "Events are created when a request is planned or sent."
+            ),
         )
 
     last_event = events[-1]
