@@ -3,7 +3,6 @@ from __future__ import annotations
 import typer
 
 from symeraseme.adapters.web.captcha_solver import CaptchaError, create_solver
-from symeraseme.cli.console import render_error
 from symeraseme.core.result_types import CliResult
 
 
@@ -34,7 +33,7 @@ def handle_solve_captcha(
     typer.echo(f"Solving captcha via {provider}...")
 
     if site_key is None or page_url is None:
-        render_error("site_key and page_url are required")
+        return CliResult(success=False, error="site_key and page_url are required")
 
     try:
         solver = create_solver(provider, api_key=api_key)
@@ -43,10 +42,13 @@ def handle_solve_captcha(
             page_url=page_url,
         )
     except CaptchaError as e:
-        render_error(
-            f"Captcha solving failed: {e}. "
-            "Check your API key, site_key, and page_url. "
-            "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var."
+        return CliResult(
+            success=False,
+            error=(
+                f"Captcha solving failed: {e}. "
+                "Check your API key, site_key, and page_url. "
+                "Set CAPSOLVER_API_KEY or TWOCAPTCHA_API_KEY env var."
+            ),
         )
 
     return CliResult(

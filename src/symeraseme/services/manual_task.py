@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from symeraseme.cli.console import render_error
 from symeraseme.core.db import init_db
 from symeraseme.core.manual_fallback import get_manual_task, list_manual_tasks, resume_from_manual
 from symeraseme.core.result_types import CliResult
@@ -33,9 +32,12 @@ def handle_manual_tasks_show(task_id: int) -> CliResult:
     task = get_manual_task(task_id)
 
     if task is None:
-        render_error(
-            f"Manual task #{task_id} not found. "
-            "Run 'symeraseme manual-tasks list' to see available tasks."
+        return CliResult(
+            success=False,
+            error=(
+                f"Manual task #{task_id} not found. "
+                "Run 'symeraseme manual-tasks list' to see available tasks."
+            ),
         )
 
     lines = [f"Manual task #{task_id}:"]
@@ -66,9 +68,12 @@ def handle_manual_tasks_complete(
     result = resume_from_manual(task_id, notes=notes, completed=True)
 
     if result is None:
-        render_error(
-            f"Manual task #{task_id} not found. "
-            "Run 'symeraseme manual-tasks list' to see available tasks."
+        return CliResult(
+            success=False,
+            error=(
+                f"Manual task #{task_id} not found. "
+                "Run 'symeraseme manual-tasks list' to see available tasks."
+            ),
         )
 
     return CliResult(

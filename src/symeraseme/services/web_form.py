@@ -10,7 +10,6 @@ from symeraseme.adapters.web.playwright_runner import (
 from symeraseme.adapters.web.playwright_runner import (
     run_web_form as _run_form,
 )
-from symeraseme.cli.console import render_error
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.core.result_types import CliResult
@@ -131,16 +130,22 @@ async def handle_run_web_form(
     try:
         broker = load_broker(broker_id)
     except (FileNotFoundError, ValueError, RuntimeError, OSError) as e:
-        render_error(
-            f"Broker '{broker_id}' not found: {e}. "
-            "Run 'symeraseme brokers list' to see available brokers."
+        return CliResult(
+            success=False,
+            error=(
+                f"Broker '{broker_id}' not found: {e}. "
+                "Run 'symeraseme brokers list' to see available brokers."
+            ),
         )
 
     web_forms = [c for c in broker.opt_out if c.type == "web_form"]
     if not web_forms:
-        render_error(
-            f"Broker '{broker_id}' has no web form opt-out channel. "
-            "Check 'symeraseme brokers show {broker_id}' for available channels (email, etc.)."
+        return CliResult(
+            success=False,
+            error=(
+                f"Broker '{broker_id}' has no web form opt-out channel. "
+                "Check 'symeraseme brokers show {broker_id}' for available channels (email, etc.)."
+            ),
         )
 
     form = cast(WebFormOptOut, web_forms[0])
@@ -203,9 +208,12 @@ async def handle_run_web_form(
             identity_fields=identity_fields,
         )
     except PlaywrightRunnerError as e:
-        render_error(
-            f"Playwright error: {e}. "
-            "Install with: uv pip install playwright && playwright install chromium"
+        return CliResult(
+            success=False,
+            error=(
+                f"Playwright error: {e}. "
+                "Install with: uv pip install playwright && playwright install chromium"
+            ),
         )
 
     task = None

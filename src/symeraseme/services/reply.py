@@ -5,7 +5,6 @@ import logging
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
-from symeraseme.cli.console import render_error
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
@@ -17,12 +16,12 @@ from symeraseme.registry.loader import load_broker
 logger = logging.getLogger(__name__)
 
 
-def _ensure_llm_consent(yes: bool = False) -> None:
+def _ensure_llm_consent(yes: bool = False) -> CliResult | None:
     if llm_consent_granted():
-        return
+        return None
     if yes:
         grant_llm_consent()
-        return
+        return None
     import typer
 
     typer.echo(
@@ -33,9 +32,13 @@ def _ensure_llm_consent(yes: bool = False) -> None:
     )
     granted = typer.confirm("Do you consent to sending this data to the LLM provider?")
     if not granted:
-        render_error("LLM consent denied. Use --yes to grant non-interactively.")
+        return CliResult(
+            success=False,
+            error="LLM consent denied. Use --yes to grant non-interactively.",
+        )
     grant_llm_consent()
     typer.echo("LLM consent granted. This will not be asked again.")
+    return None
 
 
 def handle_classify_reply(
@@ -45,7 +48,9 @@ def handle_classify_reply(
     save: bool = True,
     yes: bool = False,
 ) -> CliResult:
-    _ensure_llm_consent(yes=yes)
+    consent = _ensure_llm_consent(yes=yes)
+    if consent is not None:
+        return consent
     init_db()
 
     req = get_removal_request(request_id)
@@ -186,7 +191,9 @@ def handle_generate_rebuttal(
     save: bool = True,
     yes: bool = False,
 ) -> CliResult:
-    _ensure_llm_consent(yes=yes)
+    consent = _ensure_llm_consent(yes=yes)
+    if consent is not None:
+        return consent
     init_db()
 
     req = get_removal_request(request_id)
