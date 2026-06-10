@@ -246,7 +246,11 @@ def _build_broker_id_index(registry_dir: Path) -> dict[str, Path]:
         stem = yml.stem
         if not stem or stem.startswith("-") or yml.name.startswith("_"):
             continue
-        index[stem] = yml
+        meta = _meta_only_parse(yml)
+        if meta and "id" in meta:
+            index[meta["id"]] = yml
+        else:
+            index[stem] = yml
     return index
 
 
