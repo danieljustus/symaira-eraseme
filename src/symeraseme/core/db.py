@@ -30,6 +30,7 @@ import time
 from base64 import urlsafe_b64encode
 from contextlib import contextmanager, suppress
 from pathlib import Path
+from typing import IO
 
 from cryptography.fernet import Fernet
 
@@ -62,7 +63,7 @@ _DB_LOCK_RETRY_ATTEMPTS = 3
 _DB_LOCK_RETRY_DELAY = 1.0
 
 _local = threading.local()
-_db_lock_file: object | None = None
+_db_lock_file: IO | None = None
 
 
 def _get_secure_temp_dir() -> Path:
