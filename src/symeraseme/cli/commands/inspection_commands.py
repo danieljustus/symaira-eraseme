@@ -195,9 +195,7 @@ def _check_db_encryption() -> tuple[bool, str]:
         return True, "No database file"
 
     raw = db_file.read_bytes()
-    is_encrypted = bool(raw) and (
-        raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2)
-    )
+    is_encrypted = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
 
     if encrypt_enabled and not is_encrypted:
         return False, "Encryption enabled but DB file is plaintext (will encrypt on close)"
