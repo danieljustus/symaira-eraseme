@@ -86,13 +86,22 @@ def _print_version(value: bool) -> None:
 def main(
     ctx: typer.Context,
     output: OutputFormat = OutputFormat.text,
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug-level logging"),
+    verbose: int = typer.Option(
+        0, "--verbose", "-v",
+        help="Increase verbosity (-v for INFO, -vv for DEBUG)",
+        count=True,
+    ),
     version: bool = typer.Option(
         False, "--version", "-V", help="Show version and exit",
         is_eager=True, callback=_print_version,
     ),
 ) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
+    if verbose >= 2:
+        level = logging.DEBUG
+    elif verbose == 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
     logging.basicConfig(
         level=level,
         format="%(levelname)s:%(name)s:%(message)s",
