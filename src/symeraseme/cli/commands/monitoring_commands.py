@@ -46,7 +46,7 @@ def poll_inbox(
     retries: int = typer.Option(
         3,
         "--retries",
-        help="Number of retries on transient failures",
+        help="Number of retries on unhandled exceptions (TimeoutError, OSError)",
     ),
     retry_delay: int = typer.Option(
         5,
