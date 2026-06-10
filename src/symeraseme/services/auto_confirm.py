@@ -123,5 +123,4 @@ def handle_auto_confirm(
     )
     if result.clicked_url:
         msg += f"\n  URL: {result.clicked_url}"
-    data["message"] = msg
     return CliResult(success=False, data=data, error=msg)

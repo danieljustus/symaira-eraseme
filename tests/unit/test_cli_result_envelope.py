@@ -42,6 +42,16 @@ def test_envelope_shape_on_error() -> None:
     assert "message" not in parsed or parsed.get("message") == ""
 
 
+def test_envelope_strips_message_when_error_set() -> None:
+    r = CliResult(
+        success=False,
+        data={"message": "duplicate", "request_id": 5},
+        error="duplicate",
+    )
+    parsed = json.loads(r.to_json())
+    assert parsed == {"success": False, "error": "duplicate", "request_id": 5}
+
+
 def test_grant_revoke_nonexistent_returns_json_error_envelope(monkeypatch, tmp_path) -> None:
     _setup(monkeypatch, tmp_path)
     result = runner.invoke(

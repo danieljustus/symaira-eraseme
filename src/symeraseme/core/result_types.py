@@ -64,7 +64,10 @@ class CliResult:
         else:
             payload["message"] = self.message
         if isinstance(self.data, dict):
-            payload.update(self.data)
+            data_to_spread = self.data
+            if self.error and "message" in data_to_spread:
+                data_to_spread = {k: v for k, v in data_to_spread.items() if k != "message"}
+            payload.update(data_to_spread)
         elif self.data:
             payload["data"] = self.data
         return json.dumps(payload, indent=2, default=_json_default)
