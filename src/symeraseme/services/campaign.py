@@ -94,7 +94,7 @@ def handle_execute(
                 "Himalaya backend requires --account. "
                 "Use --account <name> or switch to SMTP with --backend smtp."
             )
-            return CliResult(success=False, data={"message": msg})
+            return CliResult(success=False, error=msg)
         if not dry_run:
             from symeraseme.adapters.email.himalaya import himalaya_available
 
@@ -104,7 +104,7 @@ def handle_execute(
                     "Install it via 'cargo install himalaya' "
                     "or 'brew install himalaya', or use --backend smtp."
                 )
-                return CliResult(success=False, data={"message": msg})
+                return CliResult(success=False, error=msg)
         logger.info("Using Himalaya backend (account=%s)", account)
     elif backend == "smtp":
         if not dry_run:
@@ -116,14 +116,14 @@ def handle_execute(
                     "SMTP backend requires SYMERASEME_SMTP_FROM "
                     "to be set. Configure it in your environment or .env file."
                 )
-                return CliResult(success=False, data={"message": msg})
+                return CliResult(success=False, error=msg)
             logger.debug("Using SMTP backend (host=%s:%s)", smtp_config.host, smtp_config.port)
         else:
             logger.info("Using SMTP backend (dry-run)")
     else:
         return CliResult(
             success=False,
-            data={"message": f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'."},
+            error=f"Unknown backend '{backend}'. Use 'smtp' or 'himalaya'.",
         )
 
     if email_sender is None and backend == "himalaya":
