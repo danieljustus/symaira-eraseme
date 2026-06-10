@@ -49,6 +49,7 @@ def _load_broker_schema() -> dict:
 
 
 _BROKER_SCHEMA: dict | None = None
+_BROKER_VALIDATOR: jsonschema.Draft202012Validator | None = None
 
 
 def broker_schema() -> dict:
@@ -56,6 +57,13 @@ def broker_schema() -> dict:
     if _BROKER_SCHEMA is None:
         _BROKER_SCHEMA = _load_broker_schema()
     return _BROKER_SCHEMA
+
+
+def _broker_validator() -> jsonschema.Draft202012Validator:
+    global _BROKER_VALIDATOR
+    if _BROKER_VALIDATOR is None:
+        _BROKER_VALIDATOR = jsonschema.Draft202012Validator(broker_schema())
+    return _BROKER_VALIDATOR
 
 
 _BROKER_FILE_CACHE: dict[tuple[str, float], Broker] = {}
@@ -69,7 +77,7 @@ def load_broker_yaml(path: str | Path) -> Broker:
         return _BROKER_FILE_CACHE[cache_key]
     with open(path) as f:
         data = yaml.safe_load(f)
-    jsonschema.validate(data, broker_schema())
+    _broker_validator().validate(data)
     broker = Broker.model_validate(data)
     _BROKER_FILE_CACHE[cache_key] = broker
     return broker
@@ -98,12 +106,13 @@ def clear_registry_cache() -> None:
     Call this after a registry sync so that subsequent operations
     see the updated data without requiring a process restart.
     """
-    global _BROKER_ID_INDEX, _BROKER_SCHEMA
+    global _BROKER_ID_INDEX, _BROKER_SCHEMA, _BROKER_VALIDATOR
     _BROKER_CACHE.clear()
     _BROKER_FILE_CACHE.clear()
     _BROKER_ID_INDEX = {}
     _SKIPPED_COUNT.clear()
     _BROKER_SCHEMA = None
+    _BROKER_VALIDATOR = None
     import contextlib
 
     _cache_dir = Path.home() / ".cache" / "symeraseme"
