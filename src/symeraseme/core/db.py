@@ -121,13 +121,11 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
     attempts = _DB_LOCK_RETRY_ATTEMPTS if retry else 1
     for attempt in range(attempts):
         try:
-            lock_file = open(lock_path, "w")
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            _db_lock_file = lock_file
-            return
+            with open(lock_path, "w") as lock_file:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _db_lock_file = lock_file
+                return
         except OSError:
-            if lock_file is not None:
-                lock_file.close()
             if attempt < attempts - 1:
                 time.sleep(_DB_LOCK_RETRY_DELAY)
             else:
@@ -166,8 +164,8 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
         return None
 
     if version >= 3 and salt:
-        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
         from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -191,8 +189,17 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
 def _is_encrypted(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
-    head = path.read_bytes()[: max(len(_ENC_HEADER_V1), len(_ENC_MAGIC_V2) + _ENC_SALT_LEN, len(_ENC_MAGIC_V3) + _ENC_SALT_LEN)]
-    return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2) or head.startswith(_ENC_MAGIC_V3)
+    max_header = max(
+        len(_ENC_HEADER_V1),
+        len(_ENC_MAGIC_V2) + _ENC_SALT_LEN,
+        len(_ENC_MAGIC_V3) + _ENC_SALT_LEN,
+    )
+    head = path.read_bytes()[:max_header]
+    return (
+        head.startswith(_ENC_HEADER_V1)
+        or head.startswith(_ENC_MAGIC_V2)
+        or head.startswith(_ENC_MAGIC_V3)
+    )
 
 
 def _migrate_v1_to_v2(path: Path) -> None:

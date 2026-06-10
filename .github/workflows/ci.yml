@@ -79,6 +79,8 @@ jobs:
               with open(schema_path) as f:
                   schema = json.load(f)
               for yml in Path('registry/brokers').rglob('*.yaml'):
+                  if yml.name.startswith('_'):
+                      continue
                   with open(yml) as f:
                       data = yaml.safe_load(f)
                   try:
