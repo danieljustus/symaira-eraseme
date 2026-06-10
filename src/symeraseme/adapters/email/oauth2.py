@@ -57,7 +57,7 @@ class OAuth2StateError(OAuth2Error):
 
 def _get_state_path() -> Path:
     path = Path(os.path.expanduser(_STATE_FILE))
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     return path
 
 
@@ -68,7 +68,8 @@ def _store_oauth2_state(state: str, provider: str) -> None:
         with path.open() as f:
             existing = json.load(f)
     existing[state] = {"provider": provider, "expires_at": time.time() + _STATE_TTL}
-    with path.open("w") as f:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with open(fd, "w", encoding="utf-8") as f:
         json.dump(existing, f)
 
 
