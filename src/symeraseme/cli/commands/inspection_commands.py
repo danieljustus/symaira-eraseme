@@ -188,13 +188,23 @@ def _check_db_encryption() -> tuple[bool, str]:
         "true",
         "yes",
     )
-    db_file = _db_path()
+    try:
+        db_file = _db_path()
+    except (OSError, PermissionError):
+        if encrypt_enabled:
+            return True, "Encryption enabled (DB path inaccessible)"
+        return True, "DB path inaccessible"
     if not db_file.exists():
         if encrypt_enabled:
             return True, "Encryption enabled (new DBs will be encrypted)"
         return True, "No database file"
 
-    raw = db_file.read_bytes()
+    try:
+        raw = db_file.read_bytes()
+    except (OSError, PermissionError):
+        if encrypt_enabled:
+            return True, "Encryption enabled (DB file unreadable)"
+        return True, "DB file unreadable"
     is_encrypted = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
 
     if encrypt_enabled and not is_encrypted:
