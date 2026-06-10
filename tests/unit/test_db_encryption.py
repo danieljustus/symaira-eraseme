@@ -266,6 +266,37 @@ class TestBackwardCompatibility:
         close_connection()
 
 
+class TestPlaintextToEncrypted:
+    """Opening a plaintext DB with encryption enabled encrypts it on close."""
+
+    def test_plaintext_db_encrypted_on_close(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
+        monkeypatch.delenv("SYMERASEME_ENCRYPT_DB", raising=False)
+
+        db_file = tmp_path / "test.db"
+        init_db(str(db_file))
+        close_connection()
+
+        raw_before = db_file.read_bytes()
+        assert not raw_before.startswith(b"SYMERASEME_ENC")
+
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        conn = get_connection(str(db_file))
+        assert conn is not None
+        close_connection()
+
+        from symeraseme.core.db import _ENC_MAGIC_V2
+
+        raw_after = db_file.read_bytes()
+        assert raw_after.startswith(_ENC_MAGIC_V2), (
+            f"Plaintext DB should be encrypted after close, got header: {raw_after[:20]!r}"
+        )
+
+
 class TestV1Migration:
     """V1-format DB files must be transparently migrated to V2."""
 

@@ -291,6 +291,9 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
                 if raw.startswith(_ENC_HEADER_V1):
                     _migrate_v1_to_v2(db_file)
                 db_file = _decrypt_to_temp(db_file)
+            else:
+                # Existing plaintext DB with encryption enabled — register for encrypt-on-close
+                _DB_TEMP[db_file.resolve()] = db_file
         elif should_encrypt and not db_file.exists():
             _DB_TEMP[db_file.resolve()] = db_file
 
