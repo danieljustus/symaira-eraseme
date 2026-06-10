@@ -216,8 +216,17 @@ def _load_persistent_cache(
 
 
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
-    dir_stat = registry_dir.stat()
-    key_data = f"{registry_dir}:{dir_stat.st_mtime}:{dir_stat.st_size}"
+    max_mtime = 0.0
+    file_count = 0
+    for yml in registry_dir.rglob("*.yaml"):
+        try:
+            stat = yml.stat()
+            if stat.st_mtime > max_mtime:
+                max_mtime = stat.st_mtime
+            file_count += 1
+        except OSError:
+            continue
+    key_data = f"{registry_dir}:{max_mtime}:{file_count}"
     digest = hashlib.sha256(key_data.encode()).hexdigest()
     return (str(registry_dir), digest)
 
