@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 SERVICE_NAME = "symeraseme-oauth2"
 _STATE_FILE = "~/.local/share/symeraseme/oauth2_state.json"
 _STATE_TTL = 300  # 5 minutes in seconds
+_OAUTH_SERVER_DEADLINE = 300  # 5 minutes total timeout for browser flow
 
 PROVIDER_CONFIGS: dict[str, dict[str, str]] = {
     "gmail": {
@@ -310,10 +311,18 @@ def run_local_server(port: int | None = None) -> tuple[str, str]:
     CallbackHandler.auth_code = ""
     CallbackHandler.auth_error = ""
     server.timeout = 120
+    deadline = time.monotonic() + _OAUTH_SERVER_DEADLINE
     while not CallbackHandler.auth_code:
         if CallbackHandler.auth_error:
             server.server_close()
             raise OAuth2StateError(CallbackHandler.auth_error)
+        if time.monotonic() > deadline:
+            server.server_close()
+            msg = (
+                "Authorization timed out — re-run 'accounts add' and complete "
+                "the browser flow within 5 minutes."
+            )
+            raise OAuth2Error(msg)
         server.handle_request()
     server.server_close()
     return CallbackHandler.auth_code, redirect_uri
