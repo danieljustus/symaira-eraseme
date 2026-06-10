@@ -123,7 +123,7 @@ class TestVerboseLogging:
 
         self._reset_logging()
         runner = CliRunner()
-        result = runner.invoke(app, ["--verbose", "version"])
+        result = runner.invoke(app, ["-vv", "version"])
         assert result.exit_code == 0
         symeraseme_logger = logging.getLogger("symeraseme")
         assert symeraseme_logger.getEffectiveLevel() == logging.DEBUG, (
@@ -133,7 +133,7 @@ class TestVerboseLogging:
         library_logger = logging.getLogger("urllib3")
         assert library_logger.level != logging.DEBUG
 
-    def test_no_verbose_uses_info(self):
+    def test_no_verbose_uses_warning(self):
         import logging
 
         self._reset_logging()
@@ -141,6 +141,7 @@ class TestVerboseLogging:
         result = runner.invoke(app, ["version"])
         assert result.exit_code == 0
         assert logging.getLogger("symeraseme").level != logging.DEBUG
+        assert logging.getLogger("symeraseme").level != logging.INFO
 
 
 class TestJsonOutput:

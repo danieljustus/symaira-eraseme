@@ -47,6 +47,7 @@ _PBKDF2_ITERATIONS = 600_000
 _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
+_DB_INITIAL_DATA_VERSION: dict[Path, int] = {}
 _FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
 _STALE_SCAVENGE_AGE = 300
 
@@ -180,6 +181,13 @@ def _decrypt_to_temp(path: Path) -> Path:
         tmp_path = Path(tmp.name)
     os.chmod(tmp_path, 0o600)
     _DB_TEMP[path.resolve()] = tmp_path
+    try:
+        conn = sqlite3.connect(str(tmp_path))
+        row = conn.execute("PRAGMA data_version").fetchone()
+        _DB_INITIAL_DATA_VERSION[tmp_path] = row[0] if row else 0
+        conn.close()
+    except OSError:
+        _DB_INITIAL_DATA_VERSION[tmp_path] = 0
     return tmp_path
 
 
@@ -205,28 +213,42 @@ def _checkpoint_and_cleanup_wal(db_path: Path) -> None:
                 logger.warning("Failed to remove WAL sibling %s: %s", sibling, exc)
 
 
+def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
+    try:
+        if tmp.exists():
+            try:
+                conn = sqlite3.connect(str(tmp))
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                current_version = conn.execute("PRAGMA data_version").fetchone()[0]
+                conn.close()
+            except OSError:
+                current_version = None
+            initial_version = _DB_INITIAL_DATA_VERSION.get(tmp)
+            db_changed = (
+                current_version is None
+                or initial_version is None
+                or current_version != initial_version
+            )
+            if not db_changed:
+                logger.debug("DB unchanged, skipping re-encryption: %s", orig)
+            else:
+                _encrypt_file(tmp, orig)
+    except (OSError, RuntimeError, ValueError) as exc:
+        logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+    finally:
+        _DB_INITIAL_DATA_VERSION.pop(tmp, None)
+        try:
+            if tmp.exists() and tmp != orig:
+                tmp.unlink(missing_ok=True)
+            _checkpoint_and_cleanup_wal(tmp)
+        except OSError as exc:
+            logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+
+
 @atexit.register
 def _cleanup_temp_files() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
-        try:
-            if tmp.exists():
-                # Checkpoint WAL before re-encrypting so the DB file is complete.
-                try:
-                    conn = sqlite3.connect(str(tmp))
-                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    conn.close()
-                except OSError:
-                    pass
-                _encrypt_file(tmp, orig)
-        except (OSError, RuntimeError, ValueError) as exc:
-            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
-        finally:
-            try:
-                if tmp.exists():
-                    tmp.unlink(missing_ok=True)
-                _checkpoint_and_cleanup_wal(tmp)
-            except OSError as exc:
-                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+        _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
 
 
@@ -287,24 +309,7 @@ def close_connection() -> None:
         _local.conn = None
 
     for orig, tmp in list(_DB_TEMP.items()):
-        try:
-            if tmp.exists():
-                try:
-                    conn = sqlite3.connect(str(tmp))
-                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    conn.close()
-                except OSError:
-                    pass
-                _encrypt_file(tmp, orig)
-        except (OSError, RuntimeError, ValueError) as exc:
-            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
-        finally:
-            try:
-                if tmp.exists() and tmp != orig:
-                    tmp.unlink(missing_ok=True)
-                _checkpoint_and_cleanup_wal(tmp)
-            except OSError as exc:
-                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+        _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
 
     if hasattr(_local, "db_path"):

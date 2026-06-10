@@ -119,12 +119,19 @@ def llm_consent_granted() -> bool:
         return True
     if not _LLM_CONSENT_FILE.exists():
         return False
+    # Legacy empty touch file (st_size == 0) — treat as granted for backward compatibility
+    if _LLM_CONSENT_FILE.stat().st_size == 0:
+        return True
     try:
         data = json.loads(_LLM_CONSENT_FILE.read_text(encoding="utf-8"))
         return bool(data.get("granted", False))
-    except (json.JSONDecodeError, OSError):
-        # Legacy empty touch file — treat as granted for backward compatibility
-        return True
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning(
+            "Cannot read LLM consent file %s (%s) — denying consent; re-run 'grant llm-consent'",
+            _LLM_CONSENT_FILE,
+            exc,
+        )
+        return False
 
 
 def grant_llm_consent() -> None:

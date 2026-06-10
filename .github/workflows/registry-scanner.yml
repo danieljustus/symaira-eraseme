@@ -23,12 +23,12 @@ jobs:
       pull-requests: write
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
       with:
         fetch-depth: 0
     
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.11'
     
@@ -65,7 +65,7 @@ jobs:
     
     - name: Create Pull Request
       if: steps.scan.outputs.has_changes == 'true' && github.event.inputs.create_pr != 'false'
-      uses: peter-evans/create-pull-request@v8
+      uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         branch: auto/registry-update-${{ github.run_number }}
@@ -101,7 +101,7 @@ jobs:
     
     - name: Create Issue if scan failed
       if: failure()
-      uses: actions/github-script@v9
+      uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
       with:
         script: |
           github.rest.issues.create({

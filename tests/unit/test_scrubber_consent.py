@@ -74,3 +74,25 @@ class TestLlmConsent:
         assert not llm_consent_granted()
         revoke_llm_consent()
         assert not llm_consent_granted()
+
+    def test_corrupt_json_file_denies_consent(self) -> None:
+        from symeraseme.adapters.triage.scrubber import _LLM_CONSENT_FILE
+
+        _LLM_CONSENT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _LLM_CONSENT_FILE.write_text("{invalid json", encoding="utf-8")
+        assert not llm_consent_granted()
+
+    def test_unreadable_file_denies_consent(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from symeraseme.adapters.triage.scrubber import _LLM_CONSENT_FILE
+
+        _LLM_CONSENT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _LLM_CONSENT_FILE.write_text('{"granted": true}', encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def raise_os_error(self: Path, *args, **kwargs):
+            if self == _LLM_CONSENT_FILE:
+                raise OSError("Permission denied")
+            return original_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", raise_os_error)
+        assert not llm_consent_granted()
