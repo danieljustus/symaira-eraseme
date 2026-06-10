@@ -37,6 +37,13 @@ from symeraseme.core.config import get_config
 
 logger = logging.getLogger(__name__)
 
+try:
+    import fcntl
+
+    _HAVE_FCNTL = True
+except ImportError:
+    _HAVE_FCNTL = False
+
 DEFAULT_DB_DIR = "~/.local/share/symeraseme"
 DEFAULT_DB_NAME = "symeraseme.db"
 
@@ -50,8 +57,11 @@ _DB_TEMP: dict[Path, Path] = {}
 _DB_INITIAL_DATA_VERSION: dict[Path, int] = {}
 _FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
 _STALE_SCAVENGE_AGE = 300
+_DB_LOCK_RETRY_ATTEMPTS = 3
+_DB_LOCK_RETRY_DELAY = 1.0
 
 _local = threading.local()
+_db_lock_file: object | None = None
 
 
 def _get_secure_temp_dir() -> Path:
@@ -100,6 +110,45 @@ def _scavenge_stale_temp_dbs() -> None:
 def _db_encryption_enabled() -> bool:
     val = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower()
     return val in ("1", "true", "yes")
+
+
+def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
+    global _db_lock_file
+    if not _HAVE_FCNTL or not _db_encryption_enabled():
+        return
+    lock_path = db_path.parent / f"{db_path.name}.lock"
+    attempts = _DB_LOCK_RETRY_ATTEMPTS if retry else 1
+    for attempt in range(attempts):
+        try:
+            lock_file = open(lock_path, "w")
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _db_lock_file = lock_file
+            return
+        except OSError:
+            if lock_file is not None:
+                lock_file.close()
+            if attempt < attempts - 1:
+                time.sleep(_DB_LOCK_RETRY_DELAY)
+            else:
+                msg = (
+                    "Another symaira-eraseme process is using the encrypted database. "
+                    "Wait for it to finish or remove the stale lock file: "
+                    f"{lock_path}"
+                )
+                raise RuntimeError(msg) from None
+
+
+def _release_db_lock() -> None:
+    global _db_lock_file
+    if _db_lock_file is None:
+        return
+    try:
+        fcntl.flock(_db_lock_file, fcntl.LOCK_UN)
+        _db_lock_file.close()
+    except OSError:
+        pass
+    finally:
+        _db_lock_file = None
 
 
 def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
@@ -250,6 +299,7 @@ def _cleanup_temp_files() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
         _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
+    _release_db_lock()
 
 
 def _handle_sigterm(signum: int, frame: object) -> None:
@@ -284,6 +334,9 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
 
         should_encrypt = _db_encryption_enabled()
 
+        if should_encrypt:
+            _acquire_db_lock(db_file, retry=True)
+
         if should_encrypt and db_file.exists():
             raw = db_file.read_bytes()
             is_enc = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
@@ -314,6 +367,8 @@ def close_connection() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
         _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
+
+    _release_db_lock()
 
     if hasattr(_local, "db_path"):
         _local.db_path = None
