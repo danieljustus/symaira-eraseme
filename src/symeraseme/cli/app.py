@@ -87,13 +87,19 @@ def main(
     ctx: typer.Context,
     output: OutputFormat = OutputFormat.text,
     verbose: int = typer.Option(
-        0, "--verbose", "-v",
+        0,
+        "--verbose",
+        "-v",
         help="Increase verbosity (-v for INFO, -vv for DEBUG)",
         count=True,
     ),
     version: bool = typer.Option(
-        False, "--version", "-V", help="Show version and exit",
-        is_eager=True, callback=_print_version,
+        False,
+        "--version",
+        "-V",
+        help="Show version and exit",
+        is_eager=True,
+        callback=_print_version,
     ),
 ) -> None:
     if verbose >= 2:
