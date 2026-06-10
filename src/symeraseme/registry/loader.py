@@ -567,15 +567,20 @@ def _filter_brokers(
 ) -> list[Broker]:
     filtered: list[Broker] = []
     for broker in brokers:
-        if not include_disabled and broker.disabled:
-            continue
-        if jurisdiction and jurisdiction not in broker.jurisdictions:
-            continue
-        if law and law not in [law_item.value for law_item in broker.laws]:
-            continue
-        if priority and broker.priority.value != priority:
-            continue
-        if category and broker.category.value != category:
-            continue
-        filtered.append(broker)
+        meta = {
+            "jurisdictions": broker.jurisdictions,
+            "laws": [law_item.value for law_item in broker.laws],
+            "priority": broker.priority.value,
+            "category": broker.category.value,
+            "disabled": broker.disabled,
+        }
+        if _meta_matches_filters(
+            meta,
+            jurisdiction=jurisdiction,
+            law=law,
+            priority=priority,
+            category=category,
+            include_disabled=include_disabled,
+        ):
+            filtered.append(broker)
     return filtered
