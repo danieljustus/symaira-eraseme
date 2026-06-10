@@ -6,6 +6,7 @@ import logging
 
 import typer
 
+from symeraseme import __version__
 from symeraseme.cli.commands.account_commands import (
     accounts_app,
     grant,
@@ -75,11 +76,21 @@ app.add_typer(brokers_app, rich_help_panel="Inspection & Diagnostics")
 app.add_typer(registry_app, rich_help_panel="Maintenance")
 
 
+def _print_version(value: bool) -> None:
+    if value:
+        print(f"Symaira EraseMe v{__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
     output: OutputFormat = OutputFormat.text,
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug-level logging"),
+    version: bool = typer.Option(
+        False, "--version", "-V", help="Show version and exit",
+        is_eager=True, callback=_print_version,
+    ),
 ) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
