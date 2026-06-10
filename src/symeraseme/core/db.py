@@ -205,28 +205,31 @@ def _checkpoint_and_cleanup_wal(db_path: Path) -> None:
                 logger.warning("Failed to remove WAL sibling %s: %s", sibling, exc)
 
 
+def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
+    try:
+        if tmp.exists():
+            try:
+                conn = sqlite3.connect(str(tmp))
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                conn.close()
+            except OSError:
+                pass
+            _encrypt_file(tmp, orig)
+    except (OSError, RuntimeError, ValueError) as exc:
+        logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
+    finally:
+        try:
+            if tmp.exists() and tmp != orig:
+                tmp.unlink(missing_ok=True)
+            _checkpoint_and_cleanup_wal(tmp)
+        except OSError as exc:
+            logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+
+
 @atexit.register
 def _cleanup_temp_files() -> None:
     for orig, tmp in list(_DB_TEMP.items()):
-        try:
-            if tmp.exists():
-                # Checkpoint WAL before re-encrypting so the DB file is complete.
-                try:
-                    conn = sqlite3.connect(str(tmp))
-                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    conn.close()
-                except OSError:
-                    pass
-                _encrypt_file(tmp, orig)
-        except (OSError, RuntimeError, ValueError) as exc:
-            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
-        finally:
-            try:
-                if tmp.exists():
-                    tmp.unlink(missing_ok=True)
-                _checkpoint_and_cleanup_wal(tmp)
-            except OSError as exc:
-                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+        _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
 
 
@@ -287,24 +290,7 @@ def close_connection() -> None:
         _local.conn = None
 
     for orig, tmp in list(_DB_TEMP.items()):
-        try:
-            if tmp.exists():
-                try:
-                    conn = sqlite3.connect(str(tmp))
-                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    conn.close()
-                except OSError:
-                    pass
-                _encrypt_file(tmp, orig)
-        except (OSError, RuntimeError, ValueError) as exc:
-            logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
-        finally:
-            try:
-                if tmp.exists() and tmp != orig:
-                    tmp.unlink(missing_ok=True)
-                _checkpoint_and_cleanup_wal(tmp)
-            except OSError as exc:
-                logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+        _reencrypt_and_remove_temp(orig, tmp)
     _DB_TEMP.clear()
 
     if hasattr(_local, "db_path"):
