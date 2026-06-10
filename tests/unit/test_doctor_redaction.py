@@ -58,3 +58,33 @@ class TestDoctorJsonRedaction:
         env_detail = data["checks"]["Environment"]["detail"]
         assert "credentials: configured" in env_detail
         assert "secret" not in env_detail
+
+    def test_pattern_based_sensitive_vars_redacted(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("SMTP_PASSWORD", "smtp_secret")
+        monkeypatch.setenv("OAUTH_CLIENT_SECRET", "oauth_secret")
+        monkeypatch.setenv("GITHUB_TOKEN", "gh_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic_key")
+        monkeypatch.setenv("SYMERASEME_LLM_PROVIDER", "openai")
+
+        result = runner.invoke(app, ["--output", "json", "doctor"])
+        assert result.exit_code == 0
+
+        output = result.output
+        assert "SMTP_PASSWORD" not in output
+        assert "OAUTH_CLIENT_SECRET" not in output
+        assert "GITHUB_TOKEN" not in output
+        assert "ANTHROPIC_API_KEY" not in output
+        assert "smtp_secret" not in output
+        assert "oauth_secret" not in output
+        assert "gh_token" not in output
+        assert "anthropic_key" not in output
+
+    def test_non_sensitive_vars_not_redacted(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("SYMERASEME_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("HOME", "/Users/test")
+
+        result = runner.invoke(app, ["--output", "json", "doctor"])
+        assert result.exit_code == 0
+
+        output = result.output
+        assert "LLM provider" in output

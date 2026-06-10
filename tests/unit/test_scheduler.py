@@ -14,6 +14,7 @@ from symeraseme.core.scheduler import (
     get_schedule_status,
     write_scheduler_files,
 )
+from symeraseme.core.scheduler.wrapper import _poll_wrapper_script
 
 
 class TestDetectPlatform:
@@ -263,3 +264,29 @@ class TestSchedulerConfig:
         assert cfg.tick_time == time(6, 30)
         assert cfg.poll_times == [time(9, 0), time(17, 0)]
         assert cfg.rescan_interval_months == 6
+
+
+class TestPollWrapperScript:
+    def test_venv_path_is_shell_quoted(self):
+        config = SchedulerConfig(
+            platform="cron",
+            poll_times=[time(8, 0)],
+            venv_activate="/path with spaces/venv/bin/activate",
+        )
+        script = _poll_wrapper_script(config, "/project")
+        assert "source" in script
+        assert "/path with spaces/venv/bin/activate" in script
+        assert "source '/path with spaces/venv/bin/activate'" in script
+
+    def test_no_venv_when_empty(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(
+            "symeraseme.core.scheduler.wrapper._resolve_venv", lambda: ""
+        )
+        config = SchedulerConfig(platform="cron", poll_times=[time(8, 0)])
+        script = _poll_wrapper_script(config, "/project")
+        assert "source" not in script
+
+    def test_project_dir_is_shell_quoted(self):
+        config = SchedulerConfig(platform="cron", poll_times=[time(8, 0)])
+        script = _poll_wrapper_script(config, "/path with spaces/project")
+        assert 'cd "/path with spaces/project"' in script

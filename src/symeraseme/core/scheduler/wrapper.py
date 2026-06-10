@@ -49,7 +49,7 @@ def _poll_wrapper_script(config: SchedulerConfig, project_dir: str) -> str:
     venv = config.venv_activate or _resolve_venv()
     poll_times_str = "|".join(f"{t.hour:02d}:{t.minute:02d}" for t in config.poll_times)
 
-    venv_line = f'source "{venv}"' if venv else ""
+    venv_line = f"source {shlex.quote(venv)}" if venv else ""
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 

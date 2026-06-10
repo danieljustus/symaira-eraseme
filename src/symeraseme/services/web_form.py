@@ -251,5 +251,4 @@ async def handle_run_web_form(
     )
     if result.screenshot_path:
         msg += f"\nScreenshot saved to: {result.screenshot_path}"
-    data["message"] = msg
     return CliResult(success=False, data=data, error=msg)

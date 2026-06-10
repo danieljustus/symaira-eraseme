@@ -164,10 +164,25 @@ _SENSITIVE_ENV_VARS: dict[str, str] = {
     "CAPSOLVER_API_KEY": "CAPSOLVER API key",
 }
 
+_SENSITIVE_SUFFIXES: tuple[str, ...] = (
+    "_PASSWORD",
+    "_SECRET",
+    "_TOKEN",
+    "_KEY",
+    "_CREDENTIAL",
+)
+
+
+def _is_sensitive_env_var(name: str) -> bool:
+    if name in _SENSITIVE_ENV_VARS:
+        return True
+    upper = name.upper()
+    return any(upper.endswith(suffix) for suffix in _SENSITIVE_SUFFIXES)
+
 
 def _check_env() -> tuple[bool, str]:
     set_vars = [label for var, label in _ENV_LABELS.items() if os.environ.get(var)]
-    sensitive_set = any(os.environ.get(var) for var in _SENSITIVE_ENV_VARS)
+    sensitive_set = any(_is_sensitive_env_var(var) for var in os.environ)
 
     pieces: list[str] = []
     if set_vars:
