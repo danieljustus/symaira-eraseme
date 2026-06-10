@@ -12,6 +12,7 @@ from cryptography.fernet import Fernet
 from symeraseme.core.db import (
     _DB_TEMP,
     _ENC_HEADER_V1,
+    _acquire_db_lock,
     _cleanup_temp_files,
     _get_secure_temp_dir,
     close_connection,
@@ -266,27 +267,124 @@ class TestBackwardCompatibility:
         close_connection()
 
 
-class TestV1Migration:
-    """V1-format DB files must be transparently migrated to V2."""
+class TestPlaintextToEncrypted:
+    """Opening a plaintext DB with encryption enabled encrypts it on close."""
 
-    def test_v1_file_migrated_to_v2_on_open(
+    def test_plaintext_db_encrypted_on_close(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
+        monkeypatch.delenv("SYMERASEME_ENCRYPT_DB", raising=False)
+
+        db_file = tmp_path / "test.db"
+        init_db(str(db_file))
+        close_connection()
+
+        raw_before = db_file.read_bytes()
+        assert not raw_before.startswith(b"SYMERASEME_ENC")
+
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        conn = get_connection(str(db_file))
+        assert conn is not None
+        close_connection()
+
+        from symeraseme.core.db import _ENC_MAGIC_V3
+
+        raw_after = db_file.read_bytes()
+        assert raw_after.startswith(_ENC_MAGIC_V3), (
+            f"Plaintext DB should be encrypted after close, got header: {raw_after[:20]!r}"
+        )
+
+
+class TestFileLocking:
+    """File locking prevents concurrent encrypted DB access."""
+
+    def test_lock_file_created_on_encrypted_open(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
         monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
-        # Verify the fixture starts as V1
+        conn = get_connection(str(encrypted_db_file))
+        assert conn is not None
+
+        lock_file = encrypted_db_file.parent / f"{encrypted_db_file.name}.lock"
+        assert lock_file.exists()
+
+        close_connection()
+
+    def test_lock_released_on_close(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        conn = get_connection(str(encrypted_db_file))
+        assert conn is not None
+        close_connection()
+
+        from symeraseme.core.db import _db_lock_file
+
+        assert _db_lock_file is None
+
+    def test_no_lock_when_encryption_disabled(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
+        monkeypatch.delenv("SYMERASEME_ENCRYPT_DB", raising=False)
+
+        db_file = tmp_path / "plain.db"
+        init_db(str(db_file))
+
+        lock_file = db_file.parent / f"{db_file.name}.lock"
+        assert not lock_file.exists()
+
+        close_connection()
+
+    def test_concurrent_access_raises_on_contention(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        import fcntl
+
+        lock_path = encrypted_db_file.parent / f"{encrypted_db_file.name}.lock"
+        lock_file = open(lock_path, "w")
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            monkeypatch.setattr(
+                "symeraseme.core.db._DB_LOCK_RETRY_ATTEMPTS", 1
+            )
+            with pytest.raises(RuntimeError, match="(?i)another symaira-eraseme process"):
+                _acquire_db_lock(encrypted_db_file, retry=True)
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+
+
+class TestV1Migration:
+    """V1-format DB files must be transparently migrated to V3."""
+
+    def test_v1_file_migrated_to_v3_on_open(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
         assert encrypted_db_file.read_bytes().startswith(_ENC_HEADER_V1)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
         close_connection()
 
-        # After close, the file should be rewritten as V2
-        raw = encrypted_db_file.read_bytes()
-        from symeraseme.core.db import _ENC_MAGIC_V2
+        from symeraseme.core.db import _ENC_MAGIC_V3
 
-        assert raw.startswith(_ENC_MAGIC_V2), "V1 file should have been migrated to V2"
+        raw = encrypted_db_file.read_bytes()
+        assert raw.startswith(_ENC_MAGIC_V3), "V1 file should have been migrated to V3"
 
 
 class TestFernetKeyCache:

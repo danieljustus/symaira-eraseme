@@ -79,6 +79,8 @@ jobs:
               with open(schema_path) as f:
                   schema = json.load(f)
               for yml in Path('registry/brokers').rglob('*.yaml'):
+                  if yml.name.startswith('_'):
+                      continue
                   with open(yml) as f:
                       data = yaml.safe_load(f)
                   try:
@@ -86,6 +88,11 @@ jobs:
                       print(f'  ✓ {yml}')
                   except jsonschema.ValidationError as e:
                       print(f'  ✗ {yml}: {e.message}')
+                      sys.exit(1)
+                  broker_id = data.get('id', '')
+                  stem = yml.stem
+                  if broker_id and broker_id != stem:
+                      print(f'  ✗ {yml}: id={broker_id!r} != stem={stem!r}')
                       sys.exit(1)
           else:
               print('  Schema not yet created — skipping validation')

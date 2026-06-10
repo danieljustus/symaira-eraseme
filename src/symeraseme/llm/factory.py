@@ -15,7 +15,7 @@ _PROVIDERS: dict[str, tuple[str, str, str, str]] = {
         "symeraseme.llm.anthropic_client",
         "AnthropicClient",
         "ANTHROPIC_API_KEY",
-        "claude-3-5-sonnet-latest",
+        "claude-sonnet-4-6",
     ),
     "openai": (
         "symeraseme.llm.openai_client",

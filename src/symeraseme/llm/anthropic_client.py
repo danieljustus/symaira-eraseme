@@ -15,12 +15,11 @@ from symeraseme.llm.protocol import (
 
 logger = logging.getLogger(__name__)
 
-# Known model pricing per 1M input tokens and 1M output tokens (USD)
-# As of May 2026
 MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "claude-3-5-sonnet-latest": (3.00, 15.00),
-    "claude-3-5-haiku-latest": (1.00, 5.00),
-    "claude-3-opus-latest": (15.00, 75.00),
+    "claude-fable-5": (0.25, 1.25),
+    "claude-opus-4-8": (15.00, 75.00),
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-haiku-4-5": (0.80, 4.00),
 }
 
 
@@ -31,7 +30,7 @@ class AnthropicClient(BaseLLMClient):
         self,
         *,
         api_key: str | None = None,
-        model: str = "claude-3-5-sonnet-latest",
+        model: str = "claude-sonnet-4-6",
         max_retries: int = 3,
         cost_tracker: list[UsageRecord] | None = None,
     ) -> None:
@@ -121,14 +120,14 @@ class AnthropicClient(BaseLLMClient):
 
         input_cost = (record.input_tokens / 1_000_000) * input_price_per_m
         output_cost = (record.output_tokens / 1_000_000) * output_price_per_m
+        cache_creation_cost = (record.cache_creation_tokens / 1_000_000) * input_price_per_m * 1.25
+        cache_read_cost = (record.cache_read_tokens / 1_000_000) * input_price_per_m * 0.10
 
-        # Cached reads are ~50% cheaper (approximate)
-        cache_read_savings = (record.cache_read_tokens / 1_000_000) * input_price_per_m * 0.5
-        return round(input_cost + output_cost - cache_read_savings, 6)
+        return round(input_cost + output_cost + cache_creation_cost + cache_read_cost, 6)
 
     def _supports_prompt_caching(self) -> bool:
         """Check if the selected model supports prompt caching."""
-        return "sonnet" in self.model or "haiku" in self.model
+        return True
 
 
 class AnthropicClientError(LLMClientError):

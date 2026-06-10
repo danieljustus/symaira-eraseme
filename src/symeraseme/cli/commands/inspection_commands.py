@@ -180,6 +180,42 @@ def _is_sensitive_env_var(name: str) -> bool:
     return any(upper.endswith(suffix) for suffix in _SENSITIVE_SUFFIXES)
 
 
+def _check_db_encryption() -> tuple[bool, str]:
+    from symeraseme.core.db import _ENC_HEADER_V1, _ENC_MAGIC_V2, _db_path
+
+    encrypt_enabled = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    try:
+        db_file = _db_path()
+    except (OSError, PermissionError):
+        if encrypt_enabled:
+            return True, "Encryption enabled (DB path inaccessible)"
+        return True, "DB path inaccessible"
+    if not db_file.exists():
+        if encrypt_enabled:
+            return True, "Encryption enabled (new DBs will be encrypted)"
+        return True, "No database file"
+
+    try:
+        raw = db_file.read_bytes()
+    except (OSError, PermissionError):
+        if encrypt_enabled:
+            return True, "Encryption enabled (DB file unreadable)"
+        return True, "DB file unreadable"
+    is_encrypted = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
+
+    if encrypt_enabled and not is_encrypted:
+        return False, "Encryption enabled but DB file is plaintext (will encrypt on close)"
+    if not encrypt_enabled and is_encrypted:
+        return False, "DB file is encrypted but SYMERASEME_ENCRYPT_DB is not set"
+    if encrypt_enabled and is_encrypted:
+        return True, "Encryption enabled and DB file is encrypted"
+    return True, "Encryption not enabled (DB is plaintext)"
+
+
 def _check_env() -> tuple[bool, str]:
     set_vars = [label for var, label in _ENV_LABELS.items() if os.environ.get(var)]
     sensitive_set = any(_is_sensitive_env_var(var) for var in os.environ)
@@ -202,6 +238,7 @@ def doctor(ctx: typer.Context) -> None:
         "Dependencies": _check_deps(),
         "Config directory": _check_config(),
         "Database": _check_database(),
+        "DB encryption": _check_db_encryption(),
         "Registry": _check_registry(),
         "Keyring": _check_keyring(),
         "LLM config": _check_llm(),

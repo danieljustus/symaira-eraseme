@@ -65,7 +65,7 @@ class TestBrokerModel:
     def test_email_opt_out_channel(self):
         from symeraseme.registry.schema import EmailOptOut
 
-        yml = _repo_root() / "registry" / "brokers" / "eu" / "acxiom.yaml"
+        yml = _repo_root() / "registry" / "brokers" / "eu" / "acxiom-eu.yaml"
         broker = load_broker_yaml(yml)
         channel = broker.opt_out[0]
         assert isinstance(channel, EmailOptOut)
@@ -74,7 +74,7 @@ class TestBrokerModel:
     def test_web_form_opt_out_channel(self):
         from symeraseme.registry.schema import WebFormOptOut
 
-        yml = _repo_root() / "registry" / "brokers" / "us" / "beenverified.yaml"
+        yml = _repo_root() / "registry" / "brokers" / "us" / "beenverified-us.yaml"
         broker = load_broker_yaml(yml)
         channel = broker.opt_out[0]
         assert isinstance(channel, WebFormOptOut)
