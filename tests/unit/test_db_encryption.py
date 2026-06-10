@@ -290,10 +290,10 @@ class TestPlaintextToEncrypted:
         assert conn is not None
         close_connection()
 
-        from symeraseme.core.db import _ENC_MAGIC_V2
+        from symeraseme.core.db import _ENC_MAGIC_V3
 
         raw_after = db_file.read_bytes()
-        assert raw_after.startswith(_ENC_MAGIC_V2), (
+        assert raw_after.startswith(_ENC_MAGIC_V3), (
             f"Plaintext DB should be encrypted after close, got header: {raw_after[:20]!r}"
         )
 
@@ -367,26 +367,24 @@ class TestFileLocking:
 
 
 class TestV1Migration:
-    """V1-format DB files must be transparently migrated to V2."""
+    """V1-format DB files must be transparently migrated to V3."""
 
-    def test_v1_file_migrated_to_v2_on_open(
+    def test_v1_file_migrated_to_v3_on_open(
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
         monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
-        # Verify the fixture starts as V1
         assert encrypted_db_file.read_bytes().startswith(_ENC_HEADER_V1)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
         close_connection()
 
-        # After close, the file should be rewritten as V2
-        raw = encrypted_db_file.read_bytes()
-        from symeraseme.core.db import _ENC_MAGIC_V2
+        from symeraseme.core.db import _ENC_MAGIC_V3
 
-        assert raw.startswith(_ENC_MAGIC_V2), "V1 file should have been migrated to V2"
+        raw = encrypted_db_file.read_bytes()
+        assert raw.startswith(_ENC_MAGIC_V3), "V1 file should have been migrated to V3"
 
 
 class TestFernetKeyCache:

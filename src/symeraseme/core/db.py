@@ -49,6 +49,7 @@ DEFAULT_DB_NAME = "symeraseme.db"
 
 _ENC_HEADER_V1 = b"SYMERASEME_ENCv1\n"
 _ENC_MAGIC_V2 = b"SYMERASEME_ENCv2\n"
+_ENC_MAGIC_V3 = b"SYMERASEME_ENCv3\n"
 _ENC_SALT_LEN = 16
 _PBKDF2_ITERATIONS = 600_000
 _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
@@ -151,7 +152,7 @@ def _release_db_lock() -> None:
         _db_lock_file = None
 
 
-def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
+def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes | None:
     cache_key = salt if salt else b""
     if cache_key in _FERNET_KEY_CACHE:
         return _FERNET_KEY_CACHE[cache_key]
@@ -164,12 +165,24 @@ def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
         logger.debug("DB encryption key unavailable: %s", exc)
         return None
 
-    derived = hashlib.pbkdf2_hmac(
-        "sha256",
-        master_key,
-        salt if salt else _PBKDF2_FIXED_SALT,
-        _PBKDF2_ITERATIONS,
-    )
+    if version >= 3 and salt:
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from cryptography.hazmat.primitives import hashes
+
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            info=b"symeraseme-db-encryption-v3",
+        )
+        derived = hkdf.derive(master_key)
+    else:
+        derived = hashlib.pbkdf2_hmac(
+            "sha256",
+            master_key,
+            salt if salt else _PBKDF2_FIXED_SALT,
+            _PBKDF2_ITERATIONS,
+        )
     key = urlsafe_b64encode(derived)
     _FERNET_KEY_CACHE[cache_key] = key
     return key
@@ -178,8 +191,8 @@ def _get_db_fernet_key(*, salt: bytes | None = None) -> bytes | None:
 def _is_encrypted(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
-    head = path.read_bytes()[: max(len(_ENC_HEADER_V1), len(_ENC_MAGIC_V2) + _ENC_SALT_LEN)]
-    return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2)
+    head = path.read_bytes()[: max(len(_ENC_HEADER_V1), len(_ENC_MAGIC_V2) + _ENC_SALT_LEN, len(_ENC_MAGIC_V3) + _ENC_SALT_LEN)]
+    return head.startswith(_ENC_HEADER_V1) or head.startswith(_ENC_MAGIC_V2) or head.startswith(_ENC_MAGIC_V3)
 
 
 def _migrate_v1_to_v2(path: Path) -> None:
@@ -190,7 +203,21 @@ def _migrate_v1_to_v2(path: Path) -> None:
         _encrypt_file(tmp, path)
         logger.info("V1→V2 migration complete: %s", path)
     finally:
-        # Clean up the temporary decrypted file
+        try:
+            if tmp.exists() and tmp != path:
+                tmp.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("Failed to remove temp file %s: %s", tmp, exc)
+
+
+def _migrate_v2_to_v3(path: Path) -> None:
+    """Transparently re-encrypt a V2-format DB to V3 on open."""
+    logger.info("Migrating V2-encrypted DB to V3 format: %s", path)
+    tmp = _decrypt_to_temp(path)
+    try:
+        _encrypt_file(tmp, path, version=3)
+        logger.info("V2→V3 migration complete: %s", path)
+    finally:
         try:
             if tmp.exists() and tmp != path:
                 tmp.unlink(missing_ok=True)
@@ -203,15 +230,21 @@ def _decrypt_to_temp(path: Path) -> Path:
     if raw.startswith(_ENC_HEADER_V1):
         header_len = len(_ENC_HEADER_V1)
         salt = None
+        version = 1
+    elif raw.startswith(_ENC_MAGIC_V3):
+        header_len = len(_ENC_MAGIC_V3) + _ENC_SALT_LEN
+        salt = raw[len(_ENC_MAGIC_V3) : header_len]
+        version = 3
     elif raw.startswith(_ENC_MAGIC_V2):
         header_len = len(_ENC_MAGIC_V2) + _ENC_SALT_LEN
         salt = raw[len(_ENC_MAGIC_V2) : header_len]
+        version = 2
     else:
         logger.debug("Unrecognized encryption header in %s", path)
         msg = "Unrecognized encryption header in database file."
         raise RuntimeError(msg)
     encrypted_data = raw[header_len:]
-    fernet_key = _get_db_fernet_key(salt=salt)
+    fernet_key = _get_db_fernet_key(salt=salt, version=version)
     if fernet_key is None:
         logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
@@ -240,15 +273,18 @@ def _decrypt_to_temp(path: Path) -> Path:
     return tmp_path
 
 
-def _encrypt_file(source: Path, target: Path) -> None:
+def _encrypt_file(source: Path, target: Path, *, version: int = 3) -> None:
     salt = secrets.token_bytes(_ENC_SALT_LEN)
-    fernet_key = _get_db_fernet_key(salt=salt)
+    fernet_key = _get_db_fernet_key(salt=salt, version=version)
     if fernet_key is None:
         logger.warning("Cannot encrypt DB \u2014 identity master key is not available.")
         return
     f = Fernet(fernet_key)
     encrypted = f.encrypt(source.read_bytes())
-    target.write_bytes(_ENC_MAGIC_V2 + salt + encrypted)
+    if version >= 3:
+        target.write_bytes(_ENC_MAGIC_V3 + salt + encrypted)
+    else:
+        target.write_bytes(_ENC_MAGIC_V2 + salt + encrypted)
 
 
 def _checkpoint_and_cleanup_wal(db_path: Path) -> None:
@@ -339,10 +375,17 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
 
         if should_encrypt and db_file.exists():
             raw = db_file.read_bytes()
-            is_enc = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
+            is_enc = bool(raw) and (
+                raw.startswith(_ENC_HEADER_V1)
+                or raw.startswith(_ENC_MAGIC_V2)
+                or raw.startswith(_ENC_MAGIC_V3)
+            )
             if is_enc:
                 if raw.startswith(_ENC_HEADER_V1):
                     _migrate_v1_to_v2(db_file)
+                    _migrate_v2_to_v3(db_file)
+                elif raw.startswith(_ENC_MAGIC_V2):
+                    _migrate_v2_to_v3(db_file)
                 db_file = _decrypt_to_temp(db_file)
             else:
                 # Existing plaintext DB with encryption enabled — register for encrypt-on-close
