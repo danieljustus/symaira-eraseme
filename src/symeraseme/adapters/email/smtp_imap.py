@@ -63,10 +63,8 @@ def _imap_session(
         yield mail
     finally:
         if mail is not None:
-            try:
+            with contextlib.suppress(OSError):
                 mail.logout()
-            except OSError:
-                pass
 
 
 def decode_mime_header(value: str | None) -> str:
@@ -234,7 +232,6 @@ def list_messages(
         if not all_ids:
             return []
 
-        page_start = (page - 1) * page_size
         page_end = page * page_size
         target_ids = all_ids[-page_end:][-page_size:]
 
@@ -242,7 +239,8 @@ def list_messages(
             return []
 
         id_range = b",".join(target_ids)
-        status, data = mail.fetch(id_range, "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO DATE MESSAGE-ID)])")
+        fetch_cmd = "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO DATE MESSAGE-ID)])"
+        status, data = mail.fetch(id_range, fetch_cmd)
         if status != "OK" or not data:
             return []
 
