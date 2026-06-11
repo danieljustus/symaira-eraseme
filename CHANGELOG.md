@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.2.1] – 2026-06-11
+
+- **Security**: Replace pickle with JSON for broker persistent cache to prevent arbitrary code execution (#238).
+- **Security**: Fix path traversal via legacy consent token filename, TOCTOU race conditions in consent file verification, and TOCTOU race in encrypted DB open (#283).
+- **Security**: Fix doctor command revealing sensitive environment variables, send_reply swallowing KeyboardInterrupt, SQL injection in repository list_replies, and projection.py silently dropping events (#300).
+- **Security**: Encrypt existing plaintext DB when SYMERASEME_ENCRYPT_DB=1 (#336).
+- **Fix**: Encrypted DB silently discards all writes — use content hash instead of PRAGMA data_version (#344).
+- **Fix**: Broker fallback, consent timing, orphan strings, IMAP errors, and doctor redaction tests (#310).
+- **Fix**: CliResult envelope, env var redaction, scheduler escaping, and retry docs (#318).
+- **Fix**: SIGTERM handler may recursively trigger itself, Windows compatibility gap in secure temp directory creation (#270).
+- **Fix**: Orphaned WAL files from encrypted DB temp files not scavenged after crash (#283).
+- **Fix**: SIGTERM handler double-calls atexit-registered cleanup, orchestrator deprecation warning fires at import time (#284).
+- **Fix**: LLM PII consent check that fails open on unreadable consent file, pin all GitHub Actions workflow steps to full commit SHAs (#328).
+- **Fix**: Persistent broker cache not invalidating on YAML edits in subdirectories (#328).
+- **Fix**: Skip DB re-encryption on close when no writes occurred (#328).
+- **Fix**: Compile JSON Schema once for broker validation instead of per-file (#328).
+- **Fix**: Lower default logging level from INFO to WARNING in CLI (#328).
+- **Fix**: Add top-level --version flag to CLI (#328).
+- **Fix**: Restrict OAuth2 CSRF state file permissions to 0600 (#328).
+- **Refactor**: Extract repository layer (campaigns, dashboard, deadlines, events, inbox, manual_tasks, replies, requests) (#271).
+- **Refactor**: Extract batch, config, execution, planning, inbox, and exceptions modules from orchestrator (#259, #271).
+- **Refactor**: Migrate render_error call sites in services to CliResult(success=False) (#311).
+- **Refactor**: Hoist function-local render_error imports to module level (#305).
+- **Refactor**: Replace two-query pattern in list_replies with single LEFT JOIN (#284).
+- **Refactor**: Limit _prepare_batch to fetch only batch_size rows from database (#284).
+- **Refactor**: Build broker ID index from filenames instead of parsing all YAML on cold start (#284).
+- **Perf**: Use meta-only YAML parse on cold-cache filter path in load_all_brokers (#312).
+- **Perf**: Inbox list fetches envelopes one-by-one — replace with single ranged IMAP fetch (#344).
+- **Perf**: PBKDF2 with 600k iterations adds ~0.5s startup overhead for zero security benefit (#336).
+- **Feat**: Add web-form fallback adapter for brokers without Playwright support (#260).
+- **Feat**: Add doctor command with redaction of sensitive environment variables (#260).
+- **Feat**: Add --output json support for several commands (#270).
+- **Feat**: Centralize default directory configuration and add writeability checks (#260).
+- **Feat**: Remove deprecated top-level CLI shims (execute, tick, status) (#260).
+- **Docs**: Add comprehensive AI agent integration support for 10 agents (#229).
+- **Docs**: Add scripts/setup-agents.sh for automated agent setup (#229).
+- **Chore**: Bump trufflesecurity/trufflehog from 3.95.3 to 3.95.5 (#285).
+
 ## [v0.2.0] – 2026-06-01
 
 - Hardened encrypted database storage with per-file salts, safer temporary files, automatic V1-to-V2 migration, and reduced PBKDF2 overhead.
