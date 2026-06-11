@@ -365,6 +365,24 @@ class TestFileLocking:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
 
+    def test_read_only_directory_raises_runtime_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db._DB_LOCK_RETRY_ATTEMPTS", 1)
+
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
+        readonly_dir.chmod(0o444)
+
+        db_file = readonly_dir / "test.db"
+        try:
+            with pytest.raises(RuntimeError, match="(?i)another symaira-eraseme process"):
+                _acquire_db_lock(db_file, retry=True)
+        finally:
+            readonly_dir.chmod(0o700)
+
 
 class TestV1Migration:
     """V1-format DB files must be transparently migrated to V3."""

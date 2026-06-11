@@ -121,6 +121,7 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
     lock_path = db_path.parent / f"{db_path.name}.lock"
     attempts = _DB_LOCK_RETRY_ATTEMPTS if retry else 1
     for attempt in range(attempts):
+        lock_file = None
         try:
             lock_file = open(lock_path, "w")  # noqa: SIM115
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
