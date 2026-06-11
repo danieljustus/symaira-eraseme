@@ -26,14 +26,20 @@ _PROVIDERS: dict[str, tuple[str, str, str, str]] = {
     "ollama": (
         "symeraseme.llm.ollama_client",
         "OllamaClient",
-        "",  # No API key required for Ollama
+        "",
         "llama3.1",
+    ),
+    "openai-compatible": (
+        "symeraseme.llm.openai_compatible_client",
+        "OpenAICompatibleClient",
+        "",
+        "default",
     ),
 }
 
 _ENV_PROVIDER = "SYMERASEME_LLM_PROVIDER"
 _ENV_MODEL = "SYMERASEME_LLM_MODEL"
-_ENV_OPENAI_KEY = "OPENAI_API_KEY"
+_ENV_BASE_URL = "SYMERASEME_LLM_BASE_URL"
 _ENV_OLLAMA_HOST = "OLLAMA_HOST"
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
@@ -47,20 +53,21 @@ def create_llm_client(
     provider: str | None = None,
     model: str | None = None,
     api_key: str | None = None,
+    base_url: str | None = None,
     cost_tracker: list | None = None,
 ) -> LLMClient:
     """Create an LLM client for the given provider.
 
     Parameters:
-        provider:  Provider name (e.g. "anthropic").
+        provider:  Provider name (e.g. "anthropic", "openai-compatible").
                    Falls back to `SYMERASEME_LLM_PROVIDER` env var,
                    then to "anthropic".
         model:     Model name. Falls back to `SYMERASEME_LLM_MODEL`
                    env var, then to the provider's default.
         api_key:   API key. Falls back to the provider's env var.
-                   For backward compat, `ANTHROPIC_API_KEY` is also
-                   checked when the provider is "anthropic" and no
-                   explicit key is given.
+        base_url:  Custom API base URL. Falls back to
+                   `SYMERASEME_LLM_BASE_URL` env var. Only used for
+                   providers that support custom endpoints.
         cost_tracker:  Mutable list shared across calls for cost
                    tracking (passed through to the client).
 
@@ -87,8 +94,9 @@ def create_llm_client(
 
     if api_key is None and key_env:
         api_key = os.environ.get(key_env)
-    if api_key is None and provider == "anthropic":
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    if base_url is None:
+        base_url = os.environ.get(_ENV_BASE_URL)
 
     klass = _lazy_import(module_path, class_name)
 
@@ -102,6 +110,8 @@ def create_llm_client(
     if provider == "ollama":
         host = os.environ.get(_ENV_OLLAMA_HOST, _DEFAULT_OLLAMA_HOST)
         kwargs["host"] = host
+    elif provider == "openai-compatible" and base_url is not None:
+        kwargs["base_url"] = base_url
 
     instance: LLMClient = klass(**kwargs)
     return instance
