@@ -230,64 +230,54 @@ def list_messages(
         if status != "OK":
             return []
 
-        ids = message_ids[0].split() if message_ids[0] else []
-        if not ids:
+        all_ids = message_ids[0].split() if message_ids[0] else []
+        if not all_ids:
+            return []
+
+        page_start = (page - 1) * page_size
+        page_end = page * page_size
+        target_ids = all_ids[-page_end:][-page_size:]
+
+        if not target_ids:
+            return []
+
+        id_range = b",".join(target_ids)
+        status, data = mail.fetch(id_range, "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO DATE MESSAGE-ID)])")
+        if status != "OK" or not data:
             return []
 
         envelopes: list[Envelope] = []
-        for msg_id in ids[-(page_size * page) :]:
-            try:
-                status, data = mail.fetch(msg_id, "(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)")
-                if status != "OK" or not data or not data[0]:
-                    continue
-                raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
-                if not raw:
-                    continue
-                parsed = _parse_envelope_response(raw.decode("utf-8", errors="replace"))
-                if parsed:
-                    envelopes.append(
-                        Envelope(
-                            id=msg_id.decode(),
-                            subject=parsed.get("subject", ""),
-                            from_=parsed.get("from", ""),
-                            to=parsed.get("to", ""),
-                            date=parsed.get("date"),
-                            flags=parsed.get("flags", []),
-                        )
-                    )
-            except (OSError, imaplib.IMAP4.error) as e:
-                logger.warning("Failed to fetch IMAP envelope %s: %s", msg_id, e)
+        for i in range(0, len(data), 2):
+            if i + 1 >= len(data):
+                break
+            meta_line = data[i]
+            header_bytes = data[i + 1]
+            if not isinstance(header_bytes, bytes):
                 continue
 
-    start = (page - 1) * page_size
-    end = start + page_size
-    return envelopes[start:end]
+            msg_id = meta_line.split()[0].decode() if meta_line else ""
 
+            parsed = _parse_email(header_bytes)
+            headers = parsed.get("headers", {})
 
-def _parse_envelope_response(response: str) -> dict[str, Any] | None:
-    """Parse IMAP ENVELOPE response into a simple dict."""
-    try:
-        match = re.search(r"ENVELOPE \((.*?)\) FLAGS", response, re.DOTALL)
-        if not match:
-            return None
-        envelope_str = match.group(1)
-        parts = envelope_str.split('"')
-        if len(parts) >= 6:
-            date_str = parts[0].strip()
+            date_str = headers.get("Date", "")
             date = None
             if date_str:
                 with contextlib.suppress(ValueError):
                     date = email.utils.parsedate_to_datetime(date_str)
-            return {
-                "subject": parts[3].strip(),
-                "from": parts[5].strip(),
-                "to": parts[7].strip() if len(parts) > 7 else "",
-                "date": date,
-                "flags": [],
-            }
-    except (ValueError, IndexError):
-        pass
-    return None
+
+            envelopes.append(
+                Envelope(
+                    id=msg_id,
+                    subject=headers.get("Subject", ""),
+                    from_=headers.get("From", ""),
+                    to=headers.get("To", ""),
+                    date=date,
+                    flags=[],
+                )
+            )
+
+    return envelopes
 
 
 def get_message(
