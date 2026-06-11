@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
 import typer
 
 from symeraseme.adapters.web.playwright_runner import (
     PlaywrightRunnerError,
+    WebFormResult,
 )
 from symeraseme.adapters.web.playwright_runner import (
     run_web_form as _run_form,
@@ -15,6 +17,71 @@ from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
+
+
+def _build_identity_fields() -> dict[str, str]:
+    if not profile_exists():
+        return {}
+    profile = load_profile()
+    name_parts = profile.full_name.split(None, 1)
+    first_name = name_parts[0] if name_parts else profile.full_name
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+    fields = {
+        "full_name": profile.full_name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": profile.email_addresses[0] if profile.email_addresses else "",
+        "phone_number": profile.phone_numbers[0] if profile.phone_numbers else "",
+    }
+    for i, addr in enumerate(profile.addresses):
+        fields[f"address_street_{i}"] = addr.street
+        fields[f"address_city_{i}"] = addr.city
+        fields[f"address_zip_{i}"] = addr.postal_code
+        fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
+        fields[f"address_country_{i}"] = addr.country
+    return fields
+
+
+async def _run_form_with_fallback(
+    broker_id: str,
+    broker_name: str,
+    url: str,
+    steps_data: list[dict[str, Any]],
+    form: WebFormOptOut,
+    *,
+    headed: bool = False,
+    screenshot_dir: str = "",
+    identity_fields: dict[str, str],
+) -> tuple[WebFormResult | None, str | None, str | None]:
+    try:
+        result = await _run_form(
+            url=url,
+            steps=steps_data,
+            headless=not headed,
+            timeout_seconds=form.form_spec.timeout_seconds,
+            rate_limit_delay=form.form_spec.rate_limit_delay,
+            screenshot_dir=screenshot_dir or None,
+            identity_fields=identity_fields,
+        )
+    except PlaywrightRunnerError as e:
+        return None, str(e), None
+
+    task_id = None
+    if not result.success:
+        task = create_manual_task(
+            broker_id=broker_id,
+            broker_name=broker_name,
+            form_url=url,
+            reason="generic_error",
+            screenshot_path=result.screenshot_path or "",
+            step_index=result.step_index,
+            total_steps=result.total_steps,
+            error_message=result.error,
+        )
+        task_id = task.id
+
+    return result, None, task_id
 
 
 async def run_web_form_for_broker(
@@ -35,30 +102,10 @@ async def run_web_form_for_broker(
     form = cast(WebFormOptOut, web_forms[0])
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
-
-    identity_fields: dict[str, str] = {}
-    if profile_exists():
-        profile = load_profile()
-        name_parts = profile.full_name.split(None, 1)
-        first_name = name_parts[0] if name_parts else profile.full_name
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
-
-        identity_fields = {
-            "full_name": profile.full_name,
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": profile.email_addresses[0] if profile.email_addresses else "",
-            "phone_number": profile.phone_numbers[0] if profile.phone_numbers else "",
-        }
-        for i, addr in enumerate(profile.addresses):
-            identity_fields[f"address_street_{i}"] = addr.street
-            identity_fields[f"address_city_{i}"] = addr.city
-            identity_fields[f"address_zip_{i}"] = addr.postal_code
-            identity_fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
-            identity_fields[f"address_country_{i}"] = addr.country
+    identity_fields = _build_identity_fields()
 
     if dry_run:
-        body = __import__("json").dumps(
+        body = json.dumps(
             {
                 "url": url,
                 "steps": steps_data,
@@ -77,37 +124,24 @@ async def run_web_form_for_broker(
             "body": body,
         }
 
-    try:
-        result = await _run_form(
-            url=url,
-            steps=steps_data,
-            headless=not headed,
-            timeout_seconds=form.form_spec.timeout_seconds,
-            rate_limit_delay=form.form_spec.rate_limit_delay,
-            screenshot_dir=screenshot_dir or None,
-            identity_fields=identity_fields,
-        )
-    except PlaywrightRunnerError as e:
+    result, error, task_id = await _run_form_with_fallback(
+        broker_id,
+        broker.name,
+        url,
+        steps_data,
+        form,
+        headed=headed,
+        screenshot_dir=screenshot_dir,
+        identity_fields=identity_fields,
+    )
+
+    if error:
         return {
             "success": False,
-            "error": str(e),
+            "error": error,
             "broker_id": broker_id,
             "broker_name": broker.name,
         }
-
-    task_id = None
-    if not result.success:
-        task = create_manual_task(
-            broker_id=broker_id,
-            broker_name=broker.name,
-            form_url=url,
-            reason="generic_error",
-            screenshot_path=result.screenshot_path or "",
-            step_index=result.step_index,
-            total_steps=result.total_steps,
-            error_message=result.error,
-        )
-        task_id = task.id
 
     return {
         "success": result.success,
@@ -151,27 +185,7 @@ async def handle_run_web_form(
     form = cast(WebFormOptOut, web_forms[0])
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
-
-    identity_fields: dict[str, str] = {}
-    if profile_exists():
-        profile = load_profile()
-        name_parts = profile.full_name.split(None, 1)
-        first_name = name_parts[0] if name_parts else profile.full_name
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
-
-        identity_fields = {
-            "full_name": profile.full_name,
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": profile.email_addresses[0] if profile.email_addresses else "",
-            "phone_number": profile.phone_numbers[0] if profile.phone_numbers else "",
-        }
-        for i, addr in enumerate(profile.addresses):
-            identity_fields[f"address_street_{i}"] = addr.street
-            identity_fields[f"address_city_{i}"] = addr.city
-            identity_fields[f"address_zip_{i}"] = addr.postal_code
-            identity_fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
-            identity_fields[f"address_country_{i}"] = addr.country
+    identity_fields = _build_identity_fields()
 
     if dry_run:
         lines = [f"[DRY RUN] Would run web form for {broker.name} ({url})"]
@@ -197,36 +211,24 @@ async def handle_run_web_form(
     typer.echo(f"Running web form for {broker.name} ({url})")
     typer.echo(f"Steps: {len(steps_data)}")
 
-    try:
-        result = await _run_form(
-            url=url,
-            steps=steps_data,
-            headless=not headed,
-            timeout_seconds=form.form_spec.timeout_seconds,
-            rate_limit_delay=form.form_spec.rate_limit_delay,
-            screenshot_dir=screenshot_dir or None,
-            identity_fields=identity_fields,
-        )
-    except PlaywrightRunnerError as e:
+    result, error, task_id = await _run_form_with_fallback(
+        broker_id,
+        broker.name,
+        url,
+        steps_data,
+        form,
+        headed=headed,
+        screenshot_dir=screenshot_dir,
+        identity_fields=identity_fields,
+    )
+
+    if error:
         return CliResult(
             success=False,
             error=(
-                f"Playwright error: {e}. "
+                f"Playwright error: {error}. "
                 "Install with: uv pip install playwright && playwright install chromium"
             ),
-        )
-
-    task = None
-    if not result.success:
-        task = create_manual_task(
-            broker_id=broker_id,
-            broker_name=broker.name,
-            form_url=url,
-            reason="generic_error",
-            screenshot_path=result.screenshot_path or "",
-            step_index=result.step_index,
-            total_steps=result.total_steps,
-            error_message=result.error,
         )
 
     data = {
@@ -236,17 +238,16 @@ async def handle_run_web_form(
         "total_steps": result.total_steps,
         "error": result.error,
         "screenshot_path": result.screenshot_path,
-        "task_id": task.id if task else None,
+        "task_id": task_id,
     }
 
     if result.success:
         data["message"] = f"Web form completed successfully ({result.total_steps} steps)."
         return CliResult(success=True, data=data)
 
-    task_id = task.id if task else "N/A"
     msg = (
         f"Web form failed at step {result.step_index + 1}/{result.total_steps}: "
-        f"{result.error}. Manual task #{task_id} created. "
+        f"{result.error}. Manual task created. "
         "Run 'symeraseme manual-tasks list' to see it."
     )
     if result.screenshot_path:
