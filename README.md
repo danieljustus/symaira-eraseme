@@ -54,7 +54,7 @@ pip install symeraseme[triage]   # LLM triage via Anthropic Claude
 **macOS users** (via Homebrew):
 
 ```bash
-brew tap danieljustus/symaira
+brew tap danieljustus/tap
 brew install symeraseme
 ```
 
