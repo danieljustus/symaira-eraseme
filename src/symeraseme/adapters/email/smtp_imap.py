@@ -8,6 +8,8 @@ import email.utils
 import imaplib
 import logging
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from email.header import decode_header
 from typing import Any
@@ -16,12 +18,10 @@ from symeraseme.adapters.email._types import Envelope, Message
 
 logger = logging.getLogger(__name__)
 
-# Common reply markers in subject lines
 RE_PREFIX = re.compile(
     r"^(Re|Fwd|Aw|Antwort|R\xe9f\.|SV|VS|WG|AW|RE|REF)\s*:\s*",
     re.IGNORECASE,
 )
-# Reference-based tracking via In-Reply-To / References headers
 RE_MESSAGE_ID = re.compile(r"<[^>]+>")
 
 
@@ -29,6 +29,44 @@ class IMAPError(Exception):
     """IMAP error."""
 
     pass
+
+
+@contextmanager
+def _imap_session(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    ssl: bool,
+    folder: str,
+) -> Iterator[imaplib.IMAP4 | imaplib.IMAP4_SSL]:
+    mail: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
+    try:
+        try:
+            mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
+        except (OSError, imaplib.IMAP4.error) as e:
+            msg = f"Failed to connect to mail server: {e}"
+            raise IMAPError(msg) from e
+
+        try:
+            mail.login(username, password)
+        except (OSError, imaplib.IMAP4.error) as e:
+            msg = f"IMAP login failed: {e}"
+            raise IMAPError(msg) from e
+
+        try:
+            mail.select(folder)
+        except (OSError, imaplib.IMAP4.error) as e:
+            msg = f"IMAP folder select failed: {e}"
+            raise IMAPError(msg) from e
+
+        yield mail
+    finally:
+        if mail is not None:
+            try:
+                mail.logout()
+            except OSError:
+                pass
 
 
 def decode_mime_header(value: str | None) -> str:
@@ -144,61 +182,33 @@ def poll_inbox(
     since_days: int = 1,
     max_messages: int = 50,
 ) -> list[dict[str, Any]]:
-    """Poll IMAP inbox for new messages.
-
-    Returns parsed messages with headers and body.
-    """
-    try:
-        mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
-    except (OSError, imaplib.IMAP4.error) as e:
-        logger.debug("Failed to connect to %s:%s: %s", host, port, e)
-        msg = f"Failed to connect to mail server: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.login(username, password)
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        logger.debug("IMAP login failed for %s: %s", username, e)
-        msg = f"IMAP login failed: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.select(folder)
+    with _imap_session(host, port, username, password, ssl, folder) as mail:
         since_date = (datetime.now(UTC) - timedelta(days=since_days)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"SINCE {since_date}")
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        logger.debug("IMAP login failed for %s: %s", username, e)
-        msg = f"IMAP login failed: {e}"
-        raise IMAPError(msg) from e
 
-    if status != "OK":
-        mail.logout()
-        return []
+        if status != "OK":
+            return []
 
-    ids = message_ids[0].split() if message_ids[0] else []
-    if not ids:
-        mail.logout()
-        return []
+        ids = message_ids[0].split() if message_ids[0] else []
+        if not ids:
+            return []
 
-    messages: list[dict[str, Any]] = []
-    for msg_id in ids[-max_messages:]:
-        try:
-            status, data = mail.fetch(msg_id, "(RFC822)")
-            if status != "OK" or not data or not data[0]:
+        messages: list[dict[str, Any]] = []
+        for msg_id in ids[-max_messages:]:
+            try:
+                status, data = mail.fetch(msg_id, "(RFC822)")
+                if status != "OK" or not data or not data[0]:
+                    continue
+                raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
+                if not raw:
+                    continue
+                parsed = _parse_email(raw)
+                parsed["imap_uid"] = msg_id.decode()
+                messages.append(parsed)
+            except (OSError, imaplib.IMAP4.error) as e:
+                logger.warning("Failed to fetch IMAP message %s: %s", msg_id, e)
                 continue
-            raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
-            if not raw:
-                continue
-            parsed = _parse_email(raw)
-            parsed["imap_uid"] = msg_id.decode()
-            messages.append(parsed)
-        except (OSError, imaplib.IMAP4.error) as e:
-            logger.warning("Failed to fetch IMAP message %s: %s", msg_id, e)
-            continue
 
-    mail.logout()
     return messages
 
 
@@ -213,71 +223,42 @@ def list_messages(
     password: str = "",
     ssl: bool = True,
 ) -> list[Envelope]:
-    """List IMAP messages, returning a Himalaya-compatible Envelope list.
-
-    Uses IMAP ENVELOPE fetch for header-level data only, avoiding
-    full body transfer.
-    """
-    try:
-        mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
-    except (OSError, imaplib.IMAP4.error) as e:
-        logger.debug("Failed to connect to %s:%s: %s", host, port, e)
-        msg = f"Failed to connect to mail server: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.login(username, password)
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        logger.debug("IMAP login failed for %s: %s", username, e)
-        msg = f"IMAP login failed: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.select(folder)
+    with _imap_session(host, port, username, password, ssl, folder) as mail:
         since_date = (datetime.now(UTC) - timedelta(days=30)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"SINCE {since_date}")
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        logger.debug("IMAP search failed: %s", e)
-        msg = f"IMAP search failed: {e}"
-        raise IMAPError(msg) from e
 
-    if status != "OK":
-        mail.logout()
-        return []
+        if status != "OK":
+            return []
 
-    ids = message_ids[0].split() if message_ids[0] else []
-    if not ids:
-        mail.logout()
-        return []
+        ids = message_ids[0].split() if message_ids[0] else []
+        if not ids:
+            return []
 
-    envelopes: list[Envelope] = []
-    for msg_id in ids[-(page_size * page) :]:
-        try:
-            status, data = mail.fetch(msg_id, "(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)")
-            if status != "OK" or not data or not data[0]:
-                continue
-            raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
-            if not raw:
-                continue
-            parsed = _parse_envelope_response(raw.decode("utf-8", errors="replace"))
-            if parsed:
-                envelopes.append(
-                    Envelope(
-                        id=msg_id.decode(),
-                        subject=parsed.get("subject", ""),
-                        from_=parsed.get("from", ""),
-                        to=parsed.get("to", ""),
-                        date=parsed.get("date"),
-                        flags=parsed.get("flags", []),
+        envelopes: list[Envelope] = []
+        for msg_id in ids[-(page_size * page) :]:
+            try:
+                status, data = mail.fetch(msg_id, "(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)")
+                if status != "OK" or not data or not data[0]:
+                    continue
+                raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
+                if not raw:
+                    continue
+                parsed = _parse_envelope_response(raw.decode("utf-8", errors="replace"))
+                if parsed:
+                    envelopes.append(
+                        Envelope(
+                            id=msg_id.decode(),
+                            subject=parsed.get("subject", ""),
+                            from_=parsed.get("from", ""),
+                            to=parsed.get("to", ""),
+                            date=parsed.get("date"),
+                            flags=parsed.get("flags", []),
+                        )
                     )
-                )
-        except (OSError, imaplib.IMAP4.error) as e:
-            logger.warning("Failed to fetch IMAP envelope %s: %s", msg_id, e)
-            continue
+            except (OSError, imaplib.IMAP4.error) as e:
+                logger.warning("Failed to fetch IMAP envelope %s: %s", msg_id, e)
+                continue
 
-    mail.logout()
     start = (page - 1) * page_size
     end = start + page_size
     return envelopes[start:end]
@@ -319,32 +300,13 @@ def get_message(
     ssl: bool = True,
     folder: str = "INBOX",
 ) -> Message:
-    """Fetch a single IMAP message by UID, returning a Himalaya-compatible Message."""
-    try:
-        mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
-    except (OSError, imaplib.IMAP4.error) as e:
-        logger.debug("Failed to connect to %s:%s: %s", host, port, e)
-        msg = f"Failed to connect to mail server: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.login(username, password)
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        logger.debug("IMAP login failed for %s: %s", username, e)
-        msg = f"IMAP login failed: {e}"
-        raise IMAPError(msg) from e
-
-    try:
-        mail.select(folder)
+    with _imap_session(host, port, username, password, ssl, folder) as mail:
         status, data = mail.fetch(message_id, "(RFC822)")
         if status != "OK" or not data or not data[0]:
-            mail.logout()
             msg = f"Message {message_id} not found"
             raise IMAPError(msg)
         raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
         if not raw:
-            mail.logout()
             msg = f"Message {message_id} not found"
             raise IMAPError(msg)
         parsed = _parse_email(raw)
@@ -354,7 +316,6 @@ def get_message(
         if date_str:
             with contextlib.suppress(ValueError):
                 date = email.utils.parsedate_to_datetime(date_str)
-        mail.logout()
         return Message(
             id=message_id,
             subject=parsed.get("subject", ""),
@@ -364,12 +325,6 @@ def get_message(
             body=parsed.get("body", ""),
             flags=[],
         )
-    except IMAPError:
-        raise
-    except (OSError, imaplib.IMAP4.error) as e:
-        mail.logout()
-        msg = f"Failed to fetch message {message_id}: {e}"
-        raise IMAPError(msg) from e
 
 
 def match_reply_to_request(
