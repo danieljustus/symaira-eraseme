@@ -56,7 +56,7 @@ _PBKDF2_ITERATIONS = 600_000
 _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
-_DB_INITIAL_DATA_VERSION: dict[Path, int] = {}
+_DB_INITIAL_DATA_HASH: dict[Path, str] = {}
 _FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
 _STALE_SCAVENGE_AGE = 300
 _DB_LOCK_RETRY_ATTEMPTS = 3
@@ -121,6 +121,7 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
     lock_path = db_path.parent / f"{db_path.name}.lock"
     attempts = _DB_LOCK_RETRY_ATTEMPTS if retry else 1
     for attempt in range(attempts):
+        lock_file = None
         try:
             lock_file = open(lock_path, "w")  # noqa: SIM115
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -273,13 +274,7 @@ def _decrypt_to_temp(path: Path) -> Path:
         tmp_path = Path(tmp.name)
     os.chmod(tmp_path, 0o600)
     _DB_TEMP[path.resolve()] = tmp_path
-    try:
-        conn = sqlite3.connect(str(tmp_path))
-        row = conn.execute("PRAGMA data_version").fetchone()
-        _DB_INITIAL_DATA_VERSION[tmp_path] = row[0] if row else 0
-        conn.close()
-    except OSError:
-        _DB_INITIAL_DATA_VERSION[tmp_path] = 0
+    _DB_INITIAL_DATA_HASH[tmp_path] = hashlib.sha256(tmp_path.read_bytes()).hexdigest()
     return tmp_path
 
 
@@ -314,16 +309,12 @@ def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
             try:
                 conn = sqlite3.connect(str(tmp))
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                current_version = conn.execute("PRAGMA data_version").fetchone()[0]
                 conn.close()
             except OSError:
-                current_version = None
-            initial_version = _DB_INITIAL_DATA_VERSION.get(tmp)
-            db_changed = (
-                current_version is None
-                or initial_version is None
-                or current_version != initial_version
-            )
+                pass
+            current_hash = hashlib.sha256(tmp.read_bytes()).hexdigest()
+            initial_hash = _DB_INITIAL_DATA_HASH.get(tmp)
+            db_changed = initial_hash is None or current_hash != initial_hash
             if not db_changed:
                 logger.debug("DB unchanged, skipping re-encryption: %s", orig)
             else:
@@ -331,7 +322,7 @@ def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
     except (OSError, RuntimeError, ValueError) as exc:
         logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
     finally:
-        _DB_INITIAL_DATA_VERSION.pop(tmp, None)
+        _DB_INITIAL_DATA_HASH.pop(tmp, None)
         try:
             if tmp.exists() and tmp != orig:
                 tmp.unlink(missing_ok=True)
