@@ -473,3 +473,62 @@ class TestCleanupRegistration:
         from symeraseme.core.db import _cleanup_temp_files
 
         assert callable(_cleanup_temp_files)
+
+
+class TestWriteRoundTrip:
+    """Writes to an encrypted DB must persist through close/reopen."""
+
+    def test_write_persists_through_encrypt_close_reopen(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        db_file = tmp_path / "roundtrip.db"
+
+        init_db(str(db_file))
+        conn = get_connection(str(db_file))
+        conn.execute(
+            "INSERT INTO campaigns (id, kind) VALUES (?, ?)",
+            ("rt-campaign", "initial"),
+        )
+        conn.commit()
+        close_connection()
+
+        conn = get_connection(str(db_file))
+        rows = conn.execute("SELECT id, kind FROM campaigns").fetchall()
+        close_connection()
+
+        assert len(rows) == 1
+        assert rows[0]["id"] == "rt-campaign"
+        assert rows[0]["kind"] == "initial"
+
+
+class TestReadonlySkipReencrypt:
+    """Opening and closing without writes must skip re-encryption."""
+
+    def test_readonly_skips_reencrypt(
+        self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
+        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+
+        from symeraseme.core.db import _ENC_MAGIC_V3
+
+        conn = get_connection(str(encrypted_db_file))
+        conn.execute("SELECT 1").fetchone()
+        close_connection()
+
+        assert encrypted_db_file.read_bytes().startswith(_ENC_MAGIC_V3)
+
+        content_after_migration = encrypted_db_file.read_bytes()
+
+        conn = get_connection(str(encrypted_db_file))
+        conn.execute("SELECT 1").fetchone()
+        close_connection()
+
+        after_content = encrypted_db_file.read_bytes()
+        assert after_content == content_after_migration, (
+            "Read-only open should not trigger re-encryption"
+        )
