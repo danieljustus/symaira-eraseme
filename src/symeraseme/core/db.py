@@ -314,10 +314,7 @@ def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
                 pass
             current_hash = hashlib.sha256(tmp.read_bytes()).hexdigest()
             initial_hash = _DB_INITIAL_DATA_HASH.get(tmp)
-            db_changed = (
-                initial_hash is None
-                or current_hash != initial_hash
-            )
+            db_changed = initial_hash is None or current_hash != initial_hash
             if not db_changed:
                 logger.debug("DB unchanged, skipping re-encryption: %s", orig)
             else:
