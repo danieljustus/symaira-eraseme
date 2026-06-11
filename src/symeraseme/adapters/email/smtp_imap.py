@@ -238,7 +238,7 @@ def list_messages(
         if not target_ids:
             return []
 
-        id_range = b",".join(target_ids)
+        id_range = ",".join(mid.decode() if isinstance(mid, bytes) else mid for mid in target_ids)
         fetch_cmd = "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO DATE MESSAGE-ID)])"
         status, data = mail.fetch(id_range, fetch_cmd)
         if status != "OK" or not data:
@@ -253,7 +253,12 @@ def list_messages(
             if not isinstance(header_bytes, bytes):
                 continue
 
-            msg_id = meta_line.split()[0].decode() if meta_line else ""
+            if isinstance(meta_line, bytes):
+                msg_id = meta_line.split()[0].decode()
+            elif isinstance(meta_line, tuple) and meta_line:
+                msg_id = meta_line[0].split()[0].decode()
+            else:
+                msg_id = ""
 
             parsed = _parse_email(header_bytes)
             headers = parsed.get("headers", {})

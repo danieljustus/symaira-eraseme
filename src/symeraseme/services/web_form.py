@@ -53,7 +53,7 @@ async def _run_form_with_fallback(
     headed: bool = False,
     screenshot_dir: str = "",
     identity_fields: dict[str, str],
-) -> tuple[WebFormResult | None, str | None, str | None]:
+) -> tuple[WebFormResult, None, int | None] | tuple[None, str, None]:
     try:
         result = await _run_form(
             url=url,
@@ -143,6 +143,8 @@ async def run_web_form_for_broker(
             "broker_name": broker.name,
         }
 
+    assert result is not None
+
     return {
         "success": result.success,
         "broker_id": broker_id,
@@ -230,6 +232,8 @@ async def handle_run_web_form(
                 "Install with: uv pip install playwright && playwright install chromium"
             ),
         )
+
+    assert result is not None
 
     data = {
         "broker_id": broker_id,
