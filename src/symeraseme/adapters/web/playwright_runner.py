@@ -188,7 +188,7 @@ async def _execute_step(
         if result.token:
             logger.debug("Injecting captcha token")
             await page.evaluate(
-                'document.getElementById("g-recaptcha-response")?.style.display = "block";'
+                'const el = document.getElementById("g-recaptcha-response"); if (el) el.style.display = "block";'
             )
             await page.fill(
                 "textarea#g-recaptcha-response, [name='g-recaptcha-response']",
