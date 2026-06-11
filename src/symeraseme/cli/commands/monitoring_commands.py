@@ -13,6 +13,7 @@ import typer
 from symeraseme.cli.console import render_result
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.result_types import CliResult
+from symeraseme.llm.factory import list_available_providers
 from symeraseme.services.inbox import handle_poll_inbox
 from symeraseme.services.reply import (
     handle_classify_reply,
@@ -104,7 +105,7 @@ def classify_reply(
         None,
         "--provider",
         envvar="SYMERASEME_LLM_PROVIDER",
-        help="LLM provider: anthropic, openai, ollama",
+        help=f"LLM provider: {', '.join(list_available_providers())}",
     ),
     model: str = typer.Option(
         None,
@@ -140,7 +141,7 @@ def generate_rebuttal_cmd(
         None,
         "--provider",
         envvar="SYMERASEME_LLM_PROVIDER",
-        help="LLM provider: anthropic, openai, ollama",
+        help=f"LLM provider: {', '.join(list_available_providers())}",
     ),
     model: str = typer.Option(
         None,
