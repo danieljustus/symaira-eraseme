@@ -66,6 +66,8 @@ async def run_web_form(
         )
         raise PlaywrightRunnerError(msg) from None
 
+    from playwright.async_api import Error as PlaywrightError
+
     screenshot_dir_path = Path(screenshot_dir) if screenshot_dir else None
     if screenshot_dir_path:
         screenshot_dir_path.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -106,7 +108,7 @@ async def run_web_form(
             result.success = True
         except PlaywrightRunnerError:
             raise
-        except (RuntimeError, ValueError, OSError) as e:
+        except (RuntimeError, ValueError, OSError, PlaywrightError) as e:
             result.error = _capture_error(e, page.url if page else url)
             if screenshot_dir_path:
                 result.screenshot_path = str(
