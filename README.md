@@ -54,7 +54,7 @@ pip install symeraseme[triage]   # LLM triage via Anthropic Claude
 **macOS users** (via Homebrew):
 
 ```bash
-brew tap danieljustus/symaira
+brew tap danieljustus/tap
 brew install symeraseme
 ```
 
@@ -75,6 +75,35 @@ cp .env.example .env
 ```
 
 See `.env.example` for all supported environment variables.
+
+### Secrets aus Symaira Vault
+
+Symaira EraseMe supports [Symaira Vault](https://github.com/danieljustus/symaira-vault)
+for centralized secret management. Instead of storing credentials in environment
+variables or the system keyring, you can reference them via `vault://` URIs:
+
+```bash
+# Store a secret in Symaira Vault
+symvault set anthropic/prod-key "sk-ant-..."
+
+# Reference it in your .env or profile config
+export ANTHROPIC_API_KEY="vault://anthropic/prod-key"
+export CAPSOLVER_API_KEY="vault://captcha/capsolver"
+export IMAP_PASSWORD="vault://email/imap-password"
+```
+
+When Symaira EraseMe encounters a `vault://` URI, it transparently resolves it
+by calling `symvault get <path>`. The fallback chain is:
+
+1. **Symaira Vault** — `symvault get <path>` (requires `symvault` on PATH)
+2. **Environment variable** — the literal value of the env var
+3. **System keyring** — Python `keyring` package (for IMAP credentials)
+
+If `symvault` is not installed, the system falls back to the plain-text value
+in the environment variable. No crash, no error — just a debug log.
+
+> **Security**: Secret values are never written to logs, tracebacks, or
+> structured logging events.
 
 ## Usage
 

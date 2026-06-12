@@ -90,3 +90,28 @@ A: Encrypted at rest using AES-256 via the `cryptography` library. The
 **Q: What if I mistype my name?**
 A: Re-run `init-profile` with the correct information. It overwrites the
    existing profile.
+
+## Secrets from Symaira Vault
+
+Symaira EraseMe supports `vault://` URIs for all credentials. Instead of
+storing API keys and passwords in environment variables, reference them
+from [Symaira Vault](https://github.com/danieljustus/symaira-vault):
+
+```bash
+# Store secrets in Symaira Vault
+symvault set anthropic/prod-key "sk-ant-..."
+symvault set captcha/capsolver "CAP-..."
+symvault set email/imap-password "your-imap-password"
+```
+
+Then set environment variables to point at the vault:
+
+```bash
+export ANTHROPIC_API_KEY="vault://anthropic/prod-key"
+export CAPSOLVER_API_KEY="vault://captcha/capsolver"
+export IMAP_PASSWORD="vault://email/imap-password"
+```
+
+**Resolution order**: vault:// → env var → system keyring.
+If `symvault` is not installed, the plain-text env var value is used.
+Secrets are never logged.
