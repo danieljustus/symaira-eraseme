@@ -6,6 +6,7 @@ import logging
 import time  # noqa: F401
 from typing import Any
 
+from symeraseme.core.secrets import SecretResolutionError, resolve_secret
 from symeraseme.llm.protocol import (
     BaseLLMClient,
     LLMClientError,
@@ -55,7 +56,12 @@ class AnthropicClient(BaseLLMClient):
         if self._api_key is None:
             import os
 
-            self._api_key = os.environ.get("ANTHROPIC_API_KEY")
+            raw = os.environ.get("ANTHROPIC_API_KEY", "")
+            if raw:
+                try:
+                    self._api_key = resolve_secret(raw)
+                except SecretResolutionError:
+                    return False
         return self._api_key is not None and len(self._api_key) > 0
 
     def _call_api(

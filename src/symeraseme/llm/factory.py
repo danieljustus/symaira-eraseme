@@ -4,6 +4,7 @@ import importlib
 import os
 from typing import Any
 
+from symeraseme.core.secrets import SecretResolutionError, resolve_secret
 from symeraseme.llm.protocol import LLMClient, LLMProviderError
 
 # ── Provider registry ────────────────────────────────────────────────
@@ -93,7 +94,12 @@ def create_llm_client(
         model = env_model if env_model else default_model
 
     if api_key is None and key_env:
-        api_key = os.environ.get(key_env)
+        raw = os.environ.get(key_env, "")
+        if raw:
+            try:
+                api_key = resolve_secret(raw)
+            except SecretResolutionError:
+                api_key = None
 
     if base_url is None:
         base_url = os.environ.get(_ENV_BASE_URL)

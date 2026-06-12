@@ -10,6 +10,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from symeraseme.core.secrets import SecretResolutionError, resolve_secret
+
 logger = logging.getLogger(__name__)
 
 CAPSOLVER_BASE = "https://api.capsolver.com"
@@ -309,24 +311,36 @@ def create_solver(
     Reads API key from environment if not provided:
     - capsolver -> CAPSOLVER_API_KEY
     - twocaptcha -> TWOCAPTCHA_API_KEY
+
+    Supports vault:// URIs for all API keys.
     """
     import os
 
     provider = provider.lower().strip()
     if provider == "capsolver":
-        key = api_key or os.environ.get("CAPSOLVER_API_KEY", "")
-        if not key:
+        raw = api_key or os.environ.get("CAPSOLVER_API_KEY", "")
+        if raw:
+            try:
+                raw = resolve_secret(raw)
+            except SecretResolutionError:
+                raw = ""
+        if not raw:
             raise CaptchaError(
                 "CapSolver API key not configured. Set CAPSOLVER_API_KEY env var or pass --api-key"
             )
-        return CapSolverSolver(key)
+        return CapSolverSolver(raw)
     elif provider == "twocaptcha":
-        key = api_key or os.environ.get("TWOCAPTCHA_API_KEY", "")
-        if not key:
+        raw = api_key or os.environ.get("TWOCAPTCHA_API_KEY", "")
+        if raw:
+            try:
+                raw = resolve_secret(raw)
+            except SecretResolutionError:
+                raw = ""
+        if not raw:
             raise CaptchaError(
                 "2Captcha API key not configured. Set TWOCAPTCHA_API_KEY env var or pass --api-key"
             )
-        return TwoCaptchaSolver(key)
+        return TwoCaptchaSolver(raw)
     else:
         msg = f"Unknown captcha provider: {provider}. Use 'capsolver' or 'twocaptcha'."
         raise CaptchaError(msg)
