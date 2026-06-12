@@ -171,10 +171,7 @@ def resolve_secret(
             return secret
 
     # --- All layers exhausted ---
-    msg = (
-        f"Cannot resolve secret 'vault://{vault_path}': "
-        f"symvault not available or returned error"
-    )
+    msg = f"Cannot resolve secret 'vault://{vault_path}': symvault not available or returned error"
     if env_fallback:
         msg += f", env var '{env_fallback}' not set"
     if keyring_service:
