@@ -38,7 +38,7 @@ def _build_identity_fields() -> dict[str, str]:
         fields[f"address_street_{i}"] = addr.street
         fields[f"address_city_{i}"] = addr.city
         fields[f"address_zip_{i}"] = addr.postal_code
-        fields[f"address_state_{i}"] = addr.state if hasattr(addr, "state") else ""
+        fields[f"address_state_{i}"] = addr.state or ""
         fields[f"address_country_{i}"] = addr.country
     return fields
 

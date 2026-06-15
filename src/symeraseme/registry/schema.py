@@ -105,6 +105,7 @@ class Address(BaseModel):
     city: str
     postal_code: str
     country: str
+    state: str | None = None
     valid_from: date | None = None
     valid_to: date | None = None
 
