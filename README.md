@@ -93,9 +93,9 @@ export IMAP_PASSWORD="vault://email/imap-password"
 ```
 
 When Symaira EraseMe encounters a `vault://` URI, it transparently resolves it
-by calling `symvault get <path>`. The fallback chain is:
+by calling `symvault get <path> --print`. The fallback chain is:
 
-1. **Symaira Vault** — `symvault get <path>` (requires `symvault` on PATH)
+1. **Symaira Vault** — `symvault get <path> --print` (requires `symvault` on PATH)
 2. **Environment variable** — the literal value of the env var
 3. **System keyring** — Python `keyring` package (for IMAP credentials)
 

@@ -51,3 +51,6 @@ build/
 
 # Local environment file
 .env
+
+# Agent/developer workspace files
+AGENTS.md

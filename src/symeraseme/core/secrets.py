@@ -39,7 +39,7 @@ def _symvault_available() -> bool:
 
 
 def _resolve_via_symvault(path: str) -> str | None:
-    """Call ``symvault get <path>`` and return stdout, or None on failure.
+    """Call ``symvault get <path> --print`` and return stdout, or None on failure.
 
     The secret value is never logged.
     """
@@ -49,7 +49,7 @@ def _resolve_via_symvault(path: str) -> str | None:
 
     try:
         result = subprocess.run(
-            ["symvault", "get", path],
+            ["symvault", "get", path, "--print"],
             capture_output=True,
             timeout=_SYMVAULT_TIMEOUT,
         )
@@ -113,7 +113,7 @@ def resolve_secret(
     ----------
     value:
         The raw value to resolve.  If it starts with ``vault://``, the
-        path portion is passed to ``symvault get``.  Otherwise the
+        path portion is passed to ``symvault get <path> --print``.  Otherwise the
         literal value is returned immediately.
     env_fallback:
         Environment variable name to check when vault:// resolution

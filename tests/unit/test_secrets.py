@@ -111,6 +111,26 @@ class TestResolveViaSymvault:
             result = _resolve_via_symvault("bad/path")
         assert result is None
 
+    def test_calls_symvault_with_print_flag(self):
+        """symvault is called in explicit scripting mode."""
+        import subprocess
+
+        fake_result = subprocess.CompletedProcess(
+            args=["symvault", "get", "github/token", "--print"],
+            returncode=0,
+            stdout=b"vault-secret-42\n",
+            stderr=b"",
+        )
+        with (
+            patch("symeraseme.core.secrets._symvault_available", return_value=True),
+            patch("subprocess.run", return_value=fake_result) as run_mock,
+        ):
+            result = _resolve_via_symvault("github/token")
+
+        assert result == "vault-secret-42"
+        run_mock.assert_called_once()
+        assert run_mock.call_args.args[0] == ["symvault", "get", "github/token", "--print"]
+
     def test_symvault_not_installed(self):
         with patch("symeraseme.core.secrets._symvault_available", return_value=False):
             result = _resolve_via_symvault("any/path")
