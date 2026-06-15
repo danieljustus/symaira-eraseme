@@ -3,6 +3,13 @@
 **Symaira EraseMe** supports all major AI coding agents through standardized
 skill formats and adapter files.
 
+## Ecosystem Guidance
+
+- Before changing cross-tool integrations, shared conventions, or product
+  boundaries, read `../docs/00-MASTERPLAN.md` and `../ECOSYSTEM.md`.
+- Keep the standalone-first contract: this repo must install, test, and run
+  without any other Symaira tool installed.
+
 ## Quick Reference
 
 | Agent | Format | Auto-Discovery | Setup Complexity |
