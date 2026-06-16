@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import os
 from typing import Any
 
 from symeraseme.core.secrets import SecretResolutionError, resolve_secret
 from symeraseme.llm.protocol import LLMClient, LLMProviderError
+
+logger = logging.getLogger(__name__)
 
 # ── Provider registry ────────────────────────────────────────────────
 # Each entry maps a provider name to its lazy-load details.
@@ -98,7 +101,13 @@ def create_llm_client(
         if raw:
             try:
                 api_key = resolve_secret(raw)
-            except SecretResolutionError:
+            except SecretResolutionError as exc:
+                logger.warning(
+                    "Failed to resolve API key from %s: %s. "
+                    "The LLM client will be created without an API key.",
+                    key_env,
+                    exc,
+                )
                 api_key = None
 
     if base_url is None:
