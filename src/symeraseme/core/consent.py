@@ -23,7 +23,6 @@ from symeraseme.core.config import get_config
 
 logger = logging.getLogger(__name__)
 
-CONSENT_DIR = "~/.local/share/symeraseme"
 TOKEN_TTL = 86400  # 24 hours in seconds
 
 

@@ -9,9 +9,14 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from symeraseme.core.config import get_config
+
 logger = logging.getLogger(__name__)
 
-_LLM_CONSENT_FILE = Path("~/.config/symeraseme/.llm_consent_granted").expanduser()
+
+def _llm_consent_file() -> Path:
+    return get_config().resolved_config_dir / ".llm_consent_granted"
+
 
 # Bounded quantifiers prevent catastrophic backtracking on pathological
 # input (long strings of dots/hyphens).  126 labels is far beyond any
@@ -125,38 +130,38 @@ def llm_consent_granted() -> bool:
     env = os.environ.get("SYMERASEME_LLM_CONSENT", "").strip().lower()
     if env in ("1", "true", "yes"):
         return True
-    if not _LLM_CONSENT_FILE.exists():
+    if not _llm_consent_file().exists():
         return False
     # Legacy empty touch file (st_size == 0) — treat as granted for backward compatibility
-    if _LLM_CONSENT_FILE.stat().st_size == 0:
+    if _llm_consent_file().stat().st_size == 0:
         return True
     try:
-        data = json.loads(_LLM_CONSENT_FILE.read_text(encoding="utf-8"))
+        data = json.loads(_llm_consent_file().read_text(encoding="utf-8"))
         return bool(data.get("granted", False))
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning(
             "Cannot read LLM consent file %s (%s) — denying consent; re-run 'grant llm-consent'",
-            _LLM_CONSENT_FILE,
+            _llm_consent_file(),
             exc,
         )
         return False
 
 
 def grant_llm_consent() -> None:
-    _LLM_CONSENT_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _llm_consent_file().parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     record = {
         "granted": True,
         "user": getpass.getuser(),
         "granted_at": int(time.time()),
         "scope": "llm_pii",
     }
-    fd = os.open(_LLM_CONSENT_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)
+    fd = os.open(_llm_consent_file(), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)
     with open(fd, "w", encoding="utf-8") as f:
         json.dump(record, f, indent=2)
-    logger.info("LLM PII consent granted via %s", _LLM_CONSENT_FILE)
+    logger.info("LLM PII consent granted via %s", _llm_consent_file())
 
 
 def revoke_llm_consent() -> None:
-    if _LLM_CONSENT_FILE.exists():
-        _LLM_CONSENT_FILE.unlink(missing_ok=True)
-        logger.info("LLM PII consent revoked (%s removed)", _LLM_CONSENT_FILE)
+    if _llm_consent_file().exists():
+        _llm_consent_file().unlink(missing_ok=True)
+        logger.info("LLM PII consent revoked (%s removed)", _llm_consent_file())
