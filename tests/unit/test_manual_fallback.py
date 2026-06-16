@@ -333,7 +333,7 @@ class TestManualTask:
 class TestDbIntegration:
     def test_init_db_creates_manual_tasks_table(self):
         """Verify the manual_tasks table exists after init_db."""
-        from symeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
         close_connection()
 

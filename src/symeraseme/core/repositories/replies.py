@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from symeraseme.core.db import get_connection
+from symeraseme.core.db_connection import get_connection
 
 _CLASSIFICATIONS_NEEDING_REPLY = frozenset(
     {"rejected", "verification", "human_required", "unclear"}

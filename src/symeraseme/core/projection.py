@@ -8,7 +8,7 @@ from datetime import timedelta
 from typing import Any
 
 from symeraseme.core.datetime_utils import parse_iso_datetime as _parse_ts
-from symeraseme.core.db import get_connection
+from symeraseme.core.db_connection import get_connection
 from symeraseme.core.events import append_event
 
 logger = logging.getLogger(__name__)

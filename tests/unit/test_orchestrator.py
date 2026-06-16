@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 from symeraseme.cli import app
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent, issue_token, verify_token
-from symeraseme.core.db import close_connection, init_db
+from symeraseme.core.db_connection import close_connection, init_db
 from symeraseme.core.events import list_removal_requests
 from symeraseme.core.execution import execute_request
 from symeraseme.core.inbox import submit_inbox_reply
@@ -263,7 +263,7 @@ class TestExecuteCampaign:
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()
@@ -428,7 +428,7 @@ class TestHandleExecuteRouting:
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_SMTP_FROM"] = "test@example.com"
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()
@@ -460,7 +460,7 @@ class TestHandleExecuteRouting:
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()
@@ -496,7 +496,7 @@ class TestHandleExecuteRouting:
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()

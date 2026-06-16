@@ -99,7 +99,7 @@ def _checkpoint_and_cleanup_wal(db_path: Path) -> None:
 
 def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
     """Re-encrypt *tmp* back to *orig* (if changed) and remove *tmp*."""
-    from symeraseme.core import db as _db_mod
+    from symeraseme.core.db_encryption import _encrypt_file
 
     try:
         if tmp.exists():
@@ -115,7 +115,7 @@ def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
             if not db_changed:
                 logger.debug("DB unchanged, skipping re-encryption: %s", orig)
             else:
-                _db_mod._encrypt_file(tmp, orig)
+                _encrypt_file(tmp, orig)
     except (OSError, RuntimeError, ValueError) as exc:
         logger.warning("Failed to re-encrypt DB %s: %s", orig, exc)
     finally:
@@ -135,13 +135,11 @@ def _reencrypt_and_remove_temp(orig: Path, tmp: Path) -> None:
 
 def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
     """Acquire an exclusive file lock for encrypted DB access."""
-    from symeraseme.core import db as _db_mod
-
     global _db_lock_file
     if not _HAVE_FCNTL or not _db_encryption_enabled():
         return
     lock_path = db_path.parent / f"{db_path.name}.lock"
-    attempts = _db_mod._DB_LOCK_RETRY_ATTEMPTS if retry else 1
+    attempts = _DB_LOCK_RETRY_ATTEMPTS if retry else 1
     for attempt in range(attempts):
         lock_file = None
         try:

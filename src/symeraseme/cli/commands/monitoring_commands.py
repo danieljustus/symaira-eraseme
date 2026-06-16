@@ -11,7 +11,7 @@ from typing import Any
 import typer
 
 from symeraseme.cli.console import render_result
-from symeraseme.core.db import get_connection, init_db
+from symeraseme.core.db_connection import get_connection, init_db
 from symeraseme.core.result_types import CliResult
 from symeraseme.llm.factory import list_available_providers
 from symeraseme.services.inbox import handle_poll_inbox

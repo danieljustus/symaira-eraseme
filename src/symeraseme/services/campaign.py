@@ -6,7 +6,7 @@ import asyncio
 
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
-from symeraseme.core.db import init_db
+from symeraseme.core.db_connection import init_db
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
 
@@ -64,6 +64,8 @@ def handle_execute(
     web_form_runner=None,
     backend: str | None = None,
     email_sender=None,
+    concurrent: bool = False,
+    workers: int = 3,
 ) -> CliResult:
     if not dry_run and not check_consent(
         "execute",
@@ -140,6 +142,53 @@ def handle_execute(
             web_form_runner=web_form_runner,
             email_sender=email_sender,
         )
+    elif concurrent:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info("Using concurrent execution with %d workers", workers)
+
+        async def _run_concurrent() -> dict:
+            import asyncio
+
+            semaphore = asyncio.Semaphore(workers)
+
+            async def _limited_execute(req: dict) -> dict:
+                async with semaphore:
+                    from symeraseme.core.execution import execute_request
+
+                    try:
+                        return await asyncio.to_thread(
+                            execute_request,
+                            req["id"],
+                            dry_run=dry_run,
+                            web_form_runner=web_form_runner,
+                            email_sender=email_sender,
+                        )
+                    except Exception as e:
+                        return {"success": False, "error": str(e), "request_id": req["id"]}
+
+            from symeraseme.core.batch import _prepare_batch
+
+            batch = _prepare_batch(campaign_id, batch_size)
+            if not batch:
+                return {
+                    "campaign_id": campaign_id,
+                    "total_planned": 0,
+                    "batch_size": 0,
+                    "results": [],
+                }
+
+            tasks = [_limited_execute(req) for req in batch]
+            results = await asyncio.gather(*tasks)
+            return {
+                "campaign_id": campaign_id,
+                "total_planned": len(batch),
+                "batch_size": len(batch),
+                "results": list(results),
+            }
+
+        result = asyncio.run(_run_concurrent())
     else:
         result = asyncio.run(
             execute_campaign_async(

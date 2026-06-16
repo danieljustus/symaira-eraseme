@@ -7,7 +7,7 @@ import os
 
 def _seed_db(tmp_path: str) -> None:
     """Seed a test database with campaign and request data."""
-    from symeraseme.core.db import close_connection, get_connection, init_db
+    from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
     os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
@@ -72,7 +72,7 @@ def _seed_db(tmp_path: str) -> None:
 
 
 def _clean_db() -> None:
-    from symeraseme.core.db import close_connection
+    from symeraseme.core.db_connection import close_connection
 
     close_connection()
     os.environ.pop("SYMERASEME_DB_DIR", None)
@@ -119,7 +119,7 @@ class TestGetDashboardData:
 
     def test_handles_no_db(self, tmp_path):
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()
