@@ -78,10 +78,11 @@ def _get_secure_temp_dir() -> Path:
     if system == "Linux" and Path("/dev/shm").exists():
         secure_dir = Path("/dev/shm") / f"symeraseme-db-{uid}"
     elif system == "Darwin":
-        # On macOS /tmp is not a RAM disk — it is persistent storage.
-        # Use the standard temp directory (respects TMPDIR) and rely on
-        # the short stale-scavenger window (300 s) plus atexit/SIGTERM
-        # cleanup to minimise exposure.
+        if _db_encryption_enabled():
+            logger.warning(
+                "macOS: decrypted database files are stored in /tmp (disk-backed). "
+                "Consider setting TMPDIR to a RAM disk (e.g., /dev/shm) for better security."
+            )
         secure_dir = Path(tempfile.gettempdir()) / f"symeraseme-db-{uid}"
     else:
         # Windows and other platforms: fall back to the OS temp directory.
