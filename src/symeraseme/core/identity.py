@@ -119,11 +119,12 @@ def load_profile(path: str | None = None) -> IdentityProfile:
     except InvalidTag:
         version = header.get("version", 0)
         if version == 0:
-            logger.warning(
-                "AAD verification failed — retrying without AAD for legacy file. "
-                "Re-encrypt the profile to upgrade: symeraseme save-profile",
+            msg = (
+                "Legacy v0 profile detected without AAD protection. "
+                "This format is deprecated and no longer supported for security reasons. "
+                "Please re-initialize your profile: symeraseme init-profile"
             )
-            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+            raise RuntimeError(msg) from None
         else:
             raise
     data = json.loads(plaintext.decode("utf-8"))

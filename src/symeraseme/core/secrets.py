@@ -65,13 +65,9 @@ def _resolve_via_symvault(path: str) -> str | None:
         return None
 
     if result.returncode != 0:
-        stderr_text = (result.stderr or b"").decode("utf-8", errors="replace").strip()
         logger.warning(
-            "symvault get %s exited with code %d: %s",
-            path,
+            "symvault get failed with exit code %d (path omitted for security)",
             result.returncode,
-            # Only log the first 200 chars of stderr to avoid log flooding
-            stderr_text[:200] if stderr_text else "(no output)",
         )
         return None
 

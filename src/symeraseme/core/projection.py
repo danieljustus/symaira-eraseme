@@ -97,13 +97,13 @@ def _accumulate_state(
 
             elif event_type == "DPA_COMPLAINT_DRAFTED":
                 state["escalation_level"] = 2
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError, AttributeError) as exc:
             logger.error(
-                "Event replay failed for request %d event_id=%s event_type=%s: skipping event",
+                "Event replay failed for request %d event_id=%s event_type=%s: %s — skipping event",
                 request_id,
                 event_id,
                 event_type,
-                exc_info=True,
+                exc,
             )
             continue
 

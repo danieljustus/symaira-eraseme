@@ -279,7 +279,7 @@ class TestNoLeak:
 
         assert result is None
         # Error context IS logged (diagnostic), but the actual secret is not.
-        error_logged = any("exited with code 1" in r.getMessage() for r in caplog.records)
+        error_logged = any("failed with exit code 1" in r.getMessage() for r in caplog.records)
         assert error_logged, "Expected a warning about symvault failure"
 
 

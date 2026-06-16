@@ -8,6 +8,7 @@ via either:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -212,6 +213,8 @@ def _read_consent_file(path: str | Path) -> str | None:
             logger.warning(
                 "Consent file %s has permissions %o, expected 0o600", p, st.st_mode & 0o777
             )
+            with contextlib.suppress(OSError):
+                os.chmod(p, 0o600)
         data = os.read(fd, 65536)
         token = data.decode().strip().split("\n")[0]
     except OSError as exc:
