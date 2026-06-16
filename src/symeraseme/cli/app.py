@@ -23,6 +23,7 @@ from symeraseme.cli.commands.inspection_commands import (
 )
 from symeraseme.cli.commands.maintenance_commands import (
     db_init,
+    db_migrate,
     export_cmd,
     generate_scheduler_cmd,
     registry_app,
@@ -54,7 +55,7 @@ app = typer.Typer(
     epilog=(
         "Quick Start:\n"
         "  1. symeraseme init-profile                       Create your identity profile\n"
-        "  2. symeraseme brokers list --jurisdiction EU      Browse the broker registry\n"
+        "  2. symeraseme brokers list --law GDPR             Browse the broker registry\n"
         "  3. symeraseme plan create --campaign initial \\\n"
         "     --jurisdiction EU --max 10                     Plan a removal campaign\n"
         "  4. symeraseme plan execute --campaign initial \\\n"
@@ -154,6 +155,7 @@ app.command(name="solve-captcha", rich_help_panel="Web-form Automation")(solve_c
 
 # ── Maintenance ───────────────────────────────────────────────────────────
 app.command(rich_help_panel="Maintenance")(db_init)
+app.command(name="db-migrate", rich_help_panel="Maintenance")(db_migrate)
 app.command(name="generate-scheduler", rich_help_panel="Maintenance")(generate_scheduler_cmd)
 app.command(name="export", rich_help_panel="Maintenance")(export_cmd)
 app.command(rich_help_panel="Maintenance")(validate)

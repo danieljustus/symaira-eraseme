@@ -58,12 +58,15 @@ _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 _DB_TEMP: dict[Path, Path] = {}
 _DB_INITIAL_DATA_HASH: dict[Path, str] = {}
 _FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
+_SCHEMA_VERSION_CACHE: dict[str, int] = {}
 _STALE_SCAVENGE_AGE = 300
 _DB_LOCK_RETRY_ATTEMPTS = 3
 _DB_LOCK_RETRY_DELAY = 1.0
 
 _local = threading.local()
 _db_lock_file: IO | None = None
+_db_temp_locks: dict[Path, threading.Lock] = {}
+_db_temp_locks_lock = threading.Lock()
 
 
 def _get_secure_temp_dir() -> Path:
@@ -75,10 +78,11 @@ def _get_secure_temp_dir() -> Path:
     if system == "Linux" and Path("/dev/shm").exists():
         secure_dir = Path("/dev/shm") / f"symeraseme-db-{uid}"
     elif system == "Darwin":
-        # On macOS /tmp is not a RAM disk — it is persistent storage.
-        # Use the standard temp directory (respects TMPDIR) and rely on
-        # the short stale-scavenger window (300 s) plus atexit/SIGTERM
-        # cleanup to minimise exposure.
+        if _db_encryption_enabled():
+            logger.warning(
+                "macOS: decrypted database files are stored in /tmp (disk-backed). "
+                "Consider setting TMPDIR to a RAM disk (e.g., /dev/shm) for better security."
+            )
         secure_dir = Path(tempfile.gettempdir()) / f"symeraseme-db-{uid}"
     else:
         # Windows and other platforms: fall back to the OS temp directory.
@@ -263,7 +267,7 @@ def _decrypt_to_temp(path: Path) -> Path:
         logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
             "Cannot decrypt database — identity master key is not available. "
-            "Run `symeraseme init-profile` first."
+            "Run `symeraseme init-profile` or ensure your master key is in the system keyring."
         )
         raise RuntimeError(msg)
     f = Fernet(fernet_key)
@@ -386,6 +390,12 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
             )
             if is_enc:
                 if raw.startswith(_ENC_HEADER_V1):
+                    logger.warning(
+                        "V1-encrypted database detected at %s. "
+                        "Migrating to V3 format automatically. "
+                        "Consider running 'symeraseme db migrate' explicitly.",
+                        db_file,
+                    )
                     _migrate_v1_to_v2(db_file)
                     _migrate_v2_to_v3(db_file)
                 elif raw.startswith(_ENC_MAGIC_V2):
@@ -449,11 +459,18 @@ def init_db(path: str | None = None) -> Path:
     Returns the database file path.
     """
     db_file = _db_path(path)
+    db_key = str(db_file)
+
+    # Skip PRAGMA check when cache is already current for this DB.
+    if _SCHEMA_VERSION_CACHE.get(db_key, -1) >= _SCHEMA_VERSION:
+        return db_file
+
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = get_connection(str(db_file))
+    conn = get_connection(db_key)
 
     current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    _SCHEMA_VERSION_CACHE[db_key] = current_version
     if current_version >= _SCHEMA_VERSION:
         return db_file
 
@@ -567,4 +584,5 @@ def init_db(path: str | None = None) -> Path:
         PRAGMA user_version = 1;
     """)
     conn.commit()
+    _SCHEMA_VERSION_CACHE[db_key] = _SCHEMA_VERSION
     return db_file

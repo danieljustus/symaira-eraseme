@@ -110,6 +110,9 @@ in the environment variable. No crash, no error — just a debug log.
 ### Getting started
 
 ```bash
+# Verify installation
+symeraseme --version
+
 # Initialize your profile with personal details
 symeraseme init-profile
 

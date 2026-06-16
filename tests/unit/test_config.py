@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from symeraseme.core.config import Config, get_config
+from symeraseme.core.config import Config, _reset_config_cache, get_config
 
 
 class TestConfigDefaults:
@@ -71,8 +71,14 @@ class TestGetConfig:
         c = get_config()
         assert isinstance(c, Config)
 
-    def test_returns_fresh_instance(self):
+    def test_returns_cached_instance(self):
         c1 = get_config()
+        c2 = get_config()
+        assert c1 is c2
+
+    def test_reset_cache(self):
+        c1 = get_config()
+        _reset_config_cache()
         c2 = get_config()
         assert c1 is not c2
         assert c1 == c2

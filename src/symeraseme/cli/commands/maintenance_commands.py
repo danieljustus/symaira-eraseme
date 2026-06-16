@@ -10,7 +10,7 @@ from typing import Any
 
 import typer
 
-from symeraseme.cli.console import print_success, render_error, render_result
+from symeraseme.cli.console import print_info, print_success, render_error, render_result
 from symeraseme.core.db import init_db
 from symeraseme.registry.sync import handle_registry_sync
 from symeraseme.services.scheduler import (
@@ -36,6 +36,43 @@ registry_app = typer.Typer(
 def db_init() -> None:
     path = init_db()
     print_success(f"Database initialized at {path}")
+
+
+def db_migrate() -> None:
+    """Migrate encrypted database to latest format (V1→V2→V3)."""
+    from symeraseme.core.db import (
+        _db_encryption_enabled,
+        _db_path,
+        _is_encrypted,
+        _migrate_v1_to_v2,
+        _migrate_v2_to_v3,
+    )
+
+    if not _db_encryption_enabled():
+        render_error(
+            "Database encryption is not enabled. Set SYMERASEME_ENCRYPT_DB=1 to enable encryption."
+        )
+
+    db_file = _db_path()
+    if not db_file.exists():
+        render_error(f"Database not found at {db_file}. Run 'symeraseme init-db' first.")
+
+    raw = db_file.read_bytes()
+    if not _is_encrypted(db_file):
+        render_error("Database is not encrypted. Nothing to migrate.")
+
+    if raw.startswith(b"SYMERASEME_ENCv1\n"):
+        print_info("Migrating V1→V2...")
+        _migrate_v1_to_v2(db_file)
+        print_info("Migrating V2→V3...")
+        _migrate_v2_to_v3(db_file)
+        print_success("Database migrated to V3 format.")
+    elif raw.startswith(b"SYMERASEME_ENCv2\n"):
+        print_info("Migrating V2→V3...")
+        _migrate_v2_to_v3(db_file)
+        print_success("Database migrated to V3 format.")
+    else:
+        print_success("Database is already in V3 format. No migration needed.")
 
 
 def generate_scheduler_cmd(

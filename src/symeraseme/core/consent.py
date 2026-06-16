@@ -37,23 +37,23 @@ def _token_filename(token: str) -> str:
 
 
 def _find_token_file(token: str) -> Path | None:
-    """Find a token file on disk.
-
-    Tries the hashed filename first, then falls back to the old
-    raw-token filename so that tokens issued before the hash-based
-    naming change remain valid for their remaining TTL.
-    """
+    """Find a token file on disk, migrating legacy filenames to hashed ones."""
     consent_dir = _consent_dir()
     hashed = consent_dir / _token_filename(token)
     if hashed.exists():
         return hashed
-    # Backward compatibility: old tokens used the raw token in the filename.
     legacy = consent_dir / f"consent_{token}.json"
     if legacy.resolve().parent != consent_dir.resolve():
         logger.warning("Legacy consent token resolved outside consent directory")
         return None
     if legacy.exists():
-        return legacy
+        try:
+            legacy.rename(hashed)
+            logger.info("Migrated legacy consent token to hashed filename")
+            return hashed
+        except OSError as exc:
+            logger.warning("Failed to migrate legacy consent token: %s", exc)
+            return legacy
     return None
 
 
