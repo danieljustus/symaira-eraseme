@@ -40,7 +40,6 @@ def db_init() -> None:
 
 def db_migrate() -> None:
     """Migrate encrypted database to latest format (V1→V2→V3)."""
-    from symeraseme.core.config import get_config
     from symeraseme.core.db import (
         _db_encryption_enabled,
         _db_path,
