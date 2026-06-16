@@ -139,6 +139,9 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
                     f"{lock_path}"
                 )
                 raise RuntimeError(msg) from None
+        finally:
+            if lock_file is not None and lock_file is not _db_lock_file:
+                lock_file.close()
 
 
 def _release_db_lock() -> None:
