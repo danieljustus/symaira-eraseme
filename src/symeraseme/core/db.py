@@ -440,6 +440,9 @@ def connection_context(path: str | None = None):
         close_connection()
 
 
+_SCHEMA_VERSION = 1
+
+
 def init_db(path: str | None = None) -> Path:
     """Create the database schema if it does not exist.
 
@@ -449,6 +452,11 @@ def init_db(path: str | None = None) -> Path:
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
     conn = get_connection(str(db_file))
+
+    current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if current_version >= _SCHEMA_VERSION:
+        return db_file
+
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS campaigns (
             id              TEXT PRIMARY KEY,
@@ -555,6 +563,8 @@ def init_db(path: str | None = None) -> Path:
             ON inbox_replies(request_id);
         CREATE INDEX IF NOT EXISTS idx_inbox_replies_classified
             ON inbox_replies(classified_as);
+
+        PRAGMA user_version = 1;
     """)
     conn.commit()
     return db_file
