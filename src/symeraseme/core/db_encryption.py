@@ -39,6 +39,7 @@ PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 DB_TEMP: dict[Path, Path] = {}
 DB_INITIAL_DATA_HASH: dict[Path, str] = {}
 _FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
+_FERNET_KEY_CACHE_MAX_SIZE = 32
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +85,8 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
     """Derive a Fernet key from the identity master key.
 
     Uses PBKDF2 for V1/V2 and HKDF for V3.  Results are cached to avoid
-    redundant derivation work.
+    redundant derivation work.  Cache is bounded to prevent unbounded growth
+    in long-running processes.
     """
     cache_key = (salt, version)
     if cache_key in _FERNET_KEY_CACHE:
@@ -117,7 +119,13 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
             PBKDF2_ITERATIONS,
         )
     key = urlsafe_b64encode(derived)
-    _FERNET_KEY_CACHE[(salt, version)] = key
+
+    # LRU eviction: remove oldest entry when cache is full
+    if len(_FERNET_KEY_CACHE) >= _FERNET_KEY_CACHE_MAX_SIZE:
+        oldest_key = next(iter(_FERNET_KEY_CACHE))
+        del _FERNET_KEY_CACHE[oldest_key]
+
+    _FERNET_KEY_CACHE[cache_key] = key
     return key
 
 
