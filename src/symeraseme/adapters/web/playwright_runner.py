@@ -212,14 +212,17 @@ async def _execute_step(
 
 
 def _resolve_value(value: str, identity_fields: dict[str, str]) -> str:
-    """Resolve template variables in a value string."""
+    """Resolve template variables in a value string using single-pass regex substitution."""
     if not value:
         return value
-    result = value
-    for key, val in (identity_fields or {}).items():
-        placeholder = f"${{{key}}}"
-        if placeholder in result:
-            result = result.replace(placeholder, val)
+    fields = identity_fields or {}
+    if fields:
+        pattern = re.compile(
+            r"\$\{(" + "|".join(re.escape(k) for k in fields) + r")\}"
+        )
+        result = pattern.sub(lambda m: fields[m.group(1)], value)
+    else:
+        result = value
     unresolved = re.findall(r"\$\{[^}]+\}", result)
     if unresolved:
         keys = ", ".join(sorted(set(unresolved)))
