@@ -57,7 +57,7 @@ _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
 _DB_INITIAL_DATA_HASH: dict[Path, str] = {}
-_FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
+_FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
 _STALE_SCAVENGE_AGE = 300
 _DB_LOCK_RETRY_ATTEMPTS = 3
 _DB_LOCK_RETRY_DELAY = 1.0
