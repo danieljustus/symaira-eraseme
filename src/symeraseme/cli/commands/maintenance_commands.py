@@ -50,8 +50,7 @@ def db_migrate() -> None:
 
     if not _db_encryption_enabled():
         render_error(
-            "Database encryption is not enabled. "
-            "Set SYMERASEME_ENCRYPT_DB=1 to enable encryption."
+            "Database encryption is not enabled. Set SYMERASEME_ENCRYPT_DB=1 to enable encryption."
         )
 
     db_file = _db_path()

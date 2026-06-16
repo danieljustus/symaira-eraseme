@@ -217,9 +217,7 @@ def _resolve_value(value: str, identity_fields: dict[str, str]) -> str:
         return value
     fields = identity_fields or {}
     if fields:
-        pattern = re.compile(
-            r"\$\{(" + "|".join(re.escape(k) for k in fields) + r")\}"
-        )
+        pattern = re.compile(r"\$\{(" + "|".join(re.escape(k) for k in fields) + r")\}")
         result = pattern.sub(lambda m: fields[m.group(1)], value)
     else:
         result = value
