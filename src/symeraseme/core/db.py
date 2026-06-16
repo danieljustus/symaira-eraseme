@@ -57,7 +57,7 @@ _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 _DB_TEMP: dict[Path, Path] = {}
 _DB_INITIAL_DATA_HASH: dict[Path, str] = {}
-_FERNET_KEY_CACHE: dict[bytes | None, bytes] = {}
+_FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
 _STALE_SCAVENGE_AGE = 300
 _DB_LOCK_RETRY_ATTEMPTS = 3
 _DB_LOCK_RETRY_DELAY = 1.0
@@ -139,6 +139,9 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
                     f"{lock_path}"
                 )
                 raise RuntimeError(msg) from None
+        finally:
+            if lock_file is not None and lock_file is not _db_lock_file:
+                lock_file.close()
 
 
 def _release_db_lock() -> None:
@@ -155,7 +158,7 @@ def _release_db_lock() -> None:
 
 
 def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes | None:
-    cache_key = salt if salt else b""
+    cache_key = (salt, version)
     if cache_key in _FERNET_KEY_CACHE:
         return _FERNET_KEY_CACHE[cache_key]
 
@@ -186,7 +189,7 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
             _PBKDF2_ITERATIONS,
         )
     key = urlsafe_b64encode(derived)
-    _FERNET_KEY_CACHE[cache_key] = key
+    _FERNET_KEY_CACHE[(salt, version)] = key
     return key
 
 
@@ -437,6 +440,9 @@ def connection_context(path: str | None = None):
         close_connection()
 
 
+_SCHEMA_VERSION = 1
+
+
 def init_db(path: str | None = None) -> Path:
     """Create the database schema if it does not exist.
 
@@ -446,6 +452,11 @@ def init_db(path: str | None = None) -> Path:
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
     conn = get_connection(str(db_file))
+
+    current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if current_version >= _SCHEMA_VERSION:
+        return db_file
+
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS campaigns (
             id              TEXT PRIMARY KEY,
@@ -552,6 +563,8 @@ def init_db(path: str | None = None) -> Path:
             ON inbox_replies(request_id);
         CREATE INDEX IF NOT EXISTS idx_inbox_replies_classified
             ON inbox_replies(classified_as);
+
+        PRAGMA user_version = 1;
     """)
     conn.commit()
     return db_file
