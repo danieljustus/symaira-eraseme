@@ -263,7 +263,7 @@ def _decrypt_to_temp(path: Path) -> Path:
         logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
             "Cannot decrypt database — identity master key is not available. "
-            "Run `symeraseme init-profile` first."
+            "Run `symeraseme init-profile` or ensure your master key is in the system keyring."
         )
         raise RuntimeError(msg)
     f = Fernet(fernet_key)
