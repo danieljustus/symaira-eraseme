@@ -158,7 +158,7 @@ def _release_db_lock() -> None:
 
 
 def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes | None:
-    cache_key = salt if salt else b""
+    cache_key = (salt, version)
     if cache_key in _FERNET_KEY_CACHE:
         return _FERNET_KEY_CACHE[cache_key]
 
@@ -189,7 +189,7 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
             _PBKDF2_ITERATIONS,
         )
     key = urlsafe_b64encode(derived)
-    _FERNET_KEY_CACHE[cache_key] = key
+    _FERNET_KEY_CACHE[(salt, version)] = key
     return key
 
 
