@@ -139,8 +139,10 @@ def _acquire_db_lock(db_path: Path, *, retry: bool = True) -> None:
             else:
                 msg = (
                     "Another symaira-eraseme process is using the encrypted database. "
-                    "Wait for it to finish or remove the stale lock file: "
-                    f"{lock_path}"
+                    "Wait for it to finish, or remove the stale lock file:\n\n"
+                    f"  rm {lock_path}\n\n"
+                    "If no other process is running, the lock file may be stale from a "
+                    "previous crash. You can safely remove it and retry."
                 )
                 raise RuntimeError(msg) from None
         finally:
