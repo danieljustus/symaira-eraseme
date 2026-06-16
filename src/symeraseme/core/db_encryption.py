@@ -153,8 +153,8 @@ def _decrypt_to_temp(path: Path) -> Path:
     in ``DB_TEMP`` / ``DB_INITIAL_DATA_HASH``.
     """
     # Lazy import: _get_db_fernet_key may be monkeypatched via
-    # ``symeraseme.core.db._get_db_fernet_key`` in tests.
-    from symeraseme.core import db as _db_mod
+    # ``symeraseme.core.db_encryption._get_db_fernet_key`` in tests.
+    from symeraseme.core.db_encryption import _get_db_fernet_key as _get_key
 
     raw = path.read_bytes()
     if raw.startswith(ENC_HEADER_V1):
@@ -174,7 +174,7 @@ def _decrypt_to_temp(path: Path) -> Path:
         msg = "Unrecognized encryption header in database file."
         raise RuntimeError(msg)
     encrypted_data = raw[header_len:]
-    fernet_key = _db_mod._get_db_fernet_key(salt=salt, version=version)
+    fernet_key = _get_key(salt=salt, version=version)
     if fernet_key is None:
         logger.debug("Cannot decrypt DB at %s — master key unavailable", path)
         msg = (
@@ -199,10 +199,10 @@ def _decrypt_to_temp(path: Path) -> Path:
 
 def _encrypt_file(source: Path, target: Path, *, version: int = 3) -> None:
     """Encrypt *source* into *target* using Fernet with a random salt."""
-    from symeraseme.core import db as _db_mod
+    from symeraseme.core.db_encryption import _get_db_fernet_key as _get_key
 
     salt = secrets.token_bytes(ENC_SALT_LEN)
-    fernet_key = _db_mod._get_db_fernet_key(salt=salt, version=version)
+    fernet_key = _get_key(salt=salt, version=version)
     if fernet_key is None:
         logger.warning("Cannot encrypt DB \u2014 identity master key is not available.")
         return

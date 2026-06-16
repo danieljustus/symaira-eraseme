@@ -182,7 +182,7 @@ def _is_sensitive_env_var(name: str) -> bool:
 
 def _check_db_encryption() -> tuple[bool, str]:
     from symeraseme.core.db_connection import _db_path
-    from symeraseme.core.db_encryption import _ENC_HEADER_V1, _ENC_MAGIC_V2
+    from symeraseme.core.db_encryption import ENC_HEADER_V1, ENC_MAGIC_V2
 
     encrypt_enabled = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower() in (
         "1",
@@ -206,7 +206,7 @@ def _check_db_encryption() -> tuple[bool, str]:
         if encrypt_enabled:
             return True, "Encryption enabled (DB file unreadable)"
         return True, "DB file unreadable"
-    is_encrypted = bool(raw) and (raw.startswith(_ENC_HEADER_V1) or raw.startswith(_ENC_MAGIC_V2))
+    is_encrypted = bool(raw) and (raw.startswith(ENC_HEADER_V1) or raw.startswith(ENC_MAGIC_V2))
 
     if encrypt_enabled and not is_encrypted:
         return False, "Encryption enabled but DB file is plaintext (will encrypt on close)"
