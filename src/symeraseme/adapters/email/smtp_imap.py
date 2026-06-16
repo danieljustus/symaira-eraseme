@@ -15,8 +15,24 @@ from email.header import decode_header
 from typing import Any
 
 from symeraseme.adapters.email._types import Envelope, Message
+from symeraseme.core.secrets import resolve_secret
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_imap_password(password: str) -> str:
+    """Resolve IMAP password via vault:// URI, env var, or keyring."""
+    if not password:
+        return password
+    try:
+        return resolve_secret(
+            password,
+            env_fallback="IMAP_PASSWORD",
+            keyring_service="symeraseme-imap",
+        )
+    except Exception:
+        logger.debug("Could not resolve IMAP password, using literal value")
+        return password
 
 RE_PREFIX = re.compile(
     r"^(Re|Fwd|Aw|Antwort|R\xe9f\.|SV|VS|WG|AW|RE|REF)\s*:\s*",
@@ -180,7 +196,8 @@ def poll_inbox(
     since_days: int = 1,
     max_messages: int = 50,
 ) -> list[dict[str, Any]]:
-    with _imap_session(host, port, username, password, ssl, folder) as mail:
+    resolved_password = _resolve_imap_password(password)
+    with _imap_session(host, port, username, resolved_password, ssl, folder) as mail:
         since_date = (datetime.now(UTC) - timedelta(days=since_days)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"SINCE {since_date}")
 
@@ -221,7 +238,8 @@ def list_messages(
     password: str = "",
     ssl: bool = True,
 ) -> list[Envelope]:
-    with _imap_session(host, port, username, password, ssl, folder) as mail:
+    resolved_password = _resolve_imap_password(password)
+    with _imap_session(host, port, username, resolved_password, ssl, folder) as mail:
         since_date = (datetime.now(UTC) - timedelta(days=30)).strftime("%d-%b-%Y")
         status, message_ids = mail.search(None, f"SINCE {since_date}")
 
@@ -293,7 +311,8 @@ def get_message(
     ssl: bool = True,
     folder: str = "INBOX",
 ) -> Message:
-    with _imap_session(host, port, username, password, ssl, folder) as mail:
+    resolved_password = _resolve_imap_password(password)
+    with _imap_session(host, port, username, resolved_password, ssl, folder) as mail:
         status, data = mail.fetch(message_id, "(RFC822)")
         if status != "OK" or not data or not data[0]:
             msg = f"Message {message_id} not found"
