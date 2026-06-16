@@ -56,13 +56,10 @@ def _warn_missing_state_for_ccpa(
         return
     for key, value in identity_fields.items():
         if key.startswith("address_state_") and not value:
-            idx = key.rsplit("_", 1)[-1]
             logger.warning(
-                "Broker '%s' (%s) requires CCPA form — address state is missing "
-                "for address index %s. The form may be incomplete or rejected.",
+                "Broker '%s' requires CCPA form — address state is missing. "
+                "The form may be incomplete or rejected.",
                 broker_name,
-                broker_id,
-                idx,  # codeql[py/clear-text-logging-sensitive-data] broker_id/name are public
             )
             return
 
