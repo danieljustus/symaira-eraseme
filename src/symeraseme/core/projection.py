@@ -201,6 +201,15 @@ def append_event_and_project(
     return eid, state
 
 
+def _build_in_clause(ids: list[int]) -> tuple[str, list[int]]:
+    """Build SQL IN-clause placeholders.
+
+    Returns placeholder string and parameter list. Placeholders are safe
+    SQL (not user input).
+    """
+    return ",".join("?" * len(ids)), ids
+
+
 def rebuild_all_states(chunk_size: int = 100) -> int:
     """Rebuild request_state for every dirty request, processing in chunks.
 
@@ -226,7 +235,7 @@ def rebuild_all_states(chunk_size: int = 100) -> int:
     total_states = 0
     for start in range(0, len(dirty_request_ids), chunk_size):
         chunk = dirty_request_ids[start : start + chunk_size]
-        placeholders = ",".join("?" * len(chunk))
+        placeholders, chunk_params = _build_in_clause(chunk)
         rows = conn.execute(
             f"""SELECT r.id AS request_id,
                       e.id AS id,
@@ -237,7 +246,7 @@ def rebuild_all_states(chunk_size: int = 100) -> int:
                JOIN request_events e ON e.request_id = r.id
                WHERE r.id IN ({placeholders})
                ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
-            chunk,
+            chunk_params,
         ).fetchall()
 
         buckets: dict[int, list[dict[str, Any]]] = {}
