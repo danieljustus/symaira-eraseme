@@ -389,6 +389,12 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
             )
             if is_enc:
                 if raw.startswith(_ENC_HEADER_V1):
+                    logger.warning(
+                        "V1-encrypted database detected at %s. "
+                        "Migrating to V3 format automatically. "
+                        "Consider running 'symeraseme db migrate' explicitly.",
+                        db_file,
+                    )
                     _migrate_v1_to_v2(db_file)
                     _migrate_v2_to_v3(db_file)
                 elif raw.startswith(_ENC_MAGIC_V2):
