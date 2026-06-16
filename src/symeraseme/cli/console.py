@@ -103,7 +103,12 @@ def render_result(
     Raises typer.Exit(1) when the result indicates failure so every command
     returns a non-zero exit code uniformly.
     """
-    if isinstance(result, Exception):
+    from symeraseme.core.exceptions import SymerasemeError
+
+    if isinstance(result, SymerasemeError):
+        result_obj = CliResult(success=False, error=result.message)
+        result = result.message
+    elif isinstance(result, Exception):
         print_error(str(result))
         raise typer.Exit(1)
 
