@@ -13,7 +13,6 @@ import typer
 from symeraseme.cli.console import render_result
 from symeraseme.core.db import get_connection, init_db
 from symeraseme.core.result_types import CliResult
-from symeraseme.core.secrets import SecretResolutionError, resolve_secret
 from symeraseme.llm.factory import list_available_providers
 from symeraseme.services.inbox import handle_poll_inbox
 from symeraseme.services.reply import (
@@ -56,13 +55,8 @@ def poll_inbox(
         help="Base delay in seconds between retries",
     ),
 ) -> None:
-    raw = os.environ.get("IMAP_PASSWORD", "")
-    if raw:
-        try:
-            password = resolve_secret(raw)
-        except SecretResolutionError:
-            password = typer.prompt("IMAP password", hide_input=True)
-    else:
+    password = os.environ.get("IMAP_PASSWORD", "")
+    if not password:
         password = typer.prompt("IMAP password", hide_input=True)
     from symeraseme.cli.console import show_spinner
 
