@@ -11,7 +11,7 @@ from typing import Any
 import typer
 
 from symeraseme.cli.console import print_info, print_success, render_error, render_result
-from symeraseme.core.db import init_db
+from symeraseme.core.db_connection import init_db
 from symeraseme.registry.sync import handle_registry_sync
 from symeraseme.services.scheduler import (
     handle_generate_scheduler,
@@ -40,9 +40,9 @@ def db_init() -> None:
 
 def db_migrate() -> None:
     """Migrate encrypted database to latest format (V1→V2→V3)."""
-    from symeraseme.core.db import (
+    from symeraseme.core.db_connection import _db_path
+    from symeraseme.core.db_encryption import (
         _db_encryption_enabled,
-        _db_path,
         _is_encrypted,
         _migrate_v1_to_v2,
         _migrate_v2_to_v3,

@@ -6,7 +6,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from symeraseme.core.db import get_connection
+from symeraseme.core.db_connection import get_connection
 
 
 def append_event(

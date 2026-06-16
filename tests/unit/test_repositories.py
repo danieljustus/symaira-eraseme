@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from symeraseme.core.db import close_connection, init_db
+from symeraseme.core.db_connection import close_connection, init_db
 from symeraseme.core.repositories import (
     append_event,
     create_campaign,

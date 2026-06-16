@@ -46,7 +46,7 @@ from symeraseme.cli.commands.web_form_commands import (
     solve_captcha_cmd,
 )
 from symeraseme.cli.console import OutputFormat
-from symeraseme.core.db import close_connection
+from symeraseme.core.db_connection import close_connection
 
 app = typer.Typer(
     name="symeraseme",

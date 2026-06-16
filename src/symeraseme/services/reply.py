@@ -5,7 +5,7 @@ import logging
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
-from symeraseme.core.db import get_connection, init_db
+from symeraseme.core.db_connection import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.inbox import submit_inbox_reply

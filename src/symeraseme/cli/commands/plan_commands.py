@@ -163,7 +163,7 @@ def tick(
         symeraseme tick --batch-size 10
     """
     from symeraseme.cli.console import render_result
-    from symeraseme.core.db import init_db
+    from symeraseme.core.db_connection import init_db
     from symeraseme.core.deadlines import apply_tick_actions, run_tick
     from symeraseme.core.result_types import CliResult
 

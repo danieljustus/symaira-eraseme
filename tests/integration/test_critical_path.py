@@ -25,7 +25,7 @@ from symeraseme.registry.schema import Broker, IdentityProfile
 @pytest.fixture
 def db_path():
     """Create a temporary directory for the test SQLite database."""
-    from symeraseme.core.db import close_connection
+    from symeraseme.core.db_connection import close_connection
 
     close_connection()
     with tempfile.TemporaryDirectory() as d:
@@ -48,7 +48,7 @@ def db_path():
 @pytest.fixture
 def clean_db(db_path):
     """Initialised empty database in a temporary directory."""
-    from symeraseme.core.db import init_db
+    from symeraseme.core.db_connection import init_db
 
     init_db()
     return db_path
@@ -298,7 +298,7 @@ class TestEventStoreProjectionRoundTrip:
 
     def test_atomicity_rolls_back_on_failure(self, clean_db, monkeypatch):
         """Projection failure rolls back the event insert (A1 guarantee)."""
-        from symeraseme.core.db import get_connection
+        from symeraseme.core.db_connection import get_connection
         from symeraseme.core.events import create_campaign, create_removal_request
         from symeraseme.core.projection import append_event_and_project
 
@@ -648,7 +648,7 @@ class TestCliSmoke:
         assert "Database initialized" in result.stdout
 
         # Verify tables were created
-        from symeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
         close_connection()
         init_db()

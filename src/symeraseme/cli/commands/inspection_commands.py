@@ -9,7 +9,7 @@ import typer
 
 from symeraseme import __version__
 from symeraseme.cli.console import render_error, render_result
-from symeraseme.core.db import _db_path, init_db
+from symeraseme.core.db_connection import _db_path, init_db
 from symeraseme.core.events import get_events, list_removal_requests
 from symeraseme.core.identity import _profile_path
 from symeraseme.core.result_types import CliResult
@@ -181,7 +181,8 @@ def _is_sensitive_env_var(name: str) -> bool:
 
 
 def _check_db_encryption() -> tuple[bool, str]:
-    from symeraseme.core.db import _ENC_HEADER_V1, _ENC_MAGIC_V2, _db_path
+    from symeraseme.core.db_connection import _db_path
+    from symeraseme.core.db_encryption import _ENC_HEADER_V1, _ENC_MAGIC_V2
 
     encrypt_enabled = os.environ.get("SYMERASEME_ENCRYPT_DB", "").strip().lower() in (
         "1",
