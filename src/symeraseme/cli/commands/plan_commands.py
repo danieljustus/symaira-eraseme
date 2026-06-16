@@ -117,6 +117,16 @@ def execute(
         "--backend",
         help="Execution backend: smtp (batch) or himalaya (CLI)",
     ),
+    concurrent: bool = typer.Option(
+        False,
+        "--concurrent",
+        help="Process requests concurrently (SMTP backend only)",
+    ),
+    workers: int = typer.Option(
+        3,
+        "--workers",
+        help="Max concurrent workers when --concurrent is set (3-10)",
+    ),
 ) -> None:
     """Send removal requests for a campaign.
 
@@ -124,9 +134,11 @@ def execute(
         symeraseme execute --campaign initial --batch-size 5 --yes
         symeraseme execute --campaign initial --consent-file /tmp/token
         echo $TOKEN | symeraseme execute --campaign initial --consent-file /dev/stdin
+        symeraseme execute --campaign initial --concurrent --workers 5
     """
     from symeraseme.cli.console import render_result, show_spinner
 
+    workers = max(3, min(10, workers))
     with show_spinner("Sending removal requests..."):
         result = handle_execute(
             campaign_id,
@@ -137,6 +149,8 @@ def execute(
             consent_token,
             consent_file,
             backend=backend,
+            concurrent=concurrent,
+            workers=workers,
         )
     render_result(ctx.obj["output"], result)
 
