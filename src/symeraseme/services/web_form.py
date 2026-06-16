@@ -6,8 +6,6 @@ from typing import Any, cast
 
 import typer
 
-logger = logging.getLogger(__name__)
-
 from symeraseme.adapters.web.playwright_runner import (
     PlaywrightRunnerError,
     WebFormResult,
@@ -20,6 +18,8 @@ from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
+
+logger = logging.getLogger(__name__)
 
 
 def _build_identity_fields() -> dict[str, str]:
