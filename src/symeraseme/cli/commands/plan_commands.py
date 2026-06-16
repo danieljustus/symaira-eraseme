@@ -28,11 +28,15 @@ def create(
     ),
     jurisdiction: str = typer.Option(
         None,
-        help="Filter by jurisdiction (e.g. DE, US, EU)",
+        "--jurisdiction",
+        "-j",
+        help="Filter by jurisdiction (e.g. GDPR, CCPA, EU, US)",
     ),
     law: str = typer.Option(
         None,
-        help="Filter by law (e.g. GDPR, CCPA, CPRA, LGPD, PIPEDA)",
+        "--law",
+        hidden=True,
+        help="Filter by law (deprecated: use --jurisdiction)",
     ),
     priority: str = typer.Option(
         None,
@@ -47,7 +51,7 @@ def create(
     """Scan the broker registry and create a removal campaign.
 
     Examples:
-        symeraseme plan create --campaign initial --law GDPR --max 10
+        symeraseme plan create --campaign initial --jurisdiction GDPR --max 10
         symeraseme plan create --campaign ccpa-batch --jurisdiction US --priority high
     """
     result = handle_plan_create(
