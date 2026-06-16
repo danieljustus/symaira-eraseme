@@ -18,11 +18,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from symeraseme.core.config import get_config
 from symeraseme.registry.schema import IdentityProfile
 
 logger = logging.getLogger(__name__)
-
-MANUAL_TASKS_DIR = "~/.local/share/symeraseme/manual_tasks"
 
 FALLBACK_REASONS = frozenset(
     {
@@ -73,7 +72,7 @@ class ManualTask:
 
 
 def _tasks_dir() -> Path:
-    tasks_dir = Path(MANUAL_TASKS_DIR).expanduser()
+    tasks_dir = get_config().resolved_data_dir / "manual_tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     return tasks_dir
 

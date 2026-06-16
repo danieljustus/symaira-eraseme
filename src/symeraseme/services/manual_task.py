@@ -86,11 +86,9 @@ def handle_manual_tasks_cleanup(
     dry_run: bool = False,
 ) -> CliResult:
     """Remove old screenshot and HTML snapshot files from manual tasks directory."""
-    from pathlib import Path
+    from symeraseme.core.config import get_config
 
-    from symeraseme.core.manual_fallback import MANUAL_TASKS_DIR
-
-    tasks_dir = Path(MANUAL_TASKS_DIR).expanduser()
+    tasks_dir = get_config().resolved_data_dir / "manual_tasks"
     if not tasks_dir.exists():
         return CliResult(
             success=True,

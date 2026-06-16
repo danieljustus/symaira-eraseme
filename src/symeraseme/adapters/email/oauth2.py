@@ -19,11 +19,12 @@ from urllib.request import Request, urlopen
 
 import keyring
 
+from symeraseme.core.config import get_config
+
 logger = logging.getLogger(__name__)
 
 
 SERVICE_NAME = "symeraseme-oauth2"
-_STATE_FILE = "~/.local/share/symeraseme/oauth2_state.json"
 _STATE_TTL = 300  # 5 minutes in seconds
 _OAUTH_SERVER_DEADLINE = 300  # 5 minutes total timeout for browser flow
 
@@ -57,7 +58,7 @@ class OAuth2StateError(OAuth2Error):
 
 
 def _get_state_path() -> Path:
-    path = Path(os.path.expanduser(_STATE_FILE))
+    path = get_config().resolved_data_dir / "oauth2_state.json"
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     return path
 

@@ -21,7 +21,6 @@ SERVICE_NAME = "symeraseme"
 KEYRING_USERNAME = "identity-master-key"
 KEY_LENGTH = 32  # AES-256
 NONCE_LENGTH = 12  # AES-GCM standard
-DEFAULT_PROFILE_PATH = "~/.config/symeraseme/identity.enc"
 
 
 def _profile_path(path: str | None = None) -> Path:
