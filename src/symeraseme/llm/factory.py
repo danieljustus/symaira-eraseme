@@ -102,13 +102,16 @@ def create_llm_client(
             try:
                 api_key = resolve_secret(raw)
             except SecretResolutionError as exc:
-                logger.warning(
-                    "Failed to resolve API key from %s: %s. "
-                    "The LLM client will be created without an API key.",
-                    key_env,
-                    exc,
-                )
-                api_key = None
+                raise LLMProviderError(
+                    f"Failed to resolve API key from {key_env}: {exc}. "
+                    f"Check your vault:// reference or environment variable."
+                ) from exc
+        else:
+            logger.warning(
+                "Environment variable %s is not set. "
+                "The LLM client will be created without an API key.",
+                key_env,
+            )
 
     if base_url is None:
         base_url = os.environ.get(_ENV_BASE_URL)
