@@ -81,9 +81,7 @@ def _locked_state_op(callback):
             with path.open() as f:
                 existing = json.load(f)
         updated = callback(existing)
-        fd, tmp_path = tempfile.mkstemp(
-            dir=path.parent, prefix=".oauth2_state_", suffix=".tmp"
-        )
+        fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=".oauth2_state_", suffix=".tmp")
         try:
             with open(fd, "w", encoding="utf-8") as f:
                 json.dump(updated, f)

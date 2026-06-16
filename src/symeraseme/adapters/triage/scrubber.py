@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 def _llm_consent_file() -> Path:
     return get_config().resolved_config_dir / ".llm_consent_granted"
 
+
 # Bounded quantifiers prevent catastrophic backtracking on pathological
 # input (long strings of dots/hyphens).  126 labels is far beyond any
 # real domain while keeping the match linear in input length.
