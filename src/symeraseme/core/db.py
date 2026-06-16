@@ -58,6 +58,7 @@ _PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 _DB_TEMP: dict[Path, Path] = {}
 _DB_INITIAL_DATA_HASH: dict[Path, str] = {}
 _FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
+_SCHEMA_VERSION_CACHE: dict[str, int] = {}
 _STALE_SCAVENGE_AGE = 300
 _DB_LOCK_RETRY_ATTEMPTS = 3
 _DB_LOCK_RETRY_DELAY = 1.0
@@ -449,11 +450,18 @@ def init_db(path: str | None = None) -> Path:
     Returns the database file path.
     """
     db_file = _db_path(path)
+    db_key = str(db_file)
+
+    # Skip PRAGMA check when cache is already current for this DB.
+    if _SCHEMA_VERSION_CACHE.get(db_key, -1) >= _SCHEMA_VERSION:
+        return db_file
+
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = get_connection(str(db_file))
+    conn = get_connection(db_key)
 
     current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    _SCHEMA_VERSION_CACHE[db_key] = current_version
     if current_version >= _SCHEMA_VERSION:
         return db_file
 
@@ -567,4 +575,5 @@ def init_db(path: str | None = None) -> Path:
         PRAGMA user_version = 1;
     """)
     conn.commit()
+    _SCHEMA_VERSION_CACHE[db_key] = _SCHEMA_VERSION
     return db_file
