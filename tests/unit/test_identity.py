@@ -184,7 +184,8 @@ class TestIdentityVault:
 
         vault.delete_profile()
 
-    def test_legacy_version_0_fallback(self, monkeypatch):
+    def test_legacy_version_0_fallback_rejected(self, monkeypatch):
+        """Legacy v0 profiles without AAD are no longer supported."""
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
         import symeraseme.core.identity as vault
@@ -205,9 +206,8 @@ class TestIdentityVault:
         path.write_bytes(header + b"\n" + ciphertext)
 
         with patch("symeraseme.core.identity.keyring.get_password", return_value=key.hex()):
-            loaded = vault.load_profile()
-
-        assert loaded.full_name == "Legacy User"
+            with pytest.raises(RuntimeError, match="Legacy v0 profile detected"):
+                vault.load_profile()
 
         vault.delete_profile()
 
