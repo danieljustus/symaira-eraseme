@@ -95,6 +95,12 @@ def _scrub_passport(match: re.Match) -> str:
     return match.group(0).replace(pn, "*" * max(3, len(pn) - 2) + pn[-2:])
 
 
+# Pre-filter: fast early exit when text contains no PII-like characters.
+# All 8 PII patterns below require at least one digit or an '@' character
+# to produce a match, so a single scan avoids running 8 regex substitutions
+# on PII-free input.
+_PII_TRIGGER_RE = re.compile(r"@|\d")
+
 _SCRUBBERS: list[tuple[re.Pattern, Callable]] = [
     (_IBAN_PATTERN, _scrub_iban),
     (_DE_ID_PATTERN, _scrub_de_id),
@@ -108,6 +114,8 @@ _SCRUBBERS: list[tuple[re.Pattern, Callable]] = [
 
 
 def scrub_pii(text: str) -> str:
+    if not _PII_TRIGGER_RE.search(text):
+        return text
     for pattern, replacer in _SCRUBBERS:
         text = pattern.sub(replacer, text)
     return text
