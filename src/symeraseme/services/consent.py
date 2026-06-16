@@ -102,7 +102,13 @@ def handle_grant(
             f"  TTL: {ttl}s",
             f"  Expires: {datetime.fromtimestamp(expires_at).isoformat()}",
             "",
-            f"Use: SYMERASEME_CONSENT=<token> symeraseme {command} ...",
+            "⚠ Security: tokens in shell history or ps listings are visible to others.",
+            "Prefer --consent-file to avoid exposure:",
+            "  echo <token> > /tmp/consent.token && chmod 600 /tmp/consent.token",
+            f"  symeraseme {command} ... --consent-file /tmp/consent.token",
+            "",
+            "Or pipe directly (no file on disk):",
+            f"  echo <token> | symeraseme {command} ... --consent-file /dev/stdin",
         ]
         result["message"] = "\n".join(lines)
         return CliResult(success=True, data=result)
