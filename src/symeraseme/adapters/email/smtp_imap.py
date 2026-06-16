@@ -34,6 +34,7 @@ def _resolve_imap_password(password: str) -> str:
         logger.debug("Could not resolve IMAP password, using literal value")
         return password
 
+
 RE_PREFIX = re.compile(
     r"^(Re|Fwd|Aw|Antwort|R\xe9f\.|SV|VS|WG|AW|RE|REF)\s*:\s*",
     re.IGNORECASE,
