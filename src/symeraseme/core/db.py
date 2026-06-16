@@ -65,6 +65,8 @@ _DB_LOCK_RETRY_DELAY = 1.0
 
 _local = threading.local()
 _db_lock_file: IO | None = None
+_db_temp_locks: dict[Path, threading.Lock] = {}
+_db_temp_locks_lock = threading.Lock()
 
 
 def _get_secure_temp_dir() -> Path:
