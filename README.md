@@ -136,7 +136,7 @@ $ symeraseme brokers list --law GDPR
 │ Schufa       │ https://www.schufa.de       │ GDPR          │
 └──────────────┴─────────────────────────────┴───────────────┘
 
-$ symeraseme plan create --campaign initial --law GDPR --max 5
+$ symeraseme plan create --campaign initial --jurisdiction GDPR --max 5
 ✓ Plan created: 5 brokers selected
   Campaign: initial
 
