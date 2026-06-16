@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import fcntl
 import hashlib
 import json
 import logging
 import os
 import secrets
 import socket
+import tempfile
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -63,38 +65,64 @@ def _get_state_path() -> Path:
     return path
 
 
-def _store_oauth2_state(state: str, provider: str) -> None:
+def _locked_state_op(callback):
+    """Run a read-modify-write callback on the OAuth2 state file with file locking.
+
+    The callback receives the current state dict and must return the updated dict.
+    Writes are atomic (temp file + rename) and the lock is released in a finally block.
+    """
     path = _get_state_path()
-    existing: dict[str, dict[str, Any]] = {}
-    if path.exists():
-        with path.open() as f:
-            existing = json.load(f)
-    existing[state] = {"provider": provider, "expires_at": time.time() + _STATE_TTL}
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with open(fd, "w", encoding="utf-8") as f:
-        json.dump(existing, f)
+    lock_path = path.with_suffix(".json.lock")
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        existing: dict[str, dict[str, Any]] = {}
+        if path.exists():
+            with path.open() as f:
+                existing = json.load(f)
+        updated = callback(existing)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=path.parent, prefix=".oauth2_state_", suffix=".tmp"
+        )
+        try:
+            with open(fd, "w", encoding="utf-8") as f:
+                json.dump(updated, f)
+            os.replace(tmp_path, path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+            raise
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
+def _store_oauth2_state(state: str, provider: str) -> None:
+    def _add_state(existing: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        existing[state] = {"provider": provider, "expires_at": time.time() + _STATE_TTL}
+        return existing
+
+    _locked_state_op(_add_state)
 
 
 def _validate_oauth2_state(state: str | None) -> None:
-    path = _get_state_path()
     if not state:
         raise OAuth2StateError("Missing OAuth2 state parameter — possible CSRF attack.")
+    path = _get_state_path()
     if not path.exists():
         raise OAuth2StateError("No OAuth2 state stored — possible CSRF attack.")
-    with path.open() as f:
-        stored = json.load(f)
-    record = stored.pop(state, None)
-    if record is None:
-        with path.open("w") as f:
-            json.dump(stored, f)
-        raise OAuth2StateError("OAuth2 state mismatch — possible CSRF attack.")
-    if record.get("expires_at", 0) < time.time():
-        with path.open("w") as f:
-            json.dump(stored, f)
-        raise OAuth2StateError("OAuth2 state expired — possible CSRF attack.")
-    # Clean up the consumed state
-    with path.open("w") as f:
-        json.dump(stored, f)
+
+    def _consume_state(
+        existing: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        record = existing.pop(state, None)
+        if record is None:
+            raise OAuth2StateError("OAuth2 state mismatch — possible CSRF attack.")
+        if record.get("expires_at", 0) < time.time():
+            raise OAuth2StateError("OAuth2 state expired — possible CSRF attack.")
+        return existing
+
+    _locked_state_op(_consume_state)
 
 
 @dataclass
