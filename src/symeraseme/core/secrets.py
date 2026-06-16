@@ -92,8 +92,11 @@ def _resolve_via_keyring(service: str, username: str) -> str | None:
 
         value = _keyring.get_password(service, username)
         return value if value else None
-    except Exception:
-        # keyring backend may be unavailable in CI or headless environments.
+    except ImportError:
+        logger.debug("keyring package not installed; skipping keyring resolution")
+        return None
+    except (OSError, _keyring.errors.KeyringError) as exc:
+        logger.debug("Keyring resolution failed (%s: %s); skipping", type(exc).__name__, exc)
         return None
 
 
