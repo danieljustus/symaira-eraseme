@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+_config_cache: Config | None = None
+
 
 @dataclass(frozen=True)
 class Config:
@@ -41,5 +43,13 @@ class Config:
         return self.resolved_config_dir / "identity.enc"
 
 
+def _reset_config_cache() -> None:
+    global _config_cache
+    _config_cache = None
+
+
 def get_config() -> Config:
-    return Config()
+    global _config_cache
+    if _config_cache is None:
+        _config_cache = Config()
+    return _config_cache
