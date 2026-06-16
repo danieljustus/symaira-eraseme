@@ -127,9 +127,7 @@ async def run_web_form_for_broker(
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
     identity_fields = _build_identity_fields()
-    _warn_missing_state_for_ccpa(
-        broker_id, broker.name, broker.jurisdictions, identity_fields
-    )
+    _warn_missing_state_for_ccpa(broker_id, broker.name, broker.jurisdictions, identity_fields)
 
     if dry_run:
         body = json.dumps(
@@ -215,9 +213,7 @@ async def handle_run_web_form(
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
     identity_fields = _build_identity_fields()
-    _warn_missing_state_for_ccpa(
-        broker_id, broker.name, broker.jurisdictions, identity_fields
-    )
+    _warn_missing_state_for_ccpa(broker_id, broker.name, broker.jurisdictions, identity_fields)
 
     if dry_run:
         lines = [f"[DRY RUN] Would run web form for {broker.name} ({url})"]
