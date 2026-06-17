@@ -5,10 +5,9 @@ import tempfile
 
 import pytest
 
-from symeraseme.core.db import close_connection, get_connection, init_db
+from symeraseme.core.db_connection import close_connection, get_connection, init_db
 from symeraseme.core.events import append_event, create_removal_request
 from symeraseme.core.projection import upsert_state
-from symeraseme.core.repositories.replies import _CLASSIFICATIONS_NEEDING_REPLY
 from symeraseme.core.reply_manager import (
     _fallback_rebuttal,
     draft_reply,
@@ -16,6 +15,7 @@ from symeraseme.core.reply_manager import (
     list_replies,
     send_reply,
 )
+from symeraseme.core.repositories.replies import _CLASSIFICATIONS_NEEDING_REPLY
 
 
 @pytest.fixture(autouse=True)

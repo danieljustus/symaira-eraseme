@@ -10,7 +10,7 @@ import pytest
 
 def _seed_db(tmp_path: str) -> None:
     """Seed a test database with multi-campaign data for report testing."""
-    from symeraseme.core.db import close_connection, get_connection, init_db
+    from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
     os.environ["SYMERASEME_DB_DIR"] = tmp_path
     close_connection()
@@ -91,7 +91,7 @@ def _seed_db(tmp_path: str) -> None:
 
 
 def _clean_db() -> None:
-    from symeraseme.core.db import close_connection
+    from symeraseme.core.db_connection import close_connection
 
     close_connection()
     os.environ.pop("SYMERASEME_DB_DIR", None)

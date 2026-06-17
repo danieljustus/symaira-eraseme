@@ -15,7 +15,7 @@ def get_report_data(
     all_campaigns: bool = False,
 ) -> dict[str, Any]:
     """Collect and aggregate report data from the event store."""
-    from symeraseme.core.db import get_connection
+    from symeraseme.core.db_connection import get_connection
 
     conn = get_connection()
 
@@ -372,7 +372,7 @@ def get_campaign_status(
     campaign_id: str | None = None,
 ) -> dict[str, Any]:
     """Return aggregated lifecycle status across removal requests."""
-    from symeraseme.core.db import get_connection, init_db
+    from symeraseme.core.db_connection import get_connection, init_db
 
     init_db()
     conn = get_connection()

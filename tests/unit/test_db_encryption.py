@@ -9,16 +9,21 @@ from unittest.mock import patch
 import pytest
 from cryptography.fernet import Fernet
 
-from symeraseme.core.db import (
-    _DB_TEMP,
-    _ENC_HEADER_V1,
-    _acquire_db_lock,
-    _cleanup_temp_files,
-    _get_secure_temp_dir,
+from symeraseme.core.db_cleanup import _acquire_db_lock, _cleanup_temp_files
+from symeraseme.core.db_connection import (
     close_connection,
     connection_context,
     get_connection,
     init_db,
+)
+from symeraseme.core.db_encryption import (
+    DB_TEMP as _DB_TEMP,
+)
+from symeraseme.core.db_encryption import (
+    ENC_HEADER_V1 as _ENC_HEADER_V1,
+)
+from symeraseme.core.db_encryption import (
+    _get_secure_temp_dir,
 )
 
 # A deterministic Fernet key for tests
@@ -61,7 +66,7 @@ class TestTempFilePermissions:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
@@ -82,7 +87,7 @@ class TestTempFilePermissions:
         """Opening an encrypted DB when the master key is missing must fail fast."""
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
         # Simulate missing key by making _get_db_fernet_key return None
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: None)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: None)
 
         with pytest.raises(RuntimeError, match="master key is not available"):
             get_connection(str(encrypted_db_file))
@@ -94,7 +99,7 @@ class TestTempFilePermissions:
     ) -> None:
         """Temp files must be in the tmpfs-backed secure temp dir."""
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) == 1
@@ -125,7 +130,7 @@ class TestTempFileCleanup:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -141,7 +146,7 @@ class TestTempFileCleanup:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         tmp_paths: list[Path] = []
 
@@ -159,7 +164,7 @@ class TestTempFileCleanup:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         get_connection(str(encrypted_db_file))
         assert len(_DB_TEMP) >= 1
@@ -176,10 +181,10 @@ class TestTempFileCleanup:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
         # Make re-encryption fail by returning None from key call
         monkeypatch.setattr(
-            "symeraseme.core.db._get_db_fernet_key",
+            "symeraseme.core.db_encryption._get_db_fernet_key",
             lambda **kw: _TEST_FERNET_KEY,
         )
 
@@ -189,7 +194,7 @@ class TestTempFileCleanup:
 
         # Make the encrypt function raise
         with patch(
-            "symeraseme.core.db._encrypt_file",
+            "symeraseme.core.db_encryption._encrypt_file",
             side_effect=RuntimeError("simulated failure"),
         ):
             close_connection()
@@ -215,7 +220,7 @@ class TestConnectionContext:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         with connection_context(str(encrypted_db_file)):
             assert len(_DB_TEMP) >= 1
@@ -229,7 +234,7 @@ class TestConnectionContext:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         with (
             pytest.raises(ValueError, match="test error"),
@@ -284,13 +289,13 @@ class TestPlaintextToEncrypted:
         assert not raw_before.startswith(b"SYMERASEME_ENC")
 
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         conn = get_connection(str(db_file))
         assert conn is not None
         close_connection()
 
-        from symeraseme.core.db import _ENC_MAGIC_V3
+        from symeraseme.core.db_encryption import ENC_MAGIC_V3 as _ENC_MAGIC_V3
 
         raw_after = db_file.read_bytes()
         assert raw_after.startswith(_ENC_MAGIC_V3), (
@@ -305,7 +310,7 @@ class TestFileLocking:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
@@ -319,13 +324,13 @@ class TestFileLocking:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         conn = get_connection(str(encrypted_db_file))
         assert conn is not None
         close_connection()
 
-        from symeraseme.core.db import _db_lock_file
+        from symeraseme.core.db_cleanup import _db_lock_file
 
         assert _db_lock_file is None
 
@@ -347,7 +352,7 @@ class TestFileLocking:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         import fcntl
 
@@ -357,7 +362,7 @@ class TestFileLocking:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
             monkeypatch.setattr(
-                "symeraseme.core.db._DB_LOCK_RETRY_ATTEMPTS", 1
+                "symeraseme.core.db_cleanup._DB_LOCK_RETRY_ATTEMPTS", 1
             )
             with pytest.raises(RuntimeError, match="(?i)another symaira-eraseme process"):
                 _acquire_db_lock(encrypted_db_file, retry=True)
@@ -369,8 +374,8 @@ class TestFileLocking:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
-        monkeypatch.setattr("symeraseme.core.db._DB_LOCK_RETRY_ATTEMPTS", 1)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_cleanup._DB_LOCK_RETRY_ATTEMPTS", 1)
 
         readonly_dir = tmp_path / "readonly"
         readonly_dir.mkdir()
@@ -391,7 +396,7 @@ class TestV1Migration:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         assert encrypted_db_file.read_bytes().startswith(_ENC_HEADER_V1)
 
@@ -399,7 +404,7 @@ class TestV1Migration:
         assert conn is not None
         close_connection()
 
-        from symeraseme.core.db import _ENC_MAGIC_V3
+        from symeraseme.core.db_encryption import ENC_MAGIC_V3 as _ENC_MAGIC_V3
 
         raw = encrypted_db_file.read_bytes()
         assert raw.startswith(_ENC_MAGIC_V3), "V1 file should have been migrated to V3"
@@ -413,7 +418,7 @@ class TestFernetKeyCache:
             "symeraseme.core.identity._get_existing_master_key",
             lambda: b"x" * 32,
         )
-        from symeraseme.core.db import _FERNET_KEY_CACHE, _get_db_fernet_key
+        from symeraseme.core.db_encryption import _FERNET_KEY_CACHE, _get_db_fernet_key
 
         _FERNET_KEY_CACHE.clear()
         key1 = _get_db_fernet_key(salt=b"test-salt")
@@ -428,7 +433,7 @@ class TestFernetKeyCache:
             "symeraseme.core.identity._get_existing_master_key",
             lambda: b"x" * 32,
         )
-        from symeraseme.core.db import _FERNET_KEY_CACHE, _get_db_fernet_key
+        from symeraseme.core.db_encryption import _FERNET_KEY_CACHE, _get_db_fernet_key
 
         _FERNET_KEY_CACHE.clear()
         key1 = _get_db_fernet_key(salt=b"salt-a")
@@ -441,7 +446,7 @@ class TestStaleScavengerAge:
     """Stale scavenger must use a short 5-minute window."""
 
     def test_scavenge_age_is_five_minutes(self) -> None:
-        from symeraseme.core.db import _STALE_SCAVENGE_AGE
+        from symeraseme.core.db_cleanup import STALE_SCAVENGE_AGE as _STALE_SCAVENGE_AGE
 
         assert _STALE_SCAVENGE_AGE == 300, (
             f"Expected _STALE_SCAVENGE_AGE to be 300s, got {_STALE_SCAVENGE_AGE}s"
@@ -456,7 +461,7 @@ class TestSecureTempDir:
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         monkeypatch.setattr("os.getuid", lambda: 42)
         monkeypatch.setattr("tempfile.gettempdir", lambda: "/mock/tmp")
-        from symeraseme.core.db import _get_secure_temp_dir
+        from symeraseme.core.db_encryption import _get_secure_temp_dir
 
         with monkeypatch.context():
             monkeypatch.setattr(
@@ -469,7 +474,7 @@ class TestSecureTempDir:
     def test_linux_uses_dev_shm_when_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("platform.system", lambda: "Linux")
         monkeypatch.setattr("os.getuid", lambda: 42)
-        from symeraseme.core.db import _get_secure_temp_dir
+        from symeraseme.core.db_encryption import _get_secure_temp_dir
 
         with monkeypatch.context():
             monkeypatch.setattr(
@@ -488,7 +493,7 @@ class TestCleanupRegistration:
         # is applied at import time. Verifying via atexit internals
         # is Python-version-dependent, so we verify indirectly:
         # calling the function directly works and cleans up.
-        from symeraseme.core.db import _cleanup_temp_files
+        from symeraseme.core.db_cleanup import _cleanup_temp_files
 
         assert callable(_cleanup_temp_files)
 
@@ -501,7 +506,7 @@ class TestWriteRoundTrip:
     ) -> None:
         monkeypatch.setenv("SYMERASEME_DB_DIR", str(tmp_path))
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
         db_file = tmp_path / "roundtrip.db"
 
@@ -530,9 +535,9 @@ class TestReadonlySkipReencrypt:
         self, encrypted_db_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SYMERASEME_ENCRYPT_DB", "1")
-        monkeypatch.setattr("symeraseme.core.db._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
+        monkeypatch.setattr("symeraseme.core.db_encryption._get_db_fernet_key", lambda **kw: _TEST_FERNET_KEY)
 
-        from symeraseme.core.db import _ENC_MAGIC_V3
+        from symeraseme.core.db_encryption import ENC_MAGIC_V3 as _ENC_MAGIC_V3
 
         conn = get_connection(str(encrypted_db_file))
         conn.execute("SELECT 1").fetchone()

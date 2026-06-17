@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from symeraseme.core.db import close_connection, get_connection, init_db
+from symeraseme.core.db_connection import close_connection, get_connection, init_db
 from symeraseme.core.events import (
     EVENT_TYPES,
     append_event,

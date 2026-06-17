@@ -281,7 +281,7 @@ class TestCalendarCommand:
 
     def test_calendar_picks_up_deadline(self, tmp_home):
         """Seed a SENT request, run tick to project deadline, calendar must see it."""
-        from symeraseme.core.db import init_db
+        from symeraseme.core.db_connection import init_db
         from symeraseme.core.events import create_campaign, create_removal_request
         from symeraseme.core.projection import append_event_and_project
 
