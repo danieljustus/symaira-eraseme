@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db_connection import init_db
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
+
+logger = logging.getLogger(__name__)
 
 
 def handle_plan_create(
@@ -86,10 +89,6 @@ def handle_execute(
     if backend is None:
         backend = "himalaya" if account else "smtp"
 
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     if backend == "himalaya":
         if not account:
             msg = (
@@ -143,9 +142,6 @@ def handle_execute(
             email_sender=email_sender,
         )
     elif concurrent:
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.info("Using concurrent execution with %d workers", workers)
 
         async def _run_concurrent() -> dict:
