@@ -15,7 +15,7 @@ from email.header import decode_header
 from typing import Any
 
 from symeraseme.adapters.email._types import Envelope, Message
-from symeraseme.core.secrets import resolve_secret
+from symeraseme.core.secrets import SecretResolutionError, resolve_secret
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,12 @@ def _resolve_imap_password(password: str) -> str:
             env_fallback="IMAP_PASSWORD",
             keyring_service="symeraseme-imap",
         )
-    except Exception:
-        logger.debug("Could not resolve IMAP password, using literal value")
+    except SecretResolutionError:
+        logger.warning(
+            "Secret resolution failed for IMAP password; using literal value. "
+            "Check vault path, SYMERASEME_IMAP_PASSWORD env var, or keyring config.",
+            exc_info=True,
+        )
         return password
 
 

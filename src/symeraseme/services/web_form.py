@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, cast
 
 import typer
@@ -17,6 +18,8 @@ from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 from symeraseme.registry.schema import WebFormOptOut
+
+logger = logging.getLogger(__name__)
 
 
 def _build_identity_fields() -> dict[str, str]:
@@ -41,6 +44,24 @@ def _build_identity_fields() -> dict[str, str]:
         fields[f"address_state_{i}"] = addr.state or ""
         fields[f"address_country_{i}"] = addr.country
     return fields
+
+
+def _warn_missing_state_for_ccpa(
+    broker_id: str,
+    broker_name: str,
+    jurisdictions: list[str],
+    identity_fields: dict[str, str],
+) -> None:
+    if "CCPA" not in jurisdictions:
+        return
+    for key, value in identity_fields.items():
+        if key.startswith("address_state_") and not value:
+            logger.warning(
+                "Broker '%s' requires CCPA form — address state is missing. "
+                "The form may be incomplete or rejected.",
+                broker_name,
+            )
+            return
 
 
 async def _run_form_with_fallback(
@@ -103,6 +124,7 @@ async def run_web_form_for_broker(
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
     identity_fields = _build_identity_fields()
+    _warn_missing_state_for_ccpa(broker_id, broker.name, broker.jurisdictions, identity_fields)
 
     if dry_run:
         body = json.dumps(
@@ -188,6 +210,7 @@ async def handle_run_web_form(
     url = form.url
     steps_data = [s.model_dump(exclude_none=True) for s in form.form_spec.steps]
     identity_fields = _build_identity_fields()
+    _warn_missing_state_for_ccpa(broker_id, broker.name, broker.jurisdictions, identity_fields)
 
     if dry_run:
         lines = [f"[DRY RUN] Would run web form for {broker.name} ({url})"]

@@ -41,7 +41,7 @@ class TestDbInit:
 
     def test_db_init_creates_tables(self, tmp_home):
         invoke("db-init")
-        from symeraseme.core.db import get_connection
+        from symeraseme.core.db_connection import get_connection
 
         conn = get_connection()
         tables = conn.execute(

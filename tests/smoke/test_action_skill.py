@@ -35,7 +35,7 @@ class TestManualTasks:
         assert_in_output_stderr(result, "not found")
 
     def test_manual_tasks_with_pending(self, seeded_db):
-        from symeraseme.core.db import get_connection, init_db
+        from symeraseme.core.db_connection import get_connection, init_db
 
         init_db()
         conn = get_connection()
@@ -51,7 +51,7 @@ class TestManualTasks:
         assert "Acxiom" in result.stdout
 
     def test_manual_tasks_complete_with_pending(self, seeded_db):
-        from symeraseme.core.db import get_connection, init_db
+        from symeraseme.core.db_connection import get_connection, init_db
 
         init_db()
         conn = get_connection()

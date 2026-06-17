@@ -333,7 +333,7 @@ class TestManualTask:
 class TestDbIntegration:
     def test_init_db_creates_manual_tasks_table(self):
         """Verify the manual_tasks table exists after init_db."""
-        from symeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
         close_connection()
 
@@ -401,7 +401,9 @@ class TestRedactionAndPermissions:
         assert "[REDACTED-PHONE]" in redacted
 
     def test_tasks_dir_created_with_restrictive_permissions(self, tmp_path):
-        with patch("symeraseme.core.manual_fallback.MANUAL_TASKS_DIR", str(tmp_path / "tasks")):
+        mock_config = MagicMock()
+        mock_config.resolved_data_dir = tmp_path
+        with patch("symeraseme.core.manual_fallback.get_config", return_value=mock_config):
             tasks_dir = _tasks_dir()
             assert tasks_dir.exists()
             perms = tasks_dir.stat().st_mode & 0o777
