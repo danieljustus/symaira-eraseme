@@ -22,7 +22,7 @@ class TestTick:
         assert "total_actions" in data
 
     def test_tick_with_sent_event(self, seeded_db):
-        from symeraseme.core.db import get_connection, init_db
+        from symeraseme.core.db_connection import get_connection, init_db
 
         init_db()
         conn = get_connection()

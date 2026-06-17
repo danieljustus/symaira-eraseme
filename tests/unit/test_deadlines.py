@@ -155,7 +155,7 @@ class TestRunTick:
     def test_no_requests_returns_empty(self, tmp_path):
         import os
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
@@ -171,7 +171,7 @@ class TestRunTick:
     def test_dry_run_returns_actions(self, tmp_path):
         import os
 
-        from symeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
@@ -205,7 +205,7 @@ class TestRunTick:
     def test_multiple_states_ticked(self, tmp_path):
         import os
 
-        from symeraseme.core.db import close_connection, get_connection, init_db
+        from symeraseme.core.db_connection import close_connection, get_connection, init_db
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()
@@ -253,7 +253,7 @@ class TestApplyTickActions:
     def test_empty_actions(self, tmp_path):
         import os
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         close_connection()

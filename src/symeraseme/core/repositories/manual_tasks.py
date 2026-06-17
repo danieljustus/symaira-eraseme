@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from symeraseme.core.db import get_connection
+from symeraseme.core.db_connection import get_connection
 
 
 def insert_manual_task(

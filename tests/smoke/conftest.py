@@ -12,7 +12,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from symeraseme.cli import app
-from symeraseme.core.db import close_connection
+from symeraseme.core.db_connection import close_connection
 
 runner = CliRunner()
 
@@ -73,7 +73,7 @@ def tmp_home(tmp_path: Path) -> Path:
 @pytest.fixture()
 def seeded_db(tmp_home: Path) -> None:
     """Initialize DB with a seeded campaign and some removal requests."""
-    from symeraseme.core.db import init_db
+    from symeraseme.core.db_connection import init_db
     from symeraseme.core.events import append_event, create_campaign, create_removal_request
     from symeraseme.core.identity import save_profile
     from symeraseme.core.projection import upsert_state

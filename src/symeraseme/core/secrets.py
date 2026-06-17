@@ -65,13 +65,9 @@ def _resolve_via_symvault(path: str) -> str | None:
         return None
 
     if result.returncode != 0:
-        stderr_text = (result.stderr or b"").decode("utf-8", errors="replace").strip()
         logger.warning(
-            "symvault get %s exited with code %d: %s",
-            path,
+            "symvault get failed with exit code %d (path omitted for security)",
             result.returncode,
-            # Only log the first 200 chars of stderr to avoid log flooding
-            stderr_text[:200] if stderr_text else "(no output)",
         )
         return None
 
@@ -96,8 +92,11 @@ def _resolve_via_keyring(service: str, username: str) -> str | None:
 
         value = _keyring.get_password(service, username)
         return value if value else None
-    except Exception:
-        # keyring backend may be unavailable in CI or headless environments.
+    except ImportError:
+        logger.debug("keyring package not installed; skipping keyring resolution")
+        return None
+    except (OSError, _keyring.errors.KeyringError) as exc:
+        logger.debug("Keyring resolution failed (%s: %s); skipping", type(exc).__name__, exc)
         return None
 
 

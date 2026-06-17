@@ -386,7 +386,7 @@ class TestHandleRunWebForm:
         os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
         os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
 
-        from symeraseme.core.db import close_connection, init_db
+        from symeraseme.core.db_connection import close_connection, init_db
 
         close_connection()
         init_db()

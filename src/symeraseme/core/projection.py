@@ -8,7 +8,7 @@ from datetime import timedelta
 from typing import Any
 
 from symeraseme.core.datetime_utils import parse_iso_datetime as _parse_ts
-from symeraseme.core.db import get_connection
+from symeraseme.core.db_connection import get_connection
 from symeraseme.core.events import append_event
 
 logger = logging.getLogger(__name__)
@@ -97,13 +97,13 @@ def _accumulate_state(
 
             elif event_type == "DPA_COMPLAINT_DRAFTED":
                 state["escalation_level"] = 2
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError, AttributeError) as exc:
             logger.error(
-                "Event replay failed for request %d event_id=%s event_type=%s: skipping event",
+                "Event replay failed for request %d event_id=%s event_type=%s: %s — skipping event",
                 request_id,
                 event_id,
                 event_type,
-                exc_info=True,
+                exc,
             )
             continue
 
@@ -201,6 +201,15 @@ def append_event_and_project(
     return eid, state
 
 
+def _build_in_clause(ids: list[int]) -> tuple[str, list[int]]:
+    """Build SQL IN-clause placeholders.
+
+    Returns placeholder string and parameter list. Placeholders are safe
+    SQL (not user input).
+    """
+    return ",".join("?" * len(ids)), ids
+
+
 def rebuild_all_states(chunk_size: int = 100) -> int:
     """Rebuild request_state for every dirty request, processing in chunks.
 
@@ -226,7 +235,7 @@ def rebuild_all_states(chunk_size: int = 100) -> int:
     total_states = 0
     for start in range(0, len(dirty_request_ids), chunk_size):
         chunk = dirty_request_ids[start : start + chunk_size]
-        placeholders = ",".join("?" * len(chunk))
+        placeholders, chunk_params = _build_in_clause(chunk)
         rows = conn.execute(
             f"""SELECT r.id AS request_id,
                       e.id AS id,
@@ -237,7 +246,7 @@ def rebuild_all_states(chunk_size: int = 100) -> int:
                JOIN request_events e ON e.request_id = r.id
                WHERE r.id IN ({placeholders})
                ORDER BY r.id, e.occurred_at ASC, e.id ASC""",
-            chunk,
+            chunk_params,
         ).fetchall()
 
         buckets: dict[int, list[dict[str, Any]]] = {}
