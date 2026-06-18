@@ -5,7 +5,7 @@ import asyncio
 import typer
 
 from symeraseme.adapters.web.confirmation_clicker import auto_confirm
-from symeraseme.core.db_connection import get_connection, init_db, with_db
+from symeraseme.core.db_connection import get_connection, with_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.core.result_types import CliResult

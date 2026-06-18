@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from symeraseme.core.db_connection import init_db, with_db
+from symeraseme.core.db_connection import with_db
 from symeraseme.core.manual_fallback import get_manual_task, list_manual_tasks, resume_from_manual
 from symeraseme.core.result_types import CliResult
 

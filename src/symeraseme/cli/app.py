@@ -86,7 +86,7 @@ def _print_version(value: bool) -> None:
 @app.callback()
 def main(
     ctx: typer.Context,
-    output: OutputFormat = typer.Option(
+    output: OutputFormat = typer.Option(  # noqa: B008
         OutputFormat.text,
         help="Output format: text (default) or json for scripting",
     ),

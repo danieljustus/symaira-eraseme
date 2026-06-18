@@ -196,7 +196,16 @@ class OpenAIBaseMixin:
 
     Provides the common kwargs construction, error handling, and response
     parsing used by both OpenAIClient and OpenAICompatibleClient.
+
+    Subclasses must define: model, client, cost_tracker, _compute_cost().
     """
+
+    model: str
+    client: Any
+    cost_tracker: list[UsageRecord]
+
+    def _compute_cost(self, record: UsageRecord) -> float:  # pragma: no cover
+        raise NotImplementedError
 
     def _call_api(
         self,
