@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from unittest.mock import patch
-import pytest
 
-from symeraseme.interactive import collect_matches, get_context_markup, run_interactive_review, PIIMatch
+from symeraseme.interactive import (
+    collect_matches,
+    get_context_markup,
+    run_interactive_review,
+)
 
 
 def test_collect_matches_basic():

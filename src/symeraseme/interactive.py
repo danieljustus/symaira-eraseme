@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from symeraseme.adapters.triage import scrubber
 from symeraseme.cli.console import console, print_error, print_info, print_success
@@ -41,10 +42,8 @@ def collect_matches(content: str) -> list[PIIMatch]:
     # 1. Profile-based matches
     profile = None
     if profile_exists():
-        try:
+        with contextlib.suppress(Exception):
             profile = load_profile()
-        except Exception:
-            pass
 
     if profile is not None:
         # Find all email addresses
@@ -244,7 +243,9 @@ def run_interactive_review(file_path: Path) -> bool:
         return False
 
     print_info(f"Found {len(matches)} potential PII matches in {file_path}.")
-    console.print("[dim]Use y: redact, n/s: keep/skip, q: quit and save changes made so far[/dim]\n")
+    console.print(
+        "[dim]Use y: redact, n/s: keep/skip, q: quit and save changes made so far[/dim]\n"
+    )
 
     new_content_chunks: list[str] = []
     current_pos = 0
@@ -257,7 +258,9 @@ def run_interactive_review(file_path: Path) -> bool:
 
         # Show match context
         context_markup = get_context_markup(content, m)
-        console.print(f"\n[bold yellow]Match {idx + 1} of {len(matches)} - Type: {m.name}[/bold yellow]")
+        console.print(
+            f"\n[bold yellow]Match {idx + 1} of {len(matches)} - Type: {m.name}[/bold yellow]"
+        )
         console.print(context_markup)
 
         # Prompt
@@ -282,7 +285,9 @@ def run_interactive_review(file_path: Path) -> bool:
                 quit_review = True
                 break
             else:
-                console.print("[red]Invalid input. Choose y (yes), n (no), s (skip), or q (quit).[/red]")
+                console.print(
+                    "[red]Invalid input. Choose y (yes), n (no), s (skip), or q (quit).[/red]"
+                )
 
     # Append any remaining content from current_pos to the end
     new_content_chunks.append(content[current_pos:])

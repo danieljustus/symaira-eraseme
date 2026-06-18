@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-import pytest
 
-from symeraseme.mcp_server import redact_content, MCPJSONRPCHandler
+from symeraseme.mcp_server import MCPJSONRPCHandler, redact_content
 
 
 def test_redact_content_basic():
@@ -12,7 +10,13 @@ def test_redact_content_basic():
     redacted = redact_content(text)
     assert "test@example.com" not in redacted
     assert "555-123-4567" not in redacted
-    assert "t****@e*.com" in redacted or "t***@e*.*" in redacted or "t*@e*" in redacted or "***-***-4567" in redacted
+    assert (
+        "t****@e*.com" in redacted
+        or "t***@e*.*" in redacted
+        or "t*@e*" in redacted
+        or "***-***-4567" in redacted
+    )
+
 
 
 class DummyHandler:

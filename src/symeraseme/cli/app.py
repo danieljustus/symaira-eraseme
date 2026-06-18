@@ -87,6 +87,7 @@ def _print_version(value: bool) -> None:
 def _run_interactive_flag(value: str | None) -> None:
     if value:
         from pathlib import Path
+
         from symeraseme.interactive import run_interactive_review
         run_interactive_review(Path(value))
         raise typer.Exit()
@@ -194,6 +195,7 @@ def review(
 ) -> None:
     """Run interactive PII review on a file."""
     from pathlib import Path
+
     from symeraseme.interactive import run_interactive_review
     run_interactive_review(Path(file_path))
 

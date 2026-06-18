@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 def redact_content(text: str) -> str:
     """Run PII redaction on text, using the profile if available and scrub_pii."""
+    from symeraseme.adapters.triage.scrubber import scrub_pii
     from symeraseme.core.identity import load_profile, profile_exists
     from symeraseme.core.manual_fallback import _redact_identity_values
-    from symeraseme.adapters.triage.scrubber import scrub_pii
 
     profile = None
     if profile_exists():
@@ -71,7 +71,10 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                     "tools": [
                         {
                             "name": "redact_file",
-                            "description": "Reads a file, runs PII redaction on it, and returns the redacted content.",
+                            "description": (
+                                "Reads a file, runs PII redaction on it, "
+                                "and returns the redacted content."
+                            ),
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
