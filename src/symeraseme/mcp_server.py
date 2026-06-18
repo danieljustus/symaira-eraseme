@@ -10,21 +10,18 @@ logger = logging.getLogger(__name__)
 
 
 def _validate_path(path_str: str) -> Path:
-    """Resolve a user-provided path and ensure it is within the working directory.
+    """Resolve a user-provided path and ensure it is safe to access.
 
-    Raises ValueError if the path escapes the working directory boundary.
+    Rejects paths containing directory traversal components (..).
+    Raises ValueError if the path is unsafe.
     """
     import os
 
-    # Reject paths with directory traversal components before any resolution
-    parts = os.path.normpath(path_str).split(os.sep)
+    normalized = os.path.normpath(path_str)
+    parts = normalized.split(os.sep)
     if ".." in parts:
         raise ValueError(f"Path {path_str!r} contains directory traversal")
-    resolved = os.path.realpath(os.path.expanduser(path_str))
-    cwd = os.getcwd()
-    if not resolved.startswith(cwd + os.sep) and resolved != cwd:
-        raise ValueError(f"Path {path_str!r} resolves outside the working directory")
-    return Path(resolved)
+    return Path(os.path.expanduser(path_str)).resolve()
 
 
 def redact_content(text: str) -> str:
