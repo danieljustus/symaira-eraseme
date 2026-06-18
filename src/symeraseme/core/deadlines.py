@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from symeraseme.core.datetime_utils import parse_iso_datetime as _parse_dt
+from symeraseme.core.exceptions import safe_error_str
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ def apply_tick_actions(
                     "event_type": action.event_type,
                     "description": action.description,
                     "executed": False,
-                    "error": str(e),
+                    "error": safe_error_str(e),
                 }
             )
 

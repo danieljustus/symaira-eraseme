@@ -15,7 +15,7 @@ from symeraseme.adapters.email.himalaya import (
     send_messages_batch,
 )
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
-from symeraseme.core.exceptions import SymerasemeError
+from symeraseme.core.exceptions import SymerasemeError, safe_error_str
 from symeraseme.core.execution import execute_request
 from symeraseme.core.identity import load_profile
 from symeraseme.core.projection import append_event_and_project
@@ -75,7 +75,7 @@ def execute_campaign(
                 email_sender=email_sender,
             )
         except SymerasemeError as e:
-            result = {"success": False, "error": str(e), "request_id": req["id"]}
+            result = {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
         results.append(result)
     return _build_result(campaign_id, total_planned, batch, results)
 
@@ -212,7 +212,7 @@ async def execute_campaign_async(
                         email_sender=email_sender,
                     )
                 except SymerasemeError as e:
-                    r = {"success": False, "error": str(e), "request_id": req["id"]}
+                    r = {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
                 results.append(r)
                 progress.advance(task)
             return _build_result(campaign_id, total_planned, batch, results)

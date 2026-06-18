@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from symeraseme.core.events import get_removal_request
+from symeraseme.core.exceptions import safe_error_str
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.core.templating import render_template
@@ -258,7 +259,7 @@ def send_reply(
         )
     except (OSError, ValueError, RuntimeError) as e:
         logger.error("Failed to send reply #%d: %s", reply_id, e)
-        return {"success": False, "error": str(e), "reply_id": reply_id}
+        return {"success": False, "error": safe_error_str(e), "reply_id": reply_id}
 
     mark_draft_sent(draft_id, account)
 

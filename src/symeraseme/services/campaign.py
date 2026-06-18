@@ -8,6 +8,7 @@ import logging
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db_connection import init_db
+from symeraseme.core.exceptions import safe_error_str
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
 
@@ -162,7 +163,7 @@ def handle_execute(
                             email_sender=email_sender,
                         )
                     except Exception as e:
-                        return {"success": False, "error": str(e), "request_id": req["id"]}
+                        return {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
 
             from symeraseme.core.batch import _prepare_batch
 
