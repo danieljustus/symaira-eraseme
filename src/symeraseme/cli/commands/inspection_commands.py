@@ -11,6 +11,7 @@ from symeraseme import __version__
 from symeraseme.cli.console import render_error, render_result
 from symeraseme.core.db_connection import _db_path, init_db
 from symeraseme.core.events import get_events, list_removal_requests
+from symeraseme.core.exceptions import RegistryError
 from symeraseme.core.identity import _profile_path
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import (
@@ -414,7 +415,7 @@ def brokers_show_cmd(
     """Show full details of one broker by id."""
     try:
         broker = load_broker(broker_id)
-    except FileNotFoundError:
+    except RegistryError:
         render_error(
             f"Broker '{broker_id}' not found in registry. "
             "Run 'symeraseme brokers list' to see available brokers."
