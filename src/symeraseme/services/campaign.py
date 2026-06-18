@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
@@ -146,29 +147,30 @@ def handle_execute(
         logger.info("Using concurrent execution with %d workers", workers)
 
         async def _run_concurrent() -> dict:
-            import asyncio
+            from symeraseme.core.execution import execute_request
 
-            semaphore = asyncio.Semaphore(workers)
+            executor = ThreadPoolExecutor(max_workers=workers)
 
             async def _limited_execute(req: dict) -> dict:
-                async with semaphore:
-                    from symeraseme.core.execution import execute_request
-
-                    try:
-                        return await asyncio.to_thread(
-                            execute_request,
+                loop = asyncio.get_event_loop()
+                try:
+                    return await loop.run_in_executor(
+                        executor,
+                        lambda: execute_request(
                             req["id"],
                             dry_run=dry_run,
                             web_form_runner=web_form_runner,
                             email_sender=email_sender,
-                        )
-                    except Exception as e:
-                        return {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
+                        ),
+                    )
+                except Exception as e:
+                    return {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
 
             from symeraseme.core.batch import _prepare_batch
 
             batch = _prepare_batch(campaign_id, batch_size)
             if not batch:
+                executor.shutdown(wait=False)
                 return {
                     "campaign_id": campaign_id,
                     "total_planned": 0,
@@ -178,6 +180,7 @@ def handle_execute(
 
             tasks = [_limited_execute(req) for req in batch]
             results = await asyncio.gather(*tasks)
+            executor.shutdown(wait=False)
             return {
                 "campaign_id": campaign_id,
                 "total_planned": len(batch),
