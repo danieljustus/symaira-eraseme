@@ -90,6 +90,7 @@ def _run_interactive_flag(value: str | None) -> None:
         from pathlib import Path
 
         from symeraseme.interactive import run_interactive_review
+
         run_interactive_review(Path(value))
         raise typer.Exit()
 
@@ -187,6 +188,7 @@ def serve(
 ) -> None:
     """Start the local MCP JSON-RPC server."""
     from symeraseme.mcp_server import run_mcp_server
+
     run_mcp_server(host, port)
 
 
@@ -198,6 +200,7 @@ def review(
     from pathlib import Path
 
     from symeraseme.interactive import run_interactive_review
+
     run_interactive_review(Path(file_path))
 
 

@@ -200,11 +200,13 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
             }
 
     def _send_error(self, code: int, message: str, req_id: any) -> None:
-        self._send_response_json({
-            "jsonrpc": "2.0",
-            "error": {"code": code, "message": message},
-            "id": req_id,
-        })
+        self._send_response_json(
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": code, "message": message},
+                "id": req_id,
+            }
+        )
 
     def _send_response_json(self, data: dict | list) -> None:
         body = json.dumps(data).encode("utf-8")

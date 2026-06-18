@@ -211,6 +211,7 @@ def get_context_markup(content: str, m: PIIMatch, context_lines: int = 2) -> str
     after = sub_content[local_end:]
 
     from rich.markup import escape
+
     formatted = f"{escape(before)}[bold red]{escape(match_text)}[/bold red]{escape(after)}"
 
     result_lines = []
@@ -218,7 +219,7 @@ def get_context_markup(content: str, m: PIIMatch, context_lines: int = 2) -> str
         current_line_no = start_idx + offset_idx + 1
         if current_line_no > len(lines):
             break
-        is_match_line = (start_idx + offset_idx == match_line_idx)
+        is_match_line = start_idx + offset_idx == match_line_idx
         prefix = "-> " if is_match_line else "   "
         result_lines.append(f"{prefix}{current_line_no:4d} | {line}")
 
@@ -265,12 +266,14 @@ def run_interactive_review(file_path: Path) -> bool:
 
         # Prompt
         while True:
-            response = console.input(
-                f"Redact [bold cyan]'{m.value}'[/bold cyan]? (y/n/s/q) "
-            ).strip().lower()
+            response = (
+                console.input(f"Redact [bold cyan]'{m.value}'[/bold cyan]? (y/n/s/q) ")
+                .strip()
+                .lower()
+            )
             if response in ("y", "yes"):
                 # Append text before match
-                new_content_chunks.append(content[current_pos:m.start])
+                new_content_chunks.append(content[current_pos : m.start])
                 # Append redacted version
                 redacted_value = m.replacer(m.match)
                 new_content_chunks.append(redacted_value)
@@ -295,9 +298,7 @@ def run_interactive_review(file_path: Path) -> bool:
 
     if quit_review:
         if saved_any:
-            response = console.input(
-                "Save changes made so far? (y/n) "
-            ).strip().lower()
+            response = console.input("Save changes made so far? (y/n) ").strip().lower()
             if response not in ("y", "yes"):
                 print_info("Review aborted. Changes discarded.")
                 return False
