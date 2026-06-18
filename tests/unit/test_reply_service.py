@@ -11,7 +11,6 @@ class TestHandleClassifyReply:
     def test_calls_create_llm_client(self):
         with (
             patch(f"{SR}._ensure_llm_consent", return_value=None),
-            patch(f"{SR}.init_db"),
             patch(f"{SR}.get_removal_request", return_value={"broker_id": "test"}),
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
@@ -44,7 +43,6 @@ class TestHandleClassifyReply:
     def test_appends_single_event_per_classification(self):
         with (
             patch(f"{SR}._ensure_llm_consent", return_value=None),
-            patch(f"{SR}.init_db"),
             patch(f"{SR}.get_removal_request", return_value={"broker_id": "test"}),
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
@@ -79,7 +77,6 @@ class TestHandleClassifyReply:
     def test_calls_create_llm_client_with_defaults(self):
         with (
             patch(f"{SR}._ensure_llm_consent", return_value=None),
-            patch(f"{SR}.init_db"),
             patch(f"{SR}.get_removal_request", return_value={"broker_id": "test"}),
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
@@ -114,7 +111,6 @@ class TestHandleGenerateRebuttal:
     def test_calls_create_llm_client(self):
         with (
             patch(f"{SR}._ensure_llm_consent", return_value=None),
-            patch(f"{SR}.init_db"),
             patch(f"{SR}.get_removal_request", return_value={"broker_id": "test"}),
             patch(f"{SR}.get_events", return_value=[{"payload_json": {}, "occurred_at": ""}]),
             patch(f"{SR}.load_broker", return_value=None),
