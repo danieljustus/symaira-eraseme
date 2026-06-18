@@ -174,10 +174,10 @@ def collect_matches(content: str) -> list[PIIMatch]:
     matches.sort(key=lambda x: (x.start, -len(x.value)))
     filtered_matches: list[PIIMatch] = []
     last_end = -1
-    for m in matches:
-        if m.start >= last_end:
-            filtered_matches.append(m)
-            last_end = m.end
+    for match_item in matches:
+        if match_item.start >= last_end:
+            filtered_matches.append(match_item)
+            last_end = match_item.end
 
     return filtered_matches
 

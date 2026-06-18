@@ -4,6 +4,7 @@ import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def redact_content(text: str) -> str:
 
 
 class MCPJSONRPCHandler(BaseHTTPRequestHandler):
-    def log_message(self, format: str, *args: any) -> None:
+    def log_message(self, format: str, *args: Any) -> None:
         # Prevent standard http server logging to stdout/stderr unless debug is on
         logger.debug(format, *args)
 
@@ -199,7 +200,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 "id": req_id,
             }
 
-    def _send_error(self, code: int, message: str, req_id: any) -> None:
+    def _send_error(self, code: int, message: str, req_id: Any) -> None:
         self._send_response_json(
             {
                 "jsonrpc": "2.0",
