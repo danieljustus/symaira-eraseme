@@ -9,6 +9,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _validate_path(path_str: str) -> Path:
+    """Resolve a user-provided path and ensure it is within the working directory.
+
+    Raises ValueError if the path escapes the working directory boundary.
+    """
+    path = Path(path_str).expanduser().resolve()
+    cwd = Path.cwd().resolve()
+    try:
+        path.relative_to(cwd)
+    except ValueError:
+        raise ValueError(
+            f"Path {path_str!r} resolves outside the working directory"
+        ) from None
+    return path
+
+
 def redact_content(text: str) -> str:
     """Run PII redaction on text, using the profile if available and scrub_pii."""
     from symeraseme.adapters.triage.scrubber import scrub_pii
@@ -117,7 +133,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 }
 
             try:
-                path = Path(path_str).expanduser().resolve()
+                path = _validate_path(path_str)
                 if not path.exists():
                     return {
                         "jsonrpc": "2.0",
@@ -139,6 +155,12 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                             }
                         ]
                     },
+                    "id": req_id,
+                }
+            except ValueError as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32602, "message": str(e)},
                     "id": req_id,
                 }
             except Exception as e:
@@ -166,7 +188,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 }
 
             try:
-                path = Path(path_str).expanduser().resolve()
+                path = _validate_path(path_str)
                 if not path.exists():
                     return {
                         "jsonrpc": "2.0",
@@ -181,6 +203,12 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 return {
                     "jsonrpc": "2.0",
                     "result": redacted,
+                    "id": req_id,
+                }
+            except ValueError as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32602, "message": str(e)},
                     "id": req_id,
                 }
             except Exception as e:
