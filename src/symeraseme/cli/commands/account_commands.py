@@ -6,9 +6,11 @@ import typer
 
 from symeraseme.cli.console import (
     console,
+    print_info,
     print_panel,
     print_success,
     print_table,
+    print_warning,
     render_error,
 )
 from symeraseme.core.identity import load_profile, profile_exists, save_profile
@@ -51,14 +53,14 @@ def add(
     port = find_free_port()
     redirect_uri = f"http://127.0.0.1:{port}/callback"
     url, code_verifier = authorize_url(provider, client_id, redirect_uri)
-    typer.echo(f"Opening browser for OAuth2 authorization: {url}")
+    print_info(f"Opening browser for OAuth2 authorization: {url}")
     webbrowser.open(url)
 
-    typer.echo(f"Waiting for authorization callback on {redirect_uri} ...")
+    print_info(f"Waiting for authorization callback on {redirect_uri} ...")
     try:
         code, _ = run_local_server(port=port)
     except TimeoutError:
-        typer.echo(
+        print_warning(
             "Timed out waiting for authorization. "
             "You can also paste the code from the redirect URL."
         )

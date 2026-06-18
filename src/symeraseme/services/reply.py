@@ -5,6 +5,7 @@ import logging
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
+from symeraseme.cli.console import print_info, print_warning
 from symeraseme.core.db_connection import get_connection, init_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
@@ -22,14 +23,14 @@ def _ensure_llm_consent(yes: bool = False) -> CliResult | None:
     if yes:
         grant_llm_consent()
         return None
+
+    print_warning(
+        "LLM operations may send PII (email addresses, phone numbers, SSNs) "
+        "to third-party LLM providers. A PII scrubber is active, but network "
+        "transmission of scrubbed metadata still occurs."
+    )
     import typer
 
-    typer.echo(
-        "WARNING: LLM operations may send PII (email addresses, phone numbers, SSNs) "
-        "to third-party LLM providers. A PII scrubber is active, but network "
-        "transmission of scrubbed metadata still occurs.",
-        err=True,
-    )
     granted = typer.confirm("Do you consent to sending this data to the LLM provider?")
     if not granted:
         return CliResult(
@@ -37,7 +38,7 @@ def _ensure_llm_consent(yes: bool = False) -> CliResult | None:
             error="LLM consent denied. Use --yes to grant non-interactively.",
         )
     grant_llm_consent()
-    typer.echo("LLM consent granted. This will not be asked again.")
+    print_info("LLM consent granted. This will not be asked again.")
     return None
 
 
