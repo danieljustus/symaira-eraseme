@@ -330,6 +330,89 @@ examples/        — Integration examples for all supported AI agents
 AGENTS.md        — Setup guide for all AI agent integrations
 ```
 
+## Exit codes
+
+Symaira EraseMe uses standard exit codes for scripting:
+
+- `0` — Command completed successfully
+- `1` — General error (validation failure, missing profile, database error, etc.)
+
+## Troubleshooting
+
+### No identity profile found
+
+```
+Error: No identity profile found. Run 'symeraseme init-profile' first.
+```
+
+Create your identity profile before using any other commands:
+
+```bash
+symeraseme init-profile
+```
+
+### Database not initialized
+
+If you see database errors, initialize the schema:
+
+```bash
+symeraseme db-init
+```
+
+### IMAP password not set
+
+For inbox triage commands (`poll-inbox`, `classify-reply`), ensure IMAP credentials are configured:
+
+```bash
+export IMAP_PASSWORD="your-app-password"
+```
+
+Use an app password if 2FA is enabled on your email account.
+
+### CAPTCHA solver unavailable
+
+Web-form automation requires a CAPTCHA solver. Set the Capsolver API key:
+
+```bash
+export CAPSOLVER_API_KEY="CAP-..."
+```
+
+### pydantic_core compatibility error on macOS
+
+If you see a `LINKEDIT alignment` error on macOS 27 (Tahoe), reinstall pydantic_core from source:
+
+```bash
+pip install --force-reinstall --no-binary pydantic_core pydantic-core
+```
+
+### LLM provider not available
+
+For triage commands, ensure your LLM provider API key is set:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Or use OpenAI:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### Consent required for destructive commands
+
+Commands like `plan execute` require explicit consent. Use the `--yes` flag for non-interactive mode:
+
+```bash
+symeraseme plan execute --campaign initial --yes
+```
+
+Or issue a consent token:
+
+```bash
+symeraseme grant execute --ttl 3600
+```
+
 ## Security
 
 - **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.

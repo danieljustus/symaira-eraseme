@@ -53,6 +53,6 @@ def check_pydantic_core_compat() -> None:
                     "Or upgrade to a newer version of pydantic that includes a compatible "
                     "pydantic_core wheel:\n\n"
                     "  pip install --upgrade pydantic\n\n"
-                    "For more information, see: https://github.com/pydantic/pydantic/issues/XXXX"
+                    "For more information, see: https://github.com/danieljustus/symaira-eraseme/issues?q=pydantic+LINKEDIT"
                 ) from exc
         raise

@@ -120,9 +120,12 @@ class TestOllamaClientClassify:
 
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(response_body)):
             client = OllamaClient()
-            text, record = client.classify(
+            text, record = client._call_api(
                 system_prompt="You are a classifier.",
                 user_prompt="Classify this.",
+                max_tokens=512,
+                temperature=0.0,
+                cache_key=None,
             )
 
         assert text == "positive"
@@ -144,7 +147,13 @@ class TestOllamaClientClassify:
 
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(response_body)):
             client = OllamaClient(model="mistral")
-            text, record = client.classify("sys", "user")
+            text, record = client._call_api(
+                system_prompt="sys",
+                user_prompt="user",
+                max_tokens=512,
+                temperature=0.0,
+                cache_key=None,
+            )
 
         assert text == "negative"
         assert record.model == "mistral"
@@ -162,11 +171,12 @@ class TestOllamaClientClassify:
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value = MockHTTPResponse(response_body)
             client = OllamaClient()
-            client.classify(
+            client._call_api(
                 system_prompt="You are a classifier.",
                 user_prompt="Classify this.",
                 max_tokens=256,
                 temperature=0.5,
+                cache_key=None,
             )
 
         call_args = mock_urlopen.call_args
@@ -194,7 +204,13 @@ class TestOllamaClientClassify:
 
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(response_body)):
             client = OllamaClient()
-            text, record = client.classify("sys", "user")
+            text, record = client._call_api(
+                system_prompt="sys",
+                user_prompt="user",
+                max_tokens=512,
+                temperature=0.0,
+                cache_key=None,
+            )
 
         assert text == ""
         assert record.input_tokens == 0
@@ -214,7 +230,13 @@ class TestOllamaClientCost:
 
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(response_body)):
             client = OllamaClient()
-            text, record = client.classify("sys", "user")
+            text, record = client._call_api(
+                system_prompt="sys",
+                user_prompt="user",
+                max_tokens=512,
+                temperature=0.0,
+                cache_key=None,
+            )
 
         assert record.cost == 0.0
 
@@ -231,7 +253,13 @@ class TestOllamaClientCost:
         tracker: list[UsageRecord] = []
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(response_body)):
             client = OllamaClient(cost_tracker=tracker)
-            client.classify("sys", "user")
+            client._call_api(
+                system_prompt="sys",
+                user_prompt="user",
+                max_tokens=512,
+                temperature=0.0,
+                cache_key=None,
+            )
 
         assert len(tracker) == 1
         assert tracker[0].cost == 0.0
@@ -244,7 +272,13 @@ class TestOllamaClientTimeout:
         with patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
             client = OllamaClient()
             with pytest.raises(LLMClientError, match="connection error"):
-                client.classify("sys", "user")
+                client._call_api(
+                    system_prompt="sys",
+                    user_prompt="user",
+                    max_tokens=512,
+                    temperature=0.0,
+                    cache_key=None,
+                )
 
     def test_classify_raises_on_url_error(self):
         with patch(
@@ -253,7 +287,13 @@ class TestOllamaClientTimeout:
         ):
             client = OllamaClient()
             with pytest.raises(LLMClientError, match="connection error"):
-                client.classify("sys", "user")
+                client._call_api(
+                    system_prompt="sys",
+                    user_prompt="user",
+                    max_tokens=512,
+                    temperature=0.0,
+                    cache_key=None,
+                )
 
     def test_classify_raises_on_http_error(self):
         error = urllib.error.HTTPError(
@@ -266,10 +306,22 @@ class TestOllamaClientTimeout:
         with patch("urllib.request.urlopen", side_effect=error):
             client = OllamaClient()
             with pytest.raises(LLMClientError, match="HTTP error 404"):
-                client.classify("sys", "user")
+                client._call_api(
+                    system_prompt="sys",
+                    user_prompt="user",
+                    max_tokens=512,
+                    temperature=0.0,
+                    cache_key=None,
+                )
 
     def test_classify_raises_on_bad_json(self):
         with patch("urllib.request.urlopen", return_value=MockHTTPResponse(b"not json")):
             client = OllamaClient()
             with pytest.raises(LLMClientError, match="Invalid JSON"):
-                client.classify("sys", "user")
+                client._call_api(
+                    system_prompt="sys",
+                    user_prompt="user",
+                    max_tokens=512,
+                    temperature=0.0,
+                    cache_key=None,
+                )

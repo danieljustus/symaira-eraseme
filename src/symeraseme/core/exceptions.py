@@ -7,6 +7,16 @@ Service-layer handlers catch these and convert them to CliResult at the boundary
 from __future__ import annotations
 
 
+def safe_error_str(e: Exception, max_len: int = 300) -> str:
+    """Truncate an exception string to prevent sensitive data leakage.
+
+    SMTP/email SDK exceptions may include server banners, session tokens,
+    or connection details. This helper ensures persisted error payloads
+    are bounded in length.
+    """
+    return str(e)[:max_len]
+
+
 class SymerasemeError(Exception):
     """Base class for all domain errors."""
 

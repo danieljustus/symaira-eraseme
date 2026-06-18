@@ -292,3 +292,16 @@ def init_db(path: str | None = None) -> Path:
     conn.commit()
     _SCHEMA_VERSION_CACHE[db_key] = SCHEMA_VERSION
     return db_file
+
+
+def with_db(func):
+    """Decorator that ensures init_db() is called before the wrapped function.
+
+    Eliminates redundant init_db() calls across service handlers.
+    """
+
+    def wrapper(*args, **kwargs):
+        init_db()
+        return func(*args, **kwargs)
+
+    return wrapper

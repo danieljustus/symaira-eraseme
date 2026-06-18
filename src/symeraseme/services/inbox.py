@@ -9,7 +9,7 @@ from symeraseme.adapters.email.smtp_imap import (
 from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
-from symeraseme.core.db_connection import init_db
+from symeraseme.core.db_connection import with_db
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
 from symeraseme.core.inbox import submit_inbox_reply
 from symeraseme.core.result_types import CliResult
@@ -17,6 +17,7 @@ from symeraseme.core.result_types import CliResult
 logger = logging.getLogger(__name__)
 
 
+@with_db
 def handle_poll_inbox(
     host: str,
     port: int,
@@ -26,8 +27,6 @@ def handle_poll_inbox(
     campaign_id: str | None,
     password: str,
 ) -> CliResult:
-    init_db()
-
     try:
         messages = _poll(
             host=host,
