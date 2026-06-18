@@ -19,9 +19,7 @@ def _validate_path(path_str: str) -> Path:
     try:
         path.relative_to(cwd)
     except ValueError:
-        raise ValueError(
-            f"Path {path_str!r} resolves outside the working directory"
-        ) from None
+        raise ValueError(f"Path {path_str!r} resolves outside the working directory") from None
     return path
 
 
