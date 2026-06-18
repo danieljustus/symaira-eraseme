@@ -8,7 +8,9 @@ __all__ = ["app"]
 def __getattr__(name: str):
     if name == "app":
         from symeraseme.cli.app import app
+        from symeraseme.core._compat import check_pydantic_core_compat
 
+        check_pydantic_core_compat()
         return app
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
