@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import time
 
+import pytest
+
 from symeraseme.core.scheduler import (
     SchedulerConfig,
     detect_platform,

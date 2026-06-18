@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -191,7 +192,7 @@ def serve(
 
 @app.command(rich_help_panel="Maintenance")
 def review(
-    file_path: Path = typer.Argument(..., help="Path to the file to review"),
+    file_path: Annotated[Path, typer.Argument(help="Path to the file to review")],
 ) -> None:
     """Run interactive PII review on a file."""
     from pathlib import Path
