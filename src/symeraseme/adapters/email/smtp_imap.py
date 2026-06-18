@@ -34,8 +34,8 @@ def _resolve_imap_password(password: str) -> str:
         logger.warning(
             "Secret resolution failed for IMAP password; using literal value. "
             "Check vault path, SYMERASEME_IMAP_PASSWORD env var, or keyring config.",
-            exc_info=True,
         )
+        logger.debug("IMAP secret resolution traceback", exc_info=True)
         return password
 
 

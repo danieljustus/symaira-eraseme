@@ -15,6 +15,12 @@ from rich.table import Table
 from rich.text import Text
 
 from symeraseme.cli.types import CliResult
+from symeraseme.core.exceptions import (
+    EXIT_CONFIG,
+    EXIT_ERROR,
+    EXIT_NETWORK,
+    SymerasemeError,
+)
 
 console = _RichConsole()
 _error_console = _RichConsole(stderr=True)
@@ -88,6 +94,19 @@ class OutputFormat(StrEnum):
     json = "json"
 
 
+def _exit_code_for_result(result: CliResult) -> int:
+    error = result.error or ""
+    if "profile" in error.lower() or "not found" in error.lower():
+        if "broker" in error.lower():
+            return EXIT_ERROR
+        return EXIT_CONFIG
+    if "registry" in error.lower():
+        return EXIT_ERROR
+    if "imap" in error.lower() or "connection" in error.lower() or "network" in error.lower():
+        return EXIT_NETWORK
+    return EXIT_ERROR
+
+
 def render_result(
     output_format: str,
     result: str | CliResult | Exception,
@@ -100,17 +119,15 @@ def render_result(
     For text output the result is wrapped in a rich Panel when the content
     spans multiple lines or carries an error.
 
-    Raises typer.Exit(1) when the result indicates failure so every command
-    returns a non-zero exit code uniformly.
+    Raises typer.Exit with an appropriate code when the result indicates
+    failure so every command returns a distinct exit code uniformly.
     """
-    from symeraseme.core.exceptions import SymerasemeError
-
     if isinstance(result, SymerasemeError):
         result_obj = CliResult(success=False, error=result.message)
         result = result.message
     elif isinstance(result, Exception):
         print_error(str(result))
-        raise typer.Exit(1)
+        raise typer.Exit(EXIT_ERROR)
 
     if isinstance(result, CliResult):
         result_obj = result
@@ -133,10 +150,11 @@ def render_result(
         print_panel("Output", result.strip())
 
     if result_obj is not None and not result_obj.success:
-        raise typer.Exit(1)
+        exit_code = _exit_code_for_result(result_obj)
+        raise typer.Exit(exit_code)
 
 
 def render_error(message: str) -> NoReturn:
     """Print an error message and exit."""
     print_error(message)
-    raise typer.Exit(1)
+    raise typer.Exit(EXIT_ERROR)

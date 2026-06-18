@@ -6,6 +6,11 @@ Service-layer handlers catch these and convert them to CliResult at the boundary
 
 from __future__ import annotations
 
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_CONFIG = 2
+EXIT_NETWORK = 3
+
 
 def safe_error_str(e: Exception, max_len: int = 300) -> str:
     """Truncate an exception string to prevent sensitive data leakage.
@@ -43,3 +48,7 @@ class ExecutionError(SymerasemeError):
     def __init__(self, message: str, request_id: int | None = None) -> None:
         self.request_id = request_id
         super().__init__(message)
+
+
+class RegistryError(SymerasemeError):
+    """Broker registry directory not found or broker not found in registry."""
