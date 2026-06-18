@@ -14,13 +14,17 @@ def _validate_path(path_str: str) -> Path:
 
     Raises ValueError if the path escapes the working directory boundary.
     """
-    path = Path(path_str).expanduser().resolve()
-    cwd = Path.cwd().resolve()
-    try:
-        path.relative_to(cwd)
-    except ValueError:
-        raise ValueError(f"Path {path_str!r} resolves outside the working directory") from None
-    return path
+    import os
+
+    # Reject paths with directory traversal components before any resolution
+    parts = os.path.normpath(path_str).split(os.sep)
+    if ".." in parts:
+        raise ValueError(f"Path {path_str!r} contains directory traversal")
+    resolved = os.path.realpath(os.path.expanduser(path_str))
+    cwd = os.getcwd()
+    if not resolved.startswith(cwd + os.sep) and resolved != cwd:
+        raise ValueError(f"Path {path_str!r} resolves outside the working directory")
+    return Path(resolved)
 
 
 def redact_content(text: str) -> str:
