@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import typer
 
@@ -83,6 +84,14 @@ def _print_version(value: bool) -> None:
         raise typer.Exit()
 
 
+def _run_interactive_flag(value: str | None) -> None:
+    if value:
+        from pathlib import Path
+        from symeraseme.interactive import run_interactive_review
+        run_interactive_review(Path(value))
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -101,6 +110,14 @@ def main(
         help="Show version and exit",
         is_eager=True,
         callback=_print_version,
+    ),
+    interactive: str | None = typer.Option(
+        None,
+        "--interactive",
+        "-i",
+        help="Run interactive PII review on a file",
+        is_eager=True,
+        callback=_run_interactive_flag,
     ),
 ) -> None:
     if verbose >= 2:
@@ -159,6 +176,26 @@ app.command(name="db-migrate", rich_help_panel="Maintenance")(db_migrate)
 app.command(name="generate-scheduler", rich_help_panel="Maintenance")(generate_scheduler_cmd)
 app.command(name="export", rich_help_panel="Maintenance")(export_cmd)
 app.command(rich_help_panel="Maintenance")(validate)
+
+
+@app.command(rich_help_panel="Maintenance")
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind the server to"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to bind the server to"),
+) -> None:
+    """Start the local MCP JSON-RPC server."""
+    from symeraseme.mcp_server import run_mcp_server
+    run_mcp_server(host, port)
+
+
+@app.command(rich_help_panel="Maintenance")
+def review(
+    file_path: Path = typer.Argument(..., help="Path to the file to review"),
+) -> None:
+    """Run interactive PII review on a file."""
+    from pathlib import Path
+    from symeraseme.interactive import run_interactive_review
+    run_interactive_review(Path(file_path))
 
 
 if __name__ == "__main__":
