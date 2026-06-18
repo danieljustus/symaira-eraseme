@@ -10,6 +10,7 @@ from symeraseme.llm.protocol import (
     BaseLLMClient,
     LLMClientError,
     LLMClientRateLimitError,
+    OpenAIBaseMixin,
     UsageRecord,
 )
 
@@ -26,7 +27,7 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
 }
 
 
-class OpenAIClient(BaseLLMClient):
+class OpenAIClient(OpenAIBaseMixin, BaseLLMClient):
     """Wrapper around the OpenAI SDK with cost tracking and retry."""
 
     def __init__(
@@ -60,56 +61,6 @@ class OpenAIClient(BaseLLMClient):
 
             self._api_key = os.environ.get("OPENAI_API_KEY")
         return self._api_key is not None and len(self._api_key) > 0
-
-    def _call_api(
-        self,
-        *,
-        system_prompt: str,
-        user_prompt: str,
-        max_tokens: int,
-        temperature: float,
-        cache_key: str | None,
-    ) -> tuple[str, UsageRecord]:
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-
-        if cache_key and self._supports_json_mode():
-            kwargs["response_format"] = {"type": "json_object"}
-
-        import openai
-
-        try:
-            response = self.client.chat.completions.create(**kwargs)
-        except openai.RateLimitError as e:
-            raise LLMClientRateLimitError(str(e)) from e
-        except (openai.APIStatusError, openai.APIConnectionError) as e:
-            raise LLMClientError(str(e)) from e
-
-        response_text = ""
-        if response.choices and len(response.choices) > 0:
-            choice = response.choices[0]
-            if choice.message and choice.message.content:
-                response_text = choice.message.content
-
-        usage = response.usage
-        record = UsageRecord(
-            model=self.model,
-            input_tokens=usage.prompt_tokens if usage else 0,
-            output_tokens=usage.completion_tokens if usage else 0,
-            cache_creation_tokens=0,
-            cache_read_tokens=0,
-        )
-        record.cost = self._compute_cost(record)
-        self.cost_tracker.append(record)
-
-        return response_text.strip(), record
 
     def _compute_cost(self, record: UsageRecord) -> float:
         """Compute USD cost for a usage record."""
