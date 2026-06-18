@@ -7,14 +7,14 @@ import logging
 import urllib.error
 import urllib.request
 
-from symeraseme.llm.protocol import LLMClientError, UsageRecord
+from symeraseme.llm.protocol import BaseLLMClient, LLMClientError, UsageRecord
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 30  # seconds
 
 
-class OllamaClient:
+class OllamaClient(BaseLLMClient):
     """Wrapper around a local Ollama instance via urllib.request."""
 
     def __init__(
@@ -22,11 +22,11 @@ class OllamaClient:
         *,
         host: str = "http://localhost:11434",
         model: str = "llama3.1",
+        max_retries: int = 3,
         cost_tracker: list[UsageRecord] | None = None,
     ) -> None:
+        super().__init__(model=model, max_retries=max_retries, cost_tracker=cost_tracker)
         self.host = host.rstrip("/")
-        self.model = model
-        self.cost_tracker = cost_tracker if cost_tracker is not None else []
 
     def is_available(self) -> bool:
         """Check if the Ollama server is reachable and the model is available."""
@@ -47,14 +47,14 @@ class OllamaClient:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             return False
 
-    def classify(
+    def _call_api(
         self,
+        *,
         system_prompt: str,
         user_prompt: str,
-        *,
-        max_tokens: int = 512,
-        temperature: float = 0.0,
-        cache_key: str | None = None,
+        max_tokens: int,
+        temperature: float,
+        cache_key: str | None,
     ) -> tuple[str, UsageRecord]:
         """Send a classification request to the local Ollama server.
 
@@ -113,3 +113,6 @@ class OllamaClient:
         self.cost_tracker.append(record)
 
         return response_text.strip(), record
+
+    def _compute_cost(self, record: UsageRecord) -> float:
+        return 0.0

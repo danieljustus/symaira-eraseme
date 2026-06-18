@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -13,6 +14,7 @@ import jsonschema
 import yaml
 from pydantic import ValidationError
 
+from symeraseme.core.exceptions import RegistryError
 from symeraseme.registry.schema import Broker
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,7 @@ def _registry_dir() -> Path:
         if (parent / "registry" / "brokers").exists():
             return parent / "registry"
     msg = "Could not find registry directory"
-    raise FileNotFoundError(msg)
+    raise RegistryError(msg)
 
 
 def _load_broker_schema() -> dict:
@@ -92,7 +94,7 @@ def load_broker(broker_id: str) -> Broker:
     if broker_id in _BROKER_ID_INDEX:
         return load_broker_yaml(_BROKER_ID_INDEX[broker_id])
     msg = f"Broker '{broker_id}' not found in registry"
-    raise FileNotFoundError(msg)
+    raise RegistryError(msg)
 
 
 _BROKER_CACHE: dict[tuple[str, str], list[Broker]] = {}
@@ -113,7 +115,6 @@ def clear_registry_cache() -> None:
     _SKIPPED_COUNT.clear()
     _BROKER_SCHEMA = None
     _BROKER_VALIDATOR = None
-    import contextlib
 
     _cache_dir = Path.home() / ".cache" / "symeraseme"
     if _cache_dir.exists():
@@ -125,7 +126,7 @@ def clear_registry_cache() -> None:
 
 def _cache_dir() -> Path:
     cache = Path.home() / ".cache" / "symeraseme"
-    cache.mkdir(parents=True, exist_ok=True)
+    cache.mkdir(parents=True, exist_ok=True, mode=0o700)
     return cache
 
 
@@ -140,7 +141,7 @@ def _integrity_key() -> bytes | None:
 
 
 def _compute_hmac(payload: dict, key: bytes) -> str:
-    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -176,6 +177,7 @@ def _save_persistent_cache(
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f)
+        os.chmod(path, 0o600)
     except OSError as e:
         logger.warning("Failed to save persistent broker cache: %s", e)
 
@@ -270,6 +272,8 @@ _META_FIELDS: frozenset[str] = frozenset(
     {"jurisdictions", "laws", "priority", "category", "disabled"}
 )
 
+_SAFE_LOADER = yaml.SafeLoader("")
+
 
 def _meta_only_parse(yml_path: Path) -> dict[str, Any] | None:
     """Extract only the top-level filterable fields without a full YAML parse.
@@ -288,17 +292,16 @@ def _meta_only_parse(yml_path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(node, yaml.MappingNode):
         return None
-    loader = yaml.SafeLoader(str(yml_path))
     out: dict[str, Any] = {}
     for key_node, value_node in node.value:
         try:
-            key = loader.construct_object(key_node)
+            key = _SAFE_LOADER.construct_object(key_node)
         except yaml.YAMLError:
             continue
         if not isinstance(key, str) or key not in _META_FIELDS:
             continue
         try:
-            value = loader.construct_object(value_node, deep=True)
+            value = _SAFE_LOADER.construct_object(value_node, deep=True)
         except yaml.YAMLError:
             continue
         out[key] = value

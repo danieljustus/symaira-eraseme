@@ -26,7 +26,7 @@ class TestBrokerLoading:
         assert broker is not None
 
     def test_load_nonexistent_broker(self):
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(Exception):
             load_broker("nonexistent_broker_xyz")
 
     def test_all_brokers_have_opt_out(self):

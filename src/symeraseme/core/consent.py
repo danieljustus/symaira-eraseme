@@ -59,7 +59,13 @@ def _find_token_file(token: str) -> Path | None:
 
 def _consent_dir() -> Path:
     d = get_config().consent_dir
-    d.mkdir(parents=True, exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Harden existing directories created without explicit mode
+    try:
+        if d.stat().st_mode & 0o777 != 0o700:
+            os.chmod(d, 0o700)
+    except OSError:
+        pass
     return d
 
 

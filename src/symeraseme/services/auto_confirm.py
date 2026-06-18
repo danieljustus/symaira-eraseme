@@ -5,20 +5,19 @@ import asyncio
 import typer
 
 from symeraseme.adapters.web.confirmation_clicker import auto_confirm
-from symeraseme.core.db_connection import get_connection, init_db
+from symeraseme.core.db_connection import get_connection, with_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.core.result_types import CliResult
 
 
+@with_db
 def handle_auto_confirm(
     request_id: int,
     headed: bool = False,
     screenshot_dir: str = "",
     dry_run: bool = False,
 ) -> CliResult:
-    init_db()
-
     req = get_removal_request(request_id)
     if req is None:
         return CliResult(

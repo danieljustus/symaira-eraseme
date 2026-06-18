@@ -13,6 +13,7 @@ from symeraseme.core.exceptions import (
     ProfileError,
     RequestNotFoundError,
     SymerasemeError,
+    safe_error_str,
 )
 from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
@@ -163,7 +164,7 @@ def _execute_email_request(
         append_event_and_project(
             request_id,
             "SEND_FAILED",
-            payload={"error": str(e), "to": channel_endpoint},
+            payload={"error": safe_error_str(e), "to": channel_endpoint},
         )
         raise ExecutionError(str(e), request_id=request_id) from e
 

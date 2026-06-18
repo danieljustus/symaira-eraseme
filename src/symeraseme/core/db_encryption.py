@@ -15,6 +15,7 @@ import platform
 import secrets
 import tempfile
 from base64 import urlsafe_b64encode
+from collections import OrderedDict
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -38,7 +39,7 @@ PBKDF2_FIXED_SALT = b"symeraseme-db-encryption-v1"
 
 DB_TEMP: dict[Path, Path] = {}
 DB_INITIAL_DATA_HASH: dict[Path, str] = {}
-_FERNET_KEY_CACHE: dict[tuple[bytes | None, int], bytes] = {}
+_FERNET_KEY_CACHE: OrderedDict[tuple[bytes | None, int], bytes] = OrderedDict()
 _FERNET_KEY_CACHE_MAX_SIZE = 32
 
 
@@ -90,6 +91,7 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
     """
     cache_key = (salt, version)
     if cache_key in _FERNET_KEY_CACHE:
+        _FERNET_KEY_CACHE.move_to_end(cache_key)
         return _FERNET_KEY_CACHE[cache_key]
 
     try:
@@ -120,10 +122,9 @@ def _get_db_fernet_key(*, salt: bytes | None = None, version: int = 2) -> bytes 
         )
     key = urlsafe_b64encode(derived)
 
-    # LRU eviction: remove oldest entry when cache is full
+    # LRU eviction: remove least recently used entry when cache is full
     if len(_FERNET_KEY_CACHE) >= _FERNET_KEY_CACHE_MAX_SIZE:
-        oldest_key = next(iter(_FERNET_KEY_CACHE))
-        del _FERNET_KEY_CACHE[oldest_key]
+        _FERNET_KEY_CACHE.popitem(last=False)
 
     _FERNET_KEY_CACHE[cache_key] = key
     return key

@@ -13,6 +13,7 @@ from symeraseme.adapters.web.playwright_runner import (
 from symeraseme.adapters.web.playwright_runner import (
     run_web_form as _run_form,
 )
+from symeraseme.core.exceptions import RegistryError
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.manual_fallback import create_manual_task
 from symeraseme.core.result_types import CliResult
@@ -187,7 +188,7 @@ async def handle_run_web_form(
 ) -> CliResult:
     try:
         broker = load_broker(broker_id)
-    except (FileNotFoundError, ValueError, RuntimeError, OSError) as e:
+    except (RegistryError, FileNotFoundError, ValueError, RuntimeError, OSError) as e:
         return CliResult(
             success=False,
             error=(

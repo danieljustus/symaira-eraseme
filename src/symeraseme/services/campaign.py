@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
-from symeraseme.core.db_connection import init_db
+from symeraseme.core.db_connection import with_db
+from symeraseme.core.exceptions import safe_error_str
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
 
 logger = logging.getLogger(__name__)
 
 
+@with_db
 def handle_plan_create(
     campaign_id: str,
     jurisdiction: str | None = None,
@@ -21,7 +24,6 @@ def handle_plan_create(
     priority: str | None = None,
     max_brokers: int = 30,
 ) -> CliResult:
-    init_db()
     result = plan_campaign(
         campaign_id=campaign_id,
         jurisdiction=jurisdiction,
@@ -40,11 +42,11 @@ def handle_plan_create(
     return CliResult(success=True, data=result)
 
 
+@with_db
 def handle_plan_show(
     campaign_id: str | None = None,
     status: str | None = None,
 ) -> CliResult:
-    init_db()
     result = get_plan(campaign_id=campaign_id, status=status)
 
     lines = [f"Plan: {result['campaign_id']} ({result['total']} requests)"]
@@ -56,6 +58,7 @@ def handle_plan_show(
     return CliResult(success=True, data=result)
 
 
+@with_db
 def handle_execute(
     campaign_id: str,
     account: str | None = None,
@@ -83,8 +86,6 @@ def handle_execute(
                 "Use --yes or issue a token via 'grant' command."
             ),
         )
-
-    init_db()
 
     if backend is None:
         backend = "himalaya" if account else "smtp"
@@ -145,29 +146,30 @@ def handle_execute(
         logger.info("Using concurrent execution with %d workers", workers)
 
         async def _run_concurrent() -> dict:
-            import asyncio
+            from symeraseme.core.execution import execute_request
 
-            semaphore = asyncio.Semaphore(workers)
+            executor = ThreadPoolExecutor(max_workers=workers)
 
             async def _limited_execute(req: dict) -> dict:
-                async with semaphore:
-                    from symeraseme.core.execution import execute_request
-
-                    try:
-                        return await asyncio.to_thread(
-                            execute_request,
+                loop = asyncio.get_event_loop()
+                try:
+                    return await loop.run_in_executor(
+                        executor,
+                        lambda: execute_request(
                             req["id"],
                             dry_run=dry_run,
                             web_form_runner=web_form_runner,
                             email_sender=email_sender,
-                        )
-                    except Exception as e:
-                        return {"success": False, "error": str(e), "request_id": req["id"]}
+                        ),
+                    )
+                except Exception as e:
+                    return {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
 
             from symeraseme.core.batch import _prepare_batch
 
             batch = _prepare_batch(campaign_id, batch_size)
             if not batch:
+                executor.shutdown(wait=False)
                 return {
                     "campaign_id": campaign_id,
                     "total_planned": 0,
@@ -177,6 +179,7 @@ def handle_execute(
 
             tasks = [_limited_execute(req) for req in batch]
             results = await asyncio.gather(*tasks)
+            executor.shutdown(wait=False)
             return {
                 "campaign_id": campaign_id,
                 "total_planned": len(batch),
