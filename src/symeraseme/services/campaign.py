@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
-from symeraseme.core.db_connection import init_db
+from symeraseme.core.db_connection import init_db, with_db
 from symeraseme.core.exceptions import safe_error_str
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
@@ -16,6 +16,7 @@ from symeraseme.core.result_types import CliResult
 logger = logging.getLogger(__name__)
 
 
+@with_db
 def handle_plan_create(
     campaign_id: str,
     jurisdiction: str | None = None,
@@ -23,7 +24,6 @@ def handle_plan_create(
     priority: str | None = None,
     max_brokers: int = 30,
 ) -> CliResult:
-    init_db()
     result = plan_campaign(
         campaign_id=campaign_id,
         jurisdiction=jurisdiction,
@@ -42,11 +42,11 @@ def handle_plan_create(
     return CliResult(success=True, data=result)
 
 
+@with_db
 def handle_plan_show(
     campaign_id: str | None = None,
     status: str | None = None,
 ) -> CliResult:
-    init_db()
     result = get_plan(campaign_id=campaign_id, status=status)
 
     lines = [f"Plan: {result['campaign_id']} ({result['total']} requests)"]
@@ -58,6 +58,7 @@ def handle_plan_show(
     return CliResult(success=True, data=result)
 
 
+@with_db
 def handle_execute(
     campaign_id: str,
     account: str | None = None,
@@ -85,8 +86,6 @@ def handle_execute(
                 "Use --yes or issue a token via 'grant' command."
             ),
         )
-
-    init_db()
 
     if backend is None:
         backend = "himalaya" if account else "smtp"

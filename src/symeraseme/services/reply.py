@@ -6,7 +6,7 @@ from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
 from symeraseme.cli.console import print_info, print_warning
-from symeraseme.core.db_connection import get_connection, init_db
+from symeraseme.core.db_connection import get_connection, init_db, with_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.identity import load_profile, profile_exists
 from symeraseme.core.inbox import submit_inbox_reply
@@ -42,6 +42,7 @@ def _ensure_llm_consent(yes: bool = False) -> CliResult | None:
     return None
 
 
+@with_db
 def handle_classify_reply(
     request_id: int,
     provider: str | None = None,
@@ -52,7 +53,6 @@ def handle_classify_reply(
     consent = _ensure_llm_consent(yes=yes)
     if consent is not None:
         return consent
-    init_db()
 
     req = get_removal_request(request_id)
     if req is None:
@@ -185,6 +185,7 @@ def handle_classify_reply(
     return CliResult(success=True, data=data)
 
 
+@with_db
 def handle_generate_rebuttal(
     request_id: int,
     provider: str | None = None,
@@ -195,7 +196,6 @@ def handle_generate_rebuttal(
     consent = _ensure_llm_consent(yes=yes)
     if consent is not None:
         return consent
-    init_db()
 
     req = get_removal_request(request_id)
     if req is None:

@@ -6,7 +6,6 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from typing import Any
 
 from symeraseme.llm.protocol import BaseLLMClient, LLMClientError, UsageRecord
 

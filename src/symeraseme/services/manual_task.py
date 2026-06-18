@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from symeraseme.core.db_connection import init_db
+from symeraseme.core.db_connection import init_db, with_db
 from symeraseme.core.manual_fallback import get_manual_task, list_manual_tasks, resume_from_manual
 from symeraseme.core.result_types import CliResult
 
 
+@with_db
 def handle_manual_tasks_list(
     status: str | None = None,
     request_id: int | None = None,
 ) -> CliResult:
-    init_db()
     tasks = list_manual_tasks(status=status, request_id=request_id)
 
     if not tasks:
@@ -27,8 +27,8 @@ def handle_manual_tasks_list(
     return CliResult(success=True, data={"tasks": tasks, "message": "\n".join(lines)})
 
 
+@with_db
 def handle_manual_tasks_show(task_id: int) -> CliResult:
-    init_db()
     task = get_manual_task(task_id)
 
     if task is None:
@@ -60,11 +60,11 @@ def handle_manual_tasks_show(task_id: int) -> CliResult:
     return CliResult(success=True, data=task)
 
 
+@with_db
 def handle_manual_tasks_complete(
     task_id: int,
     notes: str = "",
 ) -> CliResult:
-    init_db()
     result = resume_from_manual(task_id, notes=notes, completed=True)
 
     if result is None:
