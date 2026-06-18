@@ -5,3 +5,21 @@ repos:
       - id: detect-private-key
         name: Detect private keys
         description: Checks for the existence of private keys
+      - id: check-ast
+        name: Check Python syntax
+        description: Check whether Python files are syntactically valid
+      - id: check-yaml
+        name: Check YAML syntax
+        description: Check whether YAML files are syntactically valid
+      - id: check-json
+        name: Check JSON syntax
+        description: Check whether JSON files are syntactically valid
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+        description: Check for files containing merge conflict markers
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        description: Trim trailing whitespace from lines
+      - id: end-of-file-fixer
+        name: Fix end of files
+        description: Ensure files end with a single newline
