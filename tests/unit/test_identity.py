@@ -205,9 +205,11 @@ class TestIdentityVault:
         ).encode("utf-8")
         path.write_bytes(header + b"\n" + ciphertext)
 
-        with patch("symeraseme.core.identity.keyring.get_password", return_value=key.hex()):
-            with pytest.raises(RuntimeError, match="Legacy v0 profile detected"):
-                vault.load_profile()
+        with (
+            patch("symeraseme.core.identity.keyring.get_password", return_value=key.hex()),
+            pytest.raises(RuntimeError, match="Legacy v0 profile detected"),
+        ):
+            vault.load_profile()
 
         vault.delete_profile()
 

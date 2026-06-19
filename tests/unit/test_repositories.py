@@ -101,7 +101,9 @@ class TestRequestRepository:
     def test_pagination_offset_without_limit_uses_negative_one(self):
         create_campaign("pag-nolimit")
         for i in range(5):
-            create_removal_request(broker_id=f"b{i}", campaign_id="pag-nolimit", jurisdiction="GDPR")
+            create_removal_request(
+                broker_id=f"b{i}", campaign_id="pag-nolimit", jurisdiction="GDPR"
+            )
         results = list_removal_requests(campaign_id="pag-nolimit", offset=2)
         assert len(results) == 3
         assert results[0]["broker_id"] == "b2"
