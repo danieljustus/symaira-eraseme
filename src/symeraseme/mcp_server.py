@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -9,19 +10,29 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def _validate_path(path_str: str) -> Path:
-    """Resolve a user-provided path and ensure it is safe to access.
+def _read_workspace_text(path_str: str, workspace_root: Path | None = None) -> str:
+    """Read a user-provided path only when it stays within the MCP workspace.
 
-    Rejects paths containing directory traversal components (..).
-    Raises ValueError if the path is unsafe.
+    Raises ValueError if the normalized path escapes the workspace root.
     """
-    import os
+    if not isinstance(path_str, str):
+        raise ValueError("Path must be a string")
+    if "\x00" in path_str:
+        raise ValueError("Path contains a null byte")
 
-    normalized = os.path.normpath(path_str)
-    parts = normalized.split(os.sep)
-    if ".." in parts:
-        raise ValueError(f"Path {path_str!r} contains directory traversal")
-    return Path(os.path.expanduser(path_str)).resolve()  # lgtm[py/path-injection]
+    root = os.path.realpath(os.fspath(workspace_root or Path.cwd()))
+    candidate = os.path.realpath(os.path.join(root, os.path.expanduser(path_str)))
+    try:
+        common = os.path.commonpath([root, candidate])
+    except ValueError as exc:
+        raise ValueError("Path is outside the MCP workspace") from exc
+
+    root_prefix = root if root.endswith(os.sep) else root + os.sep
+    if common != root or (candidate != root and not candidate.startswith(root_prefix)):
+        raise ValueError("Path is outside the MCP workspace")
+
+    with open(candidate, encoding="utf-8") as file:
+        return file.read()
 
 
 def redact_content(text: str) -> str:
@@ -132,17 +143,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 }
 
             try:
-                path = _validate_path(path_str)  # lgtm[py/path-injection]: path validated
-                if not path.exists():
-                    return {
-                        "jsonrpc": "2.0",
-                        "error": {
-                            "code": -32602,
-                            "message": f"File not found: {path_str}",
-                        },
-                        "id": req_id,
-                    }
-                content = path.read_text(encoding="utf-8")
+                content = _read_workspace_text(path_str)
                 redacted = redact_content(content)
                 return {
                     "jsonrpc": "2.0",
@@ -160,6 +161,15 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32602, "message": str(e)},
+                    "id": req_id,
+                }
+            except FileNotFoundError:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32602,
+                        "message": f"File not found: {path_str}",
+                    },
                     "id": req_id,
                 }
             except Exception as e:
@@ -187,17 +197,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 }
 
             try:
-                path = _validate_path(path_str)  # lgtm[py/path-injection]: path validated
-                if not path.exists():
-                    return {
-                        "jsonrpc": "2.0",
-                        "error": {
-                            "code": -32602,
-                            "message": f"File not found: {path_str}",
-                        },
-                        "id": req_id,
-                    }
-                content = path.read_text(encoding="utf-8")
+                content = _read_workspace_text(path_str)
                 redacted = redact_content(content)
                 return {
                     "jsonrpc": "2.0",
@@ -208,6 +208,15 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32602, "message": str(e)},
+                    "id": req_id,
+                }
+            except FileNotFoundError:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32602,
+                        "message": f"File not found: {path_str}",
+                    },
                     "id": req_id,
                 }
             except Exception as e:
