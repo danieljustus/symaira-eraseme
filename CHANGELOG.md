@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.6.0] - 2026-06-19
+
+- **Feat**: Add a local MCP JSON-RPC server with a `redact_file` tool for PII redaction workflows (#412).
+- **Feat**: Add an interactive terminal review flow for accepting or skipping detected PII redactions (#412).
+- **Fix**: Restrict MCP file reads to the server workspace to close CodeQL path-injection findings (#412).
+- **Fix**: Add runtime guidance for pydantic_core compatibility failures on macOS 27 (Tahoe) (#413).
+- **Fix**: Harden error handling, consent directory permissions, persisted error payloads, broker cache permissions, and domain exception mapping (#425, #437).
+- **Fix**: Add JSON output support across plan status, calendar, and broker commands (#437).
+- **Perf**: Improve broker cache HMAC handling, YAML metadata parsing, LLM client reuse, and campaign execution threading (#425, #437).
+- **CI**: Add macOS test coverage and update pinned GitHub Actions dependencies (#372, #373, #374, #409).
+- **Docs**: Expand troubleshooting and exit-code documentation (#425).
+
 ## [v0.2.1] – 2026-06-11
 
 - **Security**: Replace pickle with JSON for broker persistent cache to prevent arbitrary code execution (#238).
