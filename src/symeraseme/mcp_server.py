@@ -22,13 +22,11 @@ def _read_workspace_text(path_str: str, workspace_root: Path | None = None) -> s
 
     root = os.path.realpath(os.fspath(workspace_root or Path.cwd()))
     candidate = os.path.realpath(os.path.join(root, os.path.expanduser(path_str)))
-    try:
-        common = os.path.commonpath([root, candidate])
-    except ValueError as exc:
-        raise ValueError("Path is outside the MCP workspace") from exc
 
+    if not candidate.startswith(root):
+        raise ValueError("Path is outside the MCP workspace")
     root_prefix = root if root.endswith(os.sep) else root + os.sep
-    if common != root or (candidate != root and not candidate.startswith(root_prefix)):
+    if candidate != root and not candidate.startswith(root_prefix):
         raise ValueError("Path is outside the MCP workspace")
 
     with open(candidate, encoding="utf-8") as file:
