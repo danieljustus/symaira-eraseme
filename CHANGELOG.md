@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.6.1] - 2026-06-22
+
+- **Security**: Cap MCP request body size and guard Content-Length parsing to reject oversized payloads (#439).
+- **Security**: Refuse non-loopback MCP binds unless `--allow-remote` is explicitly set (#440).
+- **Fix**: Use `ThreadingHTTPServer` for the MCP server so concurrent client requests do not block (#444).
+- **Fix**: Deduplicate read/redact/error handling blocks in the MCP request handler (#443).
+- **Fix**: Route MCP server lifecycle output through Rich console helpers for consistent formatting (#442).
+- **Docs**: Document the v0.6.0 MCP server and interactive PII-redaction features in README (#441).
+
 ## [v0.6.0] - 2026-06-19
 
 - **Feat**: Add a local MCP JSON-RPC server with a `redact_file` tool for PII redaction workflows (#412).
