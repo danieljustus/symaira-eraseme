@@ -157,3 +157,23 @@ class TestJsonOutput:
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
         assert "success" in parsed
+
+
+class TestServe:
+    def test_serve_allows_loopback_without_flag(self):
+        result = runner.invoke(app, ["serve", "--help"])
+        assert result.exit_code == 0
+        assert "127.0.0.1" in result.stdout
+        assert "--allow-remote" in result.stdout
+        assert "unauthenticated" in result.stdout
+
+    def test_serve_rejects_non_loopback_without_flag(self):
+        result = runner.invoke(app, ["serve", "--host", "0.0.0.0"])
+        assert result.exit_code == 1
+        assert "Refusing to bind" in result.stderr
+        assert "--allow-remote" in result.stderr
+
+    def test_serve_allows_non_loopback_with_flag(self):
+        result = runner.invoke(app, ["serve", "--host", "0.0.0.0", "--allow-remote", "--help"])
+        assert result.exit_code == 0
+        assert "--allow-remote" in result.stdout
