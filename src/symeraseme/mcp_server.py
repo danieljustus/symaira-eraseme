@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -243,7 +243,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
 
 
 def run_mcp_server(host: str = "127.0.0.1", port: int = 8000) -> None:
-    server = HTTPServer((host, port), MCPJSONRPCHandler)
+    server = ThreadingHTTPServer((host, port), MCPJSONRPCHandler)
     logger.info("Starting MCP Server on http://%s:%d", host, port)
     print_success(f"MCP Server running on http://{host}:{port}")
     try:
