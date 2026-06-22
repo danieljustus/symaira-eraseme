@@ -57,6 +57,48 @@ def redact_content(text: str) -> str:
     return text
 
 
+def _run_redaction(path_str: str, req_id: Any, *, wrap_content: bool) -> dict:
+    """Read, redact, and translate errors for a single file path.
+
+    The success envelope is the only difference between the JSON-RPC entry
+    points: ``tools/call`` wraps the redacted text in MCP content schema,
+    while the bare ``redact_file`` method returns it directly.
+    """
+    try:
+        content = _read_workspace_text(path_str)
+        redacted = redact_content(content)
+        result = {"content": [{"type": "text", "text": redacted}]} if wrap_content else redacted
+        return {
+            "jsonrpc": "2.0",
+            "result": result,
+            "id": req_id,
+        }
+    except ValueError as e:
+        return {
+            "jsonrpc": "2.0",
+            "error": {"code": -32602, "message": str(e)},
+            "id": req_id,
+        }
+    except FileNotFoundError:
+        return {
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32602,
+                "message": f"File not found: {path_str}",
+            },
+            "id": req_id,
+        }
+    except Exception as e:
+        return {
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32603,
+                "message": f"Internal error during redaction: {str(e)}",
+            },
+            "id": req_id,
+        }
+
+
 class MCPJSONRPCHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         # Prevent standard http server logging to stdout/stderr unless debug is on
@@ -154,45 +196,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                     "id": req_id,
                 }
 
-            try:
-                content = _read_workspace_text(path_str)
-                redacted = redact_content(content)
-                return {
-                    "jsonrpc": "2.0",
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": redacted,
-                            }
-                        ]
-                    },
-                    "id": req_id,
-                }
-            except ValueError as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32602, "message": str(e)},
-                    "id": req_id,
-                }
-            except FileNotFoundError:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32602,
-                        "message": f"File not found: {path_str}",
-                    },
-                    "id": req_id,
-                }
-            except Exception as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32603,
-                        "message": f"Internal error during redaction: {str(e)}",
-                    },
-                    "id": req_id,
-                }
+            return _run_redaction(path_str, req_id, wrap_content=True)
 
         elif method == "redact_file":
             path_str = None
@@ -208,38 +212,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                     "id": req_id,
                 }
 
-            try:
-                content = _read_workspace_text(path_str)
-                redacted = redact_content(content)
-                return {
-                    "jsonrpc": "2.0",
-                    "result": redacted,
-                    "id": req_id,
-                }
-            except ValueError as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32602, "message": str(e)},
-                    "id": req_id,
-                }
-            except FileNotFoundError:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32602,
-                        "message": f"File not found: {path_str}",
-                    },
-                    "id": req_id,
-                }
-            except Exception as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32603,
-                        "message": f"Internal error during redaction: {str(e)}",
-                    },
-                    "id": req_id,
-                }
+            return _run_redaction(path_str, req_id, wrap_content=False)
 
         else:
             return {
