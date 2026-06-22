@@ -7,6 +7,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
+from symeraseme.cli.console import print_info, print_success
+
 logger = logging.getLogger(__name__)
 
 # Maximum allowed MCP request body size (5 MiB). Requests larger than this are
@@ -243,11 +245,11 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
 def run_mcp_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     server = HTTPServer((host, port), MCPJSONRPCHandler)
     logger.info("Starting MCP Server on http://%s:%d", host, port)
-    print(f"MCP Server running on http://{host}:{port}")
+    print_success(f"MCP Server running on http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping MCP Server")
-        print("\nStopping MCP Server...")
+        print_info("Stopping MCP Server...")
     finally:
         server.server_close()
