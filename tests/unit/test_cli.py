@@ -1,6 +1,7 @@
 """Basic CLI smoke tests."""
 
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,6 +10,10 @@ from symeraseme.cli import app
 from symeraseme.cli.types import CliResult
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def test_version() -> None:
@@ -157,3 +162,26 @@ class TestJsonOutput:
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
         assert "success" in parsed
+
+
+class TestServe:
+    def test_serve_allows_loopback_without_flag(self):
+        result = runner.invoke(app, ["serve", "--help"])
+        stdout = _strip_ansi(result.stdout)
+        assert result.exit_code == 0
+        assert "127.0.0.1" in stdout
+        assert "--allow-remote" in stdout
+        assert "unauthenticated" in stdout
+
+    def test_serve_rejects_non_loopback_without_flag(self):
+        result = runner.invoke(app, ["serve", "--host", "0.0.0.0"])
+        stderr = _strip_ansi(result.stderr)
+        assert result.exit_code == 1
+        assert "Refusing to bind" in stderr
+        assert "--allow-remote" in stderr
+
+    def test_serve_allows_non_loopback_with_flag(self):
+        result = runner.invoke(app, ["serve", "--host", "0.0.0.0", "--allow-remote", "--help"])
+        stdout = _strip_ansi(result.stdout)
+        assert result.exit_code == 0
+        assert "--allow-remote" in stdout

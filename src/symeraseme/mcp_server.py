@@ -3,11 +3,17 @@ from __future__ import annotations
 import json
 import logging
 import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from symeraseme.cli.console import print_info, print_success
+
 logger = logging.getLogger(__name__)
+
+# Maximum allowed MCP request body size (5 MiB). Requests larger than this are
+# rejected with HTTP 413 before the body is read into memory.
+MAX_BODY = 5 * 1024 * 1024
 
 
 def _read_workspace_text(path_str: str, workspace_root: Path | None = None) -> str:
@@ -53,13 +59,65 @@ def redact_content(text: str) -> str:
     return text
 
 
+def _run_redaction(path_str: str, req_id: Any, *, wrap_content: bool) -> dict:
+    """Read, redact, and translate errors for a single file path.
+
+    The success envelope is the only difference between the JSON-RPC entry
+    points: ``tools/call`` wraps the redacted text in MCP content schema,
+    while the bare ``redact_file`` method returns it directly.
+    """
+    try:
+        content = _read_workspace_text(path_str)
+        redacted = redact_content(content)
+        result = {"content": [{"type": "text", "text": redacted}]} if wrap_content else redacted
+        return {
+            "jsonrpc": "2.0",
+            "result": result,
+            "id": req_id,
+        }
+    except ValueError as e:
+        return {
+            "jsonrpc": "2.0",
+            "error": {"code": -32602, "message": str(e)},
+            "id": req_id,
+        }
+    except FileNotFoundError:
+        return {
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32602,
+                "message": f"File not found: {path_str}",
+            },
+            "id": req_id,
+        }
+    except Exception as e:
+        return {
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32603,
+                "message": f"Internal error during redaction: {str(e)}",
+            },
+            "id": req_id,
+        }
+
+
 class MCPJSONRPCHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         # Prevent standard http server logging to stdout/stderr unless debug is on
         logger.debug(format, *args)
 
     def do_POST(self) -> None:
-        content_length = int(self.headers.get("Content-Length", 0))
+        content_length_header = self.headers.get("Content-Length", "0")
+        try:
+            content_length = int(content_length_header)
+        except ValueError:
+            self._send_error(-32700, "Parse error", None)
+            return
+
+        if content_length > MAX_BODY:
+            self._send_error(-32600, "Invalid Request", None, status=413)
+            return
+
         post_data = self.rfile.read(content_length)
 
         try:
@@ -140,45 +198,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                     "id": req_id,
                 }
 
-            try:
-                content = _read_workspace_text(path_str)
-                redacted = redact_content(content)
-                return {
-                    "jsonrpc": "2.0",
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": redacted,
-                            }
-                        ]
-                    },
-                    "id": req_id,
-                }
-            except ValueError as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32602, "message": str(e)},
-                    "id": req_id,
-                }
-            except FileNotFoundError:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32602,
-                        "message": f"File not found: {path_str}",
-                    },
-                    "id": req_id,
-                }
-            except Exception as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32603,
-                        "message": f"Internal error during redaction: {str(e)}",
-                    },
-                    "id": req_id,
-                }
+            return _run_redaction(path_str, req_id, wrap_content=True)
 
         elif method == "redact_file":
             path_str = None
@@ -194,38 +214,7 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                     "id": req_id,
                 }
 
-            try:
-                content = _read_workspace_text(path_str)
-                redacted = redact_content(content)
-                return {
-                    "jsonrpc": "2.0",
-                    "result": redacted,
-                    "id": req_id,
-                }
-            except ValueError as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32602, "message": str(e)},
-                    "id": req_id,
-                }
-            except FileNotFoundError:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32602,
-                        "message": f"File not found: {path_str}",
-                    },
-                    "id": req_id,
-                }
-            except Exception as e:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32603,
-                        "message": f"Internal error during redaction: {str(e)}",
-                    },
-                    "id": req_id,
-                }
+            return _run_redaction(path_str, req_id, wrap_content=False)
 
         else:
             return {
@@ -234,18 +223,19 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 "id": req_id,
             }
 
-    def _send_error(self, code: int, message: str, req_id: Any) -> None:
+    def _send_error(self, code: int, message: str, req_id: Any, *, status: int = 200) -> None:
         self._send_response_json(
             {
                 "jsonrpc": "2.0",
                 "error": {"code": code, "message": message},
                 "id": req_id,
-            }
+            },
+            status=status,
         )
 
-    def _send_response_json(self, data: dict | list) -> None:
+    def _send_response_json(self, data: dict | list, *, status: int = 200) -> None:
         body = json.dumps(data).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -253,13 +243,13 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
 
 
 def run_mcp_server(host: str = "127.0.0.1", port: int = 8000) -> None:
-    server = HTTPServer((host, port), MCPJSONRPCHandler)
+    server = ThreadingHTTPServer((host, port), MCPJSONRPCHandler)
     logger.info("Starting MCP Server on http://%s:%d", host, port)
-    print(f"MCP Server running on http://{host}:{port}")
+    print_success(f"MCP Server running on http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping MCP Server")
-        print("\nStopping MCP Server...")
+        print_info("Stopping MCP Server...")
     finally:
         server.server_close()

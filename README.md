@@ -35,6 +35,8 @@ data brokers. It provides:
 - **Scheduler integration** that generates cron, launchd, or systemd configurations to run the tick engine, inbox polling, and quarterly re-scans automatically.
 - **Automated registry maintenance** with a weekly GitHub Action that pulls fresh entries from official US state broker registries and opens a PR with the diff, plus a Monday link-check workflow that flags dead broker websites.
 - **Dashboard and reports** for campaign analytics, jurisdiction breakdowns, and GDPR-compliant record-keeping exports.
+- **Interactive PII review** via `symeraseme review <file>` — step through detected PII in a terminal UI and choose to keep, redact, or skip each match before saving the cleaned file.
+- **MCP JSON-RPC server** via `symeraseme serve` — exposes a `redact_file` tool to MCP clients such as Claude Code or Cursor, letting AI agents redact files inside the workspace root.
 
 ## Install
 
@@ -236,6 +238,43 @@ symeraseme requests list --status pending
 # Grant consent for destructive operations
 symeraseme grant execute --ttl 3600
 ```
+
+### PII redaction & MCP
+
+```bash
+# Review a file interactively and choose which PII to redact
+symeraseme review <file>
+
+# Start the local MCP JSON-RPC server (default: 127.0.0.1:8000)
+symeraseme serve
+
+# Bind to a different host/port
+symeraseme serve --host 127.0.0.1 --port 8080
+
+# Allow non-loopback binds on trusted networks
+symeraseme serve --host 0.0.0.0 --port 8000 --allow-remote
+```
+
+The MCP server exposes one tool:
+
+| Tool | Description | Input schema |
+|------|-------------|--------------|
+| `redact_file` | Reads a file, runs PII redaction on it, and returns the redacted content. | `{ "path": "string" }` (`path` is required) |
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "symeraseme": {
+      "command": "symeraseme",
+      "args": ["serve", "--host", "127.0.0.1", "--port", "8000"]
+    }
+  }
+}
+```
+
+> **Security**: the MCP endpoint is unauthenticated. The default `127.0.0.1` bind is reachable only from the local machine. Use `--allow-remote` only on trusted networks.
 
 Run `symeraseme --help` for a full list of commands and options.
 

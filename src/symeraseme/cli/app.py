@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -47,7 +48,7 @@ from symeraseme.cli.commands.web_form_commands import (
     run_web_form,
     solve_captcha_cmd,
 )
-from symeraseme.cli.console import OutputFormat
+from symeraseme.cli.console import OutputFormat, print_error, print_warning
 from symeraseme.core.db_connection import close_connection
 
 app = typer.Typer(
@@ -184,12 +185,57 @@ app.command(name="export", rich_help_panel="Maintenance")(export_cmd)
 app.command(rich_help_panel="Maintenance")(validate)
 
 
+def _is_loopback_host(host: str) -> bool:
+    """Return True when host resolves to a loopback address.
+
+    Literal IP addresses are checked via the standard library. Hostnames are
+    treated conservatively: only ``localhost`` and the standard loopback
+    literals are considered loopback.
+    """
+    try:
+        addr = ipaddress.ip_address(host)
+        return addr.is_loopback
+    except ValueError:
+        return host.lower() in {"localhost", "127.0.0.1", "::1"}
+
+
 @app.command(rich_help_panel="Maintenance")
 def serve(
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind the server to"),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        "-h",
+        help=(
+            "Host to bind the server to. The MCP endpoint is unauthenticated; "
+            "binding to a non-loopback address exposes the redact_file tool to "
+            "any host on the network. Use --allow-remote to opt in explicitly."
+        ),
+    ),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind the server to"),
+    allow_remote: bool = typer.Option(
+        False,
+        "--allow-remote",
+        help=(
+            "Allow binding to non-loopback interfaces. The server has no "
+            "authentication; only use this on trusted networks."
+        ),
+    ),
 ) -> None:
     """Start the local MCP JSON-RPC server."""
+    if not _is_loopback_host(host) and not allow_remote:
+        print_error(
+            f"Refusing to bind MCP server to non-loopback host '{host}'. "
+            "The endpoint is unauthenticated and would be reachable from the "
+            "network. Pass --allow-remote to opt in explicitly."
+        )
+        raise typer.Exit(1)
+
+    if not _is_loopback_host(host):
+        print_warning(
+            f"Binding MCP server to non-loopback host {host}. "
+            "The endpoint is unauthenticated and reachable from the network."
+        )
+
     from symeraseme.mcp_server import run_mcp_server
 
     run_mcp_server(host, port)
