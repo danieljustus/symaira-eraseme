@@ -9,6 +9,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Maximum allowed MCP request body size (5 MiB). Requests larger than this are
+# rejected with HTTP 413 before the body is read into memory.
+MAX_BODY = 5 * 1024 * 1024
+
 
 def _read_workspace_text(path_str: str, workspace_root: Path | None = None) -> str:
     """Read a user-provided path only when it stays within the MCP workspace.
@@ -59,7 +63,17 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
         logger.debug(format, *args)
 
     def do_POST(self) -> None:
-        content_length = int(self.headers.get("Content-Length", 0))
+        content_length_header = self.headers.get("Content-Length", "0")
+        try:
+            content_length = int(content_length_header)
+        except ValueError:
+            self._send_error(-32700, "Parse error", None)
+            return
+
+        if content_length > MAX_BODY:
+            self._send_error(-32600, "Invalid Request", None, status=413)
+            return
+
         post_data = self.rfile.read(content_length)
 
         try:
@@ -234,18 +248,19 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
                 "id": req_id,
             }
 
-    def _send_error(self, code: int, message: str, req_id: Any) -> None:
+    def _send_error(self, code: int, message: str, req_id: Any, *, status: int = 200) -> None:
         self._send_response_json(
             {
                 "jsonrpc": "2.0",
                 "error": {"code": code, "message": message},
                 "id": req_id,
-            }
+            },
+            status=status,
         )
 
-    def _send_response_json(self, data: dict | list) -> None:
+    def _send_response_json(self, data: dict | list, *, status: int = 200) -> None:
         body = json.dumps(data).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()

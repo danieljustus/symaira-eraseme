@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
+from unittest.mock import Mock
 
-from symeraseme.mcp_server import MCPJSONRPCHandler, redact_content
+from symeraseme.mcp_server import MAX_BODY, MCPJSONRPCHandler, redact_content
 
 
 def test_redact_content_basic():
@@ -149,3 +151,39 @@ def test_mcp_handler_rejects_directory_traversal(tmp_path: Path, monkeypatch):
     assert resp["id"] == 6
     assert "error" in resp
     assert "outside the MCP workspace" in resp["error"]["message"]
+
+
+def test_mcp_handler_rejects_malformed_content_length():
+    handler = MCPJSONRPCHandler.__new__(MCPJSONRPCHandler)
+    handler.request = Mock()
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.server = Mock()
+    handler.requestline = "POST / HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.headers = {"Content-Length": "not-a-number"}
+    handler.rfile = BytesIO(b"")
+    handler.wfile = BytesIO()
+    handler.do_POST()
+    handler.wfile.seek(0)
+    response = handler.wfile.read()
+    assert b"-32700" in response
+    assert b"Parse error" in response
+
+
+def test_mcp_handler_rejects_oversized_body():
+    handler = MCPJSONRPCHandler.__new__(MCPJSONRPCHandler)
+    handler.request = Mock()
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.server = Mock()
+    handler.requestline = "POST / HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.headers = {"Content-Length": str(MAX_BODY + 1)}
+    handler.rfile = Mock()
+    handler.wfile = BytesIO()
+    handler.do_POST()
+    handler.rfile.read.assert_not_called()
+    handler.wfile.seek(0)
+    response = handler.wfile.read()
+    assert b"-32600" in response
+    assert b"Invalid Request" in response
+    assert b"413" in response
