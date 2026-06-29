@@ -136,7 +136,24 @@ def execute(
         echo $TOKEN | symeraseme execute --campaign initial --consent-file /dev/stdin
         symeraseme execute --campaign initial --concurrent --workers 5
     """
+    import asyncio
+
     from symeraseme.cli.console import render_result, show_spinner
+
+    def _web_form_runner(
+        broker_id: str,
+        *,
+        headed: bool = False,
+        screenshot_dir: str = "",
+        dry_run: bool = False,
+    ) -> dict:
+        from symeraseme.services.web_form import run_web_form_for_broker
+
+        return asyncio.run(
+            run_web_form_for_broker(
+                broker_id, headed=headed, screenshot_dir=screenshot_dir, dry_run=dry_run
+            )
+        )
 
     workers = max(3, min(10, workers))
     with show_spinner("Sending removal requests..."):
@@ -148,6 +165,7 @@ def execute(
             yes,
             consent_token,
             consent_file,
+            web_form_runner=_web_form_runner,
             backend=backend,
             concurrent=concurrent,
             workers=workers,
