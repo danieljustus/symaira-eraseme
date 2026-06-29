@@ -281,6 +281,14 @@ TOOL_DEFS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Filter by campaign",
                 },
+                "folders": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "IMAP folders to poll (default: ['INBOX']). "
+                        "Deduplicates by Message-ID across folders."
+                    ),
+                },
             },
             "required": ["host", "port", "username", "since_days", "ssl"],
         },

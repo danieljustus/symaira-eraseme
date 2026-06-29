@@ -32,6 +32,22 @@ Five agents support the **SKILL.md** standard natively:
 
 These agents auto-discover from `.agents/skills/` (already configured in this repo).
 
+## Skill Bundle Contents
+
+The skill bundle (`skills/SKILL.md` + sub-skills) includes:
+
+- **SKILL.md** — Main skill definition with CLI command reference
+- **workflow-removal-cycle.md** — Complete removal lifecycle orchestration guide
+- **setup-identity.md** — Identity vault setup
+- **plan-removal-campaign.md** — Campaign planning
+- **send-removal-batch.md** — Sending removal requests
+- **triage-broker-replies.md** — Daily inbox triage workflow
+- **handle-action-required.md** — Handling verifications and rejections
+- **daily-tick.md** — Running the tick engine
+- **re-scan-quarterly.md** — Quarterly re-scan workflow
+
+The **workflow-removal-cycle.md** template ties all sub-skills together into a repeatable cycle: plan → execute → wait → poll → classify → respond → tick → re-scan. It includes a decision matrix for when to use each command and error handling guidance.
+
 ## Agent-Specific Setup
 
 ### Claude Code

@@ -348,6 +348,66 @@ def get_message(
         )
 
 
+def list_folders(
+    *,
+    host: str = "imap.gmail.com",
+    port: int = 993,
+    username: str = "",
+    password: str = "",
+    ssl: bool = True,
+) -> list[str]:
+    """List all available IMAP folders on the server.
+
+    Returns a list of folder names (e.g. ["INBOX", "Sent", "Unbekannt", "Junk"]).
+    """
+    resolved_password = _resolve_imap_password(password)
+    mail: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
+    try:
+        try:
+            if ssl:
+                mail = imaplib.IMAP4_SSL(host, port, ssl_context=create_default_context())
+            else:
+                mail = imaplib.IMAP4(host, port)
+        except (OSError, imaplib.IMAP4.error) as e:
+            msg = f"Failed to connect to mail server: {e}"
+            raise IMAPError(msg) from e
+
+        try:
+            mail.login(username, resolved_password)
+        except (OSError, imaplib.IMAP4.error) as e:
+            msg = f"IMAP login failed: {e}"
+            raise IMAPError(msg) from e
+
+        status, folder_data = mail.list()
+        if status != "OK" or not folder_data:
+            return []
+
+        folders: list[str] = []
+        for item in folder_data:
+            if not isinstance(item, bytes):
+                continue
+            # IMAP LIST: b'(\\HasNoChildren) "/" "INBOX"' or b'... INBOX'
+            parts = item.decode(errors="replace").strip()
+            if '"' in parts:
+                last_quote = parts.rfind('"')
+                first_quote = parts.rfind('"', 0, last_quote)
+                if first_quote != -1:
+                    folder_name = parts[first_quote + 1 : last_quote]
+                else:
+                    folder_name = parts[last_quote + 1 :].strip()
+            else:
+                folder_name = parts.split()[-1] if parts.split() else ""
+
+            if folder_name:
+                folders.append(folder_name)
+
+        return folders
+    finally:
+        if mail is not None:
+            with contextlib.suppress(OSError):
+                mail.logout()
+
+
 def match_reply_to_request(
     messages: list[dict[str, Any]],
     requests: list[dict[str, Any]],

@@ -141,6 +141,7 @@ symeraseme requests list --status PENDING --output json
 
 ## Sub-skills
 
+- [workflow-removal-cycle.md](workflow-removal-cycle.md) — Complete removal lifecycle orchestration
 - [setup-identity.md](setup-identity.md) — Creating and managing your identity vault
 - [plan-removal-campaign.md](plan-removal-campaign.md) — Planning a removal campaign
 - [send-removal-batch.md](send-removal-batch.md) — Sending removal requests
