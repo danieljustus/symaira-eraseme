@@ -8,6 +8,9 @@ from symeraseme.adapters.email.smtp_imap import (
     match_reply_to_request,
 )
 from symeraseme.adapters.email.smtp_imap import (
+    list_folders as _list_folders,
+)
+from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
 from symeraseme.core.db_connection import init_db, with_db
@@ -27,16 +30,30 @@ def handle_poll_inbox(
     ssl: bool,
     campaign_id: str | None,
     password: str,
+    folders: list[str] | None = None,
 ) -> CliResult:
+    if folders is None:
+        folders = ["INBOX"]
+
     try:
-        messages = _poll(
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            ssl=ssl,
-            since_days=since_days,
-        )
+        all_messages: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for folder in folders:
+            messages = _poll(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                ssl=ssl,
+                folder=folder,
+                since_days=since_days,
+            )
+            for msg in messages:
+                msg_id = msg.get("message_id", "")
+                if msg_id and msg_id not in seen_ids:
+                    seen_ids.add(msg_id)
+                    all_messages.append(msg)
+        messages = all_messages
     except IMAPError as e:
         logger.debug("IMAP poll failed", exc_info=True)
         return CliResult(
@@ -98,6 +115,39 @@ def handle_poll_inbox(
     return CliResult(success=True, data=result)
 
 
+def handle_list_folders(
+    host: str,
+    port: int,
+    username: str,
+    ssl: bool,
+    password: str,
+) -> CliResult:
+    try:
+        folders = _list_folders(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            ssl=ssl,
+        )
+    except IMAPError as e:
+        logger.debug("IMAP list folders failed", exc_info=True)
+        return CliResult(
+            success=False,
+            error=(
+                f"IMAP error: {e}. "
+                "Check your credentials, ensure IMAP is enabled, "
+                "and use an app password if 2FA is on."
+            ),
+        )
+
+    lines = [f"Found {len(folders)} folders:"]
+    for f in folders:
+        lines.append(f"  {f}")
+
+    return CliResult(success=True, data={"folders": folders, "message": "\n".join(lines)})
+
+
 def handle_watch_inbox(
     *,
     host: str,
@@ -108,6 +158,7 @@ def handle_watch_inbox(
     campaign_id: str | None,
     password: str,
     interval_seconds: int = 900,
+    folders: list[str] | None = None,
 ) -> CliResult:
     """Start background inbox polling with push notifications.
 
@@ -125,6 +176,7 @@ def handle_watch_inbox(
         "ssl": ssl,
         "campaign_id": campaign_id,
         "password": password,
+        "folders": folders or ["INBOX"],
     }
 
     init_db()

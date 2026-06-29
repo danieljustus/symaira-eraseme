@@ -466,6 +466,7 @@ class TestHandlePollInbox:
             username="user@example.com",
             password="app-password",
             ssl=True,
+            folder="INBOX",
             since_days=7,
         )
 

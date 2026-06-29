@@ -44,6 +44,11 @@ def poll_inbox(
         "--campaign",
         help="Campaign to match replies against",
     ),
+    folders: str = typer.Option(
+        None,
+        "--folders",
+        help="Comma-separated IMAP folders (default: INBOX). Use 'all' to discover all.",
+    ),
     retries: int = typer.Option(
         3,
         "--retries",
@@ -69,6 +74,20 @@ def poll_inbox(
     if not password:
         password = typer.prompt("IMAP password", hide_input=True)
 
+    folder_list: list[str] | None = None
+    if folders:
+        if folders.strip().lower() == "all":
+            from symeraseme.services.inbox import handle_list_folders
+
+            result = handle_list_folders(host, port, username, ssl, password)
+            if not result.success:
+                render_result(ctx.obj["output"], result)
+                return
+            data = result.data
+            folder_list = data.get("folders", ["INBOX"]) if isinstance(data, dict) else ["INBOX"]
+        else:
+            folder_list = [f.strip() for f in folders.split(",") if f.strip()]
+
     if watch:
         from symeraseme.services.inbox import handle_watch_inbox
 
@@ -81,6 +100,7 @@ def poll_inbox(
             campaign_id=campaign_id,
             password=password,
             interval_seconds=interval,
+            folders=folder_list,
         )
         render_result(ctx.obj["output"], result)
         return
@@ -99,6 +119,7 @@ def poll_inbox(
                     ssl,
                     campaign_id,
                     password,
+                    folders=folder_list,
                 )
             render_result(ctx.obj["output"], result)
             return
