@@ -13,7 +13,7 @@ from symeraseme.registry.schema import IdentityProfile
 def _templates_dir() -> Path:
     env_dir = os.environ.get("SYMERASEME_RESOURCES")
     if env_dir:
-        return Path(env_dir) / "registry" / "laws"
+        return Path(env_dir) / "laws"
     pkg_root = resources.files("symeraseme")
     candidate = Path(str(pkg_root)) / "registry" / "laws"
     if candidate.exists() and any(candidate.iterdir()):

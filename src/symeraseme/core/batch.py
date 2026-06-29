@@ -216,20 +216,39 @@ async def execute_campaign_async(
                 results.append(r)
                 progress.advance(task)
             return _build_result(campaign_id, total_planned, batch, results)
-        smtp_config = _load_smtp_config(smtp_skip_tls)
-        batch_ids = [r["id"] for r in batch]
-        events_by_rid = get_events_for_requests(batch_ids) if batch_ids else {}
-        email_messages, endpoint_ids = _gather_email_messages(
-            batch, events_by_rid, profile, progress, task
-        )
-        if not email_messages:
-            return {
-                "campaign_id": campaign_id,
-                "total_planned": total_planned,
-                "batch_size": len(batch),
-                "results": [],
-            }
-        progress.update(task, description="Sending batch via SMTP...", completed=len(batch))
-        send_results = await send_messages_batch(email_messages, smtp_config=smtp_config)
-        results = _apply_batch_results(send_results, endpoint_ids, progress, task)
+
+        # Separate web_form requests from email requests
+        web_form_reqs = [r for r in batch if r.get("channel") == "web_form"]
+        email_reqs = [r for r in batch if r.get("channel") != "web_form"]
+
+        results = []
+
+        # Process web_form requests using execute_request with web_form_runner
+        for req in web_form_reqs:
+            progress.update(task, description=f"Processing web form: {req['broker_id']}...")
+            try:
+                r = execute_request(
+                    req["id"],
+                    dry_run=False,
+                    web_form_runner=web_form_runner,
+                    email_sender=email_sender,
+                )
+            except SymerasemeError as e:
+                r = {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
+            results.append(r)
+            progress.advance(task)
+
+        # Process email requests via SMTP
+        if email_reqs:
+            smtp_config = _load_smtp_config(smtp_skip_tls)
+            email_ids = [r["id"] for r in email_reqs]
+            events_by_rid = get_events_for_requests(email_ids) if email_ids else {}
+            email_messages, endpoint_ids = _gather_email_messages(
+                email_reqs, events_by_rid, profile, progress, task
+            )
+            if email_messages:
+                progress.update(task, description="Sending batch via SMTP...", completed=len(batch))
+                send_results = await send_messages_batch(email_messages, smtp_config=smtp_config)
+                results.extend(_apply_batch_results(send_results, endpoint_ids, progress, task))
+
     return _build_result(campaign_id, total_planned, batch, results)
