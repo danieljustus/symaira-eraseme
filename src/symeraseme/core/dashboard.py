@@ -114,7 +114,7 @@ def _dashboard_templates_dir() -> Path:
     """
     env_dir = os.environ.get("SYMERASEME_RESOURCES")
     if env_dir:
-        return Path(env_dir) / "registry" / "templates"
+        return Path(env_dir) / "templates"
     pkg_root = resources.files("symeraseme")
     candidate = Path(str(pkg_root)) / "registry" / "templates"
     if candidate.exists() and any(candidate.iterdir()):
