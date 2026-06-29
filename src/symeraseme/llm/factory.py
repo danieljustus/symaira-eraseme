@@ -39,6 +39,12 @@ _PROVIDERS: dict[str, tuple[str, str, str, str]] = {
         "",
         "default",
     ),
+    "agent": (
+        "symeraseme.llm.agent_client",
+        "AgentLLMClient",
+        "",
+        "auto",
+    ),
 }
 
 _ENV_PROVIDER = "SYMERASEME_LLM_PROVIDER"

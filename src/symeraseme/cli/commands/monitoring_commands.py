@@ -54,10 +54,37 @@ def poll_inbox(
         "--retry-delay",
         help="Base delay in seconds between retries",
     ),
+    watch: bool = typer.Option(
+        False,
+        "--watch",
+        help="Run in background watch mode — poll periodically and notify on new mail",
+    ),
+    interval: int = typer.Option(
+        900,
+        "--interval",
+        help="Polling interval in seconds for watch mode (default: 900 = 15 min)",
+    ),
 ) -> None:
     password = os.environ.get("IMAP_PASSWORD", "")
     if not password:
         password = typer.prompt("IMAP password", hide_input=True)
+
+    if watch:
+        from symeraseme.services.inbox import handle_watch_inbox
+
+        result = handle_watch_inbox(
+            host=host,
+            port=port,
+            username=username,
+            since_days=since_days,
+            ssl=ssl,
+            campaign_id=campaign_id,
+            password=password,
+            interval_seconds=interval,
+        )
+        render_result(ctx.obj["output"], result)
+        return
+
     from symeraseme.cli.console import show_spinner
 
     last_error: Exception | None = None

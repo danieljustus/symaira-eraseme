@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from email.header import decode_header
+from ssl import create_default_context
 from typing import Any
 
 from symeraseme.adapters.email._types import Envelope, Message
@@ -64,7 +65,10 @@ def _imap_session(
     mail: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
     try:
         try:
-            mail = imaplib.IMAP4_SSL(host, port) if ssl else imaplib.IMAP4(host, port)
+            if ssl:
+                mail = imaplib.IMAP4_SSL(host, port, ssl_context=create_default_context())
+            else:
+                mail = imaplib.IMAP4(host, port)
         except (OSError, imaplib.IMAP4.error) as e:
             msg = f"Failed to connect to mail server: {e}"
             raise IMAPError(msg) from e

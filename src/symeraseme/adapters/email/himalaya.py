@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -10,12 +11,17 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from symeraseme.adapters.email._types import Envelope, Message, SmtpConfig
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
 
 
 class EmailError(Exception):
@@ -32,6 +38,93 @@ class HimalayaNotInstalledError(HimalayaError):
 
 class SmtpError(EmailError):
     """Raised when SMTP sending fails."""
+
+
+# ---------------------------------------------------------------------------
+# Version detection
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _detect_himalaya_version() -> tuple[int, int, int]:
+    """Detect Himalaya CLI version as (major, minor, patch).
+
+    Returns (0, 0, 0) when the version cannot be parsed.
+    """
+    _check_himalaya_installed()
+    try:
+        result = subprocess.run(
+            ["himalaya", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # Output looks like: "himalaya 1.2.0" or "himalaya v1.2.0"
+        match = re.search(r"(\d+)\.(\d+)\.(\d+)", result.stdout)
+        if match:
+            return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return (0, 0, 0)
+
+
+def _is_v1_plus() -> bool:
+    """Return True if Himalaya CLI is v1.0 or later."""
+    return _detect_himalaya_version() >= (1, 0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Config parsing
+# ---------------------------------------------------------------------------
+
+
+def _config_path_for_account() -> Path:
+    """Return the default Himalaya config file path."""
+    return Path.home() / ".config" / "himalaya" / "config.toml"
+
+
+@lru_cache(maxsize=4)
+def _read_himalaya_account_email(account: str = "") -> str:
+    """Read the email address for *account* from the Himalaya TOML config.
+
+    When *account* is empty the first (or default) account is used.
+    Returns an empty string when the config or email cannot be found.
+    """
+    config_file = _config_path_for_account()
+    if not config_file.is_file():
+        return ""
+
+    try:
+        import tomllib  # Python 3.11+
+    except ModuleNotFoundError:
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ModuleNotFoundError:
+            logger.warning("Cannot parse TOML: no tomllib/tomli available")
+            return ""
+
+    try:
+        with open(config_file, "rb") as fh:
+            data = tomllib.load(fh)
+    except OSError as exc:
+        logger.warning("Cannot read Himalaya config %s: %s", config_file, exc)
+        return ""
+
+    accounts: dict[str, Any] = data.get("accounts", {})
+    if not accounts:
+        return ""
+
+    if account and account in accounts:
+        return str(accounts[account].get("email", ""))
+
+    # Fall back to the first account
+    first_key = next(iter(accounts))
+    return str(accounts[first_key].get("email", ""))
+
+
+# ---------------------------------------------------------------------------
+# Core helpers
+# ---------------------------------------------------------------------------
 
 
 def _check_himalaya_installed() -> str:
@@ -53,15 +146,33 @@ def _run_himalaya(
     config_path: str | Path | None = None,
     timeout: int = 30,
 ) -> subprocess.CompletedProcess:
+    """Run a Himalaya CLI command with automatic version-aware flag placement.
+
+    For v1.x the ``--account`` flag is placed *after* the first subcommand
+    (e.g. ``himalaya envelope list --account NAME``).
+    For v0.x it is placed globally before the subcommand.
+    """
     _check_himalaya_installed()
 
     cmd = ["himalaya"]
-    if account:
-        cmd.extend(["--account", account])
     if config_path:
         cmd.extend(["--config", str(config_path)])
 
-    cmd.extend(args)
+    if _is_v1_plus():
+        # v1.x: --account goes after the first subcommand element
+        if args:
+            cmd.append(args[0])
+            if account:
+                cmd.extend(["--account", account])
+            cmd.extend(args[1:])
+        else:
+            if account:
+                cmd.extend(["--account", account])
+    else:
+        # v0.x: --account is a global option
+        if account:
+            cmd.extend(["--account", account])
+        cmd.extend(args)
 
     logger.debug("Running: %s", " ".join(cmd))
     try:
@@ -81,6 +192,11 @@ def _run_himalaya(
         raise HimalayaError(msg)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 
 def himalaya_available() -> bool:
@@ -107,8 +223,32 @@ def list_messages(
     account: str | None = None,
     config_path: str | Path | None = None,
 ) -> list[Envelope]:
+    if _is_v1_plus():
+        subcmd = [
+            "envelope",
+            "list",
+            "--folder",
+            folder,
+            "--page-size",
+            str(page_size),
+            "--page",
+            str(page),
+            "--output",
+            "json",
+        ]
+    else:
+        subcmd = [
+            "list",
+            "--folder",
+            folder,
+            "--page-size",
+            str(page_size),
+            "--page",
+            str(page),
+        ]
+
     result = _run_himalaya(
-        ["list", "--folder", folder, "--page-size", str(page_size), "--page", str(page)],
+        subcmd,
         account=account,
         config_path=config_path,
     )
@@ -168,6 +308,10 @@ class EmailMessage:
 
 
 def _build_mime(msg: EmailMessage, from_addr: str) -> tuple[str, str]:
+    """Build a raw MIME message string from an EmailMessage.
+
+    Returns (mime_string, message_id).
+    """
     mime = MIMEMultipart("mixed")
     mime["From"] = from_addr
     mime["To"] = msg.to
@@ -290,7 +434,55 @@ def send_message(
     account: str | None = None,
     config_path: str | Path | None = None,
 ) -> dict[str, str]:
+    """Send an email via the Himalaya CLI.
+
+    For v1.x, builds a MIME message and pipes it to ``himalaya message send``.
+    For v0.x, uses the legacy ``himalaya send --to ... --subject ...`` flags.
+    """
     _check_himalaya_installed()
+    message_id = make_msgid()
+
+    if _is_v1_plus():
+        # --- v1.x: build MIME and pipe to ``himalaya message send`` ---
+        from_addr = _read_himalaya_account_email(account or "")
+        if not from_addr:
+            msg = (
+                "Cannot determine sender email from Himalaya config. "
+                "Ensure ~/.config/himalaya/config.toml has an [accounts.*] "
+                "section with an 'email' field, or pass the account name."
+            )
+            raise HimalayaError(msg)
+
+        email_msg = EmailMessage(to=to, subject=subject, body=body, cc=cc, bcc=bcc)
+        mime_text, _ = _build_mime(email_msg, from_addr)
+
+        cmd = ["himalaya", "message", "send"]
+        if account:
+            cmd.extend(["--account", account])
+        if config_path:
+            cmd.extend(["--config", str(config_path)])
+
+        logger.debug("Running: %s", " ".join(cmd))
+        try:
+            result = subprocess.run(
+                cmd,
+                input=mime_text,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            msg = "Himalaya message send timed out"
+            raise HimalayaError(msg) from None
+
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            msg = f"Himalaya message send failed (exit {result.returncode}): {stderr}"
+            raise HimalayaError(msg)
+
+        return {"result": result.stdout.strip(), "message_id": message_id}
+
+    # --- v0.x: legacy flag-based send ---
     cmd = ["himalaya"]
     if account:
         cmd.extend(["--account", account])
@@ -303,7 +495,6 @@ def send_message(
         cmd.extend(["--bcc", bcc])
 
     logger.debug("Running: %s", " ".join(cmd))
-    message_id = make_msgid()
     try:
         result = subprocess.run(
             cmd,
@@ -442,8 +633,14 @@ def send_raw_email(
     account: str | None = None,
     config_path: str | Path | None = None,
 ) -> str:
+    """Send a raw MIME message via Himalaya CLI.
+
+    For v1.x uses ``himalaya message send``; for v0.x uses ``himalaya send``.
+    """
     _check_himalaya_installed()
-    cmd = ["himalaya", "send"]
+
+    cmd = ["himalaya", "message", "send"] if _is_v1_plus() else ["himalaya", "send"]
+
     if account:
         cmd.extend(["--account", account])
     if config_path:
@@ -470,8 +667,15 @@ def get_message(
     account: str | None = None,
     config_path: str | Path | None = None,
 ) -> Message:
+    # v1.x: ``envelope get`` was removed; use ``message read`` instead.
+    # v0.x: ``get`` is the legacy flat command.
+    if _is_v1_plus():
+        subcmd = ["message", "read", message_id, "--output", "json"]
+    else:
+        subcmd = ["get", message_id, "--json"]
+
     result = _run_himalaya(
-        ["get", message_id, "--json"],
+        subcmd,
         account=account,
         config_path=config_path,
     )
