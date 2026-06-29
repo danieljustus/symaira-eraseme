@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from symeraseme.adapters.email.smtp_imap import (
     IMAPError,
@@ -9,7 +10,7 @@ from symeraseme.adapters.email.smtp_imap import (
 from symeraseme.adapters.email.smtp_imap import (
     poll_inbox as _poll,
 )
-from symeraseme.core.db_connection import with_db
+from symeraseme.core.db_connection import init_db, with_db
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
 from symeraseme.core.inbox import submit_inbox_reply
 from symeraseme.core.result_types import CliResult
@@ -95,3 +96,49 @@ def handle_poll_inbox(
 
     result["message"] = "\n".join(lines)
     return CliResult(success=True, data=result)
+
+
+def handle_watch_inbox(
+    *,
+    host: str,
+    port: int,
+    username: str,
+    since_days: int,
+    ssl: bool,
+    campaign_id: str | None,
+    password: str,
+    interval_seconds: int = 900,
+) -> CliResult:
+    """Start background inbox polling with push notifications.
+
+    Blocks the foreground thread until SIGINT/SIGTERM is received.
+
+    Returns a CliResult indicating the watcher started successfully.
+    """
+    from symeraseme.services.watcher import run_watch_loop
+
+    poll_kwargs: dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "username": username,
+        "since_days": since_days,
+        "ssl": ssl,
+        "campaign_id": campaign_id,
+        "password": password,
+    }
+
+    init_db()
+
+    logger.info(
+        "Starting inbox watcher (interval=%ds, host=%s, user=%s)",
+        interval_seconds,
+        host,
+        username,
+    )
+
+    run_watch_loop(interval_seconds=interval_seconds, poll_kwargs=poll_kwargs)
+
+    return CliResult(
+        success=True,
+        data={"message": "Inbox watcher stopped."},
+    )
