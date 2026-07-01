@@ -1,6 +1,6 @@
 [project]
 name = "symeraseme"
-version = "0.6.2"
+version = "0.8.0"
 description = "Automated data broker removal tool — close your accounts, erase your data."
 requires-python = ">=3.11"
 license = { text = "MIT" }
