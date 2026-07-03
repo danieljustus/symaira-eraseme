@@ -1,22 +1,25 @@
 import SwiftUI
+import SymairaTheme
 
 /// Symaira brand color tokens — matches the HTML dashboard design system.
+/// Shared brand values come from symaira-appkit; status colors and the
+/// lighter card backings are EraseMe-specific and stay local.
 enum BrandColors {
-    // MARK: - Backgrounds
-    static let bgDark = Color(red: 0x0D/255, green: 0x0C/255, blue: 0x0A/255)
-    static let bgDarker = Color(red: 0x07/255, green: 0x06/255, blue: 0x05/255)
+    // MARK: - Backgrounds (shared tokens; card backings deviate on purpose)
+    static let bgDark = SymairaTheme.bgDark
+    static let bgDarker = SymairaTheme.bgDarker
     static let bgCard = Color.white.opacity(0.065)
     static let bgCardHover = Color.white.opacity(0.1)
 
-    // MARK: - Gold
-    static let goldPrimary = Color(red: 0xE5/255, green: 0xC3/255, blue: 0x97/255)
-    static let goldSecondary = Color(red: 0xF8/255, green: 0xE6/255, blue: 0xCD/255)
-    static let goldShadow = Color(red: 0xC2/255, green: 0x99/255, blue: 0x65/255)
+    // MARK: - Gold (shared tokens)
+    static let goldPrimary = SymairaTheme.goldPrimary
+    static let goldSecondary = SymairaTheme.goldSecondary
+    static let goldShadow = SymairaTheme.goldShadow
 
-    // MARK: - Text
-    static let textPrimary = Color(red: 0xF5/255, green: 0xF4/255, blue: 0xF0/255)
-    static let textSecondary = Color(red: 0xB5/255, green: 0xAE/255, blue: 0xA5/255)
-    static let textMuted = Color(red: 0x6E/255, green: 0x68/255, blue: 0x60/255)
+    // MARK: - Text (shared tokens)
+    static let textPrimary = SymairaTheme.textPrimary
+    static let textSecondary = SymairaTheme.textSecondary
+    static let textMuted = SymairaTheme.textMuted
 
     // MARK: - Status Colors
     static let confirmed = Color(red: 0xA7/255, green: 0xF3/255, blue: 0xD0/255)

@@ -13,12 +13,12 @@ else
     echo "Install Xcode or Xcode-beta from the Mac App Store."
 fi
 
-echo "Building SymairaDashboard..."
+echo "Building SymairaEraseMe..."
 swift build "$@"
 
 if [ $? -eq 0 ]; then
     echo ""
     echo "Build successful!"
-    echo "Run with: .build/debug/SymairaDashboard"
+    echo "Run with: .build/debug/SymairaEraseMe"
     echo "Or open in Xcode: open Package.swift"
 fi

@@ -57,4 +57,4 @@ AGENTS.md
 
 # Swift/Xcode build artifacts
 .build/
-app/SymairaDashboard/build_output.log
+app/SymairaEraseMe/build_output.log
