@@ -54,3 +54,7 @@ build/
 
 # Agent/developer workspace files
 AGENTS.md
+
+# Swift/Xcode build artifacts
+.build/
+app/SymairaDashboard/build_output.log
