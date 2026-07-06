@@ -1,7 +1,14 @@
 import Foundation
 import Combine
+import SymairaToolKit
 
 /// Manages spawning/stopping the `symeraseme serve` subprocess.
+///
+/// NOTE (DaemonKit v0.2 requirements): long-running daemon supervisor —
+/// start/stop lifecycle, terminate-then-interrupt escalation, published
+/// state. Second requirements donor (besides seek's EngineManager) for
+/// symaira-appkit's future SymairaDaemonKit; only binary discovery is
+/// shared for now.
 @MainActor
 final class ServerManager: ObservableObject {
     @Published var isRunning = false
@@ -183,15 +190,10 @@ final class ServerManager: ObservableObject {
         return ["serve", "--host", host, "--port", "\(port)"]
     }
 
+    /// Shared discovery (bundle → exe dir → PATH → Homebrew prefixes).
+    /// GUI apps do not inherit a shell PATH, so the Homebrew fallbacks in
+    /// BinaryLocator matter — the old PATH-only lookup missed brew installs.
     private func findInPATH(_ name: String) -> String? {
-        guard let pathEnv = ProcessInfo.processInfo.environment["PATH"] else { return nil }
-        let dirs = pathEnv.split(separator: ":")
-        for dir in dirs {
-            let fullPath = "\(dir)/\(name)"
-            if FileManager.default.isExecutableFile(atPath: fullPath) {
-                return fullPath
-            }
-        }
-        return nil
+        BinaryLocator().locate(name)?.url.path
     }
 }

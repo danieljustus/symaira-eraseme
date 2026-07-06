@@ -1,4 +1,4 @@
-# SymairaDashboard
+# SymairaEraseMe
 
 Native SwiftUI macOS app for the Symaira EraseMe dashboard. Connects to the
 Python MCP JSON-RPC server (`symeraseme serve`) over HTTP.
@@ -26,16 +26,16 @@ open Package.swift
 
 ```bash
 # From the project directory
-swift run SymairaDashboard
+swift run SymairaEraseMe
 
 # Or from the built binary
-.build/debug/SymairaDashboard
+.build/debug/SymairaEraseMe
 ```
 
 ## Architecture
 
 ```
-Sources/SymairaDashboard/
+Sources/SymairaEraseMe/
 ├── Models/         Codable structs matching MCP API response shapes
 │   ├── MCPResponse.swift    JSON-RPC 2.0 envelope + AnyCodable
 │   ├── Dashboard.swift      DashboardData, BrokerStatus, RecentEvent
@@ -57,7 +57,7 @@ Sources/SymairaDashboard/
 │   ├── ManualTasksViewModel.swift
 │   └── SettingsViewModel.swift
 ├── Views/          SwiftUI views
-│   ├── SymairaDashboardApp.swift   App entry + sidebar navigation
+│   ├── SymairaEraseMeApp.swift   App entry + sidebar navigation
 │   ├── DashboardView.swift         Summary cards, chart, tables, grid, timeline
 │   ├── CampaignsView.swift         List, create sheet, execute confirmation
 │   ├── RequestsView.swift          Paginated list, filters, event detail panel

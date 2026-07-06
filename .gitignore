@@ -57,4 +57,8 @@ AGENTS.md
 
 # Swift/Xcode build artifacts
 .build/
-app/SymairaDashboard/build_output.log
+app/SymairaEraseMe/build_output.log
+
+# Local agent session state / coverage db
+.omo/
+.coverage

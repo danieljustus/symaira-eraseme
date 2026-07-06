@@ -13,13 +13,13 @@ else
     echo "Warning: No Xcode found. SwiftUI macros may not resolve."
 fi
 
-echo "Building SymairaDashboard in Release mode..."
-cd app/SymairaDashboard
+echo "Building SymairaEraseMe in Release mode..."
+cd app/SymairaEraseMe
 swift build -c release
 cd ../..
 
-BUILD_DIR="app/SymairaDashboard/.build/release"
-STAGE_DIR="app/SymairaDashboard/.build/dmg-stage"
+BUILD_DIR="app/SymairaEraseMe/.build/release"
+STAGE_DIR="app/SymairaEraseMe/.build/dmg-stage"
 APP_BUNDLE="$STAGE_DIR/SymairaEraseMe.app"
 
 echo "Creating App Bundle structure..."
@@ -28,7 +28,7 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 echo "Copying binary..."
-cp "$BUILD_DIR/SymairaDashboard" "$APP_BUNDLE/Contents/MacOS/"
+cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/"
 
 echo "Writing Info.plist..."
 cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
@@ -37,7 +37,7 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>SymairaDashboard</string>
+    <string>SymairaEraseMe</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
@@ -61,7 +61,7 @@ EOF
 SRC_ICON="assets/apple-touch-icon.png"
 if [ -f "$SRC_ICON" ]; then
     echo "Generating AppIcon.icns..."
-    ICONSET_DIR="app/SymairaDashboard/.build/AppIcon.iconset"
+    ICONSET_DIR="app/SymairaEraseMe/.build/AppIcon.iconset"
     rm -rf "$ICONSET_DIR"
     mkdir -p "$ICONSET_DIR"
     

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SymairaDashboardApp: App {
+struct SymairaEraseMeApp: App {
     @StateObject private var serverManager = ServerManager()
 
     var body: some Scene {

@@ -292,3 +292,19 @@ To add support for a new agent:
 - [Continue Docs](https://docs.continue.dev/)
 - [Cline Docs](https://docs.cline.bot/)
 - [Aider Docs](https://aider.chat/docs/)
+
+## macOS App (`app/SymairaEraseMe/`)
+
+- SwiftUI SPM executable (formerly `SymairaDashboard`; renamed 2026-07 —
+  EraseMe stays a STANDALONE consumer app per the ecosystem GUI strategy,
+  it is not a hub module). Build: `cd app/SymairaEraseMe && swift build`
+  (local builds need `DEVELOPER_DIR` pointing at Xcode).
+- Depends on the shared **symaira-appkit** package, pinned exact (`0.1.0`)
+  in `Package.swift`: SymairaTheme (shared brand tokens in
+  `Theme/BrandColors.swift`; EraseMe-specific status colors, card backings
+  and the padded GlassCard stay local) and SymairaToolKit (binary discovery
+  in `Services/ServerManager.swift`).
+- `ServerManager` is a long-running daemon supervisor (spawns
+  `symeraseme serve`, with uv/python fallbacks) and stays app-local — it is
+  the second requirements donor for a future SymairaDaemonKit (appkit v0.2).
+- Migration context: see `../docs/symaira-appkit-migration.md` (Welle 3).
