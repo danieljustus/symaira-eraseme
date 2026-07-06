@@ -62,3 +62,12 @@ app/SymairaEraseMe/build_output.log
 # Local agent session state / coverage db
 .omo/
 .coverage
+
+# Local agent reports / session state
+.github/coverage/
+.github/prerelease/
+.github/review/
+.github/audit/
+.omo/run-continuation/
+.omo/notepads/
+coverage.html
