@@ -1,14 +1,9 @@
 import Foundation
 import Combine
 import SymairaToolKit
+import SymairaDaemonKit
 
 /// Manages spawning/stopping the `symeraseme serve` subprocess.
-///
-/// NOTE (DaemonKit v0.2 requirements): long-running daemon supervisor —
-/// start/stop lifecycle, terminate-then-interrupt escalation, published
-/// state. Second requirements donor (besides seek's EngineManager) for
-/// symaira-appkit's future SymairaDaemonKit; only binary discovery is
-/// shared for now.
 @MainActor
 final class ServerManager: ObservableObject {
     @Published var isRunning = false
@@ -40,7 +35,7 @@ final class ServerManager: ObservableObject {
         didSet { UserDefaults.standard.set(port, forKey: "symeraseme_port") }
     }
 
-    private var process: Process?
+    private let supervisor = DaemonSupervisor()
 
     init() {
         let defaults = UserDefaults.standard
@@ -49,6 +44,8 @@ final class ServerManager: ObservableObject {
         self.anthropicKey = defaults.string(forKey: "symeraseme_anthropic_key") ?? ""
         self.host = defaults.string(forKey: "symeraseme_host") ?? "127.0.0.1"
         self.port = defaults.object(forKey: "symeraseme_port") as? Int ?? 8000
+
+        setupSupervisor()
     }
 
     /// Detect `symeraseme` binary on PATH or via common locations.
@@ -76,80 +73,56 @@ final class ServerManager: ObservableObject {
         return nil
     }
 
+    private func setupSupervisor() {
+        supervisor.onStateChange = { [weak self] newState in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                switch newState {
+                case .stopped:
+                    self.isRunning = false
+                    self.pid = nil
+                case .starting:
+                    self.isRunning = false
+                    self.pid = nil
+                case .running(let pid):
+                    self.isRunning = true
+                    self.pid = pid
+                case .failed(let error):
+                    self.isRunning = false
+                    self.pid = nil
+                    self.lastError = error
+                }
+            }
+        }
+    }
+
     /// Start the MCP server subprocess.
     func start() {
         guard !isRunning else { return }
         lastError = nil
 
-        let proc = Process()
-        proc.executableURL = findExecutable()
-        proc.arguments = buildArguments()
+        let executable = findExecutable()
+        let arguments = buildArguments()
 
         // Set up environment
-        var env = ProcessInfo.processInfo.environment
+        var env = [String: String]()
         if !dataDir.isEmpty {
             env["SYMERASEME_DATA_DIR"] = dataDir
         }
         if !anthropicKey.isEmpty {
             env["ANTHROPIC_API_KEY"] = anthropicKey
         }
-        proc.environment = env
-
-        // Capture output for debugging
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        proc.standardOutput = outPipe
-        proc.standardError = errPipe
 
         // Update MCPClient with configured host/port
         MCPClient.configuredHost = host
         MCPClient.configuredPort = port
 
-        do {
-            try proc.run()
-            process = proc
-            pid = proc.processIdentifier
-            isRunning = true
-
-            // Monitor process termination
-            DispatchQueue.global(qos: .utility).async { [weak self] in
-                proc.waitUntilExit()
-                Task { @MainActor in
-                    self?.isRunning = false
-                    self?.pid = nil
-                    self?.process = nil
-                    if proc.terminationStatus != 0 {
-                        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-                        self?.lastError = "Process exited with status \(proc.terminationStatus): \(String(data: errData, encoding: .utf8) ?? "")"
-                    }
-                }
-            }
-        } catch {
-            lastError = "Failed to start: \(error.localizedDescription)"
-        }
+        _ = supervisor.start(executable: executable, arguments: arguments, environment: env)
     }
 
     /// Stop the MCP server subprocess.
     func stop() {
-        guard let proc = process, proc.isRunning else {
-            isRunning = false
-            pid = nil
-            return
-        }
-
-        proc.terminate()
-
-        // Give it 2 seconds to terminate gracefully, then force kill
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak self] in
-            if proc.isRunning {
-                proc.interrupt()
-            }
-            Task { @MainActor [weak self] in
-                self?.isRunning = false
-                self?.pid = nil
-                self?.process = nil
-            }
-        }
+        supervisor.stop()
     }
 
     // MARK: - Private Helpers
