@@ -18,6 +18,8 @@ import inspect
 import json
 import logging
 import os
+import secrets
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,40 @@ logger = logging.getLogger(__name__)
 # Maximum allowed MCP request body size (5 MiB). Requests larger than this are
 # rejected with HTTP 413 before the body is read into memory.
 MAX_BODY = 5 * 1024 * 1024
+
+# Bearer token required on every request once ``run_mcp_server`` has started
+# the server. ``None`` means auth is not configured (e.g. a handler built
+# directly in tests without going through ``run_mcp_server``).
+_AUTH_TOKEN: str | None = None
+
+_ALLOWED_ORIGIN_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_authorized(headers: Any) -> bool:
+    """Return True if the request carries a valid ``Authorization: Bearer`` header.
+
+    When ``_AUTH_TOKEN`` is unset, auth is not enforced (test/embedding use).
+    """
+    if _AUTH_TOKEN is None:
+        return True
+    auth_header = headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header[len("Bearer ") :]
+    return secrets.compare_digest(token, _AUTH_TOKEN)
+
+
+def _is_allowed_origin(headers: Any) -> bool:
+    """Return True unless the request carries a non-loopback ``Origin`` header.
+
+    Requests without an ``Origin`` header (e.g. same-process clients, curl)
+    are allowed; browser-issued cross-origin requests are rejected.
+    """
+    origin = headers.get("Origin")
+    if not origin:
+        return True
+    hostname = urllib.parse.urlsplit(origin).hostname
+    return (hostname or "").lower() in _ALLOWED_ORIGIN_HOSTS
 
 
 # ---------------------------------------------------------------------------
@@ -848,6 +884,13 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
         logger.debug(format, *args)
 
     def do_POST(self) -> None:
+        if not _is_allowed_origin(self.headers):
+            self._send_error(-32000, "Forbidden: disallowed Origin", None, status=403)
+            return
+        if not _is_authorized(self.headers):
+            self._send_error(-32000, "Unauthorized", None, status=401)
+            return
+
         content_length_header = self.headers.get("Content-Length", "0")
         try:
             content_length = int(content_length_header)
@@ -967,13 +1010,17 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
 
 
 def run_mcp_server(host: str = "127.0.0.1", port: int = 8000) -> None:
+    global _AUTH_TOKEN
+    _AUTH_TOKEN = secrets.token_urlsafe(32)
     server = ThreadingHTTPServer((host, port), MCPJSONRPCHandler)
     logger.info("Starting MCP Server on http://%s:%d", host, port)
     print_success(f"MCP Server running on http://{host}:{port}")
+    print_info(f"Auth token (send as 'Authorization: Bearer {_AUTH_TOKEN}' on every request)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping MCP Server")
         print_info("Stopping MCP Server...")
     finally:
+        _AUTH_TOKEN = None
         server.server_close()

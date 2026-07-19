@@ -10,15 +10,18 @@ import json
 from io import BytesIO
 from unittest.mock import Mock, patch
 
+import symeraseme.mcp_server as mcp_server_module
 from symeraseme.mcp_server import MCPJSONRPCHandler
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_handler(
-    rfile_body: bytes, content_length: str | None = None
+    rfile_body: bytes,
+    content_length: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> MCPJSONRPCHandler:
     """Build a minimal MCPJSONRPCHandler instance for do_POST testing.
 
@@ -32,7 +35,9 @@ def _make_handler(
     handler.server = Mock()
     handler.requestline = "POST / HTTP/1.1"
     handler.request_version = "HTTP/1.1"
-    handler.headers = {"Content-Length": content_length or str(len(rfile_body))}
+    headers = {"Content-Length": content_length or str(len(rfile_body))}
+    headers.update(extra_headers or {})
+    handler.headers = headers
     handler.rfile = BytesIO(rfile_body)
     handler.wfile = BytesIO()
     return handler
@@ -59,6 +64,7 @@ class _MethodHandler:
 # ===========================================================================
 # do_POST — single request
 # ===========================================================================
+
 
 class TestDoPostSingle:
     """Coverage: ``do_POST`` lines 121-136 (single-request path)."""
@@ -135,6 +141,7 @@ class TestDoPostSingle:
 # ===========================================================================
 # do_POST — batch requests
 # ===========================================================================
+
 
 class TestDoPostBatch:
     """Coverage: ``do_POST`` lines 129-133 (list / batch path)."""
@@ -220,6 +227,7 @@ class TestDoPostBatch:
 # _handle_single_request — tools/call error paths
 # ===========================================================================
 
+
 class TestHandleToolsCall:
     """Coverage: lines 178-191 (tools/call error dispatch)."""
 
@@ -284,6 +292,7 @@ class TestHandleToolsCall:
 # _handle_single_request — bare redact_file error paths
 # ===========================================================================
 
+
 class TestHandleRedactFile:
     """Coverage: lines 203-217 (``redact_file`` bare method dispatch)."""
 
@@ -337,6 +346,7 @@ class TestHandleRedactFile:
 # _handle_single_request — unknown method
 # ===========================================================================
 
+
 class TestHandleUnknownMethod:
     """Coverage: lines 219-224 (fallback ``else`` branch)."""
 
@@ -351,3 +361,93 @@ class TestHandleUnknownMethod:
         resp = handler._handle_single_request(req)
         assert resp["error"]["code"] == -32601
         assert resp["error"]["message"] == "Method not found"
+
+
+# ===========================================================================
+# do_POST — bearer token auth and Origin validation
+# ===========================================================================
+
+
+class TestDoPostAuthAndOrigin:
+    """Coverage: the auth-token and Origin gates added ahead of dispatch."""
+
+    def setup_method(self):
+        # Simulate a server started via run_mcp_server(), which sets a token.
+        mcp_server_module._AUTH_TOKEN = "s3cr3t-token"
+
+    def teardown_method(self):
+        mcp_server_module._AUTH_TOKEN = None
+
+    def _valid_body(self) -> bytes:
+        req = {
+            "jsonrpc": "2.0",
+            "method": "redact_file",
+            "params": {"path": "test.txt"},
+            "id": 1,
+        }
+        return json.dumps(req).encode()
+
+    def test_missing_auth_header_rejected(self):
+        handler = _make_handler(self._valid_body())
+        resp = _do_post(handler)
+
+        assert resp["error"]["code"] == -32000
+        assert resp["error"]["message"] == "Unauthorized"
+
+    def test_wrong_bearer_token_rejected(self):
+        handler = _make_handler(
+            self._valid_body(),
+            extra_headers={"Authorization": "Bearer wrong-token"},
+        )
+        resp = _do_post(handler)
+
+        assert resp["error"]["code"] == -32000
+        assert resp["error"]["message"] == "Unauthorized"
+
+    @patch("symeraseme.mcp_server._run_redaction")
+    def test_correct_bearer_token_accepted(self, mock_run):
+        mock_run.return_value = {"jsonrpc": "2.0", "result": "redacted", "id": 1}
+        handler = _make_handler(
+            self._valid_body(),
+            extra_headers={"Authorization": "Bearer s3cr3t-token"},
+        )
+        resp = _do_post(handler)
+
+        assert resp["result"] == "redacted"
+
+    @patch("symeraseme.mcp_server._run_redaction")
+    def test_no_auth_token_configured_allows_request(self, mock_run):
+        """When the server was never started via run_mcp_server(), auth is not enforced."""
+        mcp_server_module._AUTH_TOKEN = None
+        mock_run.return_value = {"jsonrpc": "2.0", "result": "redacted", "id": 1}
+        handler = _make_handler(self._valid_body())
+        resp = _do_post(handler)
+
+        assert resp["result"] == "redacted"
+
+    def test_disallowed_origin_rejected(self):
+        handler = _make_handler(
+            self._valid_body(),
+            extra_headers={
+                "Authorization": "Bearer s3cr3t-token",
+                "Origin": "https://evil.example.com",
+            },
+        )
+        resp = _do_post(handler)
+
+        assert resp["error"]["code"] == -32000
+        assert resp["error"]["message"] == "Forbidden: disallowed Origin"
+
+    @patch("symeraseme.mcp_server._run_redaction")
+    def test_loopback_origin_allowed(self, mock_run):
+        mock_run.return_value = {"jsonrpc": "2.0", "result": "redacted", "id": 1}
+        handler = _make_handler(
+            self._valid_body(),
+            extra_headers={
+                "Authorization": "Bearer s3cr3t-token",
+                "Origin": "http://127.0.0.1:8000",
+            },
+        )
+        resp = _do_post(handler)
+
+        assert resp["result"] == "redacted"
