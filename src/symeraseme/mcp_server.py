@@ -145,12 +145,13 @@ def _run_redaction(path_str: str, req_id: Any, *, wrap_content: bool) -> dict:
             },
             "id": req_id,
         }
-    except Exception as e:
+    except Exception:
+        logger.exception("Internal error during redaction of %s", path_str)
         return {
             "jsonrpc": "2.0",
             "error": {
                 "code": -32603,
-                "message": f"Internal error during redaction: {str(e)}",
+                "message": "Internal error during redaction",
             },
             "id": req_id,
         }

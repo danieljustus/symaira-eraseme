@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -508,12 +509,14 @@ class TestRunRedaction:
         assert "File not found" in resp["error"]["message"]
 
     @patch("symeraseme.mcp_server._read_workspace_text")
-    def test_generic_exception_returns_internal_error(self, mock_read):
+    def test_generic_exception_returns_internal_error(self, mock_read, caplog):
         mock_read.side_effect = OSError("disk failure")
-        resp = _run_redaction("any.txt", 5, wrap_content=True)
+        with caplog.at_level(logging.ERROR):
+            resp = _run_redaction("any.txt", 5, wrap_content=True)
         assert resp["error"]["code"] == -32603
-        assert "Internal error during redaction" in resp["error"]["message"]
-        assert "disk failure" in resp["error"]["message"]
+        assert resp["error"]["message"] == "Internal error during redaction"
+        assert "disk failure" not in resp["error"]["message"]
+        assert "disk failure" in caplog.text
 
 
 # ===========================================================================
