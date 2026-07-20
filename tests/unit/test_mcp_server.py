@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import importlib
 import json
+import logging
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from symeraseme.core.result_types import CliResult
-from symeraseme.mcp_server import (
-    MAX_BODY,
-    MCPJSONRPCHandler,
+from symeraseme.mcp.dispatch import (
     _TOOL_AUTO_KWARGS,
     _cli_result_to_jsonrpc,
     _get_handler,
+)
+from symeraseme.mcp_server import (
+    MAX_BODY,
+    MCPJSONRPCHandler,
     _jsonrpc_error,
     _read_workspace_text,
     _run_redaction,
@@ -321,7 +323,8 @@ class TestGetHandler:
 
     def setup_method(self):
         """Clear handler cache before each test."""
-        from symeraseme.mcp_server import _handler_cache
+        from symeraseme.mcp.dispatch import _handler_cache
+
         _handler_cache.clear()
 
     def test_imports_and_returns_handler(self):
@@ -329,7 +332,8 @@ class TestGetHandler:
         assert callable(handler)
 
     def test_caches_handler_on_second_call(self):
-        from symeraseme.mcp_server import _handler_cache
+        from symeraseme.mcp.dispatch import _handler_cache
+
         handler1 = _get_handler("plan_create")
         handler2 = _get_handler("plan_create")
         assert handler1 is handler2
@@ -354,91 +358,115 @@ class TestCallTool:
     """Coverage: _call_tool dispatch logic (lines 807-837)."""
 
     def setup_method(self):
-        from symeraseme.mcp_server import _handler_cache
+        from symeraseme.mcp.dispatch import _handler_cache
+
         _handler_cache.clear()
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_calls_handler_with_arguments(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True, data={"ok": True}))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         resp = _call_tool("plan_create", {"campaign_id": "c1"}, 10)
         mock_handler.assert_called_once_with(campaign_id="c1")
         assert resp["result"]["content"][0]["type"] == "text"
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_injects_auto_kwargs(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         _call_tool("execute", {"campaign_id": "c1"}, 11)
         call_kwargs = mock_handler.call_args[1]
         assert call_kwargs["yes"] is True
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_auto_kwargs_setdefault_does_not_override(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         _call_tool("execute", {"campaign_id": "c1", "yes": False}, 12)
         call_kwargs = mock_handler.call_args[1]
         assert call_kwargs["yes"] is False
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_poll_inbox_injects_password_from_env(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         with patch.dict("os.environ", {"IMAP_PASSWORD": "secret123"}):
-            _call_tool("poll_inbox", {"host": "imap.test.com", "port": 993, "username": "u", "since_days": 7, "ssl": True}, 13)
+            _call_tool(
+                "poll_inbox",
+                {
+                    "host": "imap.test.com",
+                    "port": 993,
+                    "username": "u",
+                    "since_days": 7,
+                    "ssl": True,
+                },
+                13,
+            )
         call_kwargs = mock_handler.call_args[1]
         assert call_kwargs["password"] == "secret123"
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_poll_inbox_password_default_empty(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         with patch.dict("os.environ", {}, clear=True):
             _call_tool("poll_inbox", {"host": "imap.test.com"}, 14)
         call_kwargs = mock_handler.call_args[1]
         assert call_kwargs["password"] == ""
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_handler_exception_returns_error(self, mock_get):
         mock_handler = Mock(side_effect=RuntimeError("boom"))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         resp = _call_tool("plan_create", {"campaign_id": "c1"}, 15)
         assert resp["error"]["code"] == -32603
         assert "boom" in resp["error"]["message"]
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_sync_handler_called_directly(self, mock_get):
         mock_handler = Mock(return_value=CliResult(success=True, data={"x": 1}))
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         resp = _call_tool("plan_create", {}, 16)
         mock_handler.assert_called_once()
         assert "error" not in resp
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_async_handler_runs_via_asyncio(self, mock_get):
         async def async_handler(**kwargs):
             return CliResult(success=True, data={"async": True})
 
         mock_get.return_value = async_handler
         from symeraseme.mcp_server import _call_tool
-        resp = _call_tool("poll_inbox", {"host": "h", "port": 993, "username": "u", "since_days": 1, "ssl": True}, 17)
+
+        resp = _call_tool(
+            "poll_inbox",
+            {"host": "h", "port": 993, "username": "u", "since_days": 1, "ssl": True},
+            17,
+        )
         assert resp["jsonrpc"] == "2.0"
         parsed = json.loads(resp["result"]["content"][0]["text"])
         assert parsed["async"] is True
 
-    @patch("symeraseme.mcp_server._get_handler")
+    @patch("symeraseme.mcp.dispatch._get_handler")
     def test_non_cliresulter_return_type(self, mock_get):
         mock_handler = Mock(return_value={"custom": "response"})
         mock_get.return_value = mock_handler
         from symeraseme.mcp_server import _call_tool
+
         resp = _call_tool("plan_create", {}, 18)
         parsed = json.loads(resp["result"]["content"][0]["text"])
         assert parsed["custom"] == "response"
@@ -481,12 +509,14 @@ class TestRunRedaction:
         assert "File not found" in resp["error"]["message"]
 
     @patch("symeraseme.mcp_server._read_workspace_text")
-    def test_generic_exception_returns_internal_error(self, mock_read):
+    def test_generic_exception_returns_internal_error(self, mock_read, caplog):
         mock_read.side_effect = OSError("disk failure")
-        resp = _run_redaction("any.txt", 5, wrap_content=True)
+        with caplog.at_level(logging.ERROR):
+            resp = _run_redaction("any.txt", 5, wrap_content=True)
         assert resp["error"]["code"] == -32603
-        assert "Internal error during redaction" in resp["error"]["message"]
-        assert "disk failure" in resp["error"]["message"]
+        assert resp["error"]["message"] == "Internal error during redaction"
+        assert "disk failure" not in resp["error"]["message"]
+        assert "disk failure" in caplog.text
 
 
 # ===========================================================================
@@ -523,7 +553,8 @@ class TestHandleToolsCallNewHandlers:
     """Coverage: tools/call dispatch for new handlers added in #476."""
 
     def setup_method(self):
-        from symeraseme.mcp_server import _handler_cache
+        from symeraseme.mcp.dispatch import _handler_cache
+
         _handler_cache.clear()
 
     @patch("symeraseme.mcp_server._call_tool")
@@ -555,7 +586,13 @@ class TestHandleToolsCallNewHandlers:
             "method": "tools/call",
             "params": {
                 "name": "poll_inbox",
-                "arguments": {"host": "imap.test.com", "port": 993, "username": "u", "since_days": 7, "ssl": True},
+                "arguments": {
+                    "host": "imap.test.com",
+                    "port": 993,
+                    "username": "u",
+                    "since_days": 7,
+                    "ssl": True,
+                },
             },
             "id": 1,
         }
@@ -663,27 +700,34 @@ class TestToolDefsCompleteness:
     """Verify TOOL_DEFS includes all expected tools."""
 
     def test_all_handler_map_tools_in_tool_defs(self):
-        from symeraseme.mcp_server import TOOL_DEFS, _HANDLER_MAP
+        from symeraseme.mcp.dispatch import _HANDLER_MAP
+        from symeraseme.mcp.tools import TOOL_DEFS
+
         tool_names = {t["name"] for t in TOOL_DEFS}
         for name in _HANDLER_MAP:
             assert name in tool_names, f"Handler '{name}' missing from TOOL_DEFS"
 
     def test_tool_defs_count(self):
-        from symeraseme.mcp_server import TOOL_DEFS
+        from symeraseme.mcp.tools import TOOL_DEFS
+
         # 21 tools expected from the expansion
         assert len(TOOL_DEFS) >= 20
 
     def test_all_tools_have_required_fields(self):
-        from symeraseme.mcp_server import TOOL_DEFS
+        from symeraseme.mcp.tools import TOOL_DEFS
+
         for tool in TOOL_DEFS:
-            assert "name" in tool, f"Tool missing 'name'"
+            assert "name" in tool, "Tool missing 'name'"
             assert "description" in tool, f"Tool {tool.get('name')} missing 'description'"
             assert "inputSchema" in tool, f"Tool {tool.get('name')} missing 'inputSchema'"
             schema = tool["inputSchema"]
-            assert schema.get("type") == "object", f"Tool {tool.get('name')} schema type is not 'object'"
+            assert schema.get("type") == "object", (
+                f"Tool {tool.get('name')} schema type is not 'object'"
+            )
 
     def test_tool_auto_kwargs_all_valid_tools(self):
-        from symeraseme.mcp_server import _HANDLER_MAP
+        from symeraseme.mcp.dispatch import _HANDLER_MAP
+
         for name in _TOOL_AUTO_KWARGS:
             assert name in _HANDLER_MAP, f"Auto-kwargs tool '{name}' not in handler map"
 
