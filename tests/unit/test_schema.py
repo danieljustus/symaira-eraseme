@@ -168,6 +168,54 @@ class TestRegistryLoader:
         loaded = _load_persistent_cache(registry_dir, cache_key)
         assert loaded is None
 
+    def test_broker_cache_key_memoized_within_ttl(self, monkeypatch):
+        """Repeated calls within the TTL must not re-walk the registry dir."""
+        from symeraseme.registry.loader import _broker_cache_key, clear_registry_cache
+
+        clear_registry_cache()
+        registry_dir = _repo_root() / "registry" / "brokers"
+
+        call_count = 0
+        real_rglob = Path.rglob
+
+        def counting_rglob(self, pattern):
+            nonlocal call_count
+            if self == registry_dir and pattern == "*.yaml":
+                call_count += 1
+            return real_rglob(self, pattern)
+
+        monkeypatch.setattr(Path, "rglob", counting_rglob)
+
+        first = _broker_cache_key(registry_dir)
+        second = _broker_cache_key(registry_dir)
+
+        assert first == second
+        assert call_count == 1
+
+    def test_broker_cache_key_recomputed_after_clear_registry_cache(self, monkeypatch):
+        """clear_registry_cache() must force an immediate re-walk, TTL or not."""
+        from symeraseme.registry.loader import _broker_cache_key, clear_registry_cache
+
+        clear_registry_cache()
+        registry_dir = _repo_root() / "registry" / "brokers"
+
+        call_count = 0
+        real_rglob = Path.rglob
+
+        def counting_rglob(self, pattern):
+            nonlocal call_count
+            if self == registry_dir and pattern == "*.yaml":
+                call_count += 1
+            return real_rglob(self, pattern)
+
+        monkeypatch.setattr(Path, "rglob", counting_rglob)
+
+        _broker_cache_key(registry_dir)
+        clear_registry_cache()
+        _broker_cache_key(registry_dir)
+
+        assert call_count == 2
+
     def test_meta_only_parse_extracts_filterable_fields(self, tmp_path):
         from symeraseme.registry.loader import _meta_only_parse
 
@@ -224,9 +272,7 @@ class TestRegistryLoader:
             return original_safe_load(stream, *args, **kwargs)
 
         monkeypatch.setattr(yaml, "safe_load", counting_safe_load)
-        monkeypatch.setattr(
-            "symeraseme.registry.loader.yaml.safe_load", counting_safe_load
-        )
+        monkeypatch.setattr("symeraseme.registry.loader.yaml.safe_load", counting_safe_load)
 
         registry_dir = _repo_root() / "registry" / "brokers"
         results, _ = _filter_and_validate_ymls(
