@@ -356,6 +356,7 @@ class TestRunLoop:
 
     def test_loop_continues_after_exception(self, watcher: InboxWatcher) -> None:
         """The loop catches exceptions and continues."""
+        watcher._interval = 0.001
         call_count = 0
 
         def side_effect():
