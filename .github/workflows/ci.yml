@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# CodeQL default setup scans Python and Actions. Swift is excluded because the
+# macOS app depends on the private symaira-appkit repository, which the
+# repository-level GitHub token cannot clone during CodeQL autobuild.
+
 jobs:
   lint:
     runs-on: ubuntu-latest
