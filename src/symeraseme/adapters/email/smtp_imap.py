@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_imap_password(password: str) -> str:
-    """Resolve IMAP password via vault:// URI, env var, or keyring."""
+    """Resolve IMAP password via vault:// URI, env var, or keyring.
+
+    A ``vault://`` URI that cannot be resolved raises ``IMAPError`` instead of
+    falling back to the literal URI string — sending the URI itself as the
+    password would mask the real misconfiguration and can trip provider
+    lockouts on repeated failed logins.
+    """
     if not password:
         return password
     try:
@@ -31,13 +37,8 @@ def _resolve_imap_password(password: str) -> str:
             env_fallback="IMAP_PASSWORD",
             keyring_service="symeraseme-imap",
         )
-    except SecretResolutionError:
-        logger.warning(
-            "Secret resolution failed for IMAP password; using literal value. "
-            "Check vault path, SYMERASEME_IMAP_PASSWORD env var, or keyring config.",
-        )
-        logger.debug("IMAP secret resolution traceback", exc_info=True)
-        return password
+    except SecretResolutionError as e:
+        raise IMAPError(f"Cannot resolve IMAP password: {e}") from e
 
 
 RE_PREFIX = re.compile(

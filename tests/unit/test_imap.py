@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pytest
+
 from symeraseme.adapters.email.smtp_imap import (
+    IMAPError,
+    _resolve_imap_password,
     decode_mime_header,
     extract_thread_id,
     match_reply_to_request,
@@ -10,6 +16,26 @@ from symeraseme.adapters.email.smtp_imap import (
     parse_email_body,
     subject_matches,
 )
+from symeraseme.core.secrets import SecretResolutionError
+
+
+class TestResolveImapPassword:
+    def test_empty_password_returned_as_is(self):
+        assert _resolve_imap_password("") == ""
+
+    def test_literal_password_passed_through(self):
+        assert _resolve_imap_password("plain-password") == "plain-password"
+
+    @patch("symeraseme.adapters.email.smtp_imap.resolve_secret")
+    def test_resolved_vault_secret_returned(self, mock_resolve):
+        mock_resolve.return_value = "resolved-secret"
+        assert _resolve_imap_password("vault://email/imap") == "resolved-secret"
+
+    @patch("symeraseme.adapters.email.smtp_imap.resolve_secret")
+    def test_unresolvable_vault_uri_raises_instead_of_using_literal(self, mock_resolve):
+        mock_resolve.side_effect = SecretResolutionError("symvault not available")
+        with pytest.raises(IMAPError, match="Cannot resolve IMAP password"):
+            _resolve_imap_password("vault://email/imap")
 
 
 class TestDecodeMimeHeader:
