@@ -272,6 +272,18 @@ _META_FIELDS: frozenset[str] = frozenset(
     {"jurisdictions", "laws", "priority", "category", "disabled"}
 )
 
+
+def _broker_meta(broker: Broker) -> dict[str, Any]:
+    """Build the filterable-fields dict for *broker* (keys: ``_META_FIELDS``)."""
+    return {
+        "jurisdictions": broker.jurisdictions,
+        "laws": [law_item.value for law_item in broker.laws],
+        "priority": broker.priority.value,
+        "category": broker.category.value,
+        "disabled": broker.disabled,
+    }
+
+
 _SAFE_LOADER = yaml.SafeLoader("")
 
 
@@ -479,13 +491,7 @@ def _load_cold(
             continue
         all_brokers.append(broker)
         id_index[broker.id] = yml
-        cold_meta_index[broker.id] = {
-            "jurisdictions": broker.jurisdictions,
-            "laws": [law_item.value for law_item in broker.laws],
-            "priority": broker.priority.value,
-            "category": broker.category.value,
-            "disabled": broker.disabled,
-        }
+        cold_meta_index[broker.id] = _broker_meta(broker)
     global _BROKER_ID_INDEX
     _BROKER_ID_INDEX = id_index
     _save_persistent_cache(registry_path, cache_key, all_brokers, id_index, cold_meta_index)
@@ -570,13 +576,7 @@ def _filter_brokers(
 ) -> list[Broker]:
     filtered: list[Broker] = []
     for broker in brokers:
-        meta = {
-            "jurisdictions": broker.jurisdictions,
-            "laws": [law_item.value for law_item in broker.laws],
-            "priority": broker.priority.value,
-            "category": broker.category.value,
-            "disabled": broker.disabled,
-        }
+        meta = _broker_meta(broker)
         if _meta_matches_filters(
             meta,
             jurisdiction=jurisdiction,
