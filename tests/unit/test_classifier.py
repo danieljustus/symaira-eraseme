@@ -272,7 +272,7 @@ class TestAnthropicClientRetry:
 
     def test_rate_limit_error_triggers_retry_and_raises_custom_error(self):
         """Simulate anthropic.RateLimitError → retry loop → AnthropicClientRateLimitError."""
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         import anthropic
         import pytest
@@ -296,7 +296,10 @@ class TestAnthropicClientRetry:
         )
         client._client.messages.create.side_effect = rate_limit_err
 
-        with pytest.raises(AnthropicClientRateLimitError) as exc_info:
+        with (
+            patch("symeraseme.llm.protocol.time.sleep") as mock_sleep,
+            pytest.raises(AnthropicClientRateLimitError) as exc_info,
+        ):
             client.classify(
                 system_prompt="You are helpful.",
                 user_prompt="Hello",
@@ -304,6 +307,7 @@ class TestAnthropicClientRetry:
 
         assert client._client.messages.create.call_count == 3
         assert "429 Too Many Requests" in str(exc_info.value)
+        assert mock_sleep.call_count == 2
 
 
 class TestCLassifierCLI:
