@@ -6,6 +6,7 @@ import hmac
 import json
 import logging
 import os
+import time
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,7 @@ def clear_registry_cache() -> None:
     _SKIPPED_COUNT.clear()
     _BROKER_SCHEMA = None
     _BROKER_VALIDATOR = None
+    _CACHE_KEY_MEMO.clear()
 
     _cache_dir = Path.home() / ".cache" / "symeraseme"
     if _cache_dir.exists():
@@ -226,7 +228,22 @@ def _load_persistent_cache(
     return brokers, id_index, meta_index
 
 
+# How long a computed cache key is trusted before _broker_cache_key re-walks
+# the registry directory. Repeated load_all_brokers() calls within one CLI
+# invocation (plan -> filter -> lookup) hit this memo instead of re-stat'ing
+# ~1,279 files each time. clear_registry_cache() (e.g. after a registry sync)
+# forces an immediate recomputation regardless of this TTL.
+_CACHE_KEY_TTL_SECONDS = 5.0
+_CACHE_KEY_MEMO: dict[str, tuple[float, tuple[str, str]]] = {}
+
+
 def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
+    dir_str = str(registry_dir)
+    now = time.monotonic()
+    memoized = _CACHE_KEY_MEMO.get(dir_str)
+    if memoized is not None and (now - memoized[0]) < _CACHE_KEY_TTL_SECONDS:
+        return memoized[1]
+
     max_mtime = 0.0
     file_count = 0
     for yml in registry_dir.rglob("*.yaml"):
@@ -239,7 +256,9 @@ def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
             continue
     key_data = f"{registry_dir}:{max_mtime}:{file_count}"
     digest = hashlib.sha256(key_data.encode()).hexdigest()
-    return (str(registry_dir), digest)
+    cache_key = (str(registry_dir), digest)
+    _CACHE_KEY_MEMO[dir_str] = (now, cache_key)
+    return cache_key
 
 
 def _build_broker_id_index(registry_dir: Path) -> dict[str, Path]:
