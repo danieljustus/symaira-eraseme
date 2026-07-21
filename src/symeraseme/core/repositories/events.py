@@ -32,19 +32,34 @@ def append_event(
     return eid
 
 
-def get_events_for_requests(request_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+def get_events_for_requests(
+    request_ids: list[int],
+    *,
+    event_type: str | None = None,
+) -> dict[int, list[dict[str, Any]]]:
     conn = get_connection()
     if not request_ids:
         return {}
     placeholders = ",".join("?" * len(request_ids))
-    rows = conn.execute(
-        f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
-                  payload_json, source
-           FROM request_events
-           WHERE request_id IN ({placeholders})
-           ORDER BY occurred_at ASC, id ASC""",
-        request_ids,
-    ).fetchall()
+    if event_type is not None:
+        rows = conn.execute(
+            f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
+                      payload_json, source
+               FROM request_events
+               WHERE request_id IN ({placeholders})
+                 AND event_type = ?
+               ORDER BY occurred_at ASC, id ASC""",
+            [*request_ids, event_type],
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            f"""SELECT id, request_id, occurred_at, recorded_at, event_type,
+                      payload_json, source
+               FROM request_events
+               WHERE request_id IN ({placeholders})
+               ORDER BY occurred_at ASC, id ASC""",
+            request_ids,
+        ).fetchall()
     result: dict[int, list[dict[str, Any]]] = {rid: [] for rid in request_ids}
     for r in rows:
         row = dict(r)
