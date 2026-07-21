@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from symeraseme.adapters.triage.scrubber import scrub_pii
+from symeraseme.adapters.triage.scrubber import redact_profile_pii
 from symeraseme.llm.protocol import LLMClient, LLMClientError
 
 logger = logging.getLogger(__name__)
@@ -94,8 +94,8 @@ def build_user_prompt(
     if original_request_snippet:
         parts.append(f"Original request body (truncated):\n{original_request_snippet[:500]}")
 
-    parts.append(f"\nReply subject: {scrub_pii(reply_subject)}")
-    parts.append(f"Reply body:\n{scrub_pii(reply_body[:2000])}")
+    parts.append(f"\nReply subject: {redact_profile_pii(reply_subject)}")
+    parts.append(f"Reply body:\n{redact_profile_pii(reply_body[:2000])}")
 
     return "\n\n".join(parts)
 

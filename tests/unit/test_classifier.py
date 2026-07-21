@@ -310,6 +310,149 @@ class TestAnthropicClientRetry:
         assert mock_sleep.call_count == 2
 
 
+class TestProfileRedaction:
+    """Verify that build_user_prompt applies profile-aware PII redaction.
+
+    Issue #518: profile values (name, street, phone) should be stripped from
+    the LLM prompt via ``_redact_identity_values`` *before* ``scrub_pii``.
+    """
+
+    @staticmethod
+    def _make_profile():
+        from symeraseme.registry.schema import IdentityProfile, Address
+
+        return IdentityProfile(
+            full_name="Xylophone Q. Fitzpatrick",
+            name_variants=["Xy Fitz"],
+            addresses=[
+                Address(
+                    street="742 Evergreen Terrace",
+                    city="Springfield",
+                    postal_code="62704",
+                    country="US",
+                )
+            ],
+            email_addresses=["xylo@example.com"],
+            phone_numbers=["+1-555-9876"],
+            jurisdictions=["US"],
+        )
+
+    def test_redacts_profile_name_from_reply(self):
+        from unittest.mock import patch
+
+        profile = self._make_profile()
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                return_value=profile,
+            ),
+        ):
+            prompt = build_user_prompt(
+                broker_name="TestBroker",
+                broker_website="https://b.com",
+                original_subject="",
+                original_request_snippet="",
+                reply_subject="Re: request",
+                reply_body="Hello Xylophone Q. Fitzpatrick, we received your request.",
+            )
+        assert "Xylophone Q. Fitzpatrick" not in prompt
+        assert "[REDACTED-NAME]" in prompt
+
+    def test_redacts_profile_street_from_reply(self):
+        from unittest.mock import patch
+
+        profile = self._make_profile()
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                return_value=profile,
+            ),
+        ):
+            prompt = build_user_prompt(
+                broker_name="TestBroker",
+                broker_website="https://b.com",
+                original_subject="",
+                original_request_snippet="",
+                reply_subject="Re: request",
+                reply_body="We found a record at 742 Evergreen Terrace.",
+            )
+        assert "742 Evergreen Terrace" not in prompt
+        assert "[REDACTED-STREET]" in prompt
+
+    def test_redacts_profile_phone_from_reply(self):
+        from unittest.mock import patch
+
+        profile = self._make_profile()
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                return_value=profile,
+            ),
+        ):
+            prompt = build_user_prompt(
+                broker_name="TestBroker",
+                broker_website="https://b.com",
+                original_subject="",
+                original_request_snippet="",
+                reply_subject="Re: request",
+                reply_body="Call us at +1-555-9876 to verify.",
+            )
+        assert "+1-555-9876" not in prompt
+        assert "[REDACTED-PHONE]" in prompt
+
+    def test_no_profile_skips_profile_redaction(self):
+        from unittest.mock import patch
+
+        with patch(
+            "symeraseme.core.identity.profile_exists",
+            return_value=False,
+        ):
+            prompt = build_user_prompt(
+                broker_name="TestBroker",
+                broker_website="https://b.com",
+                original_subject="",
+                original_request_snippet="",
+                reply_subject="Re: request",
+                reply_body="Hello Xylophone Q. Fitzpatrick.",
+            )
+        assert "Xylophone Q. Fitzpatrick" in prompt
+
+    def test_profile_load_error_skips_profile_redaction(self):
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                side_effect=RuntimeError("decryption failed"),
+            ),
+        ):
+            prompt = build_user_prompt(
+                broker_name="TestBroker",
+                broker_website="https://b.com",
+                original_subject="",
+                original_request_snippet="",
+                reply_subject="Re: request",
+                reply_body="Hello Xylophone Q. Fitzpatrick.",
+            )
+        assert "Xylophone Q. Fitzpatrick" in prompt
+
+
 class TestCLassifierCLI:
     def test_classifier_importable(self):
         from symeraseme.adapters.triage import classifier
