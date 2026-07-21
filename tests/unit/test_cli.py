@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from symeraseme.cli import app
@@ -185,3 +186,78 @@ class TestServe:
         stdout = _strip_ansi(result.stdout)
         assert result.exit_code == 0
         assert "--allow-remote" in stdout
+
+
+class TestExceptionGuard:
+    """Tests for the top-level exception guard (_run_app)."""
+
+    def test_unexpected_exception_logs_and_prints_friendly(self, monkeypatch, tmp_path, capsys):
+        import sys
+
+        import typer
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        def _boom(**kwargs):
+            raise RuntimeError("simulated unexpected failure")
+
+        mod = sys.modules["symeraseme.cli.app"]
+        monkeypatch.setattr(mod, "app", _boom)
+
+        from symeraseme.cli.app import _run_app
+
+        with pytest.raises(typer.Exit):
+            _run_app()
+
+        stderr_text = capsys.readouterr().err
+        assert "unexpected error" in stderr_text.lower()
+        assert "Traceback" not in stderr_text
+        assert "RuntimeError" not in stderr_text
+
+        log_dir = tmp_path / "logs"
+        assert log_dir.exists(), f"Log dir not created: {log_dir}"
+        log_files = list(log_dir.glob("crash-*.log"))
+        assert len(log_files) == 1, f"Expected 1 crash log, found {len(log_files)}"
+        log_content = log_files[0].read_text()
+        assert "RuntimeError" in log_content
+        assert "simulated unexpected failure" in log_content
+
+    def test_cliresult_errors_still_use_existing_paths(self):
+        from symeraseme.cli.console import _exit_code_for_result
+        from symeraseme.cli.types import CliResult
+
+        r = CliResult(success=False, error="No identity profile found. Run 'init-profile' first.")
+        code = _exit_code_for_result(r)
+        assert code == 2
+
+    def test_pretty_exceptions_disabled(self):
+        assert app.pretty_exceptions_enable is False
+
+
+class TestCommandDocstrings:
+    """All user-facing commands should have non-empty docstrings for --help."""
+
+    @pytest.mark.parametrize(
+        "module_path,name",
+        [
+            ("symeraseme.cli.commands.account_commands", "show_profile"),
+            ("symeraseme.cli.commands.plan_commands", "plan_show"),
+            ("symeraseme.cli.commands.monitoring_commands", "poll_inbox"),
+            ("symeraseme.cli.commands.monitoring_commands", "classify_reply"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_rebuttal_cmd"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_dashboard_cmd"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_report_cmd"),
+            ("symeraseme.cli.commands.web_form_commands", "run_web_form"),
+            ("symeraseme.cli.commands.web_form_commands", "auto_confirm_cmd"),
+            ("symeraseme.cli.commands.web_form_commands", "solve_captcha_cmd"),
+            ("symeraseme.cli.commands.inspection_commands", "events_show"),
+            ("symeraseme.cli.commands.inspection_commands", "requests_list"),
+            ("symeraseme.cli.commands.inspection_commands", "version"),
+        ],
+    )
+    def test_command_has_docstring(self, module_path, name):
+        import importlib
+
+        mod = importlib.import_module(module_path)
+        func = getattr(mod, name)
+        assert func.__doc__, f"{name} is missing a docstring"

@@ -46,6 +46,13 @@ def run_web_form(
         help="Show form steps without executing",
     ),
 ) -> None:
+    """Automate a broker's web-form opt-out via Playwright browser.
+
+    Examples:
+        symeraseme run-web-form spokeo
+        symeraseme run-web-form spokeo --headed --screenshots ./shots
+        symeraseme run-web-form spokeo --dry-run
+    """
     from symeraseme.cli.console import show_spinner
 
     with show_spinner("Running web form..."):
@@ -82,6 +89,13 @@ def auto_confirm_cmd(
         help="Simulate without clicking",
     ),
 ) -> None:
+    """Auto-confirm a removal by clicking the confirmation link in the broker's email.
+
+    Examples:
+        symeraseme auto-confirm 42
+        symeraseme auto-confirm 42 --headed
+        symeraseme auto-confirm 42 --dry-run
+    """
     result = handle_auto_confirm(
         request_id,
         headed,
@@ -122,6 +136,15 @@ def solve_captcha_cmd(
         help="Show captcha parameters without solving",
     ),
 ) -> None:
+    """Solve a reCAPTCHA challenge using an external solver API.
+
+    Side effects: charges a solver API credit per solve.
+
+    Examples:
+        symeraseme solve-captcha --site-key 6Lxxx --page-url https://example.com/opt-out
+        symeraseme solve-captcha --provider twocaptcha --site-key 6Lxxx --page-url https://...
+        symeraseme solve-captcha --site-key 6Lxxx --page-url https://... --dry-run
+    """
     result = handle_solve_captcha(
         provider,
         api_key,

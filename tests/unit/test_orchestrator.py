@@ -73,6 +73,29 @@ class TestPlanCampaign:
         result = plan_campaign(campaign_id="test-max", max_brokers=2)
         assert result["planned"] <= 2
 
+    def test_plan_truncation_warning_when_max_exceeded(self):
+        result = plan_campaign(campaign_id="test-trunc-warn", max_brokers=1)
+        assert result["matched"] > result["planned"]
+
+    def test_plan_no_truncation_warning_when_under_cap(self):
+        result = plan_campaign(campaign_id="test-no-trunc", max_brokers=9999)
+        assert result["matched"] == result["planned"]
+
+    def test_handle_plan_create_emits_truncation_warning(self):
+        from symeraseme.services.campaign import handle_plan_create
+
+        result = handle_plan_create("test-cli-trunc", max_brokers=1)
+        assert result.success
+        assert result.message is not None
+        assert "matched brokers" in result.message
+
+    def test_handle_plan_create_no_warning_when_under_cap(self):
+        from symeraseme.services.campaign import handle_plan_create
+
+        result = handle_plan_create("test-cli-notrunc", max_brokers=9999)
+        assert result.success
+        assert "matched brokers" not in result.message
+
     def test_plan_requests_have_state(self):
         plan_campaign(campaign_id="test-state", max_brokers=3)
         requests = list_removal_requests(campaign_id="test-state")

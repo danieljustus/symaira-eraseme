@@ -50,6 +50,9 @@ def create(
 ) -> None:
     """Scan the broker registry and create a removal campaign.
 
+    By default, --max caps the plan at 30 brokers. A warning is printed
+    when more brokers match than the cap allows.
+
     Examples:
         symeraseme plan create --campaign initial --law GDPR --max 10
         symeraseme plan create --campaign ccpa-batch --jurisdiction US --priority high
@@ -73,6 +76,13 @@ def plan_show(
     campaign_id: str = typer.Option(None, "--campaign", help="Filter by campaign"),
     status: str = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
+    """Show all removal requests for a campaign.
+
+    Examples:
+        symeraseme plan show
+        symeraseme plan show --campaign initial
+        symeraseme plan show --status PLANNED
+    """
     result = handle_plan_show(campaign_id, status)
     from symeraseme.cli.console import render_result
 

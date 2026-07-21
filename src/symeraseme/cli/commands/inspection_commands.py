@@ -41,6 +41,11 @@ brokers_app = typer.Typer(
 
 
 def version(ctx: typer.Context) -> None:
+    """Show the installed Symaira EraseMe version.
+
+    Examples:
+        symeraseme version
+    """
     data = {"version": __version__, "name": "Symaira EraseMe"}
     render_result(
         ctx.obj["output"],
@@ -268,6 +273,12 @@ def events_show(
     ctx: typer.Context,
     request_id: int = typer.Argument(..., help="Request ID"),
 ) -> None:
+    """Show the full event history for a removal request.
+
+    Examples:
+        symeraseme events show 42
+        symeraseme events show 1
+    """
     init_db()
     events = get_events(request_id)
 
@@ -309,6 +320,13 @@ def requests_list(
         help="Number of results per page (default: 250)",
     ),
 ) -> None:
+    """List removal requests with optional filters and pagination.
+
+    Examples:
+        symeraseme requests list
+        symeraseme requests list --campaign initial --status SENT
+        symeraseme requests list --broker spokeo --page 1 --page-size 50
+    """
     init_db()
     limit = page_size if page is not None else None
     offset = (page - 1) * page_size if page is not None else None

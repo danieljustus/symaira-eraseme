@@ -52,6 +52,7 @@ def plan_campaign(
         if ch is not None:
             channels.append((broker, ch))
 
+    matched = len(channels)
     if max_brokers and len(channels) > max_brokers:
         channels = channels[:max_brokers]
 
@@ -92,6 +93,7 @@ def plan_campaign(
     return {
         "campaign_id": campaign_id,
         "total_brokers": len(brokers),
+        "matched": matched,
         "planned": len(planned),
         "requests": planned,
     }
