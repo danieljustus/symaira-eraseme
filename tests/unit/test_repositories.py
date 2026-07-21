@@ -11,6 +11,7 @@ from symeraseme.core.repositories import (
     append_event,
     create_campaign,
     create_removal_request,
+    get_active_matchable_requests,
     get_events,
     get_events_for_requests,
     get_removal_request,
@@ -154,3 +155,115 @@ class TestEventRepository:
         later = get_events(rid, after_event_id=e1)
         assert len(later) == 1
         assert later[0]["event_type"] == "SENT"
+
+    def test_get_events_for_requests_event_type_filter(self):
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+        append_event(rid, "PLANNED")
+        append_event(rid, "SENT", payload={"message_id": "<test@ex.com>"})
+        append_event(rid, "ACK")
+
+        sent_only = get_events_for_requests([rid], event_type="SENT")
+        assert len(sent_only[rid]) == 1
+        assert sent_only[rid][0]["event_type"] == "SENT"
+
+        planned_only = get_events_for_requests([rid], event_type="PLANNED")
+        assert len(planned_only[rid]) == 1
+        assert planned_only[rid][0]["event_type"] == "PLANNED"
+
+        all_events = get_events_for_requests([rid])
+        assert len(all_events[rid]) == 3
+
+    def test_get_events_for_requests_event_type_no_match(self):
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+        append_event(rid, "PLANNED")
+
+        result = get_events_for_requests([rid], event_type="SENT")
+        assert result[rid] == []
+
+
+class TestActiveMatchableRequests:
+    def test_excludes_confirmed(self):
+        from symeraseme.core.projection import append_event_and_project
+
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+        append_event_and_project(rid, "PLANNED")
+        append_event_and_project(rid, "SENT")
+        append_event_and_project(rid, "CONFIRMED")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert rid not in active_ids
+
+    def test_excludes_rejected_final(self):
+        from symeraseme.core.projection import append_event_and_project
+
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+        append_event_and_project(rid, "PLANNED")
+        append_event_and_project(rid, "SENT")
+        append_event_and_project(rid, "REJECTED_FINAL")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert rid not in active_ids
+
+    def test_includes_planned(self):
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert rid in active_ids
+
+    def test_includes_awaiting_ack(self):
+        from symeraseme.core.projection import append_event_and_project
+
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+        append_event_and_project(rid, "PLANNED")
+        append_event_and_project(rid, "SENT")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert rid in active_ids
+
+    def test_includes_no_state_row(self):
+        create_campaign("c")
+        rid = create_removal_request(broker_id="b", campaign_id="c", jurisdiction="GDPR")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert rid in active_ids
+
+    def test_filters_by_campaign(self):
+        create_campaign("c1")
+        create_campaign("c2")
+        r1 = create_removal_request(broker_id="b1", campaign_id="c1", jurisdiction="GDPR")
+        r2 = create_removal_request(broker_id="b2", campaign_id="c2", jurisdiction="GDPR")
+
+        active_c1 = get_active_matchable_requests(campaign_id="c1")
+        active_ids = [r["id"] for r in active_c1]
+        assert r1 in active_ids
+        assert r2 not in active_ids
+
+    def test_mixed_statuses(self):
+        from symeraseme.core.projection import append_event_and_project
+
+        create_campaign("c")
+        r1 = create_removal_request(broker_id="b1", campaign_id="c", jurisdiction="GDPR")
+        r2 = create_removal_request(broker_id="b2", campaign_id="c", jurisdiction="GDPR")
+        r3 = create_removal_request(broker_id="b3", campaign_id="c", jurisdiction="GDPR")
+        append_event_and_project(r1, "SENT")
+        append_event_and_project(r2, "SENT")
+        append_event_and_project(r2, "CONFIRMED")
+        append_event_and_project(r3, "SENT")
+        append_event_and_project(r3, "REJECTED_FINAL")
+
+        active = get_active_matchable_requests(campaign_id="c")
+        active_ids = [r["id"] for r in active]
+        assert r1 in active_ids
+        assert r2 not in active_ids
+        assert r3 not in active_ids

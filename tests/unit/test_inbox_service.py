@@ -115,7 +115,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_2]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"id": 1, "broker_id": "spokeo"},
                     {"id": 2, "broker_id": "intelius"},
@@ -152,7 +152,10 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_3]),
-            patch(f"{SR}.list_removal_requests", return_value=[{"id": 1, "broker_id": "spokeo"}]),
+            patch(
+                f"{SR}.get_active_matchable_requests",
+                return_value=[{"id": 1, "broker_id": "spokeo"}],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
             patch(f"{SR}.insert_inbox_reply"),
@@ -171,7 +174,10 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_2, _MSG_3]),
-            patch(f"{SR}.list_removal_requests", return_value=[{"id": 1, "broker_id": "spokeo"}]),
+            patch(
+                f"{SR}.get_active_matchable_requests",
+                return_value=[{"id": 1, "broker_id": "spokeo"}],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
             patch(f"{SR}.insert_inbox_reply") as submit_mock,
@@ -186,7 +192,7 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_2]),
-            patch(f"{SR}.list_removal_requests", return_value=[]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests"),
             patch(f"{SR}.match_reply_to_request", return_value=[]),
             patch(f"{SR}.insert_inbox_reply") as submit_mock,
@@ -228,7 +234,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"id": 1, "broker_id": "spokeo"},
                     {"id": 2, "broker_id": "intelius"},
@@ -258,7 +264,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"id": 1, "broker_id": "spokeo"},
                 ],
@@ -288,7 +294,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"id": 1, "broker_id": "spokeo"},
                 ],
@@ -318,7 +324,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"id": 1, "broker_id": "spokeo"},
                 ],
@@ -338,12 +344,12 @@ class TestHandlePollInbox:
     # ------------------------------------------------------------------
 
     def test_no_requests_skips_event_lookup(self):
-        """When ``list_removal_requests`` returns nothing, ``get_events_for_requests``
+        """When ``get_active_matchable_requests`` returns nothing, ``get_events_for_requests``
         is not called, but ``match_reply_to_request`` still runs."""
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests") as events_mock,
             patch(f"{SR}.match_reply_to_request") as match_mock,
             patch(f"{SR}.insert_inbox_reply"),
@@ -364,7 +370,7 @@ class TestHandlePollInbox:
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(
-                f"{SR}.list_removal_requests",
+                f"{SR}.get_active_matchable_requests",
                 return_value=[
                     {"broker_id": "spokeo"},  # no id field!
                     {"request_id": 2, "broker_id": "intelius"},
@@ -376,8 +382,8 @@ class TestHandlePollInbox:
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
-        # Only request with id=2 should be passed
-        events_mock.assert_called_once_with([2])
+        # Only request with id=2 should be passed, with event_type=SENT filter
+        events_mock.assert_called_once_with([2], event_type="SENT")
 
     # ------------------------------------------------------------------
     # Result formatting  (lines 80-97)
@@ -392,7 +398,7 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[{"id": 1}]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[{"id": 1}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
             patch(f"{SR}.insert_inbox_reply"),
@@ -410,7 +416,7 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[{"id": 1}]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[{"id": 1}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(
                 f"{SR}.match_reply_to_request",
@@ -440,12 +446,12 @@ class TestHandlePollInbox:
 
         init_mock.assert_called_once()
 
-    def test_campaign_id_passed_to_list_removal_requests(self):
-        """``campaign_id`` is forwarded to ``list_removal_requests``."""
+    def test_campaign_id_passed_to_get_active_matchable_requests(self):
+        """``campaign_id`` is forwarded to ``get_active_matchable_requests``."""
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests") as list_mock,
+            patch(f"{SR}.get_active_matchable_requests") as list_mock,
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(
                 f"{SR}.match_reply_to_request",
@@ -476,7 +482,7 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll") as poll_mock,
-            patch(f"{SR}.list_removal_requests", return_value=[]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[]),
             patch(f"{SR}.match_reply_to_request", return_value=[]),
             patch(f"{SR}.insert_inbox_reply"),
         ):
@@ -507,7 +513,7 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_2, _MSG_3]),
-            patch(f"{SR}.list_removal_requests", return_value=[]),
+            patch(f"{SR}.get_active_matchable_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
             patch(f"{SR}.insert_inbox_reply"),
@@ -520,3 +526,24 @@ class TestHandlePollInbox:
         assert "[1]" in msg_lines[0]
         assert "[2]" in msg_lines[1]
         assert "[None]" in msg_lines[2]
+
+    # ------------------------------------------------------------------
+    # Query-scoping: event_type filter and active-only requests
+    # ------------------------------------------------------------------
+
+    def test_event_type_sent_passed_to_get_events_for_requests(self):
+        """get_events_for_requests is called with event_type='SENT' to skip non-SENT events."""
+        with (
+            patch(DB),
+            patch(f"{SR}._poll", return_value=[_MSG_1]),
+            patch(
+                f"{SR}.get_active_matchable_requests",
+                return_value=[{"id": 1, "broker_id": "spokeo"}],
+            ),
+            patch(f"{SR}.get_events_for_requests") as events_mock,
+            patch(f"{SR}.match_reply_to_request", return_value=[]),
+            patch(f"{SR}.insert_inbox_reply"),
+        ):
+            handle_poll_inbox(**_BASE_KWARGS)
+
+        events_mock.assert_called_once_with([1], event_type="SENT")

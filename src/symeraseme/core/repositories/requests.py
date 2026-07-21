@@ -89,6 +89,34 @@ def list_removal_requests(
     return [dict(r) for r in rows]
 
 
+def get_active_matchable_requests(
+    *,
+    campaign_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return requests that could still receive inbox replies.
+
+    Excludes terminal states (CONFIRMED, REJECTED_FINAL) where no further
+    matching is needed.  Requests with no state row are included since they
+    have not yet reached a terminal outcome.
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT r.id, r.broker_id, r.channel, r.campaign_id, r.created_at,
+              r.jurisdiction, r.template_id, r.identity_snapshot_hash,
+              s.current_status, s.last_event_at, s.sent_at, s.acknowledged_at,
+              s.resolved_at, s.deadline_at, s.next_action_at, s.reminders_sent,
+              s.escalation_level
+           FROM removal_requests r
+           LEFT JOIN request_state s ON s.request_id = r.id
+           WHERE (? IS NULL OR r.campaign_id = ?)
+             AND (s.current_status IS NULL
+                  OR s.current_status NOT IN ('CONFIRMED', 'REJECTED_FINAL'))
+           ORDER BY r.created_at ASC""",
+        (campaign_id or None, campaign_id or None),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def count_removal_requests(
     *,
     campaign_id: str | None = None,

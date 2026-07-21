@@ -20,6 +20,7 @@ from symeraseme.core.repositories.manual_tasks import (
 from symeraseme.core.repositories.requests import (
     count_removal_requests,
     create_removal_request,
+    get_active_matchable_requests,
     get_removal_request,
     list_removal_requests,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "create_campaign",
     "list_campaigns",
     "create_removal_request",
+    "get_active_matchable_requests",
     "get_removal_request",
     "list_removal_requests",
     "append_event",
