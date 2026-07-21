@@ -15,7 +15,7 @@ from symeraseme.adapters.email.smtp_imap import (
 )
 from symeraseme.core.db_connection import init_db, with_db
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
-from symeraseme.core.inbox import submit_inbox_reply
+from symeraseme.core.repositories.inbox import insert_inbox_reply
 from symeraseme.core.result_types import CliResult
 
 logger = logging.getLogger(__name__)
@@ -85,12 +85,14 @@ def handle_poll_inbox(
 
         matched = match_reply_to_request(messages, requests, thread_map)
         for msg in matched:
-            submit_inbox_reply(
-                msg.get("message_id", ""),
+            insert_inbox_reply(
                 request_id=msg.get("request_id"),
+                message_id=msg.get("message_id", ""),
+                thread_id=None,
                 from_addr=msg.get("from_addr", ""),
                 subject=msg.get("subject", ""),
                 snippet=msg.get("body", "")[:200],
+                classified_as=None,
             )
     else:
         matched = []
