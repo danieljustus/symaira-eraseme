@@ -265,6 +265,102 @@ class TestGenerateRebuttal:
         assert result.needs_human_review  # fallback always needs review
 
 
+class TestProfileRedactionInClassifierPrompt:
+    """Issue #518: _build_classifier_user_prompt should strip profile PII before scrub_pii."""
+
+    @staticmethod
+    def _make_profile():
+        return IdentityProfile(
+            full_name="Xylophone Q. Fitzpatrick",
+            name_variants=["Xy Fitz"],
+            addresses=[
+                {
+                    "street": "742 Evergreen Terrace",
+                    "city": "Springfield",
+                    "postal_code": "62704",
+                    "country": "US",
+                }
+            ],
+            email_addresses=["xylo@example.com"],
+            phone_numbers=["+1-555-9876"],
+            jurisdictions=["US"],
+        )
+
+    def test_redacts_profile_name_from_broker_message(self):
+        from unittest.mock import patch
+
+        profile = self._make_profile()
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                return_value=profile,
+            ),
+        ):
+            prompt = _build_classifier_user_prompt(
+                broker_name="TestBroker",
+                broker_message="Hello Xylophone Q. Fitzpatrick, we need ID.",
+            )
+        assert "Xylophone Q. Fitzpatrick" not in prompt
+        assert "[REDACTED-NAME]" in prompt
+
+    def test_redacts_profile_street_from_broker_message(self):
+        from unittest.mock import patch
+
+        profile = self._make_profile()
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                return_value=profile,
+            ),
+        ):
+            prompt = _build_classifier_user_prompt(
+                broker_name="TestBroker",
+                broker_message="We have a record at 742 Evergreen Terrace.",
+            )
+        assert "742 Evergreen Terrace" not in prompt
+        assert "[REDACTED-STREET]" in prompt
+
+    def test_no_profile_skips_profile_redaction(self):
+        from unittest.mock import patch
+
+        with patch(
+            "symeraseme.core.identity.profile_exists",
+            return_value=False,
+        ):
+            prompt = _build_classifier_user_prompt(
+                broker_name="TestBroker",
+                broker_message="Hello Xylophone Q. Fitzpatrick.",
+            )
+        assert "Xylophone Q. Fitzpatrick" in prompt
+
+    def test_profile_load_error_skips_profile_redaction(self):
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "symeraseme.core.identity.profile_exists",
+                return_value=True,
+            ),
+            patch(
+                "symeraseme.core.identity.load_profile",
+                side_effect=RuntimeError("decryption failed"),
+            ),
+        ):
+            prompt = _build_classifier_user_prompt(
+                broker_name="TestBroker",
+                broker_message="Hello Xylophone Q. Fitzpatrick.",
+            )
+        assert "Xylophone Q. Fitzpatrick" in prompt
+
+
 class TestRejectionTemplates:
     def test_all_templates_exist(self):
         """Verify all registered template files exist in the registry."""

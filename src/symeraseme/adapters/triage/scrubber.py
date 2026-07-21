@@ -126,6 +126,29 @@ def scrub_pii(text: str) -> str:
     return text
 
 
+def redact_profile_pii(text: str) -> str:
+    """Profile-aware identity redaction followed by regex-based PII scrubbing.
+
+    Mirrors ``mcp_server.redact_content()``: loads the identity profile when
+    available, applies ``_redact_identity_values()`` for known fields, then
+    falls through to ``scrub_pii()`` for regex-based patterns.
+    """
+    from symeraseme.core.identity import load_profile, profile_exists
+    from symeraseme.core.manual_fallback import _redact_identity_values
+
+    profile = None
+    if profile_exists():
+        try:
+            profile = load_profile()
+        except Exception as exc:
+            logger.debug("Could not load identity profile for redaction: %s", exc)
+
+    if profile is not None:
+        text = _redact_identity_values(text, profile)
+
+    return scrub_pii(text)
+
+
 def llm_consent_granted() -> bool:
     env = os.environ.get("SYMERASEME_LLM_CONSENT", "").strip().lower()
     if env in ("1", "true", "yes"):
