@@ -124,8 +124,12 @@ def append_event(
     )
 
 
-def get_events_for_requests(request_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
-    return _repo_get_events_for_requests(request_ids)
+def get_events_for_requests(
+    request_ids: list[int],
+    *,
+    event_type: str | None = None,
+) -> dict[int, list[dict[str, Any]]]:
+    return _repo_get_events_for_requests(request_ids, event_type=event_type)
 
 
 def get_events(
