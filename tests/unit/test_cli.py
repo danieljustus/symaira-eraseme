@@ -191,10 +191,8 @@ class TestServe:
 class TestExceptionGuard:
     """Tests for the top-level exception guard (_run_app)."""
 
-    def test_unexpected_exception_logs_and_prints_friendly(self, monkeypatch, tmp_path):
+    def test_unexpected_exception_logs_and_prints_friendly(self, monkeypatch, tmp_path, capsys):
         import sys
-        from io import StringIO
-        from contextlib import suppress
 
         import typer
 
@@ -204,23 +202,15 @@ class TestExceptionGuard:
             raise RuntimeError("simulated unexpected failure")
 
         mod = sys.modules["symeraseme.cli.app"]
-        original_app = mod.app
-
-        from symeraseme.cli.console import _error_console
-
-        captured = StringIO()
         monkeypatch.setattr(mod, "app", _boom)
-        monkeypatch.setattr(_error_console, "file", captured)
 
         from symeraseme.cli.app import _run_app
 
-        with suppress(typer.Exit):
+        with pytest.raises(typer.Exit):
             _run_app()
 
-        monkeypatch.setattr(mod, "app", original_app)
-
-        stderr_text = captured.getvalue()
-        assert "unexpected error" in stderr_text.lower() or "An unexpected error" in stderr_text
+        stderr_text = capsys.readouterr().err
+        assert "unexpected error" in stderr_text.lower()
         assert "Traceback" not in stderr_text
         assert "RuntimeError" not in stderr_text
 
