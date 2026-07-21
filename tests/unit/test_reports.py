@@ -524,12 +524,14 @@ class TestGetCalendarEntries:
     def test_safe_parse_replaced(self):
         import subprocess
         import sys
+        from pathlib import Path
 
+        project_root = Path(__file__).resolve().parents[2]
         result = subprocess.run(
             [sys.executable, "-c",
              "import ast; tree = ast.parse(open('src/symeraseme/cli/commands/monitoring_commands.py').read()); "
              "names = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]; "
              "assert '_safe_parse' not in names, '_safe_parse still exists'"],
-            capture_output=True, text=True, cwd="/private/var/folders/7v/7bpq0fjn44lflpxdylsx8qs40000gn/T/opencode/worktrees/symaira-eraseme/cli",
+            capture_output=True, text=True, cwd=str(project_root),
         )
         assert result.returncode == 0, result.stderr

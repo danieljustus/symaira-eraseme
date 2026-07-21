@@ -276,10 +276,8 @@ def _run_app() -> None:
         ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         log_path = log_dir / f"crash-{ts}.log"
         log_path.write_text(traceback.format_exc())
-        print_error(
-            f"An unexpected error occurred. Full traceback saved to: {log_path}"
-        )
-        raise typer.Exit(1)
+        print_error(f"An unexpected error occurred. Full traceback saved to: {log_path}")
+        raise typer.Exit(1) from None
 
 
 if __name__ == "__main__":
