@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import secrets
+import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,6 +37,11 @@ MAX_BODY = 5 * 1024 * 1024
 # directly in tests without going through ``run_mcp_server``).
 _AUTH_TOKEN: str | None = None
 
+# Set when the server is shutting down — gates _is_authorized to reject all
+# requests mid-shutdown, closing the race between the finally block clearing
+# _AUTH_TOKEN and in-flight requests.
+_SHUTDOWN_EVENT = threading.Event()
+
 _ALLOWED_ORIGIN_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
@@ -43,7 +49,10 @@ def _is_authorized(headers: Any) -> bool:
     """Return True if the request carries a valid ``Authorization: Bearer`` header.
 
     When ``_AUTH_TOKEN`` is unset, auth is not enforced (test/embedding use).
+    Once shutdown begins, all requests are rejected regardless of token state.
     """
+    if _SHUTDOWN_EVENT.is_set():
+        return False
     if _AUTH_TOKEN is None:
         return True
     auth_header = headers.get("Authorization", "")
@@ -306,15 +315,26 @@ class MCPJSONRPCHandler(BaseHTTPRequestHandler):
 def run_mcp_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     global _AUTH_TOKEN
     _AUTH_TOKEN = secrets.token_urlsafe(32)
+
+    from symeraseme.core.config import get_config
+
+    data_dir = get_config().resolved_data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+    token_path = data_dir / "mcp_token"
+    fd = os.open(token_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o600)
+    with open(fd, "w") as f:
+        f.write(_AUTH_TOKEN)
+
     server = ThreadingHTTPServer((host, port), MCPJSONRPCHandler)
     logger.info("Starting MCP Server on http://%s:%d", host, port)
     print_success(f"MCP Server running on http://{host}:{port}")
-    print_info(f"Auth token (send as 'Authorization: Bearer {_AUTH_TOKEN}' on every request)")
+    print_info(f"Auth token written to {token_path}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping MCP Server")
         print_info("Stopping MCP Server...")
     finally:
+        _SHUTDOWN_EVENT.set()
         _AUTH_TOKEN = None
         server.server_close()

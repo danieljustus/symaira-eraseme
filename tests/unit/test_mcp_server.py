@@ -813,3 +813,151 @@ class TestListToolsAlias:
         resp_list = handler._handle_single_request(req_list)
         resp_alias = handler._handle_single_request(req_alias)
         assert resp_list["result"]["tools"] == resp_alias["result"]["tools"]
+
+
+# ===========================================================================
+# MCP auth token lifecycle — persistence, stdout redaction, shutdown barrier
+# ===========================================================================
+
+
+class TestMcpTokenPersistence:
+    """Token file is created with 0o600 permissions in the data dir on start."""
+
+    def teardown_method(self):
+        from symeraseme.mcp_server import _SHUTDOWN_EVENT
+
+        _SHUTDOWN_EVENT.clear()
+
+    def test_run_mcp_server_creates_token_file(self, tmp_path: Path, monkeypatch):
+        from unittest.mock import patch
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        mock_server = Mock()
+        mock_server.serve_forever.side_effect = KeyboardInterrupt
+
+        with patch(
+            "symeraseme.mcp_server.ThreadingHTTPServer", return_value=mock_server
+        ):
+            from symeraseme.mcp_server import run_mcp_server
+
+            run_mcp_server()
+
+        token_file = tmp_path / "mcp_token"
+        assert token_file.exists(), "mcp_token file was not created"
+        perms = token_file.stat().st_mode & 0o777
+        assert perms == 0o600, f"Expected 0o600 permissions, got {oct(perms)}"
+        content = token_file.read_text(encoding="utf-8")
+        assert len(content) > 0, "Token file is empty"
+        assert "\n" not in content
+        assert " " not in content
+
+    def test_stdout_does_not_contain_token(self, tmp_path: Path, monkeypatch, capsys):
+        from unittest.mock import patch
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        mock_server = Mock()
+        mock_server.serve_forever.side_effect = KeyboardInterrupt
+
+        with patch(
+            "symeraseme.mcp_server.ThreadingHTTPServer", return_value=mock_server
+        ):
+            from symeraseme.mcp_server import run_mcp_server
+
+            run_mcp_server()
+
+        captured = capsys.readouterr()
+        token_file = tmp_path / "mcp_token"
+        token_value = token_file.read_text(encoding="utf-8").strip()
+        assert token_value not in captured.out, (
+            "Token value was printed to stdout"
+        )
+        assert "mcp_token" in captured.out, (
+            "Token file path not printed to stdout"
+        )
+
+    def test_token_file_survives_server_stop(self, tmp_path: Path, monkeypatch):
+        from unittest.mock import patch
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        mock_server = Mock()
+        mock_server.serve_forever.side_effect = KeyboardInterrupt
+
+        with patch(
+            "symeraseme.mcp_server.ThreadingHTTPServer", return_value=mock_server
+        ):
+            from symeraseme.mcp_server import run_mcp_server
+
+            run_mcp_server()
+
+        token_file = tmp_path / "mcp_token"
+        assert token_file.exists(), "Token file should persist after shutdown"
+        assert len(token_file.read_text(encoding="utf-8")) > 0
+
+
+class TestShutdownAuthBarrier:
+    """_is_authorized must reject requests once shutdown has begun."""
+
+    def test_shutdown_event_blocks_authorization(self):
+        import threading
+
+        from symeraseme.mcp_server import _is_authorized
+
+        shutdown_event = threading.Event()
+        shutdown_event.set()
+
+        with patch("symeraseme.mcp_server._SHUTDOWN_EVENT", shutdown_event):
+            with patch("symeraseme.mcp_server._AUTH_TOKEN", "test-token-123"):
+                mock_headers = Mock()
+                mock_headers.get.return_value = "Bearer test-token-123"
+                result = _is_authorized(mock_headers)
+                assert result is False, (
+                    "Request should be rejected when shutdown event is set"
+                )
+
+    def test_normal_operation_authorizes_valid_token(self):
+        import threading
+
+        from symeraseme.mcp_server import _is_authorized
+
+        shutdown_event = threading.Event()
+
+        with patch("symeraseme.mcp_server._SHUTDOWN_EVENT", shutdown_event):
+            with patch("symeraseme.mcp_server._AUTH_TOKEN", "test-token-123"):
+                mock_headers = Mock()
+                mock_headers.get.return_value = "Bearer test-token-123"
+                result = _is_authorized(mock_headers)
+                assert result is True
+
+    def test_no_token_still_allows_unauthenticated(self):
+        import threading
+
+        from symeraseme.mcp_server import _is_authorized
+
+        shutdown_event = threading.Event()
+
+        with patch("symeraseme.mcp_server._SHUTDOWN_EVENT", shutdown_event):
+            with patch("symeraseme.mcp_server._AUTH_TOKEN", None):
+                mock_headers = Mock()
+                mock_headers.get.return_value = ""
+                result = _is_authorized(mock_headers)
+                assert result is True
+
+    def test_shutdown_event_blocks_even_with_no_token(self):
+        import threading
+
+        from symeraseme.mcp_server import _is_authorized
+
+        shutdown_event = threading.Event()
+        shutdown_event.set()
+
+        with patch("symeraseme.mcp_server._SHUTDOWN_EVENT", shutdown_event):
+            with patch("symeraseme.mcp_server._AUTH_TOKEN", None):
+                mock_headers = Mock()
+                mock_headers.get.return_value = ""
+                result = _is_authorized(mock_headers)
+                assert result is False, (
+                    "During shutdown, unauthenticated requests must be rejected"
+                )
