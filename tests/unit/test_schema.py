@@ -168,8 +168,8 @@ class TestRegistryLoader:
         loaded = _load_persistent_cache(registry_dir, cache_key)
         assert loaded is None
 
-    def test_broker_cache_key_memoized_within_ttl(self, monkeypatch):
-        """Repeated calls within the TTL must not re-walk the registry dir."""
+    def test_broker_cache_key_memoized_in_process(self, monkeypatch):
+        """Repeated calls within a process must not re-walk the registry dir."""
         from symeraseme.registry.loader import _broker_cache_key, clear_registry_cache
 
         clear_registry_cache()
@@ -193,7 +193,7 @@ class TestRegistryLoader:
         assert call_count == 1
 
     def test_broker_cache_key_recomputed_after_clear_registry_cache(self, monkeypatch):
-        """clear_registry_cache() must force an immediate re-walk, TTL or not."""
+        """clear_registry_cache() must force an immediate re-walk."""
         from symeraseme.registry.loader import _broker_cache_key, clear_registry_cache
 
         clear_registry_cache()
@@ -376,3 +376,160 @@ class TestDisabledBrokers:
             assert broker_id in by_id, f"{broker_id} missing from registry"
             assert by_id[broker_id].disabled, f"{broker_id} should be disabled"
             assert by_id[broker_id].notes, f"{broker_id} should explain why it's disabled"
+
+
+class TestMtimeSnapshot:
+    def test_snapshot_persists_across_process_restart(self, tmp_path, monkeypatch):
+        """Snapshot file survives process restart and is reused."""
+        import json
+
+        from symeraseme.registry.loader import (
+            _broker_cache_key,
+            _load_snapshot,
+            _snapshot_path,
+            clear_registry_cache,
+        )
+
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
+        clear_registry_cache()
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        key1 = _broker_cache_key(registry_dir)
+
+        snapshot = _load_snapshot(registry_dir)
+        assert snapshot is not None
+        assert snapshot["max_mtime"] > 0
+        assert snapshot["file_count"] > 0
+        assert snapshot["cache_key"] == list(key1)
+
+        snapshot_path = _snapshot_path(registry_dir)
+        assert snapshot_path.exists()
+        with open(snapshot_path, encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["max_mtime"] == snapshot["max_mtime"]
+        assert data["file_count"] == snapshot["file_count"]
+
+    def test_snapshot_avoids_cold_load_when_unchanged(self, tmp_path, monkeypatch):
+        """When snapshot matches, no cold YAML parse is needed."""
+        from symeraseme.registry.loader import (
+            _broker_cache_key,
+            _load_persistent_cache,
+            clear_registry_cache,
+            load_all_brokers,
+        )
+
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
+        clear_registry_cache()
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        key = _broker_cache_key(registry_dir)
+
+        cached = _load_persistent_cache(registry_dir, key)
+        if cached is not None:
+            brokers, idx, meta = cached
+            assert len(brokers) > 0
+
+        brokers = load_all_brokers()
+        assert len(brokers) > 0
+
+    def test_yaml_edit_triggers_reload(self, tmp_path, monkeypatch):
+        """Editing a YAML file (mtime bump) invalidates the snapshot."""
+        from symeraseme.registry.loader import (
+            _broker_cache_key,
+            _load_snapshot,
+            clear_registry_cache,
+        )
+
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
+        clear_registry_cache()
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        key_before = _broker_cache_key(registry_dir)
+        snapshot_before = _load_snapshot(registry_dir)
+        assert snapshot_before is not None
+        original_mtime = snapshot_before["max_mtime"]
+
+        test_yaml = registry_dir / "eu" / "_snapshot_test.yaml"
+        test_yaml.write_text(
+            "id: snapshot-test\n"
+            "name: Snapshot Test\n"
+            "category: other\n"
+            "jurisdictions:\n"
+            "- DE\n"
+            "laws:\n"
+            "- GDPR\n"
+            "priority: low\n"
+            "opt_out:\n"
+            "- type: email\n"
+            "  endpoint: test@example.com\n"
+        )
+        try:
+            clear_registry_cache()
+            key_after = _broker_cache_key(registry_dir)
+            snapshot_after = _load_snapshot(registry_dir)
+            assert snapshot_after is not None
+            assert snapshot_after["max_mtime"] >= original_mtime
+            assert key_after != key_before
+        finally:
+            test_yaml.unlink(missing_ok=True)
+            clear_registry_cache()
+
+    def test_subdirectory_yaml_edit_triggers_reload(self, tmp_path, monkeypatch):
+        """Editing a YAML in a subdirectory bumps the snapshot max_mtime."""
+        from symeraseme.registry.loader import (
+            _broker_cache_key,
+            _load_snapshot,
+            clear_registry_cache,
+        )
+
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
+        clear_registry_cache()
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        key_before = _broker_cache_key(registry_dir)
+        snapshot_before = _load_snapshot(registry_dir)
+        original_mtime = snapshot_before["max_mtime"]
+
+        subdir = registry_dir / "us"
+        test_yaml = subdir / "_snapshot_subdir_test.yaml"
+        test_yaml.write_text(
+            "id: snapshot-subdir-test\n"
+            "name: Snapshot Subdir Test\n"
+            "category: other\n"
+            "jurisdictions:\n"
+            "- US\n"
+            "laws:\n"
+            "- CCPA\n"
+            "priority: low\n"
+            "opt_out:\n"
+            "- type: email\n"
+            "  endpoint: test@example.com\n"
+        )
+        try:
+            clear_registry_cache()
+            key_after = _broker_cache_key(registry_dir)
+            snapshot_after = _load_snapshot(registry_dir)
+            assert snapshot_after["max_mtime"] >= original_mtime
+            assert key_after != key_before
+        finally:
+            test_yaml.unlink(missing_ok=True)
+            clear_registry_cache()
+
+    def test_clear_registry_cache_deletes_snapshot(self, tmp_path, monkeypatch):
+        """clear_registry_cache() removes the snapshot file."""
+        from symeraseme.registry.loader import (
+            _broker_cache_key,
+            _snapshot_path,
+            clear_registry_cache,
+        )
+
+        monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
+        clear_registry_cache()
+
+        registry_dir = _repo_root() / "registry" / "brokers"
+        _broker_cache_key(registry_dir)
+        snapshot_file = _snapshot_path(registry_dir)
+        assert snapshot_file.exists()
+
+        clear_registry_cache()
+        assert not snapshot_file.exists()

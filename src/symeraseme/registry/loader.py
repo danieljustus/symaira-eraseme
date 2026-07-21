@@ -6,7 +6,6 @@ import hmac
 import json
 import logging
 import os
-import time
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -118,12 +117,15 @@ def clear_registry_cache() -> None:
     _BROKER_VALIDATOR = None
     _CACHE_KEY_MEMO.clear()
 
-    _cache_dir = Path.home() / ".cache" / "symeraseme"
-    if _cache_dir.exists():
+    cache_dir = _cache_dir()
+    if cache_dir.exists():
         for ext in ("*.pkl", "*.json"):
-            for f in _cache_dir.glob(f"brokers_{ext}"):
+            for f in cache_dir.glob(f"brokers_{ext}"):
                 with contextlib.suppress(OSError):
                     f.unlink()
+        for f in cache_dir.glob("mtime_snapshot_*.json"):
+            with contextlib.suppress(OSError):
+                f.unlink()
 
 
 def _cache_dir() -> Path:
@@ -228,22 +230,58 @@ def _load_persistent_cache(
     return brokers, id_index, meta_index
 
 
-# How long a computed cache key is trusted before _broker_cache_key re-walks
-# the registry directory. Repeated load_all_brokers() calls within one CLI
-# invocation (plan -> filter -> lookup) hit this memo instead of re-stat'ing
-# ~1,279 files each time. clear_registry_cache() (e.g. after a registry sync)
-# forces an immediate recomputation regardless of this TTL.
-_CACHE_KEY_TTL_SECONDS = 5.0
-_CACHE_KEY_MEMO: dict[str, tuple[float, tuple[str, str]]] = {}
+# Persisted mtime snapshot — replaces the old 5-second TTL memo.  Stores
+# recursive max_mtime + file_count under the cache dir so cross-process
+# restarts avoid a cold-load when nothing changed.
+_SNAPSHOT_SUFFIX = ".mtime_snapshot.json"
+_CACHE_KEY_MEMO: dict[str, tuple[str, tuple[str, str]]] = {}
 
 
-def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
-    dir_str = str(registry_dir)
-    now = time.monotonic()
-    memoized = _CACHE_KEY_MEMO.get(dir_str)
-    if memoized is not None and (now - memoized[0]) < _CACHE_KEY_TTL_SECONDS:
-        return memoized[1]
+def _snapshot_path(registry_dir: Path) -> Path:
+    """Return the snapshot file path for *registry_dir*."""
+    dir_hash = hashlib.sha256(str(registry_dir).encode()).hexdigest()[:16]
+    return _cache_dir() / f"mtime_snapshot_{dir_hash}.json"
 
+
+def _load_snapshot(registry_dir: Path) -> dict[str, Any] | None:
+    """Load the persisted mtime snapshot, or ``None`` if absent/unreadable."""
+    path = _snapshot_path(registry_dir)
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.debug("Mtime snapshot unreadable (%s), rebuilding", e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _save_snapshot(
+    registry_dir: Path,
+    max_mtime: float,
+    file_count: int,
+    cache_key: tuple[str, str],
+) -> None:
+    """Persist the mtime snapshot to disk."""
+    path = _snapshot_path(registry_dir)
+    payload = {
+        "max_mtime": max_mtime,
+        "file_count": file_count,
+        "cache_key": list(cache_key),
+    }
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        os.chmod(path, 0o600)
+    except OSError as e:
+        logger.debug("Failed to save mtime snapshot: %s", e)
+
+
+def _walk_registry_mtime(registry_dir: Path) -> tuple[float, int]:
+    """Walk all ``*.yaml`` files and return ``(max_mtime, file_count)``."""
     max_mtime = 0.0
     file_count = 0
     for yml in registry_dir.rglob("*.yaml"):
@@ -254,10 +292,39 @@ def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
             file_count += 1
         except OSError:
             continue
+    return max_mtime, file_count
+
+
+def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
+    """Compute the cache key for the registry directory.
+
+    Uses a persisted mtime snapshot to avoid redundant walks.  Within a
+    process the result is memoized for the process lifetime.  Between
+    processes the snapshot on disk provides the same fast path: read
+    snapshot, re-walk, compare; if values match the persistent broker
+    cache is still valid and no cold-load is needed.
+    """
+    dir_str = str(registry_dir)
+
+    memoized = _CACHE_KEY_MEMO.get(dir_str)
+    if memoized is not None:
+        return memoized[1]
+
+    max_mtime, file_count = _walk_registry_mtime(registry_dir)
+
     key_data = f"{registry_dir}:{max_mtime}:{file_count}"
     digest = hashlib.sha256(key_data.encode()).hexdigest()
     cache_key = (str(registry_dir), digest)
-    _CACHE_KEY_MEMO[dir_str] = (now, cache_key)
+
+    snapshot = _load_snapshot(registry_dir)
+    if (
+        snapshot is None
+        or snapshot.get("max_mtime") != max_mtime
+        or snapshot.get("file_count") != file_count
+    ):
+        _save_snapshot(registry_dir, max_mtime, file_count, cache_key)
+
+    _CACHE_KEY_MEMO[dir_str] = ("snapshot", cache_key)
     return cache_key
 
 
