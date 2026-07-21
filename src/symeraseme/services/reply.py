@@ -10,8 +10,8 @@ from symeraseme.core.db_connection import get_connection, with_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.exceptions import RegistryError
 from symeraseme.core.identity import load_profile, profile_exists
-from symeraseme.core.inbox import submit_inbox_reply
 from symeraseme.core.projection import append_event_and_project
+from symeraseme.core.repositories.inbox import insert_inbox_reply
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.loader import load_broker
 
@@ -160,9 +160,10 @@ def handle_classify_reply(
         )
 
     if save:
-        submit_inbox_reply(
-            message_id=str(reply["id"]),
+        insert_inbox_reply(
             request_id=request_id,
+            message_id=str(reply["id"]),
+            thread_id=None,
             from_addr=reply["from_addr"] or "",
             subject=reply["subject"] or "",
             snippet=reply["snippet"] or "",

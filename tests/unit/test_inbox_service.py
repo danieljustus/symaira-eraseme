@@ -114,13 +114,16 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1, _MSG_2]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"id": 1, "broker_id": "spokeo"},
-                {"id": 2, "broker_id": "intelius"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"id": 1, "broker_id": "spokeo"},
+                    {"id": 2, "broker_id": "intelius"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
-            patch(f"{SR}.submit_inbox_reply") as submit_mock,
+            patch(f"{SR}.insert_inbox_reply") as submit_mock,
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -130,7 +133,7 @@ class TestHandlePollInbox:
         assert len(result.data["messages"]) == 2
         assert submit_mock.call_count == 2
 
-        # Verify submit_inbox_reply was called with correct data
+        # Verify insert_inbox_reply was called with correct data
         call_1 = submit_mock.call_args_list[0]
         assert call_1.kwargs["request_id"] == 1
         assert call_1.kwargs["from_addr"] == "broker@spokeo.com"
@@ -152,7 +155,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[{"id": 1, "broker_id": "spokeo"}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -171,7 +174,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[{"id": 1, "broker_id": "spokeo"}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
-            patch(f"{SR}.submit_inbox_reply") as submit_mock,
+            patch(f"{SR}.insert_inbox_reply") as submit_mock,
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -186,7 +189,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests"),
             patch(f"{SR}.match_reply_to_request", return_value=[]),
-            patch(f"{SR}.submit_inbox_reply") as submit_mock,
+            patch(f"{SR}.insert_inbox_reply") as submit_mock,
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -224,13 +227,16 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"id": 1, "broker_id": "spokeo"},
-                {"id": 2, "broker_id": "intelius"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"id": 1, "broker_id": "spokeo"},
+                    {"id": 2, "broker_id": "intelius"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value=events),
             patch(f"{SR}.match_reply_to_request") as match_mock,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -251,12 +257,15 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"id": 1, "broker_id": "spokeo"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"id": 1, "broker_id": "spokeo"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value=events),
             patch(f"{SR}.match_reply_to_request") as match_mock,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -278,12 +287,15 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"id": 1, "broker_id": "spokeo"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"id": 1, "broker_id": "spokeo"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value=events),
             patch(f"{SR}.match_reply_to_request") as match_mock,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -305,12 +317,15 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"id": 1, "broker_id": "spokeo"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"id": 1, "broker_id": "spokeo"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests", return_value=events),
             patch(f"{SR}.match_reply_to_request") as match_mock,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -331,7 +346,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests") as events_mock,
             patch(f"{SR}.match_reply_to_request") as match_mock,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -348,13 +363,16 @@ class TestHandlePollInbox:
         with (
             patch(DB),
             patch(f"{SR}._poll", return_value=[_MSG_1]),
-            patch(f"{SR}.list_removal_requests", return_value=[
-                {"broker_id": "spokeo"},  # no id field!
-                {"request_id": 2, "broker_id": "intelius"},
-            ]),
+            patch(
+                f"{SR}.list_removal_requests",
+                return_value=[
+                    {"broker_id": "spokeo"},  # no id field!
+                    {"request_id": 2, "broker_id": "intelius"},
+                ],
+            ),
             patch(f"{SR}.get_events_for_requests") as events_mock,
             patch(f"{SR}.match_reply_to_request"),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -377,7 +395,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[{"id": 1}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -394,9 +412,11 @@ class TestHandlePollInbox:
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(f"{SR}.list_removal_requests", return_value=[{"id": 1}]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
-            patch(f"{SR}.match_reply_to_request",
-                 return_value=[{**_MSG_1, "request_id": 1, "match_method": "thread"}]),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(
+                f"{SR}.match_reply_to_request",
+                return_value=[{**_MSG_1, "request_id": 1, "match_method": "thread"}],
+            ),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
@@ -427,9 +447,11 @@ class TestHandlePollInbox:
             patch(f"{SR}._poll", return_value=[_MSG_1]),
             patch(f"{SR}.list_removal_requests") as list_mock,
             patch(f"{SR}.get_events_for_requests", return_value={}),
-            patch(f"{SR}.match_reply_to_request",
-                 return_value=[{**_MSG_1, "request_id": 1, "match_method": "thread"}]),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(
+                f"{SR}.match_reply_to_request",
+                return_value=[{**_MSG_1, "request_id": 1, "match_method": "thread"}],
+            ),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**{**_BASE_KWARGS, "campaign_id": "initial"})
 
@@ -456,7 +478,7 @@ class TestHandlePollInbox:
             patch(f"{SR}._poll") as poll_mock,
             patch(f"{SR}.list_removal_requests", return_value=[]),
             patch(f"{SR}.match_reply_to_request", return_value=[]),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             handle_poll_inbox(**_BASE_KWARGS)
 
@@ -488,7 +510,7 @@ class TestHandlePollInbox:
             patch(f"{SR}.list_removal_requests", return_value=[]),
             patch(f"{SR}.get_events_for_requests", return_value={}),
             patch(f"{SR}.match_reply_to_request", return_value=matched),
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
         ):
             result = handle_poll_inbox(**_BASE_KWARGS)
 
