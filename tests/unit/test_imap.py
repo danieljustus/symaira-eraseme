@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +14,7 @@ from symeraseme.adapters.email.smtp_imap import (
     match_reply_to_request,
     normalize_subject,
     parse_email_body,
+    poll_inbox,
     subject_matches,
 )
 from symeraseme.core.secrets import SecretResolutionError
@@ -180,3 +181,76 @@ class TestMatchReplyToRequest:
         matched = match_reply_to_request(messages, requests, thread_map)
         assert matched[0]["request_id"] == 1
         assert matched[0]["match_method"] == "thread"
+
+
+class TestPollInboxFetchStrategy:
+    """Verify poll_inbox uses BODY.PEEK with header fields + truncated text."""
+
+    def _make_header_bytes(self, subject: str = "Re: Test", from_addr: str = "b@x.com") -> bytes:
+        lines = [
+            f"Subject: {subject}",
+            f"From: {from_addr}",
+            "Date: Mon, 21 Jul 2026 10:00:00 +0000",
+            "Message-ID: <test@example.com>",
+            "",
+            "",
+        ]
+        return "\r\n".join(lines).encode()
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_fetch_command_uses_body_peek(self, mock_session_fn, _mock_pw):
+        header_bytes = self._make_header_bytes()
+        body_bytes = b"Hello, this is the body text."
+
+        mock_mail = MagicMock()
+        mock_mail.search.return_value = ("OK", [b"1"])
+        mock_mail.fetch.return_value = (
+            "OK",
+            [
+                (b"1 FETCH (FLAGS (\\Seen) BODY[HEADER.FIELDS ...] {100}", header_bytes),
+                (b" BODY[TEXT]<0.4096> {30}", body_bytes),
+            ],
+        )
+        mock_session_fn.return_value.__enter__ = MagicMock(return_value=mock_mail)
+        mock_session_fn.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = poll_inbox(
+            host="imap.test.com", port=993, username="u", password="pw", ssl=True,
+        )
+
+        assert len(result) == 1
+        fetch_call = mock_mail.fetch.call_args
+        fetch_cmd = fetch_call[0][1]
+        assert "BODY.PEEK[HEADER.FIELDS" in fetch_cmd
+        assert "BODY.PEEK[TEXT]<0.4096>" in fetch_cmd
+        assert "RFC822" not in fetch_cmd
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_returns_subject_and_body_from_peek(self, mock_session_fn, _mock_pw):
+        header_bytes = self._make_header_bytes(subject="Re: Data Request", from_addr="broker@x.com")
+        body_bytes = b"Your data has been removed."
+
+        mock_mail = MagicMock()
+        mock_mail.search.return_value = ("OK", [b"1"])
+        mock_mail.fetch.return_value = (
+            "OK",
+            [
+                (b"1 FETCH (FLAGS () BODY[HEADER.FIELDS ...] {100}", header_bytes),
+                (b" BODY[TEXT]<0.4096> {30}", body_bytes),
+            ],
+        )
+        mock_session_fn.return_value.__enter__ = MagicMock(return_value=mock_mail)
+        mock_session_fn.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = poll_inbox(
+            host="imap.test.com", port=993, username="u", password="pw", ssl=True,
+        )
+
+        assert len(result) == 1
+        msg = result[0]
+        assert msg["subject"] == "Re: Data Request"
+        assert msg["from_addr"] == "broker@x.com"
+        assert msg["body"] == "Your data has been removed."
+        assert msg["message_id"] == "<test@example.com>"

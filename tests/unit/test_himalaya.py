@@ -920,3 +920,45 @@ class TestHimalayaAvailable:
     @mock_patch("symeraseme.adapters.email.himalaya.shutil.which", return_value=None)
     def test_false(self, _mock):
         assert himalaya_available() is False
+
+
+# ---------------------------------------------------------------------------
+# Import surface: backward-compatible re-exports
+# ---------------------------------------------------------------------------
+
+
+class TestImportSurface:
+    """Verify that all public names are re-exported from the himalaya facade."""
+
+    def test_himalaya_reexports_config(self):
+        from symeraseme.adapters.email.himalaya import load_smtp_config
+
+        assert callable(load_smtp_config)
+
+    def test_himalaya_reexports_smtp_shim(self):
+        from symeraseme.adapters.email.himalaya import (
+            EmailMessage,
+            SmtpError,
+            _build_mime,
+            send_message_smtp,
+        )
+
+        assert callable(send_message_smtp)
+        assert callable(_build_mime)
+        assert issubclass(SmtpError, Exception)
+
+    def test_config_module_standalone(self):
+        from symeraseme.adapters.email.himalaya_config import load_smtp_config
+
+        assert callable(load_smtp_config)
+
+    def test_smtp_shim_module_standalone(self):
+        from symeraseme.adapters.email.smtp_himalaya import (
+            EmailMessage,
+            SmtpError,
+            _build_mime,
+            send_message_smtp,
+        )
+
+        assert callable(send_message_smtp)
+        assert issubclass(SmtpError, Exception)

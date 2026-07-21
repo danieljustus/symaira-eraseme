@@ -1,3 +1,12 @@
+"""Himalaya CLI subprocess adapter with re-exports for backward compatibility.
+
+This module wraps the Himalaya CLI for email operations (listing, sending,
+reading).  SMTP config loading lives in :mod:`himalaya_config` and the SMTP
+transport shim lives in :mod:`smtp_himalaya`.  Both are re-exported here so
+that existing ``from symeraseme.adapters.email.himalaya import ...`` paths
+keep working.
+"""
+
 from __future__ import annotations
 
 import json
@@ -6,16 +15,24 @@ import os
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.utils import formatdate, make_msgid
+from email.utils import make_msgid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from symeraseme.adapters.email._types import Envelope, Message, SmtpConfig
+
+# ---------------------------------------------------------------------------
+# Re-exports from sub-modules (backward-compatible import surface)
+# ---------------------------------------------------------------------------
+from symeraseme.adapters.email.himalaya_config import load_smtp_config  # noqa: F401
+from symeraseme.adapters.email.smtp_himalaya import (  # noqa: F401
+    EmailMessage,
+    SmtpError,
+    _build_mime,
+    send_message_smtp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +51,6 @@ class HimalayaError(EmailError):
 
 class HimalayaNotInstalledError(HimalayaError):
     """Raised when the Himalaya CLI is not found on PATH."""
-
-
-class SmtpError(EmailError):
-    """Raised when SMTP sending fails."""
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +87,7 @@ def _is_v1_plus() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Config parsing
+# Himalaya config parsing (kept here for mock_patch compatibility in tests)
 # ---------------------------------------------------------------------------
 
 
@@ -277,58 +290,6 @@ def list_messages(
     return envelopes
 
 
-def load_smtp_config() -> SmtpConfig:
-    """Load SMTP configuration from environment variables.
-
-    Reads:
-        SYMERASEME_SMTP_HOST       (default: localhost)
-        SYMERASEME_SMTP_PORT       (default: 587)
-        SYMERASEME_SMTP_USER       (default: "")
-        SYMERASEME_SMTP_PASSWORD   (default: "")
-        SYMERASEME_SMTP_TLS        (default: 1)
-        SYMERASEME_SMTP_FROM       (default: "")
-    """
-    return SmtpConfig(
-        host=os.environ.get("SYMERASEME_SMTP_HOST", "localhost"),
-        port=int(os.environ.get("SYMERASEME_SMTP_PORT", "587")),
-        username=os.environ.get("SYMERASEME_SMTP_USER", ""),
-        password=os.environ.get("SYMERASEME_SMTP_PASSWORD", ""),
-        use_tls=os.environ.get("SYMERASEME_SMTP_TLS", "1").lower() in ("1", "true", "yes"),
-        from_addr=os.environ.get("SYMERASEME_SMTP_FROM", ""),
-    )
-
-
-@dataclass
-class EmailMessage:
-    to: str
-    subject: str
-    body: str
-    cc: str | None = None
-    bcc: str | None = None
-
-
-def _build_mime(msg: EmailMessage, from_addr: str) -> tuple[str, str]:
-    """Build a raw MIME message string from an EmailMessage.
-
-    Returns (mime_string, message_id).
-    """
-    mime = MIMEMultipart("mixed")
-    mime["From"] = from_addr
-    mime["To"] = msg.to
-    mime["Subject"] = msg.subject
-    mime["Date"] = formatdate(localtime=True)
-    if msg.cc:
-        mime["Cc"] = msg.cc
-
-    message_id = make_msgid()
-    mime["Message-ID"] = message_id
-
-    part = MIMEText(msg.body, "plain")
-    mime.attach(part)
-
-    return mime.as_string(), message_id
-
-
 async def send_messages_batch(
     messages: list[EmailMessage],
     *,
@@ -513,57 +474,6 @@ def send_message(
         raise HimalayaError(msg)
 
     return {"result": result.stdout.strip(), "message_id": message_id}
-
-
-def send_message_smtp(
-    to: str,
-    subject: str,
-    body: str,
-    *,
-    cc: str | None = None,
-    bcc: str | None = None,
-    smtp_config: SmtpConfig | None = None,
-) -> dict[str, str]:
-    """Send a single email via SMTP (synchronous, stdlib smtplib).
-
-    Falls back to environment variables via :func:`load_smtp_config` when
-    *smtp_config* is ``None``.
-    """
-    import smtplib
-
-    if smtp_config is None:
-        smtp_config = load_smtp_config()
-
-    from_addr = smtp_config.from_addr
-    if not from_addr:
-        raise SmtpError(
-            "SYMERASEME_SMTP_FROM is not configured. Set it in your environment or .env file."
-        )
-
-    recipients = [to]
-    if cc:
-        recipients.append(cc)
-    if bcc:
-        recipients.append(bcc)
-
-    mime_text, message_id = _build_mime(
-        EmailMessage(to=to, subject=subject, body=body, cc=cc, bcc=bcc),
-        from_addr,
-    )
-
-    try:
-        with smtplib.SMTP(smtp_config.host, smtp_config.port, timeout=30) as smtp:
-            if smtp_config.use_tls:
-                smtp.starttls()
-            if smtp_config.username and smtp_config.password:
-                smtp.login(smtp_config.username, smtp_config.password)
-            smtp.sendmail(from_addr, recipients, mime_text)
-    except smtplib.SMTPException as e:
-        raise SmtpError(str(e)) from e
-    except OSError as e:
-        raise SmtpError(str(e)) from e
-
-    return {"result": "Message sent", "message_id": message_id}
 
 
 def get_email_backend() -> str:

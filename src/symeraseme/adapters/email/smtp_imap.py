@@ -219,15 +219,51 @@ def poll_inbox(
             return []
 
         messages: list[dict[str, Any]] = []
+        fetch_cmd = (
+            "(FLAGS BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)]"
+            " BODY.PEEK[TEXT]<0.4096>)"
+        )
         for msg_id in ids[-max_messages:]:
             try:
-                status, data = mail.fetch(msg_id, "(RFC822)")
-                if status != "OK" or not data or not data[0]:
+                status, data = mail.fetch(msg_id, fetch_cmd)
+                if status != "OK" or not data:
                     continue
-                raw: bytes = data[0][1] if isinstance(data[0][1], bytes) else b""
-                if not raw:
+
+                content_blocks = [
+                    item[1]
+                    for item in data
+                    if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], bytes)
+                ]
+                if len(content_blocks) < 2:
                     continue
-                parsed = _parse_email(raw)
+
+                header_bytes, body_bytes = content_blocks[0], content_blocks[1]
+
+                msg = email.message_from_bytes(header_bytes)
+                headers: dict[str, Any] = {}
+                for key in (
+                    "Subject",
+                    "From",
+                    "To",
+                    "Date",
+                    "Message-ID",
+                    "In-Reply-To",
+                    "References",
+                ):
+                    value = msg.get(key)
+                    if value:
+                        headers[key] = decode_mime_header(value)
+
+                body = body_bytes.decode("utf-8", errors="replace") if body_bytes else ""
+
+                parsed: dict[str, Any] = {
+                    "headers": headers,
+                    "body": body,
+                    "message_id": headers.get("Message-ID", ""),
+                    "thread_id": extract_thread_id(headers),
+                    "from_addr": headers.get("From", ""),
+                    "subject": headers.get("Subject", ""),
+                }
                 parsed["imap_uid"] = msg_id.decode()
                 messages.append(parsed)
             except (OSError, imaplib.IMAP4.error) as e:
