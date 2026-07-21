@@ -17,7 +17,7 @@ class TestHandleClassifyReply:
             patch(f"{SR}.get_connection") as conn,
             patch("symeraseme.llm.factory.create_llm_client") as mock_create,
             patch(f"{SR}.ReplyClassifier") as mock_cls,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
             patch(f"{SR}.append_event_and_project"),
         ):
             conn.return_value.execute.return_value.fetchone.return_value = {
@@ -49,7 +49,7 @@ class TestHandleClassifyReply:
             patch(f"{SR}.get_connection") as conn,
             patch("symeraseme.llm.factory.create_llm_client"),
             patch(f"{SR}.ReplyClassifier") as mock_cls,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
             patch(f"{SR}.append_event_and_project") as mock_event,
         ):
             conn.return_value.execute.return_value.fetchone.return_value = {
@@ -83,7 +83,7 @@ class TestHandleClassifyReply:
             patch(f"{SR}.get_connection") as conn,
             patch("symeraseme.llm.factory.create_llm_client") as mock_create,
             patch(f"{SR}.ReplyClassifier") as mock_cls,
-            patch(f"{SR}.submit_inbox_reply"),
+            patch(f"{SR}.insert_inbox_reply"),
             patch(f"{SR}.append_event_and_project"),
         ):
             conn.return_value.execute.return_value.fetchone.return_value = {
