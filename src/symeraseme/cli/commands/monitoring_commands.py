@@ -5,13 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import time
-from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import typer
 
 from symeraseme.cli.console import render_result
-from symeraseme.core.db_connection import get_connection, init_db
 from symeraseme.core.result_types import CliResult
 from symeraseme.llm.factory import list_available_providers
 from symeraseme.services.inbox import handle_poll_inbox
@@ -321,91 +318,18 @@ def calendar(
     if weeks < 1:
         weeks = 1
 
+    from symeraseme.core.db_connection import init_db
+    from symeraseme.core.reports.data import get_calendar_entries
+
     init_db()
-    conn = get_connection()
-    now = datetime.now(UTC)
-    horizon = now + timedelta(weeks=weeks)
-    now_iso = now.isoformat()
-    horizon_iso = horizon.isoformat()
+    data = get_calendar_entries(campaign_id=campaign_id, weeks=weeks)
 
-    rows = conn.execute(
-        """SELECT r.id AS request_id,
-                  r.broker_id,
-                  r.campaign_id,
-                  r.jurisdiction,
-                  s.current_status,
-                  s.sent_at,
-                  s.deadline_at,
-                  s.next_action_at,
-                  s.reminders_sent,
-                  s.escalation_level
-           FROM removal_requests r
-           JOIN request_state s ON s.request_id = r.id
-           WHERE (? IS NULL OR r.campaign_id = ?)
-             AND s.resolved_at IS NULL
-             AND (
-                 (s.deadline_at IS NOT NULL AND s.deadline_at <= ?)
-              OR (s.next_action_at IS NOT NULL AND s.next_action_at <= ?)
-             )
-           ORDER BY COALESCE(s.next_action_at, s.deadline_at) ASC""",
-        (campaign_id or None, campaign_id or None, horizon_iso, horizon_iso),
-    ).fetchall()
-
-    entries: list[dict] = []
-    for row in rows:
-        req = dict(row)
-        deadline = req.get("deadline_at")
-        next_action = req.get("next_action_at")
-        marker_at = next_action or deadline
-        kind = "next_action" if next_action else "deadline"
-        marker_dt = _safe_parse(marker_at) if marker_at else None
-        if marker_dt is None:
-            continue
-        days_from_now = (marker_dt - now).days
-        entries.append(
-            {
-                "request_id": req["request_id"],
-                "broker_id": req["broker_id"],
-                "campaign_id": req["campaign_id"],
-                "jurisdiction": req["jurisdiction"],
-                "current_status": req["current_status"],
-                "marker": kind,
-                "marker_at": marker_at,
-                "days_from_now": days_from_now,
-                "overdue": days_from_now < 0,
-                "deadline_at": deadline,
-                "next_action_at": next_action,
-                "escalation_level": req["escalation_level"],
-                "reminders_sent": req["reminders_sent"],
-            }
-        )
-
-    buckets: dict[str, list[dict]] = {}
-    for e in entries:
-        marker_dt = _safe_parse(e["marker_at"])
-        if marker_dt is None:
-            continue
-        iso = marker_dt.isocalendar()
-        week_key = f"{iso.year}-W{iso.week:02d}"
-        buckets.setdefault(week_key, []).append(e)
-
-    data: dict[str, Any] = {
-        "schema_version": 1,
-        "as_of": now_iso,
-        "horizon_weeks": weeks,
-        "horizon_until": horizon_iso,
-        "scope": {"campaign_id": campaign_id or "all"},
-        "totals": {
-            "entries": len(entries),
-            "overdue": sum(1 for e in entries if e["overdue"]),
-            "weeks_with_actions": len(buckets),
-        },
-        "weeks": [{"week": week, "entries": items} for week, items in sorted(buckets.items())],
-    }
+    horizon_iso = data["horizon_until"]
+    entries = [e for w in data["weeks"] for e in w["entries"]]
 
     scope = f"campaign={campaign_id}" if campaign_id else "all campaigns"
     lines = [
-        f"Calendar ({scope}) — next {weeks} weeks (until {horizon_iso[:10]})",
+        f"Calendar ({scope}) \u2014 next {weeks} weeks (until {horizon_iso[:10]})",
         f"  Total upcoming entries: {len(entries)}  Overdue: {data['totals']['overdue']}",
     ]
     if not entries:
@@ -428,15 +352,3 @@ def calendar(
         message = "\n".join(lines)
 
     render_result(ctx.obj["output"], CliResult(data=data, message=message))
-
-
-def _safe_parse(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt
-    except ValueError:
-        return None

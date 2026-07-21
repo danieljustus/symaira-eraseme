@@ -495,3 +495,94 @@ def get_campaign_status(
             "tick_actions_ready": next_tick_ready,
         },
     }
+
+
+def get_calendar_entries(
+    campaign_id: str | None = None,
+    *,
+    weeks: int = 4,
+) -> dict[str, Any]:
+    from symeraseme.core.datetime_utils import parse_iso_datetime
+    from symeraseme.core.db_connection import get_connection
+
+    conn = get_connection()
+    now = datetime.now(UTC)
+    horizon = now + timedelta(weeks=weeks)
+    now_iso = now.isoformat()
+    horizon_iso = horizon.isoformat()
+
+    rows = conn.execute(
+        """SELECT r.id AS request_id,
+                  r.broker_id,
+                  r.campaign_id,
+                  r.jurisdiction,
+                  s.current_status,
+                  s.sent_at,
+                  s.deadline_at,
+                  s.next_action_at,
+                  s.reminders_sent,
+                  s.escalation_level
+           FROM removal_requests r
+           JOIN request_state s ON s.request_id = r.id
+           WHERE (? IS NULL OR r.campaign_id = ?)
+             AND s.resolved_at IS NULL
+             AND (
+                 (s.deadline_at IS NOT NULL AND s.deadline_at <= ?)
+              OR (s.next_action_at IS NOT NULL AND s.next_action_at <= ?)
+             )
+           ORDER BY COALESCE(s.next_action_at, s.deadline_at) ASC""",
+        (campaign_id or None, campaign_id or None, horizon_iso, horizon_iso),
+    ).fetchall()
+
+    entries: list[dict] = []
+    for row in rows:
+        req = dict(row)
+        deadline = req.get("deadline_at")
+        next_action = req.get("next_action_at")
+        marker_at = next_action or deadline
+        kind = "next_action" if next_action else "deadline"
+        marker_dt = parse_iso_datetime(marker_at) if marker_at else None
+        if marker_dt is None:
+            continue
+        days_from_now = (marker_dt - now).days
+        entries.append(
+            {
+                "request_id": req["request_id"],
+                "broker_id": req["broker_id"],
+                "campaign_id": req["campaign_id"],
+                "jurisdiction": req["jurisdiction"],
+                "current_status": req["current_status"],
+                "marker": kind,
+                "marker_at": marker_at,
+                "days_from_now": days_from_now,
+                "overdue": days_from_now < 0,
+                "deadline_at": deadline,
+                "next_action_at": next_action,
+                "escalation_level": req["escalation_level"],
+                "reminders_sent": req["reminders_sent"],
+            }
+        )
+
+    buckets: dict[str, list[dict]] = {}
+    for e in entries:
+        marker_dt = parse_iso_datetime(e["marker_at"])
+        if marker_dt is None:
+            continue
+        iso = marker_dt.isocalendar()
+        week_key = f"{iso.year}-W{iso.week:02d}"
+        buckets.setdefault(week_key, []).append(e)
+
+    data: dict[str, Any] = {
+        "schema_version": 1,
+        "as_of": now_iso,
+        "horizon_weeks": weeks,
+        "horizon_until": horizon_iso,
+        "scope": {"campaign_id": campaign_id or "all"},
+        "totals": {
+            "entries": len(entries),
+            "overdue": sum(1 for e in entries if e["overdue"]),
+            "weeks_with_actions": len(buckets),
+        },
+        "weeks": [{"week": week, "entries": items} for week, items in sorted(buckets.items())],
+    }
+    return data

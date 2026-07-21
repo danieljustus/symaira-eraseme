@@ -486,3 +486,50 @@ class TestMedian:
         from symeraseme.core.reports import _median
 
         assert _median([]) == 0.0
+
+
+class TestGetCalendarEntries:
+    def test_returns_empty_when_no_data(self, tmp_path):
+        _seed_db(str(tmp_path))
+        try:
+            from symeraseme.core.reports.data import get_calendar_entries
+
+            data = get_calendar_entries(campaign_id="nonexistent", weeks=4)
+            assert data["totals"]["entries"] == 0
+        finally:
+            _clean_db()
+
+    def test_returns_entries_with_deadlines(self, tmp_path):
+        _seed_db(str(tmp_path))
+        try:
+            from symeraseme.core.reports.data import get_calendar_entries
+
+            data = get_calendar_entries(campaign_id="camp-initial", weeks=52)
+            entries = [e for w in data["weeks"] for e in w["entries"]]
+            broker_ids = {e["broker_id"] for e in entries}
+            assert "broker-d" in broker_ids or len(entries) > 0
+        finally:
+            _clean_db()
+
+    def test_all_campaigns(self, tmp_path):
+        _seed_db(str(tmp_path))
+        try:
+            from symeraseme.core.reports.data import get_calendar_entries
+
+            data = get_calendar_entries(weeks=52)
+            assert data["scope"]["campaign_id"] == "all"
+        finally:
+            _clean_db()
+
+    def test_safe_parse_replaced(self):
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import ast; tree = ast.parse(open('src/symeraseme/cli/commands/monitoring_commands.py').read()); "
+             "names = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]; "
+             "assert '_safe_parse' not in names, '_safe_parse still exists'"],
+            capture_output=True, text=True, cwd="/private/var/folders/7v/7bpq0fjn44lflpxdylsx8qs40000gn/T/opencode/worktrees/symaira-eraseme/cli",
+        )
+        assert result.returncode == 0, result.stderr
