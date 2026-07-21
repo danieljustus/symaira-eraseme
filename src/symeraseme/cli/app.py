@@ -55,6 +55,7 @@ app = typer.Typer(
     name="symeraseme",
     help="Automated data broker removal tool",
     no_args_is_help=True,
+    pretty_exceptions_enable=False,
     epilog=(
         "Quick Start:\n"
         "  1. symeraseme init-profile                       Create your identity profile\n"
@@ -253,5 +254,33 @@ def review(
     run_interactive_review(Path(file_path))
 
 
+def _run_app() -> None:
+    """Entry point that catches unhandled exceptions and logs them to a file."""
+    import traceback
+
+    from symeraseme.cli.console import print_error
+    from symeraseme.core.config import get_config
+
+    try:
+        app()
+    except typer.Exit:
+        raise
+    except KeyboardInterrupt:
+        raise
+    except Exception:
+        config = get_config()
+        log_dir = config.resolved_data_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        from datetime import UTC, datetime
+
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        log_path = log_dir / f"crash-{ts}.log"
+        log_path.write_text(traceback.format_exc())
+        print_error(
+            f"An unexpected error occurred. Full traceback saved to: {log_path}"
+        )
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
-    app()
+    _run_app()

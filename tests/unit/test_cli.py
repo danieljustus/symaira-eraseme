@@ -185,3 +185,59 @@ class TestServe:
         stdout = _strip_ansi(result.stdout)
         assert result.exit_code == 0
         assert "--allow-remote" in stdout
+
+
+class TestExceptionGuard:
+    """Tests for the top-level exception guard (_run_app)."""
+
+    def test_unexpected_exception_logs_and_prints_friendly(self, monkeypatch, tmp_path):
+        import sys
+        from io import StringIO
+        from contextlib import suppress
+
+        import typer
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        def _boom(**kwargs):
+            raise RuntimeError("simulated unexpected failure")
+
+        mod = sys.modules["symeraseme.cli.app"]
+        original_app = mod.app
+
+        from symeraseme.cli.console import _error_console
+
+        captured = StringIO()
+        monkeypatch.setattr(mod, "app", _boom)
+        monkeypatch.setattr(_error_console, "file", captured)
+
+        from symeraseme.cli.app import _run_app
+
+        with suppress(typer.Exit):
+            _run_app()
+
+        monkeypatch.setattr(mod, "app", original_app)
+
+        stderr_text = captured.getvalue()
+        assert "unexpected error" in stderr_text.lower() or "An unexpected error" in stderr_text
+        assert "Traceback" not in stderr_text
+        assert "RuntimeError" not in stderr_text
+
+        log_dir = tmp_path / "logs"
+        assert log_dir.exists(), f"Log dir not created: {log_dir}"
+        log_files = list(log_dir.glob("crash-*.log"))
+        assert len(log_files) == 1, f"Expected 1 crash log, found {len(log_files)}"
+        log_content = log_files[0].read_text()
+        assert "RuntimeError" in log_content
+        assert "simulated unexpected failure" in log_content
+
+    def test_cliresult_errors_still_use_existing_paths(self):
+        from symeraseme.cli.console import _exit_code_for_result
+        from symeraseme.cli.types import CliResult
+
+        r = CliResult(success=False, error="No identity profile found. Run 'init-profile' first.")
+        code = _exit_code_for_result(r)
+        assert code == 2
+
+    def test_pretty_exceptions_disabled(self):
+        assert app.pretty_exceptions_enable is False
