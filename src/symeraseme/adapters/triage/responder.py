@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from symeraseme.adapters.triage.scrubber import scrub_pii
+from symeraseme.adapters.triage.scrubber import redact_profile_pii, scrub_pii
 from symeraseme.llm.protocol import LLMClient, LLMClientError
 from symeraseme.registry.schema import IdentityProfile
 
@@ -114,7 +114,7 @@ def _build_classifier_user_prompt(
     parts = [f"Broker: {broker_name or 'Unknown'}"]
     if original_request_template:
         parts.append(f"Original request (truncated):\n{original_request_template[:500]}")
-    parts.append(f"\nBroker response:\n{scrub_pii(broker_message[:3000])}")
+    parts.append(f"\nBroker response:\n{redact_profile_pii(broker_message[:3000])}")
     return "\n\n".join(parts)
 
 
