@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from symeraseme.cli import app
@@ -241,3 +242,32 @@ class TestExceptionGuard:
 
     def test_pretty_exceptions_disabled(self):
         assert app.pretty_exceptions_enable is False
+
+
+class TestCommandDocstrings:
+    """All user-facing commands should have non-empty docstrings for --help."""
+
+    @pytest.mark.parametrize(
+        "module_path,name",
+        [
+            ("symeraseme.cli.commands.account_commands", "show_profile"),
+            ("symeraseme.cli.commands.plan_commands", "plan_show"),
+            ("symeraseme.cli.commands.monitoring_commands", "poll_inbox"),
+            ("symeraseme.cli.commands.monitoring_commands", "classify_reply"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_rebuttal_cmd"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_dashboard_cmd"),
+            ("symeraseme.cli.commands.monitoring_commands", "generate_report_cmd"),
+            ("symeraseme.cli.commands.web_form_commands", "run_web_form"),
+            ("symeraseme.cli.commands.web_form_commands", "auto_confirm_cmd"),
+            ("symeraseme.cli.commands.web_form_commands", "solve_captcha_cmd"),
+            ("symeraseme.cli.commands.inspection_commands", "events_show"),
+            ("symeraseme.cli.commands.inspection_commands", "requests_list"),
+            ("symeraseme.cli.commands.inspection_commands", "version"),
+        ],
+    )
+    def test_command_has_docstring(self, module_path, name):
+        import importlib
+
+        mod = importlib.import_module(module_path)
+        func = getattr(mod, name)
+        assert func.__doc__, f"{name} is missing a docstring"

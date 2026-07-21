@@ -73,6 +73,13 @@ def plan_show(
     campaign_id: str = typer.Option(None, "--campaign", help="Filter by campaign"),
     status: str = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
+    """Show all removal requests for a campaign.
+
+    Examples:
+        symeraseme plan show
+        symeraseme plan show --campaign initial
+        symeraseme plan show --status PLANNED
+    """
     result = handle_plan_show(campaign_id, status)
     from symeraseme.cli.console import render_result
 

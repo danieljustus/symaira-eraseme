@@ -70,6 +70,13 @@ def poll_inbox(
         help="Polling interval in seconds for watch mode (default: 900 = 15 min)",
     ),
 ) -> None:
+    """Poll IMAP inbox for broker replies and classify them.
+
+    Examples:
+        symeraseme poll-inbox --username you@gmail.com
+        symeraseme poll-inbox --username you@gmail.com --since 7 --folders INBOX,Sent
+        symeraseme poll-inbox --username you@gmail.com --watch --interval 600
+    """
     password = os.environ.get("IMAP_PASSWORD", "")
     if not password:
         password = typer.prompt("IMAP password", hide_input=True)
@@ -166,6 +173,13 @@ def classify_reply(
         help="Save classification result to DB",
     ),
 ) -> None:
+    """Classify a broker reply using an LLM.
+
+    Examples:
+        symeraseme classify-reply 42
+        symeraseme classify-reply 42 --provider anthropic --model claude-sonnet-4-20250514
+        symeraseme classify-reply 42 --no-save
+    """
     from symeraseme.cli.console import show_spinner
 
     with show_spinner("Classifying reply via LLM..."):
@@ -202,6 +216,13 @@ def generate_rebuttal_cmd(
         help="Save rebuttal to DB",
     ),
 ) -> None:
+    """Generate a jurisdiction-aware rebuttal for a broker rejection.
+
+    Examples:
+        symeraseme generate-rebuttal 42
+        symeraseme generate-rebuttal 42 --provider openai --model gpt-4
+        symeraseme generate-rebuttal 42 --no-save
+    """
     from symeraseme.cli.console import show_spinner
 
     with show_spinner("Generating rebuttal via LLM..."):
@@ -232,6 +253,13 @@ def generate_dashboard_cmd(
         help="Auto-refresh interval in seconds (0 = none)",
     ),
 ) -> None:
+    """Generate an interactive HTML dashboard for campaign analytics.
+
+    Examples:
+        symeraseme generate-dashboard
+        symeraseme generate-dashboard --output my-report.html --open
+        symeraseme generate-dashboard --auto-refresh 60
+    """
     result = handle_generate_dashboard(
         output,
         auto_open,
@@ -263,6 +291,13 @@ def generate_report_cmd(
         help="Include all campaigns (not just specified one)",
     ),
 ) -> None:
+    """Generate a campaign report in HTML, JSON, or CSV format.
+
+    Examples:
+        symeraseme generate-report
+        symeraseme generate-report --campaign-id initial --format json
+        symeraseme generate-report --all --output all-campaigns.csv
+    """
     result = handle_generate_report(
         campaign_id,
         format,

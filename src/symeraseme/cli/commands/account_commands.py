@@ -107,6 +107,11 @@ def init_profile(
 
 
 def show_profile() -> None:
+    """Display the current encrypted identity profile.
+
+    Examples:
+        symeraseme show-profile
+    """
     if not profile_exists():
         render_error("No identity profile found. Run 'symeraseme init-profile' first.")
 
