@@ -50,6 +50,9 @@ def create(
 ) -> None:
     """Scan the broker registry and create a removal campaign.
 
+    By default, --max caps the plan at 30 brokers. A warning is printed
+    when more brokers match than the cap allows.
+
     Examples:
         symeraseme plan create --campaign initial --law GDPR --max 10
         symeraseme plan create --campaign ccpa-batch --jurisdiction US --priority high

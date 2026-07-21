@@ -35,6 +35,11 @@ def handle_plan_create(
     lines = [f"Campaign: {result['campaign_id']}"]
     lines.append(f"  Total brokers scanned: {result['total_brokers']}")
     lines.append(f"  Planned requests: {result['planned']}")
+    if result["matched"] > result["planned"]:
+        lines.append(
+            f"  \u26a0\ufe0f  Planned {result['planned']} of {result['matched']} matched brokers "
+            f"\u2014 re-run with --max {result['matched']} to extend"
+        )
     for r in result["requests"]:
         lines.append(f"    #{r['request_id']} {r['broker_name']} ({r['channel']})")
 
