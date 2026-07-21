@@ -14,8 +14,8 @@ from symeraseme.core.consent import check_consent, issue_token, verify_token
 from symeraseme.core.db_connection import close_connection, init_db
 from symeraseme.core.events import list_removal_requests
 from symeraseme.core.execution import execute_request
-from symeraseme.core.inbox import submit_inbox_reply
 from symeraseme.core.planning import get_plan, plan_campaign
+from symeraseme.core.repositories.inbox import insert_inbox_reply
 
 runner = CliRunner()
 
@@ -597,25 +597,26 @@ class TestConsent:
 
 class TestInboxReply:
     def test_submit_reply(self):
-        result = submit_inbox_reply(
-            "<msg@test.com>",
+        reply_id = insert_inbox_reply(
             request_id=None,
+            message_id="<msg@test.com>",
+            thread_id=None,
             from_addr="broker@example.com",
             subject="Re: Data Deletion Request",
             snippet="We have received your request",
             classified_as="ack",
         )
-        assert result["reply_id"] > 0
-        assert result["classified_as"] == "ack"
+        assert reply_id > 0
 
     def test_submit_reply_does_not_create_event(self):
         from symeraseme.core.events import create_campaign, create_removal_request, get_events
 
         create_campaign("reply-test")
         rid = create_removal_request(broker_id="b", campaign_id="reply-test", jurisdiction="GDPR")
-        submit_inbox_reply(
-            "<msg2@test.com>",
+        insert_inbox_reply(
             request_id=rid,
+            message_id="<msg2@test.com>",
+            thread_id=None,
             from_addr="broker@example.com",
             subject="Your request is confirmed",
             snippet="Data has been deleted",
