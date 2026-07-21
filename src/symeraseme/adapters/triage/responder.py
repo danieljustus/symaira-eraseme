@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from symeraseme.adapters.triage.scrubber import redact_profile_pii, scrub_pii
+from symeraseme.adapters.triage.scrubber import redact_profile_pii
 from symeraseme.llm.protocol import LLMClient, LLMClientError
 from symeraseme.registry.schema import IdentityProfile
 

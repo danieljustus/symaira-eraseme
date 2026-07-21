@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from symeraseme.adapters.triage.scrubber import redact_profile_pii, scrub_pii
+from symeraseme.adapters.triage.scrubber import redact_profile_pii
 from symeraseme.llm.protocol import LLMClient, LLMClientError
 
 logger = logging.getLogger(__name__)
