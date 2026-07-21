@@ -242,7 +242,13 @@ def poll_inbox(
                 msg = email.message_from_bytes(header_bytes)
                 headers: dict[str, Any] = {}
                 for key in (
-                    "Subject", "From", "To", "Date", "Message-ID", "In-Reply-To", "References"
+                    "Subject",
+                    "From",
+                    "To",
+                    "Date",
+                    "Message-ID",
+                    "In-Reply-To",
+                    "References",
                 ):
                     value = msg.get(key)
                     if value:
