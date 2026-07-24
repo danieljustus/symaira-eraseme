@@ -209,6 +209,38 @@ class TestCheckConsent:
         token = issue_token("execute")
         assert check_consent("execute", consent_token=token) is True
 
+    def test_consent_token_consumed_after_use(self, _isolated_consent_dir):
+        """Token is consumed after successful check_consent — second use fails."""
+        token = issue_token("execute")
+        assert check_consent("execute", consent_token=token) is True
+        # Token file should be gone
+        token_file = _isolated_consent_dir / _token_filename(token)
+        assert not token_file.exists(), "Token file should be consumed after use"
+        # Second attempt must fail
+        assert check_consent("execute", consent_token=token) is False
+
+    def test_consent_token_consumed_via_consent_file(self, _isolated_consent_dir, tmp_path):
+        """Token from --consent-file is consumed after successful check."""
+        token = issue_token("execute")
+        f = tmp_path / "consent.txt"
+        f.write_text(token + "\n")
+        os.chmod(f, 0o600)
+        assert check_consent("execute", consent_file=str(f)) is True
+        # Token file should be gone
+        token_file = _isolated_consent_dir / _token_filename(token)
+        assert not token_file.exists(), "Token file should be consumed after use"
+
+    def test_consent_token_consumed_via_env(self, _isolated_consent_dir, monkeypatch):
+        """Token from SYMERASEME_CONSENT env is consumed after successful check."""
+        token = issue_token("execute")
+        monkeypatch.setenv("SYMERASEME_CONSENT", token)
+        assert check_consent("execute") is True
+        # Token file should be gone
+        token_file = _isolated_consent_dir / _token_filename(token)
+        assert not token_file.exists(), "Token file should be consumed after use"
+        # Second attempt must fail
+        assert check_consent("execute") is False
+
     def test_invalid_consent_token_returns_false(self):
         assert check_consent("execute", consent_token="badbadbadbad1234") is False
 
