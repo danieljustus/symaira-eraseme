@@ -16,9 +16,7 @@ from rich.text import Text
 
 from symeraseme.cli.types import CliResult
 from symeraseme.core.exceptions import (
-    EXIT_CONFIG,
     EXIT_ERROR,
-    EXIT_NETWORK,
     SymerasemeError,
 )
 
@@ -95,15 +93,14 @@ class OutputFormat(StrEnum):
 
 
 def _exit_code_for_result(result: CliResult) -> int:
-    error = result.error or ""
-    if "profile" in error.lower() or "not found" in error.lower():
-        if "broker" in error.lower():
-            return EXIT_ERROR
-        return EXIT_CONFIG
-    if "registry" in error.lower():
-        return EXIT_ERROR
-    if "imap" in error.lower() or "connection" in error.lower() or "network" in error.lower():
-        return EXIT_NETWORK
+    """Return the exit code for a failure result.
+
+    Prefers the explicit ``error_exit_code`` attached to the CliResult
+    by the exception-to-result conversion; falls back to ``EXIT_ERROR``
+    for direct CliResult instantiations that do not carry one.
+    """
+    if result.error_exit_code is not None:
+        return result.error_exit_code
     return EXIT_ERROR
 
 
@@ -123,7 +120,11 @@ def render_result(
     failure so every command returns a distinct exit code uniformly.
     """
     if isinstance(result, SymerasemeError):
-        result_obj = CliResult(success=False, error=result.message)
+        result_obj = CliResult(
+            success=False,
+            error=result.message,
+            error_exit_code=result.exit_code,
+        )
         result = result.message
     elif isinstance(result, Exception):
         print_error(str(result))

@@ -71,4 +71,6 @@ app/SymairaEraseMe/build_output.log
 .omo/run-continuation/
 .omo/notepads/
 coverage.html
+
+# Parallel worktree directories
 .worktrees/
