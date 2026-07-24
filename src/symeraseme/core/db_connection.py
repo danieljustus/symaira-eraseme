@@ -243,6 +243,15 @@ def init_db(path: str | None = None) -> Path:
             llm_summary     TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS imap_state (
+            host           TEXT NOT NULL,
+            folder         TEXT NOT NULL,
+            uid_validity   INTEGER NOT NULL,
+            last_uid       INTEGER NOT NULL DEFAULT 0,
+            updated_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (host, folder)
+        );
+
         CREATE TABLE IF NOT EXISTS reply_drafts (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             reply_id        INTEGER NOT NULL REFERENCES inbox_replies(id),

@@ -169,6 +169,7 @@ def manual_tasks_list(
         help="Filter by request ID",
     ),
 ) -> None:
+    """List manual fallback tasks, optionally filtered by status or request ID."""
     result = handle_manual_tasks_list(
         status,
         request_id,
@@ -181,6 +182,7 @@ def manual_tasks_show(
     ctx: typer.Context,
     task_id: int = typer.Argument(..., help="Task ID to show"),
 ) -> None:
+    """Show detailed information for a specific manual task."""
     result = handle_manual_tasks_show(task_id)
     render_result(ctx.obj["output"], result)
 
@@ -198,6 +200,7 @@ def manual_tasks_complete(
         help="Optional completion notes",
     ),
 ) -> None:
+    """Mark a manual task as completed with optional notes."""
     result = handle_manual_tasks_complete(
         task_id,
         notes,
@@ -214,6 +217,12 @@ def manual_tasks_cleanup(
         help="Show what would be removed without deleting",
     ),
 ) -> None:
+    """Remove completed and cancelled manual tasks from the database.
+
+    Examples:
+        symeraseme manual-tasks cleanup --dry-run
+        symeraseme manual-tasks cleanup
+    """
     result = handle_manual_tasks_cleanup(
         dry_run,
     )

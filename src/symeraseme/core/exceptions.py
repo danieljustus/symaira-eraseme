@@ -25,6 +25,8 @@ def safe_error_str(e: Exception, max_len: int = 300) -> str:
 class SymerasemeError(Exception):
     """Base class for all domain errors."""
 
+    exit_code: int = EXIT_ERROR
+
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
@@ -32,6 +34,8 @@ class SymerasemeError(Exception):
 
 class ProfileError(SymerasemeError):
     """Identity profile missing, incomplete, or unreadable."""
+
+    exit_code = EXIT_CONFIG
 
 
 class RequestNotFoundError(SymerasemeError):

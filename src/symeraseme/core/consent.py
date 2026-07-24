@@ -244,21 +244,29 @@ def check_consent(
     if yes:
         return True
     if consent_token:
-        return verify_token(command, consent_token)
+        if verify_token(command, consent_token):
+            consume_token(consent_token)
+            return True
+        return False
     if consent_file:
         token = _read_consent_file(consent_file)
-        if token:
-            return verify_token(command, token)
+        if token and verify_token(command, token):
+            consume_token(token)
+            return True
         return False
     consent_file_env = os.environ.get("SYMERASEME_CONSENT_FILE", "")
     if consent_file_env:
         token = _read_consent_file(consent_file_env)
-        if token:
-            return verify_token(command, token)
+        if token and verify_token(command, token):
+            consume_token(token)
+            return True
         return False
     env_token = os.environ.get("SYMERASEME_CONSENT", "")
     if env_token:
-        return verify_token(command, env_token)
+        if verify_token(command, env_token):
+            consume_token(env_token)
+            return True
+        return False
     if interactive:
         return _tty_prompt(f"Destructive command '{command}' requires consent. Proceed?")
     return False
