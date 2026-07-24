@@ -77,6 +77,7 @@ class TestCliResult:
         assert r.data == {}
         assert r.error is None
         assert r.message == ""
+        assert r.error_exit_code is None
 
     def test_with_message(self) -> None:
         r = CliResult(data={"message": "done"})
@@ -86,6 +87,10 @@ class TestCliResult:
         r = CliResult(success=False, error="something went wrong")
         assert r.success is False
         assert r.message == "something went wrong"
+
+    def test_with_error_exit_code(self) -> None:
+        r = CliResult(success=False, error="fail", error_exit_code=2)
+        assert r.error_exit_code == 2
 
     def test_to_json_success(self) -> None:
         r = CliResult(data={"message": "ok", "count": 3})
@@ -222,16 +227,50 @@ class TestExceptionGuard:
         assert "RuntimeError" in log_content
         assert "simulated unexpected failure" in log_content
 
-    def test_cliresult_errors_still_use_existing_paths(self):
+    def test_cliresult_errors_use_explicit_exit_code(self):
+        """Exit codes are now explicit on SymerasemeError subclasses."""
         from symeraseme.cli.console import _exit_code_for_result
         from symeraseme.cli.types import CliResult
+        from symeraseme.core.exceptions import EXIT_CONFIG, EXIT_ERROR
 
-        r = CliResult(success=False, error="No identity profile found. Run 'init-profile' first.")
-        code = _exit_code_for_result(r)
-        assert code == 2
+        # CliResult without explicit exit_code → falls back to EXIT_ERROR
+        r = CliResult(success=False, error="something went wrong")
+        assert _exit_code_for_result(r) == EXIT_ERROR
+
+        # CliResult with explicit exit_code → uses that code
+        r2 = CliResult(success=False, error="profile missing", error_exit_code=EXIT_CONFIG)
+        assert _exit_code_for_result(r2) == EXIT_CONFIG
 
     def test_pretty_exceptions_disabled(self):
         assert app.pretty_exceptions_enable is False
+
+
+class TestErrorExitCodes:
+    """Exit codes on SymerasemeError subclasses match expected behavior."""
+
+    def test_profile_error_has_config_exit_code(self):
+        from symeraseme.core.exceptions import EXIT_CONFIG, ProfileError
+
+        err = ProfileError("no profile")
+        assert err.exit_code == EXIT_CONFIG
+
+    def test_registry_error_has_error_exit_code(self):
+        from symeraseme.core.exceptions import EXIT_ERROR, RegistryError
+
+        err = RegistryError("registry not found")
+        assert err.exit_code == EXIT_ERROR
+
+    def test_execution_error_has_error_exit_code(self):
+        from symeraseme.core.exceptions import EXIT_ERROR, ExecutionError
+
+        err = ExecutionError("send failed", request_id=1)
+        assert err.exit_code == EXIT_ERROR
+
+    def test_request_not_found_has_error_exit_code(self):
+        from symeraseme.core.exceptions import EXIT_ERROR, RequestNotFoundError
+
+        err = RequestNotFoundError(42)
+        assert err.exit_code == EXIT_ERROR
 
 
 class TestCommandDocstrings:
