@@ -195,6 +195,9 @@ def _parse_email(raw_message: bytes) -> dict[str, Any]:
     }
 
 
+RE_UID = re.compile(rb"\bUID\s+(\d+)")
+
+
 def poll_inbox(
     *,
     host: str = "imap.gmail.com",
@@ -208,67 +211,132 @@ def poll_inbox(
 ) -> list[dict[str, Any]]:
     resolved_password = _resolve_imap_password(password)
     with _imap_session(host, port, username, resolved_password, ssl, folder) as mail:
-        since_date = (datetime.now(UTC) - timedelta(days=since_days)).strftime("%d-%b-%Y")
-        status, message_ids = mail.search(None, f"SINCE {since_date}")
+        # ------------------------------------------------------------------
+        # Resolve UIDVALIDITY for the selected folder.
+        # ------------------------------------------------------------------
+        uid_validity: int | None = None
+        status_response, status_data = mail.status(folder, "(UIDVALIDITY)")
+        if status_response == "OK" and status_data and status_data[0]:
+            m = re.search(rb"UIDVALIDITY\s+(\d+)", status_data[0])
+            if m:
+                uid_validity = int(m.group(1))
 
+        # ------------------------------------------------------------------
+        # Load persisted high-water mark (per host+ folder).
+        # If UIDVALIDITY changed, the stale HWM is discarded (cold-start).
+        # ------------------------------------------------------------------
+        from symeraseme.core.repositories.inbox import get_imap_hwm, set_imap_hwm  # noqa: PLC0415
+
+        stored_validity, last_uid = get_imap_hwm(host, folder)
+
+        if (
+            last_uid is not None
+            and stored_validity is not None
+            and uid_validity is not None
+            and stored_validity == uid_validity
+        ):
+            uid_range = f"{last_uid + 1}:*"
+        else:
+            uid_range = "1:*"
+
+        # ------------------------------------------------------------------
+        # Search for unseen UIDs in one round-trip.
+        # ------------------------------------------------------------------
+        status, message_ids = mail.uid("SEARCH", uid_range)
         if status != "OK":
             return []
 
-        ids = message_ids[0].split() if message_ids[0] else []
+        ids: list[bytes] = message_ids[0].split() if message_ids[0] else []
         if not ids:
+            # Still persist HWM so future polls skip the empty range.
+            if uid_validity is not None:
+                set_imap_hwm(host, folder, uid_validity, last_uid or 0)
             return []
 
-        messages: list[dict[str, Any]] = []
+        target_ids = ids[-max_messages:]
+        id_range = ",".join(mid.decode() for mid in target_ids)
+
+        # ------------------------------------------------------------------
+        # Batch FETCH all pending messages in one round-trip.
+        # ------------------------------------------------------------------
         fetch_cmd = (
-            "(FLAGS BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)]"
+            "(UID FLAGS BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)]"
             " BODY.PEEK[TEXT]<0.4096>)"
         )
-        for msg_id in ids[-max_messages:]:
-            try:
-                status, data = mail.fetch(msg_id, fetch_cmd)
-                if status != "OK" or not data:
-                    continue
+        status, data = mail.uid("FETCH", id_range, fetch_cmd)
+        if status != "OK" or not data:
+            # Persist HWM even on fetch failure — we already have the UIDs.
+            if uid_validity is not None:
+                max_uid = max(int(mid) for mid in target_ids)
+                set_imap_hwm(host, folder, uid_validity, max_uid)
+            return []
 
-                content_blocks = [
-                    item[1]
-                    for item in data
-                    if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], bytes)
-                ]
-                if len(content_blocks) < 2:
-                    continue
-
-                header_bytes, body_bytes = content_blocks[0], content_blocks[1]
-
-                msg = email.message_from_bytes(header_bytes)
-                headers: dict[str, Any] = {}
-                for key in (
-                    "Subject",
-                    "From",
-                    "To",
-                    "Date",
-                    "Message-ID",
-                    "In-Reply-To",
-                    "References",
-                ):
-                    value = msg.get(key)
-                    if value:
-                        headers[key] = decode_mime_header(value)
-
-                body = body_bytes.decode("utf-8", errors="replace") if body_bytes else ""
-
-                parsed: dict[str, Any] = {
-                    "headers": headers,
-                    "body": body,
-                    "message_id": headers.get("Message-ID", ""),
-                    "thread_id": extract_thread_id(headers),
-                    "from_addr": headers.get("From", ""),
-                    "subject": headers.get("Subject", ""),
-                }
-                parsed["imap_uid"] = msg_id.decode()
-                messages.append(parsed)
-            except (OSError, imaplib.IMAP4.error) as e:
-                logger.warning("Failed to fetch IMAP message %s: %s", msg_id, e)
+        # ------------------------------------------------------------------
+        # Parse batched UID FETCH response.
+        # Two BODY.PEEK items per message → collect by UID, then assemble.
+        # ------------------------------------------------------------------
+        pending: dict[int, dict[str, Any]] = {}
+        for item in data:
+            if not (isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], bytes)):
                 continue
+            response_line = item[0] if isinstance(item[0], bytes) else b""
+            content = item[1]
+
+            uid_match = RE_UID.search(response_line)
+            if not uid_match:
+                continue
+            uid = int(uid_match.group(1))
+
+            if uid not in pending:
+                pending[uid] = {"uid": uid}
+
+            if b"HEADER.FIELDS" in response_line:
+                pending[uid]["header_bytes"] = content
+            elif b"TEXT" in response_line:
+                pending[uid]["body_bytes"] = content
+
+        messages: list[dict[str, Any]] = []
+        for uid in sorted(pending):
+            entry = pending[uid]
+            header_bytes = entry.get("header_bytes")
+            if header_bytes is None:
+                continue
+            body_bytes = entry.get("body_bytes", b"")
+
+            msg = email.message_from_bytes(header_bytes)
+            headers: dict[str, Any] = {}
+            for key in (
+                "Subject",
+                "From",
+                "To",
+                "Date",
+                "Message-ID",
+                "In-Reply-To",
+                "References",
+            ):
+                value = msg.get(key)
+                if value:
+                    headers[key] = decode_mime_header(value)
+
+            body = body_bytes.decode("utf-8", errors="replace") if body_bytes else ""
+
+            parsed: dict[str, Any] = {
+                "headers": headers,
+                "body": body,
+                "message_id": headers.get("Message-ID", ""),
+                "thread_id": extract_thread_id(headers),
+                "from_addr": headers.get("From", ""),
+                "subject": headers.get("Subject", ""),
+                "imap_uid": str(uid),
+            }
+            messages.append(parsed)
+
+        # ------------------------------------------------------------------
+        # Persist HWM so the next poll only searches unseen messages.
+        # ------------------------------------------------------------------
+        if uid_validity is not None and target_ids:
+            max_uid = max(int(mid) for mid in target_ids)
+            set_imap_hwm(host, folder, uid_validity, max_uid)
 
     return messages
 

@@ -24,3 +24,46 @@ def insert_inbox_reply(
     )
     conn.commit()
     return cur.lastrowid  # type: ignore[return-value]
+
+
+def get_imap_hwm(
+    host: str,
+    folder: str,
+) -> tuple[int | None, int | None]:
+    """Return (uid_validity, last_uid) for the given (host, folder), or (None, None).
+
+    ``uid_validity`` is the IMAP UIDVALIDITY value for the folder.
+    ``last_uid`` is the highest UID successfully processed.
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT uid_validity, last_uid FROM imap_state WHERE host = ? AND folder = ?",
+        (host, folder),
+    ).fetchone()
+    if row is None:
+        return None, None
+    return int(row[0]), int(row[1])
+
+
+def set_imap_hwm(
+    host: str,
+    folder: str,
+    uid_validity: int,
+    last_uid: int,
+) -> None:
+    """Persist the high-water mark for (host, folder).
+
+    ``uid_validity`` resets ``last_uid`` when the server's UIDVALIDITY changes,
+    so stale UIDs from a previous mailbox session are never used.
+    """
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO imap_state (host, folder, uid_validity, last_uid, updated_at)
+           VALUES (?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(host, folder) DO UPDATE SET
+               uid_validity = excluded.uid_validity,
+               last_uid = excluded.last_uid,
+               updated_at = excluded.updated_at""",
+        (host, folder, uid_validity, last_uid),
+    )
+    conn.commit()
