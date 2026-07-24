@@ -58,9 +58,9 @@ jobs:
             exit 0
           fi
           echo "Submitting DMG for notarization..."
-          # Save API key to temp file (required by notarytool --key)
           KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
-          echo -n "${NOTARY_API_KEY}" > "$KEY_FILE"
+          # NOTARY_API_KEY is stored as base64-encoded .p8 file
+          echo "${NOTARY_API_KEY}" | base64 --decode > "$KEY_FILE"
           xcrun notarytool submit "dist/SymairaEraseMe.dmg" \
             --key "$KEY_FILE" \
             --key-id "${NOTARY_API_KEY_ID}" \
