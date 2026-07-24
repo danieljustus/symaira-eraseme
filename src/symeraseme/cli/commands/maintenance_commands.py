@@ -34,6 +34,7 @@ registry_app = typer.Typer(
 
 
 def db_init() -> None:
+    """Initialize the SQLite database for removal-request tracking."""
     path = init_db()
     print_success(f"Database initialized at {path}")
 
@@ -55,7 +56,7 @@ def db_migrate() -> None:
 
     db_file = _db_path()
     if not db_file.exists():
-        render_error(f"Database not found at {db_file}. Run 'symeraseme init-db' first.")
+        render_error(f"Database not found at {db_file}. Run 'symeraseme db-init' first.")
 
     raw = db_file.read_bytes()
     if not _is_encrypted(db_file):
@@ -166,6 +167,7 @@ def schedule_install(
         help="Show scheduler configs without installing",
     ),
 ) -> None:
+    """Install periodic scheduler jobs (cron, launchd, or systemd)."""
     result = handle_schedule_install(
         platform,
         tick_hour,
@@ -185,6 +187,12 @@ def schedule_uninstall(
         help="Target platform: cron, launchd, systemd (auto-detect)",
     ),
 ) -> None:
+    """Uninstall scheduler jobs and remove associated config files.
+
+    Examples:
+        symeraseme schedule uninstall
+        symeraseme schedule uninstall --platform launchd
+    """
     result = handle_schedule_uninstall(platform)
     render_result(ctx.obj["output"], result)
 
@@ -198,6 +206,7 @@ def schedule_status(
         help="Target platform: cron, launchd, systemd (auto-detect)",
     ),
 ) -> None:
+    """Show whether scheduler jobs are installed and active."""
     result = handle_schedule_status(platform)
     render_result(ctx.obj["output"], result)
 

@@ -36,6 +36,7 @@ class CliResult:
     success: bool = True
     data: dict[str, Any] | list[Any] = field(default_factory=dict)
     error: str | None = None
+    error_exit_code: int | None = None
 
     def __init__(
         self,
@@ -43,11 +44,13 @@ class CliResult:
         data: dict[str, Any] | list[Any] | None = None,
         error: str | None = None,
         message: str = "",
+        error_exit_code: int | None = None,
     ) -> None:
         self.success = success
         self.data = data if data is not None else {}
         self.error = error
         self._message = message
+        self.error_exit_code = error_exit_code
 
     @property
     def message(self) -> str:
