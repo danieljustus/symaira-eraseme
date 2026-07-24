@@ -58,11 +58,15 @@ jobs:
             exit 0
           fi
           echo "Submitting DMG for notarization..."
+          # Save API key to temp file (required by notarytool --key)
+          KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
+          echo -n "${NOTARY_API_KEY}" > "$KEY_FILE"
           xcrun notarytool submit "dist/SymairaEraseMe.dmg" \
-            --apple-id "${NOTARY_API_KEY_ID}" \
-            --team-id "${NOTARY_API_ISSUER}" \
-            --password "${NOTARY_API_KEY}" \
+            --key "$KEY_FILE" \
+            --key-id "${NOTARY_API_KEY_ID}" \
+            --issuer "${NOTARY_API_ISSUER}" \
             --wait
+          rm -f "$KEY_FILE"
 
       - name: Staple notarization ticket
         if: steps.signing.outputs.signed == 'true'
