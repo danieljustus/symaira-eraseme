@@ -57,7 +57,7 @@ def _unwrap_decorators(fn: Any) -> Any:
 # *not* part of the public MCP tool schema.
 _KNOWN_INJECTED: dict[str, set[str]] = {
     # _TOOL_AUTO_KWARGS — consent/yes flags injected so MCP calls skip prompts
-    "execute": {"yes"},
+    "execute": {"yes", "web_form_runner", "email_sender"},
     "classify_reply": {"yes"},
     "generate_rebuttal": {"yes"},
     "schedule_install": {"yes"},
