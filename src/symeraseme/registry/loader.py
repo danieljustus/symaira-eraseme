@@ -264,14 +264,18 @@ def _save_snapshot(
     max_mtime: float,
     file_count: int,
     cache_key: tuple[str, str],
+    *,
+    dir_mtime: float | None = None,
 ) -> None:
     """Persist the mtime snapshot to disk."""
     path = _snapshot_path(registry_dir)
-    payload = {
+    payload: dict[str, Any] = {
         "max_mtime": max_mtime,
         "file_count": file_count,
         "cache_key": list(cache_key),
     }
+    if dir_mtime is not None:
+        payload["dir_mtime"] = dir_mtime
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f)
@@ -303,6 +307,13 @@ def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
     processes the snapshot on disk provides the same fast path: read
     snapshot, re-walk, compare; if values match the persistent broker
     cache is still valid and no cold-load is needed.
+
+    A directory mtime first-pass short-circuits the full per-file walk
+    when no files have been added or removed from the registry since the
+    last snapshot: ``registry_dir.stat().st_mtime`` changes only on
+    directory-level mutations (add/remove/rename of entries), so an
+    unchanged value means *file_count* and the file set are still valid
+    and the snapshot values can be reused without walking ~1,300 files.
     """
     dir_str = str(registry_dir)
 
@@ -310,19 +321,42 @@ def _broker_cache_key(registry_dir: Path) -> tuple[str, str]:
     if memoized is not None:
         return memoized[1]
 
-    max_mtime, file_count = _walk_registry_mtime(registry_dir)
+    # Cheap first-pass: check the registry directory's own mtime.
+    # When unchanged, no files were added or removed since the last
+    # snapshot — the persisted max_mtime and file_count are still
+    # valid and we can skip the full per-file walk.
+    try:
+        current_dir_mtime = registry_dir.stat().st_mtime
+    except OSError:
+        current_dir_mtime = None
+
+    snapshot = _load_snapshot(registry_dir)
+    if (
+        current_dir_mtime is not None
+        and snapshot is not None
+        and snapshot.get("dir_mtime") == current_dir_mtime
+    ):
+        max_mtime = snapshot["max_mtime"]
+        file_count = snapshot["file_count"]
+    else:
+        max_mtime, file_count = _walk_registry_mtime(registry_dir)
 
     key_data = f"{registry_dir}:{max_mtime}:{file_count}"
     digest = hashlib.sha256(key_data.encode()).hexdigest()
     cache_key = (str(registry_dir), digest)
 
-    snapshot = _load_snapshot(registry_dir)
     if (
         snapshot is None
         or snapshot.get("max_mtime") != max_mtime
         or snapshot.get("file_count") != file_count
     ):
-        _save_snapshot(registry_dir, max_mtime, file_count, cache_key)
+        _save_snapshot(
+            registry_dir,
+            max_mtime,
+            file_count,
+            cache_key,
+            dir_mtime=current_dir_mtime,
+        )
 
     _CACHE_KEY_MEMO[dir_str] = ("snapshot", cache_key)
     return cache_key
