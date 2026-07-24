@@ -64,7 +64,7 @@ if [ -f "$SRC_ICON" ]; then
     ICONSET_DIR="app/SymairaEraseMe/.build/AppIcon.iconset"
     rm -rf "$ICONSET_DIR"
     mkdir -p "$ICONSET_DIR"
-    
+
     sips -z 16 16     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16.png" > /dev/null 2>&1
     sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16@2x.png" > /dev/null 2>&1
     sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_32x32.png" > /dev/null 2>&1
@@ -75,11 +75,25 @@ if [ -f "$SRC_ICON" ]; then
     sips -z 512 512   "$SRC_ICON" --out "$ICONSET_DIR/icon_256x256@2x.png" > /dev/null 2>&1
     sips -z 512 512   "$SRC_ICON" --out "$ICONSET_DIR/icon_512x512.png" > /dev/null 2>&1
     sips -z 1024 1024 "$SRC_ICON" --out "$ICONSET_DIR/icon_512x512@2x.png" > /dev/null 2>&1
-    
+
     iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     rm -rf "$ICONSET_DIR"
 else
     echo "Warning: assets/apple-touch-icon.png not found. App will build without icon."
+fi
+
+# --- Code Signing ---
+# If CODESIGN_IDENTITY is set, sign the app bundle with Developer ID,
+# including Hardened Runtime and timestamp for notarization.
+if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+    echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
+    codesign --deep --force --timestamp --options runtime \
+        -s "$CODESIGN_IDENTITY" \
+        "$APP_BUNDLE"
+    echo "Verifying signature..."
+    codesign -dvvv "$APP_BUNDLE" 2>&1 | head -5
+else
+    echo "CODESIGN_IDENTITY not set. Skipping code signing (ad-hoc only)."
 fi
 
 echo "Creating Applications symlink..."
