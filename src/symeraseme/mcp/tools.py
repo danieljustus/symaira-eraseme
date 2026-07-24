@@ -112,6 +112,14 @@ TOOL_DEFS: list[dict[str, Any]] = [
                     "description": "Number of concurrent workers",
                     "default": 3,
                 },
+                "consent_token": {
+                    "type": "string",
+                    "description": "Consent token value for destructive operations",
+                },
+                "consent_file": {
+                    "type": "string",
+                    "description": "Path to consent token file",
+                },
             },
             "required": ["campaign_id"],
         },

@@ -267,14 +267,22 @@ Example MCP client config:
 {
   "mcpServers": {
     "symeraseme": {
-      "command": "symeraseme",
-      "args": ["serve", "--host", "127.0.0.1", "--port", "8000"]
+      "command": "sh",
+      "args": [
+        "-c",
+        "TOKEN=$(cat ~/.symeraseme/mcp_token 2>/dev/null || echo ''); exec symeraseme serve --host 127.0.0.1 --port 8000"
+      ],
+      "env": {
+        "MCP_AUTH_TOKEN": "$TOKEN"
+      }
     }
   }
 }
 ```
 
-> **Security**: the MCP endpoint is unauthenticated. The default `127.0.0.1` bind is reachable only from the local machine. Use `--allow-remote` only on trusted networks.
+Alternatively, configure the MCP client to pass the token as an `Authorization: Bearer <token>` header on every request. The token is generated fresh on each server start and written to `<data_dir>/mcp_token`.
+
+> **Security**: the MCP server uses per-run Bearer-token authentication. The token is written to `<data_dir>/mcp_token` on startup and must be included as an `Authorization: Bearer <token>` header on every request. The default `127.0.0.1` bind is reachable only from the local machine. Use `--allow-remote` only on trusted networks.
 
 Run `symeraseme --help` for a full list of commands and options.
 

@@ -207,9 +207,10 @@ def serve(
         "--host",
         "-h",
         help=(
-            "Host to bind the server to. The MCP endpoint is unauthenticated; "
-            "binding to a non-loopback address exposes the redact_file tool to "
-            "any host on the network. Use --allow-remote to opt in explicitly."
+            "Host to bind the server to. The MCP endpoint uses per-run Bearer-token "
+            "authentication (token written to <data_dir>/mcp_token). Binding to a "
+            "non-loopback address exposes the server to the network. "
+            "Use --allow-remote to opt in explicitly."
         ),
     ),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind the server to"),
@@ -217,8 +218,8 @@ def serve(
         False,
         "--allow-remote",
         help=(
-            "Allow binding to non-loopback interfaces. The server has no "
-            "authentication; only use this on trusted networks."
+            "Allow binding to non-loopback interfaces. The server uses per-run "
+            "Bearer-token authentication; only use this on trusted networks."
         ),
     ),
 ) -> None:
@@ -226,15 +227,16 @@ def serve(
     if not _is_loopback_host(host) and not allow_remote:
         print_error(
             f"Refusing to bind MCP server to non-loopback host '{host}'. "
-            "The endpoint is unauthenticated and would be reachable from the "
-            "network. Pass --allow-remote to opt in explicitly."
+            "The server uses per-run Bearer-token auth, but binding to a "
+            "non-loopback address exposes it to the network. "
+            "Pass --allow-remote to opt in explicitly."
         )
         raise typer.Exit(1)
 
     if not _is_loopback_host(host):
         print_warning(
             f"Binding MCP server to non-loopback host {host}. "
-            "The endpoint is unauthenticated and reachable from the network."
+            "The server uses per-run Bearer-token auth but is reachable from the network."
         )
 
     from symeraseme.mcp_server import run_mcp_server

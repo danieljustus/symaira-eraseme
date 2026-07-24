@@ -29,8 +29,8 @@ def handle_poll_inbox(
     username: str,
     since_days: int,
     ssl: bool,
-    campaign_id: str | None,
-    password: str,
+    campaign_id: str | None = None,
+    password: str = "",
     folders: list[str] | None = None,
 ) -> CliResult:
     if folders is None:

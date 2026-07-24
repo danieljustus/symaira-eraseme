@@ -177,7 +177,7 @@ class TestServe:
         assert result.exit_code == 0
         assert "127.0.0.1" in stdout
         assert "--allow-remote" in stdout
-        assert "unauthenticated" in stdout
+        assert "Bearer-token" in stdout
 
     def test_serve_rejects_non_loopback_without_flag(self):
         result = runner.invoke(app, ["serve", "--host", "0.0.0.0"])
