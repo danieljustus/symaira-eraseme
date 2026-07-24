@@ -53,7 +53,7 @@ def add(
     port = find_free_port()
     redirect_uri = f"http://127.0.0.1:{port}/callback"
     url, code_verifier = authorize_url(provider, client_id, redirect_uri)
-    print_info(f"Opening browser for OAuth2 authorization: ***")
+    print_info("Opening browser for OAuth2 authorization: ***")
     webbrowser.open(url)
 
     print_info(f"Waiting for authorization callback on {redirect_uri} ...")
