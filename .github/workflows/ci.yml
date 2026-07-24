@@ -119,6 +119,8 @@ jobs:
           else:
               print('  Schema not yet created — skipping validation')
           "
+      - name: Check MCP tool schemas match handler signatures
+        run: uv run python scripts/check_mcp_schema_sync.py
 
   secrets-scan:
     runs-on: ubuntu-latest
