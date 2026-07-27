@@ -539,9 +539,7 @@ TOOL_DEFS: list[dict[str, Any]] = [
     },
     {
         "name": "list_requests",
-        "description": (
-            "Return paginated removal requests with optional filters."
-        ),
+        "description": ("Return paginated removal requests with optional filters."),
         "inputSchema": {
             "type": "object",
             "properties": {
