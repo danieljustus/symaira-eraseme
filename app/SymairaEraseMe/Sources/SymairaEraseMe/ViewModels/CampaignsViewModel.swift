@@ -4,9 +4,7 @@ import SwiftUI
 /// View model for the Campaigns view.
 @MainActor
 final class CampaignsViewModel: ObservableObject {
-    @Published var campaigns: [DashboardCampaign] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    @Published var state: ViewState<[DashboardCampaign]> = .idle
     @Published var planResult: PlanCreateResponse?
     @Published var executeResult: ExecuteResponse?
 
@@ -17,23 +15,23 @@ final class CampaignsViewModel: ObservableObject {
     @Published var newCampaignPriority: String = ""
     @Published var newCampaignMaxBrokers: Int = 30
 
+    var campaigns: [DashboardCampaign] { state.value ?? [] }
+    var isLoading: Bool { state.isLoading }
+    var errorMessage: String? { state.errorMessage }
+
     func refresh() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         do {
             let dashboardData: DashboardData = try await MCPClient.shared.callTool("get_dashboard_data")
-            campaigns = dashboardData.campaigns
+            state = .loaded(dashboardData.campaigns)
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
 
     func createCampaign() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         var args: [String: Any] = ["campaign_id": newCampaignId]
         if !newCampaignJurisdiction.isEmpty { args["jurisdiction"] = newCampaignJurisdiction }
@@ -46,21 +44,19 @@ final class CampaignsViewModel: ObservableObject {
             // Refresh the campaign list
             await refresh()
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
 
     func executeCampaign(_ campaignId: String) async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         do {
             executeResult = try await MCPClient.shared.callTool("execute", arguments: [
                 "campaign_id": campaignId
             ])
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
 

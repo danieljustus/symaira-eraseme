@@ -26,6 +26,26 @@ _HANDLER_MAP: dict[str, tuple[str, str]] = {
     "poll_inbox": ("symeraseme.services.inbox", "handle_poll_inbox"),
     "classify_reply": ("symeraseme.services.reply", "handle_classify_reply"),
     "generate_rebuttal": ("symeraseme.services.reply", "handle_generate_rebuttal"),
+    "get_dashboard_data": (
+        "symeraseme.services.dashboard",
+        "handle_get_dashboard_data",
+    ),
+    "list_requests": (
+        "symeraseme.services.dashboard",
+        "handle_list_requests",
+    ),
+    "get_events": (
+        "symeraseme.services.dashboard",
+        "handle_get_events",
+    ),
+    "list_brokers": (
+        "symeraseme.services.dashboard",
+        "handle_list_brokers",
+    ),
+    "get_calendar": (
+        "symeraseme.services.dashboard",
+        "handle_get_calendar",
+    ),
     "generate_dashboard": ("symeraseme.services.reporting", "handle_generate_dashboard"),
     "generate_report": ("symeraseme.services.reporting", "handle_generate_report"),
     "manual_tasks_list": (

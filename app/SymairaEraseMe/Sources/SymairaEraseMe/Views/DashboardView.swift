@@ -9,25 +9,33 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                if let error = vm.errorMessage {
-                    ErrorBanner(message: error) { vm.errorMessage = nil }
-                }
-                if vm.isLoading && vm.data == nil {
+
+                switch vm.state {
+                case .idle, .loading:
                     LoadingOverlay(message: "Loading dashboard…")
                         .frame(height: 300)
-                } else if let data = vm.data, data.totalRequests == 0 {
-                    EmptyStateView(
-                        icon: "chart.bar.fill",
-                        title: "No Data Yet",
-                        message: "Create a campaign to start removing your data from brokers."
-                    )
+
+                case .failed(let message):
+                    ErrorStateView(message: message) {
+                        Task { await vm.refresh() }
+                    }
                     .frame(height: 300)
-                } else {
-                    summaryCards
-                    statusBreakdownChart
-                    campaignsSection
-                    brokerGrid
-                    recentEvents
+
+                case .loaded(let data):
+                    if data.totalRequests == 0 {
+                        EmptyStateView(
+                            icon: "chart.bar.fill",
+                            title: "No Data Yet",
+                            message: "Create a campaign to start removing your data from brokers."
+                        )
+                        .frame(height: 300)
+                    } else {
+                        summaryCards
+                        statusBreakdownChart
+                        campaignsSection
+                        brokerGrid
+                        recentEvents
+                    }
                 }
             }
             .padding(24)
@@ -282,6 +290,36 @@ struct EventRow: View {
             }
         }
         .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Error State View
+
+struct ErrorStateView: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(BrandColors.overdue)
+            Text("Failed to Load")
+                .font(.headline)
+                .foregroundStyle(BrandColors.textPrimary)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(BrandColors.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+            Button(action: onRetry) {
+                Label("Retry", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .tint(BrandColors.goldPrimary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .interactiveGlassCard()
     }
 }
 
