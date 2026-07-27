@@ -133,7 +133,7 @@ jobs:
         with:
           version: "latest"
       - name: Audit dependencies for known vulnerabilities
-        run: uv pip audit
+        run: uv tool run pip-audit --path .
 
   secrets-scan:
     runs-on: ubuntu-latest
