@@ -137,6 +137,7 @@ struct CampaignsView: View {
                         showCreateSheet = false
                         vm.resetForm()
                     }
+                    .keyboardShortcut(.cancelAction)
                 }
             }
         }
