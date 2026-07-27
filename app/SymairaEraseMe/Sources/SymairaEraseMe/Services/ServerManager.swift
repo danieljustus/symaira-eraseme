@@ -117,7 +117,9 @@ final class ServerManager: ObservableObject {
         MCPClient.configuredHost = host
         MCPClient.configuredPort = port
 
-        _ = supervisor.start(executable: executable, arguments: arguments, environment: env)
+        Task.detached { [supervisor, executable, arguments, env] in
+            _ = supervisor.start(executable: executable, arguments: arguments, environment: env)
+        }
     }
 
     /// Stop the MCP server subprocess.
