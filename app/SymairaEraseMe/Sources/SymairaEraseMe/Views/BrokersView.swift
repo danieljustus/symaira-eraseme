@@ -206,6 +206,7 @@ struct BrokersView: View {
                         vm.selectedBroker = nil
                         showDetail = false
                     }
+                    .keyboardShortcut(.cancelAction)
                 }
             }
         }
