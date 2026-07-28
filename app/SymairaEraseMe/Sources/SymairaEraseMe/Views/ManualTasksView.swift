@@ -185,6 +185,7 @@ struct ManualTasksView: View {
                         showCompleteSheet = false
                         selectedTask = nil
                     }
+                    .keyboardShortcut(.cancelAction)
                 }
             }
         }
