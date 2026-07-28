@@ -12,22 +12,30 @@ struct RequestsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     filters
-                    if let error = vm.errorMessage {
-                        ErrorBanner(message: error) { vm.errorMessage = nil }
-                    }
-                    if vm.isLoading && vm.requests.isEmpty {
+
+                    switch vm.state {
+                    case .idle, .loading:
                         LoadingOverlay(message: "Loading requests…")
                             .frame(height: 200)
-                    } else if vm.requests.isEmpty {
-                        EmptyStateView(
-                            icon: "envelope.fill",
-                            title: "No Requests",
-                            message: "Create a campaign to generate removal requests."
-                        )
+
+                    case .failed(let message):
+                        ErrorStateView(message: message) {
+                            Task { await vm.refresh() }
+                        }
                         .frame(height: 200)
-                    } else {
-                        requestsTable
-                        pagination
+
+                    case .loaded(let requests):
+                        if requests.isEmpty {
+                            EmptyStateView(
+                                icon: "envelope.fill",
+                                title: "No Requests",
+                                message: "Create a campaign to generate removal requests."
+                            )
+                            .frame(height: 200)
+                        } else {
+                            requestsTable
+                            pagination
+                        }
                     }
                 }
                 .padding(24)
@@ -207,32 +215,51 @@ struct RequestsView: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(BrandColors.textPrimary)
 
-            if vm.isLoadingEvents {
+            switch vm.eventsState {
+            case .idle, .loading:
                 ProgressView()
                     .tint(BrandColors.goldPrimary)
-            } else if vm.requestEvents.isEmpty {
-                Text("No events")
-                    .font(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(vm.requestEvents) { event in
-                            HStack(alignment: .top, spacing: 8) {
-                                Circle()
-                                    .fill(BrandColors.color(for: event.eventType))
-                                    .frame(width: 8, height: 8)
-                                    .offset(y: 4)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
-                                        .font(.caption)
-                                        .foregroundStyle(BrandColors.textPrimary)
-                                    Text(event.occurredAt.formattedDate)
-                                        .font(.caption2)
-                                        .foregroundStyle(BrandColors.textMuted)
-                                    Text("Source: \(event.source)")
-                                        .font(.caption2)
-                                        .foregroundStyle(BrandColors.textMuted)
+
+            case .failed(let message):
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(BrandColors.overdue)
+                        .font(.caption)
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(BrandColors.textMuted)
+                    Button("Retry") {
+                        Task { await vm.loadEvents(for: request) }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(BrandColors.goldPrimary)
+                }
+
+            case .loaded:
+                if vm.requestEvents.isEmpty {
+                    Text("No events")
+                        .font(.caption)
+                        .foregroundStyle(BrandColors.textMuted)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(vm.requestEvents) { event in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Circle()
+                                        .fill(BrandColors.color(for: event.eventType))
+                                        .frame(width: 8, height: 8)
+                                        .offset(y: 4)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
+                                            .font(.caption)
+                                            .foregroundStyle(BrandColors.textPrimary)
+                                        Text(event.occurredAt.formattedDate)
+                                            .font(.caption2)
+                                            .foregroundStyle(BrandColors.textMuted)
+                                        Text("Source: \(event.source)")
+                                            .font(.caption2)
+                                            .foregroundStyle(BrandColors.textMuted)
+                                    }
                                 }
                             }
                         }

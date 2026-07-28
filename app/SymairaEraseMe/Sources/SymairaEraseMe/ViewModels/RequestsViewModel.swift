@@ -3,12 +3,10 @@ import Foundation
 /// View model for the Requests view.
 @MainActor
 final class RequestsViewModel: ObservableObject {
-    @Published var requests: [RemovalRequest] = []
+    @Published var state: ViewState<[RemovalRequest]> = .idle
     @Published var total: Int = 0
     @Published var page: Int = 1
     @Published var pageSize: Int = 50
-    @Published var isLoading = false
-    @Published var errorMessage: String?
 
     /// Filters
     @Published var filterCampaignId: String = ""
@@ -18,16 +16,18 @@ final class RequestsViewModel: ObservableObject {
     /// Selected request for detail view.
     @Published var selectedRequest: RemovalRequest?
     @Published var requestEvents: [RequestEvent] = []
-    @Published var isLoadingEvents = false
+    @Published var eventsState: ViewState<[RequestEvent]> = .idle
+
+    var requests: [RemovalRequest] { state.value ?? [] }
+    var isLoading: Bool { state.isLoading }
+    var errorMessage: String? { state.errorMessage }
 
     var totalPages: Int { max(1, Int(ceil(Double(total) / Double(pageSize)))) }
     var hasPrevious: Bool { page > 1 }
     var hasNext: Bool { page < totalPages }
 
     func refresh() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         var args: [String: Any] = [
             "page": page,
@@ -39,10 +39,10 @@ final class RequestsViewModel: ObservableObject {
 
         do {
             let response: RequestListResponse = try await MCPClient.shared.callTool("list_requests", arguments: args)
-            requests = response.items
+            state = .loaded(response.items)
             total = response.total
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
 
@@ -60,17 +60,17 @@ final class RequestsViewModel: ObservableObject {
 
     func loadEvents(for request: RemovalRequest) async {
         selectedRequest = request
-        isLoadingEvents = true
+        eventsState = .loading
         requestEvents = []
-        defer { isLoadingEvents = false }
 
         do {
             let response: EventListResponse = try await MCPClient.shared.callTool("get_events", arguments: [
                 "request_id": request.id
             ])
             requestEvents = response.events
+            eventsState = .loaded(response.events)
         } catch {
-            errorMessage = error.localizedDescription
+            eventsState = .failed(error.localizedDescription)
         }
     }
 
