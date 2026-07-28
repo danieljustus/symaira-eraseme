@@ -101,7 +101,7 @@ struct SettingsView: View {
                     .onChange(of: serverManager.host) { _, _ in
                         MCPClient.configuredHost = serverManager.host
                     }
-                TextField("Port", value: $serverManager.port, format: .number)
+                TextField("Port", value: $serverManager.port, format: .number.grouping(.never))
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 100)
                     .onChange(of: serverManager.port) { _, _ in
