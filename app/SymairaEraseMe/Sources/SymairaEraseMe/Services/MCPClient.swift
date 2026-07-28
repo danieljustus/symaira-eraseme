@@ -43,8 +43,10 @@ actor MCPClient {
         let params: [String: Any] = ["name": name, "arguments": arguments]
         let result = try await call(method: "tools/call", params: params)
 
-        // Try to decode the raw value directly
-        let data = try JSONSerialization.data(withJSONObject: result.raw)
+        // Use JSONEncoder to serialize AnyCodable safely —
+        // JSONSerialization.data(withJSONObject:) would raise
+        // an uncatchable ObjC exception on AnyCodable values.
+        let data = try JSONEncoder().encode(result.raw)
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
@@ -56,12 +58,15 @@ actor MCPClient {
     func callToolRaw(_ name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
         let params: [String: Any] = ["name": name, "arguments": arguments]
         let result = try await call(method: "tools/call", params: params)
-        // Convert AnyCodable values back to Any
-        var output: [String: Any] = [:]
-        for (key, val) in result.raw {
-            output[key] = val.value
+
+        // Round-trip through JSONEncoder → JSONSerialization
+        // so AnyCodable values become JSON-legal Foundation types.
+        let data = try JSONEncoder().encode(result.raw)
+        let obj = try JSONSerialization.jsonObject(with: data)
+        guard let dict = obj as? [String: Any] else {
+            throw MCPClientError.invalidResponse("Expected dictionary payload")
         }
-        return output
+        return dict
     }
 
     /// Check if the MCP server is reachable.
