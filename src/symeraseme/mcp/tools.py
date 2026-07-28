@@ -525,6 +525,115 @@ TOOL_DEFS: list[dict[str, Any]] = [
             "required": ["request_id"],
         },
     },
+    # -- Data Queries (GUI) ---------------------------------------------------
+    {
+        "name": "get_dashboard_data",
+        "description": (
+            "Return aggregated dashboard data: campaigns, request status counts, "
+            "broker status, and recent events."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "list_requests",
+        "description": ("Return paginated removal requests with optional filters."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "campaign_id": {
+                    "type": "string",
+                    "description": "Filter by campaign identifier",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Filter by request status",
+                },
+                "broker_id": {
+                    "type": "string",
+                    "description": "Filter by broker identifier",
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "1-indexed page number",
+                    "default": 1,
+                },
+                "page_size": {
+                    "type": "integer",
+                    "description": "Maximum items per page",
+                    "default": 100,
+                },
+            },
+        },
+    },
+    {
+        "name": "get_events",
+        "description": "Return the event history for a removal request.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "request_id": {
+                    "type": "integer",
+                    "description": "Removal request ID",
+                },
+                "after_event_id": {
+                    "type": "integer",
+                    "description": "Only return events with ID greater than this",
+                },
+            },
+            "required": ["request_id"],
+        },
+    },
+    {
+        "name": "list_brokers",
+        "description": "Return filtered brokers from the registry.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "jurisdiction": {
+                    "type": "string",
+                    "description": "Filter by jurisdiction (e.g. GDPR, CCPA)",
+                },
+                "law": {
+                    "type": "string",
+                    "description": "Filter by specific law",
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "Filter by priority level",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Filter by broker category",
+                },
+                "include_disabled": {
+                    "type": "boolean",
+                    "description": "Include disabled brokers",
+                    "default": False,
+                },
+            },
+        },
+    },
+    {
+        "name": "get_calendar",
+        "description": "Return upcoming deadlines and tick actions for the next N weeks.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "weeks": {
+                    "type": "integer",
+                    "description": "Number of weeks to look ahead",
+                    "default": 4,
+                },
+                "campaign_id": {
+                    "type": "string",
+                    "description": "Filter by campaign identifier",
+                },
+            },
+        },
+    },
     # -- Consent Tokens -------------------------------------------------------
     {
         "name": "grant",

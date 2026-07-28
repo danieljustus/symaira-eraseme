@@ -9,25 +9,30 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                if let error = vm.errorMessage {
-                    ErrorBanner(message: error) { vm.errorMessage = nil }
-                }
-
-                if vm.isLoading && vm.calendarData == nil {
+                switch vm.state {
+                case .idle, .loading:
                     LoadingOverlay(message: "Loading calendar…")
                         .frame(height: 200)
-                } else if let data = vm.calendarData {
+
+                case .failed(let message):
+                    ErrorStateView(message: message) {
+                        Task { await vm.refresh() }
+                    }
+                    .frame(height: 200)
+
+                case .loaded(let data):
                     if let deadlines = data.upcomingDeadlines {
                         deadlinesSummary(deadlines)
                     }
                     tickActionsSection
-                } else {
-                    EmptyStateView(
-                        icon: "calendar",
-                        title: "No Calendar Data",
-                        message: "Create a campaign to see upcoming deadlines."
-                    )
-                    .frame(height: 200)
+                    if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
+                        EmptyStateView(
+                            icon: "calendar",
+                            title: "No Calendar Data",
+                            message: "Create a campaign to see upcoming deadlines."
+                        )
+                        .frame(height: 200)
+                    }
                 }
             }
             .padding(24)

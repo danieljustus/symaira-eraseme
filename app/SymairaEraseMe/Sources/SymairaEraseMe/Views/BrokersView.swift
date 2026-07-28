@@ -9,25 +9,30 @@ struct BrokersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-
-                if let error = vm.errorMessage {
-                    ErrorBanner(message: error) { vm.errorMessage = nil }
-                }
-
                 filters
 
-                if vm.isLoading && vm.brokers.isEmpty {
+                switch vm.state {
+                case .idle, .loading:
                     LoadingOverlay(message: "Loading brokers…")
                         .frame(height: 200)
-                } else if vm.filteredBrokers.isEmpty {
-                    EmptyStateView(
-                        icon: "person.2.fill",
-                        title: "No Brokers Found",
-                        message: "Adjust filters or check the broker registry."
-                    )
+
+                case .failed(let message):
+                    ErrorStateView(message: message) {
+                        Task { await vm.refresh() }
+                    }
                     .frame(height: 200)
-                } else {
-                    brokerGrid
+
+                case .loaded:
+                    if vm.filteredBrokers.isEmpty {
+                        EmptyStateView(
+                            icon: "person.2.fill",
+                            title: "No Brokers Found",
+                            message: "Adjust filters or check the broker registry."
+                        )
+                        .frame(height: 200)
+                    } else {
+                        brokerGrid
+                    }
                 }
             }
             .padding(24)

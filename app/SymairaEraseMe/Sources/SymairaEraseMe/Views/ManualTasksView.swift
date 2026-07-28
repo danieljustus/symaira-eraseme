@@ -12,9 +12,6 @@ struct ManualTasksView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                if let error = vm.errorMessage {
-                    ErrorBanner(message: error) { vm.errorMessage = nil }
-                }
                 if let success = vm.successMessage {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
@@ -30,18 +27,28 @@ struct ManualTasksView: View {
 
                 summaryCards
 
-                if vm.isLoading && vm.tasks.isEmpty {
+                switch vm.state {
+                case .idle, .loading:
                     LoadingOverlay(message: "Loading tasks…")
                         .frame(height: 200)
-                } else if vm.tasks.isEmpty {
-                    EmptyStateView(
-                        icon: "checklist",
-                        title: "No Manual Tasks",
-                        message: "All broker forms are handled automatically. Manual tasks appear when automation fails."
-                    )
+
+                case .failed(let message):
+                    ErrorStateView(message: message) {
+                        Task { await vm.refresh() }
+                    }
                     .frame(height: 200)
-                } else {
-                    tasksTable
+
+                case .loaded(let tasks):
+                    if tasks.isEmpty {
+                        EmptyStateView(
+                            icon: "checklist",
+                            title: "No Manual Tasks",
+                            message: "All broker forms are handled automatically. Manual tasks appear when automation fails."
+                        )
+                        .frame(height: 200)
+                    } else {
+                        tasksTable
+                    }
                 }
             }
             .padding(24)

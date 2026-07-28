@@ -4,21 +4,22 @@ import SwiftUI
 /// View model for the main Dashboard view.
 @MainActor
 final class DashboardViewModel: ObservableObject {
-    @Published var data: DashboardData?
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    @Published var state: ViewState<DashboardData> = .idle
 
     func refresh() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         do {
-            data = try await MCPClient.shared.callTool("get_dashboard_data")
+            let data: DashboardData = try await MCPClient.shared.callTool("get_dashboard_data")
+            state = .loaded(data)
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
+
+    var data: DashboardData? { state.value }
+    var isLoading: Bool { state.isLoading }
+    var errorMessage: String? { state.errorMessage }
 
     var totalRequests: Int { data?.totalRequests ?? 0 }
     var inProgress: Int {
