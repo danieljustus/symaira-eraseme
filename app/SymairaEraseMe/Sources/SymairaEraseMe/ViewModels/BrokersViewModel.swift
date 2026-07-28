@@ -3,10 +3,8 @@ import Foundation
 /// View model for the Brokers view.
 @MainActor
 final class BrokersViewModel: ObservableObject {
-    @Published var brokers: [Broker] = []
+    @Published var state: ViewState<[Broker]> = .idle
     @Published var total: Int = 0
-    @Published var isLoading = false
-    @Published var errorMessage: String?
 
     /// Filters
     @Published var filterJurisdiction: String = ""
@@ -17,6 +15,10 @@ final class BrokersViewModel: ObservableObject {
 
     /// Selected broker for detail sheet.
     @Published var selectedBroker: Broker?
+
+    var brokers: [Broker] { state.value ?? [] }
+    var isLoading: Bool { state.isLoading }
+    var errorMessage: String? { state.errorMessage }
 
     var filteredBrokers: [Broker] {
         if searchText.isEmpty { return brokers }
@@ -29,9 +31,7 @@ final class BrokersViewModel: ObservableObject {
     }
 
     func refresh() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
+        state = .loading
 
         var args: [String: Any] = [:]
         if !filterJurisdiction.isEmpty { args["jurisdiction"] = filterJurisdiction }
@@ -41,10 +41,10 @@ final class BrokersViewModel: ObservableObject {
 
         do {
             let response: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers", arguments: args)
-            brokers = response.brokers
+            state = .loaded(response.brokers)
             total = response.total
         } catch {
-            errorMessage = error.localizedDescription
+            state = .failed(error.localizedDescription)
         }
     }
 

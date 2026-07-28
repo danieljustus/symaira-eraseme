@@ -20,6 +20,7 @@ struct SymairaEraseMeApp: App {
 struct ContentView: View {
     @EnvironmentObject var serverManager: ServerManager
     @State private var selectedNav: NavItem = .dashboard
+    @State private var mcpReachable = false
 
     enum NavItem: String, CaseIterable, Identifiable {
         case dashboard = "Dashboard"
@@ -106,9 +107,9 @@ struct ContentView: View {
             // Server Quick Status in Footer
             HStack(spacing: 8) {
                 Circle()
-                    .fill(serverManager.isRunning ? BrandColors.confirmed : BrandColors.rejected)
+                    .fill(mcpReachable ? BrandColors.confirmed : BrandColors.rejected)
                     .frame(width: 8, height: 8)
-                Text(serverManager.isRunning ? "MCP Engine Active" : "MCP Engine Offline")
+                Text(mcpReachable ? "MCP Engine Active" : "MCP Engine Offline")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(BrandColors.textSecondary)
             }
@@ -118,6 +119,13 @@ struct ContentView: View {
         }
         .frame(maxHeight: .infinity)
         .background(BrandColors.bgDarker.ignoresSafeArea())
+        .task {
+            // Periodically check MCP server reachability
+            while !Task.isCancelled {
+                mcpReachable = await MCPClient.shared.ping()
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
     }
 
     @ViewBuilder

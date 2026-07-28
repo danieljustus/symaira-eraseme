@@ -12,9 +12,6 @@ struct CampaignsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                if let error = vm.errorMessage {
-                    ErrorBanner(message: error) { vm.errorMessage = nil }
-                }
                 if let plan = vm.planResult {
                     successBanner(plan.message ?? "Campaign created")
                 }
@@ -22,18 +19,28 @@ struct CampaignsView: View {
                     successBanner(exec.message ?? "Execution complete")
                 }
 
-                if vm.isLoading && vm.campaigns.isEmpty {
+                switch vm.state {
+                case .idle, .loading:
                     LoadingOverlay(message: "Loading campaigns…")
                         .frame(height: 200)
-                } else if vm.campaigns.isEmpty {
-                    EmptyStateView(
-                        icon: "megaphone.fill",
-                        title: "No Campaigns",
-                        message: "Create your first campaign to start removing data from brokers."
-                    )
+
+                case .failed(let message):
+                    ErrorStateView(message: message) {
+                        Task { await vm.refresh() }
+                    }
                     .frame(height: 200)
-                } else {
-                    campaignsTable
+
+                case .loaded(let campaigns):
+                    if campaigns.isEmpty {
+                        EmptyStateView(
+                            icon: "megaphone.fill",
+                            title: "No Campaigns",
+                            message: "Create your first campaign to start removing data from brokers."
+                        )
+                        .frame(height: 200)
+                    } else {
+                        campaignsTable(campaigns)
+                    }
                 }
             }
             .padding(24)
@@ -77,9 +84,9 @@ struct CampaignsView: View {
         }
     }
 
-    private var campaignsTable: some View {
+    private func campaignsTable(_ campaigns: [DashboardCampaign]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Table(vm.campaigns) {
+            Table(campaigns) {
                 TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
                 TableColumn("Kind") { Text($0.kind ?? "—") }
                 TableColumn("Total") { Text("\($0.total)") }
