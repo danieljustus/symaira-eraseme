@@ -42,6 +42,8 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.symaira.eraseme.app</string>
+    <key>CFBundleDisplayName</key>
+    <string>Symaira EraseMe</string>
     <key>CFBundleName</key>
     <string>Symaira EraseMe</string>
     <key>CFBundlePackageType</key>
@@ -58,28 +60,12 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
-SRC_ICON="assets/apple-touch-icon.png"
+SRC_ICON="assets/branding/AppIcon.icns"
 if [ -f "$SRC_ICON" ]; then
-    echo "Generating AppIcon.icns..."
-    ICONSET_DIR="app/SymairaEraseMe/.build/AppIcon.iconset"
-    rm -rf "$ICONSET_DIR"
-    mkdir -p "$ICONSET_DIR"
-
-    sips -z 16 16     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16.png" > /dev/null 2>&1
-    sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16@2x.png" > /dev/null 2>&1
-    sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_32x32.png" > /dev/null 2>&1
-    sips -z 64 64     "$SRC_ICON" --out "$ICONSET_DIR/icon_32x32@2x.png" > /dev/null 2>&1
-    sips -z 128 128   "$SRC_ICON" --out "$ICONSET_DIR/icon_128x128.png" > /dev/null 2>&1
-    sips -z 256 256   "$SRC_ICON" --out "$ICONSET_DIR/icon_128x128@2x.png" > /dev/null 2>&1
-    sips -z 256 256   "$SRC_ICON" --out "$ICONSET_DIR/icon_256x256.png" > /dev/null 2>&1
-    sips -z 512 512   "$SRC_ICON" --out "$ICONSET_DIR/icon_256x256@2x.png" > /dev/null 2>&1
-    sips -z 512 512   "$SRC_ICON" --out "$ICONSET_DIR/icon_512x512.png" > /dev/null 2>&1
-    sips -z 1024 1024 "$SRC_ICON" --out "$ICONSET_DIR/icon_512x512@2x.png" > /dev/null 2>&1
-
-    iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-    rm -rf "$ICONSET_DIR"
+    echo "Installing AppIcon.icns..."
+    cp "$SRC_ICON" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 else
-    echo "Warning: assets/apple-touch-icon.png not found. App will build without icon."
+    echo "Warning: $SRC_ICON not found. App will build without icon."
 fi
 
 # --- Code Signing ---
@@ -96,12 +82,12 @@ else
     echo "CODESIGN_IDENTITY not set. Skipping code signing (ad-hoc only)."
 fi
 
-echo "Creating Applications symlink..."
-ln -s /Applications "$STAGE_DIR/Applications"
-
 echo "Creating DMG..."
 rm -f "dist/SymairaEraseMe.dmg"
 mkdir -p dist
-hdiutil create -volname "Symaira EraseMe" -srcfolder "$STAGE_DIR" -ov -format UDZO "dist/SymairaEraseMe.dmg"
+scripts/create-symaira-dmg.sh \
+    "$APP_BUNDLE" \
+    "dist/SymairaEraseMe.dmg" \
+    "Symaira EraseMe"
 
 echo "DMG successfully created: dist/SymairaEraseMe.dmg"

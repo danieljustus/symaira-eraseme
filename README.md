@@ -5,8 +5,10 @@
 > **Beta** — Core features are stable and tested. Some advanced features (web-form CAPTCHA solving, DPA auto-filing) require manual setup or are event-flagged only.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira-EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira-EraseMe/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
+
+![Symaira EraseMe social preview](docs/assets/social-preview.png)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/danieljustus/symaira-eraseme/main/assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
@@ -15,7 +17,7 @@
 Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It provides:
 
-- **A curated registry** of 1,200+ data brokers with opt-out processes documented
+- **A curated registry** of 1,279 data brokers with opt-out processes documented
 - **CLI tools** to plan, send, track, and triage removal requests
 - **Skills** for LLM-powered agents (Claude Code, OpenClaw, etc.)
 - **Lifecycle management** with deadline tracking, reminders, escalation, and re-scans
@@ -23,7 +25,7 @@ data brokers. It provides:
 
 ## Features
 
-- **Curated broker registry** with YAML-based definitions for **1,277 data brokers** across the EU (121), UK (20), and US (1,138), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
+- **Curated broker registry** with YAML-based definitions for **1,279 data brokers** across the EU (121), UK (20), and US (1,138), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
 - **Event-sourced architecture** with an append-only SQLite event store, state projections, and full audit trail for every removal request.
 - **CLI automation** with 30+ commands to plan removal campaigns, send opt-out requests in batches, track progress, monitor deadlines, and triage broker replies from the terminal.
 - **Web-form automation** via Playwright for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and screenshot capture.
@@ -211,10 +213,10 @@ symeraseme plan tick --dry-run
 symeraseme plan tick
 
 # Generate scheduler configs (cron / launchd / systemd)
-symeraseme generate-scheduler --output ./schedules
+symeraseme generate-scheduler --output-dir ./schedules
 
 # Install schedules
-symeraseme schedule install ./schedules
+symeraseme schedule install
 
 # Generate a dashboard report
 symeraseme generate-dashboard
@@ -382,7 +384,9 @@ AGENTS.md        — Setup guide for all AI agent integrations
 Symaira EraseMe uses standard exit codes for scripting:
 
 - `0` — Command completed successfully
-- `1` — General error (validation failure, missing profile, database error, etc.)
+- `1` — General error (validation failure, database error, etc.)
+- `2` — Configuration error (missing/invalid identity profile, bad settings)
+- `3` — Network error (connection failures, e.g. IMAP/SMTP/HTTP)
 
 ## Troubleshooting
 
@@ -468,4 +472,4 @@ symeraseme grant execute --ttl 3600
 
 ## License
 
-MIT
+Apache-2.0

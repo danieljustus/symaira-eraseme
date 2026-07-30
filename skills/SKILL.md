@@ -6,7 +6,7 @@ description: >
   rebuttal generation against 1,200+ data brokers.
 version: 1.0.0
 author: Symaira
-license: MIT
+license: Apache-2.0
 platforms: [macos, linux, windows]
 required_environment_variables:
   - ANTHROPIC_API_KEY

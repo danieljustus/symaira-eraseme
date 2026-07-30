@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.9.2] - 2026-07-28
+
+- **Fix**: CLI exit codes, help text, and `db-migrate` error message (#555).
+- **Fix**: Consume the consent token after verification to enforce a single-use contract (#551).
+- **Fix**: Update MCP `serve` auth docs and add MCP schema-sync CI check (#557).
+- **Perf**: Persist the IMAP UID high-water mark and batch FETCH commands (#556).
+- **Perf**: Short-circuit the registry cache-key walk via directory mtime (#550).
+- **CI**: Add a dependency-vulnerability scan with `uv pip audit` (#543, #552), later fixed to use `uv tool run pip-audit` (#558).
+
+## [v0.9.1] - 2026-07-27
+
+- **Fix**: Code-sign and notarize the macOS `.app` release using `notarytool` API-key auth (#541), including a base64 key-decoding fix.
+
+## [v0.9.0] - 2026-07-27
+
+- **Feat**: Migrate the macOS app's `ServerManager` to `SymairaDaemonKit.DaemonSupervisor` (#493).
+- **Feat**: Redesign the SwiftUI dashboard and configure DMG release packaging (#490); rename `SymairaDashboard` → `SymairaEraseMe` and migrate to `symaira-appkit` (#491); add MCP dashboard data handlers (#492).
+- **Fix**: Redact profile PII in LLM triage prompts (#532); persist the MCP auth token and close a shutdown auth race (#531); fail hard when a `vault://` IMAP password cannot be resolved (#506).
+- **Refactor**: Remove the dead orchestrator shim and inbox pass-through (#537); split `himalaya.py` into focused modules (#524, #534); harden and simplify the MCP JSON-RPC server (#505).
+- **Perf**: Persist a registry mtime snapshot instead of TTL re-stat (#539); scope inbox poll queries to relevant rows (#538); improve registry loader consistency and performance (#507).
+- **CI**: Suppress raw tracebacks with a top-level CLI exception guard (#533); pin the release-app workflow actions to commit SHAs (#530); exclude the inaccessible private Swift dependency from CodeQL (#517).
+
+## [v0.8.0] - 2026-07-08
+
+- **Feat**: Optimize the dashboard UI with Symaira branding and client-side filtering (#488).
+
+## [v0.7.0] - 2026-06-30
+
+- **Feat**: Multi-folder `poll-inbox` and a workflow orchestration template (#481).
+- **Fix**: Resolve multiple CLI and execution bugs, and adapt to the Himalaya v1.2 CLI/API breaking changes (#480, #471).
+- **Docs**: Add macOS 27 (Tahoe) `pydantic_core` troubleshooting guide and fix script (#455).
+- **Chore**: Adopt canonical Apache-2.0 license text (#464).
+- **Test**: Add coverage for new modules and service handlers/adapters (#486, #462).
+
 ## [v0.6.1] - 2026-06-22
 
 - **Security**: Cap MCP request body size and guard Content-Length parsing to reject oversized payloads (#439).
