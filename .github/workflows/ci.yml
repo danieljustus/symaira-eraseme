@@ -76,6 +76,10 @@ jobs:
       - name: Run tests
         run: uv run pytest --verbose --tb=short
 
+      - name: Coverage check
+        if: github.event_name != 'pull_request'
+        run: uv run pytest --cov=src/symeraseme/ --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
+
   test-macos:
     name: Test on macOS
     if: github.event_name != 'pull_request'  # PR gate = ubuntu; macOS on main/schedule
