@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.9.3] - 2026-07-30
+
+- **Fix**: Disable locale grouping on port TextField to prevent formatting artifact (#566).
+- **Fix**: Fix MCPClient SIGABRT crash and sidebar engine status indicator (#568).
+- **Fix**: Reconcile view model tool names with server and add loading/error states (#569).
+- **Feat**: Add Escape key shortcut to dismiss modal sheets (#567).
+- **CI**: Fast PR gate — lint + ubuntu tests on PRs, full suite on main + weekly schedule.
+- **CI**: Switch from `uv pip audit` to `uv tool run pip-audit` for vulnerability scanning (#558).
+- **Chore**: Bump astral-sh/setup-uv from 8.3.2 to 9.0.0 (#571).
+- **Chore**: Bump trufflesecurity/trufflehog from 3.95.9 to 3.96.0 (#570).
+- **Chore**: Prepare v0.9.2 release — license migration, branding assets, DMG packaging.
+
 ## [v0.9.2] - 2026-07-28
 
 - **Fix**: CLI exit codes, help text, and `db-migrate` error message (#555).
