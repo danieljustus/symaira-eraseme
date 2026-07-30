@@ -8,6 +8,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _restore_anthropic_module():
+    """Restore the real ``anthropic`` module after tests that fake it in sys.modules."""
+    original = sys.modules.get("anthropic")
+    yield
+    if original is not None:
+        sys.modules["anthropic"] = original
+    else:
+        sys.modules.pop("anthropic", None)
+
+
 def _mock_anthropic_module():
     """Create and inject a mock ``anthropic`` module into sys.modules."""
     mock_anthropic = MagicMock()
