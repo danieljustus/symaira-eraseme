@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.9.4] - 2026-07-31
+
+- **Fix**: MCP client auth header — read token from server and attach `Authorization: Bearer` to every request (#580).
+- **Fix**: ping() parser — correctly parse `tools/list` JSON-RPC response instead of reusing tool-call-envelope decoder (#581).
+- **Fix**: Disable locale grouping on server PID display to prevent formatting artifact (#582).
+- **Fix**: Surface server stderr in failure banner — show actionable diagnostics instead of only exit code (#583).
+
 ## [v0.9.3] - 2026-07-30
 
 - **Fix**: Disable locale grouping on port TextField to prevent formatting artifact (#566).
