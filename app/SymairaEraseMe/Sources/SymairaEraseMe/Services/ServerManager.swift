@@ -35,6 +35,9 @@ final class ServerManager: ObservableObject {
         didSet { UserDefaults.standard.set(port, forKey: "symeraseme_port") }
     }
 
+    /// Most recent stderr line from the server subprocess, for surfacing actionable diagnostics.
+    @Published var lastStderrLine: String?
+
     private let supervisor = DaemonSupervisor()
 
     init() {
@@ -74,6 +77,13 @@ final class ServerManager: ObservableObject {
     }
 
     private func setupSupervisor() {
+        supervisor.onLog = { [weak self] logLine in
+            guard logLine.isError else { return }
+            Task { @MainActor [weak self] in
+                self?.lastStderrLine = logLine.text
+            }
+        }
+
         supervisor.onStateChange = { [weak self] newState in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -84,13 +94,19 @@ final class ServerManager: ObservableObject {
                 case .starting:
                     self.isRunning = false
                     self.pid = nil
+                    self.lastStderrLine = nil
                 case .running(let pid):
                     self.isRunning = true
                     self.pid = pid
                 case .failed(let error):
                     self.isRunning = false
                     self.pid = nil
-                    self.lastError = error
+                    // Surface the last stderr line so the user can diagnose the failure
+                    if let stderr = self.lastStderrLine, !stderr.isEmpty {
+                        self.lastError = "\\(stderr)\n\\(error)"
+                    } else {
+                        self.lastError = error
+                    }
                 }
             }
         }
@@ -100,6 +116,7 @@ final class ServerManager: ObservableObject {
     func start() {
         guard !isRunning else { return }
         lastError = nil
+        lastStderrLine = nil
 
         let executable = findExecutable()
         let arguments = buildArguments()
