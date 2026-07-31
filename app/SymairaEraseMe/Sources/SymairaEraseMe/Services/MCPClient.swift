@@ -13,6 +13,14 @@ actor MCPClient {
     nonisolated(unsafe) static var configuredHost: String = "127.0.0.1"
     /// Configurable port (default 8000).
     nonisolated(unsafe) static var configuredPort: Int = 8000
+    /// Configurable data directory (default ~/.local/share/symeraseme).
+    /// Respects SYMERASEME_DATA_DIR environment variable.
+    nonisolated(unsafe) static var configuredDataDir: String = {
+        if let env = ProcessInfo.processInfo.environment["SYMERASEME_DATA_DIR"] {
+            return env
+        }
+        return NSString(string: "~/.local/share/symeraseme").expandingTildeInPath
+    }()
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -70,9 +78,46 @@ actor MCPClient {
     }
 
     /// Check if the MCP server is reachable.
+    /// Uses its own lightweight JSON-RPC parser for the tools/list response shape.
     func ping() async -> Bool {
         do {
-            let _: MCPCallResult = try await call(method: "tools/list", params: [:])
+            let host = MCPClient.configuredHost
+            let port = MCPClient.configuredPort
+            guard let url = URL(string: "http://\(host):\(port)/") else {
+                return false
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+            if let token = Self.readAuthToken(), !token.isEmpty {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+
+            let body = try JSONSerialization.data(withJSONObject: [
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "params": [:],
+                "id": 1
+            ])
+            request.httpBody = body
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return false
+            }
+
+            // Parse as a generic JSON-RPC 2.0 response — tools/list returns
+            // {"result": {"tools": [...]}} not the tool-call envelope shape.
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  json["result"] != nil,
+                  json["error"] == nil else {
+                return false
+            }
+
             return true
         } catch {
             return false
@@ -101,6 +146,11 @@ actor MCPClient {
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Attach per-run Bearer token for MCP server authentication.
+        if let token = Self.readAuthToken(), !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         let data: Data
         let response: URLResponse
@@ -152,5 +202,19 @@ actor MCPClient {
         }
 
         return callResult
+    }
+
+    // MARK: - Auth
+
+    /// Reads the MCP bearer token from the configured data directory.
+    /// The token is written by the MCP server on startup and must be
+    /// included as an Authorization header on every request.
+    private static func readAuthToken() -> String? {
+        let tokenPath = (configuredDataDir as NSString).appendingPathComponent("mcp_token")
+        guard let token = try? String(contentsOfFile: tokenPath, encoding: .utf8) else {
+            return nil
+        }
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
