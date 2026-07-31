@@ -55,7 +55,7 @@ struct SettingsView: View {
                         .font(.subheadline)
                         .foregroundStyle(BrandColors.textSecondary)
                     if let pid = serverManager.pid {
-                        Text("PID \(pid)")
+                        Text("PID \(String(pid))")
                             .font(.caption)
                             .foregroundStyle(BrandColors.textMuted)
                     }
