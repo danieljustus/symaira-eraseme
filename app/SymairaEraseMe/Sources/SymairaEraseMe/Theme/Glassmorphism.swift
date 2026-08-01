@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Glassmorphism card style matching the HTML dashboard aesthetic.
 struct GlassCardModifier: ViewModifier {
@@ -25,21 +26,23 @@ extension View {
     }
 }
 
-/// Status badge pill used throughout the dashboard.
+/// Shared status badge with a visible label and semantic tone.
 struct StatusBadge: View {
     let status: String
 
     var body: some View {
-        Text(displayText)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(BrandColors.backgroundColor(for: status))
-            )
-            .foregroundStyle(BrandColors.color(for: status))
+        SymairaBadge(displayText, tone: tone, systemImage: tone.systemImage)
+    }
+
+    private var tone: SymairaTone {
+        switch status.uppercased() {
+        case "CONFIRMED": return .positive
+        case "REJECTED", "REJECTED_FINAL", "OVERDUE": return .critical
+        case "AWAITING_ACK", "AWAITING_RESPONSE": return .warning
+        case "SENT": return .informative
+        case "PLANNED": return .neutral
+        default: return .neutral
+        }
     }
 
     private var displayText: String {
@@ -66,16 +69,16 @@ struct StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textSecondary)
                 .textCase(.uppercase)
                 .kerning(0.8)
             Text("\(value)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .symairaText(.display, respectsForeground: false)
                 .foregroundStyle(color)
             if let subtitle {
                 Text(subtitle)
-                    .font(.caption2)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
         }
@@ -103,20 +106,7 @@ struct EmptyStateView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 40))
-                .foregroundStyle(BrandColors.textMuted)
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(BrandColors.textSecondary)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(BrandColors.textMuted)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        SymairaEmptyState(systemImage: icon, title: title, message: message)
     }
 }
 
@@ -126,30 +116,7 @@ struct ErrorBanner: View {
     var onDismiss: (() -> Void)? = nil
 
     var body: some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(BrandColors.rejected)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(BrandColors.textPrimary)
-            Spacer()
-            if let onDismiss {
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(BrandColors.textMuted)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(BrandColors.rejectedBg)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(BrandColors.rejectedBorder, lineWidth: 1)
-                )
-        )
+        SymairaNotice(message: message, tone: .critical, onDismiss: onDismiss)
     }
 }
 
@@ -158,14 +125,7 @@ struct LoadingOverlay: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .tint(BrandColors.goldPrimary)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(BrandColors.textSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        SymairaLoadingState(message)
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Campaigns management view — list, create, and execute campaigns.
 struct CampaignsView: View {
@@ -70,7 +71,7 @@ struct CampaignsView: View {
     private var header: some View {
         HStack {
             Text("Campaigns")
-                .font(.largeTitle.bold())
+                .symairaText(.display)
                 .foregroundStyle(BrandColors.textPrimary)
             Spacer()
             Button {
@@ -114,13 +115,13 @@ struct CampaignsView: View {
             Form {
                 Section("Campaign Details") {
                     TextField("Campaign ID", text: $vm.newCampaignId)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.symaira)
                     TextField("Jurisdiction (optional)", text: $vm.newCampaignJurisdiction)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.symaira)
                     TextField("Law (optional)", text: $vm.newCampaignLaw)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.symaira)
                     TextField("Priority (optional)", text: $vm.newCampaignPriority)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.symaira)
                     Stepper("Max Brokers: \(vm.newCampaignMaxBrokers)", value: $vm.newCampaignMaxBrokers, in: 1...500)
                 }
 
@@ -156,7 +157,7 @@ struct CampaignsView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(BrandColors.confirmed)
             Text(message)
-                .font(.subheadline)
+                .symairaText(.callout)
                 .foregroundStyle(BrandColors.textPrimary)
             Spacer()
         }

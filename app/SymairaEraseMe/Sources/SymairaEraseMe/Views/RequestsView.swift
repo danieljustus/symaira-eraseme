@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Requests view — paginated list with filters and event detail.
 struct RequestsView: View {
@@ -55,10 +56,10 @@ struct RequestsView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("Requests")
-                    .font(.largeTitle.bold())
+                    .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                 Text("\(vm.total) total requests")
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
@@ -75,13 +76,13 @@ struct RequestsView: View {
     private var filters: some View {
         HStack(spacing: 12) {
             TextField("Campaign", text: $vm.filterCampaignId)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.symaira)
                 .frame(width: 150)
             TextField("Status", text: $vm.filterStatus)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.symaira)
                 .frame(width: 180)
             TextField("Broker", text: $vm.filterBrokerId)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.symaira)
                 .frame(width: 150)
             Button("Apply") {
                 vm.page = 1
@@ -105,7 +106,7 @@ struct RequestsView: View {
                 Text("Jurisdiction").frame(width: 90, alignment: .leading)
                 Text("Deadline").frame(width: 80, alignment: .leading)
             }
-            .font(.caption.bold())
+            .symairaText(.sectionLabel)
             .foregroundStyle(BrandColors.textMuted)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -137,7 +138,7 @@ struct RequestsView: View {
                                     .frame(width: 80, alignment: .leading)
                             }
                         }
-                        .font(.subheadline)
+                        .symairaText(.callout)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
@@ -159,7 +160,7 @@ struct RequestsView: View {
     private var pagination: some View {
         HStack {
             Text("Page \(vm.page) of \(vm.totalPages)")
-                .font(.caption)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
             Spacer()
             Button("Previous") { vm.previousPage() }
@@ -174,7 +175,7 @@ struct RequestsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Request #\(request.id)")
-                    .font(.headline)
+                    .symairaText(.subheading)
                     .foregroundStyle(BrandColors.textPrimary)
                 Spacer()
                 Button {
@@ -212,7 +213,7 @@ struct RequestsView: View {
                 .background(BrandColors.textMuted.opacity(0.2))
 
             Text("Events")
-                .font(.subheadline.bold())
+                .symairaText(.bodyEmphasized)
                 .foregroundStyle(BrandColors.textPrimary)
 
             switch vm.eventsState {
@@ -224,9 +225,9 @@ struct RequestsView: View {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(BrandColors.overdue)
-                        .font(.caption)
+                        .symairaText(.caption)
                     Text(message)
-                        .font(.caption)
+                        .symairaText(.caption)
                         .foregroundStyle(BrandColors.textMuted)
                     Button("Retry") {
                         Task { await vm.loadEvents(for: request) }
@@ -238,26 +239,28 @@ struct RequestsView: View {
             case .loaded:
                 if vm.requestEvents.isEmpty {
                     Text("No events")
-                        .font(.caption)
+                        .symairaText(.caption)
                         .foregroundStyle(BrandColors.textMuted)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(vm.requestEvents) { event in
                                 HStack(alignment: .top, spacing: 8) {
-                                    Circle()
-                                        .fill(BrandColors.color(for: event.eventType))
-                                        .frame(width: 8, height: 8)
-                                        .offset(y: 4)
+                                    SymairaStatusDot(
+                                        tone: eventTone(for: event.eventType),
+                                        accessibilityLabel: event.eventType.replacingOccurrences(of: "_", with: " ").capitalized
+                                    )
+                                    .accessibilityHidden(true)
+                                    .offset(y: 4)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
-                                            .font(.caption)
+                                            .symairaText(.caption)
                                             .foregroundStyle(BrandColors.textPrimary)
                                         Text(event.occurredAt.formattedDate)
-                                            .font(.caption2)
+                                            .symairaText(.caption)
                                             .foregroundStyle(BrandColors.textMuted)
                                         Text("Source: \(event.source)")
-                                            .font(.caption2)
+                                            .symairaText(.caption)
                                             .foregroundStyle(BrandColors.textMuted)
                                     }
                                 }
@@ -278,14 +281,24 @@ struct RequestsView: View {
         )
     }
 
+    private func eventTone(for eventType: String) -> SymairaTone {
+        switch eventType.uppercased() {
+        case "CONFIRMATION_RECEIVED": return .positive
+        case "REJECTION_RECEIVED", "DEADLINE_REACHED": return .critical
+        case "SENT", "REMINDER_SENT", "REBUTTAL_SENT": return .warning
+        case "PLANNED": return .informative
+        default: return .neutral
+        }
+    }
+
     private func detailRow(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label)
-                .font(.caption)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
                 .frame(width: 90, alignment: .trailing)
             Text(value)
-                .font(.subheadline)
+                .symairaText(.callout)
                 .foregroundStyle(BrandColors.textPrimary)
         }
     }

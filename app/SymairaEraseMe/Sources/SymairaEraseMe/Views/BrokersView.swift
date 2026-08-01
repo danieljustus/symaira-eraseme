@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Brokers view — browse and filter the broker registry.
 struct BrokersView: View {
@@ -48,21 +49,21 @@ struct BrokersView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("Brokers")
-                    .font(.largeTitle.bold())
+                    .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                 Text("\(vm.total) brokers in registry")
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
             TextField("Search…", text: $vm.searchText)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.symaira)
                 .frame(width: 200)
             Button {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.title3)
+                    .symairaText(.heading)
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
@@ -133,11 +134,11 @@ struct BrokersView: View {
                     // Header
                     VStack(alignment: .leading, spacing: 4) {
                         Text(broker.name)
-                            .font(.title2.bold())
+                            .symairaText(.heading)
                             .foregroundStyle(BrandColors.goldPrimary)
                         if let website = broker.website {
                             Link(website, destination: URL(string: website) ?? URL(string: "about:blank")!)
-                                .font(.caption)
+                                .symairaText(.caption)
                         }
                     }
 
@@ -161,7 +162,7 @@ struct BrokersView: View {
                     // Opt-out channels
                     if let optOut = broker.optOut, !optOut.isEmpty {
                         Text("Opt-Out Channels")
-                            .font(.headline)
+                            .symairaText(.subheading)
                             .foregroundStyle(BrandColors.textPrimary)
                         ForEach(optOut.indices, id: \.self) { index in
                             let channel = optOut[index]
@@ -170,16 +171,16 @@ struct BrokersView: View {
                                     StatusBadge(status: channel.type)
                                     if let endpoint = channel.endpoint {
                                         Text(endpoint)
-                                            .font(.caption)
+                                            .symairaText(.caption)
                                     }
                                     if let url = channel.url {
                                         Link(url, destination: URL(string: url) ?? URL(string: "about:blank")!)
-                                            .font(.caption)
+                                            .symairaText(.caption)
                                     }
                                 }
                                 if let fields = channel.requiredFields, !fields.isEmpty {
                                     Text("Required fields: \(fields.joined(separator: ", "))")
-                                        .font(.caption2)
+                                        .symairaText(.caption)
                                         .foregroundStyle(BrandColors.textMuted)
                                 }
                             }
@@ -189,10 +190,10 @@ struct BrokersView: View {
                     if let notes = broker.notes, !notes.isEmpty {
                         Divider().background(BrandColors.textMuted.opacity(0.2))
                         Text("Notes")
-                            .font(.headline)
+                            .symairaText(.subheading)
                             .foregroundStyle(BrandColors.textPrimary)
                         Text(notes)
-                            .font(.subheadline)
+                            .symairaText(.callout)
                             .foregroundStyle(BrandColors.textSecondary)
                     }
                 }
@@ -216,11 +217,11 @@ struct BrokersView: View {
     private func detailRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top) {
             Text(label)
-                .font(.caption)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
                 .frame(width: 110, alignment: .trailing)
             Text(value)
-                .font(.subheadline)
+                .symairaText(.callout)
                 .foregroundStyle(BrandColors.textPrimary)
         }
     }
@@ -234,13 +235,13 @@ struct BrokerCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(broker.name)
-                    .font(.subheadline.bold())
+                    .symairaText(.bodyEmphasized)
                     .foregroundStyle(BrandColors.goldPrimary)
                     .lineLimit(1)
                 Spacer()
                 if let priority = broker.priority {
                     Text(priority.uppercased())
-                        .font(.caption2.bold())
+                        .symairaText(.sectionLabel)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -252,7 +253,7 @@ struct BrokerCard: View {
 
             if let category = broker.category {
                 Text(category.replacingOccurrences(of: "-", with: " ").capitalized)
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textSecondary)
             }
 
@@ -260,7 +261,7 @@ struct BrokerCard: View {
                 HStack(spacing: 4) {
                     ForEach(jurisdictions, id: \.self) { jur in
                         Text(jur)
-                            .font(.caption2)
+                            .symairaText(.caption)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(BrandColors.plannedBg))
@@ -273,7 +274,7 @@ struct BrokerCard: View {
                 HStack(spacing: 8) {
                     ForEach(channels, id: \.type) { ch in
                         Label(ch.type, systemImage: ch.type == "email" ? "envelope" : "globe")
-                            .font(.caption2)
+                            .symairaText(.caption)
                             .foregroundStyle(BrandColors.textMuted)
                     }
                 }
