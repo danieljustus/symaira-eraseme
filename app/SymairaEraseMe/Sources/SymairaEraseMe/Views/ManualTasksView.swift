@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Manual tasks view — list and complete tasks requiring human intervention.
 struct ManualTasksView: View {
@@ -13,16 +14,7 @@ struct ManualTasksView: View {
                 header
 
                 if let success = vm.successMessage {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(BrandColors.confirmed)
-                        Text(success)
-                            .font(.subheadline)
-                            .foregroundStyle(BrandColors.textPrimary)
-                        Spacer()
-                    }
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(BrandColors.confirmedBg))
+                    SymairaNotice(message: success, tone: .positive)
                 }
 
                 summaryCards
@@ -64,10 +56,10 @@ struct ManualTasksView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("Manual Tasks")
-                    .font(.largeTitle.bold())
+                    .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                 Text("Tasks requiring human intervention")
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
@@ -85,7 +77,7 @@ struct ManualTasksView: View {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.title3)
+                    .symairaText(.heading)
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
@@ -128,7 +120,7 @@ struct ManualTasksView: View {
                         .controlSize(.small)
                     } else {
                         Text("Done")
-                            .font(.caption)
+                            .symairaText(.caption)
                             .foregroundStyle(BrandColors.textMuted)
                     }
                 }
@@ -147,11 +139,11 @@ struct ManualTasksView: View {
                         LabeledContent("Reason", value: task.reason)
                         LabeledContent("URL") {
                             Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
-                                .font(.caption)
+                                .symairaText(.caption)
                         }
                         if !task.instructions.isEmpty {
                             Text(task.instructions)
-                                .font(.subheadline)
+                                .symairaText(.callout)
                                 .foregroundStyle(BrandColors.textSecondary)
                         }
                     }
@@ -160,7 +152,7 @@ struct ManualTasksView: View {
                 Section("Completion Notes") {
                     TextEditor(text: $completionNotes)
                         .frame(height: 80)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.symaira)
                 }
 
                 Section {

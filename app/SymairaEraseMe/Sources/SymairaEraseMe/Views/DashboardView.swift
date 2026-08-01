@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 import Charts
 
 /// Main dashboard view showing summary cards, status breakdown, campaigns, broker grid, and events.
@@ -50,11 +51,11 @@ struct DashboardView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("Dashboard")
-                    .font(.largeTitle.bold())
+                    .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                 if let data = vm.data {
                     Text("Generated \(data.generatedAt.formattedDate)")
-                        .font(.caption)
+                        .symairaText(.caption)
                         .foregroundStyle(BrandColors.textMuted)
                 }
             }
@@ -63,7 +64,7 @@ struct DashboardView: View {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.title3)
+                    .symairaText(.heading)
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
@@ -93,7 +94,7 @@ struct DashboardView: View {
     private var statusBreakdownChart: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Status Breakdown")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             Chart(vm.statusBreakdown, id: \.label) { item in
@@ -125,7 +126,7 @@ struct DashboardView: View {
     private var campaignsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Campaigns")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let campaigns = vm.data?.campaigns, !campaigns.isEmpty {
@@ -156,7 +157,7 @@ struct DashboardView: View {
     private var brokerGrid: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Broker Status")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let brokerStatus = vm.data?.brokerStatus, !brokerStatus.isEmpty {
@@ -182,7 +183,7 @@ struct DashboardView: View {
     private var recentEvents: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recent Events")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let events = vm.data?.recentEvents, !events.isEmpty {
@@ -214,33 +215,33 @@ struct BrokerStatusCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(broker.brokerId)
-                .font(.subheadline.bold())
+                .symairaText(.bodyEmphasized)
                 .foregroundStyle(BrandColors.goldPrimary)
                 .lineLimit(1)
             HStack(spacing: 8) {
                 if broker.confirmed > 0 {
                     Label("\(broker.confirmed)", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(BrandColors.confirmed)
-                        .font(.caption)
+                        .symairaText(.caption)
                 }
                 if broker.pending > 0 {
                     Label("\(broker.pending)", systemImage: "clock.fill")
                         .foregroundStyle(BrandColors.pending)
-                        .font(.caption)
+                        .symairaText(.caption)
                 }
                 if broker.overdue > 0 {
                     Label("\(broker.overdue)", systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(BrandColors.overdue)
-                        .font(.caption)
+                        .symairaText(.caption)
                 }
                 if broker.rejected > 0 {
                     Label("\(broker.rejected)", systemImage: "xmark.circle.fill")
                         .foregroundStyle(BrandColors.rejected)
-                        .font(.caption)
+                        .symairaText(.caption)
                 }
             }
             Text("\(broker.total) total")
-                .font(.caption2)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -269,22 +270,22 @@ struct EventRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .font(.subheadline)
+                    .symairaText(.callout)
                     .foregroundStyle(BrandColors.textPrimary)
                 if let brokerId = event.brokerId {
                     Text(brokerId)
-                        .font(.caption)
+                        .symairaText(.caption)
                         .foregroundStyle(BrandColors.goldPrimary)
                 }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(event.source)
-                    .font(.caption2)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
                 if let date = event.occurredDate {
                     Text(date.formatted(.relative(presentation: .named)))
-                        .font(.caption2)
+                        .symairaText(.caption)
                         .foregroundStyle(BrandColors.textMuted)
                 }
             }
@@ -305,10 +306,10 @@ struct ErrorStateView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(BrandColors.overdue)
             Text("Failed to Load")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
             Text(message)
-                .font(.subheadline)
+                .symairaText(.callout)
                 .foregroundStyle(BrandColors.textMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)

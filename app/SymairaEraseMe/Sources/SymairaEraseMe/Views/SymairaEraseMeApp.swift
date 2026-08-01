@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 @main
 struct SymairaEraseMeApp: App {
@@ -70,7 +71,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
                     Image(systemName: "shield.checkerboard")
-                        .font(.title2)
+                        .symairaText(.heading)
                         .foregroundStyle(BrandColors.goldPrimary)
                     
                     Text("SYMAIRA")
@@ -79,7 +80,7 @@ struct ContentView: View {
                         .kerning(2.0)
                 }
                 Text("EraseMe Portal")
-                    .font(.caption2)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
                     .kerning(1.0)
                     .padding(.leading, 30)
@@ -105,14 +106,10 @@ struct ContentView: View {
             Spacer()
             
             // Server Quick Status in Footer
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(mcpReachable ? BrandColors.confirmed : BrandColors.rejected)
-                    .frame(width: 8, height: 8)
-                Text(mcpReachable ? "MCP Engine Active" : "MCP Engine Offline")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(BrandColors.textSecondary)
-            }
+            SymairaStatusLabel(
+                mcpReachable ? "MCP Engine Active" : "MCP Engine Offline",
+                tone: mcpReachable ? .positive : .critical
+            )
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
@@ -165,12 +162,12 @@ struct SidebarButton: View {
                     .frame(width: 3, height: 16)
                 
                 Image(systemName: item.icon)
-                    .font(.body)
+                    .symairaText(.body)
                     .foregroundStyle(isSelected ? BrandColors.goldPrimary : (isHovered ? BrandColors.textPrimary : BrandColors.textSecondary))
                     .frame(width: 20, alignment: .center)
                 
                 Text(item.rawValue)
-                    .font(.subheadline)
+                    .symairaText(.callout)
                     .fontWeight(isSelected ? .semibold : .medium)
                     .foregroundStyle(isSelected ? BrandColors.textPrimary : (isHovered ? BrandColors.textPrimary : BrandColors.textSecondary))
                 

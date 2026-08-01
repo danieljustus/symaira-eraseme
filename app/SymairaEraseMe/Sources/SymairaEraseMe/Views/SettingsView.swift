@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Settings view — server management, connection, and configuration.
 struct SettingsView: View {
@@ -29,10 +30,10 @@ struct SettingsView: View {
     private var header: some View {
         VStack(alignment: .leading) {
             Text("Settings")
-                .font(.largeTitle.bold())
+                .symairaText(.display)
                 .foregroundStyle(BrandColors.textPrimary)
             Text("Configure the MCP server connection and app preferences")
-                .font(.caption)
+                .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
         }
     }
@@ -40,28 +41,20 @@ struct SettingsView: View {
     // MARK: - Server Section
 
     private var serverSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("MCP Server")
-                .font(.headline)
-                .foregroundStyle(BrandColors.textPrimary)
-
-            HStack(spacing: 16) {
-                // Status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(serverManager.isRunning ? BrandColors.confirmed : BrandColors.rejected)
-                        .frame(width: 10, height: 10)
-                    Text(serverManager.isRunning ? "Running" : "Stopped")
-                        .font(.subheadline)
-                        .foregroundStyle(BrandColors.textSecondary)
+        SymairaFormSection("MCP Server") {
+            HStack(spacing: SymairaSpacing.large) {
+                HStack(spacing: SymairaSpacing.medium) {
+                    SymairaStatusLabel(
+                        serverManager.isRunning ? "Running" : "Stopped",
+                        tone: serverManager.isRunning ? .positive : .critical
+                    )
                     if let pid = serverManager.pid {
                         Text("PID \(String(pid))")
-                            .font(.caption)
-                            .foregroundStyle(BrandColors.textMuted)
+                            .symairaText(.monoSmall)
                     }
                 }
 
-                Spacer()
+                Spacer(minLength: SymairaSpacing.medium)
 
                 if serverManager.isRunning {
                     Button("Stop Server") {
@@ -83,30 +76,35 @@ struct SettingsView: View {
                 ErrorBanner(message: error) { serverManager.lastError = nil }
             }
         }
-        .interactiveGlassCard()
     }
 
     // MARK: - Connection Section
 
     private var connectionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Connection")
-                .font(.headline)
-                .foregroundStyle(BrandColors.textPrimary)
-
-            HStack(spacing: 12) {
+        SymairaFormSection("Connection") {
+            SymairaFormRow("Host") {
                 TextField("Host", text: $serverManager.host)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
+                    .textFieldStyle(.symaira)
+                    .frame(minWidth: 180, idealWidth: 260, maxWidth: 360)
                     .onChange(of: serverManager.host) { _, _ in
                         MCPClient.configuredHost = serverManager.host
                     }
+            }
+
+            SymairaFormDivider()
+
+            SymairaFormRow("Port") {
                 TextField("Port", value: $serverManager.port, format: .number.grouping(.never))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 100)
+                    .textFieldStyle(.symaira)
+                    .frame(width: 120)
                     .onChange(of: serverManager.port) { _, _ in
                         MCPClient.configuredPort = serverManager.port
                     }
+            }
+
+            SymairaFormDivider()
+
+            SymairaFormRow("Test Connection") {
                 Button("Test Connection") {
                     Task { await vm.checkConnection() }
                 }
@@ -115,81 +113,62 @@ struct SettingsView: View {
                 .disabled(vm.isChecking)
             }
 
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(vm.isConnected ? BrandColors.confirmed : BrandColors.rejected)
-                    .frame(width: 8, height: 8)
-                Text(vm.isConnected ? "Connected" : "Not connected")
-                    .font(.caption)
-                    .foregroundStyle(BrandColors.textSecondary)
+            HStack(spacing: SymairaSpacing.medium) {
+                SymairaStatusLabel(
+                    vm.isConnected ? "Connected" : "Not connected",
+                    tone: vm.isConnected ? .positive : .critical
+                )
                 if vm.isChecking {
                     ProgressView()
                         .controlSize(.mini)
+                        .accessibilityLabel("Checking connection")
                 }
             }
 
             if let error = vm.lastCheckError {
                 Text(error)
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.rejected)
             }
         }
-        .interactiveGlassCard()
     }
 
     // MARK: - Configuration Section
 
     private var configurationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Configuration")
-                .font(.headline)
-                .foregroundStyle(BrandColors.textPrimary)
+        SymairaFormSection("Configuration") {
+            SymairaFormRow("Binary Path") {
+                TextField("Auto-detect", text: $serverManager.binaryPath)
+                    .textFieldStyle(.symaira)
+                    .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
+            }
 
-            Group {
-                HStack {
-                    Text("Binary Path")
-                        .frame(width: 120, alignment: .trailing)
-                        .font(.subheadline)
-                        .foregroundStyle(BrandColors.textSecondary)
-                    TextField("Auto-detect", text: $serverManager.binaryPath)
-                        .textFieldStyle(.roundedBorder)
-                }
+            SymairaFormDivider()
 
-                HStack {
-                    Text("Data Directory")
-                        .frame(width: 120, alignment: .trailing)
-                        .font(.subheadline)
-                        .foregroundStyle(BrandColors.textSecondary)
-                    TextField("Default (~/.symeraseme)", text: $serverManager.dataDir)
-                        .textFieldStyle(.roundedBorder)
-                }
+            SymairaFormRow("Data Directory") {
+                TextField("Default (~/.symeraseme)", text: $serverManager.dataDir)
+                    .textFieldStyle(.symaira)
+                    .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
+            }
 
-                HStack {
-                    Text("API Key")
-                        .frame(width: 120, alignment: .trailing)
-                        .font(.subheadline)
-                        .foregroundStyle(BrandColors.textSecondary)
-                    SecureField("ANTHROPIC_API_KEY", text: $serverManager.anthropicKey)
-                        .textFieldStyle(.roundedBorder)
-                }
+            SymairaFormDivider()
+
+            SymairaFormRow("API Key") {
+                SecureField("ANTHROPIC_API_KEY", text: $serverManager.anthropicKey)
+                    .textFieldStyle(.symaira)
+                    .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
         }
-        .interactiveGlassCard()
     }
 
     // MARK: - HTML Dashboard
 
     private var htmlDashboardSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("HTML Dashboard")
-                .font(.headline)
-                .foregroundStyle(BrandColors.textPrimary)
-
-            Text("Generate and open the HTML dashboard in your browser as a fallback.")
-                .font(.subheadline)
-                .foregroundStyle(BrandColors.textSecondary)
-
-            HStack(spacing: 12) {
+        SymairaFormSection(
+            "HTML Dashboard",
+            footer: "Generate and open the HTML dashboard in your browser as a fallback."
+        ) {
+            HStack(spacing: SymairaSpacing.medium) {
                 Button("Generate & Open Dashboard") {
                     Task { await vm.openHTMLDashboard() }
                 }
@@ -206,37 +185,31 @@ struct SettingsView: View {
 
             if let path = vm.dashboardPath {
                 Text(path)
-                    .font(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
+                    .symairaText(.monoSmall)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
         }
-        .interactiveGlassCard()
     }
 
     // MARK: - About
 
     private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("About")
-                .font(.headline)
-                .foregroundStyle(BrandColors.textPrimary)
-
+        SymairaFormSection("About") {
             HStack {
                 Text("Symaira EraseMe")
-                    .font(.subheadline)
+                    .symairaText(.callout)
                     .foregroundStyle(BrandColors.goldPrimary)
                 Text("•")
                     .foregroundStyle(BrandColors.textMuted)
+                    .accessibilityHidden(true)
                 Text("Native Dashboard")
-                    .font(.subheadline)
+                    .symairaText(.callout)
                     .foregroundStyle(BrandColors.textSecondary)
             }
 
             Text("Connects to the Symaira MCP server for GDPR/CCPA data broker removal automation.")
-                .font(.caption)
-                .foregroundStyle(BrandColors.textMuted)
+                .symairaText(.caption)
         }
-        .interactiveGlassCard()
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import SymairaTheme
 
 /// Calendar view showing upcoming deadlines and tick actions.
 struct CalendarView: View {
@@ -45,10 +46,10 @@ struct CalendarView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("Calendar")
-                    .font(.largeTitle.bold())
+                    .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                 Text("Upcoming deadlines and tick actions")
-                    .font(.caption)
+                    .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
@@ -67,7 +68,7 @@ struct CalendarView: View {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.title3)
+                    .symairaText(.heading)
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
@@ -77,7 +78,7 @@ struct CalendarView: View {
     private func deadlinesSummary(_ deadlines: UpcomingDeadlines) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Deadline Summary")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let totals = deadlines.totals {
@@ -108,17 +109,17 @@ struct CalendarView: View {
 
             if let byStatus = deadlines.byStatus, !byStatus.isEmpty {
                 Text("By Status")
-                    .font(.subheadline.bold())
+                    .symairaText(.bodyEmphasized)
                     .foregroundStyle(BrandColors.textSecondary)
                     .padding(.top, 4)
                 HStack(spacing: 16) {
                     ForEach(byStatus.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
                         VStack(spacing: 4) {
                             Text("\(value)")
-                                .font(.title3.bold())
+                                .symairaText(.heading)
                                 .foregroundStyle(BrandColors.color(for: key))
                             Text(key.replacingOccurrences(of: "_", with: " "))
-                                .font(.caption2)
+                                .symairaText(.caption)
                                 .foregroundStyle(BrandColors.textMuted)
                         }
                     }
@@ -127,17 +128,17 @@ struct CalendarView: View {
 
             if let escalation = deadlines.escalation, !escalation.isEmpty {
                 Text("Escalation")
-                    .font(.subheadline.bold())
+                    .symairaText(.bodyEmphasized)
                     .foregroundStyle(BrandColors.textSecondary)
                     .padding(.top, 4)
                 HStack(spacing: 16) {
                     ForEach(escalation.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
                         HStack(spacing: 4) {
                             Text("\(value)")
-                                .font(.subheadline.bold())
+                                .symairaText(.bodyEmphasized)
                                 .foregroundStyle(BrandColors.textPrimary)
                             Text(key)
-                                .font(.caption)
+                                .symairaText(.caption)
                                 .foregroundStyle(BrandColors.textMuted)
                         }
                     }
@@ -150,7 +151,7 @@ struct CalendarView: View {
     private var tickActionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Tick Actions")
-                .font(.headline)
+                .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if vm.tickActions.isEmpty {
