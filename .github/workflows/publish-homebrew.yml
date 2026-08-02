@@ -1,0 +1,147 @@
+name: Publish Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (for example, v0.10.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homebrew-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Update Homebrew CLI Formula
+    runs-on: macos-latest
+    env:
+      HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
+    steps:
+      - name: Validate publisher credential
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_GITHUB_TOKEN:-}" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: danieljustus/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: tap
+          fetch-depth: 0
+
+      - name: Register checked-out tap with Homebrew
+        run: |
+          set -euo pipefail
+          TAP_PATH="$(brew --repository)/Library/Taps/danieljustus/homebrew-tap"
+          rm -rf "$TAP_PATH"
+          mkdir -p "$(dirname "$TAP_PATH")"
+          mv "$GITHUB_WORKSPACE/tap" "$TAP_PATH"
+          echo "TAP_PATH=$TAP_PATH" >> "$GITHUB_ENV"
+
+      - name: Wait for the PyPI release
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          case "$VERSION" in
+            ''|*[!0-9.]*|*.*.*.*) echo "::error::Invalid release version: $RELEASE_TAG"; exit 1 ;;
+          esac
+
+          for attempt in $(seq 1 30); do
+            PUBLISHED_VERSION=$(curl --fail --silent --show-error --retry 3 \
+              https://pypi.org/pypi/symeraseme/json | jq -r '.info.version' || true)
+            if [ "$PUBLISHED_VERSION" = "$VERSION" ]; then
+              echo "PyPI version $VERSION is available."
+              echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Waiting for PyPI version $VERSION (observed: ${PUBLISHED_VERSION:-unavailable}, attempt $attempt/30)."
+            sleep 20
+          done
+
+          echo "::error::PyPI version $VERSION was not published within the expected window."
+          exit 1
+
+      - name: Refresh Python resources
+        run: |
+          set -euo pipefail
+          brew update
+          if ! brew update-python-resources --ignore-errors --version "$VERSION" danieljustus/tap/symeraseme; then
+            echo "::warning::Some Homebrew Python resources could not be refreshed; the formula audit below remains required."
+          fi
+
+      - name: Update main PyPI source metadata
+        run: |
+          set -euo pipefail
+          METADATA=$(mktemp)
+          trap 'rm -f "$METADATA"' EXIT
+          curl --fail --silent --show-error --retry 3 \
+            https://pypi.org/pypi/symeraseme/json > "$METADATA"
+          SDIST_URL=$(jq -r --arg filename "symeraseme-${VERSION}.tar.gz" \
+            '.urls[] | select(.packagetype == "sdist" and .filename == $filename) | .url' "$METADATA")
+          SDIST_SHA=$(jq -r --arg filename "symeraseme-${VERSION}.tar.gz" \
+            '.urls[] | select(.packagetype == "sdist" and .filename == $filename) | .digests.sha256' "$METADATA")
+          test -n "$SDIST_URL"
+          test "${#SDIST_SHA}" -eq 64
+          FORMULA_PATH="$TAP_PATH/Formula/symeraseme.rb" \
+            SDIST_URL="$SDIST_URL" SDIST_SHA="$SDIST_SHA" \
+            python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          formula = pathlib.Path(os.environ["FORMULA_PATH"])
+          content = formula.read_text()
+          pattern = re.compile(
+              r'(?m)^  url "https://files\\.pythonhosted\\.org/[^\n"]+'
+              r'/symeraseme-[^\n"]+\\.tar\\.gz"\n'
+              r'  sha256 "[0-9a-f]{64}"'
+          )
+          match = pattern.search(content)
+          if match is None:
+              raise SystemExit("main sdist metadata block not found")
+          replacement = (
+              f'  url "{os.environ["SDIST_URL"]}"\n'
+              f'  sha256 "{os.environ["SDIST_SHA"]}"'
+          )
+          formula.write_text(content[:match.start()] + replacement + content[match.end():])
+          PY
+
+      - name: Verify Formula metadata
+        run: |
+          set -euo pipefail
+          ruby -c "$TAP_PATH/Formula/symeraseme.rb"
+          brew audit --formula --online "$TAP_PATH/Formula/symeraseme.rb"
+          grep -q "symeraseme-${VERSION}.tar.gz" "$TAP_PATH/Formula/symeraseme.rb"
+          git -C "$TAP_PATH" diff --check
+
+      - name: Publish updated Formula
+        run: |
+          set -euo pipefail
+          if git -C "$TAP_PATH" diff --quiet -- Formula/symeraseme.rb; then
+            echo "::error::Homebrew Formula did not change for version $VERSION."
+            exit 1
+          fi
+          git -C "$TAP_PATH" config user.name "github-actions[bot]"
+          git -C "$TAP_PATH" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$TAP_PATH" add Formula/symeraseme.rb
+          git -C "$TAP_PATH" commit -m "symeraseme $VERSION"
+          git -C "$TAP_PATH" push origin HEAD:main
+
+      - name: Verify published Formula
+        run: |
+          set -euo pipefail
+          git -C "$TAP_PATH" fetch origin main
+          git -C "$TAP_PATH" show origin/main:Formula/symeraseme.rb | grep -q "symeraseme-${VERSION}.tar.gz"
+          echo "Homebrew Formula for $VERSION is published on origin/main."
