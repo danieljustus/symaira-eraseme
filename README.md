@@ -62,6 +62,9 @@ brew tap danieljustus/tap
 brew install symeraseme
 ```
 
+This installs the Symaira EraseMe command-line tool. The macOS graphical app is
+distributed separately as a DMG from the GitHub release.
+
 **Developers** (from source):
 
 ```bash
