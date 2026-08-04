@@ -13,6 +13,9 @@ from symeraseme.adapters.email.smtp_imap import (
     _resolve_imap_password,
     decode_mime_header,
     extract_thread_id,
+    get_message,
+    list_folders,
+    list_messages,
     match_reply_to_request,
     normalize_subject,
     parse_email_body,
@@ -275,6 +278,119 @@ class TestMatchReplyToRequest:
         matched = match_reply_to_request(messages, requests, thread_map)
         assert matched[0]["request_id"] == 1
         assert matched[0]["match_method"] == "thread"
+
+
+class TestMessageQueries:
+    @staticmethod
+    def _setup_session(mock_session_fn):
+        mock_mail = MagicMock()
+        mock_session_fn.return_value.__enter__ = MagicMock(return_value=mock_mail)
+        mock_session_fn.return_value.__exit__ = MagicMock(return_value=False)
+        return mock_mail
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_list_messages_parses_envelopes(self, mock_session_fn, _mock_password):
+        mock_mail = self._setup_session(mock_session_fn)
+        mock_mail.search.return_value = ("OK", [b"1 2"])
+        mock_mail.fetch.return_value = (
+            "OK",
+            [
+                b"1 (FLAGS ())",
+                b"Subject: First\r\nFrom: one@example.com\r\n"
+                b"To: me@example.com\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+                b"2 (FLAGS ())",
+                b"Subject: Second\r\nFrom: two@example.com\r\n\r\n",
+            ],
+        )
+
+        result = list_messages(password="secret", page_size=2)
+
+        assert [message.id for message in result] == ["1", "2"]
+        assert result[0].subject == "First"
+        assert result[0].from_ == "one@example.com"
+        assert result[0].date is not None
+        mock_mail.search.assert_called_once()
+        mock_mail.fetch.assert_called_once()
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_list_messages_returns_empty_on_search_or_fetch_failure(
+        self, mock_session_fn, _mock_password
+    ):
+        mock_mail = self._setup_session(mock_session_fn)
+        mock_mail.search.return_value = ("NO", [b""])
+        assert list_messages(password="secret") == []
+
+        mock_mail.search.return_value = ("OK", [b"1"])
+        mock_mail.fetch.return_value = ("NO", [])
+        assert list_messages(password="secret") == []
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_get_message_parses_body(self, mock_session_fn, _mock_password):
+        mock_mail = self._setup_session(mock_session_fn)
+        mock_mail.fetch.return_value = (
+            "OK",
+            [
+                (
+                    b"42 (RFC822 {100})",
+                    b"Subject: Reply\r\nFrom: broker@example.com\r\n"
+                    b"To: me@example.com\r\n\r\nBody text",
+                )
+            ],
+        )
+
+        result = get_message("42", password="secret")
+
+        assert result.id == "42"
+        assert result.subject == "Reply"
+        assert result.from_ == "broker@example.com"
+        assert result.to == "me@example.com"
+        assert result.body == "Body text"
+
+    @pytest.mark.parametrize("fetch_result", [("NO", []), ("OK", []), ("OK", [(b"meta", b"")])])
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("symeraseme.adapters.email.smtp_imap._imap_session")
+    def test_get_message_rejects_missing_message(
+        self, mock_session_fn, _mock_password, fetch_result
+    ):
+        mock_mail = self._setup_session(mock_session_fn)
+        mock_mail.fetch.return_value = fetch_result
+
+        with pytest.raises(IMAPError, match="Message 42 not found"):
+            get_message("42", password="secret")
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("imaplib.IMAP4")
+    def test_list_folders_parses_quoted_and_unquoted_names(self, mock_imap4, _mock_password):
+        mock_imap4.error = IMAP4_ERROR
+        mock_mail = mock_imap4.return_value
+        mock_mail.list.return_value = (
+            "OK",
+            [
+                b'(\\HasNoChildren) "/" "INBOX"',
+                b'(\\HasNoChildren) "/" "Archive/2026"',
+                b"(\\HasNoChildren) / Sent",
+                "not bytes",
+            ],
+        )
+
+        result = list_folders(password="secret", ssl=False)
+
+        assert result == ["INBOX", "Archive/2026", "Sent"]
+        mock_mail.login.assert_called_once_with("", "pw")
+        mock_mail.logout.assert_called_once_with()
+
+    @patch("symeraseme.adapters.email.smtp_imap._resolve_imap_password", return_value="pw")
+    @patch("imaplib.IMAP4")
+    def test_list_folders_returns_empty_when_list_fails(self, mock_imap4, _mock_password):
+        mock_imap4.error = IMAP4_ERROR
+        mock_mail = mock_imap4.return_value
+        mock_mail.list.return_value = ("NO", [])
+
+        assert list_folders(password="secret", ssl=False) == []
+        mock_mail.logout.assert_called_once_with()
 
 
 class TestPollInboxFetchStrategy:
