@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import imaplib
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from symeraseme.adapters.email.smtp_imap import (
     IMAPError,
+    _imap_session,
     _resolve_imap_password,
     decode_mime_header,
     extract_thread_id,
@@ -18,6 +20,9 @@ from symeraseme.adapters.email.smtp_imap import (
     subject_matches,
 )
 from symeraseme.core.secrets import SecretResolutionError
+
+# Real exception class, captured before any test patches imaplib.IMAP4.
+IMAP4_ERROR = imaplib.IMAP4.error
 
 
 class TestResolveImapPassword:
@@ -39,6 +44,83 @@ class TestResolveImapPassword:
             _resolve_imap_password("vault://email/imap")
 
 
+class TestImapSession:
+    """Cover _imap_session() connect/login/select failures and cleanup paths."""
+
+    @patch("imaplib.IMAP4")
+    def test_connect_failure_plain_raises_imap_error(self, mock_imap4):
+        mock_imap4.error = IMAP4_ERROR
+        mock_imap4.side_effect = OSError("connection refused")
+
+        with (
+            pytest.raises(IMAPError, match="Failed to connect"),
+            _imap_session("imap.test.com", 993, "user", "pw", False, "INBOX"),
+        ):
+            pass  # pragma: no cover
+
+    @patch("imaplib.IMAP4_SSL")
+    def test_connect_failure_ssl_raises_imap_error(self, mock_imap4_ssl):
+        mock_imap4_ssl.side_effect = IMAP4_ERROR("TLS negotiation failed")
+
+        with (
+            pytest.raises(IMAPError, match="Failed to connect"),
+            _imap_session("imap.test.com", 993, "user", "pw", True, "INBOX"),
+        ):
+            pass  # pragma: no cover
+
+    @pytest.mark.parametrize("server_error", ["AUTHENTICATIONFAILED", "LOGINFAILED"])
+    @patch("imaplib.IMAP4")
+    def test_login_failure_raises_imap_error_and_logs_out(self, mock_imap4, server_error):
+        mock_imap4.error = IMAP4_ERROR
+        mail = mock_imap4.return_value
+        mail.login.side_effect = IMAP4_ERROR(server_error)
+
+        with (
+            pytest.raises(IMAPError, match="IMAP login failed"),
+            _imap_session("imap.test.com", 993, "user", "pw", False, "INBOX"),
+        ):
+            pass  # pragma: no cover
+
+        mail.logout.assert_called_once_with()
+
+    @patch("imaplib.IMAP4")
+    def test_folder_select_failure_raises_imap_error(self, mock_imap4):
+        mock_imap4.error = IMAP4_ERROR
+        mail = mock_imap4.return_value
+        mail.select.side_effect = IMAP4_ERROR("Invalid mailbox name")
+
+        with (
+            pytest.raises(IMAPError, match="IMAP folder select failed"),
+            _imap_session("imap.test.com", 993, "user", "pw", False, "INBOX"),
+        ):
+            pass  # pragma: no cover
+
+        mail.logout.assert_called_once_with()
+
+    @patch("imaplib.IMAP4")
+    def test_successful_session_yields_mail_and_logs_out(self, mock_imap4):
+        mock_imap4.error = IMAP4_ERROR
+        mail = mock_imap4.return_value
+
+        with _imap_session("imap.test.com", 993, "user", "pw", False, "INBOX") as session_mail:
+            assert session_mail is mail
+
+        mail.login.assert_called_once_with("user", "pw")
+        mail.select.assert_called_once_with("INBOX")
+        mail.logout.assert_called_once_with()
+
+    @patch("imaplib.IMAP4")
+    def test_logout_failure_is_suppressed(self, mock_imap4):
+        mock_imap4.error = IMAP4_ERROR
+        mail = mock_imap4.return_value
+        mail.logout.side_effect = OSError("connection reset")
+
+        with _imap_session("imap.test.com", 993, "user", "pw", False, "INBOX") as session_mail:
+            assert session_mail is mail
+        # No exception escapes on logout failure (contextlib.suppress path).
+        mail.logout.assert_called_once_with()
+
+
 class TestDecodeMimeHeader:
     def test_empty(self):
         assert decode_mime_header(None) == ""
@@ -50,6 +132,18 @@ class TestDecodeMimeHeader:
     def test_encoded(self):
         result = decode_mime_header("=?UTF-8?Q?Re:_Data_Request?=")
         assert "Re: Data Request" in result
+
+    @patch("symeraseme.adapters.email.smtp_imap.decode_header")
+    def test_unknown_charset_falls_back_to_utf8_replacement(self, mock_decode_header):
+        # Unknown charset makes bytes.decode() raise LookupError; the function
+        # must fall back to UTF-8 with replacement instead of propagating.
+        mock_decode_header.return_value = [("café".encode("latin-1"), "unknown-charset-xyz")]
+
+        result = decode_mime_header("=?unknown-charset-xyz?B?Y2Fmw6k=?=")
+
+        assert isinstance(result, str)
+        assert "caf" in result
+        assert "\ufffd" in result
 
 
 class TestNormalizeSubject:
@@ -258,9 +352,7 @@ class TestPollInboxFetchStrategy:
     def test_returns_subject_and_body_from_peek(
         self, _mock_set_hwm, _mock_get_hwm, mock_session_fn, _mock_pw
     ):
-        header_bytes = self._make_header_bytes(
-            subject="Re: Data Request", from_addr="broker@x.com"
-        )
+        header_bytes = self._make_header_bytes(subject="Re: Data Request", from_addr="broker@x.com")
         body_bytes = b"Your data has been removed."
 
         mock_mail = self._setup_mock_session(mock_session_fn)
@@ -302,9 +394,7 @@ class TestPollInboxFetchStrategy:
     @patch("symeraseme.adapters.email.smtp_imap._imap_session")
     @patch("symeraseme.core.repositories.inbox.get_imap_hwm", return_value=(42, 5))
     @patch("symeraseme.core.repositories.inbox.set_imap_hwm")
-    def test_uses_hwm_for_uid_range(
-        self, mock_set_hwm, _mock_get_hwm, mock_session_fn, _mock_pw
-    ):
+    def test_uses_hwm_for_uid_range(self, mock_set_hwm, _mock_get_hwm, mock_session_fn, _mock_pw):
         """When a valid HWM exists, SEARCH should use UID >= last_uid+1."""
         mock_mail = self._setup_mock_session(mock_session_fn)
 
@@ -327,9 +417,7 @@ class TestPollInboxFetchStrategy:
 
         assert result == []
         # SEARCH should use "6:*" (last_uid=5 -> 5+1=6)
-        search_calls = [
-            c for c in mock_mail.uid.call_args_list if c[0][0] == "SEARCH"
-        ]
+        search_calls = [c for c in mock_mail.uid.call_args_list if c[0][0] == "SEARCH"]
         assert len(search_calls) == 1
         assert search_calls[0][0][1] == "6:*"
 
@@ -361,8 +449,6 @@ class TestPollInboxFetchStrategy:
         )
 
         assert result == []
-        search_calls = [
-            c for c in mock_mail.uid.call_args_list if c[0][0] == "SEARCH"
-        ]
+        search_calls = [c for c in mock_mail.uid.call_args_list if c[0][0] == "SEARCH"]
         assert len(search_calls) == 1
         assert search_calls[0][0][1] == "1:*"
