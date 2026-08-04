@@ -268,7 +268,7 @@ def doctor(ctx: typer.Context) -> None:
     render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
-@events_app.command(name="show")
+@events_app.command(name="show", help="Show the event history for a removal request.")
 def events_show(
     ctx: typer.Context,
     request_id: int = typer.Argument(..., help="Request ID"),
@@ -295,7 +295,7 @@ def events_show(
     render_result(ctx.obj["output"], CliResult(data={"events": events}, message=message))
 
 
-@requests_app.command(name="list")
+@requests_app.command(name="list", help="List removal requests with optional filters.")
 def requests_list(
     ctx: typer.Context,
     campaign_id: str = typer.Option(
@@ -352,7 +352,7 @@ def requests_list(
     render_result(ctx.obj["output"], CliResult(data=requests, message=message))
 
 
-@brokers_app.command(name="list")
+@brokers_app.command(name="list", help="List brokers in the registry.")
 def brokers_list_cmd(
     ctx: typer.Context,
     jurisdiction: str = typer.Option(None, help="Filter by jurisdiction (e.g. DE, US, EU)"),
@@ -445,7 +445,7 @@ def brokers_list_cmd(
     render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
-@brokers_app.command(name="show")
+@brokers_app.command(name="show", help="Show details for one broker.")
 def brokers_show_cmd(
     ctx: typer.Context,
     broker_id: str = typer.Argument(help="Broker id (e.g. acxiom-eu, spokeo)"),

@@ -25,7 +25,7 @@ accounts_app = typer.Typer(
 )
 
 
-@accounts_app.command()
+@accounts_app.command(help="Add an email account using OAuth2.")
 def add(
     provider: str = typer.Argument(help="Provider: gmail or outlook"),
     email: str = typer.Option(..., prompt=True, help="Email address"),
@@ -75,7 +75,7 @@ def add(
     print_success(f"Account {email} ({provider}) configured successfully.")
 
 
-@accounts_app.command(name="list")
+@accounts_app.command(name="list", help="List configured email accounts.")
 def list_cmd() -> None:
     from symeraseme.adapters.email.oauth2 import list_accounts
 
@@ -87,7 +87,7 @@ def list_cmd() -> None:
     print_table("Accounts", ["Email", "Provider"], rows)
 
 
-@accounts_app.command()
+@accounts_app.command(help="Remove a configured email account.")
 def remove(email: str = typer.Argument(help="Email address to remove")) -> None:
     from symeraseme.adapters.email.oauth2 import _remove_from_index, delete_account
 

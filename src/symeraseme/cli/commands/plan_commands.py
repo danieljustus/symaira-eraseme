@@ -18,7 +18,7 @@ plan_app = typer.Typer(
 )
 
 
-@plan_app.command()
+@plan_app.command(help="Scan the registry and create a removal campaign.")
 def create(
     ctx: typer.Context,
     campaign_id: str = typer.Option(
@@ -82,7 +82,7 @@ def create(
     render_result(ctx.obj["output"], result)
 
 
-@plan_app.command(name="show")
+@plan_app.command(name="show", help="Show removal requests for a campaign.")
 def plan_show(
     ctx: typer.Context,
     campaign_id: str = typer.Option(None, "--campaign", help="Filter by campaign"),
@@ -101,7 +101,7 @@ def plan_show(
     render_result(ctx.obj["output"], result)
 
 
-@plan_app.command()
+@plan_app.command(help="Send removal requests for a campaign.")
 def execute(
     ctx: typer.Context,
     campaign_id: str = typer.Option(
@@ -196,7 +196,7 @@ def execute(
     render_result(ctx.obj["output"], result)
 
 
-@plan_app.command()
+@plan_app.command(help="Process deadlines, reminders, and escalations.")
 def tick(
     ctx: typer.Context,
     dry_run: bool = typer.Option(
@@ -246,7 +246,7 @@ def tick(
     render_result(ctx.obj["output"], CliResult(data=data, message=message))
 
 
-@plan_app.command()
+@plan_app.command(help="Show aggregated removal-request status.")
 def status(
     ctx: typer.Context,
     campaign: str = typer.Option(
