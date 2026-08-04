@@ -270,3 +270,57 @@ class TestIdentityVault:
         assert loaded1 is not loaded2
 
         vault.delete_profile()
+
+
+class TestKeyringContract:
+    """Contract tests for the hermetic session keyring (issue #598).
+
+    The session-wide in-memory keyring installed by tests/conftest.py must
+    preserve the real keyring semantics the production identity code
+    depends on: the documented service/username pair, a working
+    set/get/delete round-trip, and isolation from the host OS keyring.
+    Unlike ``TestIdentityVault`` (which patches the keyring functions with
+    a per-class store), these tests exercise the real ``keyring`` module
+    dispatch against the session fake backend.
+    """
+
+    def test_documented_service_and_username(self):
+        import symeraseme.core.identity as vault
+
+        assert vault.SERVICE_NAME == "symeraseme"
+        assert vault.KEYRING_USERNAME == "identity-master-key"
+
+    def test_set_get_delete_roundtrip_through_fake_backend(self):
+        import keyring as kr
+
+        import symeraseme.core.identity as vault
+
+        service, username = vault.SERVICE_NAME, vault.KEYRING_USERNAME
+        kr.delete_password(service, username)
+        try:
+            # Empty store behaves like an untouched host keyring.
+            assert kr.get_password(service, username) is None
+
+            # Save path mints a key and persists it through the backend.
+            key = vault._get_or_create_master_key()
+            assert kr.get_password(service, username) == key.hex()
+            assert vault._get_existing_master_key() == key
+
+            # Delete path removes the entry; read path fails fast after.
+            kr.delete_password(service, username)
+            assert kr.get_password(service, username) is None
+            with pytest.raises(RuntimeError, match="master key not found"):
+                vault._get_existing_master_key()
+        finally:
+            kr.delete_password(service, username)
+
+    def test_session_keyring_is_the_in_memory_backend(self, fake_keyring_backend):
+        """The whole session must dispatch to the fake backend, never the host."""
+        import keyring as kr
+
+        from symeraseme.core.identity import KEYRING_USERNAME, SERVICE_NAME
+
+        assert kr.get_keyring() is fake_keyring_backend
+        # Guard against host-keyring leakage into the fake store.
+        kr.delete_password(SERVICE_NAME, KEYRING_USERNAME)
+        assert kr.get_password(SERVICE_NAME, KEYRING_USERNAME) is None
