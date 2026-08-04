@@ -150,7 +150,10 @@ app.command(rich_help_panel="Account & Profile")(render_template)
 app.command(rich_help_panel="Account & Profile")(grant)
 
 
-@app.command(rich_help_panel="Account & Profile")
+@app.command(
+    rich_help_panel="Account & Profile",
+    help="Revoke previously granted LLM PII consent.",
+)
 def revoke_llm_consent_cmd() -> None:
     """Revoke previously granted LLM PII consent."""
     from symeraseme.adapters.triage.scrubber import revoke_llm_consent
@@ -200,7 +203,10 @@ def _is_loopback_host(host: str) -> bool:
         return host.lower() in {"localhost", "127.0.0.1", "::1"}
 
 
-@app.command(rich_help_panel="Maintenance")
+@app.command(
+    rich_help_panel="Maintenance",
+    help="Start the local MCP JSON-RPC server.",
+)
 def serve(
     host: str = typer.Option(
         "127.0.0.1",
@@ -244,7 +250,10 @@ def serve(
     run_mcp_server(host, port)
 
 
-@app.command(rich_help_panel="Maintenance")
+@app.command(
+    rich_help_panel="Maintenance",
+    help="Run interactive PII review on a file.",
+)
 def review(
     file_path: Annotated[Path, typer.Argument(help="Path to the file to review")],
 ) -> None:

@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+from typer.main import get_command
+
+from symeraseme.cli.app import app
+
 from .conftest import assert_ok, invoke
+
+
+def _command_paths(command, path=()):
+    if path:
+        yield path
+    for name, child in (getattr(command, "commands", None) or {}).items():
+        yield from _command_paths(child, path + (name,))
 
 
 class TestVersion:
@@ -24,6 +35,14 @@ class TestHelp:
     def test_help_no_args(self):
         result = invoke("--help")
         assert_ok(result)
+
+    def test_every_command_has_help_text(self):
+        command = get_command(app)
+
+        for path in _command_paths(command):
+            result = invoke(*path, "--help")
+            assert_ok(result)
+            assert result.stdout.strip(), f"Help output is empty for {' '.join(path)}"
 
 
 class TestOutputFormat:

@@ -155,7 +155,7 @@ def solve_captcha_cmd(
     render_result(ctx.obj["output"], result)
 
 
-@manual_tasks_app.command(name="list")
+@manual_tasks_app.command(name="list", help="List manual fallback tasks.")
 def manual_tasks_list(
     ctx: typer.Context,
     status: str = typer.Option(
@@ -177,7 +177,7 @@ def manual_tasks_list(
     render_result(ctx.obj["output"], result)
 
 
-@manual_tasks_app.command(name="show")
+@manual_tasks_app.command(name="show", help="Show a manual fallback task.")
 def manual_tasks_show(
     ctx: typer.Context,
     task_id: int = typer.Argument(..., help="Task ID to show"),
@@ -187,7 +187,7 @@ def manual_tasks_show(
     render_result(ctx.obj["output"], result)
 
 
-@manual_tasks_app.command(name="complete")
+@manual_tasks_app.command(name="complete", help="Mark a manual task as completed.")
 def manual_tasks_complete(
     ctx: typer.Context,
     task_id: int = typer.Argument(
@@ -208,7 +208,7 @@ def manual_tasks_complete(
     render_result(ctx.obj["output"], result)
 
 
-@manual_tasks_app.command(name="cleanup")
+@manual_tasks_app.command(name="cleanup", help="Remove completed and cancelled manual tasks.")
 def manual_tasks_cleanup(
     ctx: typer.Context,
     dry_run: bool = typer.Option(

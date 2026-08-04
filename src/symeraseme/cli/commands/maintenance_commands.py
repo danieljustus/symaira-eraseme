@@ -138,7 +138,7 @@ def generate_scheduler_cmd(
     render_result(ctx.obj["output"], result)
 
 
-@schedule_app.command()
+@schedule_app.command(help="Install periodic scheduler jobs.")
 def schedule_install(
     ctx: typer.Context,
     platform: str = typer.Option(
@@ -178,7 +178,7 @@ def schedule_install(
     render_result(ctx.obj["output"], result)
 
 
-@schedule_app.command(name="uninstall")
+@schedule_app.command(name="uninstall", help="Uninstall periodic scheduler jobs.")
 def schedule_uninstall(
     ctx: typer.Context,
     platform: str = typer.Option(
@@ -197,7 +197,7 @@ def schedule_uninstall(
     render_result(ctx.obj["output"], result)
 
 
-@schedule_app.command()
+@schedule_app.command(help="Show scheduler installation status.")
 def schedule_status(
     ctx: typer.Context,
     platform: str = typer.Option(
@@ -211,7 +211,7 @@ def schedule_status(
     render_result(ctx.obj["output"], result)
 
 
-@registry_app.command(name="sync")
+@registry_app.command(name="sync", help="Pull the latest broker definitions.")
 def registry_sync_cmd(
     ctx: typer.Context,
     verify_signatures: bool = typer.Option(
