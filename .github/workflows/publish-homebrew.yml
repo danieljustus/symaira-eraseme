@@ -155,8 +155,7 @@ jobs:
           git -C "$TAP_PATH" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$TAP_PATH" add Formula/symeraseme.rb
           git -C "$TAP_PATH" commit -m "symeraseme $VERSION"
-          GH_TOKEN="$HOMEBREW_TAP_GITHUB_TOKEN" gh auth setup-git
-          git -C "$TAP_PATH" push origin HEAD:main
+          git -C "$TAP_PATH" push "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/danieljustus/homebrew-tap.git" HEAD:main
 
       - name: Verify published Formula
         run: |
