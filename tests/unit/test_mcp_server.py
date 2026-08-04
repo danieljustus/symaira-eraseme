@@ -868,12 +868,16 @@ class TestMcpTokenPersistence:
             run_mcp_server()
 
         captured = capsys.readouterr()
+        # rich folds long lines at console width (80 on non-tty CI runners),
+        # which can split the token value or the "mcp_token" path segment
+        # across lines — unfold before asserting to avoid path-length flakes.
+        out = captured.out.replace("\n", "")
         token_file = tmp_path / "mcp_token"
         token_value = token_file.read_text(encoding="utf-8").strip()
-        assert token_value not in captured.out, (
+        assert token_value not in out, (
             "Token value was printed to stdout"
         )
-        assert "mcp_token" in captured.out, (
+        assert "mcp_token" in out, (
             "Token file path not printed to stdout"
         )
 
