@@ -30,6 +30,15 @@ class Priority(StrEnum):
     low = "low"
 
 
+class BrokerStatus(StrEnum):
+    """Operational lifecycle status of a broker registry entry."""
+
+    active = "active"
+    deprecated = "deprecated"
+    merged = "merged"
+    out_of_business = "out-of-business"
+
+
 class SolveCaptcha(BaseModel):
     type: str
     site_key: str
@@ -94,6 +103,7 @@ class Broker(BaseModel):
     laws: list[Law] = Field(min_length=1)
     data_sensitivity: int = Field(default=3, ge=1, le=5)
     priority: Priority
+    status: BrokerStatus = BrokerStatus.active
     opt_out: list[OptOutChannel] = Field(min_length=1)
     verification: Verification | None = None
     disabled: bool = False

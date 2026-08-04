@@ -9,7 +9,7 @@ from symeraseme.core.events import create_campaign, create_removal_request, list
 from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
-from symeraseme.registry.schema import Broker, EmailOptOut, WebFormOptOut
+from symeraseme.registry.schema import Broker, BrokerStatus, EmailOptOut, WebFormOptOut
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,8 @@ def plan_campaign(
     law: str | None = None,
     priority: str | None = None,
     category: str | None = None,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
     max_brokers: int = 30,
     notes: str | None = None,
 ) -> dict[str, Any]:
@@ -38,6 +40,8 @@ def plan_campaign(
         law=law,
         priority=priority,
         category=category,
+        status=status,
+        include_inactive=include_inactive,
     )
 
     try:

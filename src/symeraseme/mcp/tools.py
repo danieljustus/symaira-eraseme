@@ -52,6 +52,17 @@ TOOL_DEFS: list[dict[str, Any]] = [
                     "description": "Maximum number of brokers to include",
                     "default": 30,
                 },
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "deprecated", "merged", "out-of-business"],
+                    "description": "Broker lifecycle status filter (defaults to active)",
+                    "default": "active",
+                },
+                "include_inactive": {
+                    "type": "boolean",
+                    "description": "Include deprecated, merged, and out-of-business brokers",
+                    "default": False,
+                },
             },
             "required": ["campaign_id"],
         },
@@ -611,6 +622,17 @@ TOOL_DEFS: list[dict[str, Any]] = [
                 "include_disabled": {
                     "type": "boolean",
                     "description": "Include disabled brokers",
+                    "default": False,
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "deprecated", "merged", "out-of-business"],
+                    "description": "Broker lifecycle status filter (defaults to active)",
+                    "default": "active",
+                },
+                "include_inactive": {
+                    "type": "boolean",
+                    "description": "Include deprecated, merged, and out-of-business brokers",
                     "default": False,
                 },
             },

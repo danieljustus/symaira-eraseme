@@ -15,7 +15,7 @@ import yaml
 from pydantic import ValidationError
 
 from symeraseme.core.exceptions import RegistryError
-from symeraseme.registry.schema import Broker
+from symeraseme.registry.schema import Broker, BrokerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +216,9 @@ def _load_persistent_cache(
     raw_brokers = data.get("brokers", [])
     if not raw_brokers:
         return None
+    if any("status" not in broker for broker in raw_brokers if isinstance(broker, dict)):
+        logger.debug("Persistent broker cache lacks lifecycle metadata, rebuilding")
+        return None
     brokers = [Broker.model_validate(b) for b in raw_brokers]
     raw_index = data.get("id_index")
     if isinstance(raw_index, dict) and raw_index:
@@ -226,6 +229,13 @@ def _load_persistent_cache(
     else:
         id_index = _build_broker_id_index(registry_dir)
     meta_index = data.get("meta_index")
+    if isinstance(meta_index, dict) and any(
+        "status" not in meta_entry
+        for meta_entry in meta_index.values()
+        if isinstance(meta_entry, dict)
+    ):
+        logger.debug("Persistent broker cache metadata lacks lifecycle status, rebuilding")
+        return None
     logger.debug("Loaded %d brokers from persistent cache", len(brokers))
     return brokers, id_index, meta_index
 
@@ -389,7 +399,7 @@ def _quick_parse_meta(yml_path: Path) -> dict | None:
 
 
 _META_FIELDS: frozenset[str] = frozenset(
-    {"jurisdictions", "laws", "priority", "category", "disabled"}
+    {"jurisdictions", "laws", "priority", "category", "disabled", "status"}
 )
 
 
@@ -401,6 +411,7 @@ def _broker_meta(broker: Broker) -> dict[str, Any]:
         "priority": broker.priority.value,
         "category": broker.category.value,
         "disabled": broker.disabled,
+        "status": broker.status.value,
     }
 
 
@@ -447,6 +458,8 @@ def _meta_matches_filters(
     priority: str | None,
     category: str | None,
     include_disabled: bool,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> bool:
     if not include_disabled and meta.get("disabled", False):
         return False
@@ -458,6 +471,10 @@ def _meta_matches_filters(
         return False
     if category and meta.get("category") != category:  # noqa: SIM103
         return False
+    if not include_inactive and status is not None:
+        expected_status = status.value if isinstance(status, BrokerStatus) else status
+        if meta.get("status", BrokerStatus.active.value) != expected_status:
+            return False
     return True
 
 
@@ -469,6 +486,8 @@ def _filter_and_validate_ymls(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> tuple[list[Broker], int]:
     """Load, filter, and validate a list of broker YAML paths.
 
@@ -491,6 +510,8 @@ def _filter_and_validate_ymls(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         ):
             continue
         try:
@@ -511,6 +532,8 @@ def _load_from_warm_cache(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> list[Broker]:
     return _filter_brokers(
         _BROKER_CACHE[cache_key],
@@ -519,6 +542,8 @@ def _load_from_warm_cache(
         priority=priority,
         category=category,
         include_disabled=include_disabled,
+        status=status,
+        include_inactive=include_inactive,
     )
 
 
@@ -532,6 +557,8 @@ def _load_from_persistent_cache(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> list[Broker] | None:
     cached = _load_persistent_cache(registry_path, cache_key)
     if cached is None:
@@ -548,6 +575,8 @@ def _load_from_persistent_cache(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         )
     if meta_index is not None:
         brokers: list[Broker] = []
@@ -559,6 +588,8 @@ def _load_from_persistent_cache(
                 priority=priority,
                 category=category,
                 include_disabled=include_disabled,
+                status=status,
+                include_inactive=include_inactive,
             ):
                 continue
             yml = cached_index.get(broker_id)
@@ -584,6 +615,8 @@ def _load_cold(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> list[Broker]:
     yaml_files = sorted(registry_path.rglob("*.yaml"))
 
@@ -595,6 +628,8 @@ def _load_cold(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         )
         return filtered_brokers
 
@@ -622,6 +657,8 @@ def _load_cold(
         priority=priority,
         category=category,
         include_disabled=include_disabled,
+        status=status,
+        include_inactive=include_inactive,
     )
 
 
@@ -632,12 +669,14 @@ def load_all_brokers(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> list[Broker]:
     """Load and filter brokers from the registry.
 
-    Disabled brokers (``disabled: true`` in YAML) are excluded by default
-    so the default plan never targets known-broken broker entries.
-    Pass ``include_disabled=True`` to get everything (used by ``brokers list``).
+    Disabled brokers remain independently controlled by ``include_disabled``.
+    Lifecycle status defaults to ``active``; pass ``status`` for one explicit
+    lifecycle status or ``include_inactive=True`` to include every status.
 
     When filters are active and the global cache is cold, only YAML files
     matching the filters are loaded — avoiding full parse of all ~1,279
@@ -648,7 +687,15 @@ def load_all_brokers(
 
     registry_path = Path(registry_dir)
     cache_key = _broker_cache_key(registry_path)
-    has_filters = bool(jurisdiction or law or priority or category)
+    status_value = status.value if isinstance(status, BrokerStatus) else status
+    has_filters = bool(
+        jurisdiction
+        or law
+        or priority
+        or category
+        or include_inactive
+        or (status_value is not None and status_value != BrokerStatus.active.value)
+    )
 
     if cache_key in _BROKER_CACHE:
         return _load_from_warm_cache(
@@ -658,6 +705,8 @@ def load_all_brokers(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         )
 
     result = _load_from_persistent_cache(
@@ -669,6 +718,8 @@ def load_all_brokers(
         priority=priority,
         category=category,
         include_disabled=include_disabled,
+        status=status,
+        include_inactive=include_inactive,
     )
     if result is not None:
         return result
@@ -682,6 +733,8 @@ def load_all_brokers(
         priority=priority,
         category=category,
         include_disabled=include_disabled,
+        status=status,
+        include_inactive=include_inactive,
     )
 
 
@@ -693,6 +746,8 @@ def _filter_brokers(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> list[Broker]:
     filtered: list[Broker] = []
     for broker in brokers:
@@ -704,6 +759,8 @@ def _filter_brokers(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         ):
             filtered.append(broker)
     return filtered

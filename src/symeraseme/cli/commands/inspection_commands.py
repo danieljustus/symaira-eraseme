@@ -371,6 +371,16 @@ def brokers_list_cmd(
         "--include-disabled",
         help="Include brokers marked disabled (default: skip them).",
     ),
+    status: str = typer.Option(
+        "active",
+        "--status",
+        help="Filter by lifecycle status.",
+    ),
+    include_inactive: bool = typer.Option(
+        False,
+        "--include-inactive",
+        help="Include deprecated, merged, and out-of-business brokers.",
+    ),
 ) -> None:
     """List brokers in the registry, optionally filtered."""
     brokers = load_all_brokers(
@@ -379,6 +389,8 @@ def brokers_list_cmd(
         priority=priority,
         category=category,
         include_disabled=include_disabled,
+        status=status,
+        include_inactive=include_inactive,
     )
 
     data = {
@@ -389,6 +401,8 @@ def brokers_list_cmd(
             "priority": priority,
             "category": category,
             "include_disabled": include_disabled,
+            "status": status,
+            "include_inactive": include_inactive,
         },
         "count": len(brokers),
         "brokers": [
@@ -402,6 +416,7 @@ def brokers_list_cmd(
                 "priority": b.priority.value,
                 "data_sensitivity": b.data_sensitivity,
                 "disabled": b.disabled,
+                "status": b.status.value,
                 "opt_out_channels": [ch.type for ch in b.opt_out],
             }
             for b in brokers
@@ -414,7 +429,12 @@ def brokers_list_cmd(
         lines = [f"{len(brokers)} broker(s):"]
         for b in brokers:
             channels = "/".join(ch.type for ch in b.opt_out)
-            flag = " [DISABLED]" if b.disabled else ""
+            flags = []
+            if b.disabled:
+                flags.append("DISABLED")
+            if b.status.value != "active":
+                flags.append(b.status.value.upper())
+            flag = f" [{', '.join(flags)}]" if flags else ""
             juris = ",".join(b.jurisdictions)
             lines.append(
                 f"  {b.id:<28} {b.priority.value:<6} {b.category.value:<18} "
@@ -450,6 +470,7 @@ def brokers_show_cmd(
         f"  website:          {broker.website}",
         f"  category:         {broker.category.value}",
         f"  priority:         {broker.priority.value}",
+        f"  status:           {broker.status.value}",
         f"  data_sensitivity: {broker.data_sensitivity}",
         f"  jurisdictions:    {', '.join(broker.jurisdictions)}",
         f"  laws:             {', '.join(law.value for law in broker.laws)}",

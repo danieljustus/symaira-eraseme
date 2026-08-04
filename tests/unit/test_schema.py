@@ -126,7 +126,7 @@ class TestRegistryLoader:
         monkeypatch.setattr("symeraseme.registry.loader._cache_dir", lambda: tmp_path)
 
         clear_registry_cache()
-        brokers = load_all_brokers(include_disabled=True)
+        brokers = load_all_brokers(include_disabled=True, status=None)
         assert len(brokers) >= 5
 
         registry_dir = _repo_root() / "registry" / "brokers"
