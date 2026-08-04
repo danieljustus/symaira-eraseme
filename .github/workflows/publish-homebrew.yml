@@ -81,6 +81,25 @@ jobs:
             echo "::warning::Some Homebrew Python resources could not be refreshed; the formula audit below remains required."
           fi
 
+      - name: Normalize Homebrew resource names
+        run: |
+          set -euo pipefail
+          FORMULA="$TAP_PATH/Formula/symeraseme.rb" python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          formula = Path(os.environ["FORMULA"])
+          content = formula.read_text()
+          for old, new in {
+              "jaraco.classes": "jaraco-classes",
+              "jaraco.context": "jaraco-context",
+              "jaraco.functools": "jaraco-functools",
+              "pydantic_core": "pydantic-core",
+          }.items():
+              content = content.replace(f'resource "{old}"', f'resource "{new}"')
+          formula.write_text(content)
+          PY
+
       - name: Update main PyPI source metadata
         run: |
           set -euo pipefail
