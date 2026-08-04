@@ -95,3 +95,8 @@ exclude = ["tests/", ".venv/"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest-xdist>=3.6.0",
+]
