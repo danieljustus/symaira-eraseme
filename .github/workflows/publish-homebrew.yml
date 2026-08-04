@@ -104,8 +104,7 @@ jobs:
           formula = pathlib.Path(os.environ["FORMULA_PATH"])
           content = formula.read_text()
           pattern = re.compile(
-              r'(?m)^  url "https://files\\.pythonhosted\\.org/[^\n"]+'
-              r'/symeraseme-[^\n"]+\\.tar\\.gz"\n'
+              r'(?m)^  url "[^\n"]*/symeraseme-[^\n"]+[.]tar[.]gz"\n'
               r'  sha256 "[0-9a-f]{64}"'
           )
           match = pattern.search(content)
