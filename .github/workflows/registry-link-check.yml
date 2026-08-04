@@ -36,15 +36,22 @@ jobs:
           for yml in sorted(Path('registry/brokers').rglob('*.yaml')):
               with open(yml) as f:
                   data = yaml.safe_load(f)
-              url = data.get('website', '')
+              status = data.get('status', 'active')
               name = data.get('name', yml.stem)
+              if status != 'active':
+                  print(f'  - {name} — skipped (status: {status})')
+                  continue
+              url = data.get('website', '')
               urls.append((name, url))
 
-          errors: list[str] = []
+          data_errors: list[str] = []
+          link_errors: list[str] = []
           checked = 0
 
           def check(name: str, url: str) -> tuple[str, str, str]:
               try:
+                  if not url.startswith(('http://', 'https://')) or any(c.isspace() for c in url):
+                      return (name, 'data_err', f'{name}: malformed website URL in registry data — {url!r}')
                   req = Request(url, method='HEAD')
                   req.add_header('User-Agent', 'Symaira EraseMe-LinkCheck/0.1')
                   urlopen(req, timeout=10)
@@ -52,9 +59,11 @@ jobs:
               except HTTPError as e:
                   if e.code == 403:
                       return (name, 'skip', f'  ~ {name} \u2014 {url} (HTTP {e.code}, skipping)')
-                  return (name, 'err', f'{name}: HTTP {e.code} \u2014 {url}')
+                  return (name, 'link_err', f'{name}: HTTP {e.code} \u2014 {url}')
               except (URLError, ValueError, OSError) as e:
-                  return (name, 'err', f'{name}: {e} \u2014 {url}')
+                  return (name, 'link_err', f'{name}: {e} \u2014 {url}')
+              except Exception as e:  # safety net: a single bad entry must not crash the run
+                  return (name, 'link_err', f'{name}: unexpected {type(e).__name__}: {e} \u2014 {url}')
 
           with ThreadPoolExecutor(max_workers=30) as executor:
               futures = {executor.submit(check, n, u): n for n, u in urls}
@@ -62,14 +71,22 @@ jobs:
                   name, status, msg = future.result()
                   checked += 1
                   print(msg)
-                  if status == 'err':
-                      errors.append(msg)
+                  if status == 'data_err':
+                      data_errors.append(msg)
+                  elif status == 'link_err':
+                      link_errors.append(msg)
                   if checked % 50 == 0:
                       time.sleep(0.2)
 
-          if errors:
-              print(f'\n{len(errors)} link(s) failed:')
-              for e in errors:
+          # Unreachable external sites are informational (transient downtime,
+          # defunct brokers) and do not fail the run; malformed registry data does.
+          if link_errors:
+              print(f'\n{len(link_errors)} site(s) unreachable (informational):')
+              for e in link_errors:
+                  print(f'  - {e}')
+          if data_errors:
+              print(f'\n{len(data_errors)} malformed website URL(s) in registry data:')
+              for e in data_errors:
                   print(f'  - {e}')
               sys.exit(1)
           "

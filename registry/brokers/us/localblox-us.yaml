@@ -1,6 +1,6 @@
 id: localblox-us
 name: Localblox
-website: https://5684 173rd Ave SE
+website: https://www.localblox.com
 category: other
 jurisdictions:
 - US
@@ -32,5 +32,5 @@ verification:
   - identification
   - upload
 added_date: '2025-05-21'
-status: active
+status: out-of-business
 source: Vermont Data Broker Registry
