@@ -47,6 +47,10 @@ TOOL_DEFS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Filter by priority level",
                 },
+                "category": {
+                    "type": "string",
+                    "description": "Filter by broker category (e.g. people-search, marketing)",
+                },
                 "max_brokers": {
                     "type": "integer",
                     "description": "Maximum number of brokers to include",
