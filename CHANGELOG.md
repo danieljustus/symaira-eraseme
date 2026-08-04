@@ -2,10 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
-## [v0.10.0] - 2026-08-01
+## [v0.10.0] - 2026-08-04
 
+- **Feat**: Honor broker lifecycle status in planning and listing (#606).
+- **Feat**: Add help descriptions to CLI commands (#607).
 - **Feat**: Adopt the shared Symaira app design system for typography, text fields, forms, and accessible status feedback (#584).
-- **Chore**: Raise the macOS app's `symaira-appkit` dependency to 0.7.0.
+- **Fix**: Repair malformed broker website URLs and harden the weekly registry link check (#592).
+- **CI**: Restore the maintained Homebrew formula publisher (#590) and halve main-push test cost with macOS gated to weekly (#603).
+- **Chore**: Raise the macOS app's `symaira-appkit` dependency to 0.7.0 and bump `cryptography` to 50.0.0 (#591).
 
 ## [v0.9.4] - 2026-07-31
 
