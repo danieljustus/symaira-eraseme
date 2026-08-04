@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.0] - 2026-08-01
+
+- **Feat**: Adopt the shared Symaira app design system for typography, text fields, forms, and accessible status feedback (#584).
+- **Chore**: Raise the macOS app's `symaira-appkit` dependency to 0.7.0.
+
 ## [v0.9.4] - 2026-07-31
 
 - **Fix**: MCP client auth header — read token from server and attach `Authorization: Bearer` to every request (#580).
