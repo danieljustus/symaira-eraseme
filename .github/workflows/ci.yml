@@ -73,16 +73,21 @@ jobs:
           version: "latest"
       - name: Install dependencies
         run: uv sync --frozen --all-extras
+      # Single suite pass: with coverage on main/schedule, without on PRs.
+      # (Previously the suite ran twice per matrix version: "Run tests" + "Coverage check".)
       - name: Run tests
-        run: uv run pytest --verbose --tb=short
-
-      - name: Coverage check
-        if: github.event_name != 'pull_request'
-        run: uv run pytest --cov=src/symeraseme/ --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            uv run pytest -n auto --verbose --tb=short
+          else
+            uv run pytest -n auto --cov=src/symeraseme/ --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
+          fi
 
   test-macos:
     name: Test on macOS
-    if: github.event_name != 'pull_request'  # PR gate = ubuntu; macOS on main/schedule
+    # Weekly schedule only — macOS runners are the slowest leg and are not
+    # needed as a per-push gate (ubuntu matrix covers every push/PR).
+    if: github.event_name == 'schedule'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
