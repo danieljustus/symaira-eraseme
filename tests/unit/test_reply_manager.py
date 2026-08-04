@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 
@@ -267,6 +268,130 @@ class TestDraftReply:
         events = get_events(req_id)
         event_types = [e["event_type"] for e in events]
         assert "REPLY_DRAFTED" in event_types
+
+    def test_unknown_classification_uses_rejected_template(self):
+        """Unknown classifications fall back to the default rejected template.
+
+        ``template_map.get(classification, default)`` means an unrecognized
+        classification (e.g. ``ack``) must still produce a draft using
+        ``gdpr-rebuttal-rejected.en.md.j2`` instead of raising.
+        """
+        conn = get_connection()
+        req_id = create_removal_request(
+            broker_id="test-broker",
+            channel="email",
+            campaign_id="test",
+            jurisdiction="GDPR",
+        )
+        append_event(req_id, "PLANNED")
+        upsert_state(req_id)
+        rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="ack")
+
+        result = draft_reply(rid)
+
+        assert result["draft_id"] is not None
+        assert result["draft_body"]
+        from symeraseme.core.events import get_events
+
+        events = get_events(req_id)
+        drafted = [e for e in events if e["event_type"] == "REPLY_DRAFTED"]
+        assert drafted
+        payload = drafted[-1]["payload_json"]
+        assert payload["template"] == "gdpr-rebuttal-rejected.en.md.j2"
+        assert payload["classification"] == "ack"
+
+    def test_missing_template_falls_back(self, monkeypatch, caplog):
+        """A template that cannot be rendered must produce the fallback draft.
+
+        render_template failures are caught and routed to _fallback_rebuttal
+        (with the profile name defaulting to "Your Name" when no identity
+        profile exists), never a raised error or an empty draft.
+        """
+        conn = get_connection()
+        req_id = create_removal_request(
+            broker_id="test-broker",
+            channel="email",
+            campaign_id="test",
+            jurisdiction="GDPR",
+        )
+        append_event(req_id, "PLANNED")
+        upsert_state(req_id)
+        rid = _insert_inbox_reply(
+            conn,
+            request_id=req_id,
+            classified_as="rejected",
+            snippet="Your request is denied.",
+        )
+
+        def _missing_template(*args, **kwargs):
+            raise FileNotFoundError("template missing")
+
+        monkeypatch.setattr("symeraseme.core.reply_manager.render_template", _missing_template)
+        monkeypatch.setattr("symeraseme.core.reply_manager.profile_exists", lambda *a, **k: False)
+
+        with caplog.at_level(logging.WARNING, logger="symeraseme.core.reply_manager"):
+            result = draft_reply(rid)
+
+        assert "I respectfully disagree" in result["draft_body"]
+        assert "Your request is denied." in result["draft_body"]
+        assert "Your Name" in result["draft_body"]
+        assert any("using fallback" in r.message for r in caplog.records)
+
+    def test_fallback_uses_profile_name(self, monkeypatch):
+        """The fallback rebuttal is signed with the profile's full name."""
+        from symeraseme.registry.schema import IdentityProfile
+
+        conn = get_connection()
+        req_id = create_removal_request(
+            broker_id="test-broker",
+            channel="email",
+            campaign_id="test",
+            jurisdiction="GDPR",
+        )
+        append_event(req_id, "PLANNED")
+        upsert_state(req_id)
+        rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="rejected")
+
+        def _missing_template(*args, **kwargs):
+            raise FileNotFoundError("template missing")
+
+        monkeypatch.setattr("symeraseme.core.reply_manager.render_template", _missing_template)
+        monkeypatch.setattr("symeraseme.core.reply_manager.profile_exists", lambda *a, **k: True)
+        monkeypatch.setattr(
+            "symeraseme.core.reply_manager.load_profile",
+            lambda *a, **k: IdentityProfile(full_name="Jane Doe"),
+        )
+
+        result = draft_reply(rid)
+
+        assert result["draft_body"]
+        assert "Jane Doe" in result["draft_body"]
+
+    def test_profile_load_failure_still_drafts(self, monkeypatch, caplog):
+        """A failing load_profile must not prevent the draft from being made."""
+        conn = get_connection()
+        req_id = create_removal_request(
+            broker_id="test-broker",
+            channel="email",
+            campaign_id="test",
+            jurisdiction="GDPR",
+        )
+        append_event(req_id, "PLANNED")
+        upsert_state(req_id)
+        rid = _insert_inbox_reply(conn, request_id=req_id, classified_as="rejected")
+
+        def _broken_profile(*args, **kwargs):
+            raise FileNotFoundError("profile gone")
+
+        monkeypatch.setattr("symeraseme.core.reply_manager.profile_exists", lambda *a, **k: True)
+        monkeypatch.setattr("symeraseme.core.reply_manager.load_profile", _broken_profile)
+
+        with caplog.at_level(logging.WARNING, logger="symeraseme.core.reply_manager"):
+            result = draft_reply(rid)
+
+        assert result["draft_id"] is not None
+        assert result["draft_body"]
+        assert any("Failed to load identity profile" in r.message for r in caplog.records)
 
 
 class TestSendReply:
