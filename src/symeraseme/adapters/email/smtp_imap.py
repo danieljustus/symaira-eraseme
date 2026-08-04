@@ -54,6 +54,35 @@ class IMAPError(Exception):
     pass
 
 
+def _connect_and_login(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    ssl: bool,
+) -> imaplib.IMAP4 | imaplib.IMAP4_SSL:
+    mail: imaplib.IMAP4 | imaplib.IMAP4_SSL
+    try:
+        if ssl:
+            mail = imaplib.IMAP4_SSL(host, port, ssl_context=create_default_context())
+        else:
+            mail = imaplib.IMAP4(host, port)
+    except (OSError, imaplib.IMAP4.error) as e:
+        raise IMAPError(f"Failed to connect to mail server: {e}") from e
+
+    try:
+        mail.login(username, password)
+    except (OSError, imaplib.IMAP4.error) as e:
+        _logout(mail)
+        raise IMAPError(f"IMAP login failed: {e}") from e
+    return mail
+
+
+def _logout(mail: imaplib.IMAP4 | imaplib.IMAP4_SSL) -> None:
+    with contextlib.suppress(OSError):
+        mail.logout()
+
+
 @contextmanager
 def _imap_session(
     host: str,
@@ -63,34 +92,16 @@ def _imap_session(
     ssl: bool,
     folder: str,
 ) -> Iterator[imaplib.IMAP4 | imaplib.IMAP4_SSL]:
-    mail: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
+    mail = _connect_and_login(host, port, username, password, ssl)
     try:
-        try:
-            if ssl:
-                mail = imaplib.IMAP4_SSL(host, port, ssl_context=create_default_context())
-            else:
-                mail = imaplib.IMAP4(host, port)
-        except (OSError, imaplib.IMAP4.error) as e:
-            msg = f"Failed to connect to mail server: {e}"
-            raise IMAPError(msg) from e
-
-        try:
-            mail.login(username, password)
-        except (OSError, imaplib.IMAP4.error) as e:
-            msg = f"IMAP login failed: {e}"
-            raise IMAPError(msg) from e
-
         try:
             mail.select(folder)
         except (OSError, imaplib.IMAP4.error) as e:
-            msg = f"IMAP folder select failed: {e}"
-            raise IMAPError(msg) from e
+            raise IMAPError(f"IMAP folder select failed: {e}") from e
 
         yield mail
     finally:
-        if mail is not None:
-            with contextlib.suppress(OSError):
-                mail.logout()
+        _logout(mail)
 
 
 def decode_mime_header(value: str | None) -> str:
@@ -466,23 +477,8 @@ def list_folders(
     Returns a list of folder names (e.g. ["INBOX", "Sent", "Unbekannt", "Junk"]).
     """
     resolved_password = _resolve_imap_password(password)
-    mail: imaplib.IMAP4 | imaplib.IMAP4_SSL | None = None
+    mail = _connect_and_login(host, port, username, resolved_password, ssl)
     try:
-        try:
-            if ssl:
-                mail = imaplib.IMAP4_SSL(host, port, ssl_context=create_default_context())
-            else:
-                mail = imaplib.IMAP4(host, port)
-        except (OSError, imaplib.IMAP4.error) as e:
-            msg = f"Failed to connect to mail server: {e}"
-            raise IMAPError(msg) from e
-
-        try:
-            mail.login(username, resolved_password)
-        except (OSError, imaplib.IMAP4.error) as e:
-            msg = f"IMAP login failed: {e}"
-            raise IMAPError(msg) from e
-
         status, folder_data = mail.list()
         if status != "OK" or not folder_data:
             return []
@@ -508,9 +504,7 @@ def list_folders(
 
         return folders
     finally:
-        if mail is not None:
-            with contextlib.suppress(OSError):
-                mail.logout()
+        _logout(mail)
 
 
 def match_reply_to_request(
