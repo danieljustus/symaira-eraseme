@@ -47,6 +47,16 @@ def create(
         "--max",
         help="Maximum brokers to plan",
     ),
+    status: str = typer.Option(
+        None,
+        "--status",
+        help="Broker lifecycle status (active, deprecated, merged, out-of-business)",
+    ),
+    include_inactive: bool = typer.Option(
+        False,
+        "--include-inactive",
+        help="Include deprecated, merged, and out-of-business brokers",
+    ),
 ) -> None:
     """Scan the broker registry and create a removal campaign.
 
@@ -64,6 +74,8 @@ def create(
         law,
         priority,
         max_brokers,
+        status=status,
+        include_inactive=include_inactive,
     )
     from symeraseme.cli.console import render_result
 

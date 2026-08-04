@@ -120,6 +120,40 @@ class TestBrokersList:
         disabled = [b for b in full["brokers"] if b["disabled"]]
         assert disabled, "registry should have at least one disabled broker for this test"
 
+    def test_list_default_excludes_inactive_and_reports_status(self):
+        from .conftest import assert_json_output
+
+        result = invoke("--output", "json", "brokers", "list")
+        data = assert_json_output(result)
+        assert data["filters"]["status"] == "active"
+        assert all(broker["status"] == "active" for broker in data["brokers"])
+        assert "localblox-us" not in {broker["id"] for broker in data["brokers"]}
+
+    def test_list_status_filter_and_include_inactive(self):
+        from .conftest import assert_json_output
+
+        result = invoke(
+            "--output",
+            "json",
+            "brokers",
+            "list",
+            "--status",
+            "out-of-business",
+        )
+        data = assert_json_output(result)
+        assert {broker["status"] for broker in data["brokers"]} == {"out-of-business"}
+        assert "localblox-us" in {broker["id"] for broker in data["brokers"]}
+
+        result = invoke(
+            "--output",
+            "json",
+            "brokers",
+            "list",
+            "--include-inactive",
+        )
+        data = assert_json_output(result)
+        assert "localblox-us" in {broker["id"] for broker in data["brokers"]}
+
 
 class TestBrokersShow:
     def test_show_known_broker_text(self):
@@ -145,6 +179,14 @@ class TestBrokersShow:
         data = assert_json_output(result)
         assert data["broker"]["id"] == "beenverified-us"
         assert data["broker"]["disabled"] is True
+
+    def test_show_inactive_broker_still_visible(self):
+        from .conftest import assert_json_output
+
+        result = invoke("--output", "json", "brokers", "show", "localblox-us")
+        data = assert_json_output(result)
+        assert data["broker"]["id"] == "localblox-us"
+        assert data["broker"]["status"] == "out-of-business"
 
     def test_show_unknown_broker_exits_nonzero(self):
         result = invoke("brokers", "show", "this-broker-does-not-exist")

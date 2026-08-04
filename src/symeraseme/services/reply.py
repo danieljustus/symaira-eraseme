@@ -5,7 +5,6 @@ import logging
 from symeraseme.adapters.triage.classifier import ReplyClassifier
 from symeraseme.adapters.triage.responder import generate_rebuttal
 from symeraseme.adapters.triage.scrubber import grant_llm_consent, llm_consent_granted
-from symeraseme.cli.console import print_info, print_warning
 from symeraseme.core.db_connection import get_connection, with_db
 from symeraseme.core.events import get_events, get_removal_request
 from symeraseme.core.exceptions import RegistryError
@@ -19,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_llm_consent(yes: bool = False) -> CliResult | None:
+    from symeraseme.cli.console import print_info, print_warning
+
     if llm_consent_granted():
         return None
     if yes:

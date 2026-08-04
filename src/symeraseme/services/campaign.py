@@ -12,6 +12,7 @@ from symeraseme.core.db_connection import with_db
 from symeraseme.core.exceptions import safe_error_str
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
+from symeraseme.registry.schema import BrokerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +24,18 @@ def handle_plan_create(
     law: str | None = None,
     priority: str | None = None,
     max_brokers: int = 30,
+    category: str | None = None,
+    status: BrokerStatus | str | None = BrokerStatus.active,
+    include_inactive: bool = False,
 ) -> CliResult:
     result = plan_campaign(
         campaign_id=campaign_id,
         jurisdiction=jurisdiction,
         law=law,
         priority=priority,
+        category=category,
+        status=status,
+        include_inactive=include_inactive,
         max_brokers=max_brokers,
     )
 

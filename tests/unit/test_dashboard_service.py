@@ -143,6 +143,8 @@ class TestHandleListBrokers:
                 priority="high",
                 category="people-search",
                 include_disabled=True,
+                status="active",
+                include_inactive=False,
             )
 
     def test_failure(self):

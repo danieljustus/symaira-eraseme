@@ -150,6 +150,8 @@ def handle_list_brokers(
     priority: str | None = None,
     category: str | None = None,
     include_disabled: bool = False,
+    status: str | None = "active",
+    include_inactive: bool = False,
 ) -> CliResult:
     """Return filtered brokers from the registry as a list of dicts.
 
@@ -159,6 +161,8 @@ def handle_list_brokers(
         priority: Filter by priority level (high, medium, low).
         category: Filter by broker category (people-search, marketing, etc.).
         include_disabled: If True, include brokers marked as disabled.
+        status: Filter by lifecycle status (defaults to active).
+        include_inactive: If True, include all lifecycle statuses.
 
     Returns a ``CliResult`` with ``data`` containing ``brokers`` (list of
     serialized Broker dicts) and ``total`` count.
@@ -172,6 +176,8 @@ def handle_list_brokers(
             priority=priority,
             category=category,
             include_disabled=include_disabled,
+            status=status,
+            include_inactive=include_inactive,
         )
         broker_dicts = [b.model_dump(mode="json") for b in brokers]
         result: dict[str, Any] = {
