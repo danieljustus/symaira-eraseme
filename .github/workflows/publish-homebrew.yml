@@ -121,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           ruby -c "$TAP_PATH/Formula/symeraseme.rb"
-          brew audit --formula --online "$TAP_PATH/Formula/symeraseme.rb"
+          brew audit --formula --online danieljustus/tap/symeraseme
           grep -q "symeraseme-${VERSION}.tar.gz" "$TAP_PATH/Formula/symeraseme.rb"
           git -C "$TAP_PATH" diff --check
 
