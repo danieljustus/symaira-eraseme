@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -39,6 +40,20 @@ class TestHandleGetDashboardData:
             assert result.success is False
             assert "Failed to fetch dashboard data" in result.error
             assert "Database error" in result.error
+            mock_get.assert_called_once()
+
+    def test_sqlite_failure_sanitized(self):
+        """Issue #619: raw sqlite text must never reach the client."""
+        with patch(
+            "symeraseme.core.dashboard.get_dashboard_data",
+            side_effect=sqlite3.OperationalError("no such table: campaigns"),
+        ) as mock_get:
+            result = handle_get_dashboard_data()
+            assert result.success is False
+            assert result.error is not None
+            assert "no such table" not in result.error
+            assert "campaigns" not in result.error
+            assert "Database not ready" in result.error
             mock_get.assert_called_once()
 
 
@@ -200,3 +215,38 @@ class TestHandleExportData:
             result = handle_export_data()
             assert result.success is False
             assert "Failed to export data" in result.error
+
+
+class TestWithDbDecoration:
+    """Issue #619: dashboard read handlers guarantee schema creation.
+
+    ``@with_db`` must ensure the schema exists even when the server was
+    started by an older version (or another tool) that skipped init_db().
+    """
+
+    def test_dashboard_handler_creates_schema(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+        with patch("symeraseme.core.dashboard.get_dashboard_data", return_value={}):
+            result = handle_get_dashboard_data()
+        assert result.success is True
+
+        conn = sqlite3.connect(tmp_path / "symeraseme.db")
+        try:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+        finally:
+            conn.close()
+        assert {"campaigns", "removal_requests", "request_events"} <= tables
+
+    def test_list_brokers_does_not_require_db(self):
+        """list_brokers is registry-only; @with_db must not break it."""
+        mock_broker = MagicMock()
+        mock_broker.model_dump.return_value = {"id": "broker-x", "name": "Broker X"}
+        with patch("symeraseme.registry.loader.load_all_brokers", return_value=[mock_broker]):
+            result = handle_list_brokers()
+        assert result.success is True
+        assert result.data["total"] == 1

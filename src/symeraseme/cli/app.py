@@ -245,8 +245,14 @@ def serve(
             "The server uses per-run Bearer-token auth but is reachable from the network."
         )
 
+    from symeraseme.core.db_connection import init_db
     from symeraseme.mcp_server import run_mcp_server
 
+    # Issue #619: a fresh data dir must get the full schema before the MCP
+    # server starts serving requests, otherwise every data screen fails with
+    # a raw "no such table" error. init_db() resolves the same data dir that
+    # run_mcp_server writes mcp_token to (SYMERASEME_DATA_DIR et al).
+    init_db()
     run_mcp_server(host, port)
 
 
