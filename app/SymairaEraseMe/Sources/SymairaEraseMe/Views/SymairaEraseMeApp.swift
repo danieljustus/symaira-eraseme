@@ -119,7 +119,7 @@ struct ContentView: View {
         .task {
             // Periodically check MCP server reachability
             while !Task.isCancelled {
-                mcpReachable = await MCPClient.shared.ping()
+                mcpReachable = (await MCPClient.shared.ping()) == .connected
                 try? await Task.sleep(for: .seconds(10))
             }
         }

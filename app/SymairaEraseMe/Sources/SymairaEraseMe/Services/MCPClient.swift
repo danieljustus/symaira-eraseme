@@ -1,5 +1,15 @@
 import Foundation
 
+/// Result of a reachability probe against the MCP server.
+enum ConnectionStatus: Equatable, Sendable {
+    /// The server answered and accepted the request.
+    case connected
+    /// The server is up but rejected the request as unauthenticated (401).
+    case unauthorized
+    /// The server could not be reached (connection refused, timeout, ...).
+    case unreachable
+}
+
 /// JSON-RPC 2.0 HTTP client for the Symaira MCP server.
 /// Posts to `http://127.0.0.1:8000` and parses the MCP content envelope.
 actor MCPClient {
@@ -79,12 +89,14 @@ actor MCPClient {
 
     /// Check if the MCP server is reachable.
     /// Uses its own lightweight JSON-RPC parser for the tools/list response shape.
-    func ping() async -> Bool {
+    /// Distinguishes an auth rejection (401) from a transport failure so the
+    /// UI can point at the real cause instead of claiming unreachability.
+    func ping() async -> ConnectionStatus {
         do {
             let host = MCPClient.configuredHost
             let port = MCPClient.configuredPort
             guard let url = URL(string: "http://\(host):\(port)/") else {
-                return false
+                return .unreachable
             }
 
             var request = URLRequest(url: url)
@@ -105,9 +117,18 @@ actor MCPClient {
 
             let (data, response) = try await session.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                return false
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .unreachable
+            }
+
+            // 401 means the server is up and listening but rejected our
+            // token — an auth problem, not a reachability problem.
+            if httpResponse.statusCode == 401 {
+                return .unauthorized
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                return .unreachable
             }
 
             // Parse as a generic JSON-RPC 2.0 response — tools/list returns
@@ -115,12 +136,12 @@ actor MCPClient {
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   json["result"] != nil,
                   json["error"] == nil else {
-                return false
+                return .unreachable
             }
 
-            return true
+            return .connected
         } catch {
-            return false
+            return .unreachable
         }
     }
 

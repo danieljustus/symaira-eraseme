@@ -22,8 +22,14 @@ final class SettingsViewModel: ObservableObject {
         defer { isChecking = false }
 
         let client = MCPClient.shared
-        isConnected = await client.ping()
-        if !isConnected {
+        switch await client.ping() {
+        case .connected:
+            isConnected = true
+        case .unauthorized:
+            isConnected = false
+            lastCheckError = "Server rejected the request (401 Unauthorized) — the Data Directory does not match the server's token directory"
+        case .unreachable:
+            isConnected = false
             lastCheckError = "Server not reachable at \(MCPClient.configuredHost):\(MCPClient.configuredPort)"
         }
     }
