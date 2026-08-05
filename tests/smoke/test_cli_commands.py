@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from typer.main import get_command
 
 from symeraseme.cli.app import app
@@ -172,6 +175,54 @@ class TestBrokersList:
         )
         data = assert_json_output(result)
         assert "localblox-us" in {broker["id"] for broker in data["brokers"]}
+
+
+class TestPlanCreateStatus:
+    def test_default_plan_excludes_inactive_brokers(self, seeded_db, tmp_path, monkeypatch):
+        """plan create without --status must default to active brokers only (#626)."""
+        from symeraseme.registry.loader import clear_registry_cache
+
+        from .conftest import assert_json_output
+
+        registry_dir = tmp_path / "registry"
+        brokers_dir = registry_dir / "brokers"
+        brokers_dir.mkdir(parents=True)
+        schemas_dir = registry_dir / "schemas"
+        schemas_dir.mkdir(parents=True)
+        shutil.copy(
+            Path(__file__).resolve().parents[2] / "registry" / "schemas" / "broker.schema.json",
+            schemas_dir / "broker.schema.json",
+        )
+        for broker_id, status in [
+            ("active-broker", "active"),
+            ("dead-broker", "out-of-business"),
+        ]:
+            (brokers_dir / f"{broker_id}.yaml").write_text(
+                "id: " + broker_id + "\n"
+                "name: " + broker_id + "\n"
+                "website: https://example.com\n"
+                "category: other\n"
+                "jurisdictions:\n"
+                "- US\n"
+                "laws:\n"
+                "- CCPA\n"
+                "priority: medium\n"
+                "status: " + status + "\n"
+                "opt_out:\n"
+                "- type: email\n"
+                "  endpoint: test@example.com\n"
+                "  template: ccpa-deletion\n"
+                "  locale: en\n"
+            )
+        monkeypatch.setenv("SYMERASEME_RESOURCES", str(tmp_path / "registry"))
+        clear_registry_cache()
+        try:
+            result = invoke("--output", "json", "plan", "create", "--campaign", "status-default")
+        finally:
+            clear_registry_cache()
+        data = assert_json_output(result)
+        assert data["total_brokers"] == 1, data
+        assert [r["broker_name"] for r in data["requests"]] == ["active-broker"]
 
 
 class TestBrokersShow:
