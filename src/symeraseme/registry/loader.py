@@ -24,11 +24,16 @@ def _registry_dir() -> Path:
     env_dir = os.environ.get("SYMERASEME_RESOURCES")
     if env_dir:
         return Path(env_dir)
-    pkg_root = resources.files("symeraseme")
-    candidate = Path(str(pkg_root)) / "registry"
+    pkg_root = Path(str(resources.files("symeraseme")))
+    # Packaged installs (wheel/Homebrew bottle): the registry tree is
+    # force-included at symeraseme/registry_data/ (issue #615).
+    packaged = pkg_root / "registry_data"
+    if packaged.exists() and (packaged / "brokers").exists():
+        return packaged
+    candidate = pkg_root / "registry"
     if candidate.exists() and (candidate / "brokers").exists():
         return candidate
-    for parent in Path(str(pkg_root)).parents:
+    for parent in pkg_root.parents:
         if (parent / "registry" / "brokers").exists():
             return parent / "registry"
     msg = "Could not find registry directory"

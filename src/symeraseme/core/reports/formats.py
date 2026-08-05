@@ -59,12 +59,15 @@ def export_csv(data: dict[str, Any]) -> str:
 
 
 def export_html(data: dict[str, Any]) -> str:
-    import pathlib
+    from symeraseme.registry.loader import _registry_dir
 
-    project_root = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
+    # Resolve the templates dir through the shared registry resolver so this
+    # works in both source checkouts and packaged installs, where the registry
+    # tree lives at symeraseme/registry_data/ (issue #615).
+    templates_dir = _registry_dir() / "templates"
     loader = FileSystemLoader(
         searchpath=[
-            str(project_root / "registry" / "templates"),
+            str(templates_dir),
         ]
     )
     env = Environment(loader=loader, autoescape=select_autoescape(["html"]))
