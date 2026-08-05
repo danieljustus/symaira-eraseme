@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.1] - 2026-08-05
+
+- **Fix**: Ship broker registry data in wheel and sdist so packaged installs can list brokers and create campaigns (#615).
+- **Fix**: Default plan creation to active brokers, initialize the database schema at server startup, and sanitize internal database errors (#619, #627).
+- **Fix**: Accept Homebrew-installed CLI binaries and show actionable server failure diagnostics (#616, #617).
+- **Fix**: Use the configured data directory for MCP authentication and distinguish unauthorized responses from unreachable servers (#618).
+- **Fix**: Keep Settings connection state synchronized after server startup (#621).
+- **Fix**: Allow Escape to dismiss sheets and size the New Campaign sheet so its primary action remains visible (#622, #623).
+- **Fix**: Expose accessible names for sidebar navigation and correct data-directory and calendar escalation labels (#620, #624).
+- **Test**: Add regression coverage for server launch diagnostics, fallback interpreter timeouts, packaged registry data, and dashboard/MCP behavior.
+
 ## [v0.10.0] - 2026-08-04
 
 - **Feat**: Honor broker lifecycle status in planning and listing (#606).
