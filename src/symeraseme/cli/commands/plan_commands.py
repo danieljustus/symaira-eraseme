@@ -48,7 +48,7 @@ def create(
         help="Maximum brokers to plan",
     ),
     status: str = typer.Option(
-        None,
+        "active",
         "--status",
         help="Broker lifecycle status (active, deprecated, merged, out-of-business)",
     ),
