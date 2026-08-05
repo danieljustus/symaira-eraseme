@@ -14,11 +14,16 @@ def _templates_dir() -> Path:
     env_dir = os.environ.get("SYMERASEME_RESOURCES")
     if env_dir:
         return Path(env_dir) / "laws"
-    pkg_root = resources.files("symeraseme")
-    candidate = Path(str(pkg_root)) / "registry" / "laws"
+    pkg_root = Path(str(resources.files("symeraseme")))
+    # Packaged installs (wheel/Homebrew bottle): registry_data ships the
+    # registry tree inside the package (issue #615).
+    packaged = pkg_root / "registry_data" / "laws"
+    if packaged.exists() and any(packaged.iterdir()):
+        return packaged
+    candidate = pkg_root / "registry" / "laws"
     if candidate.exists() and any(candidate.iterdir()):
         return candidate
-    for parent in Path(str(pkg_root)).parents:
+    for parent in pkg_root.parents:
         if (parent / "registry" / "laws").exists():
             return parent / "registry" / "laws"
     msg = "Could not find templates directory (registry/laws)"
