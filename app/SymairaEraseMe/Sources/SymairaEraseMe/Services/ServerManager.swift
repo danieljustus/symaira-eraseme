@@ -102,11 +102,7 @@ final class ServerManager: ObservableObject {
                     self.isRunning = false
                     self.pid = nil
                     // Surface the last stderr line so the user can diagnose the failure
-                    if let stderr = self.lastStderrLine, !stderr.isEmpty {
-                        self.lastError = "\\(stderr)\n\\(error)"
-                    } else {
-                        self.lastError = error
-                    }
+                    self.lastError = Self.failureMessage(stderr: self.lastStderrLine, error: error)
                 }
             }
         }
@@ -142,6 +138,18 @@ final class ServerManager: ObservableObject {
     /// Stop the MCP server subprocess.
     func stop() {
         supervisor.stop()
+    }
+
+    // MARK: - Testable pure helpers
+
+    /// Compose the failure banner message for a failed server transition.
+    /// Returns the stderr text followed by the error when stderr is
+    /// non-empty, otherwise the error alone.
+    nonisolated static func failureMessage(stderr: String?, error: String) -> String {
+        if let stderr, !stderr.isEmpty {
+            return "\(stderr)\n\(error)"
+        }
+        return error
     }
 
     // MARK: - Private Helpers

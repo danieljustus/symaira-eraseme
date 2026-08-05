@@ -18,6 +18,11 @@ let package = Package(
                 .product(name: "SymairaDaemonKit", package: "symaira-appkit"),
             ],
             path: "Sources/SymairaEraseMe"
-        )
+        ),
+        .testTarget(
+            name: "SymairaEraseMeTests",
+            dependencies: ["SymairaEraseMe"],
+            path: "Tests/SymairaEraseMeTests"
+        ),
     ]
 )
