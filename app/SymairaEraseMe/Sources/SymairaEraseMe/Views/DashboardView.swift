@@ -68,6 +68,7 @@ struct DashboardView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
+            .accessibilityLabel("Refresh dashboard")
         }
     }
 

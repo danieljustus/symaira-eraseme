@@ -33,6 +33,10 @@ struct ContentView: View {
 
         var id: String { rawValue }
 
+        /// Accessibility name surfaced as the sidebar button's label so
+        /// VoiceOver users can tell Dashboard from Settings.
+        var accessibilityName: String { rawValue }
+
         var icon: String {
             switch self {
             case .dashboard: return "chart.bar.fill"
@@ -176,6 +180,7 @@ struct SidebarButton: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(item.accessibilityName)
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering
