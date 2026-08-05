@@ -67,6 +67,7 @@ struct BrokersView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
+            .accessibilityLabel("Refresh brokers")
         }
     }
 
@@ -212,6 +213,10 @@ struct BrokersView: View {
             }
         }
         .frame(width: 500, height: 600)
+        .onExitCommand {
+            vm.selectedBroker = nil
+            showDetail = false
+        }
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {
