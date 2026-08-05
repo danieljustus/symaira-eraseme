@@ -150,6 +150,10 @@ struct CampaignsView: View {
             }
         }
         .frame(width: 450)
+        .onExitCommand {
+            showCreateSheet = false
+            vm.resetForm()
+        }
     }
 
     private func successBanner(_ message: String) -> some View {

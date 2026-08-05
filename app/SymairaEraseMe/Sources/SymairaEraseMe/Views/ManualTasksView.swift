@@ -182,5 +182,9 @@ struct ManualTasksView: View {
             }
         }
         .frame(width: 500, height: 450)
+        .onExitCommand {
+            showCompleteSheet = false
+            selectedTask = nil
+        }
     }
 }
