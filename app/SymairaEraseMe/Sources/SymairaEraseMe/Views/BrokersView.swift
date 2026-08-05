@@ -67,6 +67,7 @@ struct BrokersView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
+            .accessibilityLabel("Refresh brokers")
         }
     }
 
