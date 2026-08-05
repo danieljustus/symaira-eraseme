@@ -16,13 +16,14 @@ final class SettingsViewModel: ObservableObject {
     }
 
     /// Check if the MCP server is reachable.
+    /// Uses the shared reachability refresh so the Settings indicator and
+    /// the sidebar footer always derive from the same poll.
     func checkConnection() async {
         isChecking = true
         lastCheckError = nil
         defer { isChecking = false }
 
-        let client = MCPClient.shared
-        switch await client.ping() {
+        switch await serverManager.refreshReachability() {
         case .connected:
             isConnected = true
         case .unauthorized:
