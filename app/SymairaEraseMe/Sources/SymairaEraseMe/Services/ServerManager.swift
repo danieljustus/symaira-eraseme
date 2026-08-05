@@ -114,6 +114,14 @@ final class ServerManager: ObservableObject {
         // Update MCPClient with configured host/port
         MCPClient.configuredHost = host
         MCPClient.configuredPort = port
+        // The server writes its per-run bearer token to <data_dir>/mcp_token;
+        // the client must read the token from the SAME directory, otherwise
+        // every request is rejected as unauthenticated while the UI blames
+        // reachability. Assigned here (not just lazily at first access) so a
+        // later Data Directory change takes effect without relaunching.
+        if !dataDir.isEmpty {
+            MCPClient.configuredDataDir = dataDir
+        }
 
         Task.detached { [supervisor, executable, arguments, env] in
             _ = supervisor.start(executable: executable, arguments: arguments, environment: env)
