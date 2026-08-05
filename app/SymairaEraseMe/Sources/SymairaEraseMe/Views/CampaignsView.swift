@@ -149,7 +149,7 @@ struct CampaignsView: View {
                 }
             }
         }
-        .frame(width: 450, height: 380)
+        .frame(width: 450)
     }
 
     private func successBanner(_ message: String) -> some View {
