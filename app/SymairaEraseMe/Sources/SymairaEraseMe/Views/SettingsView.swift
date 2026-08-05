@@ -160,7 +160,7 @@ struct SettingsView: View {
             SymairaFormDivider()
 
             SymairaFormRow("Data Directory") {
-                TextField("Default (~/.symeraseme)", text: $serverManager.dataDir)
+                TextField("Default (\(ServerManager.defaultDataDir))", text: $serverManager.dataDir)
                     .textFieldStyle(.symaira)
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
