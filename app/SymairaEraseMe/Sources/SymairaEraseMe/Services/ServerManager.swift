@@ -76,7 +76,7 @@ final class ServerManager: ObservableObject {
         reachabilityTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                _ = await self.refreshReachability()
+                await self.refreshReachability()
                 try? await Task.sleep(for: .seconds(10))
             }
         }
@@ -324,9 +324,6 @@ final class ServerManager: ObservableObject {
             return (mode & S_IWGRP) != 0
                 ? "group-writable, owner not current user"
                 : "owner is not root or the current user"
-        }
-        if (mode & S_IWGRP) != 0 && owner != currentUser {
-            return "group-writable, owner not current user"
         }
         return nil
     }
