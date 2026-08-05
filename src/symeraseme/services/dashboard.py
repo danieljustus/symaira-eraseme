@@ -9,9 +9,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from symeraseme.core.db_connection import with_db
 from symeraseme.core.result_types import CliResult
+from symeraseme.mcp.dispatch import sanitize_client_error
 
 
+@with_db
 def handle_get_dashboard_data() -> CliResult:
     """Return aggregated dashboard data from the event store.
 
@@ -24,9 +27,13 @@ def handle_get_dashboard_data() -> CliResult:
         data = get_dashboard_data()
         return CliResult(success=True, data=data)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to fetch dashboard data: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to fetch dashboard data: {exc}"),
+        )
 
 
+@with_db
 def handle_list_requests(
     campaign_id: str | None = None,
     status: str | None = None,
@@ -69,9 +76,13 @@ def handle_list_requests(
         }
         return CliResult(success=True, data=result)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to list requests: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to list requests: {exc}"),
+        )
 
 
+@with_db
 def handle_get_events(
     request_id: int,
     after_event_id: int | None = None,
@@ -95,9 +106,13 @@ def handle_get_events(
         }
         return CliResult(success=True, data=result)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to get events: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to get events: {exc}"),
+        )
 
 
+@with_db
 def handle_get_calendar(
     weeks: int = 4,
     campaign_id: str | None = None,
@@ -141,9 +156,13 @@ def handle_get_calendar(
         }
         return CliResult(success=True, data=result)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to build calendar: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to build calendar: {exc}"),
+        )
 
 
+@with_db
 def handle_list_brokers(
     jurisdiction: str | None = None,
     law: str | None = None,
@@ -186,7 +205,10 @@ def handle_list_brokers(
         }
         return CliResult(success=True, data=result)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to list brokers: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to list brokers: {exc}"),
+        )
 
 
 def handle_get_profile() -> CliResult:
@@ -209,7 +231,10 @@ def handle_get_profile() -> CliResult:
         data = json.loads(profile.model_dump_json())
         return CliResult(success=True, data=data)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to load profile: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to load profile: {exc}"),
+        )
 
 
 def handle_export_data(
@@ -238,4 +263,7 @@ def handle_export_data(
         }
         return CliResult(success=True, data=result)
     except Exception as exc:
-        return CliResult(success=False, error=f"Failed to export data: {exc}")
+        return CliResult(
+            success=False,
+            error=sanitize_client_error(f"Failed to export data: {exc}"),
+        )

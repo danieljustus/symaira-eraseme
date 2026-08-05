@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -297,6 +298,18 @@ class TestCliResultToJsonrpc:
         resp = _cli_result_to_jsonrpc(result, 3)
         assert resp["error"]["message"] == "Handler returned an error"
 
+    def test_failure_result_sanitizes_sqlite_message(self):
+        """Issue #619: sqlite internals must never reach the client."""
+        result = CliResult(
+            success=False,
+            error="Failed to fetch dashboard data: no such table: campaigns",
+        )
+        resp = _cli_result_to_jsonrpc(result, 21)
+        assert resp["error"]["code"] == -32603
+        assert "no such table" not in resp["error"]["message"]
+        assert "campaigns" not in resp["error"]["message"]
+        assert "Database not ready" in resp["error"]["message"]
+
     def test_unexpected_return_type(self):
         """Handlers that don't return CliResult get fallback serialization."""
         result = {"custom": "data"}
@@ -433,6 +446,25 @@ class TestCallTool:
         resp = _call_tool("plan_create", {"campaign_id": "c1"}, 15)
         assert resp["error"]["code"] == -32603
         assert "boom" in resp["error"]["message"]
+
+    @patch("symeraseme.mcp.dispatch._get_handler")
+    def test_sqlite_exception_message_sanitized(self, mock_get, caplog):
+        """Issue #619: raw sqlite text must not leak through the exception path."""
+        mock_handler = Mock(
+            side_effect=sqlite3.OperationalError("no such table: campaigns")
+        )
+        mock_get.return_value = mock_handler
+        from symeraseme.mcp_server import _call_tool
+
+        with caplog.at_level(logging.ERROR):
+            resp = _call_tool("get_dashboard_data", {}, 22)
+
+        assert resp["error"]["code"] == -32603
+        assert "no such table" not in resp["error"]["message"]
+        assert "campaigns" not in resp["error"]["message"]
+        assert "Database not ready" in resp["error"]["message"]
+        # Full detail stays in the server log for operators.
+        assert "no such table: campaigns" in caplog.text
 
     @patch("symeraseme.mcp.dispatch._get_handler")
     def test_sync_handler_called_directly(self, mock_get):

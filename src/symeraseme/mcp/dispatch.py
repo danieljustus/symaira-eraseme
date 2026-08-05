@@ -8,9 +8,53 @@ import inspect
 import json
 import logging
 import os
+import sqlite3
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Client-facing error sanitisation
+# ---------------------------------------------------------------------------
+
+# Generic message shown to GUI clients when the database layer fails. The
+# full sqlite detail stays in the server log (logger.exception / warning).
+_DB_ERROR_MESSAGE = "Database not ready — start the server again"
+
+# sqlite error signatures that must never reach the client verbatim — they
+# leak internal schema details (table/column names) and confuse users.
+_DB_ERROR_TEXT_PATTERNS = (
+    "no such table",
+    "no such column",
+    "no such index",
+    "database is locked",
+    "unable to open database file",
+    "attempt to write a readonly database",
+    "database disk image is malformed",
+    "not a database",
+    "unique constraint failed",
+    "foreign key constraint failed",
+    "sqlite3.",
+    "operationalerror",
+    "syntax error near",
+)
+
+
+def sanitize_client_error(message: str | Exception) -> str:
+    """Replace database internals in an error message with a generic message.
+
+    Raw ``sqlite3`` text (e.g. ``no such table: campaigns``) leaks internal
+    schema details to MCP clients. Full details remain available in the
+    server log; the client only ever sees a generic user-facing message.
+    """
+    if isinstance(message, sqlite3.Error):
+        return _DB_ERROR_MESSAGE
+    text = str(message)
+    lowered = text.lower()
+    if any(pattern in lowered for pattern in _DB_ERROR_TEXT_PATTERNS):
+        return _DB_ERROR_MESSAGE
+    return text
+
 
 # ---------------------------------------------------------------------------
 # Tool Dispatch
@@ -128,7 +172,11 @@ def _cli_result_to_jsonrpc(result: Any, req_id: Any) -> dict[str, Any]:
             "jsonrpc": "2.0",
             "error": {
                 "code": -32603,
-                "message": result.error or "Handler returned an error",
+                "message": (
+                    sanitize_client_error(result.error)
+                    if result.error
+                    else "Handler returned an error"
+                ),
             },
             "id": req_id,
         }
@@ -169,7 +217,7 @@ def _call_tool(name: str, arguments: dict[str, Any], req_id: Any) -> dict[str, A
             "jsonrpc": "2.0",
             "error": {
                 "code": -32603,
-                "message": f"Internal error in {name}: {e}",
+                "message": sanitize_client_error(f"Internal error in {name}: {e}"),
             },
             "id": req_id,
         }

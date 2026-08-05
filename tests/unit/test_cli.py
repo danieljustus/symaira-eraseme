@@ -192,6 +192,41 @@ class TestServe:
         assert result.exit_code == 0
         assert "--allow-remote" in stdout
 
+    def test_serve_creates_db_schema_in_fresh_data_dir(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        """Issue #619: serve must initialise the schema before startup.
+
+        A fresh data dir must end up with the full schema, not just the
+        empty 4096-byte database file that sqlite creates on first connect.
+        """
+        import sqlite3
+        from unittest.mock import patch
+
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
+
+        with patch(
+            "symeraseme.mcp_server.run_mcp_server", return_value=None
+        ) as mock_run:
+            result = runner.invoke(app, ["serve", "--port", "8123"])
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once_with("127.0.0.1", 8123)
+
+        db_file = tmp_path / "symeraseme.db"
+        assert db_file.exists(), "serve did not create the database file"
+        conn = sqlite3.connect(db_file)
+        try:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+        finally:
+            conn.close()
+        assert {"campaigns", "removal_requests", "request_events"} <= tables
+
 
 class TestExceptionGuard:
     """Tests for the top-level exception guard (_run_app)."""
