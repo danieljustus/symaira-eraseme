@@ -21,6 +21,11 @@ final class ServerManager: ObservableObject {
         didSet { UserDefaults.standard.set(binaryPath, forKey: "symeraseme_binary_path") }
     }
 
+    /// Backend default data directory (empty `dataDir` means "use this
+    /// default"); mirrors `src/symeraseme/core/config.py`. The Settings
+    /// placeholder derives from this constant so UI and backend cannot drift.
+    nonisolated static let defaultDataDir = "~/.local/share/symeraseme"
+
     /// Configurable data directory.
     @Published var dataDir: String {
         didSet { UserDefaults.standard.set(dataDir, forKey: "symeraseme_data_dir") }

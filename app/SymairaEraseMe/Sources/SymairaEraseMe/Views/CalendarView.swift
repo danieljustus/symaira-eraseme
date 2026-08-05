@@ -72,6 +72,24 @@ struct CalendarView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(BrandColors.goldPrimary)
+            .accessibilityLabel("Refresh calendar")
+        }
+    }
+
+    /// Human-readable label for an escalation category identifier returned
+    /// by the backend (`src/symeraseme/core/reports/data.py` escalation dict:
+    /// "none", "reminder", "dpa_pending"). Unknown identifiers fall back to
+    /// the raw key so the UI never crashes on a new backend category.
+    static func escalationLabel(for key: String) -> String {
+        switch key {
+        case "dpa_pending":
+            return "DPA pending"
+        case "reminder":
+            return "Reminder"
+        case "none", "":
+            return "No escalation"
+        default:
+            return key
         }
     }
 
@@ -137,7 +155,7 @@ struct CalendarView: View {
                             Text("\(value)")
                                 .symairaText(.bodyEmphasized)
                                 .foregroundStyle(BrandColors.textPrimary)
-                            Text(key)
+                            Text(Self.escalationLabel(for: key))
                                 .symairaText(.caption)
                                 .foregroundStyle(BrandColors.textMuted)
                         }
