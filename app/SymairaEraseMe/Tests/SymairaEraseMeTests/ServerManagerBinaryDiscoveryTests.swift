@@ -25,9 +25,9 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: path)
     }
 
-    private func makeExecutable(named name: String) throws {
+    private func makeExecutable(named name: String, contents: String = "#!/bin/sh\n") throws {
         let url = tempDir.appendingPathComponent(name)
-        try Data("#!/bin/sh\n".utf8).write(to: url)
+        try Data(contents.utf8).write(to: url)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
@@ -110,5 +110,42 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
 
     func testModuleImportableRejectsMissingInterpreter() {
         XCTAssertFalse(ServerManager.moduleImportable(python: "/nonexistent/python3"))
+    }
+
+    func testModuleImportableRejectsTimedOutInterpreter() throws {
+        try makeExecutable(named: "sleepy-python", contents: "#!/bin/sh\nexec sleep 5\n")
+        XCTAssertFalse(
+            ServerManager.moduleImportable(
+                python: tempDir.appendingPathComponent("sleepy-python").path,
+                timeout: 0.01
+            )
+        )
+    }
+
+    // MARK: - Launch failure diagnostics
+
+    func testStartFailureMessageExplainsMissingCli() {
+        XCTAssertEqual(
+            ServerManager.startFailureMessage(refusals: []),
+            "Could not find the symeraseme CLI. Install it via Homebrew or set the Binary Path in Settings."
+        )
+    }
+
+    func testStartFailureMessageIncludesAllRefusals() {
+        let refusals = [
+            "found /tmp/symeraseme but directory not accepted (world-writable)",
+            "found /usr/bin/python3 but symeraseme module not importable",
+        ]
+        let message = ServerManager.startFailureMessage(refusals: refusals)
+        XCTAssertTrue(message.hasPrefix("Could not start the symeraseme server — no usable CLI found:\n"))
+        XCTAssertTrue(message.contains(refusals[0]))
+        XCTAssertTrue(message.contains(refusals[1]))
+        XCTAssertEqual(message.components(separatedBy: "\n").count, 3)
+    }
+
+    func testScanDirectoriesStartsWithHomebrewPrefixesAndDeduplicatesPath() {
+        let directories = ServerManager.scanDirectories()
+        XCTAssertEqual(Array(directories.prefix(2)), ["/opt/homebrew/bin", "/usr/local/bin"])
+        XCTAssertEqual(directories.count, Set(directories).count)
     }
 }
