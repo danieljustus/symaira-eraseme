@@ -71,6 +71,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/symeraseme"]
 
+# Ship the broker registry data (brokers/, laws/, schemas/, templates/) inside
+# the installed package so pip/Homebrew installs work without a source checkout
+# (issue #615).  The repo-root `registry/` tree is force-included into the
+# package as `symeraseme/registry_data/`; the sdist carries it automatically
+# (hatchling's default sdist includes the whole project tree).
+[tool.hatch.build.targets.wheel.force-include]
+"registry" = "src/symeraseme/registry_data"
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
