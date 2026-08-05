@@ -1,7 +1,13 @@
 import Foundation
 import Combine
+import Darwin
 import SymairaToolKit
 import SymairaDaemonKit
+
+/// Well-known Homebrew binary prefixes. GUI apps do not inherit a shell
+/// PATH, so these are scanned explicitly (mirrors BinaryLocator's own
+/// extra-directory list).
+private let homebrewBinDirectories = ["/opt/homebrew/bin", "/usr/local/bin"]
 
 /// Manages spawning/stopping the `symeraseme serve` subprocess.
 @MainActor
@@ -51,31 +57,6 @@ final class ServerManager: ObservableObject {
         setupSupervisor()
     }
 
-    /// Detect `symeraseme` binary on PATH or via common locations.
-    func detectBinary() -> String? {
-        // 1. User-configured path
-        if !binaryPath.isEmpty, FileManager.default.isExecutableFile(atPath: binaryPath) {
-            return binaryPath
-        }
-
-        // 2. Check PATH for `symeraseme`
-        if let path = findInPATH("symeraseme") {
-            return path
-        }
-
-        // 3. Try `uv run symeraseme`
-        if findInPATH("uv") != nil {
-            return nil // Will use "uv run symeraseme serve"
-        }
-
-        // 4. Try `python -m symeraseme`
-        if findInPATH("python3") != nil || findInPATH("python") != nil {
-            return nil // Will use "python -m symeraseme serve"
-        }
-
-        return nil
-    }
-
     private func setupSupervisor() {
         supervisor.onLog = { [weak self] logLine in
             guard logLine.isError else { return }
@@ -114,8 +95,12 @@ final class ServerManager: ObservableObject {
         lastError = nil
         lastStderrLine = nil
 
-        let executable = findExecutable()
-        let arguments = buildArguments()
+        let plan = resolveLaunchPlan()
+        guard let executable = plan.executable else {
+            lastError = Self.startFailureMessage(refusals: plan.refusals)
+            return
+        }
+        let arguments = plan.arguments
 
         // Set up environment
         var env = [String: String]()
@@ -140,6 +125,102 @@ final class ServerManager: ObservableObject {
         supervisor.stop()
     }
 
+    // MARK: - Launch-plan resolution
+
+    /// How to launch the server, or why no launch was possible.
+    private struct LaunchPlan {
+        let executable: URL?
+        let arguments: [String]
+        /// Human-readable reasons candidates were refused; empty when a
+        /// usable executable was found.
+        let refusals: [String]
+    }
+
+    /// Resolve the executable and arguments for `symeraseme serve`.
+    ///
+    /// Discovery order:
+    /// 1. User-configured Binary Path — always honoured when executable.
+    /// 2. The direct binary via `BinaryLocator` (strict directory-security
+    ///    check), then a relaxed scan of the Homebrew prefixes and PATH
+    ///    that tolerates group-writable directories owned by the current
+    ///    user (the stock Homebrew layout: `/opt/homebrew/bin` is mode 775
+    ///    owned by the installing user, which the strict locator rejects).
+    /// 3. `uv run symeraseme`.
+    /// 4. `python3`/`python -m symeraseme` — only after verifying the
+    ///    module actually imports, so a broken fallback never spawns blind.
+    private func resolveLaunchPlan() -> LaunchPlan {
+        let serveArguments = ["serve", "--host", host, "--port", "\(port)"]
+
+        // 1. User-configured path — unchanged, always honoured.
+        if !binaryPath.isEmpty, FileManager.default.isExecutableFile(atPath: binaryPath) {
+            return LaunchPlan(executable: URL(fileURLWithPath: binaryPath), arguments: serveArguments, refusals: [])
+        }
+
+        var refusals: [String] = []
+
+        // 2. Direct binary: strict locator first, then the relaxed
+        //    Homebrew/PATH scan.
+        if let path = findInPATH("symeraseme") {
+            return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: serveArguments, refusals: [])
+        }
+        // No usable binary: explain why the candidates we did find were
+        // refused instead of silently spawning a broken fallback.
+        for directory in Self.scanDirectories() {
+            if let diagnostic = Self.candidateRefusalDiagnostic(directory: directory, binaryName: "symeraseme") {
+                refusals.append(diagnostic)
+            }
+        }
+
+        // 3. `uv run symeraseme` fallback. No import pre-check here: `uv
+        //    run` resolves the environment itself and a
+        //    `uv run python -c "import symeraseme"` probe would pay the
+        //    full environment-resolution cost on every start; its failures
+        //    surface in stderr.
+        if let uvPath = findInPATH("uv") {
+            return LaunchPlan(
+                executable: URL(fileURLWithPath: uvPath),
+                arguments: ["run", "symeraseme"] + serveArguments,
+                refusals: []
+            )
+        }
+
+        // 4. Python fallback — only when the module imports. This runs
+        //    only on the fallback path, so the happy path stays fast.
+        for python in [findInPATH("python3"), findInPATH("python")].compactMap({ $0 }) {
+            if Self.moduleImportable(python: python) {
+                return LaunchPlan(
+                    executable: URL(fileURLWithPath: python),
+                    arguments: ["-m", "symeraseme"] + serveArguments,
+                    refusals: []
+                )
+            }
+            refusals.append("found \(python) but symeraseme module not importable")
+        }
+
+        return LaunchPlan(executable: nil, arguments: [], refusals: refusals)
+    }
+
+    /// Shared discovery: strict `BinaryLocator` first, then a relaxed scan
+    /// of the Homebrew prefixes and PATH.
+    ///
+    /// `BinaryLocator` rejects any group-writable directory (e.g.
+    /// `/opt/homebrew/bin`, mode 775, owned by the current user), which is
+    /// the stock Homebrew layout — so the relaxed scan below fixes
+    /// Homebrew installs without loosening appkit itself.
+    private func findInPATH(_ name: String) -> String? {
+        if let located = BinaryLocator().locate(name) {
+            return located.url.path
+        }
+        for directory in Self.scanDirectories() {
+            let candidate = URL(fileURLWithPath: directory).appendingPathComponent(name).path
+            if FileManager.default.isExecutableFile(atPath: candidate),
+               Self.isAcceptableExecutableDirectory(directory) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
     // MARK: - Testable pure helpers
 
     /// Compose the failure banner message for a failed server transition.
@@ -152,48 +233,96 @@ final class ServerManager: ObservableObject {
         return error
     }
 
-    // MARK: - Private Helpers
-
-    private func findExecutable() -> URL {
-        if let binPath = detectBinary(), !binPath.isEmpty {
-            return URL(fileURLWithPath: binPath)
+    /// Compose the "no usable CLI" banner when discovery refused every
+    /// candidate.
+    nonisolated static func startFailureMessage(refusals: [String]) -> String {
+        if refusals.isEmpty {
+            return "Could not find the symeraseme CLI. Install it via Homebrew or set the Binary Path in Settings."
         }
-
-        // Fallback: try uv
-        if let uvPath = findInPATH("uv") {
-            return URL(fileURLWithPath: uvPath)
-        }
-
-        // Fallback: try python3
-        if let pyPath = findInPATH("python3") {
-            return URL(fileURLWithPath: pyPath)
-        }
-
-        // Last resort
-        return URL(fileURLWithPath: "/usr/bin/env")
+        return "Could not start the symeraseme server — no usable CLI found:\n" + refusals.joined(separator: "\n")
     }
 
-    private func buildArguments() -> [String] {
-        let binPath = detectBinary()
-
-        if binPath == nil || binPath?.isEmpty == true {
-            // No direct binary found — try via uv or python
-            if findInPATH("uv") != nil {
-                return ["run", "symeraseme", "serve", "--host", host, "--port", "\(port)"]
-            } else if findInPATH("python3") != nil {
-                return ["-m", "symeraseme", "serve", "--host", host, "--port", "\(port)"]
-            } else if findInPATH("python") != nil {
-                return ["-m", "symeraseme", "serve", "--host", host, "--port", "\(port)"]
-            }
-        }
-
-        return ["serve", "--host", host, "--port", "\(port)"]
+    /// Directories scanned by the relaxed fallback: the well-known
+    /// Homebrew prefixes followed by PATH entries (deduplicated).
+    nonisolated static func scanDirectories() -> [String] {
+        let pathEntries = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+        var seen = Set<String>()
+        return (homebrewBinDirectories + pathEntries).filter { seen.insert($0).inserted }
     }
 
-    /// Shared discovery (bundle → exe dir → PATH → Homebrew prefixes).
-    /// GUI apps do not inherit a shell PATH, so the Homebrew fallbacks in
-    /// BinaryLocator matter — the old PATH-only lookup missed brew installs.
-    private func findInPATH(_ name: String) -> String? {
-        BinaryLocator().locate(name)?.url.path
+    /// Relaxed, still-safe acceptance rule for executable directories.
+    ///
+    /// A directory is acceptable when it is owned by root or the current
+    /// user and is not world-writable; group-writable is tolerated only
+    /// when the owner is the current user (the standard Homebrew layout,
+    /// `/opt/homebrew/bin` is 775 owned by the installing user).
+    /// `BinaryLocator`'s strict check in appkit rejects group-writable
+    /// directories outright, which is why this relaxed rule lives here and
+    /// is applied only to the Homebrew-prefix/PATH fallbacks.
+    nonisolated static func isAcceptableExecutableDirectory(_ path: String) -> Bool {
+        directoryRefusalReason(path) == nil
+    }
+
+    /// Human-readable reason a directory failed the acceptance rule, or
+    /// nil when it is acceptable.
+    nonisolated static func directoryRefusalReason(_ path: String) -> String? {
+        var statBuf = stat()
+        guard stat(path, &statBuf) == 0 else { return "directory does not exist" }
+        let owner = statBuf.st_uid
+        let mode = statBuf.st_mode
+        let currentUser = getuid()
+        if (mode & S_IWOTH) != 0 {
+            return "world-writable"
+        }
+        if owner != 0 && owner != currentUser {
+            return (mode & S_IWGRP) != 0
+                ? "group-writable, owner not current user"
+                : "owner is not root or the current user"
+        }
+        if (mode & S_IWGRP) != 0 && owner != currentUser {
+            return "group-writable, owner not current user"
+        }
+        return nil
+    }
+
+    /// Build the diagnostic line for a refused candidate directory, or nil
+    /// when the directory holds no executable with `binaryName` or is
+    /// acceptable.
+    nonisolated static func candidateRefusalDiagnostic(directory: String, binaryName: String) -> String? {
+        let candidate = URL(fileURLWithPath: directory).appendingPathComponent(binaryName).path
+        guard FileManager.default.isExecutableFile(atPath: candidate) else { return nil }
+        guard let reason = directoryRefusalReason(directory) else { return nil }
+        return "found \(candidate) but directory not accepted (\(reason))"
+    }
+
+    /// Verify that `python -c "import <module>"` succeeds within `timeout`,
+    /// so fallback paths never spawn a broken interpreter blindly.
+    nonisolated static func moduleImportable(
+        python: String,
+        module: String = "symeraseme",
+        timeout: TimeInterval = 10
+    ) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: python)
+        process.arguments = ["-c", "import \(module)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate()
+            return false
+        }
+        return process.terminationStatus == 0
     }
 }
