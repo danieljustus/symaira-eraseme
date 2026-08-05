@@ -44,7 +44,13 @@ final class ServerManager: ObservableObject {
     /// Most recent stderr line from the server subprocess, for surfacing actionable diagnostics.
     @Published var lastStderrLine: String?
 
+    /// Single source of truth for MCP server reachability. Both the sidebar
+    /// footer and the Settings connection section read this, so the two
+    /// indicators can never contradict each other.
+    @Published var mcpReachable = false
+
     private let supervisor = DaemonSupervisor()
+    private var reachabilityTask: Task<Void, Never>?
 
     init() {
         let defaults = UserDefaults.standard
@@ -55,6 +61,30 @@ final class ServerManager: ObservableObject {
         self.port = defaults.object(forKey: "symeraseme_port") as? Int ?? 8000
 
         setupSupervisor()
+        startReachabilityPolling()
+    }
+
+    /// Shared reachability poller. Runs for the app's lifetime; every
+    /// indicator (sidebar footer, Settings Connection section) derives from
+    /// `mcpReachable`, so there is exactly one source of truth.
+    private func startReachabilityPolling() {
+        reachabilityTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                _ = await self.refreshReachability()
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
+    }
+
+    /// Ping the MCP server and publish the result to `mcpReachable`.
+    /// Returns the raw status so callers can distinguish an auth rejection
+    /// from a transport failure in their error text.
+    @discardableResult
+    func refreshReachability() async -> ConnectionStatus {
+        let status = await MCPClient.shared.ping()
+        mcpReachable = (status == .connected)
+        return status
     }
 
     private func setupSupervisor() {

@@ -25,6 +25,20 @@ struct SettingsView: View {
         }
         .background(Color.clear)
         .task { await vm.checkConnection() }
+        .onChange(of: serverManager.isRunning) { _, running in
+            guard running else { return }
+            Task {
+                // The server needs a moment to accept connections. Retry
+                // briefly so the Connection section reflects the running
+                // server without pressing Test Connection or waiting for
+                // the next shared poll.
+                for _ in 0..<6 {
+                    await vm.checkConnection()
+                    if vm.isConnected { break }
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
+        }
     }
 
     private var header: some View {

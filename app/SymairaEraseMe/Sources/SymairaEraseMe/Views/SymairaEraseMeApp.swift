@@ -21,7 +21,6 @@ struct SymairaEraseMeApp: App {
 struct ContentView: View {
     @EnvironmentObject var serverManager: ServerManager
     @State private var selectedNav: NavItem = .dashboard
-    @State private var mcpReachable = false
 
     enum NavItem: String, CaseIterable, Identifiable {
         case dashboard = "Dashboard"
@@ -105,10 +104,12 @@ struct ContentView: View {
             
             Spacer()
             
-            // Server Quick Status in Footer
+            // Server Quick Status in Footer — driven by the shared
+            // reachability poll on ServerManager so it can never contradict
+            // the Settings connection section.
             SymairaStatusLabel(
-                mcpReachable ? "MCP Engine Active" : "MCP Engine Offline",
-                tone: mcpReachable ? .positive : .critical
+                serverManager.mcpReachable ? "MCP Engine Active" : "MCP Engine Offline",
+                tone: serverManager.mcpReachable ? .positive : .critical
             )
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,13 +117,6 @@ struct ContentView: View {
         }
         .frame(maxHeight: .infinity)
         .background(BrandColors.bgDarker.ignoresSafeArea())
-        .task {
-            // Periodically check MCP server reachability
-            while !Task.isCancelled {
-                mcpReachable = (await MCPClient.shared.ping()) == .connected
-                try? await Task.sleep(for: .seconds(10))
-            }
-        }
     }
 
     @ViewBuilder
