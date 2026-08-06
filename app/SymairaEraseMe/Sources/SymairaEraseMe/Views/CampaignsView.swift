@@ -132,7 +132,7 @@ struct CampaignsView: View {
                             showCreateSheet = false
                         }
                     }
-                    .disabled(vm.newCampaignId.isEmpty)
+                    .disabled(!vm.canCreateCampaign)
                     .tint(BrandColors.goldPrimary)
                 }
             }

@@ -503,3 +503,30 @@ class TestWebFormRunner:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Campaign-id validation (issue #642)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestPlanCreateCampaignIdValidation:
+    """Regression coverage for #642: blank campaign ids must be rejected."""
+
+    @pytest.mark.parametrize("campaign_id", ["", "   ", "\t\n"])
+    def test_blank_campaign_id_rejected_with_clear_error(
+        self, monkeypatch, tmp_path, campaign_id
+    ):
+        _setup(monkeypatch, tmp_path)
+        from symeraseme.cli import app as typer_app
+
+        result = runner.invoke(typer_app, ["plan", "create", "--campaign", campaign_id])
+        assert result.exit_code == EXIT_ERROR
+        assert "must not be blank" in _strip_ansi(result.output).lower()
+
+    def test_blank_campaign_id_never_reaches_plan_handler(self, monkeypatch, tmp_path):
+        _setup(monkeypatch, tmp_path)
+        from symeraseme.cli import app as typer_app
+        from symeraseme.cli.commands import plan_commands
+
+        with patch.object(plan_commands, "handle_plan_create") as mock_create:
+            result = runner.invoke(typer_app, ["plan", "create", "--campaign", "   "])
+        assert result.exit_code == EXIT_ERROR
+        mock_create.assert_not_called()

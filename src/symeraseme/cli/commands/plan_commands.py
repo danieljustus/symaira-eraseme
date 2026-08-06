@@ -104,6 +104,23 @@ def create(
         symeraseme plan create --campaign ccpa-batch --jurisdiction US --priority high
         symeraseme plan create --campaign lgpd --law LGPD --jurisdiction BR
     """
+    from symeraseme.cli.console import render_result
+
+    if not campaign_id.strip():
+        from symeraseme.core.result_types import CliResult
+
+        render_result(
+            ctx.obj["output"],
+            CliResult(
+                success=False,
+                error=(
+                    "Campaign id must not be blank. "
+                    "Provide a non-empty --campaign value (e.g. initial-2026-Q2)."
+                ),
+            ),
+        )
+        return
+
     result = handle_plan_create(
         campaign_id,
         jurisdiction,
@@ -113,7 +130,6 @@ def create(
         status=status,
         include_inactive=include_inactive,
     )
-    from symeraseme.cli.console import render_result
 
     render_result(ctx.obj["output"], result)
 
