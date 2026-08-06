@@ -115,7 +115,10 @@ def show_profile() -> None:
     if not profile_exists():
         render_error("No identity profile found. Run 'symeraseme init-profile' first.")
 
-    profile = load_profile()
+    try:
+        profile = load_profile()
+    except RuntimeError as exc:
+        render_error(str(exc))
     lines = [f"Name:  {profile.full_name}"]
     for e in profile.email_addresses:
         lines.append(f"Email: {e}")
@@ -134,7 +137,12 @@ def render_template(
     broker_name: str = typer.Option("", help="Name of the data broker"),
     broker_website: str = typer.Option("", help="Broker website URL"),
 ) -> None:
-    prof = load_profile() if profile_exists() else None
+    prof = None
+    if profile_exists():
+        try:
+            prof = load_profile()
+        except RuntimeError as exc:
+            render_error(str(exc))
     result = _render(
         template,
         profile=prof,
