@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import typer
@@ -461,3 +461,45 @@ class TestBrokersCommands:
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
         assert "success" in parsed
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Web-form runner (issue #638)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestWebFormRunner:
+    """Regression coverage for #638: nested asyncio.run() crashed plan execute."""
+
+    def test_runs_without_running_event_loop(self):
+        from symeraseme.cli.commands.plan_commands import _web_form_runner
+
+        with patch(
+            "symeraseme.services.web_form.run_web_form_for_broker",
+            new_callable=AsyncMock,
+            return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
+        ) as mock_run:
+            result = _web_form_runner("test-broker", dry_run=True)
+        assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
+        mock_run.assert_awaited_once_with(
+            "test-broker", headed=False, screenshot_dir="", dry_run=True
+        )
+
+    @pytest.mark.asyncio
+    async def test_runs_inside_running_event_loop(self):
+        """Must not raise RuntimeError from a nested asyncio.run() call."""
+        from symeraseme.cli.commands.plan_commands import _web_form_runner
+
+        with patch(
+            "symeraseme.services.web_form.run_web_form_for_broker",
+            new_callable=AsyncMock,
+            return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
+        ) as mock_run:
+            result = _web_form_runner("test-broker", dry_run=True)
+        assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
+        mock_run.assert_awaited_once_with(
+            "test-broker", headed=False, screenshot_dir="", dry_run=True
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════

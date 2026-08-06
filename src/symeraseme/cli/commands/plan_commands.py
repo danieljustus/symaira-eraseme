@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
+
 import typer
 
 from symeraseme.core.reports import get_campaign_status
@@ -16,6 +20,38 @@ plan_app = typer.Typer(
     help="Plan a removal campaign (scan registry, create events)",
     no_args_is_help=True,
 )
+
+
+def _web_form_runner(
+    broker_id: str,
+    *,
+    headed: bool = False,
+    screenshot_dir: str = "",
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Run a broker's web form, safe with or without a running event loop.
+
+    ``run_web_form_for_broker`` is a coroutine. ``plan execute`` drives the
+    SMTP async backend with ``asyncio.run`` inside ``handle_execute``, so this
+    runner is invoked while an event loop is already running — a nested
+    ``asyncio.run()`` would raise ``RuntimeError``. When no loop is running
+    (Himalaya backend, concurrent workers, standalone callers) the coroutine
+    is driven directly; otherwise it runs on a fresh loop in a worker thread.
+    """
+    from symeraseme.services.web_form import run_web_form_for_broker
+
+    coroutine = run_web_form_for_broker(
+        broker_id, headed=headed, screenshot_dir=screenshot_dir, dry_run=dry_run
+    )
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No event loop is running in this thread — drive the coroutine directly.
+        return asyncio.run(coroutine)
+    # Already inside a running event loop: run the coroutine on its own loop
+    # in a worker thread and block for the result.
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="web-form") as pool:
+        return pool.submit(asyncio.run, coroutine).result()
 
 
 @plan_app.command(help="Scan the registry and create a removal campaign.")
@@ -159,24 +195,7 @@ def execute(
         echo $TOKEN | symeraseme execute --campaign initial --consent-file /dev/stdin
         symeraseme execute --campaign initial --concurrent --workers 5
     """
-    import asyncio
-
     from symeraseme.cli.console import render_result, show_spinner
-
-    def _web_form_runner(
-        broker_id: str,
-        *,
-        headed: bool = False,
-        screenshot_dir: str = "",
-        dry_run: bool = False,
-    ) -> dict:
-        from symeraseme.services.web_form import run_web_form_for_broker
-
-        return asyncio.run(
-            run_web_form_for_broker(
-                broker_id, headed=headed, screenshot_dir=screenshot_dir, dry_run=dry_run
-            )
-        )
 
     workers = max(3, min(10, workers))
     with show_spinner("Sending removal requests..."):
