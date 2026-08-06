@@ -90,10 +90,10 @@ struct CampaignsView: View {
             Table(campaigns) {
                 TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
                 TableColumn("Kind") { Text($0.kind ?? "—") }
-                TableColumn("Total") { Text("\($0.total)") }
-                TableColumn("Confirmed") { Text("\($0.confirmed)").foregroundStyle(BrandColors.confirmed) }
-                TableColumn("Rejected") { Text("\($0.rejected)").foregroundStyle(BrandColors.rejected) }
-                TableColumn("Overdue") { Text("\($0.overdue)").foregroundStyle(BrandColors.overdue) }
+                TableColumn("Total") { Text("\($0.total.plainDigits)") }
+                TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
+                TableColumn("Rejected") { Text("\($0.rejected.plainDigits)").foregroundStyle(BrandColors.rejected) }
+                TableColumn("Overdue") { Text("\($0.overdue.plainDigits)").foregroundStyle(BrandColors.overdue) }
                 TableColumn("Actions") { campaign in
                     Button("Execute") {
                         pendingExecuteId = campaign.id
@@ -122,7 +122,7 @@ struct CampaignsView: View {
                         .textFieldStyle(.symaira)
                     TextField("Priority (optional)", text: $vm.newCampaignPriority)
                         .textFieldStyle(.symaira)
-                    Stepper("Max Brokers: \(vm.newCampaignMaxBrokers)", value: $vm.newCampaignMaxBrokers, in: 1...500)
+                    Stepper("Max Brokers: \(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
                 }
 
                 Section {
