@@ -41,13 +41,30 @@ class TestConfigEnvOverrides:
     def test_identity_path_override(self, monkeypatch, tmp_path):
         identity = tmp_path / "identity.enc"
         monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(identity))
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path))
         c = Config()
         assert c.identity_path == identity
 
     def test_identity_path_default(self, monkeypatch):
         monkeypatch.delenv("SYMERASEME_IDENTITY_PATH", raising=False)
+        monkeypatch.delenv("SYMERASEME_DATA_DIR", raising=False)
         c = Config()
         assert c.identity_path == Path("~/.config/symeraseme/identity.enc").expanduser()
+
+    def test_identity_path_under_data_dir_when_data_dir_set(self, monkeypatch, tmp_path):
+        """SYMERASEME_DATA_DIR must relocate the identity profile (issue #644)."""
+        data_dir = tmp_path / "data"
+        monkeypatch.delenv("SYMERASEME_IDENTITY_PATH", raising=False)
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(data_dir))
+        c = Config()
+        assert c.identity_path == data_dir / "identity.enc"
+
+    def test_identity_path_explicit_override_wins_over_data_dir(self, monkeypatch, tmp_path):
+        identity = tmp_path / "custom" / "identity.enc"
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(identity))
+        monkeypatch.setenv("SYMERASEME_DATA_DIR", str(tmp_path / "data"))
+        c = Config()
+        assert c.identity_path == identity
 
 
 class TestConfigPaths:
