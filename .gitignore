@@ -68,6 +68,7 @@ app/SymairaEraseMe/build_output.log
 .github/prerelease/
 .github/review/
 .github/audit/
+docs/app-test/
 .omo/run-continuation/
 .omo/notepads/
 coverage.html
