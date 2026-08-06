@@ -512,3 +512,17 @@ class TestAccountCommands:
         assert result.exit_code == 1
         assert "could not be decrypted" in _strip_ansi(result.stderr)
         assert "Traceback" not in result.output
+
+    def test_init_profile_invalid_email_reprompts(self):
+        """An invalid email must show a short validation message and re-prompt."""
+        from symeraseme.cli import app as typer_app
+
+        result = runner.invoke(
+            typer_app,
+            ["init-profile"],
+            input="Jane Doe\nnot-an-email\njane@example.com\n",
+        )
+        assert result.exit_code == 0
+        assert "not a valid email" in _strip_ansi(result.stderr)
+        assert "Traceback" not in result.output
+        assert "encrypted identity profile" in _strip_ansi(result.stdout)

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import typer
+from pydantic import ValidationError
 
 from symeraseme.cli.console import (
     console,
+    print_error,
     print_info,
     print_panel,
     print_success,
@@ -100,7 +102,18 @@ def init_profile(
     full_name: str = typer.Option(..., prompt="Full name"),
     email: str = typer.Option(..., prompt="Email address"),
 ) -> None:
-    profile = IdentityProfile(full_name=full_name, email_addresses=[email])
+    while True:
+        try:
+            profile = IdentityProfile(full_name=full_name, email_addresses=[email])
+            break
+        except ValidationError as exc:
+            # Surface a short, friendly validation message (e.g. for an
+            # invalid email) instead of a raw Pydantic traceback, then
+            # re-prompt for the offending value.
+            first = exc.errors()[0]
+            loc = ".".join(str(part) for part in first.get("loc", ()))
+            print_error(f"{loc or 'profile'}: {first.get('msg', 'validation error')}")
+            email = typer.prompt("Email address")
     path = save_profile(profile)
     action = "Updated" if profile_exists() else "Created"
     print_success(f"{action} encrypted identity profile at {path}")
