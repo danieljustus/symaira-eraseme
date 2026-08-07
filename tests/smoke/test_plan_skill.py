@@ -111,7 +111,7 @@ class TestEventsShow:
         for event in events:
             assert "event_type" in event
 
-    def test_events_show_nonexistent(self):
+    def test_events_show_nonexistent(self, tmp_home):
         result = invoke("events", "show", "9999")
         assert_ok(result)
         assert "No events found" in result.stdout
