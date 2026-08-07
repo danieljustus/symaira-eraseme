@@ -215,9 +215,7 @@ class TestIdentityRoundTrip:
         vault.delete_profile()
 
     def test_tampered_ciphertext_fails_closed(self, fake_keyring, monkeypatch, tmp_path):
-        """Tampering with the ciphertext must raise InvalidTag."""
-        from cryptography.exceptions import InvalidTag
-
+        """Tampering with the ciphertext must fail closed with a friendly error."""
         profile_path = tmp_path / "tamper.enc"
         monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(profile_path))
 
@@ -235,7 +233,7 @@ class TestIdentityRoundTrip:
         tampered[-1] ^= 0xFF
         profile_path.write_bytes(header_bytes + b"\n" + bytes(tampered))
 
-        with pytest.raises(InvalidTag):
+        with pytest.raises(RuntimeError, match="could not be decrypted"):
             vault.load_profile()
 
         vault.delete_profile()

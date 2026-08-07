@@ -44,13 +44,18 @@ def _execute_webform_request(
         )
         raise ValueError(msg)
 
-    result = web_form_runner(broker_name, dry_run=dry_run)
+    # Load the profile before running the form so an undecryptable profile
+    # fails fast instead of after the submission has already been sent.
     identity_hash = ""
     try:
         profile = load_profile()
         identity_hash = hash_profile(profile)
     except FileNotFoundError:
         pass
+    except RuntimeError as e:
+        raise ProfileError(str(e)) from e
+
+    result = web_form_runner(broker_name, dry_run=dry_run)
     if result["success"]:
         append_event_and_project(
             request_id,
@@ -98,6 +103,8 @@ def _execute_email_request(
             "Identity profile not found. "
             "Run 'symeraseme init-profile' first to create your identity profile."
         ) from e
+    except RuntimeError as e:
+        raise ProfileError(str(e)) from e
 
     missing = []
     profile_vars = profile.model_dump()
