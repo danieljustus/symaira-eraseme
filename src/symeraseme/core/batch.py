@@ -15,7 +15,7 @@ from symeraseme.adapters.email.himalaya import (
     send_messages_batch,
 )
 from symeraseme.core.events import get_events_for_requests, list_removal_requests
-from symeraseme.core.exceptions import SymerasemeError, safe_error_str
+from symeraseme.core.exceptions import ProfileError, SymerasemeError, safe_error_str
 from symeraseme.core.execution import execute_request
 from symeraseme.core.identity import load_profile
 from symeraseme.core.projection import append_event_and_project
@@ -191,6 +191,8 @@ async def execute_campaign_async(
         profile = load_profile()
     except FileNotFoundError:
         profile = None
+    except RuntimeError as e:
+        raise ProfileError(str(e)) from e
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),

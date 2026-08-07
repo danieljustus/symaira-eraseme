@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from symeraseme.core.events import create_campaign, create_removal_request, list_removal_requests
+from symeraseme.core.exceptions import ProfileError
 from symeraseme.core.identity import hash_profile, load_profile
 from symeraseme.core.projection import append_event_and_project
 from symeraseme.registry.loader import load_all_brokers
@@ -28,6 +29,18 @@ def plan_campaign(
 ) -> dict[str, Any]:
     """Scan registry, create PLANNED events for matching brokers."""
     logger.debug("Planning campaign %s (jurisdiction=%s law=%s)", campaign_id, jurisdiction, law)
+
+    # Load the identity profile before creating the campaign row so a broken
+    # (undecryptable) profile fails fast with a friendly error instead of
+    # leaving an orphaned campaign row behind.
+    try:
+        profile = load_profile()
+        identity_hash = hash_profile(profile)
+    except FileNotFoundError:
+        identity_hash = ""
+    except RuntimeError as e:
+        raise ProfileError(str(e)) from e
+
     if not create_campaign(campaign_id, kind="initial", notes=notes):
         logger.warning(
             "Campaign '%s' already exists — appending new removal requests to "
@@ -43,12 +56,6 @@ def plan_campaign(
         status=status,
         include_inactive=include_inactive,
     )
-
-    try:
-        profile = load_profile()
-        identity_hash = hash_profile(profile)
-    except FileNotFoundError:
-        identity_hash = ""
 
     channels: list[tuple[Broker, dict[str, Any]]] = []
     for broker in brokers:

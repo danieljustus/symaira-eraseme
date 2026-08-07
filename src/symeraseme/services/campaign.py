@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from symeraseme.core.batch import execute_campaign, execute_campaign_async
 from symeraseme.core.consent import check_consent
 from symeraseme.core.db_connection import with_db
-from symeraseme.core.exceptions import safe_error_str
+from symeraseme.core.exceptions import SymerasemeError, safe_error_str
 from symeraseme.core.planning import get_plan, plan_campaign
 from symeraseme.core.result_types import CliResult
 from symeraseme.registry.schema import BrokerStatus
@@ -28,16 +28,19 @@ def handle_plan_create(
     status: BrokerStatus | str | None = BrokerStatus.active,
     include_inactive: bool = False,
 ) -> CliResult:
-    result = plan_campaign(
-        campaign_id=campaign_id,
-        jurisdiction=jurisdiction,
-        law=law,
-        priority=priority,
-        category=category,
-        status=status,
-        include_inactive=include_inactive,
-        max_brokers=max_brokers,
-    )
+    try:
+        result = plan_campaign(
+            campaign_id=campaign_id,
+            jurisdiction=jurisdiction,
+            law=law,
+            priority=priority,
+            category=category,
+            status=status,
+            include_inactive=include_inactive,
+            max_brokers=max_brokers,
+        )
+    except SymerasemeError as e:
+        return CliResult(success=False, error=e.message, error_exit_code=e.exit_code)
 
     lines = [f"Campaign: {result['campaign_id']}"]
     lines.append(f"  Total brokers scanned: {result['total_brokers']}")
@@ -145,71 +148,78 @@ def handle_execute(
 
         email_sender = send_email
 
-    if backend == "himalaya":
-        result = execute_campaign(
-            campaign_id,
-            account=account or "",
-            batch_size=batch_size,
-            dry_run=dry_run,
-            web_form_runner=web_form_runner,
-            email_sender=email_sender,
-        )
-    elif concurrent:
-        logger.info("Using concurrent execution with %d workers", workers)
-
-        async def _run_concurrent() -> dict:
-            from symeraseme.core.execution import execute_request
-
-            executor = ThreadPoolExecutor(max_workers=workers)
-
-            async def _limited_execute(req: dict) -> dict:
-                loop = asyncio.get_event_loop()
-                try:
-                    return await loop.run_in_executor(
-                        executor,
-                        lambda: execute_request(
-                            req["id"],
-                            dry_run=dry_run,
-                            web_form_runner=web_form_runner,
-                            email_sender=email_sender,
-                        ),
-                    )
-                except Exception as e:
-                    return {"success": False, "error": safe_error_str(e), "request_id": req["id"]}
-
-            from symeraseme.core.batch import _prepare_batch
-
-            batch = _prepare_batch(campaign_id, batch_size)
-            if not batch:
-                executor.shutdown(wait=False)
-                return {
-                    "campaign_id": campaign_id,
-                    "total_planned": 0,
-                    "batch_size": 0,
-                    "results": [],
-                }
-
-            tasks = [_limited_execute(req) for req in batch]
-            results = await asyncio.gather(*tasks)
-            executor.shutdown(wait=False)
-            return {
-                "campaign_id": campaign_id,
-                "total_planned": len(batch),
-                "batch_size": len(batch),
-                "results": list(results),
-            }
-
-        result = asyncio.run(_run_concurrent())
-    else:
-        result = asyncio.run(
-            execute_campaign_async(
+    try:
+        if backend == "himalaya":
+            result = execute_campaign(
                 campaign_id,
+                account=account or "",
                 batch_size=batch_size,
                 dry_run=dry_run,
                 web_form_runner=web_form_runner,
                 email_sender=email_sender,
             )
-        )
+        elif concurrent:
+            logger.info("Using concurrent execution with %d workers", workers)
+
+            async def _run_concurrent() -> dict:
+                from symeraseme.core.execution import execute_request
+
+                executor = ThreadPoolExecutor(max_workers=workers)
+
+                async def _limited_execute(req: dict) -> dict:
+                    loop = asyncio.get_event_loop()
+                    try:
+                        return await loop.run_in_executor(
+                            executor,
+                            lambda: execute_request(
+                                req["id"],
+                                dry_run=dry_run,
+                                web_form_runner=web_form_runner,
+                                email_sender=email_sender,
+                            ),
+                        )
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": safe_error_str(e),
+                            "request_id": req["id"],
+                        }
+
+                from symeraseme.core.batch import _prepare_batch
+
+                batch = _prepare_batch(campaign_id, batch_size)
+                if not batch:
+                    executor.shutdown(wait=False)
+                    return {
+                        "campaign_id": campaign_id,
+                        "total_planned": 0,
+                        "batch_size": 0,
+                        "results": [],
+                    }
+
+                tasks = [_limited_execute(req) for req in batch]
+                results = await asyncio.gather(*tasks)
+                executor.shutdown(wait=False)
+                return {
+                    "campaign_id": campaign_id,
+                    "total_planned": len(batch),
+                    "batch_size": len(batch),
+                    "results": list(results),
+                }
+
+            result = asyncio.run(_run_concurrent())
+        else:
+            result = asyncio.run(
+                execute_campaign_async(
+                    campaign_id,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    web_form_runner=web_form_runner,
+                    email_sender=email_sender,
+                )
+            )
+    except SymerasemeError as e:
+        return CliResult(success=False, error=e.message, error_exit_code=e.exit_code)
 
     lines = []
     any_failure = False
