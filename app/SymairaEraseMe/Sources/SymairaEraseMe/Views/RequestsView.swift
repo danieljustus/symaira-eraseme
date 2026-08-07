@@ -58,7 +58,7 @@ struct RequestsView: View {
                 Text("Requests")
                     .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
-                Text("\(vm.total) total requests")
+                Text("\(vm.total.plainDigits) total requests")
                     .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
@@ -100,9 +100,9 @@ struct RequestsView: View {
             // Header row
             HStack {
                 Text("ID").frame(width: 50, alignment: .leading)
-                Text("Broker").frame(minWidth: 100, alignment: .leading)
+                Text("Broker").frame(width: 100, alignment: .leading)
                 Text("Channel").frame(width: 80, alignment: .leading)
-                Text("Status").frame(minWidth: 120, alignment: .leading)
+                Text("Status").frame(width: 120, alignment: .leading)
                 Text("Jurisdiction").frame(width: 90, alignment: .leading)
                 Text("Deadline").frame(width: 80, alignment: .leading)
             }
@@ -118,15 +118,16 @@ struct RequestsView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(vm.requests) { request in
                         HStack {
-                            Text("\(request.id)")
+                            Text("\(request.id.plainDigits)")
                                 .frame(width: 50, alignment: .leading)
                             Text(request.brokerId)
                                 .foregroundStyle(BrandColors.goldPrimary)
-                                .frame(minWidth: 100, alignment: .leading)
+                                .lineLimit(1)
+                                .frame(width: 100, alignment: .leading)
                             Text(request.channel)
                                 .frame(width: 80, alignment: .leading)
                             StatusBadge(status: request.statusDisplay)
-                                .frame(minWidth: 120, alignment: .leading)
+                                .frame(width: 120, alignment: .leading)
                             Text(request.jurisdiction)
                                 .frame(width: 90, alignment: .leading)
                             if let date = request.deadlineDate {
@@ -159,7 +160,7 @@ struct RequestsView: View {
 
     private var pagination: some View {
         HStack {
-            Text("Page \(vm.page) of \(vm.totalPages)")
+            Text("Page \(vm.page.plainDigits) of \(vm.totalPages.plainDigits)")
                 .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
             Spacer()
@@ -174,7 +175,7 @@ struct RequestsView: View {
     private func detailPanel(request: RemovalRequest) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Request #\(request.id)")
+                Text("Request #\(request.id.plainDigits)")
                     .symairaText(.subheading)
                     .foregroundStyle(BrandColors.textPrimary)
                 Spacer()
