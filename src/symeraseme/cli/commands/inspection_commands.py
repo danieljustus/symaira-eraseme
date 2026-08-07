@@ -238,6 +238,12 @@ def _check_env() -> tuple[bool, str]:
     return True, "None set (optional)"
 
 
+# Optional feature checks: reported as informational rows and excluded from the
+# overall environment verdict. A healthy install without these extras configured
+# (e.g. no OS secure keyring, no LLM/triage API key) is not a broken install.
+_OPTIONAL_CHECKS: frozenset[str] = frozenset({"Keyring", "LLM config"})
+
+
 def doctor(ctx: typer.Context) -> None:
     """Run environment checks and report status."""
     checks = {
@@ -252,17 +258,25 @@ def doctor(ctx: typer.Context) -> None:
         "Environment": _check_env(),
     }
 
-    all_ok = all(ok for ok, _ in checks.values())
-    data = {
-        "ok": all_ok,
-        "checks": {name: {"ok": ok, "detail": detail} for name, (ok, detail) in checks.items()},
-    }
+    core_ok = all(ok for name, (ok, _) in checks.items() if name not in _OPTIONAL_CHECKS)
+    check_data: dict[str, dict[str, object]] = {}
+    for name, (ok, detail) in checks.items():
+        entry: dict[str, object] = {"ok": ok, "detail": detail}
+        if name in _OPTIONAL_CHECKS:
+            entry["optional"] = True
+        check_data[name] = entry
+    data = {"ok": core_ok, "checks": check_data}
 
     lines = []
     for name, (ok, detail) in checks.items():
-        status = "✓" if ok else "✗"
+        if ok:
+            status = "✓"
+        elif name in _OPTIONAL_CHECKS:
+            status = "○ optional"
+        else:
+            status = "✗"
         lines.append(f"  {status} {name:<20} {detail}")
-    header = "Environment check passed" if all_ok else "Environment check failed"
+    header = "Environment check passed" if core_ok else "Environment check failed"
     message = f"{header}\n" + "\n".join(lines)
 
     render_result(ctx.obj["output"], CliResult(data=data, message=message))
