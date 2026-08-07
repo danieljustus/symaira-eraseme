@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import typer
@@ -464,6 +464,74 @@ class TestBrokersCommands:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Web-form runner (issue #638)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestWebFormRunner:
+    """Regression coverage for #638: nested asyncio.run() crashed plan execute."""
+
+    def test_runs_without_running_event_loop(self):
+        from symeraseme.cli.commands.plan_commands import _web_form_runner
+
+        with patch(
+            "symeraseme.services.web_form.run_web_form_for_broker",
+            new_callable=AsyncMock,
+            return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
+        ) as mock_run:
+            result = _web_form_runner("test-broker", dry_run=True)
+        assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
+        mock_run.assert_awaited_once_with(
+            "test-broker", headed=False, screenshot_dir="", dry_run=True
+        )
+
+    @pytest.mark.asyncio
+    async def test_runs_inside_running_event_loop(self):
+        """Must not raise RuntimeError from a nested asyncio.run() call."""
+        from symeraseme.cli.commands.plan_commands import _web_form_runner
+
+        with patch(
+            "symeraseme.services.web_form.run_web_form_for_broker",
+            new_callable=AsyncMock,
+            return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
+        ) as mock_run:
+            result = _web_form_runner("test-broker", dry_run=True)
+        assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
+        mock_run.assert_awaited_once_with(
+            "test-broker", headed=False, screenshot_dir="", dry_run=True
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Campaign-id validation (issue #642)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestPlanCreateCampaignIdValidation:
+    """Regression coverage for #642: blank campaign ids must be rejected."""
+
+    @pytest.mark.parametrize("campaign_id", ["", "   ", "\t\n"])
+    def test_blank_campaign_id_rejected_with_clear_error(
+        self, monkeypatch, tmp_path, campaign_id
+    ):
+        _setup(monkeypatch, tmp_path)
+        from symeraseme.cli import app as typer_app
+
+        result = runner.invoke(typer_app, ["plan", "create", "--campaign", campaign_id])
+        assert result.exit_code == EXIT_ERROR
+        assert "must not be blank" in _strip_ansi(result.output).lower()
+
+    def test_blank_campaign_id_never_reaches_plan_handler(self, monkeypatch, tmp_path):
+        _setup(monkeypatch, tmp_path)
+        from symeraseme.cli import app as typer_app
+        from symeraseme.cli.commands import plan_commands
+
+        with patch.object(plan_commands, "handle_plan_create") as mock_create:
+            result = runner.invoke(typer_app, ["plan", "create", "--campaign", "   "])
+        assert result.exit_code == EXIT_ERROR
+        mock_create.assert_not_called()
+
+
 # Account & Profile commands (identity decrypt failure handling)
 # ═══════════════════════════════════════════════════════════════════════════
 

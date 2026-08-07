@@ -19,6 +19,12 @@ final class CampaignsViewModel: ObservableObject {
     var isLoading: Bool { state.isLoading }
     var errorMessage: String? { state.errorMessage }
 
+    /// Whether the Create Campaign button may be used: the campaign id must
+    /// be non-empty after trimming whitespace (issue #642).
+    var canCreateCampaign: Bool {
+        !newCampaignId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func refresh() async {
         state = .loading
 
