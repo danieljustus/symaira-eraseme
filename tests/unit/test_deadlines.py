@@ -266,25 +266,36 @@ class TestApplyTickActions:
             close_connection()
             os.environ.pop("SYMERASEME_DB_DIR", None)
 
-    def test_dry_run_actions_not_executed(self):
+    def test_dry_run_actions_not_executed(self, tmp_path):
+        import os
+
+        from symeraseme.core.db_connection import close_connection, init_db
         from symeraseme.core.deadlines import TickAction
 
-        actions = [
-            TickAction(
-                request_id=1,
-                broker_id="b",
-                campaign_id="c",
-                current_status="AWAITING_ACK",
-                action_type="send_reminder",
-                event_type="REMINDER_SENT",
-                description="Test",
-                dry_run=True,
-            )
-        ]
-        results = apply_tick_actions(actions)
-        assert len(results) == 1
-        assert results[0]["dry_run"] is True
-        assert results[0]["executed"] is False
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        close_connection()
+        init_db()
+
+        try:
+            actions = [
+                TickAction(
+                    request_id=1,
+                    broker_id="b",
+                    campaign_id="c",
+                    current_status="AWAITING_ACK",
+                    action_type="send_reminder",
+                    event_type="REMINDER_SENT",
+                    description="Test",
+                    dry_run=True,
+                )
+            ]
+            results = apply_tick_actions(actions)
+            assert len(results) == 1
+            assert results[0]["dry_run"] is True
+            assert results[0]["executed"] is False
+        finally:
+            close_connection()
+            os.environ.pop("SYMERASEME_DB_DIR", None)
 
 
 class TestCCPADeadline:
