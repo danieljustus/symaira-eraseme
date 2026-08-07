@@ -472,14 +472,14 @@ class TestWebFormRunner:
     """Regression coverage for #638: nested asyncio.run() crashed plan execute."""
 
     def test_runs_without_running_event_loop(self):
-        from symeraseme.cli.commands.plan_commands import _web_form_runner
+        from symeraseme.services.web_form import run_web_form_sync
 
         with patch(
             "symeraseme.services.web_form.run_web_form_for_broker",
             new_callable=AsyncMock,
             return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
         ) as mock_run:
-            result = _web_form_runner("test-broker", dry_run=True)
+            result = run_web_form_sync("test-broker", dry_run=True)
         assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
         mock_run.assert_awaited_once_with(
             "test-broker", headed=False, screenshot_dir="", dry_run=True
@@ -488,14 +488,14 @@ class TestWebFormRunner:
     @pytest.mark.asyncio
     async def test_runs_inside_running_event_loop(self):
         """Must not raise RuntimeError from a nested asyncio.run() call."""
-        from symeraseme.cli.commands.plan_commands import _web_form_runner
+        from symeraseme.services.web_form import run_web_form_sync
 
         with patch(
             "symeraseme.services.web_form.run_web_form_for_broker",
             new_callable=AsyncMock,
             return_value={"success": True, "dry_run": True, "broker_id": "test-broker"},
         ) as mock_run:
-            result = _web_form_runner("test-broker", dry_run=True)
+            result = run_web_form_sync("test-broker", dry_run=True)
         assert result == {"success": True, "dry_run": True, "broker_id": "test-broker"}
         mock_run.assert_awaited_once_with(
             "test-broker", headed=False, screenshot_dir="", dry_run=True
