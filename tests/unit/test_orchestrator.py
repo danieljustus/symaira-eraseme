@@ -128,6 +128,63 @@ class TestPlanCampaign:
         assert len(requests) > 0
         assert all(r.get("identity_snapshot_hash") == "" for r in requests)
 
+    def test_plan_decrypt_failure_leaves_no_orphaned_campaign(self, monkeypatch):
+        """A broken profile must fail plan create before the campaign row is written."""
+        from symeraseme.core.events import list_campaigns
+        from symeraseme.core.exceptions import ProfileError
+
+        def broken_profile():
+            raise RuntimeError(
+                "Your identity profile could not be decrypted. "
+                "Re-initialize with `symeraseme init-profile`."
+            )
+
+        monkeypatch.setattr(
+            "symeraseme.core.planning.load_profile",
+            broken_profile,
+        )
+        with pytest.raises(ProfileError, match="could not be decrypted"):
+            plan_campaign(campaign_id="no-orphan", max_brokers=2)
+        assert all(c["id"] != "no-orphan" for c in list_campaigns())
+
+    def test_handle_plan_create_decrypt_failure_returns_friendly_result(self, monkeypatch):
+        from symeraseme.core.exceptions import ProfileError
+        from symeraseme.services.campaign import handle_plan_create
+
+        def broken_profile(**kwargs):
+            raise ProfileError(
+                "Your identity profile could not be decrypted. "
+                "Re-initialize with `symeraseme init-profile`."
+            )
+
+        monkeypatch.setattr(
+            "symeraseme.services.campaign.plan_campaign",
+            broken_profile,
+        )
+        result = handle_plan_create("broken-cli")
+        assert result.success is False
+        assert "could not be decrypted" in (result.error or "")
+
+    def test_plan_create_decrypt_failure_friendly_cli(self, monkeypatch):
+        """CLI plan create must render a friendly error, not a traceback."""
+        from symeraseme.core.exceptions import EXIT_CONFIG
+
+        def broken_profile():
+            raise RuntimeError(
+                "Your identity profile could not be decrypted. "
+                "Re-initialize with `symeraseme init-profile`."
+            )
+
+        monkeypatch.setattr(
+            "symeraseme.core.planning.load_profile",
+            broken_profile,
+        )
+        result = runner.invoke(app, ["plan", "create", "--campaign", "cli-broken", "--max", "1"])
+        # ProfileError is a configuration error -> EXIT_CONFIG, not a crash.
+        assert result.exit_code == EXIT_CONFIG
+        assert "could not be decrypted" in result.stderr
+        assert "Traceback" not in result.output
+
     def test_plan_show(self):
         plan_campaign(campaign_id="show-test", max_brokers=2)
         plan = get_plan(campaign_id="show-test")

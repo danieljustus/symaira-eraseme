@@ -123,9 +123,12 @@ def load_profile(path: str | None = None) -> IdentityProfile:
                 "This format is deprecated and no longer supported for security reasons. "
                 "Please re-initialize your profile: symeraseme init-profile"
             )
-            raise RuntimeError(msg) from None
         else:
-            raise
+            msg = (
+                "Your identity profile could not be decrypted. "
+                "Re-initialize with `symeraseme init-profile`."
+            )
+        raise RuntimeError(msg) from None
     data = json.loads(plaintext.decode("utf-8"))
 
     profile = IdentityProfile.model_validate(data)

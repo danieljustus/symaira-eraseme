@@ -40,6 +40,13 @@ class Config:
         raw = os.environ.get("SYMERASEME_IDENTITY_PATH")
         if raw:
             return Path(raw).expanduser()
+        if "SYMERASEME_DATA_DIR" in os.environ:
+            # When the data directory is explicitly overridden, keep the
+            # identity profile next to the database/event store, matching
+            # .env.example. The config-dir default is retained when
+            # SYMERASEME_DATA_DIR is unset so existing installs keep
+            # their current profile location.
+            return self.resolved_data_dir / "identity.enc"
         return self.resolved_config_dir / "identity.enc"
 
 
