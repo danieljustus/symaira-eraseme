@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.2] - 2026-08-07
+
+- **Fix**: Resolve identity profile decrypt failures, validate email addresses, and honor the configured data directory for identity storage (#648).
+- **Fix**: Report accurate doctor environment verdicts for optional checks (#649).
+- **Fix**: Format numbers in the macOS app according to the system locale (#650).
+- **Fix**: Prevent a nested event loop in plan execute and reject blank campaign ids (#651).
+- **Fix**: Keep the Settings Test Connection status in sync with server stop (#652).
+- **Fix**: Expose accessible names on sidebar navigation buttons (#653).
+- **Fix**: Chain decrypt errors to the user and cover the error paths (#655).
+- **Refactor**: Move the web-form sync runner into the service layer for reuse by MCP/app backends (#660).
+- **Test**: Cover the concurrent execution branch of `handle_execute` (#661).
+- **Test**: Make smoke and tick tests hermetic (#665).
+- **Docs**: Add a "Why EraseMe" / comparison section to the README (#662).
+- **Chore**: Ignore generated docs/app-test output (#647).
+
 ## [v0.10.1] - 2026-08-05
 
 - **Fix**: Ship broker registry data in wheel and sdist so packaged installs can list brokers and create campaigns (#615).
