@@ -4,6 +4,14 @@
 
 > **Beta** — Core features are stable and tested. Some advanced features (web-form CAPTCHA solving, DPA auto-filing) require manual setup or are event-flagged only.
 
+## Why EraseMe?
+
+- **CLI-first and scriptable** — no account, no subscription, no web dashboard; runs in a terminal, cron job, or CI pipeline.
+- **Open source (Apache-2.0) and self-hosted** — your identity stays in local, encrypted storage (AES-256-GCM) under your control.
+- **Jurisdiction-aware templates** — GDPR / CCPA / LGPD replies with correct legal deadlines, reminders, and escalation.
+- **Lifecycle tracking** — broker registry with per-request status, a deadline tick engine, and quarterly re-scans.
+- **A direct alternative to subscription opt-out services** (DeleteMe, Incogni, Optery, Kanary): free, auditable, and your data never leaves your machine.
+
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira-EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira-EraseMe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
