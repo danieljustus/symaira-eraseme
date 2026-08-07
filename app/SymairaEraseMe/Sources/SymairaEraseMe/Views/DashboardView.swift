@@ -134,12 +134,12 @@ struct DashboardView: View {
                 Table(campaigns) {
                     TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
                     TableColumn("Kind") { Text($0.kind ?? "—") }
-                    TableColumn("Total") { Text("\($0.total)") }
-                    TableColumn("Confirmed") { Text("\($0.confirmed)").foregroundStyle(BrandColors.confirmed) }
-                    TableColumn("Rejected") { Text("\($0.rejected)").foregroundStyle(BrandColors.rejected) }
-                    TableColumn("Overdue") { Text("\($0.overdue)").foregroundStyle(BrandColors.overdue) }
+                    TableColumn("Total") { Text("\($0.total.plainDigits)") }
+                    TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
+                    TableColumn("Rejected") { Text("\($0.rejected.plainDigits)").foregroundStyle(BrandColors.rejected) }
+                    TableColumn("Overdue") { Text("\($0.overdue.plainDigits)").foregroundStyle(BrandColors.overdue) }
                     TableColumn("Pending") {
-                        Text("\($0.sent + $0.awaitingAck + $0.awaitingResponse)")
+                        Text("\(($0.sent + $0.awaitingAck + $0.awaitingResponse).plainDigits)")
                             .foregroundStyle(BrandColors.pending)
                     }
                 }
@@ -221,27 +221,27 @@ struct BrokerStatusCard: View {
                 .lineLimit(1)
             HStack(spacing: 8) {
                 if broker.confirmed > 0 {
-                    Label("\(broker.confirmed)", systemImage: "checkmark.circle.fill")
+                    Label("\(broker.confirmed.plainDigits)", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(BrandColors.confirmed)
                         .symairaText(.caption)
                 }
                 if broker.pending > 0 {
-                    Label("\(broker.pending)", systemImage: "clock.fill")
+                    Label("\(broker.pending.plainDigits)", systemImage: "clock.fill")
                         .foregroundStyle(BrandColors.pending)
                         .symairaText(.caption)
                 }
                 if broker.overdue > 0 {
-                    Label("\(broker.overdue)", systemImage: "exclamationmark.circle.fill")
+                    Label("\(broker.overdue.plainDigits)", systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                 }
                 if broker.rejected > 0 {
-                    Label("\(broker.rejected)", systemImage: "xmark.circle.fill")
+                    Label("\(broker.rejected.plainDigits)", systemImage: "xmark.circle.fill")
                         .foregroundStyle(BrandColors.rejected)
                         .symairaText(.caption)
                 }
             }
-            Text("\(broker.total) total")
+            Text("\(broker.total.plainDigits) total")
                 .symairaText(.caption)
                 .foregroundStyle(BrandColors.textMuted)
         }
