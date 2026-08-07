@@ -198,6 +198,67 @@ class TestPlanCampaign:
         assert plan_done["total"] == 0
 
 
+class TestDecryptFailureExecutionPaths:
+    """An undecryptable profile must raise ProfileError (not a raw RuntimeError)
+    from every execution entry point that loads the identity profile."""
+
+    @staticmethod
+    def _broken_profile():
+        raise RuntimeError(
+            "Your identity profile could not be decrypted. "
+            "Re-initialize with `symeraseme init-profile`."
+        )
+
+    def test_webform_decrypt_failure_raises_profile_error(self, monkeypatch):
+        from symeraseme.core.exceptions import ProfileError
+        from symeraseme.core.execution import _execute_webform_request
+
+        monkeypatch.setattr(
+            "symeraseme.core.execution.load_profile",
+            self._broken_profile,
+        )
+        with pytest.raises(ProfileError, match="could not be decrypted"):
+            _execute_webform_request(
+                1,
+                "test-broker",
+                web_form_runner=lambda _b, dry_run=False: {
+                    "success": True,
+                    "url": "http://example.com",
+                    "dry_run": dry_run,
+                },
+                dry_run=True,
+            )
+
+    def test_email_decrypt_failure_raises_profile_error(self, monkeypatch):
+        from symeraseme.core.exceptions import ProfileError
+        from symeraseme.core.execution import _execute_email_request
+
+        monkeypatch.setattr(
+            "symeraseme.core.execution.load_profile",
+            self._broken_profile,
+        )
+        with pytest.raises(ProfileError, match="could not be decrypted"):
+            _execute_email_request(
+                1,
+                "test-broker",
+                payload={"endpoint": "test@example.com"},
+                dry_run=True,
+            )
+
+    def test_batch_decrypt_failure_raises_profile_error(self, monkeypatch):
+        import asyncio
+
+        from symeraseme.core.batch import execute_campaign_async
+        from symeraseme.core.exceptions import ProfileError
+
+        monkeypatch.setattr(
+            "symeraseme.core.batch.load_profile",
+            self._broken_profile,
+        )
+        with pytest.raises(ProfileError, match="could not be decrypted"):
+            asyncio.run(execute_campaign_async("broken-batch", dry_run=True))
+
+
 class TestExecuteCampaign:
     def test_dry_run_returns_body(self, _fake_profile):
         plan_campaign(campaign_id="dry-test", max_brokers=1)
