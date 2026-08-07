@@ -8,6 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from symeraseme.cli import app
+from symeraseme.cli.commands import inspection_commands
 
 runner = CliRunner()
 
@@ -88,3 +89,93 @@ class TestDoctorJsonRedaction:
 
         output = result.output
         assert "LLM provider" in output
+
+
+class TestDoctorVerdict:
+    """The overall environment verdict must ignore optional, not-configured features."""
+
+    @staticmethod
+    def _patch_checks(
+        monkeypatch: pytest.MonkeyPatch,
+        core_ok: bool = True,
+    ) -> None:
+        """Force every doctor check to a deterministic outcome."""
+        for name in (
+            "_check_python_version",
+            "_check_deps",
+            "_check_config",
+            "_check_database",
+            "_check_db_encryption",
+            "_check_registry",
+            "_check_env",
+        ):
+            monkeypatch.setattr(
+                inspection_commands,
+                name,
+                lambda name=name: (core_ok, f"{name} (stubbed)"),
+            )
+        monkeypatch.setattr(
+            inspection_commands,
+            "_check_keyring",
+            lambda: (False, "no secure keyring available"),
+        )
+        monkeypatch.setattr(
+            inspection_commands,
+            "_check_llm",
+            lambda: (False, "provider=anthropic, ANTHROPIC_API_KEY=✗ (not set)"),
+        )
+
+    def test_healthy_install_without_optional_features_passes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Unset keyring/LLM must not flip a healthy install to 'failed'."""
+        self._patch_checks(monkeypatch)
+
+        result = runner.invoke(app, ["doctor"])
+        assert result.exit_code == 0
+        assert "Environment check passed" in result.stdout
+        assert "○ optional Keyring" in result.stdout
+        assert "○ optional LLM config" in result.stdout
+        assert "✓ Python version" in result.stdout
+        assert "  ✗ " not in result.stdout
+
+        data = json.loads(runner.invoke(app, ["--output", "json", "doctor"]).output)
+        assert data["ok"] is True
+        assert data["checks"]["Keyring"]["ok"] is False
+        assert data["checks"]["Keyring"]["optional"] is True
+        assert data["checks"]["LLM config"]["optional"] is True
+        assert "optional" not in data["checks"]["Python version"]
+
+    def test_core_check_failure_still_fails(self, monkeypatch: pytest.MonkeyPatch):
+        """A genuinely broken core check must keep the 'failed' verdict."""
+        self._patch_checks(monkeypatch, core_ok=False)
+
+        result = runner.invoke(app, ["doctor"])
+        assert result.exit_code == 0
+        assert "Environment check failed" in result.stdout
+        assert "✗ Python version" in result.stdout
+        assert "○ optional Keyring" in result.stdout
+
+        data = json.loads(runner.invoke(app, ["--output", "json", "doctor"]).output)
+        assert data["ok"] is False
+
+    def test_configured_optional_features_show_checkmarks(self, monkeypatch: pytest.MonkeyPatch):
+        """Configured optional features render as ✓ rows and never flip the verdict."""
+        self._patch_checks(monkeypatch)
+        monkeypatch.setattr(
+            inspection_commands,
+            "_check_keyring",
+            lambda: (True, "KeyringBackend (available)"),
+        )
+        monkeypatch.setattr(
+            inspection_commands,
+            "_check_llm",
+            lambda: (True, "provider=anthropic, ANTHROPIC_API_KEY=✓"),
+        )
+
+        result = runner.invoke(app, ["doctor"])
+        assert result.exit_code == 0
+        assert "Environment check passed" in result.stdout
+        assert "✓ Keyring" in result.stdout
+        assert "✓ LLM config" in result.stdout
+        assert "○ optional" not in result.stdout
