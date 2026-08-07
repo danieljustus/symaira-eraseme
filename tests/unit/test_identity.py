@@ -125,8 +125,6 @@ class TestIdentityVault:
             vault.load_profile()
 
     def test_tampered_ciphertext_fails_closed(self, monkeypatch):
-        from cryptography.exceptions import InvalidTag
-
         import symeraseme.core.identity as vault
 
         monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", "/tmp/symeraseme_test_tampered.enc")
@@ -142,7 +140,7 @@ class TestIdentityVault:
         tampered[-1] ^= 0xFF
         path.write_bytes(header_bytes + b"\n" + bytes(tampered))
 
-        with pytest.raises(InvalidTag):
+        with pytest.raises(RuntimeError, match="could not be decrypted"):
             vault.load_profile()
 
         vault.delete_profile()
