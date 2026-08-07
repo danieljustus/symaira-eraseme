@@ -629,6 +629,52 @@ class TestHandleExecuteRouting:
         handle_execute("test-campaign", account="gmail", yes=True)
         assert len(sync_called) == 1
 
+    def test_concurrent_branch_runs_and_captures_errors(self, monkeypatch, tmp_path):
+        """Coverage for the concurrent=True thread-pool branch (issue #659)."""
+        import os
+
+        from symeraseme.services.campaign import handle_execute
+
+        os.environ["SYMERASEME_DB_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_DATA_DIR"] = str(tmp_path)
+        os.environ["SYMERASEME_SMTP_FROM"] = "test@example.com"
+
+        from symeraseme.core.db_connection import close_connection, init_db
+
+        close_connection()
+        init_db()
+
+        monkeypatch.setattr(
+            "symeraseme.core.batch._prepare_batch",
+            lambda campaign_id, batch_size: [{"id": 1}, {"id": 2}],
+        )
+
+        def mock_execute_request(request_id, **kwargs):
+            if request_id == 2:
+                raise RuntimeError("boom")
+            return {
+                "success": True,
+                "request_id": request_id,
+                "dry_run": True,
+                "error": None,
+            }
+
+        monkeypatch.setattr(
+            "symeraseme.core.execution.execute_request",
+            mock_execute_request,
+        )
+
+        result = handle_execute(
+            "test-campaign", yes=True, dry_run=True, concurrent=True, workers=3
+        )
+        assert result.data["total_planned"] == 2
+        assert result.data["batch_size"] == 2
+        assert len(result.data["results"]) == 2
+        by_id = {r["request_id"]: r for r in result.data["results"]}
+        assert by_id[1]["success"] is True
+        assert by_id[2]["success"] is False
+        assert "boom" in by_id[2]["error"]
+
     def test_passes_execute_not_execute_dot_execute(self, monkeypatch, tmp_path):
         import os
 
