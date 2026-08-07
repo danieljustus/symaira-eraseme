@@ -97,7 +97,7 @@ struct ManualTasksView: View {
     private var tasksTable: some View {
         VStack(alignment: .leading, spacing: 8) {
             Table(vm.tasks) {
-                TableColumn("ID") { Text("\($0.taskId)") }
+                TableColumn("ID") { Text("\($0.taskId.plainDigits)") }
                 TableColumn("Broker") { Text($0.brokerName).foregroundStyle(BrandColors.goldPrimary) }
                 TableColumn("Reason") { Text($0.reason.replacingOccurrences(of: "_", with: " ").capitalized) }
                 TableColumn("Status") {

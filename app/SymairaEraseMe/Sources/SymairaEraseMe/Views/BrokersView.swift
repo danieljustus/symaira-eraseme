@@ -51,7 +51,7 @@ struct BrokersView: View {
                 Text("Brokers")
                     .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
-                Text("\(vm.total) brokers in registry")
+                Text("\(vm.total.plainDigits) brokers in registry")
                     .symairaText(.caption)
                     .foregroundStyle(BrandColors.textMuted)
             }
