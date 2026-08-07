@@ -115,7 +115,7 @@ def load_profile(path: str | None = None) -> IdentityProfile:
 
     try:
         plaintext = aesgcm.decrypt(nonce, ciphertext, header_bytes)
-    except InvalidTag:
+    except InvalidTag as exc:
         version = header.get("version", 0)
         if version == 0:
             msg = (
@@ -128,7 +128,10 @@ def load_profile(path: str | None = None) -> IdentityProfile:
                 "Your identity profile could not be decrypted. "
                 "Re-initialize with `symeraseme init-profile`."
             )
-        raise RuntimeError(msg) from None
+        # Chain the original cryptography exception so logs/diagnostics keep
+        # the root cause (wrong key vs corrupted file) while the message
+        # stays user-friendly.
+        raise RuntimeError(msg) from exc
     data = json.loads(plaintext.decode("utf-8"))
 
     profile = IdentityProfile.model_validate(data)

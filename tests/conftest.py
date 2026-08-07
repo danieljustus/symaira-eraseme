@@ -81,6 +81,30 @@ def _hermetic_identity_path(tmp_path_factory: pytest.TempPathFactory) -> Iterato
     os.environ.pop("SYMERASEME_IDENTITY_PATH", None)
 
 
+# LLM-related env vars are read by ``symeraseme.llm.factory`` at call time
+# (provider, model, base URL, Ollama host). A developer shell may export them
+# (e.g. ``SYMERASEME_LLM_PROVIDER=ollama`` to use a local model), which makes
+# ``tests/unit/test_llm_factory.py`` fail in full-suite runs while CI stays
+# green on runners without them. Pin them to unset for the whole session so
+# local runs match CI regardless of the developer environment.
+_LLM_ENV_VARS = (
+    "SYMERASEME_LLM_PROVIDER",
+    "SYMERASEME_LLM_MODEL",
+    "SYMERASEME_LLM_BASE_URL",
+    "OLLAMA_HOST",
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _hermetic_llm_env() -> Iterator[None]:
+    """Remove LLM-related environment overrides for the whole session."""
+    saved = {name: os.environ.pop(name, None) for name in _LLM_ENV_VARS}
+    yield
+    for name, value in saved.items():
+        if value is not None:
+            os.environ[name] = value
+
+
 @pytest.fixture(scope="session")
 def fake_keyring_backend() -> InMemoryKeyring:
     """Expose the session's in-memory keyring backend for contract tests."""
