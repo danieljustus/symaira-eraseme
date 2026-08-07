@@ -581,9 +581,14 @@ class TestAccountCommands:
         assert "could not be decrypted" in _strip_ansi(result.stderr)
         assert "Traceback" not in result.output
 
-    def test_init_profile_invalid_email_reprompts(self):
+    def test_init_profile_invalid_email_reprompts(self, monkeypatch, tmp_path):
         """An invalid email must show a short validation message and re-prompt."""
         from symeraseme.cli import app as typer_app
+
+        # Isolate from the session-wide identity path: init-profile writes a
+        # real profile, and writing into the shared session file would let
+        # other tests (that delete the master key) poison load_profile().
+        monkeypatch.setenv("SYMERASEME_IDENTITY_PATH", str(tmp_path / "identity.enc"))
 
         result = runner.invoke(
             typer_app,
