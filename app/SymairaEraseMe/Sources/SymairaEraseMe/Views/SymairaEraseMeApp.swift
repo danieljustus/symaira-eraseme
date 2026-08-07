@@ -178,9 +178,17 @@ struct SidebarButton: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(isSelected ? Color.white.opacity(0.04) : (isHovered ? Color.white.opacity(0.02) : Color.clear))
             )
+            // Exclude the composed content (indicator bar + icon + label) from
+            // the accessibility tree so the button itself is the single
+            // accessibility element. Without this, macOS can drop or scatter
+            // the accessibility label of plain-styled Buttons with composed
+            // HStack content, leaving VoiceOver to announce an unnamed
+            // "button" (fixes #646).
+            .accessibilityElement(children: .ignore)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.accessibilityName)
+        .accessibilityAddTraits(.isButton)
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering
