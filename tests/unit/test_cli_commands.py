@@ -461,3 +461,68 @@ class TestBrokersCommands:
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
         assert "success" in parsed
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Account & Profile commands (identity decrypt failure handling)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestAccountCommands:
+    """Broken identity profiles must render friendly errors, not tracebacks."""
+
+    def test_show_profile_decrypt_failure_is_friendly(self, monkeypatch):
+        from symeraseme.cli import app as typer_app
+
+        monkeypatch.setattr(
+            "symeraseme.cli.commands.account_commands.profile_exists",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "symeraseme.cli.commands.account_commands.load_profile",
+            lambda: (_ for _ in ()).throw(
+                RuntimeError(
+                    "Your identity profile could not be decrypted. "
+                    "Re-initialize with `symeraseme init-profile`."
+                )
+            ),
+        )
+        result = runner.invoke(typer_app, ["show-profile"])
+        assert result.exit_code == 1
+        assert "could not be decrypted" in _strip_ansi(result.stderr)
+        assert "Traceback" not in result.output
+
+    def test_render_template_decrypt_failure_is_friendly(self, monkeypatch):
+        from symeraseme.cli import app as typer_app
+
+        monkeypatch.setattr(
+            "symeraseme.cli.commands.account_commands.profile_exists",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "symeraseme.cli.commands.account_commands.load_profile",
+            lambda: (_ for _ in ()).throw(
+                RuntimeError(
+                    "Your identity profile could not be decrypted. "
+                    "Re-initialize with `symeraseme init-profile`."
+                )
+            ),
+        )
+        result = runner.invoke(typer_app, ["render-template", "gdpr-art17.de.md.j2"])
+        assert result.exit_code == 1
+        assert "could not be decrypted" in _strip_ansi(result.stderr)
+        assert "Traceback" not in result.output
+
+    def test_init_profile_invalid_email_reprompts(self):
+        """An invalid email must show a short validation message and re-prompt."""
+        from symeraseme.cli import app as typer_app
+
+        result = runner.invoke(
+            typer_app,
+            ["init-profile"],
+            input="Jane Doe\nnot-an-email\njane@example.com\n",
+        )
+        assert result.exit_code == 0
+        assert "not a valid email" in _strip_ansi(result.stderr)
+        assert "Traceback" not in result.output
+        assert "encrypted identity profile" in _strip_ansi(result.stdout)
