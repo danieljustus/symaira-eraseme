@@ -4,7 +4,11 @@ import AppKit
 /// View model for the Settings view.
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var isConnected = false
+    /// Derived from `ServerManager.mcpReachable` — the single source of
+    /// truth refreshed by the shared 10-second reachability poll — so the
+    /// Settings "Test Connection" indicator and the sidebar footer can
+    /// never contradict each other, including when the server stops.
+    var isConnected: Bool { serverManager.mcpReachable }
     @Published var isChecking = false
     @Published var lastCheckError: String?
     @Published var dashboardPath: String?
@@ -25,12 +29,10 @@ final class SettingsViewModel: ObservableObject {
 
         switch await serverManager.refreshReachability() {
         case .connected:
-            isConnected = true
+            break
         case .unauthorized:
-            isConnected = false
             lastCheckError = "Server rejected the request (401 Unauthorized) — the Data Directory does not match the server's token directory"
         case .unreachable:
-            isConnected = false
             lastCheckError = "Server not reachable at \(MCPClient.configuredHost):\(MCPClient.configuredPort)"
         }
     }
