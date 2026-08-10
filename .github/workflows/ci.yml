@@ -172,4 +172,5 @@ jobs:
           # Der Lob-Detektor matcht Testfunktionsnamen ("test_*" ist auch das
           # Praefix-Format der Lob-Sandbox-Keys) und "verifiziert" sie gegen die
           # Sandbox-API -> 34 False Positives in tests/. Keine echten Secrets.
-          exclude-detectors: Lob
+          # Der Action-Input heisst extra_args, nicht exclude-detectors.
+          extra_args: --exclude-detectors Lob
