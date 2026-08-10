@@ -55,7 +55,12 @@ def _db_path(path: str | None = None) -> Path:
     config = get_config()
     db_dir = config.db_dir
     db_dir.mkdir(parents=True, exist_ok=True)
-    return config.db_path
+    # Resolve symlinks so the config-derived path and explicit-path lookups
+    # (init_db passes a string) always normalize to the same canonical file.
+    # Without this, a symlinked temp dir (macOS /var -> /private/var) made
+    # get_connection() treat the same DB as two different paths and replace
+    # the thread-local connection without closing it (issue #670).
+    return config.db_path.resolve()
 
 
 # ---------------------------------------------------------------------------

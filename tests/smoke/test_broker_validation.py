@@ -60,7 +60,13 @@ class TestBrokerLoading:
 
 
 class TestBrokerSchemas:
-    def test_all_yamls_valid(self):
+    def test_representative_yamls_valid(self):
+        """A representative sample of broker YAMLs validates against the schema.
+
+        The authoritative full-registry validation lives in
+        tests/unit/test_schema.py::TestBrokerSchema::test_all_broker_yamls_validate
+        (issue #671); this smoke test keeps a lightweight real-data check.
+        """
         schema_path = Path("registry/schemas/broker.schema.json")
         if not schema_path.exists():
             pytest.skip("Schema file not found")
@@ -71,13 +77,11 @@ class TestBrokerSchemas:
         with open(schema_path) as f:
             schema = json.load(f)
         brokers_dir = Path("registry/brokers")
-        for yml in sorted(brokers_dir.rglob("*.yaml")):
+        sample = sorted(brokers_dir.rglob("*.yaml"))[:5]
+        for yml in sample:
             with open(yml) as f:
                 data = yaml.safe_load(f)
-            try:
-                jsonschema.validate(data, schema)
-            except jsonschema.ValidationError as e:
-                pytest.fail(f"{yml}: {e.message}")
+            jsonschema.validate(data, schema)
 
     def test_each_broker_has_unique_id(self):
         brokers = load_all_brokers()

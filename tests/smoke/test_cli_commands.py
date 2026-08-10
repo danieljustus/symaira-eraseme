@@ -311,14 +311,41 @@ class TestValidateCommand:
         assert_ok(result)
         assert "OK" in result.stdout
 
-    def test_validate_json_shape(self):
+    def test_validate_json_shape(self, tmp_path):
+        """The JSON output shape is correct when validating a focused registry.
+
+        Uses a small --registry-dir fixture instead of the full bundled
+        registry (issue #671); the bundled registry itself stays covered by
+        test_validate_bundled_registry_passes.
+        """
         from .conftest import assert_json_output
 
-        result = invoke("--output", "json", "validate")
+        brokers_dir = tmp_path / "brokers"
+        brokers_dir.mkdir()
+        for broker_id in ("alpha", "beta", "gamma"):
+            (brokers_dir / f"{broker_id}.yaml").write_text(
+                f"id: {broker_id}\n"
+                f"name: Broker {broker_id}\n"
+                "website: https://example.com\n"
+                "category: people-search\n"
+                "jurisdictions: [DE]\n"
+                "laws: [GDPR]\n"
+                "priority: high\n"
+                "opt_out:\n"
+                "- type: email\n"
+                "  endpoint: optout@example.com\n"
+                "  template: gdpr-art17\n"
+                "  locale: en\n"
+                "  required_fields:\n"
+                "  - full_name\n"
+                "  - email\n"
+            )
+
+        result = invoke("--output", "json", "validate", "--registry-dir", str(brokers_dir))
         data = assert_json_output(result)
         assert data["schema_version"] == 1
         assert data["ok"] is True
-        assert data["totals"]["valid"] >= 30
+        assert data["totals"]["valid"] == 3
         assert data["totals"]["failed"] == 0
         assert data["totals"]["duplicate_ids"] == 0
 
