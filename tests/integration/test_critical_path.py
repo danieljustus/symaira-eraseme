@@ -7,8 +7,11 @@ integrity, registry loading and schema validation.
 
 from __future__ import annotations
 
+import gc
 import os
+import sys
 import tempfile
+import warnings
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -147,6 +150,27 @@ class TestPlanExecuteTickStatus:
 
         status = get_campaign_status(campaign_id="integration-test")
         assert status["totals"]["requests"] >= 1
+
+        # Regression for #670: the lifecycle must leave no unclosed SQLite
+        # connection behind. sqlite3 emits ResourceWarning from __del__, which
+        # bypasses the warnings pipeline, so intercept the unraisable hook
+        # while forcing collection.
+        from symeraseme.core.db_connection import close_connection
+
+        close_connection()
+        unraisable: list[BaseException] = []
+
+        def _hook(unraisable_exc) -> None:
+            if isinstance(unraisable_exc.exc_value, ResourceWarning):
+                unraisable.append(unraisable_exc.exc_value)
+
+        old_hook = sys.unraisablehook
+        sys.unraisablehook = _hook
+        try:
+            gc.collect()
+        finally:
+            sys.unraisablehook = old_hook
+        assert not unraisable, "unclosed SQLite connection detected in lifecycle"
 
     def test_plan_with_jurisdiction_filter(self, clean_db):
         """Plan a campaign filtered by EU jurisdiction."""
@@ -427,7 +451,13 @@ class TestRegistryIntegration:
         assert broker.website
 
     def test_schema_validation_passes(self):
-        """Every broker YAML file must validate against the JSON Schema."""
+        """A representative sample of broker YAMLs validates against the schema.
+
+        The authoritative full-registry validation lives in
+        tests/unit/test_schema.py::TestBrokerSchema::test_all_broker_yamls_validate;
+        this integration test exercises the loader path on real data without
+        re-scanning the whole registry (issue #671).
+        """
         import jsonschema
         import yaml
 
@@ -437,11 +467,22 @@ class TestRegistryIntegration:
         assert registry_dir.exists(), f"Registry broker dir not found at {registry_dir}"
 
         schema = broker_schema()
-        yaml_files = list(registry_dir.rglob("*.yaml"))
+        yaml_files = sorted(registry_dir.rglob("*.yaml"))
         assert len(yaml_files) > 100
 
+        # One representative file per jurisdiction directory, plus the example.
+        sample: list[Path] = []
+        for sub in sorted(p for p in registry_dir.iterdir() if p.is_dir()):
+            files = sorted(sub.rglob("*.yaml"))
+            if files:
+                sample.append(files[0])
+        example = registry_dir / "eu" / "_example.yaml"
+        if example not in sample and example.exists():
+            sample.append(example)
+        assert sample, "No broker YAML files found to sample"
+
         failures: list[str] = []
-        for yml in sorted(yaml_files):
+        for yml in sample:
             with open(yml) as f:
                 data = yaml.safe_load(f)
             try:
