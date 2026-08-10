@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.3] - 2026-08-10
+
+- **Fix**: Close SQLite connections cleanly when equivalent database paths use macOS symlink aliases (#672).
+- **Test**: Reduce redundant full registry validation in the test suite while retaining authoritative validation coverage (#672).
+- **CI**: Correct the TruffleHog configuration for the Lob detector false-positive exclusion (#668, #669).
+- **Docs**: Point the Cline example at the repository agent guidance (#667).
+
 ## [v0.10.2] - 2026-08-07
 
 - **Fix**: Resolve identity profile decrypt failures, validate email addresses, and honor the configured data directory for identity storage (#648).
