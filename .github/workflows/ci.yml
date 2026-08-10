@@ -169,3 +169,7 @@ jobs:
         uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
         with:
           path: ./
+          # Der Lob-Detektor matcht Testfunktionsnamen ("test_*" ist auch das
+          # Praefix-Format der Lob-Sandbox-Keys) und "verifiziert" sie gegen die
+          # Sandbox-API -> 34 False Positives in tests/. Keine echten Secrets.
+          exclude-detectors: Lob
