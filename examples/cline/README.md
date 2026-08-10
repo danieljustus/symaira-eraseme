@@ -79,7 +79,7 @@ Cline automatically detects these files if they exist:
 - `.windsurfrules` (Windsurf rules)
 - `AGENTS.md` (Generic agent instructions)
 
-See [AGENTS.md](../AGENTS.md) for a comprehensive agent instructions file.
+See [AGENTS.md](../../AGENTS.md) for a comprehensive agent instructions file.
 
 ### Option 3: Global Rules
 
