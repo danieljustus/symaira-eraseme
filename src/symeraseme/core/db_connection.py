@@ -81,6 +81,12 @@ def get_connection(path: str | None = None) -> sqlite3.Connection:
         or not hasattr(_local, "db_path")
         or _local.db_path != requested_path
     ):
+        if getattr(_local, "conn", None) is not None:
+            # The DB path genuinely changed: close the previous thread-local
+            # connection (re-encrypting any temp DB) instead of dropping it
+            # unclosed — same leak class as #670, triggered by real path
+            # switches rather than symlink aliases.
+            close_connection()
         _scavenge_stale_temp_dbs()
         db_file = _db_path(path)
 

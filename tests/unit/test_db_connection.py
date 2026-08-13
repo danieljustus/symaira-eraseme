@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import gc
 import os
+import sqlite3
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -90,6 +91,27 @@ def test_init_db_and_get_connection_share_the_same_connection(symlinked_db_dir):
     """init_db() and plain get_connection() must not churn connections."""
     init_db()
     assert get_connection() is get_connection(str(_db_path(None)))
+
+
+def test_path_switch_closes_previous_connection(isolated_db, tmp_path: Path):
+    """A genuine DB-path switch must close the old connection, not drop it.
+
+    The symlink fix for #670 canonicalized alias paths; this covers the
+    remaining case where the path really changes (e.g. SYMERASEME_DB_DIR is
+    re-pointed mid-process). The previous thread-local connection must be
+    closed via close_connection() instead of being replaced unclosed.
+    """
+    first = get_connection()
+    assert first.execute("SELECT 1").fetchone() is not None
+
+    other_dir = tmp_path / "other"
+    other_dir.mkdir()
+    os.environ["SYMERASEME_DB_DIR"] = str(other_dir)
+
+    second = get_connection()
+    assert second is not first
+    with pytest.raises(sqlite3.ProgrammingError):
+        first.execute("SELECT 1")
 
 
 def test_close_connection_leaves_no_unclosed_connection(isolated_db):
