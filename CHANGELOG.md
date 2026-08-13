@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.4] - 2026-08-13
+
+- **Fix**: Close the previous thread-local database connection when the database path genuinely changes, instead of dropping it unclosed (#676).
+- **Chore**: Pin the macOS app's symaira-appkit dependency to 0.9.2 (#675).
+
 ## [v0.10.3] - 2026-08-10
 
 - **Fix**: Close SQLite connections cleanly when equivalent database paths use macOS symlink aliases (#672).
