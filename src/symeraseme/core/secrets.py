@@ -152,9 +152,8 @@ def resolve_secret(
         secret = _resolve_via_env(env_fallback)
         if secret is not None:
             logger.debug(
-                "Resolved secret from env var %s (vault://%s unavailable)",
+                "Resolved secret from env var %s (vault unavailable)",
                 env_fallback,
-                vault_path,
             )
             return secret
 
@@ -163,9 +162,8 @@ def resolve_secret(
         secret = _resolve_via_keyring(keyring_service, vault_path)
         if secret is not None:
             logger.debug(
-                "Resolved secret from keyring %s (vault://%s unavailable)",
+                "Resolved secret from keyring %s (vault unavailable)",
                 keyring_service,
-                vault_path,
             )
             return secret
 
