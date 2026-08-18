@@ -170,10 +170,12 @@ def resolve_secret(
             return secret
 
     # --- All layers exhausted ---
-    msg = f"Cannot resolve secret 'vault://{vault_path}': symvault not available or returned error"
+    # Do NOT include vault_path in the error message — it leaks the
+    # credential storage location to logs, crash reporters, and users.
+    msg = "Cannot resolve secret: symvault not available or returned error"
     if env_fallback:
         msg += f", env var '{env_fallback}' not set"
     if keyring_service:
-        msg += f", keyring '{keyring_service}' has no entry for '{vault_path}'"
+        msg += f", keyring '{keyring_service}' has no entry"
     msg += ". Set the value directly or install symvault."
     raise SecretResolutionError(msg)
