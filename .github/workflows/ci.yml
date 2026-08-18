@@ -78,7 +78,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             uv run pytest -n auto --verbose --tb=short
           else
-            uv run pytest -n auto --cov=src/symeraseme/ --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
+            uv run pytest -n auto --cov=src/symeraseme/ --cov-branch --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
           fi
 
   test-macos:
