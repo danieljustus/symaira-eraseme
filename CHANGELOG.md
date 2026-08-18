@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.10.5] - 2026-08-18
+
+- **Security**: Remove vault path from secret resolution debug logs to prevent credential storage location leakage (#688, CodeQL alert #25).
+- **Security**: Remove vault path from secret resolution error message (#683).
+- **Test**: Add branch coverage to the CI pytest command (#687).
+- **CI**: Pin PyPI publisher to image commit and add PyPI metadata 2.5 support (#680).
+- **Chore**: Bump trufflesecurity/trufflehog 3.96.0 → 3.97.0 (#681).
+- **Chore**: Bump astral-sh/setup-uv 9.0.0 → 10.0.1 (#682).
+
 ## [v0.10.4] - 2026-08-13
 
 - **Fix**: Close the previous thread-local database connection when the database path genuinely changes, instead of dropping it unclosed (#676).
