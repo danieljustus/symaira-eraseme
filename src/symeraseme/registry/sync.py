@@ -39,6 +39,16 @@ def _is_detached_head(repo_root: Path) -> bool:
     return result.returncode != 0
 
 
+def _has_upstream(repo_root: Path) -> bool:
+    """Return True if the current branch has an upstream tracking branch."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+        cwd=str(repo_root),
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
 def _run_git_pull(repo_root: Path) -> dict[str, Any]:
     if _is_detached_head(repo_root):
         return {
@@ -47,6 +57,17 @@ def _run_git_pull(repo_root: Path) -> dict[str, Any]:
             "stdout": "",
             "stderr": "",
             "message": "Detached HEAD — no branch to update. Skipping pull.",
+        }
+
+    if not _has_upstream(repo_root):
+        # A checkout on a local-only branch (e.g. a feature or session
+        # branch) has nothing to pull from; that is not an error.
+        return {
+            "ok": True,
+            "skipped": "no-upstream",
+            "stdout": "",
+            "stderr": "",
+            "message": ("Branch has no upstream tracking branch — nothing to pull. Skipping."),
         }
 
     try:
