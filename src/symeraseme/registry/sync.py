@@ -67,9 +67,7 @@ def _run_git_pull(repo_root: Path) -> dict[str, Any]:
             "skipped": "no-upstream",
             "stdout": "",
             "stderr": "",
-            "message": (
-                "Branch has no upstream tracking branch — nothing to pull. Skipping."
-            ),
+            "message": ("Branch has no upstream tracking branch — nothing to pull. Skipping."),
         }
 
     try:

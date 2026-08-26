@@ -96,7 +96,9 @@ class TestSyncRegistry:
                     "skipped": "no-upstream",
                     "stdout": "",
                     "stderr": "",
-                    "message": "Branch has no upstream tracking branch — nothing to pull. Skipping.",
+                    "message": (
+                        "Branch has no upstream tracking branch — nothing to pull. Skipping."
+                    ),
                 },
             ),
         ):
