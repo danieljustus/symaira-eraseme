@@ -1,0 +1,64 @@
+name: Go CI
+
+# Second CI leg alongside the Python ci.yml. Both legs run on every PR:
+# the Python tree stays green for the whole milestone and the Go leg goes
+# red-to-green as port packages land (issue #710).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - '**.go'
+      - 'Makefile'
+      - '.golangci.yml'
+      - 'cmd/**'
+      - 'internal/**'
+  pull_request:
+    branches: [main]
+    # No paths filter on pull requests: both CI legs must run on every PR
+    # (issue #710), so the Python tree gets continuous Go-leg feedback and
+    # the Go leg cannot silently skip.
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.26.5'
+  CGO_ENABLED: '0'
+
+jobs:
+  go-lint:
+    name: Go / lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Check formatting
+        run: make fmt-check
+      - name: Lint
+        run: make lint
+
+  go-test:
+    name: Go / test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        run: make build
+      - name: Test
+        run: make test
