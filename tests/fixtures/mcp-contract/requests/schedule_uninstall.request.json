@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "schedule_uninstall",
+    "arguments": {
+      "platform": "cron"
+    }
+  },
+  "id": 1
+}

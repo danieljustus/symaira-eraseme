@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "schedule_install",
+    "arguments": {
+      "platform": "cron",
+      "tick_hour": 1,
+      "tick_minute": 1,
+      "dry_run": true
+    }
+  },
+  "id": 1
+}

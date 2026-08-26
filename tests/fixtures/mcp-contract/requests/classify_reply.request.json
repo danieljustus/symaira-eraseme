@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "classify_reply",
+    "arguments": {
+      "request_id": 1,
+      "provider": "example",
+      "model": "example",
+      "save": true
+    }
+  },
+  "id": 1
+}

@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "generate_report",
+    "arguments": {
+      "campaign_id": "example",
+      "format": "html",
+      "output": "example",
+      "all_campaigns": true
+    }
+  },
+  "id": 1
+}

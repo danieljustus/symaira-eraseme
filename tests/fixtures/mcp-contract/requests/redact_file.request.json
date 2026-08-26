@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "redact_file",
+    "arguments": {
+      "path": "example"
+    }
+  },
+  "id": 1
+}

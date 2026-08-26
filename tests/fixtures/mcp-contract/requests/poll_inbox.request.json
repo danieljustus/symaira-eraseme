@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "poll_inbox",
+    "arguments": {
+      "host": "example",
+      "port": 1,
+      "username": "example",
+      "since_days": 1,
+      "ssl": true,
+      "campaign_id": "example",
+      "folders": [
+        "example"
+      ]
+    }
+  },
+  "id": 1
+}

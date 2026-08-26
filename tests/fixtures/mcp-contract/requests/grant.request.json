@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "grant",
+    "arguments": {
+      "command": "example",
+      "ttl": 1,
+      "revoke": "example",
+      "revoke_all": true,
+      "list_tokens": true,
+      "dry_run": true
+    }
+  },
+  "id": 1
+}

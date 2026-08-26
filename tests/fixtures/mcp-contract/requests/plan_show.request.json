@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "plan_show",
+    "arguments": {
+      "campaign_id": "example",
+      "status": "example"
+    }
+  },
+  "id": 1
+}

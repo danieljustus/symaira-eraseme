@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "validate",
+    "arguments": {
+      "registry_dir": "example"
+    }
+  },
+  "id": 1
+}
