@@ -1,8 +1,22 @@
 # Symaira EraseMe
 
-**Automated data broker removal tool — close your accounts, erase your data.**
+[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/symaira-eraseme/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/symaira-eraseme/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/danieljustus/symaira-eraseme?label=Release&logo=github)](https://github.com/danieljustus/symaira-eraseme/releases)
+[![License](https://img.shields.io/github/license/danieljustus/symaira-eraseme?label=License)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 
-> **Beta** — Core features are stable and tested. Some advanced features (web-form CAPTCHA solving, DPA auto-filing) require manual setup or are event-flagged only.
+![Symaira EraseMe social preview](docs/assets/social-preview.png)
+
+Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
+data brokers — automated data broker removal from the terminal.
+
+**Status:** Beta — core features are stable and tested; some advanced features
+(web-form CAPTCHA solving, DPA auto-filing) require manual setup or are
+event-flagged only. See [CHANGELOG.md](CHANGELOG.md).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/danieljustus/symaira-eraseme/main/assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
+</p>
 
 ## Why EraseMe?
 
@@ -11,19 +25,6 @@
 - **Jurisdiction-aware templates** — GDPR / CCPA / LGPD replies with correct legal deadlines, reminders, and escalation.
 - **Lifecycle tracking** — broker registry with per-request status, a deadline tick engine, and quarterly re-scans.
 - **A direct alternative to subscription opt-out services** (DeleteMe, Incogni, Optery, Kanary): free, auditable, and your data never leaves your machine.
-
-[![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/Symaira-EraseMe/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/Symaira-EraseMe/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
-
-![Symaira EraseMe social preview](docs/assets/social-preview.png)
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/danieljustus/symaira-eraseme/main/assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
-</p>
-
-Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
-data brokers. It provides:
 
 - **A curated registry** of 1,279 data brokers with opt-out processes documented
 - **CLI tools** to plan, send, track, and triage removal requests
@@ -77,7 +78,7 @@ distributed separately as a DMG from the GitHub release.
 
 ```bash
 # Clone the repository
-git clone https://github.com/danieljustus/Symaira-EraseMe.git
+git clone https://github.com/danieljustus/symaira-eraseme.git
 cd symaira-eraseme
 
 # Install dependencies with uv
@@ -328,7 +329,7 @@ Symaira EraseMe uses an **event-sourced architecture** built on SQLite:
 - **Tick Engine**: Daily scan for deadlines, reminders, and escalations
 - **Triage**: LLM-based classification of broker replies with jurisdiction-aware rebuttal generation
 
-## Registry maintenance
+### Registry maintenance
 
 The broker registry is kept fresh by two scheduled GitHub Actions:
 
@@ -395,7 +396,7 @@ examples/        — Integration examples for all supported AI agents
 AGENTS.md        — Setup guide for all AI agent integrations
 ```
 
-## Exit codes
+### Exit codes
 
 Symaira EraseMe uses standard exit codes for scripting:
 
@@ -480,12 +481,21 @@ Or issue a consent token:
 symeraseme grant execute --ttl 3600
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Development](#development)
+section for setup, tests, and linting. The broker registry is maintained
+automatically — see [Registry maintenance](#registry-maintenance).
+
 ## Security
 
 - **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.
 - **Database encryption**: When `SYMERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. Databases created before v0.2.0 used a fixed PBKDF2 salt (V1 format); newer databases use a per-file random salt (V2 format). On open, any V1 database is automatically re-encrypted to V2 transparently — no manual migration is required. On open, the database is decrypted to a temporary file with restrictive permissions (`0o600`). The temp file is placed in a secure temporary directory. On Linux `/dev/shm` (tmpfs, memory-backed) is used when available. On macOS and Windows the OS temp directory is used, which may be disk-backed. On normal exit, SIGTERM, or context close, the temp file is re-encrypted and removed. A startup scavenger removes any stale temp files older than 5 minutes from previous aborted runs. A `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind temporarily; the 5-minute scavenger window limits exposure. If this is a concern for your threat model, consider running Symaira EraseMe on a single-user system, using full-disk encryption, or setting `TMPDIR` to a RAM disk (e.g., `/dev/shm` on Linux).
 - **Consent tokens**: Consent tokens passed via `--consent` or the `SYMERASEME_CONSENT` environment variable are visible in process listings (`ps aux`), shell history, and crash dumps. On shared systems or CI runners, prefer `--consent-file` or `SYMERASEME_CONSENT_FILE` to read the token from a file with `0o600` permissions. The file is read once and the token is consumed (`consume_token`) after verification. Pipe-based input is supported: `echo $TOKEN | symeraseme plan execute --consent-file /dev/stdin`.
 
+For private security reports, open a private security advisory via
+GitHub Security Advisories (**Security → Report a vulnerability**).
+
 ## License
 
-Apache-2.0
+Apache-2.0 — see [LICENSE](LICENSE).
