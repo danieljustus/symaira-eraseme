@@ -43,8 +43,17 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Build, Sign, and Package DMG
+        # The tag (v0.10.6) determines both the Info.plist version and the
+        # versioned DMG filename (Symaira-EraseMe-0.10.6-macos.dmg).
         run: |
           ./scripts/package-dmg.sh
+        env:
+          VERSION: ${{ github.ref_name }}
+
+      - name: Resolve DMG path
+        id: dmg
+        run: |
+          echo "path=$(ls dist/Symaira-EraseMe-*-macos.dmg)" >> "$GITHUB_OUTPUT"
 
       - name: Notarize DMG
         if: steps.signing.outputs.signed == 'true'
@@ -61,7 +70,7 @@ jobs:
           KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
           # NOTARY_API_KEY is stored as base64-encoded .p8 file
           echo "${NOTARY_API_KEY}" | base64 --decode > "$KEY_FILE"
-          xcrun notarytool submit "dist/SymairaEraseMe.dmg" \
+          xcrun notarytool submit "${{ steps.dmg.outputs.path }}" \
             --key "$KEY_FILE" \
             --key-id "${NOTARY_API_KEY_ID}" \
             --issuer "${NOTARY_API_ISSUER}" \
@@ -71,14 +80,14 @@ jobs:
       - name: Staple notarization ticket
         if: steps.signing.outputs.signed == 'true'
         run: |
-          if [ -f "dist/SymairaEraseMe.dmg" ]; then
-            xcrun stapler staple "dist/SymairaEraseMe.dmg" || true
+          if [ -f "${{ steps.dmg.outputs.path }}" ]; then
+            xcrun stapler staple "${{ steps.dmg.outputs.path }}" || true
           fi
 
       - name: Create GitHub Release and Upload DMG
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          files: dist/SymairaEraseMe.dmg
+          files: ${{ steps.dmg.outputs.path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
