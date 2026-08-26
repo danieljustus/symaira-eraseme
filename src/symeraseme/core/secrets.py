@@ -1,9 +1,11 @@
-"""Unified secret resolution: vault:// URIs → env vars → keyring.
+"""Unified secret resolution: symvault:// URIs → env vars → keyring.
 
 All credential lookups in Symaira EraseMe should funnel through
-:func:`resolve_secret` so that ``vault://`` references are transparently
-resolved via the ``symvault`` CLI while plain values fall back to
-environment variables or the system keyring.
+:func:`resolve_secret` so that ``symvault://`` references are
+transparently resolved via the ``symvault`` CLI while plain values fall
+back to environment variables or the system keyring.  The shorter
+``vault://`` form remains supported as a deprecated alias and resolves
+to exactly the same paths.
 
 Security contract
 -----------------
@@ -25,12 +27,16 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-_VAULT_PREFIX = "vault://"
+# ``symvault://`` is the canonical prefix (matches symaira-vault's own
+# MCP resource naming); ``vault://`` is a deprecated backwards-compatible
+# alias that resolves to exactly the same paths.
+_VAULT_PREFIX = "symvault://"
+_VAULT_PREFIXES = (_VAULT_PREFIX, "vault://")
 _SYMVAULT_TIMEOUT = 5  # seconds
 
 
 class SecretResolutionError(Exception):
-    """Raised when all resolution layers fail for a vault:// URI."""
+    """Raised when all resolution layers fail for a symvault:// URI."""
 
 
 def _symvault_available() -> bool:
@@ -111,11 +117,12 @@ def resolve_secret(
     Parameters
     ----------
     value:
-        The raw value to resolve.  If it starts with ``vault://``, the
-        path portion is passed to ``symvault get <path> --print``.  Otherwise the
-        literal value is returned immediately.
+        The raw value to resolve.  If it starts with ``symvault://`` (or
+        the deprecated ``vault://`` alias), the path portion is passed to
+        ``symvault get <path> --print``.  Otherwise the literal value is
+        returned immediately.
     env_fallback:
-        Environment variable name to check when vault:// resolution
+        Environment variable name to check when symvault:// resolution
         fails or is skipped.  For example ``"ANTHROPIC_API_KEY"``.
     keyring_service:
         Keyring service name (with ``keyring_username`` defaulting to
@@ -132,14 +139,16 @@ def resolve_secret(
     SecretResolutionError
         If no layer could produce a value.
     """
-    # --- Layer 0: literal value (not a vault:// URI) ---
-    if not value.startswith(_VAULT_PREFIX):
+    # --- Layer 0: literal value (not a vault URI) ---
+    prefix = next((p for p in _VAULT_PREFIXES if value.startswith(p)), None)
+    if prefix is None:
         return value
 
-    vault_path = value[len(_VAULT_PREFIX) :]
+    vault_path = value[len(prefix) :]
     if not vault_path:
         raise SecretResolutionError(
-            "vault:// URI is empty; provide a path like vault://github/api-token"
+            "symvault:// URI is empty; provide a path like symvault://github/api-token "
+            "(the shorter vault:// form is still accepted)"
         )
 
     # --- Layer 1: symvault ---

@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_imap_password(password: str) -> str:
-    """Resolve IMAP password via vault:// URI, env var, or keyring.
+    """Resolve IMAP password via symvault:// URI, env var, or keyring.
 
-    A ``vault://`` URI that cannot be resolved raises ``IMAPError`` instead of
+    A ``symvault://`` URI (or the deprecated ``vault://`` alias) that cannot
+    be resolved raises ``IMAPError`` instead of
     falling back to the literal URI string — sending the URI itself as the
     password would mask the real misconfiguration and can trip provider
     lockouts on repeated failed logins.

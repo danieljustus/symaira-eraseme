@@ -312,7 +312,8 @@ def create_solver(
     - capsolver -> CAPSOLVER_API_KEY
     - twocaptcha -> TWOCAPTCHA_API_KEY
 
-    Supports vault:// URIs for all API keys.
+    Supports symvault:// URIs for all API keys (vault:// works as a
+    deprecated alias).
     """
     import os
 

@@ -95,24 +95,29 @@ See `.env.example` for all supported environment variables.
 
 Symaira EraseMe supports [Symaira Vault](https://github.com/danieljustus/symaira-vault)
 for centralized secret management. Instead of storing credentials in environment
-variables or the system keyring, you can reference them via `vault://` URIs:
+variables or the system keyring, you can reference them via `symvault://` URIs:
 
 ```bash
 # Store a secret in Symaira Vault
 symvault set anthropic/prod-key "sk-ant-..."
 
-# Reference it in your .env or profile config
-export ANTHROPIC_API_KEY="vault://anthropic/prod-key"
-export CAPSOLVER_API_KEY="vault://captcha/capsolver"
-export IMAP_PASSWORD="vault://email/imap-password"
+# Reference it in your .env or profile config (canonical form)
+export ANTHROPIC_API_KEY="symvault://anthropic/prod-key"
+export CAPSOLVER_API_KEY="symvault://captcha/capsolver"
+export IMAP_PASSWORD="symvault://email/imap-password"
 ```
 
-When Symaira EraseMe encounters a `vault://` URI, it transparently resolves it
+When Symaira EraseMe encounters a `symvault://` URI, it transparently resolves it
 by calling `symvault get <path> --print`. The fallback chain is:
 
 1. **Symaira Vault** — `symvault get <path> --print` (requires `symvault` on PATH)
 2. **Environment variable** — the literal value of the env var
 3. **System keyring** — Python `keyring` package (for IMAP credentials)
+
+> **Deprecated alias**: the shorter `vault://anthropic/prod-key` form keeps
+> working and resolves to exactly the same paths. Existing configs do not
+> break — but new configurations should use `symvault://`, which matches the
+> prefix used across the Symaira ecosystem.
 
 If `symvault` is not installed, the system falls back to the plain-text value
 in the environment variable. No crash, no error — just a debug log.

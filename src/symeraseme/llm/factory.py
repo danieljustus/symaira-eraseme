@@ -110,7 +110,7 @@ def create_llm_client(
             except SecretResolutionError as exc:
                 raise LLMProviderError(
                     f"Failed to resolve API key from {key_env}: {exc}. "
-                    f"Check your vault:// reference or environment variable."
+                    f"Check your symvault:// reference or environment variable."
                 ) from exc
         else:
             logger.warning(
