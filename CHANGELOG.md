@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [v0.10.6] - 2026-08-26
 
 - **macOS app**: Rename the bundle identifier from `com.symaira.eraseme.app` to
   `com.symaira.eraseme` (#696). **Warning:** macOS treats the new identifier as
