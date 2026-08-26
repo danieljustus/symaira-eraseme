@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+- **macOS app**: Rename the bundle identifier from `com.symaira.eraseme.app` to
+  `com.symaira.eraseme` (#696). **Warning:** macOS treats the new identifier as
+  a different app — on first launch after upgrading, re-grant Full Disk Access
+  (and any other TCC permissions) to Symaira EraseMe, otherwise erasure runs
+  will silently fail.
+- **macOS app**: The `.app` bundle is now named `Symaira EraseMe.app` (display
+  convention) and the release asset carries a version:
+  `Symaira-EraseMe-<version>-macos.dmg` instead of the ambiguous unversioned
+  `SymairaEraseMe.dmg` (#696).
+
 ## [v0.10.5] - 2026-08-18
 
 - **Security**: Remove vault path from secret resolution debug logs to prevent credential storage location leakage (#688, CodeQL alert #25).
