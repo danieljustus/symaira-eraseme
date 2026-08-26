@@ -1,0 +1,19 @@
+# Golden fixture: minimal entry with only the required fields and a disabled
+# opt-out channel (missing optional blocks: no verification, source, notes,
+# added_date, disabled flag on the broker).
+id: golden-minimal-us
+name: Golden Minimal Broker
+website: https://golden-minimal.example.com
+category: credit
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 5
+priority: high
+opt_out:
+  - type: email
+    endpoint: remove@golden-minimal.example.com
+    template: ccpa-deletion
+    locale: en
+    disabled: true

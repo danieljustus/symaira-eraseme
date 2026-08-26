@@ -2,8 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/danieljustus/symaira-eraseme/registry/schemas/broker.schema.json",
   "title": "Data Broker Definition",
-  "description": "Schema for YAML broker files in the Symaira EraseMe registry.",
+  "description": "Versioned JSON Schema for YAML broker files in the Symaira EraseMe registry. The versioned contract is documented in docs/registry-contract.md; schema_version must equal registry/manifest.json.",
+  "schema_version": 1,
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "id",
     "name",
@@ -18,7 +20,7 @@
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
-      "description": "Unique identifier (lowercase, hyphenated)."
+      "description": "Unique identifier (lowercase, hyphenated). Must match the YAML file stem."
     },
     "name": {
       "type": "string",
@@ -39,13 +41,34 @@
         "background-check",
         "social-media",
         "other"
-      ]
+      ],
+      "description": "Business category; the enum is the closed set of allowed values."
     },
     "jurisdictions": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^[A-Z]{2}(-[A-Z]{2})?$" },
+      "items": {
+        "type": "string",
+        "enum": [
+          "AT",
+          "CH",
+          "DE",
+          "DK",
+          "EU",
+          "FI",
+          "FR",
+          "GB",
+          "IE",
+          "IL",
+          "LU",
+          "NL",
+          "NO",
+          "SE",
+          "UK",
+          "US"
+        ]
+      },
       "minItems": 1,
-      "description": "ISO country codes (e.g. DE, US, EU)."
+      "description": "Closed enum of the jurisdictions used by the registry (ISO 3166-1 alpha-2 plus EU/UK registry conveniences)."
     },
     "laws": {
       "type": "array",
@@ -53,7 +76,8 @@
         "type": "string",
         "enum": ["GDPR", "CCPA", "CPRA", "LGPD", "PIPEDA"]
       },
-      "minItems": 1
+      "minItems": 1,
+      "description": "Privacy laws the broker is subject to; closed enum."
     },
     "data_sensitivity": {
       "type": "integer",
@@ -64,61 +88,20 @@
     },
     "priority": {
       "type": "string",
-      "enum": ["high", "medium", "low"]
+      "enum": ["high", "medium", "low"],
+      "description": "Removal priority assigned by the registry maintainers."
     },
     "opt_out": {
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "required": ["type"],
-        "oneOf": [
-          {
-            "properties": {
-              "type": { "const": "email" },
-              "endpoint": { "type": "string", "format": "email" },
-              "template": { "type": "string" },
-              "locale": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
-              "required_fields": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "supports_suppression": { "type": "boolean" },
-              "expected_response_days": { "type": "integer", "minimum": 1 }
-            },
-            "required": ["endpoint", "template", "locale"]
-          },
-          {
-            "properties": {
-              "type": { "const": "web_form" },
-              "url": { "type": "string", "format": "uri" },
-              "form_spec": {
-                "type": "object",
-                "properties": {
-                  "steps": {
-                    "type": "array",
-                    "items": { "$ref": "#/$defs/formStep" }
-                  },
-                  "timeout_seconds": { "type": "number", "minimum": 1 },
-                  "rate_limit_delay": { "type": "number", "minimum": 0 },
-                  "headless": { "type": "boolean" }
-                },
-                "required": ["steps"]
-              }
-            },
-            "required": ["url", "form_spec"]
-          }
-        ],
-        "additionalProperties": true
-      }
+        "$ref": "#/$defs/optOutChannel"
+      },
+      "description": "One or more opt-out channels (email and/or web form). At least one channel is required."
     },
     "verification": {
-      "type": "object",
-      "properties": {
-        "ack_keywords": { "type": "array", "items": { "type": "string" } },
-        "rejection_keywords": { "type": "array", "items": { "type": "string" } },
-        "human_required_keywords": { "type": "array", "items": { "type": "string" } }
-      }
+      "$ref": "#/$defs/verification",
+      "description": "Keyword sets used to classify broker replies. Optional."
     },
     "disabled": {
       "type": "boolean",
@@ -140,14 +123,117 @@
       "default": "active",
       "description": "Operational status of the broker entry."
     },
-    "notes": { "type": "string" }
+    "notes": {
+      "type": "string",
+      "description": "Free-form maintainer notes."
+    }
   },
   "$defs": {
+    "optOutChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["email", "web_form"],
+          "description": "Channel kind. Exactly one channel variant applies (see oneOf)."
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address the opt-out request is sent to (email channels only)."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Broker opt-out form URL (web_form channels only)."
+        },
+        "form_spec": {
+          "$ref": "#/$defs/formSpec",
+          "description": "Playwright form specification (web_form channels only)."
+        },
+        "template": {
+          "type": "string",
+          "enum": ["ccpa-deletion", "gdpr-art17"],
+          "description": "Letter template id used for email channels; optional on web_form channels (present when the form mirrors a template). Closed enum of the bundled templates."
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "description": "RFC 5646 language tag of the letter/request language."
+        },
+        "required_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["full_name", "email", "address", "date_of_birth", "state"]
+          },
+          "description": "Identity fields the broker requires; closed enum of fields the identity store can supply."
+        },
+        "supports_suppression": {
+          "type": "boolean",
+          "description": "True when the broker accepts a suppression-list opt-out in addition to deletion."
+        },
+        "expected_response_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected response time in days, used for deadline tick scheduling."
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Channel-level disable flag (e.g. broken endpoint)."
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "email" },
+            "endpoint": {
+              "type": "string",
+              "format": "email",
+              "description": "Email address the opt-out request is sent to."
+            }
+          },
+          "required": ["endpoint"]
+        },
+        {
+          "properties": {
+            "type": { "const": "web_form" },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Broker opt-out form URL."
+            },
+            "form_spec": {
+              "$ref": "#/$defs/formSpec"
+            }
+          },
+          "required": ["url", "form_spec"]
+        }
+      ]
+    },
+    "formSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/formStep" }
+        },
+        "timeout_seconds": { "type": "number", "minimum": 1 },
+        "rate_limit_delay": { "type": "number", "minimum": 0 },
+        "headless": { "type": "boolean" }
+      },
+      "required": ["steps"]
+    },
     "formStep": {
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
-      "description": "One step in a Playwright form_spec. Standard DSL: fill/select keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
+      "description": "One step in a Playwright form_spec. Standard DSL: goto/fill/select/click/wait keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
       "properties": {
         "goto": { "type": "string", "description": "URL to navigate to. Use '.' for the form's own URL." },
         "fill": {
@@ -183,6 +269,16 @@
           "required": ["type", "site_key"]
         }
       }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ack_keywords": { "type": "array", "items": { "type": "string" } },
+        "rejection_keywords": { "type": "array", "items": { "type": "string" } },
+        "human_required_keywords": { "type": "array", "items": { "type": "string" } }
+      },
+      "description": "Keyword sets for classifying broker replies: ack (request accepted), rejection (refused), human_required (manual verification needed)."
     }
   }
 }

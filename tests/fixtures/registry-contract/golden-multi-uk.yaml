@@ -1,0 +1,46 @@
+# Golden fixture: multi-identifier broker with both channel types in one entry.
+id: golden-multi-uk
+name: Golden Multi Channel Broker
+website: https://golden-multi.example.uk
+category: other
+jurisdictions:
+  - UK
+laws:
+  - GDPR
+data_sensitivity: 3
+priority: low
+opt_out:
+  - type: email
+    endpoint: privacy@golden-multi.example.uk
+    template: gdpr-art17
+    locale: en
+    required_fields:
+      - full_name
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+  - type: web_form
+    url: https://golden-multi.example.uk/optout
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#email": "${email}"
+        - click: "#submit"
+        - wait_for: ".done"
+      timeout_seconds: 30.0
+    locale: en
+    required_fields:
+      - email
+    supports_suppression: true
+    expected_response_days: 30
+verification:
+  ack_keywords:
+    - success
+    - done
+  rejection_keywords:
+    - failed
+  human_required_keywords:
+    - manual
+added_date: "2026-08-01"
+status: active

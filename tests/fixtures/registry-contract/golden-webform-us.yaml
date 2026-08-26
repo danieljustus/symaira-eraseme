@@ -1,0 +1,58 @@
+# Golden fixture: complete web_form channel exercising every formStep branch
+# (goto, fill, select, click, wait_for, wait_seconds, screenshot, assert_text,
+# solve_captcha) plus verification keyword sets.
+id: golden-webform-us
+name: Golden Web Form Broker
+website: https://golden-webform.example.com
+category: people-search
+jurisdictions:
+  - US
+laws:
+  - CCPA
+data_sensitivity: 4
+priority: high
+opt_out:
+  - type: web_form
+    url: https://golden-webform.example.com/optout
+    form_spec:
+      steps:
+        - goto: .
+        - fill:
+            "#full_name": "${full_name}"
+            "#email": "${email}"
+        - select:
+            "#state": "${state}"
+        - click: "#continue"
+        - wait_for: "#confirmation"
+        - wait_seconds: 2.5
+        - screenshot: result
+        - assert_text: "Your request has been received"
+        - solve_captcha:
+            type: recaptcha-v2
+            site_key: GOLDEN-DEMO-SITE-KEY-0000
+            provider: capsolver
+            is_invisible: false
+      timeout_seconds: 45.0
+      rate_limit_delay: 2.0
+      headless: true
+    template: ccpa-deletion
+    locale: en
+    required_fields:
+      - full_name
+      - email
+      - state
+    supports_suppression: true
+    expected_response_days: 30
+verification:
+  ack_keywords:
+    - received
+    - confirmed
+  rejection_keywords:
+    - error
+    - invalid
+  human_required_keywords:
+    - support
+    - verify
+added_date: "2026-08-01"
+source: Golden Test Registry
+status: active

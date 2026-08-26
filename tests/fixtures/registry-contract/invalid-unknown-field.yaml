@@ -1,0 +1,18 @@
+# Negative golden fixture: MUST FAIL schema validation.
+# Exercises the rejection branch (unknown top-level field + invalid enum value).
+# The Go conformance suite must reject this file with the same two errors.
+id: golden-invalid-sample
+name: Golden Invalid Sample
+website: https://golden-invalid.example.com
+category: not-a-category
+jurisdictions:
+  - ZZ
+laws:
+  - GDPR
+priority: high
+opt_out:
+  - type: email
+    endpoint: privacy@golden-invalid.example.com
+    template: gdpr-art17
+    locale: en
+made_up_field: value

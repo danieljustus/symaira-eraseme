@@ -1,0 +1,35 @@
+# Golden fixture: complete email channel with all optional email fields.
+id: golden-email-eu
+name: Golden Email Broker
+website: https://golden-email.example.eu
+category: marketing
+jurisdictions:
+  - DE
+  - AT
+  - EU
+laws:
+  - GDPR
+data_sensitivity: 2
+priority: medium
+opt_out:
+  - type: email
+    endpoint: privacy@golden-email.example.eu
+    template: gdpr-art17
+    locale: de
+    required_fields:
+      - full_name
+      - email
+      - address
+      - date_of_birth
+    supports_suppression: false
+    expected_response_days: 45
+verification:
+  ack_keywords:
+    - erhalten
+    - bestätigt
+  rejection_keywords:
+    - abgelehnt
+  human_required_keywords:
+    - ausweis
+notes: Golden fixture for email branch
+added_date: "2026-08-01"
