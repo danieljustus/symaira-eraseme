@@ -63,12 +63,83 @@ class TestResolveSecretBasic:
         assert resolve_secret("sk-ant-12345") == "sk-ant-12345"
 
     def test_empty_vault_prefix_raises(self):
-        with pytest.raises(SecretResolutionError, match="vault:// URI is empty"):
+        with pytest.raises(SecretResolutionError, match="symvault:// URI is empty"):
+            resolve_secret("symvault://")
+
+    def test_empty_deprecated_alias_prefix_raises(self):
+        with pytest.raises(SecretResolutionError, match="symvault:// URI is empty"):
             resolve_secret("vault://")
 
     def test_non_vault_value_ignores_fallbacks(self):
         """A literal value never touches symvault, env, or keyring."""
         assert resolve_secret("direct-value", env_fallback="NONEXISTENT_VAR") == "direct-value"
+
+
+# ---------------------------------------------------------------------------
+# Canonical symvault:// prefix vs deprecated vault:// alias
+# ---------------------------------------------------------------------------
+
+
+class TestCanonicalPrefixAndAliasEquivalence:
+    """``symvault://`` is canonical; ``vault://`` resolves identically."""
+
+    def _resolve_with_fake_vault(self, uri: str) -> str:
+        import subprocess
+
+        fake_result = subprocess.CompletedProcess(
+            args=["symvault", "get", "anthropic/prod-key", "--print"],
+            returncode=0,
+            stdout=b"same-secret\n",
+            stderr=b"",
+        )
+        with (
+            patch("symeraseme.core.secrets._symvault_available", return_value=True),
+            patch("subprocess.run", return_value=fake_result),
+        ):
+            return resolve_secret(uri)
+
+    def test_canonical_prefix_resolves_via_symvault(self):
+        assert self._resolve_with_fake_vault("symvault://anthropic/prod-key") == "same-secret"
+
+    def test_deprecated_alias_resolves_to_same_path(self):
+        assert self._resolve_with_fake_vault("vault://anthropic/prod-key") == "same-secret"
+
+    def test_both_prefixes_resolve_identically(self):
+        canonical = self._resolve_with_fake_vault("symvault://anthropic/prod-key")
+        alias = self._resolve_with_fake_vault("vault://anthropic/prod-key")
+        assert canonical == alias
+
+    def test_alias_falls_through_same_chain(self):
+        """Alias failure reaches the same env fallback as the canonical form."""
+        with (
+            patch("symeraseme.core.secrets._resolve_via_symvault", return_value=None),
+            patch.dict(os.environ, {"TEST_ALIAS_FALLBACK": "env-ok"}),
+        ):
+            canonical = resolve_secret(
+                "symvault://secret/path", env_fallback="TEST_ALIAS_FALLBACK"
+            )
+            alias = resolve_secret("vault://secret/path", env_fallback="TEST_ALIAS_FALLBACK")
+        assert canonical == alias == "env-ok"
+
+    def test_path_extraction_strips_only_the_matched_prefix(self):
+        """The alias must not leave a stray 'vault://' fragment on the path."""
+        import subprocess
+
+        captured = []
+
+        def fake_run(args, **kwargs):
+            captured.append(args)
+            return subprocess.CompletedProcess(
+                args=args, returncode=0, stdout=b"v\n", stderr=b""
+            )
+
+        with (
+            patch("symeraseme.core.secrets._symvault_available", return_value=True),
+            patch("subprocess.run", side_effect=fake_run),
+        ):
+            resolve_secret("vault://github/api-token")
+
+        assert captured[0][2] == "github/api-token"
 
 
 # ---------------------------------------------------------------------------
