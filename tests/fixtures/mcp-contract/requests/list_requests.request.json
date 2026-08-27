@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "list_requests",
+    "arguments": {
+      "campaign_id": "example",
+      "status": "example",
+      "broker_id": "example",
+      "page": 1,
+      "page_size": 1
+    }
+  },
+  "id": 1
+}

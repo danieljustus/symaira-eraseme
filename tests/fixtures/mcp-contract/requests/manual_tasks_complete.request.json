@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "manual_tasks_complete",
+    "arguments": {
+      "task_id": 1,
+      "notes": "example"
+    }
+  },
+  "id": 1
+}

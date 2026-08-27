@@ -1,0 +1,21 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - unused
+    - ineffassign
+    - staticcheck
+    - unconvert
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+# Formatting is enforced by make fmt-check with the repository's Go 1.26.5
+# toolchain. golangci-lint's goimports formatter may embed a newer gofmt.

@@ -45,14 +45,31 @@ def _load_broker_schema() -> dict:
 
     The schema file lives at registry/schemas/broker.schema.json relative to
     the repo root.  It is the single source of truth — pydantic models are
-    derived from it (validated through testing).
+    derived from it (validated through testing).  The schema version must
+    match the registry manifest (docs/registry-contract.md §1); a mismatch
+    means the registry and this loader disagree on the data contract and
+    processing is refused.
     """
-    schema_path = _registry_dir() / "schemas" / "broker.schema.json"
+    registry_dir = _registry_dir()
+    schema_path = registry_dir / "schemas" / "broker.schema.json"
+    manifest_path = registry_dir / "manifest.json"
     if not schema_path.exists():
         msg = f"Broker schema not found at {schema_path}"
         raise FileNotFoundError(msg)
     with open(schema_path) as f:
-        return dict(json.load(f))
+        schema = dict(json.load(f))
+    if manifest_path.exists():
+        with open(manifest_path) as f:
+            manifest = dict(json.load(f))
+        manifest_version = str(manifest.get("schema_version"))
+        schema_version = str(schema.get("schema_version"))
+        if manifest_version and schema_version and manifest_version != schema_version:
+            msg = (
+                f"Registry contract mismatch: manifest schema_version "
+                f"{manifest_version} != schema schema_version {schema_version}"
+            )
+            raise RegistryError(msg)
+    return schema
 
 
 _BROKER_SCHEMA: dict | None = None

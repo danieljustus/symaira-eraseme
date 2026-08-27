@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "list_brokers",
+    "arguments": {
+      "jurisdiction": "example",
+      "law": "example",
+      "priority": "example",
+      "category": "example",
+      "include_disabled": true,
+      "status": "active",
+      "include_inactive": true
+    }
+  },
+  "id": 1
+}

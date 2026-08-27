@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "run_web_form",
+    "arguments": {
+      "broker_id": "example",
+      "headed": true,
+      "screenshot_dir": "example",
+      "dry_run": true
+    }
+  },
+  "id": 1
+}

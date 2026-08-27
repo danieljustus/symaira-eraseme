@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "description": "Versioned, language-neutral contract for the data broker registry.",
+  "schemas": {
+    "broker": "schemas/broker.schema.json"
+  }
+}

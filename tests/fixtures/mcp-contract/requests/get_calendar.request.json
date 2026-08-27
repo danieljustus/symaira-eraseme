@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_calendar",
+    "arguments": {
+      "weeks": 1,
+      "campaign_id": "example"
+    }
+  },
+  "id": 1
+}

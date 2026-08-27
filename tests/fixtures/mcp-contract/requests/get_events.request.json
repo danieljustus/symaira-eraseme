@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_events",
+    "arguments": {
+      "request_id": 1,
+      "after_event_id": 1
+    }
+  },
+  "id": 1
+}

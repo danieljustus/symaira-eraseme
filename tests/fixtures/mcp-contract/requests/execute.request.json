@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "execute",
+    "arguments": {
+      "campaign_id": "example",
+      "account": "example",
+      "batch_size": 1,
+      "dry_run": true,
+      "backend": "smtp",
+      "concurrent": true,
+      "workers": 1,
+      "consent_token": "example",
+      "consent_file": "example"
+    }
+  },
+  "id": 1
+}

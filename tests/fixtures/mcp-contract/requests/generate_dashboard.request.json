@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "generate_dashboard",
+    "arguments": {
+      "output": "example",
+      "auto_open": true,
+      "auto_refresh": 1
+    }
+  },
+  "id": 1
+}

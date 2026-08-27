@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "auto_confirm",
+    "arguments": {
+      "request_id": 1,
+      "headed": true,
+      "screenshot_dir": "example",
+      "dry_run": true
+    }
+  },
+  "id": 1
+}
