@@ -6,7 +6,6 @@ require (
 	github.com/danieljustus/symaira-corekit v0.16.0
 	github.com/spf13/cobra v1.9.1
 	golang.org/x/sys v0.47.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
