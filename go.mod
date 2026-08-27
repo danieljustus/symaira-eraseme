@@ -3,7 +3,7 @@ module github.com/danieljustus/symaira-eraseme
 go 1.26.5
 
 require (
-	github.com/danieljustus/symaira-corekit v0.14.0
+	github.com/danieljustus/symaira-corekit v0.16.0
 	github.com/spf13/cobra v1.9.1
 )
 
