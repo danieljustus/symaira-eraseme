@@ -224,6 +224,82 @@ func (r *Repository) GetEvents(ctx context.Context, requestID int64, afterEventI
 }
 
 // --------------------------------------------------------------------
+// Tick candidates (deadline engine)
+// --------------------------------------------------------------------
+
+// TickCandidate mirrors one row of repositories/deadlines.fetch_tick_candidates.
+type TickCandidate struct {
+	ID              int64
+	BrokerID        string
+	CampaignID      string
+	Jurisdiction    string
+	CurrentStatus   string
+	SentAt          string
+	DeadlineAt      string
+	NextActionAt    string
+	AcknowledgedAt  string
+	ResolvedAt      string
+	RemindersSent   int
+	EscalationLevel int
+}
+
+// FetchTickCandidates mirrors repositories/deadlines.fetch_tick_candidates:
+// requests whose next_action_at is NULL or due by now_iso, earliest first.
+func (r *Repository) FetchTickCandidates(ctx context.Context, nowISO string, batchSize int) ([]TickCandidate, error) {
+	q := `SELECT r.id, r.broker_id, r.campaign_id, r.jurisdiction,
+	             s.current_status, s.sent_at, s.deadline_at, s.next_action_at,
+	             s.acknowledged_at, s.resolved_at, s.reminders_sent,
+	             s.escalation_level
+	      FROM removal_requests r
+	      JOIN request_state s ON s.request_id = r.id
+	      WHERE s.next_action_at IS NULL
+	         OR s.next_action_at <= ?
+	      ORDER BY s.next_action_at ASC`
+	args := []any{nowISO}
+	if batchSize > 0 {
+		q += " LIMIT ?"
+		args = append(args, batchSize)
+	}
+	rows, err := r.store.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TickCandidate
+	for rows.Next() {
+		var (
+			c          TickCandidate
+			nextAction sql.NullString
+			sentAt     sql.NullString
+			deadlineAt sql.NullString
+			ackAt      sql.NullString
+			resolvedAt sql.NullString
+		)
+		if err := rows.Scan(
+			&c.ID, &c.BrokerID, &c.CampaignID, &c.Jurisdiction,
+			&c.CurrentStatus, &sentAt, &deadlineAt, &nextAction,
+			&ackAt, &resolvedAt, &c.RemindersSent, &c.EscalationLevel,
+		); err != nil {
+			return nil, err
+		}
+		c.SentAt = nextActionString(sentAt)
+		c.DeadlineAt = nextActionString(deadlineAt)
+		c.NextActionAt = nextActionString(nextAction)
+		c.AcknowledgedAt = nextActionString(ackAt)
+		c.ResolvedAt = nextActionString(resolvedAt)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func nextActionString(ns sql.NullString) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return ""
+}
+
+// --------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------
 
