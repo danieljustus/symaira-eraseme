@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.11.0] - 2026-08-27
+
+- **Registry contract**: Broker registry schema is now versioned (`schema_version` in
+  `registry/manifest.json` and `registry/schemas/broker.schema.json`); the loader refuses
+  to process a registry when the versions disagree (#736).
+- **Registry validation**: Broker YAML files are validated against a stricter schema
+  (`additionalProperties: false`, closed enums for category and jurisdictions); unknown
+  fields or values are rejected instead of silently ignored (#736).
+- **Go port foundation**: Broker registry, MCP tool surface, and SQLite event-store
+  contracts frozen as versioned data contracts with golden fixtures (#736); LLM clients
+  ported onto corekit/llmkit (#737). The Go rewrite ships in a future release.
+
 ## [v0.10.6] - 2026-08-26
 
 - **macOS app**: Rename the bundle identifier from `com.symaira.eraseme.app` to
