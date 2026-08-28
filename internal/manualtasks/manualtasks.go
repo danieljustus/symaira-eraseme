@@ -383,6 +383,30 @@ func isArtifact(name string) bool {
 	return strings.HasSuffix(name, ".png") || strings.HasSuffix(name, ".html") || strings.HasSuffix(name, ".json")
 }
 
+// SaveScreenshot stores a screenshot in the manual-task artifact directory
+// with restrictive permissions and returns its path. Empty screenshots are
+// ignored so evidence capture remains best effort.
+func SaveScreenshot(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", nil
+	}
+	dir, err := TasksDir()
+	if err != nil {
+		return "", err
+	}
+	if err := ensureTasksDir(dir); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, fmt.Sprintf("screenshot_%d.png", time.Now().UnixNano()))
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // InstructionsForReason is exported for parity tests and UI callers.
 func InstructionsForReason(reason, brokerName, _ string) string {
 	return instructionsForReason(reason, brokerName)
