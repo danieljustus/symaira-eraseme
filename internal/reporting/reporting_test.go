@@ -131,7 +131,7 @@ func TestReportExports(t *testing.T) {
 	if !strings.Contains(page, `http-equiv="refresh" content="30"`) {
 		t.Fatalf("dashboard refresh missing")
 	}
-	if _, err := GenerateReport(data, "pdf", now); err == nil || err.Error() != "Unsupported format: pdf. Choose html, json, or csv." {
+	if _, err := GenerateReport(data, "pdf", now); err == nil || err.Error() != "unsupported format: pdf; choose html, json, or csv" {
 		t.Fatalf("error = %v", err)
 	}
 }

@@ -230,6 +230,7 @@ func Create(ctx context.Context, store *eventstore.Store, opts CreateOpts) (Manu
 		}, eventstore.SrcSystem, time.Now().UTC())
 		if eventErr != nil {
 			// Preserve Python's best-effort event behavior: the task remains usable.
+			_ = eventErr
 		}
 	}
 	return ManualTask{ID: taskID, RequestID: opts.RequestID, BrokerID: opts.BrokerID,

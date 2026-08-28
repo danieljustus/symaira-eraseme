@@ -153,15 +153,16 @@ func TestGoldenTemplateConformance(t *testing.T) {
 				BrokerName:    "Acme Data Corp",
 				BrokerWebsite: "https://acme.example.com",
 			}
-			if name == "templates/dashboard.html.j2" {
+			switch name {
+			case "templates/dashboard.html.j2":
 				opts.ExtraVars = map[string]any{
 					"auto_refresh_seconds": extra["auto_refresh_seconds"],
 					"data":                 data,
 					"now":                  now,
 				}
-			} else if name == "templates/report.html.j2" {
+			case "templates/report.html.j2":
 				opts.ExtraVars = map[string]any{"data": data, "now": now}
-			} else {
+			default:
 				opts.ExtraVars = letterExtra
 			}
 			got, err := Render(name, opts)

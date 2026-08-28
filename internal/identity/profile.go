@@ -298,11 +298,8 @@ func ProfileExists(path string) bool {
 // canonical JSON form of the profile.  Mirrors hash_profile() in
 // identity.py and is used for audit-trail entries.
 func HashProfile(p *Profile) string {
-	canon, _ := json.Marshal(p) // json.Marshal sorts map keys; the
-	// Pydantic model_dump() output keeps field order, but the hash
-	// is over the canonical form so field order must not change the
-	// digest.  Build a canonical map explicitly.
-	canon = canonicalJSON(p)
+	// The hash is over a canonical map so field order cannot change the digest.
+	canon := canonicalJSON(p)
 	sum := sha256.Sum256(canon)
 	return hex.EncodeToString(sum[:])
 }

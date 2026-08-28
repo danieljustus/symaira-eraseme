@@ -22,7 +22,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
+
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -131,16 +131,6 @@ func DeriveKeyHKDF(master, salt, info []byte) ([]byte, error) {
 		return nil, err
 	}
 	return out, nil
-}
-
-// fernetKeyFromBytes returns the URL-safe base64 encoding used as
-// the Fernet "key" (the 32-byte AES key encoded as base64url is
-// what Fernet expects when wrapping the token, because Fernet
-// does its own key derivation in the cryptography library).
-func fernetKeyFromBytes(b []byte) []byte {
-	out := make([]byte, base64.RawURLEncoding.EncodedLen(len(b)))
-	base64.RawURLEncoding.Encode(out, b)
-	return out
 }
 
 // DetectVersion reads the header of a file and returns 1, 2, 3 or

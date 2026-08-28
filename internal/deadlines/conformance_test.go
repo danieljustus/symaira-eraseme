@@ -270,10 +270,7 @@ func TestApplyTickActionsWritesEvents(t *testing.T) {
 		}
 		byRequest[r.RequestID] = r.EventType
 	}
-	// Request 4 (broker-d) got RE_SCAN_TRIGGERED; verify it landed.
-	if et := byRequest[0]; et != "" {
-		// deterministic check via broker map
-	}
+	// Request 4 (broker-d) is verified through the broker map below.
 	for rid, broker := range ids {
 		if broker == "broker-a" {
 			if byRequest[rid] != "REMINDER_SENT" {
