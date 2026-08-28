@@ -120,11 +120,24 @@ func executeWebformRequest(
 			"form_url":               result["url"],
 			"expected_response_days": 30,
 			"identity_snapshot_hash": identityHash,
+			"formflow_code":          result["code"],
+			"evidence":               result["evidence"],
 		})
 	} else {
 		payload := map[string]any{
-			"error":       result["error"],
-			"broker_name": brokerName,
+			"error":         result["error"],
+			"broker_name":   brokerName,
+			"formflow_code": result["code"],
+			"reason":        stringOr(result["reason"], reasonForCodeString(result["code"])),
+			"evidence":      result["evidence"],
+		}
+		if result["final_url"] != nil {
+			payload["form_url"] = result["final_url"]
+		} else {
+			payload["form_url"] = result["url"]
+		}
+		if result["page_text"] != nil {
+			payload["page_text"] = result["page_text"]
 		}
 		if taskID, ok := result["task_id"]; ok && taskID != nil {
 			payload["task_id"] = taskID
@@ -132,14 +145,28 @@ func executeWebformRequest(
 			// The Python web-form service creates the task before execution
 			// records SEND_FAILED. Keep that ordering so HUMAN_ACTION_REQUIRED
 			// projects first, then SEND_FAILED becomes the final status.
+			screenshotPath := stringValue(result["screenshot_path"])
+			if screenshotPath == "" {
+				if path, saveErr := manualtasks.SaveScreenshot(resultScreenshot(result)); saveErr == nil {
+					screenshotPath = path
+				}
+			}
+			htmlSnapshot := stringValue(result["html_snapshot"])
+			if htmlSnapshot == "" {
+				htmlSnapshot = stringValue(result["page_text"])
+			}
+			formURL := stringValue(result["url"])
+			if formURL == "" {
+				formURL = stringValue(result["final_url"])
+			}
 			task, taskErr := manualtasks.Create(ctx, store, manualtasks.CreateOpts{
 				RequestID:      &requestID,
 				BrokerID:       brokerName,
 				BrokerName:     brokerName,
-				FormURL:        stringValue(result["url"]),
-				Reason:         stringOr(result["reason"], "generic_error"),
-				ScreenshotPath: stringValue(result["screenshot_path"]),
-				HTMLSnapshot:   stringValue(result["html_snapshot"]),
+				FormURL:        formURL,
+				Reason:         stringOr(result["reason"], reasonForCodeString(result["code"])),
+				ScreenshotPath: screenshotPath,
+				HTMLSnapshot:   htmlSnapshot,
 				FormFields:     stringMap(result["form_fields"]),
 				StepIndex:      intValue(result["step_index"]),
 				TotalSteps:     intValue(result["total_steps"]),
@@ -153,6 +180,7 @@ func executeWebformRequest(
 		}
 		_, _, err = storeAppend(ctx, store, requestID, eventstore.EvtSendFailed, payload)
 	}
+
 	if err != nil {
 		return nil, err
 	}
