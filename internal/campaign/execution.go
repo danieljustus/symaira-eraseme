@@ -11,6 +11,7 @@ import (
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
+	"github.com/danieljustus/symaira-eraseme/internal/manualtasks"
 )
 
 // Errors mirror core/exceptions.py for the executed domain.
@@ -125,8 +126,30 @@ func executeWebformRequest(
 			"error":       result["error"],
 			"broker_name": brokerName,
 		}
-		if taskID, ok := result["task_id"]; ok {
+		if taskID, ok := result["task_id"]; ok && taskID != nil {
 			payload["task_id"] = taskID
+		} else {
+			// The Python web-form service creates the task before execution
+			// records SEND_FAILED. Keep that ordering so HUMAN_ACTION_REQUIRED
+			// projects first, then SEND_FAILED becomes the final status.
+			task, taskErr := manualtasks.Create(ctx, store, manualtasks.CreateOpts{
+				RequestID:      &requestID,
+				BrokerID:       brokerName,
+				BrokerName:     brokerName,
+				FormURL:        stringValue(result["url"]),
+				Reason:         stringOr(result["reason"], "generic_error"),
+				ScreenshotPath: stringValue(result["screenshot_path"]),
+				HTMLSnapshot:   stringValue(result["html_snapshot"]),
+				FormFields:     stringMap(result["form_fields"]),
+				StepIndex:      intValue(result["step_index"]),
+				TotalSteps:     intValue(result["total_steps"]),
+				ErrorMessage:   stringValue(result["error"]),
+			})
+			if taskErr != nil {
+				return nil, taskErr
+			}
+			payload["task_id"] = task.ID
+			result["task_id"] = task.ID
 		}
 		_, _, err = storeAppend(ctx, store, requestID, eventstore.EvtSendFailed, payload)
 	}
@@ -312,6 +335,48 @@ func toStrings(xs []any) []string {
 	for _, x := range xs {
 		if s, ok := x.(string); ok {
 			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func stringValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
+
+func stringOr(value any, fallback string) string {
+	if text := stringValue(value); text != "" {
+		return text
+	}
+	return fallback
+}
+
+func intValue(value any) int {
+	switch number := value.(type) {
+	case int:
+		return number
+	case int64:
+		return int(number)
+	case float64:
+		return int(number)
+	default:
+		return 0
+	}
+}
+
+func stringMap(value any) map[string]string {
+	out := map[string]string{}
+	switch fields := value.(type) {
+	case map[string]string:
+		return fields
+	case map[string]any:
+		for key, item := range fields {
+			if text, ok := item.(string); ok {
+				out[key] = text
+			}
 		}
 	}
 	return out
