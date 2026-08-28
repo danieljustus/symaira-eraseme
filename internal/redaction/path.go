@@ -13,12 +13,12 @@ import (
 var (
 	// ErrPathOutsideWorkspace is returned before opening a path that is not
 	// contained by the canonical workspace root.
-	ErrPathOutsideWorkspace = errors.New("Path is outside the MCP workspace")
+	ErrPathOutsideWorkspace = errors.New("path is outside the MCP workspace")
 	// ErrPathNullByte mirrors Python's explicit path validation.
-	ErrPathNullByte = errors.New("Path contains a null byte")
+	ErrPathNullByte = errors.New("path contains a null byte")
 	// ErrPathNotString is retained as a typed equivalent for callers that
 	// validate decoded JSON before converting to a Go string.
-	ErrPathNotString = errors.New("Path must be a string")
+	ErrPathNotString = errors.New("path must be a string")
 )
 
 // ResolveWorkspacePath canonicalizes path and verifies that it remains inside
