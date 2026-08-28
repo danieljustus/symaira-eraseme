@@ -91,7 +91,7 @@ func ResolveSecret(value string, opts SecretResolver) (string, error) {
 
 	// 2. env fallback.
 	if opts.EnvFallback != "" {
-		if v := os.Getenv(opts.EnvFallback); v != "" {
+		if v := os.Getenv(opts.EnvFallback); v != "" && vaultPrefix(v) == "" {
 			return v, nil
 		}
 	}
