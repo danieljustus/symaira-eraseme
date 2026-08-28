@@ -675,7 +675,7 @@ func installRoot(opts InstallOptions, platform Platform) (string, error) {
 		return filepath.Join(home, "Library", "LaunchAgents"), nil
 	}
 	configHome := opts.XDGConfigHome
-	if configHome == "" {
+	if configHome == "" && opts.HomeDir == "" {
 		configHome = os.Getenv("XDG_CONFIG_HOME")
 	}
 	if configHome == "" {
