@@ -3,8 +3,8 @@
 // checkpoint, file locking for encrypted DBs, and atexit-style
 // re-encryption.  The Go version is goroutine-safe and does not
 // rely on signal handlers — cleanup is driven by explicit Close
-// calls plus a process-exit hook installed via SetExitHook (the
-// caller wires that to its own lifecycle).
+// calls plus explicit finalisation (the caller wires that to its
+// own lifecycle).
 package eventstore
 
 import (
@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"sync"
 	"time"
 )
 
@@ -146,30 +145,7 @@ func (l *DBLock) Close() error {
 // Encrypted re-encrypt on exit
 // --------------------------------------------------------------------
 
-var exitHookMu sync.Mutex
-var exitHook func()
-
-// SetExitHook installs a process-exit hook (e.g. for atexit-style
-// re-encryption of all registered temp DBs).
-func SetExitHook(fn func()) {
-	exitHookMu.Lock()
-	defer exitHookMu.Unlock()
-	exitHook = fn
-}
-
-// runExitHook is called by user code on graceful shutdown.  It
-// is goroutine-safe.
-func runExitHook() {
-	exitHookMu.Lock()
-	fn := exitHook
-	exitHookMu.Unlock()
-	if fn != nil {
-		fn()
-	}
-}
-
-// FinaliseAll re-encrypts every still-registered temp file.  Used
-// as the default exit hook.
+// FinaliseAll re-encrypts every still-registered temp file.
 func FinaliseAll() {
 	encryptedTemps.Range(func(k, v any) bool {
 		origPath, _ := k.(string)
@@ -181,17 +157,6 @@ func FinaliseAll() {
 		_ = RemoveWALSiblings(tmpPath)
 		return true
 	})
-}
-
-// Init registers the default exit hook (re-encrypts + removes
-// temp DBs) once.  Subsequent calls are no-ops.
-var initOnce sync.Once
-
-// InstallDefaultExitHook wires FinaliseAll into the atexit hook
-// and registers a sync.Once so the same hook is not registered
-// twice in the same process.
-func InstallDefaultExitHook() {
-	initOnce.Do(func() { SetExitHook(FinaliseAll) })
 }
 
 // EncryptAndClose re-encrypts the Store's temp file back to

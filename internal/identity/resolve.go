@@ -22,7 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
+
 	"time"
 
 	"github.com/zalando/go-keyring"
@@ -178,7 +178,3 @@ func symvaultTimeout(opts SecretResolver) time.Duration {
 	}
 	return SymvaultTimeout
 }
-
-// var so unit tests can swap the subprocess invocation without
-// touching public API.
-var symvaultRunMu sync.Mutex

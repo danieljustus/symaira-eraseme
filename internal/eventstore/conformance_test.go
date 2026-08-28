@@ -96,7 +96,7 @@ func TestGoldenFixtureConformance(t *testing.T) {
 				t.Fatalf("RebuildState: %v", err)
 			}
 			got := compact(t, state)
-			want := compact(t, json.RawMessage(golden[idStr]))
+			want := compact(t, golden[idStr])
 			if string(got) != string(want) {
 				t.Errorf("projection mismatch for request %s\n got: %s\nwant: %s", idStr, got, want)
 			}
@@ -129,7 +129,7 @@ func TestUpsertStateMatchesGolden(t *testing.T) {
 		if err != nil {
 			t.Fatalf("UpsertState(%s): %v", idStr, err)
 		}
-		if string(compact(t, state)) != string(compact(t, json.RawMessage(golden[idStr]))) {
+		if string(compact(t, state)) != string(compact(t, golden[idStr])) {
 			t.Errorf("upserted state diverges from golden for request %s", idStr)
 		}
 	}

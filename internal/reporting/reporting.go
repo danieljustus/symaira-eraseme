@@ -686,7 +686,7 @@ func GenerateReport(data map[string]any, format string, now time.Time) (string, 
 	case "html":
 		return ExportHTML(data, now)
 	default:
-		return "", fmt.Errorf("Unsupported format: %s. Choose html, json, or csv.", strings.ToLower(format))
+		return "", fmt.Errorf("unsupported format: %s; choose html, json, or csv", strings.ToLower(format))
 	}
 }
 

@@ -209,11 +209,6 @@ func decodeAndValidate(d *doc) (Broker, error) {
 			return Broker{}, verr("opt_out[%d]: %v", i, err)
 		}
 	}
-	if b.Verification != nil {
-		// Only field presence is enforced by the struct; unknown keys inside
-		// verification require strict sub-decoding which the inline map cannot
-		// express — enforce via KnownFields(true) re-decode below.
-	}
 	if b.Status != "" && !statuses[b.Status] {
 		return Broker{}, verr("status %q is not in the closed enum", b.Status)
 	}

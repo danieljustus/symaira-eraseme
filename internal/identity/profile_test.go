@@ -88,7 +88,8 @@ func TestWrongKeyFails(t *testing.T) {
 // TestHashProfileDeterministic.
 func TestHashProfileDeterministic(t *testing.T) {
 	p := &Profile{FullName: "X", EmailAddresses: []string{"a@b.example.com"}}
-	if HashProfile(p) != HashProfile(p) {
+	first := HashProfile(p)
+	if first != HashProfile(p) {
 		t.Error("hash not deterministic")
 	}
 }

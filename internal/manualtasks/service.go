@@ -120,10 +120,6 @@ func HandleCleanup(dryRun bool) (Result, error) {
 	} else {
 		data["message"] = fmt.Sprintf("Removed %d artifact(s) from %s.", result.Removed, dir)
 	}
-	if result.Removed == 0 && result.Skipped == 0 {
-		// Match the normal Python result shape; the missing-directory wording
-		// is only needed when the directory itself does not exist.
-	}
 	return Result{Success: true, Data: data}, nil
 }
 
