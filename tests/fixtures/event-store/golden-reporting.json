@@ -1,0 +1,478 @@
+{
+  "calendar": {
+    "as_of": "2026-08-06T12:00:00+00:00",
+    "horizon_until": "2026-09-03T12:00:00+00:00",
+    "horizon_weeks": 4,
+    "schema_version": 1,
+    "scope": {
+      "campaign_id": "all"
+    },
+    "totals": {
+      "entries": 1,
+      "overdue": 1,
+      "weeks_with_actions": 1
+    },
+    "weeks": [
+      {
+        "entries": [
+          {
+            "broker_id": "broker-b",
+            "campaign_id": "new",
+            "current_status": "OVERDUE",
+            "days_from_now": -2,
+            "deadline_at": "2026-08-03T09:00:00+00:00",
+            "escalation_level": 2,
+            "jurisdiction": "CCPA",
+            "marker": "next_action",
+            "marker_at": "2026-08-05T09:00:00+00:00",
+            "next_action_at": "2026-08-05T09:00:00+00:00",
+            "overdue": true,
+            "reminders_sent": 2,
+            "request_id": 2
+          }
+        ],
+        "week": "2026-W32"
+      }
+    ]
+  },
+  "campaign_status": {
+    "as_of": "2026-08-06T12:00:00+00:00",
+    "by_channel": {
+      "email": 2,
+      "web_form": 1
+    },
+    "by_status": {
+      "CONFIRMED": 1,
+      "OVERDUE": 1,
+      "REJECTED_FINAL": 1
+    },
+    "escalation": {
+      "dpa_pending": 1,
+      "none": 2,
+      "reminder": 0
+    },
+    "schema_version": 1,
+    "scope": {
+      "campaign_id": "all"
+    },
+    "totals": {
+      "open": 1,
+      "requests": 3,
+      "resolved": 2
+    },
+    "upcoming": {
+      "deadline_due_within_30d": 0,
+      "deadline_due_within_7d": 0,
+      "overdue": 1,
+      "tick_actions_ready": 1
+    }
+  },
+  "dashboard": {
+    "awaiting_ack": 0,
+    "awaiting_response": 0,
+    "broker_status": [
+      {
+        "broker_id": "broker-a",
+        "confirmed": 1,
+        "overdue": 0,
+        "pending": 0,
+        "rejected": 1,
+        "total": 2
+      },
+      {
+        "broker_id": "broker-b",
+        "confirmed": 0,
+        "overdue": 1,
+        "pending": 0,
+        "rejected": 0,
+        "total": 1
+      }
+    ],
+    "campaigns": [
+      {
+        "awaiting_ack": 0,
+        "awaiting_response": 0,
+        "confirmed": 1,
+        "created_at": "2026-08-02T08:00:00+00:00",
+        "id": "new",
+        "kind": "initial",
+        "overdue": 1,
+        "planned": 0,
+        "rejected": 0,
+        "requests": [
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-a",
+            "campaign_id": "new",
+            "channel": "email",
+            "created_at": "2026-08-02T08:00:00+00:00",
+            "current_status": "CONFIRMED",
+            "deadline_at": "2026-09-01T08:00:00+00:00",
+            "escalation_level": 0,
+            "id": 1,
+            "jurisdiction": "GDPR",
+            "last_event_at": "2026-08-04T08:00:00+00:00",
+            "reminders_sent": 1,
+            "resolved_at": "2026-08-04T08:00:00+00:00",
+            "sent_at": "2026-08-02T08:00:00+00:00",
+            "template_id": "gdpr"
+          },
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-b",
+            "campaign_id": "new",
+            "channel": "web_form",
+            "created_at": "2026-08-02T09:00:00+00:00",
+            "current_status": "OVERDUE",
+            "deadline_at": "2026-08-03T09:00:00+00:00",
+            "escalation_level": 2,
+            "id": 2,
+            "jurisdiction": "CCPA",
+            "last_event_at": "2026-08-05T09:00:00+00:00",
+            "reminders_sent": 2,
+            "resolved_at": null,
+            "sent_at": "2026-08-02T09:00:00+00:00",
+            "template_id": "ccpa"
+          }
+        ],
+        "sent": 0,
+        "total": 2
+      },
+      {
+        "awaiting_ack": 0,
+        "awaiting_response": 0,
+        "confirmed": 0,
+        "created_at": "2026-07-01T08:00:00+00:00",
+        "id": "old",
+        "kind": "initial",
+        "overdue": 0,
+        "planned": 0,
+        "rejected": 1,
+        "requests": [
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-a",
+            "campaign_id": "old",
+            "channel": "email",
+            "created_at": "2026-07-01T08:00:00+00:00",
+            "current_status": "REJECTED_FINAL",
+            "deadline_at": "2026-07-31T08:00:00+00:00",
+            "escalation_level": 0,
+            "id": 3,
+            "jurisdiction": "GDPR",
+            "last_event_at": "2026-07-03T08:00:00+00:00",
+            "reminders_sent": 0,
+            "resolved_at": "2026-07-03T08:00:00+00:00",
+            "sent_at": "2026-07-01T08:00:00+00:00",
+            "template_id": "gdpr"
+          }
+        ],
+        "sent": 0,
+        "total": 1
+      }
+    ],
+    "confirmed": 1,
+    "generated_at": "2026-08-06T12:00:00+00:00",
+    "overdue": 1,
+    "planned": 0,
+    "recent_events": [
+      {
+        "broker_id": "broker-b",
+        "event_type": "DEADLINE_REACHED",
+        "id": 4,
+        "occurred_at": "2026-08-05T09:00:00+00:00",
+        "request_id": 2,
+        "source": "scheduler"
+      },
+      {
+        "broker_id": "broker-a",
+        "event_type": "CONFIRMED",
+        "id": 2,
+        "occurred_at": "2026-08-04T08:00:00+00:00",
+        "request_id": 1,
+        "source": "inbox"
+      },
+      {
+        "broker_id": "broker-b",
+        "event_type": "SENT",
+        "id": 3,
+        "occurred_at": "2026-08-02T09:00:00+00:00",
+        "request_id": 2,
+        "source": "system"
+      },
+      {
+        "broker_id": "broker-a",
+        "event_type": "SENT",
+        "id": 1,
+        "occurred_at": "2026-08-02T08:00:00+00:00",
+        "request_id": 1,
+        "source": "system"
+      },
+      {
+        "broker_id": "broker-a",
+        "event_type": "REJECTED_FINAL",
+        "id": 6,
+        "occurred_at": "2026-07-03T08:00:00+00:00",
+        "request_id": 3,
+        "source": "inbox"
+      },
+      {
+        "broker_id": "broker-a",
+        "event_type": "SENT",
+        "id": 5,
+        "occurred_at": "2026-07-01T08:00:00+00:00",
+        "request_id": 3,
+        "source": "system"
+      }
+    ],
+    "rejected": 1,
+    "sent": 0,
+    "total_requests": 3
+  },
+  "report": {
+    "broker_leaderboard": [
+      {
+        "avg_response_time_days": 2.0,
+        "broker_id": "broker-a",
+        "confirmed": 1,
+        "overdue": 0,
+        "pending": 0,
+        "rejected": 1,
+        "success_rate": 50.0,
+        "total": 2
+      },
+      {
+        "avg_response_time_days": null,
+        "broker_id": "broker-b",
+        "confirmed": 0,
+        "overdue": 1,
+        "pending": 0,
+        "rejected": 0,
+        "success_rate": 0.0,
+        "total": 1
+      }
+    ],
+    "campaigns": [
+      {
+        "avg_response_time_days": 2.0,
+        "awaiting_ack": 0,
+        "awaiting_response": 0,
+        "campaign_id": "new",
+        "confirmation_rate": 50.0,
+        "confirmed": 1,
+        "created_at": "2026-08-02T08:00:00+00:00",
+        "kind": "initial",
+        "overdue": 1,
+        "planned": 0,
+        "rejected": 0,
+        "rejection_rate": 0.0,
+        "requests": [
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-a",
+            "campaign_id": "new",
+            "channel": "email",
+            "created_at": "2026-08-02T08:00:00+00:00",
+            "current_status": "CONFIRMED",
+            "deadline_at": "2026-09-01T08:00:00+00:00",
+            "escalation_level": 0,
+            "events": [
+              {
+                "event_type": "SENT",
+                "id": 1,
+                "occurred_at": "2026-08-02T08:00:00+00:00",
+                "request_id": 1,
+                "source": "system"
+              },
+              {
+                "event_type": "CONFIRMED",
+                "id": 2,
+                "occurred_at": "2026-08-04T08:00:00+00:00",
+                "request_id": 1,
+                "source": "inbox"
+              }
+            ],
+            "id": 1,
+            "jurisdiction": "GDPR",
+            "reminders_sent": 1,
+            "resolved_at": "2026-08-04T08:00:00+00:00",
+            "sent_at": "2026-08-02T08:00:00+00:00",
+            "template_id": "gdpr"
+          },
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-b",
+            "campaign_id": "new",
+            "channel": "web_form",
+            "created_at": "2026-08-02T09:00:00+00:00",
+            "current_status": "OVERDUE",
+            "deadline_at": "2026-08-03T09:00:00+00:00",
+            "escalation_level": 2,
+            "events": [
+              {
+                "event_type": "SENT",
+                "id": 3,
+                "occurred_at": "2026-08-02T09:00:00+00:00",
+                "request_id": 2,
+                "source": "system"
+              },
+              {
+                "event_type": "DEADLINE_REACHED",
+                "id": 4,
+                "occurred_at": "2026-08-05T09:00:00+00:00",
+                "request_id": 2,
+                "source": "scheduler"
+              }
+            ],
+            "id": 2,
+            "jurisdiction": "CCPA",
+            "reminders_sent": 2,
+            "resolved_at": null,
+            "sent_at": "2026-08-02T09:00:00+00:00",
+            "template_id": "ccpa"
+          }
+        ],
+        "sent": 0,
+        "status_counts": {
+          "CONFIRMED": 1,
+          "OVERDUE": 1
+        },
+        "total": 2,
+        "total_reminders_sent": 3
+      },
+      {
+        "avg_response_time_days": 2.0,
+        "awaiting_ack": 0,
+        "awaiting_response": 0,
+        "campaign_id": "old",
+        "confirmation_rate": 0.0,
+        "confirmed": 0,
+        "created_at": "2026-07-01T08:00:00+00:00",
+        "kind": "initial",
+        "overdue": 0,
+        "planned": 0,
+        "rejected": 1,
+        "rejection_rate": 100.0,
+        "requests": [
+          {
+            "acknowledged_at": null,
+            "broker_id": "broker-a",
+            "campaign_id": "old",
+            "channel": "email",
+            "created_at": "2026-07-01T08:00:00+00:00",
+            "current_status": "REJECTED_FINAL",
+            "deadline_at": "2026-07-31T08:00:00+00:00",
+            "escalation_level": 0,
+            "events": [
+              {
+                "event_type": "SENT",
+                "id": 5,
+                "occurred_at": "2026-07-01T08:00:00+00:00",
+                "request_id": 3,
+                "source": "system"
+              },
+              {
+                "event_type": "REJECTED_FINAL",
+                "id": 6,
+                "occurred_at": "2026-07-03T08:00:00+00:00",
+                "request_id": 3,
+                "source": "inbox"
+              }
+            ],
+            "id": 3,
+            "jurisdiction": "GDPR",
+            "reminders_sent": 0,
+            "resolved_at": "2026-07-03T08:00:00+00:00",
+            "sent_at": "2026-07-01T08:00:00+00:00",
+            "template_id": "gdpr"
+          }
+        ],
+        "sent": 0,
+        "status_counts": {
+          "REJECTED_FINAL": 1
+        },
+        "total": 1,
+        "total_reminders_sent": 0
+      }
+    ],
+    "generated_at": "2026-08-06T12:00:00+00:00",
+    "historical_comparison": {
+      "avg_response_time_change": 0.0,
+      "confirmation_rate_change": 50.0,
+      "latest_campaign": "new",
+      "previous_campaign": "old",
+      "rejection_rate_change": -100.0,
+      "requests_change": 1
+    },
+    "jurisdiction_stats": [
+      {
+        "confirmation_rate": 50.0,
+        "confirmed": 1,
+        "jurisdiction": "GDPR",
+        "overdue": 0,
+        "rejected": 1,
+        "total": 2
+      },
+      {
+        "confirmation_rate": 0.0,
+        "confirmed": 0,
+        "jurisdiction": "CCPA",
+        "overdue": 1,
+        "rejected": 0,
+        "total": 1
+      }
+    ],
+    "status_breakdown": {
+      "CONFIRMED": 1,
+      "OVERDUE": 1,
+      "REJECTED_FINAL": 1
+    },
+    "success_metrics": {
+      "avg_response_time_days": 2.0,
+      "median_response_time_days": 2.0,
+      "overall_confirmation_rate": 33.3,
+      "overall_rejection_rate": 33.3,
+      "overdue_rate": 33.3,
+      "total_requests": 3
+    },
+    "timeline": [
+      {
+        "date": "2026-07-01",
+        "events": {
+          "SENT": 1
+        },
+        "total_events": 1
+      },
+      {
+        "date": "2026-07-03",
+        "events": {
+          "REJECTED_FINAL": 1
+        },
+        "total_events": 1
+      },
+      {
+        "date": "2026-08-02",
+        "events": {
+          "SENT": 2
+        },
+        "total_events": 2
+      },
+      {
+        "date": "2026-08-04",
+        "events": {
+          "CONFIRMED": 1
+        },
+        "total_events": 1
+      },
+      {
+        "date": "2026-08-05",
+        "events": {
+          "DEADLINE_REACHED": 1
+        },
+        "total_events": 1
+      }
+    ],
+    "total_campaigns": 2,
+    "total_requests": 3
+  }
+}
