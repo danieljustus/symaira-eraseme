@@ -247,6 +247,30 @@ func (s *Store) ensureManualTaskSchema() error {
 			return fmt.Errorf("eventstore: manual task schema exec %q: %w", firstLine(q), err)
 		}
 	}
+	return s.ensureReplySchema()
+}
+
+func (s *Store) ensureReplySchema() error {
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS inbox_replies (
+			id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER REFERENCES removal_requests(id),
+			message_id TEXT UNIQUE NOT NULL, thread_id TEXT, received_at TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+			from_addr TEXT, subject TEXT, snippet TEXT, classified_as TEXT,
+			classifier_confidence REAL, llm_summary TEXT
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_inbox_replies_request ON inbox_replies(request_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_inbox_replies_classified ON inbox_replies(classified_as)`,
+		`CREATE TABLE IF NOT EXISTS reply_drafts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT, reply_id INTEGER NOT NULL REFERENCES inbox_replies(id),
+			request_id INTEGER REFERENCES removal_requests(id), draft_body TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), sent_at TIMESTAMP, account TEXT
+		)`,
+	}
+	for _, q := range stmts {
+		if _, err := s.db.Exec(q); err != nil {
+			return fmt.Errorf("eventstore: reply schema exec %q: %w", firstLine(q), err)
+		}
+	}
 	return nil
 }
 
