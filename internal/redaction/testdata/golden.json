@@ -1,0 +1,11 @@
+[
+  {"name":"email","input":"Contact: jane.doe@example.com","expected":"Contact: j******e@e*.com"},
+  {"name":"phone","input":"Call 555-123-4567 anytime","expected":"Call ***-***-4567 anytime"},
+  {"name":"ssn","input":"SSN: 123-45-6789 on file","expected":"SSN: ***-**-**** on file"},
+  {"name":"iban","input":"IBAN: DE89370400440532013000 for payment","expected":"IBAN: DE********************3000 for payment"},
+  {"name":"german-id","input":"Personalausweis: L12345678 erfasst","expected":"Personalausweis: *******78 erfasst"},
+  {"name":"french-id","input":"NIR: 185017510812342 is the SSN","expected":"NIR: ***342 is the SSN"},
+  {"name":"spanish-id","input":"DNI: 12345678Z registrado","expected":"DNI: ****-****-Z registrado"},
+  {"name":"passport","input":"Passport #: AB123456 was issued","expected":"Passport #: ******56 was issued"},
+  {"name":"passport-without-keyword","input":"Tracking code: AB123456 for shipment","expected":"Tracking code: AB123456 for shipment"}
+]
