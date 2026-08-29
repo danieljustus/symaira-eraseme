@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	_ "github.com/danieljustus/symaira-eraseme"
 	"github.com/danieljustus/symaira-eraseme/internal/campaign"
 	"github.com/danieljustus/symaira-eraseme/internal/deadlines"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
