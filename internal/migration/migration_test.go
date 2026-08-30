@@ -248,6 +248,52 @@ func Test728RejectsNestedDestinationBeforeMutation(t *testing.T) {
 	}
 }
 
+func Test728RejectsBackupOverlappingSeparateConfigRoot(t *testing.T) {
+	source := t.TempDir()
+	configSource := t.TempDir()
+	destination := filepath.Join(t.TempDir(), "destination")
+	backup := filepath.Join(configSource, "backup")
+	writeFixture(t, filepath.Join(source, "symeraseme.db"), "synthetic db")
+	writeFixture(t, filepath.Join(configSource, "config.toml"), "[app]\nfixture = true\n")
+
+	_, err := Run(context.Background(), Options{
+		SourceRoot: source, DestinationRoot: destination,
+		SourceConfigRoot: configSource, BackupDir: backup,
+		Platform: scheduler.PlatformCron,
+	})
+	if err == nil || !strings.Contains(err.Error(), "backup directory must be outside") {
+		t.Fatalf("overlapping backup was accepted: %v", err)
+	}
+	if exists(destination) || exists(backup) {
+		t.Fatalf("invalid backup path caused mutation: destination=%v backup=%v", exists(destination), exists(backup))
+	}
+}
+
+func Test728RejectsSymlinkedSchedulerDestination(t *testing.T) {
+	source := t.TempDir()
+	destination := filepath.Join(t.TempDir(), "destination")
+	backup := filepath.Join(t.TempDir(), "backup")
+	outside := t.TempDir()
+	writeFixture(t, filepath.Join(source, "schedules", "symeraseme-tick.sh"), "#!/bin/sh\n/usr/bin/python3 -m symeraseme tick\n")
+	if err := os.MkdirAll(destination, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(destination, "schedules")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	_, err := Run(context.Background(), Options{
+		SourceRoot: source, DestinationRoot: destination, BackupDir: backup,
+		Platform: scheduler.PlatformCron, BinaryPath: "/opt/symeraseme",
+	})
+	if err == nil || !strings.Contains(err.Error(), "destination path is unsafe") {
+		t.Fatalf("symlinked scheduler destination was accepted: %v", err)
+	}
+	if exists(filepath.Join(outside, "symeraseme-tick.sh")) {
+		t.Fatal("migration wrote through the scheduler destination symlink")
+	}
+}
+
 func writeFixture(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

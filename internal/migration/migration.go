@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -154,6 +155,9 @@ func Detect(ctx context.Context, opts Options) (Detection, error) {
 	}
 	configSource, configDestination, err := configRoots(opts, source, dest)
 	if err != nil {
+		return Detection{}, err
+	}
+	if err := validateMigrationPaths(opts, source, dest, configSource, configDestination); err != nil {
 		return Detection{}, err
 	}
 	platform := opts.Platform
@@ -335,7 +339,7 @@ func Run(ctx context.Context, opts Options) (*Report, error) {
 		return nil, err
 	}
 	opts.SourceRoot, opts.DestinationRoot = source, destination
-	configSource, _, err := configRoots(opts, source, destination)
+	configSource, configDestination, err := configRoots(opts, source, destination)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +381,17 @@ func Run(ctx context.Context, opts Options) (*Report, error) {
 			return report, fmt.Errorf("resolve backup directory: %w", err)
 		}
 	}
-	if err := validateBackupDir(backupDir, source, destination); err != nil {
+	backupRoots := []string{source, destination, configSource, configDestination}
+	if opts.SchedulerSource != "" {
+		backupRoots = append(backupRoots, opts.SchedulerSource)
+	}
+	if opts.SchedulerDest != "" {
+		backupRoots = append(backupRoots, opts.SchedulerDest)
+	}
+	if nativeRoot, _ := nativeSchedulerPaths(opts.HomeDir, opts.Platform); nativeRoot != "" {
+		backupRoots = append(backupRoots, nativeRoot)
+	}
+	if err := validateBackupDir(backupDir, backupRoots...); err != nil {
 		return report, err
 	}
 	if err := ensureBackup(backupDir, source, []string{configSource}, detection.Artifacts); err != nil {
@@ -510,6 +524,12 @@ func validateRoots(source, destination string) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("resolve destination directory: %w", err)
 	}
+	if err := rejectSymlinkComponents(source); err != nil {
+		return "", "", fmt.Errorf("source path is unsafe: %w", err)
+	}
+	if err := rejectSymlinkComponents(destination); err != nil {
+		return "", "", fmt.Errorf("destination path is unsafe: %w", err)
+	}
 	info, err := os.Lstat(source)
 	if err != nil {
 		return "", "", fmt.Errorf("stat source directory: %w", err)
@@ -574,14 +594,111 @@ func validateAuxiliaryPaths(opts Options) error {
 	return nil
 }
 
-func validateBackupDir(backup, source, destination string) error {
-	if info, err := os.Lstat(backup); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		return errors.New("backup directory must not be a symlink")
+func validateMigrationPaths(opts Options, source, destination, configSource, configDestination string) error {
+	if err := rejectSymlinkComponents(source); err != nil {
+		return fmt.Errorf("source path is unsafe: %w", err)
 	}
-	if backup == source || backup == destination || pathWithin(source, backup) || pathWithin(destination, backup) {
-		return errors.New("backup directory must be outside source and destination directories")
+	if err := rejectSymlinkComponents(destination); err != nil {
+		return fmt.Errorf("destination path is unsafe: %w", err)
+	}
+	for label, path := range map[string]string{
+		"source config":         configSource,
+		"destination config":    configDestination,
+		"scheduler source":      opts.SchedulerSource,
+		"scheduler destination": opts.SchedulerDest,
+		"home":                  opts.HomeDir,
+	} {
+		if path == "" {
+			continue
+		}
+		if err := validateOptionalDirectoryPath(label, path); err != nil {
+			return err
+		}
+	}
+	if configSource != source && pathsOverlap(configSource, destination) {
+		return errors.New("source config directory must not overlap destination")
+	}
+	if configDestination != destination && pathsOverlap(configDestination, source) {
+		return errors.New("destination config directory must not overlap source")
 	}
 	return nil
+}
+
+func validateOptionalDirectoryPath(label, path string) error {
+	if err := rejectSymlinkComponents(path); err != nil {
+		return fmt.Errorf("%s path is unsafe: %w", label, err)
+	}
+	info, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect %s directory: %w", label, err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s must be a real directory", label)
+	}
+	return nil
+}
+
+func validateBackupDir(backup string, roots ...string) error {
+	if err := rejectSymlinkComponents(backup); err != nil {
+		return fmt.Errorf("backup directory is unsafe: %w", err)
+	}
+	for _, root := range roots {
+		if root != "" && pathsOverlap(root, backup) {
+			return errors.New("backup directory must be outside all migration source and destination directories")
+		}
+	}
+	return nil
+}
+
+func pathsOverlap(left, right string) bool {
+	return left == right || pathWithin(left, right) || pathWithin(right, left)
+}
+
+func rejectSymlinkComponents(path string) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	volume := filepath.VolumeName(abs)
+	current := volume + string(filepath.Separator)
+	remainder := strings.TrimPrefix(abs, current)
+	if remainder == abs && volume != "" {
+		current = volume
+		remainder = strings.TrimPrefix(abs, volume)
+		remainder = strings.TrimPrefix(remainder, string(filepath.Separator))
+	}
+	for index, component := range strings.Split(remainder, string(filepath.Separator)) {
+		if component == "" {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 && (index > 0 || !isAllowedSystemSymlink(current)) {
+			return fmt.Errorf("symlink component: %s", current)
+		}
+	}
+	return nil
+}
+
+func isAllowedSystemSymlink(path string) bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	switch filepath.Clean(path) {
+	case "/etc", "/private", "/tmp", "/var":
+		return true
+	default:
+		return false
+	}
 }
 
 func pathWithin(root, candidate string) bool {
@@ -724,6 +841,9 @@ func copyTree(source, destination string) error {
 }
 
 func copyOne(source, destination string) error {
+	if err := rejectSymlinkComponents(source); err != nil {
+		return fmt.Errorf("source path is unsafe: %w", err)
+	}
 	info, err := os.Lstat(source)
 	if err != nil {
 		return err
@@ -747,6 +867,9 @@ func writeState(path string, st state) error {
 }
 
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
+	if err := rejectSymlinkComponents(path); err != nil {
+		return fmt.Errorf("destination path is unsafe: %w", err)
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
