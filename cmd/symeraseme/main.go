@@ -13,6 +13,7 @@ import (
 
 	"github.com/danieljustus/symaira-corekit/logkit"
 
+	"github.com/danieljustus/symaira-eraseme/internal/migration"
 	"github.com/danieljustus/symaira-eraseme/internal/version"
 )
 
@@ -31,6 +32,7 @@ func newRootCommand() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.AddCommand(newVersionCommand())
+	root.AddCommand(migration.NewCommand())
 	return root
 }
 
