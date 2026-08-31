@@ -8,18 +8,17 @@ cd "$(dirname "$0")/.."
 # target names stay unchanged.
 APP_NAME="Symaira EraseMe"
 
-# Version for Info.plist and the DMG filename: prefer the git tag that
-# triggered the release workflow (v0.10.6 → 0.10.6), fall back to the
-# version in pyproject.toml for local builds.
+# Version for Info.plist and the DMG filename. Release workflows pass VERSION
+# explicitly; local tagged builds use the exact Git tag.
 VERSION="${VERSION:-}"
 if [ -z "$VERSION" ]; then
-    VERSION="$(git describe --exact-match --tags 2>/dev/null | sed 's/^v//' || true)"
+    TAG="$(git describe --exact-match --tags 2>/dev/null || true)"
+    case "$TAG" in
+        v*) VERSION="${TAG#v}" ;;
+    esac
 fi
 if [ -z "$VERSION" ]; then
-    VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
-fi
-if [ -z "$VERSION" ]; then
-    echo "Error: could not determine version (no tag, no pyproject.toml version)." >&2
+    echo "Error: set VERSION or run from an exact release tag." >&2
     exit 1
 fi
 

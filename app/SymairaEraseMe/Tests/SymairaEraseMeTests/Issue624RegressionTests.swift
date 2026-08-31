@@ -11,7 +11,7 @@ final class Issue624RegressionTests: XCTestCase {
         XCTAssertEqual(
             ServerManager.defaultDataDir,
             "~/.local/share/symeraseme",
-            "must match src/symeraseme/core/config.py data_dir default"
+            "Go config data_dir default must stay aligned with the app contract"
         )
     }
 

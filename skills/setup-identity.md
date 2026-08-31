@@ -4,7 +4,7 @@ Guide an AI agent or user through creating and managing their identity vault.
 
 ## Prerequisites
 
-- Symaira EraseMe installed (`uv sync` complete)
+- Go binary `symeraseme` is on PATH
 - No existing identity profile (run `symeraseme show-profile` to check)
 
 ## Creating an identity profile
@@ -84,8 +84,8 @@ A: No. The system supports one identity vault per machine. Use different
    machines for different identities, or manually backup/restore the vault file.
 
 **Q: How is my data stored?**
-A: Encrypted at rest using AES-256 via the `cryptography` library. The
-   encryption key is stored in the system keyring.
+A: Encrypted at rest using the Go event store's AES-256-GCM envelope. The
+   key is resolved through the configured secure secret provider.
 
 **Q: What if I mistype my name?**
 A: Re-run `init-profile` with the correct information. It overwrites the
@@ -93,9 +93,7 @@ A: Re-run `init-profile` with the correct information. It overwrites the
 
 ## Secrets from Symaira Vault
 
-Symaira EraseMe supports `vault://` URIs for all credentials. Instead of
-storing API keys and passwords in environment variables, reference them
-from [Symaira Vault](https://github.com/danieljustus/symaira-vault):
+Symaira EraseMe supports canonical `symvault://` URIs for credentials.
 
 ```bash
 # Store secrets in Symaira Vault
@@ -107,11 +105,9 @@ symvault set email/imap-password "your-imap-password"
 Then set environment variables to point at the vault:
 
 ```bash
-export ANTHROPIC_API_KEY="vault://anthropic/prod-key"
-export CAPSOLVER_API_KEY="vault://captcha/capsolver"
-export IMAP_PASSWORD="vault://email/imap-password"
+export ANTHROPIC_API_KEY="symvault://anthropic/prod-key"
+export CAPSOLVER_API_KEY="symvault://captcha/capsolver"
+export IMAP_PASSWORD="symvault://email/imap-password"
 ```
 
-**Resolution order**: vault:// → env var → system keyring.
-If `symvault` is not installed, the plain-text env var value is used.
-Secrets are never logged.
+**Resolution order**: `symvault://` → environment → platform secure store.

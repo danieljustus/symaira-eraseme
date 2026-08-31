@@ -6,8 +6,7 @@ removals using Symaira EraseMe.
 ## Prerequisites
 
 - [OpenClaw](https://github.com/openclaw/openclaw) installed
-- Symaira EraseMe installed (`uv sync`)
-- Python 3.11+
+- Symaira EraseMe static binary installed and available as `symeraseme`
 
 ## Setup
 

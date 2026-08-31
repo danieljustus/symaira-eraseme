@@ -83,8 +83,8 @@ export SYMERASEME_DATA_DIR="$HOME/.symeraseme"
 | Issue | Fix |
 |-------|-----|
 | Skill not listed | Run `hermes skills reload` or restart Hermes |
-| Commands not found | Ensure `symeraseme` is in PATH: `pip install symeraseme` |
-| API key errors | Check `ANTHROPIC_API_KEY` is exported in environment |
+| Commands not found | Ensure `symeraseme` is on PATH (Homebrew or GitHub release archive) |
+| Provider errors | Check the configured shared LLM provider environment |
 
 ## Documentation
 

@@ -1,8 +1,7 @@
 name: Go CI
 
-# Second CI leg alongside the Python ci.yml. Both legs run on every PR:
-# the Python tree stays green for the whole milestone and the Go leg goes
-# red-to-green as port packages land (issue #710).
+# Go-only CI for the static symeraseme CLI. The macOS GUI is built and verified
+# by the tag-triggered release workflow.
 on:
   push:
     branches: [main]
@@ -29,7 +28,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.26.6'
   CGO_ENABLED: '0'
 
 jobs:

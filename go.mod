@@ -1,6 +1,6 @@
 module github.com/danieljustus/symaira-eraseme
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/danieljustus/symaira-corekit v0.16.2

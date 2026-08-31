@@ -13,7 +13,7 @@ This template ties all sub-skills together into a repeatable cycle.
 │    [review with user before executing]                         │
 ├─────────────────────────────────────────────────────────────────┤
 │ 2. EXECUTE                                                     │
-│    symeraseme plan execute --campaign <id> --batch-size 5     │
+│    symeraseme execute --campaign <id> --batch-size 5     │
 │    [consent required: --yes or grant token]                    │
 ├─────────────────────────────────────────────────────────────────┤
 │ 3. WAIT                                                        │
@@ -34,7 +34,7 @@ This template ties all sub-skills together into a repeatable cycle.
 │    COMPLETED → mark done                                       │
 ├─────────────────────────────────────────────────────────────────┤
 │ 7. TICK (daily)                                                │
-│    symeraseme plan tick                                        │
+│    symeraseme tick                                        │
 │    [handles deadlines, reminders, escalations]                 │
 ├─────────────────────────────────────────────────────────────────┤
 │ 8. RE-SCAN (quarterly)                                         │
@@ -80,7 +80,7 @@ This template ties all sub-skills together into a repeatable cycle.
 
 ### When to tick
 
-- Daily — run `plan tick` every morning
+- Daily — run `tick` every morning
 - Use `--dry-run` first to preview what will happen
 - Handles: deadline tracking, reminders, escalation to DPA complaints
 
@@ -101,14 +101,14 @@ Error: This command requires consent. Use --yes or grant a consent token.
 Fix:
 ```bash
 # Option 1: Interactive consent
-symeraseme plan execute --campaign initial
+symeraseme execute --campaign initial
 
 # Option 2: Non-interactive (automation)
-symeraseme plan execute --campaign initial --yes
+symeraseme execute --campaign initial --yes
 
 # Option 3: Consent token (for CI/automation)
 symeraseme grant execute --ttl 3600
-symeraseme plan execute --campaign initial --consent <token>
+symeraseme execute --campaign initial --consent <token>
 ```
 
 ### No identity profile
@@ -176,7 +176,7 @@ If a broker's website is unreachable:
 ### Claude Code
 
 - Skills auto-discovered from `.claude/skills/`
-- Use MCP server for file redaction: `symeraseme serve`
+- Use MCP server for file redaction: `symeraseme mcp`
 - Session memory persists across conversations
 
 ### Hermes
@@ -213,7 +213,7 @@ symeraseme schedule status
 ```
 
 This sets up:
-- **Daily tick**: `symeraseme plan tick` at 09:00
+- **Daily tick**: `symeraseme tick` at 09:00
 - **Daily inbox poll**: `symeraseme poll-inbox` at 10:00
 - **Weekly report**: `symeraseme generate-report` on Mondays
 

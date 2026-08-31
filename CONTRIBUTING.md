@@ -1,172 +1,118 @@
 # Contributing to Symaira EraseMe
 
-## Quick Start
+## Quick start
 
-1. Fork the repository and create a feature branch:
+1. Clone the repository and create a feature branch.
+2. Build and verify the Go CLI:
+
    ```bash
-   git checkout -b feature/my-feature
+   make build
+   make test
+   make lint
+   make coverage
    ```
-2. Install dependencies: `uv sync`
-3. Run tests: `pytest`
-4. Run lints: `ruff check . && mypy src/symeraseme/`
-5. Open a pull request — use the PR template checklist.
 
----
+3. For the macOS GUI, use a full Xcode installation:
 
-## Adding a Data Broker (most impactful contribution)
+   ```bash
+   ./app/SymairaEraseMe/build.sh
+   ```
 
-Adding a broker lets Symaira EraseMe automatically file opt-out requests
-on behalf of users. No Python knowledge required — just a YAML file.
+4. Open a pull request with a focused change and the relevant issue reference.
 
-### Step 1 — Open an issue first (optional but helpful)
+The supported runtime is the static `symeraseme` binary. The macOS GUI is a
+Swift Package Manager application that starts the Go MCP server bundled in the
+release app. No external runtime is required for released artifacts.
 
-Use the **Add / Update Data Broker** issue template on GitHub. This lets
-maintainers flag duplicates and share research before you write the YAML.
-If you have all the details already, you can skip straight to a PR.
+## Adding a data broker
 
-### Step 2 — Create the YAML file
+Adding or updating a broker requires verified public evidence. No personal data
+or unverified opt-out endpoint belongs in the registry.
 
-Pick the right directory based on the broker's primary jurisdiction:
-
-| Directory | Laws covered | Examples |
-|-----------|-------------|---------|
-| `registry/brokers/us/` | CCPA, CPRA | Spokeo, BeenVerified, ZoomInfo |
-| `registry/brokers/eu/` | GDPR | SCHUFA, Creditreform, Criteo |
-| `registry/brokers/uk/` | UK GDPR | Experian UK, TransUnion UK |
-
-Name the file `<broker-slug>-<region>.yaml` (e.g. `radaris-us.yaml`).
-The `id` field in the YAML must match: `radaris-us`.
-
-Use `registry/brokers/eu/_example.yaml` as the reference template.
-The JSON schema is at `registry/schemas/broker.schema.json`.
-
-### Step 3 — Fill in the key fields
-
-**Minimum required fields:**
+### Required fields
 
 ```yaml
-id: example-broker-us          # unique, lowercase, hyphenated
+id: example-broker-us
 name: Example Broker Inc.
 website: https://example.com
-category: people-search         # see allowed values below
+category: people-search
 jurisdictions: [US]
 laws: [CCPA]
-priority: high                  # high / medium / low
+data_sensitivity: 3
+priority: medium
+status: active
 opt_out:
-  - type: email                 # or web_form
+  - type: email
     endpoint: privacy@example.com
     template: ccpa-deletion
-    required_fields: [full_name, email, address]
-    expected_response_days: 30
-verification:
-  ack_keywords: ["request received", "opt-out"]
+    locale: en
+    required_fields: [full_name, email]
+    expected_response_days: 45
 ```
 
-**Category values:** `people-search`, `background-check`, `marketing`,
-`credit`, `analytics`, `social-media`, `other`
+- Put the file under `registry/brokers/us/`, `registry/brokers/eu/`, or
+  `registry/brokers/uk/` according to its primary jurisdiction.
+- Name it `<broker-id>.yaml`; the `id` must equal the file stem.
+- Include a reliable `source` and verification keywords where available.
+- Keep one broker addition or update per pull request.
 
-### Step 4 — Finding the CAPTCHA site key
-
-If the opt-out form has a reCAPTCHA or hCaptcha, you need the live
-`data-sitekey` value — not a placeholder. Here's how to find it:
-
-1. Open the opt-out page in Chrome/Firefox.
-2. Right-click → **Inspect** → search the HTML for `data-sitekey`.
-3. Copy the full key (looks like `6Lc...XXXX`).
-4. Paste it into the `site_key` field of the `solve_captcha` step.
-
-If you cannot capture a live site key, set `disabled: true` on that
-`opt_out` entry and add a `notes:` block explaining what's missing.
-A partial entry is better than no entry — maintainers can complete it later.
-
-### Step 5 — Identity placeholders in form fields
-
-Web-form steps can reference identity fields with `${field_name}` syntax
-(e.g. `${full_name}`, `${email}`). If a referenced field is missing from the
-user's profile, the form runner aborts with an error listing the unresolved
-placeholders. Only reference fields that are guaranteed to exist for the
-broker's target jurisdiction.
-
-### Step 6 — Find the acknowledgement text
-
-After submitting a real opt-out (use a throwaway email), note the exact
-wording of the confirmation message. Add key phrases to `ack_keywords`.
-These are used by the automated triage engine to mark requests as resolved.
-
-### Step 7 — Validate
+Validate the embedded registry before opening the pull request:
 
 ```bash
-symeraseme registry validate registry/brokers/us/example-broker-us.yaml
+make build
+./symeraseme registry validate
 ```
 
-Or validate the whole registry:
+## Code contributions
 
-```bash
-symeraseme registry validate
-```
+- Go code must remain CGO-free (`CGO_ENABLED=0`) and compile on Linux, macOS,
+  and Windows for the supported architectures.
+- Use `gofmt`, `go vet`, and the configured `golangci-lint` checks.
+- Preserve the CLI and MCP contracts in `docs/mcp-contract.md`.
+- Keep secrets as references or environment configuration. Never log resolved
+  secret values or commit credentials.
+- Use the existing event-store and registry abstractions instead of adding
+  parallel storage or schema formats.
+- Swift changes must build with the full Xcode toolchain and keep the app's
+  `com.symaira.eraseme` bundle contract intact.
 
-### Step 8 — Open a pull request
+## Testing
 
-Use the PR template. Complete the **Registry Additions** table at the
-bottom. A maintainer will review the opt-out URL/email and merge.
+| Area | Command | Scope |
+|---|---|---|
+| Go unit tests | `make test` | All Go packages |
+| Go race tests | `make test-race` | All Go packages with the race detector |
+| Go coverage | `make coverage` | Exact 75% statement gate |
+| Go static checks | `make lint && make vet` | Formatting, lint, and vet |
+| CLI cross-build | `GOOS=windows GOARCH=amd64 go build ./cmd/symeraseme` | Platform compilation |
+| macOS GUI | `cd app/SymairaEraseMe && swift test` | Swift package tests |
+| macOS packaging | `VERSION=0.12.0 ./scripts/package-dmg.sh` | App bundle and DMG path |
 
----
+Do not weaken an assertion to make a test pass. When a test reveals a
+compatibility or byte-format mismatch, fix the implementation or document the
+intentional contract change.
 
-## Research-Only Contributions
+## Pull requests
 
-Not sure about the form fields or CAPTCHA key? Open an issue using the
-**Add / Update Data Broker** template and fill in what you know. Mark
-unknown fields with `NEEDS_RESEARCH`. Someone else can complete the rest.
+PR descriptions should state:
 
----
+- what behavior changed and why;
+- which issue is addressed;
+- the exact local checks run;
+- any platform-specific or signing limitation.
 
-## Code Contributions
+Keep generated `dist/`, local coverage profiles, and build output out of the
+commit. GitHub Actions workflows must use pinned action SHAs and least-privilege
+permissions.
 
-### Code Style
+## Release changes
 
-- Python 3.11+ with type annotations.
-- Format with `ruff format`.
-- All CLI output must support `--output {text,json}`.
-- All commands return a non-zero exit code on failure for both text and JSON output.
-  `_render` is the single place that raises `typer.Exit(1)` for failed `CliResult` instances.
-- All models must use pydantic v2.
-- Default to no comments — only add one when the *why* is non-obvious.
-- Pin all GitHub Actions to a release tag or commit SHA (e.g. `uses: owner/action@v1.2.3`).
-  Dependabot is configured to propose upgrades automatically.
+Release configuration lives in `.goreleaser.yml` and
+`.github/workflows/release.yml`. GoReleaser produces static CLI archives; the
+Homebrew workflow writes `Formula/symeraseme.rb` from the exact published
+archives and checksums. The macOS job builds the versioned DMG and records
+whether Developer ID signing, notarization, and stapling were completed.
 
-### Testing
-
-| Suite | Location | Notes |
-|-------|----------|-------|
-| Unit tests | `tests/unit/` | No external dependencies |
-| Integration tests | `tests/integration/` | Not yet implemented |
-| Registry validation | `tests/smoke/test_broker_validation.py` | Schema + lint checks |
-
-Run everything: `pytest`
-
-Run only registry validation: `pytest tests/smoke/test_broker_validation.py`
-
----
-
-## Broker Registry at a Glance
-
-```
-registry/
-├── brokers/
-│   ├── us/          # CCPA/CPRA brokers
-│   ├── eu/          # GDPR brokers
-│   │   └── _example.yaml   # reference template
-│   └── uk/          # UK GDPR brokers
-├── laws/            # Law definitions
-├── schemas/
-│   └── broker.schema.json  # JSON Schema for YAML validation
-└── templates/       # Email opt-out templates (gdpr-art17, ccpa-deletion, …)
-```
-
----
-
-## Questions?
-
-Open a [Discussion](https://github.com/danieljustus/Symaira EraseMe/discussions)
-or comment on an existing issue. Security issues go to the
-[Security Policy](https://github.com/danieljustus/Symaira EraseMe/security/policy).
+Do not create or move a release tag from a feature branch. Use the repository's
+release gate and verify the GitHub release assets and Homebrew Formula after
+publication.

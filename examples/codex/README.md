@@ -83,7 +83,7 @@ export SYMERASEME_DATA_DIR="$HOME/.symeraseme"
 | Issue | Fix |
 |-------|-----|
 | Skill not found | Run `codex /skills reload` |
-| Command not found | `pip install symeraseme` or `uv pip install -e .` |
+| Command not found | Install `symeraseme` from Homebrew or GitHub Releases |
 | JSON parsing errors | Use `--output json` flag with symeraseme commands |
 
 ## Documentation

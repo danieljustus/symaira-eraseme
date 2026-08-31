@@ -6,8 +6,8 @@ skill bundle for automated data broker removal orchestration.
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
-- Symaira EraseMe installed (`uv sync`)
-- Python 3.11+
+- Symaira EraseMe installed (`symeraseme` on PATH)
+- Go CLI available (Homebrew or GitHub release archive)
 
 ## Setup
 
@@ -167,6 +167,6 @@ For direct tool access (advanced), add to `.claude/mcp.json`:
 | Issue | Fix |
 |-------|-----|
 | Skills not loading | Ensure `.claude/skills/symeraseme` is a valid symlink to `skills/` |
-| Command not found | Run `uv sync && uv pip install -e .` |
-| API key errors | Check `ANTHROPIC_API_KEY` is set in the environment |
+| Command not found | Install the static binary with `brew install danieljustus/tap/symeraseme` |
+| API key errors | Check the configured shared LLM provider environment |
 | IMAP connection fails | Use an app-specific password for Gmail/Outlook |

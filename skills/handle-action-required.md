@@ -7,8 +7,8 @@ rejections, and other action-required scenarios.
 
 - [Reply classified](triage-broker-replies.md) as `VERIFICATION_REQUIRED`,
   `REJECTED`, or `AUTO_CONFIRM`
-- `ANTHROPIC_API_KEY` set (for rebuttal generation)
-- Playwright installed (for auto-confirmation links)
+- LLM provider configured for the Go shared provider layer
+- `symaira-browse` available on PATH for automated confirmation links
 
 ## Scenario 1: Auto-confirmation links
 

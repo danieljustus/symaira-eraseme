@@ -77,8 +77,7 @@ struct CalendarView: View {
     }
 
     /// Human-readable label for an escalation category identifier returned
-    /// by the backend (`src/symeraseme/core/reports/data.py` escalation dict:
-    /// "none", "reminder", "dpa_pending"). Unknown identifiers fall back to
+    /// by the Go reporting backend. Unknown identifiers fall back to
     /// the raw key so the UI never crashes on a new backend category.
     static func escalationLabel(for key: String) -> String {
         switch key {

@@ -82,11 +82,8 @@ verification:
 ### 4. Validate the file
 
 ```bash
-# Install dependencies if needed
-pip install pyyaml jsonschema
-
-# Validate
-python scripts/registry_sync.py --validate-all
+# Validate the embedded registry with the Go CLI
+symeraseme registry validate
 ```
 
 ### 5. Create a Pull Request
@@ -117,8 +114,8 @@ If the broker exists but information is outdated:
 # Update only the changed fields
 # Add a note about what changed
 
-# Validate
-python scripts/registry_sync.py --validate-all
+# Validate the embedded registry with the Go CLI
+symeraseme registry validate
 
 # Commit with descriptive message
 git add registry/brokers/<jurisdiction>/<existing-id>.yaml
@@ -189,7 +186,7 @@ verification:
 EOF
 
 # 4. Validate
-python scripts/registry_sync.py --validate-all
+symeraseme registry validate
 
 # 5. Create PR
 git checkout -b add-broker-datamax
