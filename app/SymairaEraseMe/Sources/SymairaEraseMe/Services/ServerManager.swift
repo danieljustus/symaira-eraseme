@@ -183,7 +183,8 @@ final class ServerManager: ObservableObject {
     ///
     /// Discovery order:
     /// 1. User-configured Binary Path — always honoured when executable.
-    /// 2. The binary bundled in the app's Resources directory.
+    /// 2. The binary bundled in the app's Helpers directory (with a
+    ///    Resources fallback for older app bundles).
     /// 3. A sibling binary from the local Swift Package Manager build.
     /// 4. Homebrew/PATH, using BinaryLocator's strict check followed by the
     ///    app's safe Homebrew-compatible directory scan.
@@ -247,12 +248,16 @@ final class ServerManager: ObservableObject {
         return nil
     }
 
-    /// Return the bundled Go server when an app package contains an
-    /// executable named `symeraseme` in `Contents/Resources`.
+    /// Return the bundled Go server from the standard nested-code directory.
+    /// The Resources location remains a compatibility fallback for older apps.
     nonisolated static func bundledBinaryPath(resourceURL: URL?) -> String? {
         guard let resourceURL else { return nil }
-        let path = resourceURL.appendingPathComponent("symeraseme").path
-        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+        let contentsURL = resourceURL.deletingLastPathComponent()
+        let candidates = [
+            contentsURL.appendingPathComponent("Helpers/symeraseme").path,
+            resourceURL.appendingPathComponent("symeraseme").path,
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     /// Return the Go server produced next to the Swift executable by the
