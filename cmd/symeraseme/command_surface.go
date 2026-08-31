@@ -34,8 +34,6 @@ func addCommandSurface(root *cobra.Command) {
 		realManualTasksCommand(), realRedactFileCommand(), realPollInboxCommand(), realClassifyReplyCommand(),
 		realGenerateRebuttalCommand(), realAutoConfirmCommand(), realRunWebFormCommand(),
 	)
-	root.AddCommand(realScheduleCommand())
-
 }
 
 func commandGroup(name string) *cobra.Command {

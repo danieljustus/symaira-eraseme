@@ -39,6 +39,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(migration.NewCommand())
 	root.AddCommand(newMCPCommand())
 	root.AddCommand(newServeAlias())
+	root.AddCommand(newCompletionCommand())
 	return root
 }
 

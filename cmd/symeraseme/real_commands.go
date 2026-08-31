@@ -13,6 +13,7 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/campaign"
 	"github.com/danieljustus/symaira-eraseme/internal/deadlines"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
+	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/registry"
 	"github.com/danieljustus/symaira-eraseme/internal/reporting"
 )
@@ -50,6 +51,7 @@ func realPlanCommand() *cobra.Command {
 	plan := commandGroup("plan")
 	var campaignID, jurisdiction, law, priority, category, status, profilePath, notes string
 	var maxBrokers int
+	var includeInactive bool
 	create := &cobra.Command{Use: "create", Short: "Create a removal campaign plan", RunE: func(cmd *cobra.Command, _ []string) error {
 		if campaignID == "" {
 			return fmt.Errorf("--campaign is required")
@@ -63,7 +65,7 @@ func realPlanCommand() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		result, err := campaign.PlanCampaign(context.Background(), store, brokers, campaign.PlanOpts{CampaignID: campaignID, Jurisdiction: jurisdiction, Law: law, Priority: priority, Category: category, Status: status, MaxBrokers: maxBrokers, Notes: notes}, profilePath)
+		result, err := campaign.PlanCampaign(context.Background(), store, brokers, campaign.PlanOpts{CampaignID: campaignID, Jurisdiction: jurisdiction, Law: law, Priority: priority, Category: category, Status: status, IncludeInactive: includeInactive, MaxBrokers: maxBrokers, Notes: notes}, profilePath)
 		if err != nil {
 			return err
 		}
@@ -83,7 +85,8 @@ func realPlanCommand() *cobra.Command {
 	create.Flags().StringVar(&priority, "priority", "", "priority filter")
 	create.Flags().StringVar(&category, "category", "", "category filter")
 	create.Flags().StringVar(&status, "status", "active", "broker status filter")
-	create.Flags().IntVar(&maxBrokers, "max", 0, "maximum brokers")
+	create.Flags().IntVar(&maxBrokers, "max", 30, "maximum brokers")
+	create.Flags().BoolVar(&includeInactive, "include-inactive", false, "include inactive brokers")
 	create.Flags().StringVar(&profilePath, "profile", "", "identity profile path")
 	create.Flags().StringVar(&notes, "notes", "", "campaign notes")
 
@@ -113,6 +116,8 @@ func realPlanCommand() *cobra.Command {
 
 	var executeCampaignID string
 	var batchSize int
+	var executeAccount, consentToken, consentFile string
+	var executeDryRun bool
 	execute := &cobra.Command{Use: "execute", Short: "Execute planned requests", RunE: func(cmd *cobra.Command, _ []string) error {
 		if executeCampaignID == "" {
 			return fmt.Errorf("--campaign is required")
@@ -122,7 +127,21 @@ func realPlanCommand() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		result, err := campaign.ExecuteCampaign(context.Background(), store, executeCampaignID, campaign.ExecuteOpts{}, batchSize)
+		if !executeDryRun {
+			if err := identity.ConsentGate("execute", identity.ConsentOptions{
+				ConsentToken:      consentToken,
+				ConsentFile:       consentFile,
+				Interactive:       false,
+				ConsentEnvVar:     "SYMERASEME_CONSENT",
+				ConsentFileEnvVar: "SYMERASEME_CONSENT_FILE",
+			}); err != nil {
+				return err
+			}
+		}
+		result, err := campaign.ExecuteCampaign(context.Background(), store, executeCampaignID, campaign.ExecuteOpts{
+			Account: executeAccount,
+			DryRun:  executeDryRun,
+		}, batchSize)
 		if err != nil {
 			return err
 		}
@@ -138,6 +157,10 @@ func realPlanCommand() *cobra.Command {
 	}}
 	execute.Flags().StringVar(&executeCampaignID, "campaign", "", "campaign identifier")
 	execute.Flags().IntVar(&batchSize, "batch-size", 5, "maximum requests to execute")
+	execute.Flags().StringVar(&executeAccount, "account", "", "email account name")
+	execute.Flags().StringVar(&consentToken, "consent", "", "consent token for destructive execution")
+	execute.Flags().StringVar(&consentFile, "consent-file", "", "path to consent token file")
+	execute.Flags().BoolVar(&executeDryRun, "dry-run", false, "preview without sending")
 
 	plan.AddCommand(create, show, execute, planTickCommand(), planStatusCommand())
 	return plan
