@@ -35,20 +35,30 @@ fi
 echo "Building SymairaEraseMe in Release mode..."
 cd app/SymairaEraseMe
 swift build -c release
+SWIFT_BIN_PATH="$(swift build -c release --show-bin-path)"
 cd ../..
 
-BUILD_DIR="app/SymairaEraseMe/.build/release"
+BUILD_DIR="$SWIFT_BIN_PATH"
 STAGE_DIR="app/SymairaEraseMe/.build/dmg-stage"
 APP_BUNDLE="$STAGE_DIR/$APP_NAME.app"
 DMG_PATH="dist/Symaira-EraseMe-${VERSION}-macos.dmg"
+
+echo "Building the self-contained Go MCP server..."
+GO_BINARY="$BUILD_DIR/symeraseme"
+CGO_ENABLED=0 go build -trimpath \
+    -ldflags "-s -w -X main.versionValue=$VERSION" \
+    -o "$GO_BINARY" ./cmd/symeraseme
 
 echo "Creating App Bundle structure..."
 rm -rf "$STAGE_DIR"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-echo "Copying binary..."
+echo "Copying Swift and Go binaries..."
 cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+cp "$GO_BINARY" "$APP_BUNDLE/Contents/Resources/symeraseme"
+chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/Resources/symeraseme"
+test -x "$APP_BUNDLE/Contents/Resources/symeraseme"
 
 echo "Writing Info.plist..."
 cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"

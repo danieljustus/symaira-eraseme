@@ -9,7 +9,7 @@ import SymairaDaemonKit
 /// extra-directory list).
 private let homebrewBinDirectories = ["/opt/homebrew/bin", "/usr/local/bin"]
 
-/// Manages spawning/stopping the `symeraseme serve` subprocess.
+/// Manages spawning/stopping the `symeraseme mcp` subprocess.
 @MainActor
 final class ServerManager: ObservableObject {
     @Published var isRunning = false
@@ -137,10 +137,12 @@ final class ServerManager: ObservableObject {
         }
         let arguments = plan.arguments
 
-        // Set up environment
+        // Set up environment. Expand `~` once so the Go server and the
+        // Swift client address the same token/database directory.
+        let resolvedDataDir = dataDir.isEmpty ? nil : (dataDir as NSString).expandingTildeInPath
         var env = [String: String]()
-        if !dataDir.isEmpty {
-            env["SYMERASEME_DATA_DIR"] = dataDir
+        if let resolvedDataDir {
+            env["SYMERASEME_DATA_DIR"] = resolvedDataDir
         }
         if !anthropicKey.isEmpty {
             env["ANTHROPIC_API_KEY"] = anthropicKey
@@ -154,8 +156,8 @@ final class ServerManager: ObservableObject {
         // every request is rejected as unauthenticated while the UI blames
         // reachability. Assigned here (not just lazily at first access) so a
         // later Data Directory change takes effect without relaunching.
-        if !dataDir.isEmpty {
-            MCPClient.configuredDataDir = dataDir
+        if let resolvedDataDir {
+            MCPClient.configuredDataDir = resolvedDataDir
         }
 
         Task.detached { [supervisor, executable, arguments, env] in
@@ -179,65 +181,48 @@ final class ServerManager: ObservableObject {
         let refusals: [String]
     }
 
-    /// Resolve the executable and arguments for `symeraseme serve`.
+    /// Resolve the executable and arguments for `symeraseme mcp`.
     ///
     /// Discovery order:
     /// 1. User-configured Binary Path — always honoured when executable.
-    /// 2. The direct binary via `BinaryLocator` (strict directory-security
-    ///    check), then a relaxed scan of the Homebrew prefixes and PATH
-    ///    that tolerates group-writable directories owned by the current
-    ///    user (the stock Homebrew layout: `/opt/homebrew/bin` is mode 775
-    ///    owned by the installing user, which the strict locator rejects).
-    /// 3. `uv run symeraseme`.
-    /// 4. `python3`/`python -m symeraseme` — only after verifying the
-    ///    module actually imports, so a broken fallback never spawns blind.
+    /// 2. The binary bundled in the app's Resources directory.
+    /// 3. A sibling binary from the local Swift Package Manager build.
+    /// 4. Homebrew/PATH, using BinaryLocator's strict check followed by the
+    ///    app's safe Homebrew-compatible directory scan.
+    ///
+    /// There is deliberately no Python or `uv` fallback. The Go binary is
+    /// self-contained and is the only backend the Swift app supports after
+    /// the cutover.
     private func resolveLaunchPlan() -> LaunchPlan {
-        let serveArguments = ["serve", "--host", host, "--port", "\(port)"]
+        let mcpArguments = ["mcp", "--host", host, "--port", "\(port)"]
 
         // 1. User-configured path — unchanged, always honoured.
         if !binaryPath.isEmpty, FileManager.default.isExecutableFile(atPath: binaryPath) {
-            return LaunchPlan(executable: URL(fileURLWithPath: binaryPath), arguments: serveArguments, refusals: [])
+            return LaunchPlan(executable: URL(fileURLWithPath: binaryPath), arguments: mcpArguments, refusals: [])
+        }
+
+        // 2. A released app carries the matching Go server in Resources.
+        if let path = Self.bundledBinaryPath(resourceURL: Bundle.main.resourceURL) {
+            return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: mcpArguments, refusals: [])
+        }
+
+        // 3. The build script places a development Go binary next to the
+        //    Swift executable so `swift run` remains self-contained.
+        if let path = Self.developmentBinaryPath(executableURL: Bundle.main.executableURL) {
+            return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: mcpArguments, refusals: [])
         }
 
         var refusals: [String] = []
 
-        // 2. Direct binary: strict locator first, then the relaxed
+        // 4. Direct binary: strict locator first, then the relaxed
         //    Homebrew/PATH scan.
         if let path = findInPATH("symeraseme") {
-            return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: serveArguments, refusals: [])
+            return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: mcpArguments, refusals: [])
         }
-        // No usable binary: explain why the candidates we did find were
-        // refused instead of silently spawning a broken fallback.
         for directory in Self.scanDirectories() {
             if let diagnostic = Self.candidateRefusalDiagnostic(directory: directory, binaryName: "symeraseme") {
                 refusals.append(diagnostic)
             }
-        }
-
-        // 3. `uv run symeraseme` fallback. No import pre-check here: `uv
-        //    run` resolves the environment itself and a
-        //    `uv run python -c "import symeraseme"` probe would pay the
-        //    full environment-resolution cost on every start; its failures
-        //    surface in stderr.
-        if let uvPath = findInPATH("uv") {
-            return LaunchPlan(
-                executable: URL(fileURLWithPath: uvPath),
-                arguments: ["run", "symeraseme"] + serveArguments,
-                refusals: []
-            )
-        }
-
-        // 4. Python fallback — only when the module imports. This runs
-        //    only on the fallback path, so the happy path stays fast.
-        for python in [findInPATH("python3"), findInPATH("python")].compactMap({ $0 }) {
-            if Self.moduleImportable(python: python) {
-                return LaunchPlan(
-                    executable: URL(fileURLWithPath: python),
-                    arguments: ["-m", "symeraseme"] + serveArguments,
-                    refusals: []
-                )
-            }
-            refusals.append("found \(python) but symeraseme module not importable")
         }
 
         return LaunchPlan(executable: nil, arguments: [], refusals: refusals)
@@ -264,6 +249,23 @@ final class ServerManager: ObservableObject {
         return nil
     }
 
+    /// Return the bundled Go server when an app package contains an
+    /// executable named `symeraseme` in `Contents/Resources`.
+    nonisolated static func bundledBinaryPath(resourceURL: URL?) -> String? {
+        guard let resourceURL else { return nil }
+        let path = resourceURL.appendingPathComponent("symeraseme").path
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+    }
+
+    /// Return the Go server produced next to the Swift executable by the
+    /// local SPM build script. This keeps `swift run` useful without Homebrew.
+    nonisolated static func developmentBinaryPath(executableURL: URL?) -> String? {
+        guard let executableURL else { return nil }
+        let path = executableURL.deletingLastPathComponent()
+            .appendingPathComponent("symeraseme").path
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+    }
+
     // MARK: - Testable pure helpers
 
     /// Compose the failure banner message for a failed server transition.
@@ -280,7 +282,7 @@ final class ServerManager: ObservableObject {
     /// candidate.
     nonisolated static func startFailureMessage(refusals: [String]) -> String {
         if refusals.isEmpty {
-            return "Could not find the symeraseme CLI. Install it via Homebrew or set the Binary Path in Settings."
+            return "Could not find the symeraseme CLI. Install the self-contained Go binary via Homebrew or set the Binary Path in Settings."
         }
         return "Could not start the symeraseme server — no usable CLI found:\n" + refusals.joined(separator: "\n")
     }
@@ -338,31 +340,4 @@ final class ServerManager: ObservableObject {
         return "found \(candidate) but directory not accepted (\(reason))"
     }
 
-    /// Verify that `python -c "import <module>"` succeeds within `timeout`,
-    /// so fallback paths never spawn a broken interpreter blindly.
-    nonisolated static func moduleImportable(
-        python: String,
-        module: String = "symeraseme",
-        timeout: TimeInterval = 10
-    ) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: python)
-        process.arguments = ["-c", "import \(module)"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return false
-        }
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        if process.isRunning {
-            process.terminate()
-            return false
-        }
-        return process.terminationStatus == 0
-    }
 }
