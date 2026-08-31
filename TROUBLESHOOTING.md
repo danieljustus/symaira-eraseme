@@ -113,7 +113,7 @@ from the repository root:
 VERSION=0.12.0 ./scripts/package-dmg.sh
 ```
 
-Release apps contain `Symaira EraseMe.app/Contents/Helpers/symeraseme`. A
+Release apps contain `Symaira EraseMe.app/Contents/MacOS/symeraseme`. A
 local build may be ad-hoc signed; the release workflow records whether Developer
 ID signing, notarization, and stapling were completed. An ad-hoc DMG is not
 Gatekeeper-ready.

@@ -115,10 +115,10 @@ jobs:
           trap 'hdiutil detach "$MOUNT_POINT" -quiet || true' EXIT
           test -d "$MOUNT_POINT/Symaira EraseMe.app"
           test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/Symaira EraseMe"
-          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/Helpers/symeraseme"
+          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/symeraseme"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
-          NESTED_BINARY="$MOUNT_POINT/Symaira EraseMe.app/Contents/Helpers/symeraseme"
+          NESTED_BINARY="$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/symeraseme"
           codesign --verify --strict --verbose=2 "$NESTED_BINARY"
           codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/Symaira EraseMe.app"
 
