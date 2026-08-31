@@ -106,6 +106,9 @@ if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
         CODESIGN_KEYCHAIN_ARGS=(--keychain "$KEYCHAIN_PATH")
     fi
+    # Go emits an ad-hoc linker signature. Remove it before applying the
+    # Developer ID signature so recursive app signing cannot retain it.
+    codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/symeraseme" || true
     codesign --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
