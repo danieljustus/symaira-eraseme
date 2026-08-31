@@ -3,7 +3,8 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/symaira-eraseme/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/symaira-eraseme/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/danieljustus/symaira-eraseme?label=Release&logo=github)](https://github.com/danieljustus/symaira-eraseme/releases)
 [![License](https://img.shields.io/github/license/danieljustus/symaira-eraseme?label=License)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
+[![Go](https://img.shields.io/badge/go-1.26%2B-00ADD8)](https://go.dev)
+[![Swift](https://img.shields.io/badge/swift-5.10%2B-F05138)](https://swift.org)
 
 ![Symaira EraseMe social preview](docs/assets/social-preview.png)
 
@@ -37,7 +38,7 @@ event-flagged only. See [CHANGELOG.md](CHANGELOG.md).
 - **Curated broker registry** with YAML-based definitions for **1,279 data brokers** across the EU (121), UK (20), and US (1,138), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
 - **Event-sourced architecture** with an append-only SQLite event store, state projections, and full audit trail for every removal request.
 - **CLI automation** with 30+ commands to plan removal campaigns, send opt-out requests in batches, track progress, monitor deadlines, and triage broker replies from the terminal.
-- **Web-form automation** via Playwright for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and screenshot capture.
+- **Web-form automation** via the Go `symaira-browse` stack for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and evidence capture.
 - **Inbox triage** via IMAP polling to fetch broker replies, classify them with an LLM (Claude), and generate jurisdiction-aware rebuttals for rejections.
 - **Deadline tracking** with automatic jurisdiction-aware deadline monitoring (GDPR: 30 days, CCPA: 45 days). The tick engine checks daily for overdue requests and triggers reminders with exponential backoff.
 - **Escalation workflows** that flag requests for DPA complaints after brokers miss the legal response window.
@@ -47,32 +48,31 @@ event-flagged only. See [CHANGELOG.md](CHANGELOG.md).
 - **Automated registry maintenance** with a weekly GitHub Action that pulls fresh entries from official US state broker registries and opens a PR with the diff, plus a Monday link-check workflow that flags dead broker websites.
 - **Dashboard and reports** for campaign analytics, jurisdiction breakdowns, and GDPR-compliant record-keeping exports.
 - **Interactive PII review** via `symeraseme review <file>` — step through detected PII in a terminal UI and choose to keep, redact, or skip each match before saving the cleaned file.
-- **MCP JSON-RPC server** via `symeraseme serve` — exposes a `redact_file` tool to MCP clients such as Claude Code or Cursor, letting AI agents redact files inside the workspace root.
+- **MCP JSON-RPC server** via `symeraseme mcp` — exposes the complete tool catalog to MCP clients such as Claude Code or Cursor, including workspace-safe file redaction.
 
 ## Install
 
-**End users** (from PyPI):
-
-```bash
-pip install symeraseme
-```
-
-Optional extras:
-
-```bash
-pip install symeraseme[web]      # Playwright-based browser automation
-pip install symeraseme[triage]   # LLM triage via Anthropic Claude
-```
-
-**macOS users** (via Homebrew):
+**macOS and Linux users** (via Homebrew):
 
 ```bash
 brew tap danieljustus/tap
 brew install symeraseme
 ```
 
-This installs the Symaira EraseMe command-line tool. The macOS graphical app is
-distributed separately as a DMG from the GitHub release.
+**Windows and other platforms:**
+
+Download the matching static `symeraseme` archive from the
+[latest GitHub release](https://github.com/danieljustus/symaira-eraseme/releases).
+No Python runtime is required. The macOS graphical app is distributed separately
+as the versioned DMG attached to the same release.
+
+**PyPI users:**
+
+The PyPI package is the legacy Python implementation and is frozen while the
+cutover completes. New installations should use the static binary above; the
+manual legacy publisher is retained only for existing Python users until #731
+removes the Python tree.
+
 
 **Developers** (from source):
 
@@ -81,16 +81,17 @@ distributed separately as a DMG from the GitHub release.
 git clone https://github.com/danieljustus/symaira-eraseme.git
 cd symaira-eraseme
 
-# Install dependencies with uv
-uv sync
-uv pip install -e ".[dev,web,triage]"
+# Build and test the static Go CLI
+make build
+make test
+make coverage
 
-# Configure your environment
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Build the macOS GUI (requires full Xcode)
+./app/SymairaEraseMe/build.sh
 ```
 
-See `.env.example` for all supported environment variables.
+The Python tree and its uv environment are retained only for the legacy cutover
+until #731 removes them. See `.env.example` for legacy Python variables.
 
 ### Secrets aus Symaira Vault
 

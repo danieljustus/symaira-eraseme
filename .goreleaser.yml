@@ -1,0 +1,101 @@
+version: 2
+
+project_name: symeraseme
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: symeraseme
+    main: ./cmd/symeraseme
+    binary: symeraseme
+    env:
+      - CGO_ENABLED=0
+      - GOWORK=off
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    goamd64:
+      - v1
+    ldflags:
+      - -s -w
+      - -X main.versionValue={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: "^feat[:(]"
+      order: 0
+    - title: Bug Fixes
+      regexp: "^fix[:(]"
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: danieljustus
+    name: symaira-eraseme
+  draft: false
+  prerelease: auto
+  name_template: "{{ .Tag }}"
+  header: |
+    ## Symaira EraseMe {{ .Version }}
+
+    This release ships the static `symeraseme` CLI for Linux, macOS, and Windows.
+    The macOS GUI DMG is uploaded by the companion job after the CLI release.
+  footer: |
+    ## Installation
+
+    ### Homebrew (macOS and Linux)
+
+    ```bash
+    brew install danieljustus/tap/symeraseme
+    ```
+
+    ### Other platforms
+
+    Download the archive matching your operating system and architecture from the assets above.
+
+    The CLI archives are reproducible cross-platform builds. The macOS GUI DMG is signed and
+    notarized when the release credentials are available; otherwise the workflow records that
+    it is ad-hoc/unsigned rather than claiming Gatekeeper-ready distribution.
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+dist: dist

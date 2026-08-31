@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-cli:
+    name: Release / CLI and Homebrew Formula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.5'
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  release-gui:
+    name: Release / macOS GUI DMG
+    needs: release-cli
+    runs-on: macos-15
+    environment: release
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Import Developer ID certificate
+        id: signing
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERTIFICATE_P12:-}" ]; then
+            echo "::warning::CERTIFICATE_P12 is not configured; the DMG will be explicitly recorded as ad-hoc/unsigned."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/symaira-release.keychain-db"
+          CERTIFICATE_PATH="$RUNNER_TEMP/symaira-release.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" -P "$CERTIFICATE_PASSWORD" -A -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk -F '"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity was found in the imported certificate."
+            exit 1
+          fi
+          echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build and package GUI DMG
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ./scripts/package-dmg.sh
+          DMG="dist/Symaira-EraseMe-${VERSION#v}-macos.dmg"
+          test -f "$DMG"
+          shasum -a 256 "$DMG"
+
+      - name: Verify DMG bundle contents
+        run: |
+          set -euo pipefail
+          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
+          MOUNT_POINT="$RUNNER_TEMP/symaira-dmg-mount"
+          mkdir -p "$MOUNT_POINT"
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT_POINT"
+          trap 'hdiutil detach "$MOUNT_POINT" -quiet || true' EXIT
+          test -d "$MOUNT_POINT/Symaira EraseMe.app"
+          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/Symaira EraseMe"
+          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/Resources/symeraseme"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${GITHUB_REF_NAME#v}"
+
+      - name: Notarize and staple signed DMG
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          for name in NOTARY_API_KEY NOTARY_API_KEY_ID NOTARY_API_ISSUER; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required when the DMG is signed."
+              exit 1
+            fi
+          done
+          KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
+          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
+          printf '%s' "$NOTARY_API_KEY" | base64 --decode > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          RESPONSE="$RUNNER_TEMP/notary-response.json"
+          xcrun notarytool submit "$DMG" \
+            --key "$KEY_FILE" \
+            --key-id "$NOTARY_API_KEY_ID" \
+            --issuer "$NOTARY_API_ISSUER" \
+            --wait \
+            --output-format json | tee "$RESPONSE"
+          test "$(jq -r '.status' "$RESPONSE")" = "Accepted"
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          rm -f "$KEY_FILE" "$RESPONSE"
+
+      - name: Upload GUI DMG to the existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
+          gh release upload "$GITHUB_REF_NAME" "$DMG" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Record GUI signing status in release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$NOTES"
+          printf '\n\n### macOS GUI distribution\n' >> "$NOTES"
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            printf '%s\n' 'The GUI DMG was signed with Developer ID Application, notarized, and stapled.' >> "$NOTES"
+          else
+            printf '%s\n' 'The GUI DMG is ad-hoc/unsigned because no Developer ID certificate was configured; it is not presented as Gatekeeper-ready.' >> "$NOTES"
+          fi
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
+
+      - name: Clean up signing material
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          fi
