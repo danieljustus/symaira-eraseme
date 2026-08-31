@@ -26,6 +26,7 @@ func TestCommandVocabularyMatchesGoContracts(t *testing.T) {
 		"plan", "tick", "status", "calendar", "dashboard", "generate-report",
 		"generate-dashboard", "generate-scheduler", "schedule", "registry",
 		"requests", "events", "brokers", "manual-tasks", "review", "config", "mcp",
+		"poll-inbox", "classify-reply", "generate-rebuttal", "auto-confirm", "run-web-form", "serve", "completion",
 	} {
 		if childCommand(name, root) == nil {
 			t.Errorf("missing top-level command %q", name)
@@ -42,6 +43,44 @@ func TestCommandVocabularyMatchesGoContracts(t *testing.T) {
 		if childCommand(name, schedule) == nil {
 			t.Errorf("missing schedule command %q", name)
 		}
+	}
+}
+
+func TestRootCommandNamesAreUnique(t *testing.T) {
+	seen := map[string]bool{}
+	for _, command := range newRootCommand().Commands() {
+		if seen[command.Name()] {
+			t.Fatalf("duplicate root command %q", command.Name())
+		}
+		seen[command.Name()] = true
+	}
+}
+
+func TestCLIManualTaskShowAcceptsPositionalID(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	out, err := execute(t, "--output", "json", "manual-tasks", "show", "999")
+	if err != nil {
+		t.Fatalf("manual-tasks show returned error: %v", err)
+	}
+	if !strings.Contains(out, "Manual task #999 not found") {
+		t.Fatalf("unexpected manual task response: %s", out)
+	}
+}
+
+func TestCLIInitProfileRequiresArguments(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	if _, err := execute(t, "init-profile"); err == nil {
+		t.Fatal("init-profile without required values must fail")
+	}
+}
+
+func TestCompletionGeneratesBashScript(t *testing.T) {
+	out, err := execute(t, "completion", "bash")
+	if err != nil {
+		t.Fatalf("completion bash returned error: %v", err)
+	}
+	if !strings.Contains(out, "symeraseme") {
+		t.Fatalf("completion script does not mention symeraseme: %s", out)
 	}
 }
 

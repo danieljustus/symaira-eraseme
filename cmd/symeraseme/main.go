@@ -38,20 +38,33 @@ func newRootCommand() *cobra.Command {
 	addCommandSurface(root)
 	root.AddCommand(migration.NewCommand())
 	root.AddCommand(newMCPCommand())
+	root.AddCommand(newServeAlias())
+	root.AddCommand(newCompletionCommand())
 	return root
 }
 
 func newMCPCommand() *cobra.Command {
-	root := &cobra.Command{Use: "mcp", Short: "Run the MCP JSON-RPC interface"}
-	root.AddCommand(&cobra.Command{
-		Use:   "serve",
-		Short: "Serve newline-delimited JSON-RPC on stdin/stdout",
+	return &cobra.Command{
+		Use:   "mcp",
+		Short: "Run the MCP JSON-RPC interface",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return mcp.NewServer(mcp.ContractHandler()).ServeStdio(context.Background(), cmd.InOrStdin(), cmd.OutOrStdout())
 		},
-	})
-	return root
+	}
+}
+
+func newServeAlias() *cobra.Command {
+	return &cobra.Command{
+		Use:    "serve",
+		Hidden: true,
+		Short:  "Deprecated: use mcp instead",
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.PrintErrln("symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.")
+			return mcp.NewServer(mcp.ContractHandler()).ServeStdio(context.Background(), cmd.InOrStdin(), cmd.OutOrStdout())
+		},
+	}
 }
 
 func newVersionCommand() *cobra.Command {
