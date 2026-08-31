@@ -113,6 +113,8 @@ if [ -n "${CODESIGN_IDENTITY:-}" ]; then
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
         "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    echo "Verifying nested Go binary signature before app signing..."
+    codesign -dvvv "$APP_BUNDLE/Contents/MacOS/symeraseme" 2>&1
     codesign --deep --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
