@@ -310,6 +310,13 @@ func nullableString(p *string) any {
 	return *p
 }
 
+func nullInt(value sql.NullInt64) int {
+	if value.Valid {
+		return int(value.Int64)
+	}
+	return 0
+}
+
 func scanListRow(rows *sql.Rows) map[string]any {
 	var (
 		id                  int64
@@ -325,8 +332,8 @@ func scanListRow(rows *sql.Rows) map[string]any {
 		resolvedAt          sql.NullString
 		deadlineAt          sql.NullString
 		nextActionAt        sql.NullString
-		remindersSent       int
-		escalation          int
+		remindersSent       sql.NullInt64
+		escalation          sql.NullInt64
 	)
 	if err := rows.Scan(
 		&id, &brokerID, &channel, &campaignID, &created, &jurisdiction,
@@ -351,7 +358,7 @@ func scanListRow(rows *sql.Rows) map[string]any {
 		"resolved_at":            nullStr(resolvedAt),
 		"deadline_at":            nullStr(deadlineAt),
 		"next_action_at":         nullStr(nextActionAt),
-		"reminders_sent":         remindersSent,
-		"escalation_level":       escalation,
+		"reminders_sent":         nullInt(remindersSent),
+		"escalation_level":       nullInt(escalation),
 	}
 }

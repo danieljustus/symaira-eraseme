@@ -70,5 +70,5 @@ func FormatISO(t time.Time) string {
 // FormatSQL is the wall-clock UTC form used by the Python write path
 // for both occurred_at and recorded_at.
 func FormatSQL(t time.Time) string {
-	return t.UTC().Format("2006-01-02T15:04:05")
+	return t.UTC().Format("2006-01-02 15:04:05")
 }
