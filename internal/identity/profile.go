@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -384,6 +385,9 @@ func encryptProfile(plaintext, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("identity: marshal envelope: %w", err)
 	}
 	ciphertext := gcm.Seal(nil, nonce, plaintext, headerJSON)
+	if len(ciphertext) > math.MaxInt-1 || len(headerJSON) > math.MaxInt-1-len(ciphertext) {
+		return nil, errors.New("identity: encrypted profile is too large")
+	}
 	out := make([]byte, 0, len(headerJSON)+1+len(ciphertext))
 	out = append(out, headerJSON...)
 	out = append(out, '\n')
