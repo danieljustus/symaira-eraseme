@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -155,5 +156,14 @@ func TestWriteMCPAuthTokenUsesPrivateDataDirectory(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("token file mode = %o, want 600", info.Mode().Perm())
+	}
+}
+
+func TestMCPHTTPRejectsUnsafeConfiguration(t *testing.T) {
+	if err := runMCPHTTP(context.Background(), "0.0.0.0", 8000, false); err == nil {
+		t.Fatal("non-loopback bind accepted without --allow-remote")
+	}
+	if err := runMCPHTTP(context.Background(), "127.0.0.1", 0, false); err == nil {
+		t.Fatal("port zero accepted")
 	}
 }

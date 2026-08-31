@@ -206,9 +206,15 @@ func DecryptBytes(raw []byte) ([]byte, error) {
 		salt = PBKDF2FixedSalt
 	case 2:
 		keyFrom = len(EncMagicV2) + SaltLen
+		if len(raw) < keyFrom {
+			return nil, errors.New("eventstore: encrypted V2 envelope is truncated")
+		}
 		salt = raw[len(EncMagicV2) : len(EncMagicV2)+SaltLen]
 	case 3:
 		keyFrom = len(EncMagicV3) + SaltLen
+		if len(raw) < keyFrom {
+			return nil, errors.New("eventstore: encrypted V3 envelope is truncated")
+		}
 		salt = raw[len(EncMagicV3) : len(EncMagicV3)+SaltLen]
 	default:
 		return nil, ErrUnrecognizedHeader
