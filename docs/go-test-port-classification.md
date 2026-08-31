@@ -92,7 +92,7 @@ Go coverage gate. No Python test is deleted by this change.
 
 ## Gate and follow-up
 
-The local reference run covers 5,159 / 6,842 statements = 75.40%. CI remains
+The local reference run covers 5,184 / 6,842 statements = 75.77%. CI remains
 canonical for the runner's target OS; the exact profile gate is evaluated there
 rather than trusting rounded package summaries.
 
