@@ -158,7 +158,28 @@ jobs:
         run: |
           set -euo pipefail
           DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
-          gh release upload "$RELEASE_TAG" "$DMG" --repo "$GITHUB_REPOSITORY" --clobber
+          CHECKSUMS_DIR="$RUNNER_TEMP/release-checksums"
+          mkdir -p "$CHECKSUMS_DIR"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern checksums.txt \
+            --dir "$CHECKSUMS_DIR" \
+            --clobber
+          CHECKSUMS="$CHECKSUMS_DIR/checksums.txt"
+          python3 - "$CHECKSUMS" "$DMG" <<'PY'
+          from pathlib import Path
+          import hashlib
+          import sys
+
+          checksums = Path(sys.argv[1])
+          artifact = Path(sys.argv[2])
+          lines = [line for line in checksums.read_text().splitlines() if artifact.name not in line]
+          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+          lines.append(f"{digest}  {artifact.name}")
+          checksums.write_text("\n".join(lines) + "\n")
+          PY
+          gh release upload "$RELEASE_TAG" "$DMG" "$CHECKSUMS" \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Record GUI signing status in release notes
         env:
