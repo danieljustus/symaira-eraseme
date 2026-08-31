@@ -15,6 +15,7 @@ import (
 	"github.com/danieljustus/symaira-corekit/logkit"
 
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
+	"github.com/danieljustus/symaira-eraseme/internal/migration"
 	"github.com/danieljustus/symaira-eraseme/internal/version"
 )
 
@@ -35,6 +36,7 @@ func newRootCommand() *cobra.Command {
 	root.PersistentFlags().String("output", "text", "output format: text or json")
 	root.AddCommand(newVersionCommand())
 	addCommandSurface(root)
+	root.AddCommand(migration.NewCommand())
 	root.AddCommand(newMCPCommand())
 	return root
 }
