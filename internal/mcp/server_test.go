@@ -51,7 +51,7 @@ func TestHTTPToolsListAndCallUseJSONRPCEnvelope(t *testing.T) {
 	if call.Error != nil || call.Result == nil || call.ID != "x" {
 		t.Fatalf("unexpected call response: %#v", call)
 	}
-	if !strings.Contains(string(rec.Body.Bytes()), `"type":"text"`) {
+	if !strings.Contains(rec.Body.String(), `"type":"text"`) {
 		t.Fatalf("missing content envelope: %s", rec.Body.String())
 	}
 }
