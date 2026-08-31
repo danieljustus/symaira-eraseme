@@ -35,6 +35,9 @@ func TestSyncRejectsArchiveTraversal(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dst, "absolute.txt")); !os.IsNotExist(err) {
 		t.Fatalf("absolute archive path was extracted: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(dst, "nested", "safe..name.txt")); !os.IsNotExist(err) {
+		t.Fatalf("archive path containing '..' was extracted: %v", err)
+	}
 	good, err := os.ReadFile(filepath.Join(dst, "nested", "good.txt"))
 	if err != nil {
 		t.Fatalf("safe archive entry missing: %v", err)
@@ -55,6 +58,7 @@ func syncTestArchive(t *testing.T) []byte {
 	}{
 		{name: "../../escape.txt", body: "escaped"},
 		{name: "/absolute.txt", body: "absolute"},
+		{name: "nested/safe..name.txt", body: "rejected"},
 		{name: "nested/good.txt", body: "safe"},
 	}
 	for _, entry := range entries {
