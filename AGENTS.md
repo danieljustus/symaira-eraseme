@@ -262,9 +262,9 @@ Verify your agent can access the skill:
 
 ### Commands not found
 
-- Install Symaira EraseMe: `pip install symeraseme`
-- Or from source: `uv sync && uv pip install -e .`
-- Verify: `symeraseme --version`
+- Install Symaira EraseMe: `brew install danieljustus/tap/symeraseme`
+- Or download the matching static archive from GitHub Releases
+- Verify: `symeraseme version`
 
 ### API key errors
 
@@ -295,16 +295,11 @@ To add support for a new agent:
 
 ## macOS App (`app/SymairaEraseMe/`)
 
-- SwiftUI SPM executable (formerly `SymairaDashboard`; renamed 2026-07 —
-  EraseMe stays a STANDALONE consumer app per the ecosystem GUI strategy,
-  it is not a hub module). Build: `cd app/SymairaEraseMe && swift build`
-  (local builds need `DEVELOPER_DIR` pointing at Xcode).
-- Depends on the shared **symaira-appkit** package, pinned exact (`0.1.0`)
-  in `Package.swift`: SymairaTheme (shared brand tokens in
-  `Theme/BrandColors.swift`; EraseMe-specific status colors, card backings
-  and the padded GlassCard stay local) and SymairaToolKit (binary discovery
-  in `Services/ServerManager.swift`).
-- `ServerManager` is a long-running daemon supervisor (spawns
-  `symeraseme serve`, with uv/python fallbacks) and stays app-local — it is
-  the second requirements donor for a future SymairaDaemonKit (appkit v0.2).
-- Migration context: see `../docs/symaira-appkit-migration.md` (Welle 3).
+- SwiftUI SPM executable (`SymairaEraseMe`). Build: `cd app/SymairaEraseMe && swift build`
+  (local builds need `DEVELOPER_DIR` pointing at a full Xcode installation).
+- Depends on the shared **symaira-appkit** package, pinned exact in
+  `Package.swift`: SymairaTheme and SymairaToolKit.
+- `ServerManager` launches the bundled or development `symeraseme mcp` Go
+  binary over HTTP; Homebrew/configured Binary Path is the fallback.
+- Migration context: see `../docs/go-test-port-classification.md` and
+  `TROUBLESHOOTING.md`.

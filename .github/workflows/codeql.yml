@@ -7,9 +7,12 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
   schedule:
     - cron: '17 3 * * 1'
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 concurrency:
   group: codeql-${{ github.ref }}
@@ -23,18 +26,16 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - language: actions
-            os: ubuntu-latest
             build_mode: none
-          - language: python
-            os: ubuntu-latest
-            build_mode: none
+          - language: go
+            build_mode: autobuild
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

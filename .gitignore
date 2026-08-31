@@ -1,7 +1,4 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Local build artifacts
 *.so
 *.egg-info/
 dist/
@@ -40,10 +37,7 @@ token.json
 # Claude Code local settings (contains per-user paths)
 .claude/settings.local.json
 
-# Tool caches
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
+# Build/tool caches
 
 # Distribution artifacts
 dist/

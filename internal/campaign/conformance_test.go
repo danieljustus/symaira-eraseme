@@ -30,9 +30,8 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
-// buildMiniRegistry constructs the fixed broker subset the golden Python
-// fixture ran against (same YAML files, same layout as
-// /tmp/golden-plan-registry used by scripts/gen_golden_plan_fixture.py).
+// buildMiniRegistry constructs the fixed broker subset used by the golden
+// conformance fixtures and the committed Go registry layout.
 func buildMiniRegistry(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)

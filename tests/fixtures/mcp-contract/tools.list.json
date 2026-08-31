@@ -511,7 +511,7 @@
     },
     {
       "name": "run_web_form",
-      "description": "Run a broker web-form opt-out via Playwright browser automation.",
+      "description": "Run a broker web-form opt-out through the symaira-browse integration.",
       "inputSchema": {
         "type": "object",
         "properties": {

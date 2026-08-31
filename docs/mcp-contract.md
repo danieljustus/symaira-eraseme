@@ -3,18 +3,18 @@
 **Status:** pinned · **Tools:** 26 · **Scope:** milestone v1.0.0 (Go port)
 
 This document freezes the MCP tool surface the SwiftUI app
-(`app/SymairaEraseMe`) talks to. The Python server at
-`src/symeraseme/mcp_server.py` + `src/symeraseme/mcp/` is conformance
-implementation #1; the Go server (milestone v1.0.0) is implementation #2 and
-must be diffable against the golden fixtures below. Nothing here is invented —
-every schema is extracted from the live `TOOL_DEFS` list.
+(`app/SymairaEraseMe`) talks to. The Go server is the production
+implementation; the pre-cutover implementation is preserved at the
+`python-final` tag for historical comparison. Nothing here is invented —
+every schema is extracted from and verified against the committed contract.
 
 ## 1. Transport and protocol
 
-- Server: **HTTP JSON-RPC 2.0** on `symeraseme serve` (default port 8000,
+- Server: **HTTP JSON-RPC 2.0** on `symeraseme mcp` (default port 8000,
   loopback only unless `--allow-remote`).
 - Endpoints:
-  - `tools/list` → `{"tools": TOOL_DEFS}` (exact shape frozen in
+  - `tools/list` → the exact 26-tool definition set from `internal/mcp/tools.json`
+    (fixture frozen in
     `tests/fixtures/mcp-contract/tools.list.json`)
   - `tools/call` with `{"name": "<tool>", "arguments": {...}}`
   - legacy bare method `redact_file` (same redaction, returns plain text
@@ -64,7 +64,7 @@ Rules:
 
 Required parameters are marked `*`.
 
-[GENERATED: scripts/render_mcp_contract_md.py]
+[MAINTAINED: `internal/mcp/tools.json` plus Go contract tests]
 
 ### `redact_file`
 
@@ -276,7 +276,7 @@ Parameters:
 
 ### `run_web_form`
 
-Run a broker web-form opt-out via Playwright browser automation.
+Run a broker web-form opt-out through the `symaira-browse` integration.
 
 Required: `['broker_id']`
 
@@ -373,10 +373,9 @@ Parameters:
 
 Directory `tests/fixtures/mcp-contract/`:
 
-- `tools.list.json` — frozen `tools/list` result (exact `TOOL_DEFS`).
+- `tools.list.json` — frozen `tools/list` result (exact `internal/mcp/tools.json`).
 - `requests/<tool>.request.json` — one valid `tools/call` request per tool,
-  generated deterministically from the tool's `inputSchema`
-  (`scripts/generate_mcp_contract_fixtures.py`).
+  maintained as committed contract fixtures.
 
 The Go server's conformance run (milestone v1.0.0) validates that its own
 tools/list output equals `tools.list.json` and that every fixture request is
@@ -416,13 +415,12 @@ two views over the same operations. Decisions made for v1.0.0:
 
 ### The one rename: `serve` → `mcp`
 
-- **Decision:** at v1.0.0 the Go CLI ships `symeraseme mcp` as the server
-  command; `symeraseme serve` disappears.
+- **Decision:** the Go CLI ships `symeraseme mcp` as the server command;
+  `symeraseme serve` is retained only as a hidden deprecated alias during the
+  cutover.
 - **Reason:** `serve` is ambiguous (HTTP server for what?); `mcp` names the
-  protocol contractally. The Swift app references
-  `symeraseme serve` in `ServerManager.swift` today — that reference moves
-  with the app repoint (#727), which is why the rename happens at cutover,
-  not now.
+  protocol contractually. The Swift app launches the bundled Go binary with
+  `mcp` through `ServerManager`.
 - **Transition:** the v1.0.0 Go CLI may keep `serve` as a deprecated alias
   printing a redirect notice for one minor release.
 
@@ -439,12 +437,11 @@ two views over the same operations. Decisions made for v1.0.0:
 
 ## 6. Drift protection
 
-`tests/unit/test_mcp_contract.py`:
+The Go contract tests verify the fixture requests and the pinned 26-tool surface:
 
-- `tools.list.json` must equal live `TOOL_DEFS`;
-- every fixture request validates against its tool's `inputSchema`;
+- `tools.json` is the source for the catalogued tool definitions;
+- every fixture request validates against its tool's input contract;
 - the tool surface is pinned at 26 names.
 
-Any intended surface change requires regenerating fixtures
-(`uv run python scripts/generate_mcp_contract_fixtures.py`) together with
-the schema change. Schema changes without fixture regeneration fail CI.
+Any intended surface change requires updating the committed request fixtures
+and the Go contract tests. Schema changes without fixture/test updates fail CI.

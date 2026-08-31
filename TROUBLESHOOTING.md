@@ -1,118 +1,139 @@
-# Troubleshooting
+# Troubleshooting Symaira EraseMe
 
-## macOS 27 (Tahoe) — `pydantic_core` / `rpds` LINKEDIT crash
+## Binary not found
 
-### Symptoms
-
-```
-ImportError: dlopen(.../pydantic_core/_pydantic_core.cpython-312-darwin.so):
-  mis-aligned LINKEDIT string pool, fileOffset=0x00418E4C
-```
-
-Same error for `rpds/rpds.cpython-312-darwin.so`.
-
-### Root Cause
-
-macOS 27 beta's stricter `dlopen` rejects Mach-O `.so` files where the LINKEDIT
-segment's string pool has a non-page-aligned file offset. All Rust-based Python
-extensions (pydantic_core, rpds-py) built from source with PyO3/maturin produce
-such binaries. Pre-built wheels from PyPI may or may not have this issue depending
-on the build environment used by the package maintainer.
-
-### Workaround (Homebrew install)
-
-The `danieljustus/tap` formula includes a `post_install` block that automatically
-fixes this on macOS 27+. Just run:
+Install the static CLI from the Symaira Homebrew tap or download the archive
+for the current operating system and architecture from the GitHub release:
 
 ```bash
-brew reinstall danieljustus/tap/symeraseme
+brew tap danieljustus/tap
+brew install symeraseme
+symeraseme version
 ```
 
-If the auto-fix doesn't work (e.g., network issues during install), apply manually:
+For a source build, run `make build` from the repository root and ensure the
+resulting `symeraseme` binary is on `PATH`.
+
+## MCP server cannot start
+
+The supported server command is `symeraseme mcp`. It binds to loopback on port
+8000 by default and writes its authentication token below the configured data
+directory.
 
 ```bash
-# 1. Replace pydantic_core .so with pre-built wheel
-VENV_SITE="$(brew --prefix symeraseme)/libexec/lib/python3.12/site-packages"
-cd /tmp
-curl -sL -o pc.whl "https://files.pythonhosted.org/packages/6c/70/2988cb5112b892b7dc13af570ff57d0f383f770fc88bbb644262df1b3017/pydantic_core-2.47.0-cp312-cp312-macosx_11_0_arm64.whl"
-unzip -o pc.whl pydantic_core/_pydantic_core.cpython-312-darwin.so -d "$VENV_SITE/"
-
-# 2. Patch pydantic version check
-sed -i '' "s/_COMPATIBLE_PYDANTIC_CORE_VERSION = '2.46.4'/_COMPATIBLE_PYDANTIC_CORE_VERSION = '2.47.0'/" "$VENV_SITE/pydantic/version.py"
-
-# 3. Verify
-symeraseme --version
+symeraseme mcp --host 127.0.0.1 --port 8000
+symeraseme mcp --stdio
 ```
 
-### Workaround (source install / pip)
+Non-loopback HTTP binds require an explicit `--allow-remote`. A `401` response
+means the client did not send the token; a connection refusal means the server
+is not listening. Keep the token file private and never paste it into logs or
+issue reports.
 
-If you installed via `pip install symeraseme` or `uv sync`:
+## Identity and data directory
+
+Initialize the encrypted profile before planning a campaign:
 
 ```bash
-# Use uv to get a compatible build
-uv pip install --force-reinstall pydantic_core==2.47.0
-# Or build from source with correct Rust toolchain
-pip install --force-reinstall --no-binary pydantic_core pydantic_core==2.47.0
+symeraseme init-profile
+symeraseme show-profile --output json
 ```
 
-For `rpds-py`, the issue is similar. If using uv, it may automatically build a
-compatible version. For pip, you may need to wait for an upstream PyO3 fix.
+Use `SYMERASEME_DATA_DIR` for an isolated installation or test directory. The
+Go event store uses an AES-256-GCM envelope and stores private files with
+restrictive permissions. Credentials should be referenced through the canonical
+`symvault://` form or a platform secure store.
 
-### Tracking
+## Migrating an older installation
 
-- GitHub Issue: [#410](https://github.com/danieljustus/symaira-eraseme/issues/410)
-- Upstream: PyO3/maturin needs to generate properly aligned LINKEDIT for macOS 27
-- pydantic PR [#13147](https://github.com/pydantic/pydantic/pull/13147) added
-  `-headerpad_max_install_names` but this only fixes `install_name_tool` padding,
-  not the string pool alignment issue in PyO3-generated binaries.
-
-## Migrating a Python-era installation to the Go CLI
-
-The Go port exposes `symeraseme migrate` as a bounded, explicit migration. It
-requires separate `--source` and `--destination` directories; use
-`--source-config` and `--destination-config` when the Python defaults keep
-configuration/profile files under a separate `~/.config/symeraseme` directory.
-This prevents an
-accidental in-place rewrite while the plan is being reviewed. Start with:
+The migration command is explicit and dry-run first:
 
 ```bash
-symeraseme migrate --source /path/to/python-state \
-  --destination /path/to/go-state --platform launchd --dry-run --json
+symeraseme migrate \
+  --source /path/to/old-state \
+  --destination /path/to/go-state \
+  --source-config /path/to/old-config \
+  --destination-config /path/to/go-config \
+  --dry-run
 ```
 
-The detector reports the Python event database (`symeraseme.db`), TOML config,
-legacy encrypted profile (`identity.enc`), and Python-generated scheduler
-artifacts. If a native launchd or systemd unit is present under `--home`, it is
-reported as well. The source is retained; the destination receives the Go
-profile name (`identity.encrypted`) and generated Go scheduler content.
+The source is never deleted. A complete backup is created before writes, and
+`.migration-state.json` allows an interrupted migration to resume. Keep the
+backup until the new CLI has been exercised successfully.
 
-### Backup and rollback
+## Web forms and manual tasks
 
-A complete recursive copy of the selected source directory is made in
-`<destination>.migration-backup` (or `--backup`) before any destination write.
-Native scheduler files outside the source directory are copied into the backup
-as external artifacts. The backup contains a `.complete.json` marker; an
-incomplete or pre-existing unmarked backup is never overwritten.
+Web-form automation uses the `symaira-browse` integration. If a broker requires
+an unsupported interaction, inspect the fallback queue:
 
-Migration writes `.migration-state.json` after the backup and after each item.
-If the process is interrupted, run the same command again with the same source,
-destination, and backup paths. Completed items are skipped and remaining items
-resume. To roll back, stop the Go scheduler if it was activated, remove or
-move the destination, and restore the backup's `source/` tree and any files in
-`external/` to their original locations. The migration command itself never
-deletes the Python source or activates native scheduler units.
+```bash
+symeraseme manual-tasks list
+symeraseme manual-tasks show <task-id>
+symeraseme manual-tasks complete <task-id>
+```
 
-### Secrets and limitations
+Do not submit a real opt-out while debugging unless the user explicitly asked
+for that action and the target data is appropriate for the operation.
 
-Python credentials are normally in the OS keyring, not in the source tree. The
-safe default only reports keyring-backed metadata and never reads or copies
-secret values. A caller embedding the migration package may inject a
-`SecretStore` implementation and opt into copying through `CopySecrets`; the
-CLI does not provide a keychain-copy implementation. Reconfigure credentials
-manually unless an independently reviewed SecretStore is supplied.
+## Email and triage
 
-The migration is intentionally not a live-install end-to-end test: it does not
-run `launchctl`, `systemctl`, or `crontab`, and it does not verify provider
-credentials. Use `--dry-run` first, keep the backup until the Go installation
-has been exercised, and treat scheduler activation as a separate, operator-
-controlled step.
+Inbox polling requires an IMAP account and a platform-appropriate credential.
+Use a dry-run or isolated account while configuring it:
+
+```bash
+symeraseme poll-inbox --host imap.example.com --port 993 --username <address>
+symeraseme classify-reply <request-id>
+symeraseme generate-rebuttal <request-id>
+```
+
+LLM provider configuration is resolved by the shared Go provider layer. Missing
+provider configuration is a setup error, not a reason to expose credentials in
+an issue or log.
+
+## Scheduler
+
+Generate files first, inspect them, then install only after review:
+
+```bash
+symeraseme generate-scheduler --platform launchd --output ./schedules
+symeraseme schedule status --platform launchd
+```
+
+The scheduler supports cron, launchd, and systemd. Activation can affect future
+outbound actions; use `--dry-run` wherever available and preserve generated
+files for diagnosis.
+
+## macOS GUI and DMG
+
+The GUI requires a full Xcode installation, not Command Line Tools alone. Build
+from the repository root:
+
+```bash
+./app/SymairaEraseMe/build.sh
+VERSION=0.12.0 ./scripts/package-dmg.sh
+```
+
+Release apps contain `Symaira EraseMe.app/Contents/Resources/symeraseme`. A
+local build may be ad-hoc signed; the release workflow records whether Developer
+ID signing, notarization, and stapling were completed. An ad-hoc DMG is not
+Gatekeeper-ready.
+
+## Windows build
+
+The Go CLI is CGO-free. A Windows cross-build can be checked without executing
+it on macOS:
+
+```bash
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build ./cmd/symeraseme
+CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build ./cmd/symeraseme
+```
+
+The event store uses the Windows `LockFileEx` API for non-blocking lock
+semantics.
+
+## Reporting a problem
+
+Include the command, operating system, CLI version, and a redacted error. Do
+not include profile files, token files, API keys, email contents, or personal
+identity data. Security vulnerabilities belong in the repository's private
+security reporting channel.

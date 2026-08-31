@@ -9,493 +9,188 @@
 ![Symaira EraseMe social preview](docs/assets/social-preview.png)
 
 Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
-data brokers — automated data broker removal from the terminal.
+data brokers. It is a local-first, static Go CLI with a native SwiftUI macOS
+app and an authenticated MCP JSON-RPC interface.
 
-**Status:** Beta — core features are stable and tested; some advanced features
-(web-form CAPTCHA solving, DPA auto-filing) require manual setup or are
-event-flagged only. See [CHANGELOG.md](CHANGELOG.md).
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/danieljustus/symaira-eraseme/main/assets/terminal-demo.svg" alt="Symaira EraseMe terminal demo — init-profile, broker listing, plan creation, and campaign status" width="760">
-</p>
-
-## Why EraseMe?
-
-- **CLI-first and scriptable** — no account, no subscription, no web dashboard; runs in a terminal, cron job, or CI pipeline.
-- **Open source (Apache-2.0) and self-hosted** — your identity stays in local, encrypted storage (AES-256-GCM) under your control.
-- **Jurisdiction-aware templates** — GDPR / CCPA / LGPD replies with correct legal deadlines, reminders, and escalation.
-- **Lifecycle tracking** — broker registry with per-request status, a deadline tick engine, and quarterly re-scans.
-- **A direct alternative to subscription opt-out services** (DeleteMe, Incogni, Optery, Kanary): free, auditable, and your data never leaves your machine.
-
-- **A curated registry** of 1,279 data brokers with opt-out processes documented
-- **CLI tools** to plan, send, track, and triage removal requests
-- **Skills** for LLM-powered agents (Claude Code, OpenClaw, etc.)
-- **Lifecycle management** with deadline tracking, reminders, escalation, and re-scans
-- **Automated registry maintenance** via weekly scans of public state broker registries
+**Status:** Beta. Core planning, event tracking, deadline handling, registry
+validation, inbox triage, reports, and the MCP/CLI contracts are implemented.
+Some broker-specific web flows still require manual review.
 
 ## Features
 
-- **Curated broker registry** with YAML-based definitions for **1,279 data brokers** across the EU (121), UK (20), and US (1,138), including opt-out URLs, required account identifiers, contact methods (web forms, email), and verification keywords.
-- **Event-sourced architecture** with an append-only SQLite event store, state projections, and full audit trail for every removal request.
-- **CLI automation** with 30+ commands to plan removal campaigns, send opt-out requests in batches, track progress, monitor deadlines, and triage broker replies from the terminal.
-- **Web-form automation** via the Go `symaira-browse` stack for brokers that only accept opt-outs through web forms, including form-filling, CAPTCHA detection, and evidence capture.
-- **Inbox triage** via IMAP polling to fetch broker replies, classify them with an LLM (Claude), and generate jurisdiction-aware rebuttals for rejections.
-- **Deadline tracking** with automatic jurisdiction-aware deadline monitoring (GDPR: 30 days, CCPA: 45 days). The tick engine checks daily for overdue requests and triggers reminders with exponential backoff.
-- **Escalation workflows** that flag requests for DPA complaints after brokers miss the legal response window.
-- **LLM agent skills** as ready-made skill files for Claude Code, Cursor, Windsurf, Hermes, GitHub Copilot, Codex, and other LLM-powered coding agents. These skills let AI assistants work with the tool on your behalf. See [AGENTS.md](AGENTS.md) for setup instructions.
-- **Jurisdiction-aware workflows** with support for GDPR (Europe), CCPA (California), CPRA, LGPD, and PIPEDA erasure rights, including jurisdiction-specific templates, timelines, and legal references.
-- **Scheduler integration** that generates cron, launchd, or systemd configurations to run the tick engine, inbox polling, and quarterly re-scans automatically.
-- **Automated registry maintenance** with a weekly GitHub Action that pulls fresh entries from official US state broker registries and opens a PR with the diff, plus a Monday link-check workflow that flags dead broker websites.
-- **Dashboard and reports** for campaign analytics, jurisdiction breakdowns, and GDPR-compliant record-keeping exports.
-- **Interactive PII review** via `symeraseme review <file>` — step through detected PII in a terminal UI and choose to keep, redact, or skip each match before saving the cleaned file.
-- **MCP JSON-RPC server** via `symeraseme mcp` — exposes the complete tool catalog to MCP clients such as Claude Code or Cursor, including workspace-safe file redaction.
+- Curated registry of more than 1,200 data brokers with jurisdiction and law metadata.
+- Event-sourced SQLite storage with projections and an audit trail.
+- CLI commands for profile setup, planning, execution, inbox polling, triage,
+  rebuttals, scheduling, reports, and manual fallback tasks.
+- Web-form automation through the `symaira-browse` integration.
+- Shared LLM provider layer for reply classification and rebuttal generation.
+- Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
+- AES-256-GCM encrypted identity/database data and explicit destructive-operation consent.
+- Native SwiftUI dashboard for macOS. Release DMGs contain the Go MCP server.
 
 ## Install
 
-**macOS and Linux users** (via Homebrew):
+### macOS and Linux
 
 ```bash
 brew tap danieljustus/tap
 brew install symeraseme
+symeraseme version
 ```
 
-**Windows and other platforms:**
+### Windows and other platforms
 
-Download the matching static `symeraseme` archive from the
+Download the matching `symeraseme_<version>_<os>_<arch>` archive from the
 [latest GitHub release](https://github.com/danieljustus/symaira-eraseme/releases).
-No Python runtime is required. The macOS graphical app is distributed separately
-as the versioned DMG attached to the same release.
+The archives are static Go builds and do not require an external runtime.
 
-**PyPI users:**
+### macOS GUI
 
-The PyPI package is the legacy Python implementation and is frozen while the
-cutover completes. New installations should use the static binary above; the
-manual legacy publisher is retained only for existing Python users until #731
-removes the Python tree.
+The versioned `Symaira-EraseMe-<version>-macos.dmg` is attached to the same
+GitHub release. The release notes state whether Developer ID signing,
+notarization, and stapling were completed.
 
+### Migration from the pre-cutover installation
 
-**Developers** (from source):
+The last pre-cutover implementation is preserved at the annotated Git tag
+`python-final`. Existing installations should migrate their local data before
+removing the old runtime:
 
 ```bash
-# Clone the repository
-git clone https://github.com/danieljustus/symaira-eraseme.git
-cd symaira-eraseme
-
-# Build and test the static Go CLI
-make build
-make test
-make coverage
-
-# Build the macOS GUI (requires full Xcode)
-./app/SymairaEraseMe/build.sh
+symeraseme migrate \
+  --source /path/to/old-state \
+  --destination /path/to/go-state \
+  --dry-run
 ```
 
-The Python tree and its uv environment are retained only for the legacy cutover
-until #731 removes them. See `.env.example` for legacy Python variables.
+The migration is explicit, creates a backup before writing, never deletes the
+source, and can resume from `.migration-state.json`. See
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) for the full rollback procedure.
 
-### Secrets aus Symaira Vault
-
-Symaira EraseMe supports [Symaira Vault](https://github.com/danieljustus/symaira-vault)
-for centralized secret management. Instead of storing credentials in environment
-variables or the system keyring, you can reference them via `symvault://` URIs:
+## Quick start
 
 ```bash
-# Store a secret in Symaira Vault
-symvault set anthropic/prod-key "sk-ant-..."
-
-# Reference it in your .env or profile config (canonical form)
-export ANTHROPIC_API_KEY="symvault://anthropic/prod-key"
-export CAPSOLVER_API_KEY="symvault://captcha/capsolver"
-export IMAP_PASSWORD="symvault://email/imap-password"
-```
-
-When Symaira EraseMe encounters a `symvault://` URI, it transparently resolves it
-by calling `symvault get <path> --print`. The fallback chain is:
-
-1. **Symaira Vault** — `symvault get <path> --print` (requires `symvault` on PATH)
-2. **Environment variable** — the literal value of the env var
-3. **System keyring** — Python `keyring` package (for IMAP credentials)
-
-> **Deprecated alias**: the shorter `vault://anthropic/prod-key` form keeps
-> working and resolves to exactly the same paths. Existing configs do not
-> break — but new configurations should use `symvault://`, which matches the
-> prefix used across the Symaira ecosystem.
-
-If `symvault` is not installed, the system falls back to the plain-text value
-in the environment variable. No crash, no error — just a debug log.
-
-> **Security**: Secret values are never written to logs, tracebacks, or
-> structured logging events.
-
-## Usage
-
-### Getting started
-
-```bash
-# Verify installation
-symeraseme --version
-
-# Initialize your profile with personal details
+# Create an encrypted local identity profile
 symeraseme init-profile
 
-# List all registered brokers, optionally filtered by jurisdiction or law
+# Inspect the embedded broker registry
+symeraseme registry validate
 symeraseme brokers list --law GDPR
 
-# Show details for a specific broker
-symeraseme brokers show --name spokeo
-```
-
-### Demo
-
-```console
-$ symeraseme init-profile
-✓ Profile saved to ~/.config/symeraseme/profile.json
-
-$ symeraseme brokers list --law GDPR
-┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Name         ┃ Website                     ┃ Jurisdiction  ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ Spokeo       │ https://www.spokeo.com      │ CCPA          │
-│ Intelius     │ https://www.intelius.com    │ CCPA          │
-│ Acxiom (EU)  │ https://www.acxiom.com      │ GDPR          │
-│ Schufa       │ https://www.schufa.de       │ GDPR          │
-└──────────────┴─────────────────────────────┴───────────────┘
-
-$ symeraseme plan create --campaign initial --jurisdiction GDPR --max 5
-✓ Plan created: 5 brokers selected
-  Campaign: initial
-
-$ symeraseme plan status
-Campaign: initial
-┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Broker      ┃ Status      ┃ Deadline             ┃
-┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
-│ Acxiom (EU) │ planned     │ —                    │
-│ Schufa      │ planned     │ —                    │
-│ Experian EU │ planned     │ —                    │
-│ Equifax EU  │ planned     │ —                    │
-│ Creditreform│ planned     │ —                    │
-└─────────────┴─────────────┴──────────────────────┘
-```
-
-### Planning and execution
-
-```bash
-# Create a removal plan for GDPR brokers (limit to 10)
-symeraseme plan create --campaign initial --jurisdiction GDPR --max 10
-
-# Review the plan before sending
+# Plan, review, and dry-run a campaign
+symeraseme plan create --campaign initial --max 5
 symeraseme plan show --campaign initial
+symeraseme execute --campaign initial --dry-run
 
-# Execute the plan in batches (respects rate limits, requires consent)
-symeraseme plan execute --campaign initial --batch-size 5 --delay 30 --yes
-
-# Check overall campaign progress
-symeraseme plan status
-
-# View deadline calendar and upcoming tick actions
-symeraseme calendar --weeks 4
+# Track deadlines and view reports
+symeraseme tick --dry-run
+symeraseme generate-report
 ```
 
-### Inbox triage (requires `[triage]` extra)
+Destructive execution requires explicit consent. Review the plan first and use
+`symeraseme grant execute --ttl 3600` for a short-lived automation token.
+
+## MCP server
+
+Start the local authenticated HTTP server:
 
 ```bash
-# Poll your IMAP inbox for broker replies
-symeraseme poll-inbox --username your@email.com
-
-# Classify a broker reply via LLM
-symeraseme classify-reply <request_id>
-
-# Generate a jurisdiction-aware rebuttal for a rejection
-symeraseme generate-rebuttal <request_id>
+symeraseme mcp
+# Default: http://127.0.0.1:8000
 ```
 
-### Web-form automation (requires `[web]` extra)
+Use `--host` and `--port` to change the loopback endpoint. Non-loopback binds
+require `--allow-remote`. Use `--stdio` when an MCP client needs
+newline-delimited JSON-RPC over standard streams.
 
-```bash
-# Run a broker's web-form opt-out via Playwright
-symeraseme run-web-form <broker_id>
+The token is generated on startup and written with restrictive permissions to
+the configured data directory (`mcp_token`). Send it on every HTTP request as:
 
-# List manual fallback tasks for forms that couldn't be automated
-symeraseme manual-tasks list
-
-# Mark a manual task as completed
-symeraseme manual-tasks complete <task_id>
+```text
+Authorization: Bearer <token>
 ```
 
-### Lifecycle and maintenance
+Never put the token in source control, issue reports, shell history, or logs.
+The complete transport and tool contract lives in
+[docs/mcp-contract.md](docs/mcp-contract.md).
 
-```bash
-# Run the tick engine (checks deadlines, reminders, escalations)
-symeraseme plan tick --dry-run
-symeraseme plan tick
+## Configuration and secrets
 
-# Generate scheduler configs (cron / launchd / systemd)
-symeraseme generate-scheduler --output-dir ./schedules
-
-# Install schedules
-symeraseme schedule install
-
-# Generate a dashboard report
-symeraseme generate-dashboard
-
-# Export campaign data for GDPR record-keeping
-symeraseme export --format json --output campaign.json
-```
-
-### Other commands
-
-```bash
-# Validate registry YAML files against the schema
-symeraseme validate
-
-# Show event history for a request
-symeraseme events show <request_id>
-
-# List all removal requests
-symeraseme requests list --status pending
-
-# Grant consent for destructive operations
-symeraseme grant execute --ttl 3600
-```
-
-### PII redaction & MCP
-
-```bash
-# Review a file interactively and choose which PII to redact
-symeraseme review <file>
-
-# Start the local MCP JSON-RPC server (default: 127.0.0.1:8000)
-symeraseme serve
-
-# Bind to a different host/port
-symeraseme serve --host 127.0.0.1 --port 8080
-
-# Allow non-loopback binds on trusted networks
-symeraseme serve --host 0.0.0.0 --port 8000 --allow-remote
-```
-
-The MCP server exposes one tool:
-
-| Tool | Description | Input schema |
-|------|-------------|--------------|
-| `redact_file` | Reads a file, runs PII redaction on it, and returns the redacted content. | `{ "path": "string" }` (`path` is required) |
-
-Example MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "symeraseme": {
-      "command": "sh",
-      "args": [
-        "-c",
-        "TOKEN=$(cat ~/.symeraseme/mcp_token 2>/dev/null || echo ''); exec symeraseme serve --host 127.0.0.1 --port 8000"
-      ],
-      "env": {
-        "MCP_AUTH_TOKEN": "$TOKEN"
-      }
-    }
-  }
-}
-```
-
-Alternatively, configure the MCP client to pass the token as an `Authorization: Bearer <token>` header on every request. The token is generated fresh on each server start and written to `<data_dir>/mcp_token`.
-
-> **Security**: the MCP server uses per-run Bearer-token authentication. The token is written to `<data_dir>/mcp_token` on startup and must be included as an `Authorization: Bearer <token>` header on every request. The default `127.0.0.1` bind is reachable only from the local machine. Use `--allow-remote` only on trusted networks.
-
-Run `symeraseme --help` for a full list of commands and options.
-
-## Architecture
-
-Symaira EraseMe uses an **event-sourced architecture** built on SQLite:
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   CLI /     │────▶│   Event      │────▶│  Request    │
-│   Skills    │     │   Store      │     │  State      │
-└─────────────┘     │  (SQLite)    │     │ (Projection)│
-                    └──────────────┘     └─────────────┘
-                           │
-                    ┌──────┴──────┐
-                    ▼             ▼
-            ┌──────────┐   ┌──────────┐
-            │  Tick    │   │  Reports │
-            │  Engine  │   │ / Export │
-            └──────────┘   └──────────┘
-```
-
-- **Event Store**: Append-only log of all actions (planned, sent, ack, reminder, deadline reached, etc.)
-- **State Projection**: Rebuilds the current state of every request from events
-- **Tick Engine**: Daily scan for deadlines, reminders, and escalations
-- **Triage**: LLM-based classification of broker replies with jurisdiction-aware rebuttal generation
-
-### Registry maintenance
-
-The broker registry is kept fresh by two scheduled GitHub Actions:
-
-- **`registry-scanner`** (Sundays, 00:00 UTC) — fetches the latest data-broker
-  registries published by US states (e.g. California, Vermont, Oregon, Texas),
-  normalizes the records into YAML entries, and opens a pull request for any
-  additions or changes.
-- **`registry-link-check`** (Mondays, 06:00 UTC) — issues a `HEAD` request to
-  every broker's `website` field and reports unreachable URLs so dead entries
-  can be retired or corrected.
-
-You can also run the sync manually:
-
-```bash
-uv run python scripts/registry_sync.py
-```
+`SYMERASEME_DATA_DIR` selects the local data directory. Credentials should be
+referenced through the canonical `symvault://` form or a platform secure store;
+resolved values are never logged. Provider-specific configuration is consumed
+by the shared Go LLM layer.
 
 ## Development
 
-### Setup
+Requirements: Go 1.26.5 or newer. A full Xcode installation is required for
+the macOS GUI.
 
 ```bash
-uv sync --all-extras
-uv pip install -e ".[dev,web,triage]"
-pre-commit install
+# Go CLI
+make build
+make test
+make test-race
+make lint
+make vet
+make coverage                 # exact 75% statement gate
+
+# macOS app
+./app/SymairaEraseMe/build.sh
+VERSION=0.12.0 ./scripts/package-dmg.sh
 ```
 
-The pre-commit hooks include:
-- **Detect private keys** — checks for hardcoded private keys
+The coverage gate reports exact profile counts rather than rounded package
+percentages. CI runs the same gate on Linux and checks the complete Go matrix.
 
-CI additionally runs **TruffleHog** for comprehensive secrets scanning on every pull request.
+### Registry contributions
 
-### Run tests
+Add a verified YAML broker entry under `registry/brokers/`, then run:
 
 ```bash
-uv run pytest --verbose --tb=short
+make build
+./symeraseme registry validate
 ```
 
-### Lint and type-check
+Do not fabricate endpoints or include personal data. The registry is embedded
+and read by the Go loader; it is not rewritten by normal CLI operation.
 
-```bash
-uv run ruff check src/symeraseme/
-uv run ruff format --check src/symeraseme/
-uv run mypy src/symeraseme/
+### Project layout
+
+```text
+cmd/symeraseme/       CLI entrypoint and command surface
+internal/              Go domain packages and MCP handlers
+registry/              Embedded broker/law/schema data
+skills/                Agent skill bundle and workflow documentation
+app/SymairaEraseMe/   SwiftUI macOS client
+scripts/              Release and packaging scripts
+.goreleaser.yml       Static archive build matrix
 ```
 
-All three checks run in CI on every push and pull request to the `main` branch.
+## Releases
 
-### Project structure
+Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml):
 
-```
-src/symeraseme/
-  cli/           — Typer CLI application
-  core/          — Event store, projections, tick engine, templating, scheduler
-  registry/      — Broker loader, schema validation
-  services/      — CLI command handlers
-  adapters/      — Web (Playwright), Triage (Claude), Email (SMTP/IMAP)
-registry/
-  brokers/       — YAML broker definitions (eu/, uk/, us/)
-  laws/          — Jinja2 legal templates (GDPR, CCPA, rebuttals)
-  schemas/       — JSON Schema for broker validation
-skills/          — LLM agent skill files (Claude Code, Cursor, Windsurf, Hermes, Copilot, Codex)
-examples/        — Integration examples for all supported AI agents
-AGENTS.md        — Setup guide for all AI agent integrations
-```
+1. GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64
+   and creates the GitHub release.
+2. The macOS job builds the SwiftUI app and uploads the versioned DMG to that
+   release. Signing/notarization status is recorded explicitly.
+3. The Homebrew publisher downloads the exact release archives, verifies their
+   checksums, and updates `danieljustus/homebrew-tap/Formula/symeraseme.rb`.
 
-### Exit codes
+The legacy package publisher is no longer tag-triggered. The archived tag
+`python-final` remains available for historical recovery; new distribution
+work is binary-first.
 
-Symaira EraseMe uses standard exit codes for scripting:
+## Documentation
 
-- `0` — Command completed successfully
-- `1` — General error (validation failure, database error, etc.)
-- `2` — Configuration error (missing/invalid identity profile, bad settings)
-- `3` — Network error (connection failures, e.g. IMAP/SMTP/HTTP)
-
-## Troubleshooting
-
-### No identity profile found
-
-```
-Error: No identity profile found. Run 'symeraseme init-profile' first.
-```
-
-Create your identity profile before using any other commands:
-
-```bash
-symeraseme init-profile
-```
-
-### Database not initialized
-
-If you see database errors, initialize the schema:
-
-```bash
-symeraseme db-init
-```
-
-### IMAP password not set
-
-For inbox triage commands (`poll-inbox`, `classify-reply`), ensure IMAP credentials are configured:
-
-```bash
-export IMAP_PASSWORD="your-app-password"
-```
-
-Use an app password if 2FA is enabled on your email account.
-
-### CAPTCHA solver unavailable
-
-Web-form automation requires a CAPTCHA solver. Set the Capsolver API key:
-
-```bash
-export CAPSOLVER_API_KEY="CAP-..."
-```
-
-### pydantic_core compatibility error on macOS
-
-If you see a `LINKEDIT alignment` error on macOS 27 (Tahoe), reinstall pydantic_core from source:
-
-```bash
-pip install --force-reinstall --no-binary pydantic_core pydantic-core
-```
-
-### LLM provider not available
-
-For triage commands, ensure your LLM provider API key is set:
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-Or use OpenAI:
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-### Consent required for destructive commands
-
-Commands like `plan execute` require explicit consent. Use the `--yes` flag for non-interactive mode:
-
-```bash
-symeraseme plan execute --campaign initial --yes
-```
-
-Or issue a consent token:
-
-```bash
-symeraseme grant execute --ttl 3600
-```
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Development](#development)
-section for setup, tests, and linting. The broker registry is maintained
-automatically — see [Registry maintenance](#registry-maintenance).
-
-## Security
-
-- **Identity profile encryption**: Profiles are encrypted with AES-256-GCM and authenticated with the header as AAD. Files written since v0.1.2 use header `version: 2`; earlier files used `version: 1`. A legacy no-AAD fallback exists for `version: 0` files only — any tampered ciphertext on version 1+ fails closed with `InvalidTag`.
-- **Database encryption**: When `SYMERASEME_ENCRYPT_DB=1` is set, the SQLite database is encrypted at rest using AES-256-GCM with a key derived from your identity master key. Databases created before v0.2.0 used a fixed PBKDF2 salt (V1 format); newer databases use a per-file random salt (V2 format). On open, any V1 database is automatically re-encrypted to V2 transparently — no manual migration is required. On open, the database is decrypted to a temporary file with restrictive permissions (`0o600`). The temp file is placed in a secure temporary directory. On Linux `/dev/shm` (tmpfs, memory-backed) is used when available. On macOS and Windows the OS temp directory is used, which may be disk-backed. On normal exit, SIGTERM, or context close, the temp file is re-encrypted and removed. A startup scavenger removes any stale temp files older than 5 minutes from previous aborted runs. A `SIGKILL` (e.g., `kill -9`, OOM killer, or system crash) may leave the decrypted temp file behind temporarily; the 5-minute scavenger window limits exposure. If this is a concern for your threat model, consider running Symaira EraseMe on a single-user system, using full-disk encryption, or setting `TMPDIR` to a RAM disk (e.g., `/dev/shm` on Linux).
-- **Consent tokens**: Consent tokens passed via `--consent` or the `SYMERASEME_CONSENT` environment variable are visible in process listings (`ps aux`), shell history, and crash dumps. On shared systems or CI runners, prefer `--consent-file` or `SYMERASEME_CONSENT_FILE` to read the token from a file with `0o600` permissions. The file is read once and the token is consumed (`consume_token`) after verification. Pipe-based input is supported: `echo $TOKEN | symeraseme plan execute --consent-file /dev/stdin`.
-
-For private security reports, open a private security advisory via
-GitHub Security Advisories (**Security → Report a vulnerability**).
+- [Contributing](CONTRIBUTING.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [MCP contract](docs/mcp-contract.md)
+- [Event-store contract](docs/event-store.md)
+- [Registry contract](docs/registry-contract.md)
+- [Go test classification](docs/go-test-port-classification.md)
+- [Agent skill bundle](skills/SKILL.md)
 
 ## License
 

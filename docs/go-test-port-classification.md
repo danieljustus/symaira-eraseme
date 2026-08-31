@@ -1,8 +1,8 @@
 # Python test classification for the Go port
 
-Issue #729 requires every existing Python test to have an explicit fate. This
-inventory covers all 74 files matching `tests/**/test_*.py` at the time of the
-Go coverage gate. No Python test is deleted by this change.
+This inventory records the 74 Python test files that existed before the cutover.
+The files are removed by #731; the table preserves the review decision and the
+replacement evidence for future audits.
 
 ## Classification
 
@@ -11,7 +11,8 @@ Go coverage gate. No Python test is deleted by this change.
 - **Contract replacement** — the Python test asserted a wire/schema/packaging
   contract; the Go implementation now owns that contract and tests it directly.
 - **Remove with #731** — Python-only infrastructure or provider adapter; it
-  remains in the tree until the Python implementation is removed in #731.
+  was removed in this cutover because the Go runtime has no corresponding
+  surface.
 
 | Python test | Classification | Go evidence or removal rationale |
 |---|---|---|
@@ -97,7 +98,5 @@ canonical for the runner's target OS; the exact profile gate is evaluated there
 rather than trusting rounded package summaries.
 
 `make coverage` enforces `COVERAGE_THRESHOLD ?= 75` using the profile's exact
-statement counts. The remaining Python-only files marked **Remove with #731**
-are intentionally retained until the Python implementation removal milestone;
-#731 must re-check this table and delete each file only after its replacement
-has landed and the Python CI leg is retired.
+statement counts. The Python test files listed above are now archived decisions;
+#731 removed the Python CI leg and implementation after the Go gate passed.

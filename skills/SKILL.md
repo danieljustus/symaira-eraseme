@@ -9,7 +9,6 @@ author: Symaira
 license: Apache-2.0
 platforms: [macos, linux, windows]
 required_environment_variables:
-  - ANTHROPIC_API_KEY
   - SYMERASEME_DATA_DIR
 metadata:
   hermes:

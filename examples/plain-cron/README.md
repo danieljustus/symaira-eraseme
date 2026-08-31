@@ -1,260 +1,76 @@
-# Cron-only Integration
+# Scheduled removal cycle
 
-This example shows how to run Symaira EraseMe maintenance tasks on a schedule
-using cron, without any AI agent.
+This example runs the static `symeraseme` binary from cron. It assumes the
+binary is on `PATH` and that the local profile/database were initialized.
 
-## Prerequisites
+## Install
 
-- Symaira EraseMe installed (`uv sync`)
-- Email account configured for IMAP polling
-- Consent token issued for automated execution
-- `ANTHROPIC_API_KEY` set (for triage)
+```bash
+brew install danieljustus/tap/symeraseme
+symeraseme init-profile
+```
 
-## Crontab entries
+## Environment
 
-Add these entries to your crontab (`crontab -e`):
+Keep provider and mail credentials in the platform secure store or use
+`symvault://` references. Do not put resolved values in this file.
+
+```bash
+export SYMERASEME_DATA_DIR="$HOME/.local/share/symeraseme"
+export SYMERASEME_LLM_PROVIDER="shared"
+export IMAP_HOST="imap.example.com"
+export IMAP_PORT="993"
+export IMAP_USERNAME="user@example.com"
+```
+
+## Cron entries
+
+Use the absolute path to the installed binary when cron does not load the
+interactive shell `PATH`:
 
 ```cron
-# ┌───────────── minute (0-59)
-# │ ┌───────────── hour (0-23)
-# │ │ ┌───────────── day of month (1-31)
-# │ │ │ ┌───────────── month (1-12)
-# │ │ │ │ ┌───────────── day of week (0-7, 0=Sun)
-# │ │ │ │ │
-# * * * * * command_to_execute
+# Daily deadline tick at 09:00
+0 9 * * * /usr/local/bin/symeraseme tick --output json >> "$HOME/.local/state/symeraseme/tick.log" 2>&1
 
-# ── Daily maintenance ──────────────────────────────────
-# Poll inbox at 08:00 and 18:00 daily
-0 8,18 * * * cd /home/jane/symeraseme && ./cron/poll-inbox.sh >> ./cron/logs/poll.log 2>&1
-
-# Run tick engine at 08:30 daily
-30 8 * * * cd /home/jane/symeraseme && ./cron/tick.sh >> ./cron/logs/tick.log 2>&1
-
-# ── Weekly maintenance ─────────────────────────────────
-# Classify unmatched replies every Monday at 09:00
-0 9 * * 1 cd /home/jane/symeraseme && ./cron/classify-replies.sh >> ./cron/logs/classify.log 2>&1
-
-# ── Quarterly maintenance ──────────────────────────────
-# Re-scan on the first day of each quarter at 10:00
-0 10 1 1,4,7,10 * cd /home/jane/symeraseme && ./cron/quarterly-rescan.sh >> ./cron/logs/rescan.log 2>&1
+# Daily inbox poll at 10:00
+0 10 * * * /usr/local/bin/symeraseme poll-inbox --host "$IMAP_HOST" --port "$IMAP_PORT" --username "$IMAP_USERNAME" --output json >> "$HOME/.local/state/symeraseme/inbox.log" 2>&1
 ```
 
-## Helper scripts
-
-### `cron/poll-inbox.sh`
+Generate native schedules for the current platform instead of maintaining cron
+manually:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "$(dirname "$0")/.."
-
-# Source environment
-source ./cron/env.sh
-
-echo "[$(date)] Starting inbox poll..."
-
-uv run symeraseme poll-inbox \
-  --host "$IMAP_HOST" \
-  --port "$IMAP_PORT" \
-  --username "$IMAP_USERNAME" \
-  --password "$IMAP_PASSWORD" \
-  --since 3 \
-  --output json 2>&1
-
-echo "[$(date)] Inbox poll complete."
+symeraseme generate-scheduler --platform cron --output ./schedules
+symeraseme schedule status --platform cron
 ```
 
-### `cron/tick.sh`
+## First run
+
+Always plan and inspect a campaign before any destructive execution:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "$(dirname "$0")/.."
-source ./cron/env.sh
-
-echo "[$(date)] Running tick engine..."
-
-uv run symeraseme tick --output json 2>&1
-
-echo "[$(date)] Tick complete."
+CAMPAIGN="initial"
+symeraseme plan create --campaign "$CAMPAIGN" --max 5 --output json
+symeraseme plan show --campaign "$CAMPAIGN" --output json
+symeraseme execute --campaign "$CAMPAIGN" --dry-run --output json
 ```
 
-### `cron/classify-replies.sh`
+After explicit user consent, issue a short-lived token and execute the reviewed
+plan:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "$(dirname "$0")/.."
-source ./cron/env.sh
-
-echo "[$(date)] Classifying unmatched replies..."
-
-# Get unmatched requests
-uv run symeraseme requests list --status PENDING --output json | \
-  python3 -c "
-import json, sys, subprocess
-data = json.load(sys.stdin)
-for req in data:
-    rid = req.get('id')
-    if rid:
-        print(f'Classifying request #{rid}...')
-        result = subprocess.run(
-            ['uv', 'run', 'symeraseme', 'classify-reply', str(rid), '--api-key', '$ANTHROPIC_API_KEY'],
-            capture_output=True, text=True
-        )
-        print(result.stdout)
-        if result.stderr:
-            print(f'  Error: {result.stderr}', file=sys.stderr)
-"
-
-echo "[$(date)] Classification complete."
+symeraseme grant execute --ttl 3600
+symeraseme execute --campaign "$CAMPAIGN" --consent-file /path/to/token
 ```
 
-### `cron/quarterly-rescan.sh`
+## Monitoring
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "$(dirname "$0")/.."
-source ./cron/env.sh
-
-QUARTER=$(date +%Y-q$(( ($(date +%-m)-1)/3+1 )))
-CAMPAIGN="rescan-$QUARTER"
-
-echo "[$(date)] Starting quarterly re-scan ($CAMPAIGN)..."
-
-# Plan the campaign
-uv run symeraseme plan create --campaign "$CAMPAIGN" --output json 2>&1
-
-# Dry-run first
-uv run symeraseme execute --campaign "$CAMPAIGN" --dry-run --output json 2>&1
-
-# Execute (requires valid consent token in env)
-if [ -n "${CONSENT_TOKEN:-}" ]; then
-  uv run symeraseme execute \
-    --campaign "$CAMPAIGN" \
-    --batch-size 5 \
-    --consent "$CONSENT_TOKEN" \
-    --output json 2>&1
-else
-  echo "  SKIP: No CONSENT_TOKEN set — execution requires manual consent."
-fi
-
-echo "[$(date)] Quarterly re-scan complete."
+symeraseme requests list --status pending --output json | jq .
+symeraseme calendar --weeks 4 --output json | jq .
+symeraseme generate-report --all-campaigns
 ```
 
-### `cron/env.sh`
-
-```bash
-#!/usr/bin/env bash
-# ── Cron environment for Symaira EraseMe ────────────────────
-# Source this file from all cron helper scripts.
-
-# Symaira EraseMe paths
-export SYMERASEME_DATA_DIR="${SYMERASEME_DATA_DIR:-$HOME/.symeraseme}"
-export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH"
-
-# IMAP settings
-export IMAP_HOST="${IMAP_HOST:-imap.gmail.com}"
-export IMAP_PORT="${IMAP_PORT:-993}"
-export IMAP_USERNAME="${IMAP_USERNAME:-jane@gmail.com}"
-export IMAP_PASSWORD="${IMAP_PASSWORD:-app-password-here}"
-
-# LLM API key (for classify-reply)
-export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-sk-ant-...}"
-
-# Consent token for automation (issue via: symeraseme grant execute --ttl 86400)
-# Refresh this token regularly to maintain security
-export CONSENT_TOKEN="${CONSENT_TOKEN:-}"
-
-# Optional: CAPTCHA solving
-export CAPSOLVER_API_KEY="${CAPSOLVER_API_KEY:-}"
-
-# Project directory (auto-detected by default)
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$PROJECT_DIR"
-```
-
-## Log rotation
-
-Create `cron/logrotate.conf`:
-
-```
-/home/jane/symeraseme/cron/logs/*.log {
-    daily
-    rotate 30
-    compress
-    delaycompress
-    missingok
-    notifempty
-    copytruncate
-}
-```
-
-Install via:
-
-```bash
-sudo cp cron/logrotate.conf /etc/logrotate.d/symeraseme
-```
-
-## Email notification on errors
-
-### Option A: cron MAILTO
-
-Add at the top of your crontab:
-
-```cron
-MAILTO=jane@example.com
-```
-
-cron will email any stdout/stderr output from failed commands.
-
-### Option B: Custom notification script
-
-Create `cron/notify.sh`:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-SUBJECT="$1"
-BODY="$2"
-
-# Send via msmtp or similar
-echo "Subject: [Symaira EraseMe] $SUBJECT
-To: jane@example.com
-
-$BODY" | msmtp --from=cron@example.com jane@example.com
-```
-
-Then pipe errors:
-
-```bash
-0 8 * * * cd /home/jane/symeraseme && ./cron/poll-inbox.sh 2>&1 | \
-  mail -s "Symaira EraseMe: poll-inbox failed" jane@example.com || true
-```
-
-## Best practices
-
-1. **Consent tokens**: Issue a 24h token for daily cron jobs. Re-issue weekly.
-   ```bash
-   symeraseme grant execute --ttl 86400
-   ```
-2. **Log rotation**: Always set up log rotation to prevent disk fill.
-3. **Dry-run first**: Run new cron jobs manually once to verify the setup.
-4. **Monitor failures**: Use MAILTO or notification scripts to catch errors.
-5. **Stagger tasks**: Space out polling and tick to avoid rate limits.
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| cron not executing | Check `cron.env` has correct paths and `PATH` is set |
-| "Command not found" | Use absolute paths or set `PATH` in env.sh |
-| IMAP auth fails | Refresh IMAP password; Gmail requires app-specific password |
-| Consent expired | Re-issue consent token via `symeraseme grant execute --ttl <seconds>` |
-| Logs growing | Set up log rotation via `logrotate` |
+The scheduler never replaces review of destructive actions. Keep logs local,
+redact identity data before sharing diagnostics, and remove temporary test
+schedules after verification.

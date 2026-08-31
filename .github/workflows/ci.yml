@@ -3,174 +3,89 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
   schedule:
-    - cron: '33 5 * * 1'  # weekly Monday 05:33 UTC — full matrix incl. macOS
+    - cron: '33 5 * * 1'
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 permissions:
   contents: read
 
-# CodeQL default setup scans Python and Actions. Swift is excluded because the
-# macOS app depends on the private symaira-appkit repository, which the
-# repository-level GitHub token cannot clone during CodeQL autobuild.
-
 jobs:
   lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: "3.11"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "latest"
-      - name: Install dependencies
-        run: uv sync --frozen --all-extras
-      - name: Ruff lint
-        run: uv run ruff check src/symeraseme/
-      - name: Ruff format check
-        run: uv run ruff format --check src/symeraseme/
-      - name: MyPy type check
-        run: uv run mypy src/symeraseme/
-      - name: Check for raw typer.echo error emissions
+          go-version: '1.26.5'
+      - name: Check formatting and lint
         run: |
-          if grep -rn 'typer\.echo.*err=True' src/symeraseme/services/; then
-            echo "ERROR: Found raw typer.echo error emissions. Use render_error() or print_error() instead."
-            exit 1
-          fi
-          echo "OK: No raw typer.echo error emissions found."
-      - name: Check render_error() terminal placement
-        run: uv run python scripts/check_render_error_terminal.py
+          make fmt-check
+          make lint
 
   test:
+    name: test (3.12)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # PR gate is Python 3.12 only; full matrix runs on main pushes and weekly schedule.
-        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.11", "3.12", "3.13"]') }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "latest"
-      - name: Install dependencies
-        run: uv sync --frozen --all-extras
-      # Single suite pass: with coverage on main/schedule, without on PRs.
-      # (Previously the suite ran twice per matrix version: "Run tests" + "Coverage check".)
-      - name: Run tests
+          go-version: '1.26.5'
+      - name: Build and test
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            uv run pytest -n auto --verbose --tb=short
-          else
-            uv run pytest -n auto --cov=src/symeraseme/ --cov-branch --cov-report=term-missing --cov-fail-under=75 --verbose --tb=short
-          fi
-
-  test-macos:
-    name: Test on macOS
-    # Weekly schedule only — macOS runners are the slowest leg and are not
-    # needed as a per-push gate (ubuntu matrix covers every push/PR).
-    if: github.event_name == 'schedule'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "latest"
-      - name: Install dependencies
-        run: uv sync --frozen --all-extras
-      - name: Run tests
-        run: uv run pytest --verbose --tb=short
-      - name: Verify CLI loads on macOS
-        run: uv run symeraseme --help
+          make build
+          make test
+          make test-race
 
   schema-validate:
+    name: schema-validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: "3.11"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "latest"
-      - name: Install dependencies
-        run: uv sync --frozen --all-extras
-      - name: Validate registry YAMLs against schema
+          go-version: '1.26.5'
+      - name: Validate embedded registry
         run: |
-          uv run python -c "
-          import yaml, json, jsonschema, sys
-          from pathlib import Path
-
-          schema_path = Path('registry/schemas/broker.schema.json')
-          if schema_path.exists():
-              with open(schema_path) as f:
-                  schema = json.load(f)
-              for yml in Path('registry/brokers').rglob('*.yaml'):
-                  if yml.name.startswith('_'):
-                      continue
-                  with open(yml) as f:
-                      data = yaml.safe_load(f)
-                  try:
-                      jsonschema.validate(data, schema)
-                      print(f'  ✓ {yml}')
-                  except jsonschema.ValidationError as e:
-                      print(f'  ✗ {yml}: {e.message}')
-                      sys.exit(1)
-                  broker_id = data.get('id', '')
-                  stem = yml.stem
-                  if broker_id and broker_id != stem:
-                      print(f'  ✗ {yml}: id={broker_id!r} != stem={stem!r}')
-                      sys.exit(1)
-          else:
-              print('  Schema not yet created — skipping validation')
-          "
-      - name: Check MCP tool schemas match handler signatures
-        run: uv run python scripts/check_mcp_schema_sync.py
+          make build
+          ./symeraseme registry validate
 
   vuln-scan:
+    name: vuln-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: "3.11"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "latest"
-      - name: Audit dependencies for known vulnerabilities
-        run: uv tool run pip-audit --path .
+          go-version: '1.26.5'
+      - name: Audit Go dependencies
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   secrets-scan:
+    name: secrets-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: TruffleHog secrets scan
         uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
         with:
           path: ./
-          # Der Lob-Detektor matcht Testfunktionsnamen ("test_*" ist auch das
-          # Praefix-Format der Lob-Sandbox-Keys) und "verifiziert" sie gegen die
-          # Sandbox-API -> 34 False Positives in tests/. Keine echten Secrets.
-          # Der Action-Input heisst extra_args, nicht exclude-detectors.
           extra_args: --exclude-detectors Lob

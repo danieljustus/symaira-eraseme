@@ -1,7 +1,8 @@
 SHELL := /bin/sh
 
 BINARY := symeraseme
-VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo dev)
+RAW_VERSION := $(shell git describe --exact-match --tags 2>/dev/null || true)
+VERSION ?= $(if $(filter v%,$(RAW_VERSION)),$(patsubst v%,%,$(RAW_VERSION)),dev)
 GO ?= go
 CGO_ENABLED ?= 0
 GOFLAGS ?=

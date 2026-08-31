@@ -3,10 +3,9 @@
 **Status:** pinned · **Schema version:** `1` · **Manifest:** `registry/manifest.json`
 
 This document is the language-neutral contract for the data broker registry.
-It exists so a second implementation (the Go port, milestone v1.0.0) can be
-built and verified against the same rules without reading Python. The Python
-loader (`src/symeraseme/registry/loader.py`) and its tests are one conformance
-implementation of this document; the Go loader will be the second.
+These behaviors are part of the committed registry contract and are verified
+by the Go loader. The pre-cutover loader and tests are preserved only at the
+`python-final` tag for historical comparison.
 
 ## 1. Versioning
 
@@ -132,16 +131,13 @@ Two independent checkers must both pass for any change to the registry:
 
 1. **Schema validation** — every non-`_` YAML under `registry/brokers/**`
    validates against `registry/schemas/broker.schema.json` and `id` equals
-   the file stem. Python checkers:
-   - CI job `schema-validate` (`.github/workflows/ci.yml`)
-   - `tests/unit/test_registry_contract.py::test_every_live_broker_document_validates_against_pinned_schema`
+   the file stem. The Go CI job `schema-validate` and
+   `internal/registry` tests enforce this rule.
 2. **Loader conformance** — the golden fixtures
    (`tests/fixtures/registry-contract/`) load through the runtime loader
-   unchanged, and the invalid fixture is rejected:
-   `tests/unit/test_registry_contract.py`.
+   unchanged, and the invalid fixture is rejected by the Go loader tests.
 
-The Go conformance suite (milestone v1.0.0) will run the same two checks
-against the same files.
+The Go conformance suite runs these same two checks against the same files.
 
 ## 8. Golden fixtures
 
@@ -155,8 +151,8 @@ against the same files.
 
 ## 9. Implicit behaviours (traps for the port)
 
-These are behaviorally true in the Python implementation today and must be
-replicated, but are not visible in the schema:
+These behaviors are part of the committed registry contract and are verified
+by the Go loader; the pre-cutover implementation is historical context only.
 
 - `template`/`locale`/`required_fields`/`supports_suppression`/
   `expected_response_days` are **not** email-only in practice — web_form

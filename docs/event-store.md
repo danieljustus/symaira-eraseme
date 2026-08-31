@@ -3,9 +3,9 @@
 **Status:** pinned · **Schema version:** `1` (PRAGMA user_version) · **Scope:** milestone v1.0.0 (Go port)
 
 This document specifies the on-disk format of the Symaira EraseMe event
-store so the Go port can read and write the **same database files** real
-users have today. The Python implementation is conformance implementation
-#1; the Go port is #2. The golden fixture
+store so the Go port can read and write the same database files used by the
+pre-cutover implementation. The archived implementation is available at the
+`python-final` tag. The golden fixture
 (`tests/fixtures/event-store/golden-campaign.db` + `golden-projection.json`)
 is the executable part of this contract: the Go projection must reproduce
 the exact JSON from the exact SQLite file.
@@ -82,8 +82,8 @@ tie-breaker makes same-instant events deterministic.
 | `reminders_sent` | INTEGER NOT NULL | from REMINDER_SENT payload `count` (or 1) |
 | `escalation_level` | INTEGER NOT NULL | DEADLINE_REACHED→1, DPA_COMPLAINT_DRAFTED→2 |
 
-The projection is **derived, not authoritative**: `rebuild_state()` replays
-the log and recomputes every column; `upsert_state()` writes it;
+The projection is **derived, not authoritative**: `RebuildState` replays
+the log and recomputes every column; `UpsertState` writes it;
 `append_event_and_project()` writes event+projection atomically in one
 transaction. `rebuild_all_states()` rebuilds dirty rows in chunks of 100.
 The golden fixture ships with an **empty** `request_state` on purpose.
@@ -184,13 +184,13 @@ tests/fixtures/event-store/
   golden-projection.json    expected rebuilt projections (keyed by request id)
 ```
 
-Regenerate deliberately (only when the projection rules change):
-`uv run python scripts/generate_event_store_fixture.py`
+The golden fixtures are maintained as committed data. Run the Go conformance
+tests after changing the event-store contract:
+`go test ./internal/eventstore/...`
 
-Conformance: `tests/unit/test_event_store_contract.py`
-1. copies the golden DB to a temp path, sets `SYMERASEME_DB_DIR`,
-   `init_db()`, `rebuild_state()` per request, compares **exactly** against
-   `golden-projection.json`;
+Conformance: `internal/eventstore/conformance_test.go`
+1. copies the golden DB to a temp path, opens it with the Go store, rebuilds
+   state per request, and compares **exactly** against `golden-projection.json`;
 2. asserts `request_state` is empty before rebuild (projection is derived);
 3. asserts the fixture covers CONFIRMED / REJECTED_FINAL / ESCALATED paths +
    deadline derivation + reminder counter + escalation level.
@@ -200,12 +200,12 @@ JSON bytes.
 
 ## 7. Implicit behaviours (traps for the port)
 
-- `datetime('now')` defaults are UTC but space-separated; Python write path
-  uses `T`-separated. Both appear in real databases — parse both.
+- `datetime('now')` defaults are UTC but space-separated; the Go parser accepts
+  both space- and `T`-separated timestamps.
 - Replay ordering uses `(occurred_at, id)`; payload `null`/`''` must be
   treated as `{}`.
-- Unparseable timestamps or payloads during replay: Python logs and
-  **skips the event** (never aborts the rebuild) — replicate this.
+- Unparseable timestamps or payloads during replay are logged and skipped by
+  the Go projection (never aborting the rebuild).
 - `next_action_at` is never written by events; it is tick-engine bookkeeping
   and may be any value.
 - `request_state.reminders_sent` default is `0`; first REMINDER_SENT with no

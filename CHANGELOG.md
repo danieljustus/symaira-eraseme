@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.12.0] - 2026-08-31
+
+- **Go/Swift cutover**: Replace the Python runtime with a static Go CLI,
+  authenticated 26-tool MCP server, and the SwiftUI macOS client bundled with
+  the Go backend (#725, #726, #727, #731).
+- **Distribution**: Add GoReleaser archives for Linux, macOS, and Windows on
+  amd64/arm64; publish the Homebrew Formula from exact release-asset checksums;
+  keep legacy PyPI publishing manual (#730).
+- **Migration**: Add explicit, backup-first migration for pre-cutover data,
+  profiles, and scheduler units. The last pre-cutover tree is preserved at the
+  `python-final` tag (#728, #731).
+- **Verification**: Add the exact 75% Go coverage gate and classify all 74
+  pre-cutover test files with Go replacements or explicit removal rationale (#729).
+
 ## [v0.11.0] - 2026-08-27
 
 - **Registry contract**: Broker registry schema is now versioned (`schema_version` in

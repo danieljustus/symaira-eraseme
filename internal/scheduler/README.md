@@ -1,6 +1,6 @@
 # Go scheduler integration
 
-`internal/scheduler` ports the Python scheduler integration without relying on
+`internal/scheduler` provides the cross-platform scheduler integration without relying on
 ambient `PATH` resolution. An empty `Config.BinaryPath` resolves to the exact
 absolute path returned by `os.Executable`; an explicit path is preserved
 verbatim in generated wrappers.
@@ -21,9 +21,9 @@ command runner seam for tests.
 Before installing launchd or systemd units, `Install` scans the native user
 unit directory. Existing Symaira unit names are returned as replacement
 candidates, and installation returns `ErrLegacyUnits` unless
-`InstallOptions.ReplaceLegacy` is explicitly true. Python runtime markers are
-reported on `LegacyUnit.IsPython`. This prevents the Go port from silently
-coexisting with a Python schedule or overwriting it without consent.
+`InstallOptions.ReplaceLegacy` is explicitly true. Legacy markers are reported
+on `LegacyUnit` so the Go scheduler never silently overwrites an existing
+schedule without consent.
 
 Cron schedules use the marked `# Symaira EraseMe scheduled tasks` block and are
 replaced only by the cron lifecycle helper; unrelated crontab entries are
