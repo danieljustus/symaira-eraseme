@@ -94,6 +94,17 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
 
     // MARK: - Bundled and development binaries
 
+    func testBundledBinaryPathPrefersHelpersDirectory() throws {
+        let resources = tempDir.appendingPathComponent("Symaira EraseMe.app/Contents/Resources")
+        let helpers = resources.deletingLastPathComponent().appendingPathComponent("Helpers")
+        try FileManager.default.createDirectory(at: helpers, withIntermediateDirectories: true)
+        let binary = helpers.appendingPathComponent("symeraseme")
+        try Data("go-server".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+
+        XCTAssertEqual(ServerManager.bundledBinaryPath(resourceURL: resources), binary.path)
+    }
+
     func testBundledBinaryPathFindsExecutableInResources() throws {
         let resources = tempDir.appendingPathComponent("Symaira EraseMe.app/Contents/Resources")
         try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
