@@ -107,9 +107,10 @@ if [ -n "${CODESIGN_IDENTITY:-}" ]; then
         "$APP_BUNDLE/Contents/Resources/symeraseme"
     codesign --verify --strict --verbose=2 \
         "$APP_BUNDLE/Contents/Resources/symeraseme"
-    codesign --deep --force --timestamp --options runtime \
+    codesign --force --timestamp --options runtime \
         -s "$CODESIGN_IDENTITY" \
         "$APP_BUNDLE"
+    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
     echo "Verifying signature..."
     codesign -dvvv "$APP_BUNDLE" 2>&1 | head -5
 else
