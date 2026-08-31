@@ -48,17 +48,17 @@ jobs:
   release-gui:
     name: Release / macOS GUI DMG
     needs: release-cli
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success') }}
+    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success')) }}
     runs-on: macos-15
     environment: release
     env:
-      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
     steps:
       - name: Checkout tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_tag || github.ref }}
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -99,7 +99,7 @@ jobs:
 
       - name: Build and package GUI DMG
         env:
-          VERSION: ${{ inputs.release_tag || github.ref_name }}
+          VERSION: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           ./scripts/package-dmg.sh
