@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to build the GUI DMG for'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -14,6 +20,7 @@ concurrency:
 
 jobs:
   release-cli:
+    if: github.event_name == 'push'
     name: Release / CLI and Homebrew Formula
     runs-on: ubuntu-latest
     steps:
@@ -41,14 +48,23 @@ jobs:
   release-gui:
     name: Release / macOS GUI DMG
     needs: release-cli
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success') }}
     runs-on: macos-15
     environment: release
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - name: Checkout tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.release_tag || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+          cache: true
 
       - name: Import Developer ID certificate
         id: signing
@@ -83,18 +99,18 @@ jobs:
 
       - name: Build and package GUI DMG
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           ./scripts/package-dmg.sh
-          DMG="dist/Symaira-EraseMe-${VERSION#v}-macos.dmg"
+          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
           test -f "$DMG"
           shasum -a 256 "$DMG"
 
       - name: Verify DMG bundle contents
         run: |
           set -euo pipefail
-          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
+          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
           MOUNT_POINT="$RUNNER_TEMP/symaira-dmg-mount"
           mkdir -p "$MOUNT_POINT"
           hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT_POINT"
@@ -103,7 +119,7 @@ jobs:
           test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/Symaira EraseMe"
           test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/Resources/symeraseme"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
-          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
 
       - name: Notarize and staple signed DMG
         if: steps.signing.outputs.signed == 'true'
@@ -120,7 +136,7 @@ jobs:
             fi
           done
           KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
-          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
+          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
           printf '%s' "$NOTARY_API_KEY" | base64 --decode > "$KEY_FILE"
           chmod 600 "$KEY_FILE"
           RESPONSE="$RUNNER_TEMP/notary-response.json"
@@ -140,8 +156,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          DMG="dist/Symaira-EraseMe-${GITHUB_REF_NAME#v}-macos.dmg"
-          gh release upload "$GITHUB_REF_NAME" "$DMG" --repo "$GITHUB_REPOSITORY" --clobber
+          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
+          gh release upload "$RELEASE_TAG" "$DMG" --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Record GUI signing status in release notes
         env:
@@ -149,14 +165,14 @@ jobs:
         run: |
           set -euo pipefail
           NOTES="$RUNNER_TEMP/release-notes.md"
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$NOTES"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$NOTES"
           printf '\n\n### macOS GUI distribution\n' >> "$NOTES"
           if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
             printf '%s\n' 'The GUI DMG was signed with Developer ID Application, notarized, and stapled.' >> "$NOTES"
           else
             printf '%s\n' 'The GUI DMG is ad-hoc/unsigned because no Developer ID certificate was configured; it is not presented as Gatekeeper-ready.' >> "$NOTES"
           fi
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
 
       - name: Clean up signing material
         if: always()
