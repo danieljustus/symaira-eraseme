@@ -31,7 +31,7 @@ func addCommandSurface(root *cobra.Command) {
 		"init-profile", "show-profile", "render-template", "grant", "status",
 		"calendar", "dashboard", "generate-report", "generate-dashboard",
 		"generate-scheduler", "requests", "events", "manual-tasks",
-		"review", "mcp",
+		"review",
 	} {
 		root.AddCommand(unsupportedCommand(name))
 	}
