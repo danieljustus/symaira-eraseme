@@ -183,8 +183,8 @@ final class ServerManager: ObservableObject {
     ///
     /// Discovery order:
     /// 1. User-configured Binary Path — always honoured when executable.
-    /// 2. The binary bundled in the app's Helpers directory (with a
-    ///    Resources fallback for older app bundles).
+    /// 2. The binary bundled in the app's MacOS directory (with Helpers and
+    ///    Resources fallbacks for older app bundles).
     /// 3. A sibling binary from the local Swift Package Manager build.
     /// 4. Homebrew/PATH, using BinaryLocator's strict check followed by the
     ///    app's safe Homebrew-compatible directory scan.
@@ -254,6 +254,7 @@ final class ServerManager: ObservableObject {
         guard let resourceURL else { return nil }
         let contentsURL = resourceURL.deletingLastPathComponent()
         let candidates = [
+            contentsURL.appendingPathComponent("MacOS/symeraseme").path,
             contentsURL.appendingPathComponent("Helpers/symeraseme").path,
             resourceURL.appendingPathComponent("symeraseme").path,
         ]

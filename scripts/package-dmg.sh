@@ -52,13 +52,12 @@ echo "Creating App Bundle structure..."
 rm -rf "$STAGE_DIR"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
-mkdir -p "$APP_BUNDLE/Contents/Helpers"
 
 echo "Copying Swift and Go binaries..."
 cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-cp "$GO_BINARY" "$APP_BUNDLE/Contents/Helpers/symeraseme"
-chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/Helpers/symeraseme"
-test -x "$APP_BUNDLE/Contents/Helpers/symeraseme"
+cp "$GO_BINARY" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
 
 echo "Writing Info.plist..."
 cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
@@ -110,7 +109,7 @@ if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     codesign --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
-        "$APP_BUNDLE/Contents/Helpers/symeraseme"
+        "$APP_BUNDLE/Contents/MacOS/symeraseme"
     codesign --deep --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
