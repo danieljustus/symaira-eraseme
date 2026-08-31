@@ -282,5 +282,3 @@ func realRegistryCommand() *cobra.Command {
 	group.AddCommand(list, validate)
 	return group
 }
-
-func unsupportedCommand(name string) *cobra.Command { return stubCommand(name) }

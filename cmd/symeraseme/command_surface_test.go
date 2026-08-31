@@ -26,6 +26,7 @@ func TestCommandVocabularyMatchesGoContracts(t *testing.T) {
 		"plan", "tick", "status", "calendar", "dashboard", "generate-report",
 		"generate-dashboard", "generate-scheduler", "schedule", "registry",
 		"requests", "events", "brokers", "manual-tasks", "review", "config", "mcp",
+		"poll-inbox", "classify-reply", "generate-rebuttal", "auto-confirm", "run-web-form", "serve",
 	} {
 		if childCommand(name, root) == nil {
 			t.Errorf("missing top-level command %q", name)

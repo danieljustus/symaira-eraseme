@@ -20,35 +20,26 @@ func addCommandSurface(root *cobra.Command) {
 		tickCommandWith(new(bool)),
 	)
 	schedule := commandGroup("schedule")
-	for _, name := range []string{"install", "uninstall", "status"} {
-		schedule.AddCommand(unsupportedCommand(name))
-	}
+	schedule.AddCommand(realScheduleInstallCommand(), realScheduleUninstallCommand(), realScheduleStatusCommand())
 	root.AddCommand(schedule)
 	config := commandGroup("config")
 	config.AddCommand(configShowCommand())
 	root.AddCommand(config)
-	for _, name := range []string{
-		"init-profile", "show-profile", "render-template", "grant", "status",
-		"calendar", "dashboard", "generate-report", "generate-dashboard",
-		"generate-scheduler", "requests", "events", "manual-tasks",
-		"review",
-	} {
-		root.AddCommand(unsupportedCommand(name))
-	}
+
+	root.AddCommand(
+		realInitProfileCommand(), realShowProfileCommand(), realRenderTemplateCommand(),
+		realGrantCommand(), realStatusCommand(), realGetCalendarCommand(),
+		realGetDashboardDataCommand(), realGenerateReportCommand(), realGenerateDashboardCommand(),
+		realGenerateSchedulerCommand(), realRequestsCommand(), realEventsCommand(),
+		realManualTasksCommand(), realRedactFileCommand(), realPollInboxCommand(), realClassifyReplyCommand(),
+		realGenerateRebuttalCommand(), realAutoConfirmCommand(), realRunWebFormCommand(),
+	)
+	root.AddCommand(realScheduleCommand())
+
 }
 
 func commandGroup(name string) *cobra.Command {
 	return &cobra.Command{Use: name, Short: fmt.Sprintf("%s commands", name)}
-}
-
-func stubCommand(name string) *cobra.Command {
-	return &cobra.Command{
-		Use:   name,
-		Short: fmt.Sprintf("%s command", name),
-		RunE: func(*cobra.Command, []string) error {
-			return fmt.Errorf("%s is not implemented in the current Go port", name)
-		},
-	}
 }
 
 func configShowCommand() *cobra.Command {
