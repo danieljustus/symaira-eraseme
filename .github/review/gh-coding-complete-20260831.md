@@ -1,0 +1,29 @@
+# gh-coding-complete run report
+
+- status: completed
+- started_at: 2026-08-31T18:17:38+02:00
+- completed_at: 2026-08-31T21:15:57Z
+- repo: danieljustus/symaira-eraseme
+- branch: main
+- head_sha: 34387bc10a9b596a5b33bba6470709b5af7406d1
+- last_verified_sha: 34387bc10a9b596a5b33bba6470709b5af7406d1
+- current_phase: cleanup
+- sync: synced; local main exactly matches origin/main; obsolete security worktree/branch removed after byte-identical tree verification
+- foreign_wip: none
+- pr: 0 open after merging recovery PRs #767, #769, #771, #773, #774, #775, #776, #777, #778, #779, #780, #781, #782, #783, and #785
+- issues: 0 open after verified closure of tracking epic #732 and release recovery issues #766, #768, #770, #772, and #784; leaves #707–#731 and cross-repo dependencies #280/#281 closed
+- security: code-scanning=0, secret-scanning=0, dependabot=0
+- default_branch_ci: successful CI matrix verified for all recovery PRs; final release recovery run 33440207644 completed successfully on main@34387bc
+- release: v0.12.0 published; existing tag remains at audited source HEAD 8fa45a5; recovery DMG built from current main source, notarized, stapled, validated, and uploaded
+- release_assets: checksums.txt, Symaira-EraseMe-0.12.0-macos.dmg, and five platform archives uploaded
+- local_verification: make build, make test, make test-race, make lint, make vet, make coverage, CGO_ENABLED=0 go test -json -count=1 ./..., GoReleaser check, bash -n, YAML parse, and git diff --check passed; Swift test blocked locally by missing full Xcode/SwiftUIMacros toolchain
+- pending_human_gate: none
+- accepted_decisions: routine end-to-end execution and regular merges authorized by direct gh-coding-complete invocation
+- phase_outcomes:
+  - phase_0: complete
+  - phase_1: complete
+  - phase_2: complete; all release-recovery PRs merged after green checks
+  - phase_3: complete; closed tracking issue #732 after child/dependency verification
+  - phase_4: complete; repository audit and security state verified
+  - phase_5: complete; v0.12.0 release and GUI recovery path verified
+  - phase_6: complete; main/origin alignment and clean working tree verified
