@@ -65,3 +65,54 @@ compatible version. For pip, you may need to wait for an upstream PyO3 fix.
 - pydantic PR [#13147](https://github.com/pydantic/pydantic/pull/13147) added
   `-headerpad_max_install_names` but this only fixes `install_name_tool` padding,
   not the string pool alignment issue in PyO3-generated binaries.
+
+## Migrating a Python-era installation to the Go CLI
+
+The Go port exposes `symeraseme migrate` as a bounded, explicit migration. It
+requires separate `--source` and `--destination` directories; use
+`--source-config` and `--destination-config` when the Python defaults keep
+configuration/profile files under a separate `~/.config/symeraseme` directory.
+This prevents an
+accidental in-place rewrite while the plan is being reviewed. Start with:
+
+```bash
+symeraseme migrate --source /path/to/python-state \
+  --destination /path/to/go-state --platform launchd --dry-run --json
+```
+
+The detector reports the Python event database (`symeraseme.db`), TOML config,
+legacy encrypted profile (`identity.enc`), and Python-generated scheduler
+artifacts. If a native launchd or systemd unit is present under `--home`, it is
+reported as well. The source is retained; the destination receives the Go
+profile name (`identity.encrypted`) and generated Go scheduler content.
+
+### Backup and rollback
+
+A complete recursive copy of the selected source directory is made in
+`<destination>.migration-backup` (or `--backup`) before any destination write.
+Native scheduler files outside the source directory are copied into the backup
+as external artifacts. The backup contains a `.complete.json` marker; an
+incomplete or pre-existing unmarked backup is never overwritten.
+
+Migration writes `.migration-state.json` after the backup and after each item.
+If the process is interrupted, run the same command again with the same source,
+destination, and backup paths. Completed items are skipped and remaining items
+resume. To roll back, stop the Go scheduler if it was activated, remove or
+move the destination, and restore the backup's `source/` tree and any files in
+`external/` to their original locations. The migration command itself never
+deletes the Python source or activates native scheduler units.
+
+### Secrets and limitations
+
+Python credentials are normally in the OS keyring, not in the source tree. The
+safe default only reports keyring-backed metadata and never reads or copies
+secret values. A caller embedding the migration package may inject a
+`SecretStore` implementation and opt into copying through `CopySecrets`; the
+CLI does not provide a keychain-copy implementation. Reconfigure credentials
+manually unless an independently reviewed SecretStore is supplied.
+
+The migration is intentionally not a live-install end-to-end test: it does not
+run `launchctl`, `systemctl`, or `crontab`, and it does not verify provider
+credentials. Use `--dry-run` first, keep the backup until the Go installation
+has been exercised, and treat scheduler activation as a separate, operator-
+controlled step.

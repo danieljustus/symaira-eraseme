@@ -7,12 +7,15 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/danieljustus/symaira-corekit/logkit"
 
+	"github.com/danieljustus/symaira-eraseme/internal/mcp"
+	"github.com/danieljustus/symaira-eraseme/internal/migration"
 	"github.com/danieljustus/symaira-eraseme/internal/version"
 )
 
@@ -30,7 +33,24 @@ func newRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.PersistentFlags().String("output", "text", "output format: text or json")
 	root.AddCommand(newVersionCommand())
+	addCommandSurface(root)
+	root.AddCommand(migration.NewCommand())
+	root.AddCommand(newMCPCommand())
+	return root
+}
+
+func newMCPCommand() *cobra.Command {
+	root := &cobra.Command{Use: "mcp", Short: "Run the MCP JSON-RPC interface"}
+	root.AddCommand(&cobra.Command{
+		Use:   "serve",
+		Short: "Serve newline-delimited JSON-RPC on stdin/stdout",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return mcp.NewServer(mcp.ContractHandler()).ServeStdio(context.Background(), cmd.InOrStdin(), cmd.OutOrStdout())
+		},
+	})
 	return root
 }
 

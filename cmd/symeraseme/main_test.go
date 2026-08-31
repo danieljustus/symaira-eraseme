@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/danieljustus/symaira-corekit/versionkit"
@@ -55,6 +58,25 @@ func TestVersionCommandPlainText(t *testing.T) {
 	// "symeraseme dev" (versionkit appends "v" only when missing).
 	if len(out) == 0 {
 		t.Fatal("version printed nothing")
+	}
+}
+
+func TestMigrateCommandDryRunIsRegistered(t *testing.T) {
+	source := t.TempDir()
+	destination := filepath.Join(t.TempDir(), "destination")
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "symeraseme.db"), []byte("synthetic db"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := execute(t, "migrate", "--source", source, "--destination", destination, "--home", home, "--platform", "cron", "--dry-run", "--json")
+	if err != nil {
+		t.Fatalf("migrate dry-run returned error: %v", err)
+	}
+	if !strings.Contains(out, `"dry_run": true`) || !strings.Contains(out, "Python-era event database found") {
+		t.Fatalf("unexpected migrate output: %s", out)
+	}
+	if _, err := os.Stat(destination); !os.IsNotExist(err) {
+		t.Fatalf("dry-run created destination: %v", err)
 	}
 }
 
