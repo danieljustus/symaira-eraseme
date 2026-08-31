@@ -92,12 +92,9 @@ Go coverage gate. No Python test is deleted by this change.
 
 ## Gate and follow-up
 
-The Go gate is measured from the complete profile, not the rounded package
-summaries:
-
-```text
-5,133 / 6,842 statements = 75.021923%
-```
+The local reference run covers 5,159 / 6,842 statements = 75.40%. CI remains
+canonical for the runner's target OS; the exact profile gate is evaluated there
+rather than trusting rounded package summaries.
 
 `make coverage` enforces `COVERAGE_THRESHOLD ?= 75` using the profile's exact
 statement counts. The remaining Python-only files marked **Remove with #731**
