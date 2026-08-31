@@ -81,16 +81,24 @@ func TestSecretResolverURISplit(t *testing.T) {
 	}
 
 	// vault:// and symvault:// are both recognized as vault URIs.
+	originalResolve := resolveSharedSecret
+	t.Cleanup(func() { resolveSharedSecret = originalResolve })
 	for _, uri := range []string{"vault://x/y", "symvault://x/y"} {
 		called := false
-		opts := SecretResolver{
-			RunSymvault: func(ctx context.Context, path, vaultPath string) (string, error) {
-				called = true
-				return "from-vault", nil
-			},
-			SymvaultPath: "/fake/symvault",
+		resolveSharedSecret = func(_ context.Context, reference, envDefault string) (string, error) {
+			called = true
+			if envDefault != "" {
+				t.Errorf("env default = %q, want empty", envDefault)
+			}
+			if uri == "vault://x/y" && reference != "symvault://x/y" {
+				t.Errorf("legacy reference = %q, want symvault://x/y", reference)
+			}
+			if uri == "symvault://x/y" && reference != uri {
+				t.Errorf("canonical reference = %q, want %s", reference, uri)
+			}
+			return "from-vault", nil
 		}
-		got, err := ResolveSecret(uri, opts)
+		got, err := ResolveSecret(uri, SecretResolver{})
 		if err != nil {
 			t.Errorf("%s: %v", uri, err)
 			continue
@@ -105,13 +113,10 @@ func TestSecretResolverURISplit(t *testing.T) {
 
 	// A failing symvault call surfaces the error (no silent fallback to
 	// the raw URI — that would leak the vault path into output).
-	opts := SecretResolver{
-		RunSymvault: func(ctx context.Context, path, vaultPath string) (string, error) {
-			return "", errors.New("vault unavailable")
-		},
-		SymvaultPath: "/fake/symvault",
+	resolveSharedSecret = func(context.Context, string, string) (string, error) {
+		return "", errors.New("vault unavailable")
 	}
-	if _, err := ResolveSecret("symvault://secret/entry", opts); err == nil {
+	if _, err := ResolveSecret("symvault://secret/entry", SecretResolver{}); err == nil {
 		t.Error("failing vault lookup must error")
 	}
 }

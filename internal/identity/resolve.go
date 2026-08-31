@@ -1,180 +1,146 @@
-// Package identity — resolve.go: symvault:// and vault:// secret
-// resolution.  Mirrors src/symeraseme/core/secrets.py in the
-// Go port.
+// Package identity — resolve.go: shared secret-reference resolution with
+// an EraseMe-specific keyring fallback.  The shared corekit package owns
+// prefix parsing and hardened symvault/keychain subprocess handling.
 //
 // Resolution order (highest priority first):
 //
-//  1. Literal value (no prefix → returned as-is).
-//  2. “symvault get <path> --print“ subprocess (5s timeout).
-//  3. “env_fallback“ env var (only when symvault failed).
+//  1. Literal value (no supported URI prefix → returned as-is).
+//  2. Shared corekit secretref resolution for env://, keychain://,
+//     symvault://, and the legacy vault:// alias.
+//  3. “env_fallback“ env var (only when vault resolution fails).
 //  4. Keyring lookup (only when env_fallback also failed).
 //
-// The shorter “vault://“ form is accepted as a deprecated alias
-// and resolves to the same paths — see the AGENTS.md / README
-// section on the symvault:// vs vault:// URI split.
+// The shorter “vault://“ form is accepted as a deprecated alias and is
+// normalized to the canonical symvault:// reference before delegation.
 package identity
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
-	"time"
-
+	"github.com/danieljustus/symaira-corekit/secretref"
 	"github.com/zalando/go-keyring"
 )
 
-// Vault URI prefixes.  The order matters: the longer symvault:// is
-// checked first so that the legacy "vault://" prefix never shadows
-// the canonical one.
-var (
+// Vault URI prefixes. The order matters: the longer symvault:// is checked
+// first so that the legacy vault:// prefix never shadows the canonical one.
+const (
 	VaultPrefixSymvault = "symvault://"
 	VaultPrefixVault    = "vault://"
-	vaultPrefixes       = []string{VaultPrefixSymvault, VaultPrefixVault}
+	envPrefix           = "env://"
+	keychainPrefix      = "keychain://"
 )
 
-// SymvaultTimeout is the subprocess timeout for “symvault get“.
-// Mirrors _SYMVAULT_TIMEOUT = 5.
-const SymvaultTimeout = 5 * time.Second
-
-// ErrSecretResolution is returned when no layer can supply a
-// secret.  Wraps the underlying reason in the message but never
-// the secret value itself.
+// ErrSecretResolution is returned when no resolution layer can supply a
+// secret. The message never includes a resolved secret value.
 var ErrSecretResolution = errors.New("identity: cannot resolve secret")
 
-// SecretResolver is the per-process configuration for ResolveSecret.
-// A zero value uses the defaults (symvault on PATH, 5s timeout).
+// resolveSharedSecret is indirected for tests. Production calls always use
+// the shared corekit resolver; the indirection keeps tests independent of
+// installed binaries and OS keychain contents.
+var resolveSharedSecret = secretref.Resolve
+
+// keyringGet is indirected for tests so the EraseMe-specific final fallback
+// can be verified without reading the user's real keyring.
+var keyringGet = keyring.Get
+
+// SecretResolver is the EraseMe-specific configuration for ResolveSecret.
+// Shared URI parsing and subprocess timeouts are owned by corekit/secretref.
 type SecretResolver struct {
-	// EnvFallback, when non-empty, names the environment variable
-	// to consult if the symvault layer returns nothing.
+	// EnvFallback, when non-empty, names the environment variable to consult
+	// if a symvault reference cannot be resolved.
 	EnvFallback string
-	// KeyringService, when non-empty, names the keyring service
-	// to consult as a last resort.
+	// KeyringService, when non-empty, names the keyring service to consult as
+	// a last resort.
 	KeyringService string
-	// KeyringUsername, when non-empty, names the keyring account.
-	// Defaults to the value (sans prefix) of the vault URI.
+	// KeyringUsername, when non-empty, names the keyring account. It defaults
+	// to the value (sans URI prefix) of the vault reference.
 	KeyringUsername string
-	// Timeout overrides the default subprocess timeout.
-	Timeout time.Duration
-	// SymvaultPath overrides the symvault binary lookup.  When
-	// empty, exec.LookPath("symvault") is used.
-	SymvaultPath string
-	// LookPath is an indirection for executable lookup (tests).
-	LookPath func(string) (string, error)
-	// RunSymvault is the actual subprocess invocation.  Tests
-	// override this to skip the real CLI.
-	RunSymvault func(ctx context.Context, path, vaultPath string) (string, error)
 }
 
-// ResolveSecret evaluates the fallback chain.  When value is not
-// a vault URI it is returned as-is.  The error never includes the
-// secret value (only the env var name, which is not a secret).
+// ResolveSecret evaluates the shared secret-reference resolver and the
+// EraseMe-specific fallback chain. Non-reference values are deliberately
+// returned unchanged because existing callers pass already-resolved literal
+// credentials here.
 func ResolveSecret(value string, opts SecretResolver) (string, error) {
-	prefix := vaultPrefix(value)
-	if prefix == "" {
+	switch {
+	case strings.HasPrefix(value, envPrefix), strings.HasPrefix(value, keychainPrefix):
+		secret, err := resolveSharedSecret(context.Background(), value, "")
+		if err != nil {
+			return "", fmt.Errorf("%w: %v", ErrSecretResolution, err)
+		}
+		return secret, nil
+	case strings.HasPrefix(value, VaultPrefixSymvault), strings.HasPrefix(value, VaultPrefixVault):
+		return resolveVaultSecret(value, opts)
+	default:
 		return value, nil
 	}
+}
+
+func resolveVaultSecret(value string, opts SecretResolver) (string, error) {
+	prefix := vaultPrefix(value)
 	vaultPath := value[len(prefix):]
 	if vaultPath == "" {
 		return "", fmt.Errorf("%w: empty %s URI (provide a path like %spart/key)",
 			ErrSecretResolution, prefix, VaultPrefixSymvault)
 	}
 
-	// 1. symvault subprocess.
-	if secret, err := callSymvault(opts, vaultPath); err == nil && secret != "" {
+	reference := value
+	if prefix == VaultPrefixVault {
+		reference = VaultPrefixSymvault + vaultPath
+	}
+
+	// Corekit owns prefix parsing, path validation, the `--` separator, and
+	// the default subprocess timeout. Do not duplicate that implementation.
+	if secret, err := resolveSharedSecret(context.Background(), reference, ""); err == nil && secret != "" {
 		return secret, nil
 	}
 
-	// 2. env fallback.
+	// EraseMe-specific fallback chain for vault references.
 	if opts.EnvFallback != "" {
-		if v := os.Getenv(opts.EnvFallback); v != "" && vaultPrefix(v) == "" {
-			return v, nil
+		if value := os.Getenv(opts.EnvFallback); value != "" && !isSecretReference(value) {
+			return value, nil
 		}
 	}
 
-	// 3. keyring.
 	if opts.KeyringService != "" {
 		username := opts.KeyringUsername
 		if username == "" {
 			username = vaultPath
 		}
-		if v, err := keyring.Get(opts.KeyringService, username); err == nil && v != "" {
-			return v, nil
+		if value, err := keyringGet(opts.KeyringService, username); err == nil && value != "" {
+			return value, nil
 		}
 	}
 
-	// All layers exhausted.
-	msg := "symvault not available or returned error"
+	msg := "shared secret reference could not be resolved"
 	if opts.EnvFallback != "" {
 		msg += fmt.Sprintf(", env var %q not set", opts.EnvFallback)
 	}
 	if opts.KeyringService != "" {
 		msg += fmt.Sprintf(", keyring %q has no entry", opts.KeyringService)
 	}
-	msg += ". Set the value directly or install symvault."
+	msg += ". Set the value directly or configure a supported secret reference."
 	return "", fmt.Errorf("%w: %s", ErrSecretResolution, msg)
 }
 
 // vaultPrefix returns the matched vault prefix (or "" for none).
-func vaultPrefix(v string) string {
-	for _, p := range vaultPrefixes {
-		if strings.HasPrefix(v, p) {
-			return p
-		}
+func vaultPrefix(value string) string {
+	if strings.HasPrefix(value, VaultPrefixSymvault) {
+		return VaultPrefixSymvault
+	}
+	if strings.HasPrefix(value, VaultPrefixVault) {
+		return VaultPrefixVault
 	}
 	return ""
 }
 
-// callSymvault invokes the symvault CLI.  Tests override
-// opts.RunSymvault to return canned output without spawning a
-// process.
-func callSymvault(opts SecretResolver, vaultPath string) (string, error) {
-	if opts.RunSymvault != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), symvaultTimeout(opts))
-		defer cancel()
-		return opts.RunSymvault(ctx, opts.SymvaultPath, vaultPath)
-	}
-	bin, err := symvaultLookPath(opts)
-	if err != nil {
-		return "", err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), symvaultTimeout(opts))
-	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "get", vaultPath, "--print") //nolint:gosec // resolved path
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", err
-	}
-	if ctx.Err() == context.DeadlineExceeded {
-		return "", context.DeadlineExceeded
-	}
-	secret := strings.TrimRight(stdout.String(), "\r\n")
-	if secret == "" {
-		return "", errors.New("symvault returned empty output")
-	}
-	return secret, nil
-}
-
-func symvaultLookPath(opts SecretResolver) (string, error) {
-	if opts.SymvaultPath != "" {
-		return opts.SymvaultPath, nil
-	}
-	look := opts.LookPath
-	if look == nil {
-		look = exec.LookPath
-	}
-	return look("symvault")
-}
-
-func symvaultTimeout(opts SecretResolver) time.Duration {
-	if opts.Timeout > 0 {
-		return opts.Timeout
-	}
-	return SymvaultTimeout
+func isSecretReference(value string) bool {
+	return strings.HasPrefix(value, VaultPrefixSymvault) ||
+		strings.HasPrefix(value, VaultPrefixVault) ||
+		strings.HasPrefix(value, envPrefix) ||
+		strings.HasPrefix(value, keychainPrefix)
 }
