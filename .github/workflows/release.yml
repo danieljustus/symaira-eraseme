@@ -120,7 +120,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
           NESTED_BINARY="$MOUNT_POINT/Symaira EraseMe.app/Contents/Helpers/symeraseme"
           codesign --verify --strict --verbose=2 "$NESTED_BINARY"
-          codesign --display --verbose=4 "$NESTED_BINARY" 2>&1 | tee "$RUNNER_TEMP/nested-signature.txt"
+          codesign -dvvv "$NESTED_BINARY" 2>&1 | tee "$RUNNER_TEMP/nested-signature.txt"
           grep -F 'Authority=Developer ID Application:' "$RUNNER_TEMP/nested-signature.txt"
           grep -F 'Timestamp=' "$RUNNER_TEMP/nested-signature.txt"
           grep -F 'flags=0x10000(runtime)' "$RUNNER_TEMP/nested-signature.txt"
