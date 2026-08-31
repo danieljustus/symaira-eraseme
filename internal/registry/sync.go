@@ -65,7 +65,7 @@ func Sync(ctx context.Context, dst string, url string) error {
 		}
 		// Guard against absolute paths and traversal outside the destination.
 		name := filepath.Clean(filepath.FromSlash(hdr.Name))
-		if filepath.IsAbs(name) {
+		if filepath.IsAbs(name) || strings.Contains(name, "..") {
 			continue
 		}
 		target := filepath.Join(root, name)
