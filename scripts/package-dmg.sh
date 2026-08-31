@@ -102,12 +102,18 @@ fi
 # including Hardened Runtime and timestamp for notarization.
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
+    CODESIGN_KEYCHAIN_ARGS=()
+    if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
+        CODESIGN_KEYCHAIN_ARGS=(--keychain "$KEYCHAIN_PATH")
+    fi
     codesign --force --timestamp --options runtime \
+        "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
         "$APP_BUNDLE/Contents/Resources/symeraseme"
     codesign --verify --strict --verbose=2 \
         "$APP_BUNDLE/Contents/Resources/symeraseme"
     codesign --force --timestamp --options runtime \
+        "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
         "$APP_BUNDLE"
     codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
