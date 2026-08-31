@@ -98,11 +98,9 @@ jobs:
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build and package GUI DMG
-        env:
-          VERSION: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
-          ./scripts/package-dmg.sh
+          VERSION="${RELEASE_TAG#v}" ./scripts/package-dmg.sh
           DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
           test -f "$DMG"
           shasum -a 256 "$DMG"
