@@ -30,7 +30,9 @@ func newRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.PersistentFlags().String("output", "text", "output format: text or json")
 	root.AddCommand(newVersionCommand())
+	addCommandSurface(root)
 	return root
 }
 
