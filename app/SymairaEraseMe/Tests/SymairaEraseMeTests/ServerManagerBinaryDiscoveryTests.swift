@@ -1,10 +1,8 @@
 import XCTest
 @testable import SymairaEraseMe
 
-/// Tests for #616: the relaxed executable-directory acceptance rule that
-/// lets a stock Homebrew install (`/opt/homebrew/bin`, mode 775, owned by
-/// the current user) be used without weakening appkit's BinaryLocator,
-/// plus the refusal diagnostics and the verified python fallback.
+/// Tests for #727: the app launches the self-contained Go server from the
+/// bundle or the local SPM build before considering Homebrew.
 final class ServerManagerBinaryDiscoveryTests: XCTestCase {
 
     private var tempDir: URL!
@@ -94,32 +92,37 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
         XCTAssertNil(ServerManager.candidateRefusalDiagnostic(directory: tempDir.path, binaryName: "symeraseme"))
     }
 
-    // MARK: - moduleImportable
+    // MARK: - Bundled and development binaries
 
-    func testModuleImportableAcceptsImportableModule() throws {
-        let python = "/usr/bin/python3"
-        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: python), "python3 not available")
-        XCTAssertTrue(ServerManager.moduleImportable(python: python, module: "sys"))
+    func testBundledBinaryPathFindsExecutableInResources() throws {
+        let resources = tempDir.appendingPathComponent("Symaira EraseMe.app/Contents/Resources")
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        let binary = resources.appendingPathComponent("symeraseme")
+        try Data("go-server".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+
+        XCTAssertEqual(ServerManager.bundledBinaryPath(resourceURL: resources), binary.path)
     }
 
-    func testModuleImportableRejectsMissingModule() throws {
-        let python = "/usr/bin/python3"
-        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: python), "python3 not available")
-        XCTAssertFalse(ServerManager.moduleImportable(python: python, module: "definitely_not_a_real_module_xyz"))
+    func testBundledBinaryPathRejectsNonExecutableResource() throws {
+        let resources = tempDir.appendingPathComponent("Resources", isDirectory: true)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        let binary = resources.appendingPathComponent("symeraseme")
+        try Data("go-server".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: binary.path)
+
+        XCTAssertNil(ServerManager.bundledBinaryPath(resourceURL: resources))
     }
 
-    func testModuleImportableRejectsMissingInterpreter() {
-        XCTAssertFalse(ServerManager.moduleImportable(python: "/nonexistent/python3"))
-    }
+    func testDevelopmentBinaryPathFindsSiblingOfSwiftExecutable() throws {
+        let products = tempDir.appendingPathComponent("Products/Debug", isDirectory: true)
+        try FileManager.default.createDirectory(at: products, withIntermediateDirectories: true)
+        let binary = products.appendingPathComponent("symeraseme")
+        try Data("go-server".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        let swiftExecutable = products.appendingPathComponent("SymairaEraseMe")
 
-    func testModuleImportableRejectsTimedOutInterpreter() throws {
-        try makeExecutable(named: "sleepy-python", contents: "#!/bin/sh\nexec sleep 5\n")
-        XCTAssertFalse(
-            ServerManager.moduleImportable(
-                python: tempDir.appendingPathComponent("sleepy-python").path,
-                timeout: 0.01
-            )
-        )
+        XCTAssertEqual(ServerManager.developmentBinaryPath(executableURL: swiftExecutable), binary.path)
     }
 
     // MARK: - Launch failure diagnostics
@@ -127,7 +130,7 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
     func testStartFailureMessageExplainsMissingCli() {
         XCTAssertEqual(
             ServerManager.startFailureMessage(refusals: []),
-            "Could not find the symeraseme CLI. Install it via Homebrew or set the Binary Path in Settings."
+            "Could not find the symeraseme CLI. Install the self-contained Go binary via Homebrew or set the Binary Path in Settings."
         )
     }
 

@@ -28,7 +28,11 @@ import (
 func dataStore() (*eventstore.Store, error) {
 	dir := os.Getenv("SYMERASEME_DATA_DIR")
 	if dir == "" {
-		dir = filepath.Join(os.TempDir(), "symeraseme")
+		var err error
+		dir, err = identity.DefaultConsentDir()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
