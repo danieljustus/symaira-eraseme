@@ -110,13 +110,11 @@ if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     codesign --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
-        "$APP_BUNDLE"
-    # Sign nested code last: signing the app bundle can replace a nested
-    # signature, even when the helper lives in Contents/Helpers.
-    codesign --force --timestamp --options runtime \
+        "$APP_BUNDLE/Contents/Helpers/symeraseme"
+    codesign --deep --force --timestamp --options runtime \
         "${CODESIGN_KEYCHAIN_ARGS[@]}" \
         -s "$CODESIGN_IDENTITY" \
-        "$APP_BUNDLE/Contents/Helpers/symeraseme"
+        "$APP_BUNDLE"
     codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
     echo "Verifying signature..."
     codesign -dvvv "$APP_BUNDLE" 2>&1 | head -5
