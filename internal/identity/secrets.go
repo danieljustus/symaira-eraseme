@@ -12,9 +12,8 @@
 //  3. Environment variable — SYMVAULT_PASSPHRASE.  The corekit/
 //     symvault ecosystem convention for a vault-derived master
 //     passphrase (the secret was fetched from the vault and exposed
-//     as this env var by the calling operator).  The value is
-//     hashed to 32 bytes via SHA-256 to derive a deterministic
-//     AES-256 key.
+//     as this env var by the calling operator). The value is
+//     derived with scrypt to produce a deterministic AES-256 key.
 //  4. OS keychain via the `keyring` library (best effort).  When
 //     no keychain backend is available, fall through.
 //
@@ -37,6 +36,7 @@ import (
 
 	"github.com/danieljustus/symaira-corekit/envutil"
 	"github.com/zalando/go-keyring"
+	"golang.org/x/crypto/scrypt"
 )
 
 // Master-key env vars.  Honoured by GetExistingMasterKey in the
@@ -53,6 +53,10 @@ const (
 	// SHA-256 to produce a 32-byte AES-256 key.
 	EnvSymvaultPassphrase = "SYMVAULT_PASSPHRASE"
 )
+
+// identityPassphraseSalt domain-separates passphrase-derived identity keys
+// from all other uses of scrypt. It is public format metadata, not a secret.
+var identityPassphraseSalt = []byte("symeraseme-identity-master-key-v1")
 
 // keyCache caches the resolved master key in-process.  The cache
 // survives until the process exits, mirroring the Python
@@ -118,11 +122,14 @@ func GetExistingMasterKey() ([]byte, error) {
 		return raw, nil
 	}
 
-	// 2. Symvault-passphrase form (hashed down to 32 bytes).
+	// 2. Symvault-passphrase form (memory-hard derivation).
 	if pass := envutil.Getenv(EnvSymvaultPassphrase); pass != "" {
-		sum := sha256.Sum256([]byte(pass))
-		SetMasterKey(sum[:])
-		return sum[:], nil
+		key, err := scrypt.Key([]byte(pass), identityPassphraseSalt, 1<<15, 8, 1, KeyLength)
+		if err != nil {
+			return nil, fmt.Errorf("identity: derive master key: %w", err)
+		}
+		SetMasterKey(key)
+		return key, nil
 	}
 
 	// 3. OS keychain.  Best effort; any error falls through to
