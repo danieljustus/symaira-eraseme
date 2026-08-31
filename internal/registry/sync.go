@@ -31,6 +31,10 @@ func Sync(ctx context.Context, dst string, url string) error {
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return fmt.Errorf("registry sync: create dst: %w", err)
 	}
+	root, err := filepath.Abs(dst)
+	if err != nil {
+		return fmt.Errorf("registry sync: resolve dst: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("registry sync: %w", err)
@@ -59,12 +63,16 @@ func Sync(ctx context.Context, dst string, url string) error {
 		if err != nil {
 			return fmt.Errorf("registry sync: tar: %w", err)
 		}
-		// Guard against path traversal.
-		name := filepath.Clean(hdr.Name)
-		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
+		// Guard against absolute paths and traversal outside the destination.
+		name := filepath.Clean(filepath.FromSlash(hdr.Name))
+		if filepath.IsAbs(name) {
 			continue
 		}
-		target := filepath.Join(dst, name)
+		target := filepath.Join(root, name)
+		relative, err := filepath.Rel(root, target)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			continue
+		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0o755); err != nil {

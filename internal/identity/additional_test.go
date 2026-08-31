@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
+	"golang.org/x/crypto/scrypt"
 )
 
 func TestMasterKeyCacheAndProfileCipherHelpers(t *testing.T) {
@@ -66,6 +67,25 @@ func TestMasterKeyEnvironmentValidationAndGeneration(t *testing.T) {
 	}
 	if string(generated) == string(key) {
 		t.Fatal("generated key unexpectedly equals passphrase key")
+	}
+}
+
+func TestPassphraseUsesMemoryHardDerivation(t *testing.T) {
+	SetMasterKey(nil)
+	t.Cleanup(func() { SetMasterKey(nil) })
+	t.Setenv(EnvMasterKeyHex, "")
+	t.Setenv(EnvSymvaultPassphrase, "passphrase")
+
+	key, err := GetExistingMasterKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := scrypt.Key([]byte("passphrase"), identityPassphraseSalt, 1<<15, 8, 1, KeyLength)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(key) != string(want) {
+		t.Fatal("passphrase did not use the configured scrypt derivation")
 	}
 }
 
