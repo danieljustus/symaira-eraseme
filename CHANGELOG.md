@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.12.1] - 2026-09-01
+
+- **Fix**: Load existing campaigns whose nullable `notes` field is `NULL`
+  instead of failing the dashboard with a SQLite scan error (#790).
+
 ## [v0.12.0] - 2026-08-31
 
 - **Go/Swift cutover**: Replace the Python runtime with a static Go CLI,

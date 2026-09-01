@@ -137,7 +137,7 @@ make coverage                 # exact 75% statement gate
 
 # macOS app
 ./app/SymairaEraseMe/build.sh
-VERSION=0.12.0 ./scripts/package-dmg.sh
+VERSION=0.12.1 ./scripts/package-dmg.sh
 ```
 
 The coverage gate reports exact profile counts rather than rounded package
