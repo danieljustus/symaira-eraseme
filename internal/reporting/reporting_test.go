@@ -44,6 +44,23 @@ func fixtureStore(t *testing.T) *eventstore.Store {
 	return store
 }
 
+func TestLoadCampaignsAcceptsNullNotes(t *testing.T) {
+	store := fixtureStore(t)
+	_, err := store.DB().ExecContext(context.Background(),
+		`INSERT INTO campaigns(id,created_at,kind,notes) VALUES ('null-notes','2026-08-03T08:00:00+00:00','initial',NULL)`,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	campaigns, err := loadCampaigns(context.Background(), store, "null-notes", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(campaigns) != 1 || campaigns[0].ID != "null-notes" || campaigns[0].Notes != "" {
+		t.Fatalf("campaigns = %#v", campaigns)
+	}
+}
+
 func TestReportDashboardCalendarParityShape(t *testing.T) {
 	store := fixtureStore(t)
 	ctx := context.Background()
