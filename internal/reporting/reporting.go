@@ -121,9 +121,11 @@ func loadCampaigns(ctx context.Context, store *eventstore.Store, id string, all 
 	out := []campaignRow{}
 	for rows.Next() {
 		var c campaignRow
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Kind, &c.Notes); err != nil {
+		var notes sql.NullString
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Kind, &notes); err != nil {
 			return nil, err
 		}
+		c.Notes = nullText(notes)
 		c.CreatedAt = pyTimestamp(c.CreatedAt)
 		out = append(out, c)
 	}
