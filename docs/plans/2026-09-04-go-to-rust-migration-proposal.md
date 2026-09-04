@@ -1,7 +1,7 @@
 # Go-to-Rust migration proposal
 
 > **Status:** proposal — implementation is blocked until Daniel answers only `go`
-> **Depends on:** #794–#800, approval of this document and the implementation plan
+> **Depends on:** #794–#800 and #816–#817, approval of this document and the implementation plan
 > **Produces:** code, tests, release artifacts, migration documentation
 
 ## 1. Why this change
@@ -16,11 +16,11 @@ Baseline captured from `v0.12.1` / commit
 
 | Measure | Go baseline |
 |---|---:|
-| Go source | 123 files / 23,305 physical lines |
+| Go source | 122 tracked files / 23,179 physical lines |
 | Tests | `make test` passed |
 | Lint/vet | passed |
 | Coverage | 76.23% (5,225/6,854 statements; gate 75%) |
-| arm64 macOS binary | 16,774,642 bytes |
+| arm64 macOS binary | 16,758,114 bytes (clean pinned-source build) |
 | `version` startup | median 9.30 ms, p95 9.97 ms over 100 runs |
 | `version` maximum RSS | 22,282,240 bytes (`/usr/bin/time -l`) |
 | Embedded brokers | 1,277 validated by the Go conformance test |
@@ -190,7 +190,8 @@ The executable dependency/order contract is
 the companion implementation plan.
 
 1. **Gate and freeze** — baselines, complete contract matrix, oracle build,
-   #794–#800 resolved before their affected gates, toolchain/crate proof.
+   #794–#800 and #816–#817 resolved before their affected gates,
+   toolchain/crate proof.
 2. **Shadow foundation** — Cargo workspace, Rust CI, black-box harness, version,
    config, time and command-shell contracts.
 3. **Data contracts** — registry, templates, redaction and deterministic pure
@@ -236,6 +237,8 @@ Each stage is mergeable while the Go product remains fully working.
 | Swift `listTools()` expects the wrong response envelope | high | resolve #797 and freeze the real `tools/list` shape before app parity |
 | `poll_inbox` has no production dialer/HWM | high | resolve #799 and freeze a fake-server transcript before the email slice |
 | `run_web_form` has no production driver | high | resolve #800; choose an honest runtime integration or manual fallback before the campaign slice |
+| Identity profile path/hash/key-read behavior is not interoperable | critical | resolve #816 with Python fixtures and read-only decrypt key lookup before freezing the oracle |
+| MCP bearer secrets use ordinary equality | high | resolve #817 with constant-time comparison and malformed-header tests |
 | Whole-file encrypted SQLite + WAL | critical | checkpoint/close/copy/re-encrypt crash tests; never operate on real user data in tests |
 | Keyring differences | high | native platform tests and explicit fallback-order fixtures |
 | Cobra vs Clap text/errors | high | snapshot every command/help/error/exit code |

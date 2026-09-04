@@ -3,7 +3,7 @@
 > Performance/release baseline: commit
 > `240bf67cefa05e643e32611a02e6e7ed87a033ea` (`v0.12.1`). The executable
 > contract oracle is pinned to the merge commit after #795, #796 and
-> #798–#800 are fixed;
+> #798–#800 and #816–#817 are fixed;
 > Task 0.4 must replace this sentence with that exact commit before Rust
 > behavior is implemented. Rust may not replace the default binary until every
 > required row is `PASS`. `TODO` means the contract is known but its
@@ -17,7 +17,7 @@ SQLite, network transcript or process behavior.
 |---|---|---|---|---|---|---|---|
 | BASE-001 | baseline | Go format/test/lint/vet/build | `make fmt-check test lint vet build` | pre-flight script | side-effect | macOS/Linux | PASS |
 | BASE-002 | baseline | exact coverage gate | `make coverage` | retain Go gate until retirement | semantic | Linux | PASS (76.23%) |
-| BASE-003 | baseline | binary size/startup/RSS | `symeraseme version` benchmark | `rust-tests/parity/perf.rs` | semantic | macOS arm64 | TODO |
+| BASE-003 | baseline | binary size/startup/RSS and release asset manifest | `v0.12.1`; `scripts/capture-go-baseline.sh` | `rust-tests/parity/baselines/v0.12.1.json` | semantic | macOS arm64 | PASS |
 | CLI-001 | CLI | root help and command ordering | `symeraseme --help` | `cli_root_help.snap` | byte | all | TODO |
 | CLI-002 | CLI | root `--version` | `symeraseme --version` | `cli_root_version.snap` | byte | all | TODO |
 | CLI-003 | CLI | `version` text | `symeraseme version` | `cli_version_text.snap` | byte | all | TODO |
@@ -82,6 +82,7 @@ SQLite, network transcript or process behavior.
 | CRY-007 | crypto | decrypted temp dir/file modes and cleanup | isolated TMPDIR | filesystem manifest | side-effect | native OS | TODO |
 | CRY-008 | crypto | WAL checkpoint before re-encryption | write/close/crash corpus | data durability test | side-effect | all | TODO |
 | ID-001 | identity | encrypted profile Go→Rust→Go | deterministic vector | bidirectional harness | byte/semantic | all | TODO |
+| ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | corrected Go oracle test | byte/side-effect | all | BLOCKED #816 |
 | ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | adapter tests | semantic | native OS | TODO |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | output scanner | byte | all | TODO |
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | shared cases | byte | all | TODO |
@@ -99,6 +100,7 @@ SQLite, network transcript or process behavior.
 | DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | TODO |
 | DOM-010 | domain | manual-task evidence/cleanup retention | temp files/DB | filesystem+DB | side-effect | all | TODO |
 | MCP-001 | MCP | `initialize` protocol version/capabilities/serverInfo | raw frame | raw frame test | byte | all | TODO |
+| MCP-000 | MCP HTTP | bearer secret uses constant-time comparison and strict header parsing | auth corpus; issue #817 | corrected Go oracle test | side-effect | all | BLOCKED #817 |
 | MCP-002 | MCP | exact 26-tool `tools/list` | `tools.list.json` | shared golden test | byte | all | TODO |
 | MCP-003 | MCP | 26 valid `tools/call` requests | request fixtures | fixture loop | byte/semantic | all | TODO |
 | MCP-004 | MCP | success content envelope | handler fixtures | raw frame test | byte | all | TODO |

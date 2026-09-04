@@ -46,10 +46,19 @@ block execution until both are reconciled.
 - Treat one checkbox or one inseparable test→implementation→verification cycle
   as the normal worker unit; do not hand a whole multi-day milestone to one
   agent.
+- Before dispatch, write a bounded context packet to
+  `docs/rust-port/packets/<task>-<base-sha>.md` containing only the task,
+  relevant matrix rows, allowed files, exact commands, timeout, and recovery
+  point. Default budgets: 20 minutes for implementation and 10 minutes per
+  review; one fresh fallback worker after a timeout, then escalation.
 - After implementation, dispatch a fresh **spec reviewer**. Fix all gaps and
   repeat until PASS, capped at three revision cycles.
 - Then dispatch a fresh **quality/security reviewer**. Fix all critical and
   important issues and repeat until APPROVED, also capped at three cycles.
+- Persist each reviewer verdict at
+  `docs/rust-port/reviews/<task>-<reviewed-sha>-{spec,quality}.md` with reviewed
+  SHA, commands/results, findings, verdict, and reviewer lane. A chat summary
+  alone is not durable evidence.
 - Escalate if a three-cycle review fails or the issue count does not decrease
   between consecutive reviews; never loop indefinitely.
 - Re-run the coordinator-owned gates, inspect the diff, commit if needed, push,
@@ -61,6 +70,9 @@ block execution until both are reconciled.
 - At every phase boundary, checkpoint merged state and start the next phase
   with fresh orchestration context rather than carrying the full migration
   transcript forward.
+- On worker timeout or partial output, preserve the worktree, record status and
+  diff in the context packet, verify the partial changes, and dispatch a fresh
+  recovery worker. Never reset or delete uncommitted partial work blindly.
 
 ### Invariants for every code task
 
@@ -138,19 +150,19 @@ verbatim: `make fmt-check test lint vet build coverage`.
 - Create: `scripts/capture-go-baseline.sh`
 
 **Steps:**
-- [ ] Validate `v0.12.1` resolves to
+- [x] Validate `v0.12.1` resolves to
       `240bf67cefa05e643e32611a02e6e7ed87a033ea`.
-- [ ] Capture source counts, exact Go coverage counts, binary hash/size,
+- [x] Capture source counts, exact Go coverage counts, binary hash/size,
       100-run startup distribution and RSS without personal data.
-- [ ] Capture the six released archive names/sizes, checksums format and DMG
+- [x] Capture the six released archive names/sizes, checksums format and DMG
       bundle manifest.
-- [ ] Record OS/architecture/tool versions with the measurements.
-- [ ] Make the capture script deterministic except explicitly timestamped
+- [x] Record OS/architecture/tool versions with the measurements.
+- [x] Make the capture script deterministic except explicitly timestamped
       metadata.
 
 **Verification:** run the script twice; stable fields compare equal.
 
-### Task 0.3: Resolve known blockers #794–#800 before affected phases
+### Task 0.3: Resolve known blockers #794–#800 and #816–#817 before affected phases
 
 **Files:**
 - Modify: `scripts/package-dmg.sh`
@@ -166,6 +178,9 @@ verbatim: `make fmt-check test lint vet build coverage`.
   #798
 - Modify/test: production inbox adapter/HWM wiring required by #799
 - Modify/test: production web-form boundary required by #800
+- Modify/test: identity profile interoperability and decrypt-only key lookup
+  required by #816
+- Modify/test: constant-time MCP bearer comparison required by #817
 
 **Steps:**
 - [ ] Execute each issue in its own worktree/branch/PR; serialize overlapping
@@ -203,10 +218,15 @@ verbatim: `make fmt-check test lint vet build coverage`.
       an executable fake-server transcript; no real mailbox in tests.
 - [ ] Resolve #800 by choosing and testing an honest runtime browser boundary
       or explicit manual fallback; missing `symbrowse` must never claim success.
+- [ ] Resolve #816 with real Python profile fixtures, frozen path/serialization/
+      hash bytes, and read-only key lookup on every decrypt path.
+- [ ] Resolve #817 with strict Bearer parsing and constant-time secret
+      comparison while preserving statuses and loopback defaults.
 
 **Gate:** `DB-000 = PASS` before Task 0.4, `CRY-000` and `CRY-000B = PASS`
-before Phase 4, `DOM-000A` and `DOM-000B = PASS` before Tasks 6.3 and 7.2,
-and `APP-000` plus `REL-008 = PASS` before Phase 9.
+before Phase 4, `ID-000 = PASS` before identity/Rust fixture work,
+`MCP-000 = PASS` before MCP oracle capture, `DOM-000A` and `DOM-000B = PASS`
+before Tasks 6.3 and 7.2, and `APP-000` plus `REL-008 = PASS` before Phase 9.
 
 ### Task 0.4: Generate complete Go oracle fixtures
 
