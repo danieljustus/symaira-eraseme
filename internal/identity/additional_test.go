@@ -12,12 +12,12 @@ import (
 )
 
 func TestMasterKeyCacheAndProfileCipherHelpers(t *testing.T) {
-	SetMasterKey(nil)
-	t.Cleanup(func() { SetMasterKey(nil) })
-	SetMasterKey([]byte("short key is hashed"))
+	_ = SetMasterKey(nil)
+	t.Cleanup(func() { _ = SetMasterKey(nil) })
+	_ = SetMasterKey([]byte("12345678901234567890123456789012"))
 	first, err := GetExistingMasterKey()
 	if err != nil || len(first) != KeyLength {
-		t.Fatalf("hashed cached key = %d, err=%v", len(first), err)
+		t.Fatalf("cached key = %d, err=%v", len(first), err)
 	}
 	first[0] ^= 1
 	second, err := GetExistingMasterKey()
@@ -34,7 +34,7 @@ func TestMasterKeyCacheAndProfileCipherHelpers(t *testing.T) {
 	if err != nil || string(decoded) != string(plain) {
 		t.Fatalf("cipher helper round trip = %q, err=%v", decoded, err)
 	}
-	if _, err := DecryptProfileWithKey(ciphertext, []byte("wrong-key")); err == nil {
+	if _, err := DecryptProfileWithKey(ciphertext, []byte("wrong-key-0123456789abcdef012345")); err == nil {
 		t.Fatal("wrong profile key accepted")
 	}
 	for _, raw := range [][]byte{[]byte("no separator"), []byte("not-json\nbody")} {
@@ -45,8 +45,8 @@ func TestMasterKeyCacheAndProfileCipherHelpers(t *testing.T) {
 }
 
 func TestMasterKeyEnvironmentValidationAndGeneration(t *testing.T) {
-	SetMasterKey(nil)
-	t.Cleanup(func() { SetMasterKey(nil) })
+	_ = SetMasterKey(nil)
+	t.Cleanup(func() { _ = SetMasterKey(nil) })
 	t.Setenv(EnvMasterKeyHex, "not-hex")
 	if _, err := GetExistingMasterKey(); err == nil {
 		t.Fatal("invalid hex master key accepted")
@@ -71,8 +71,8 @@ func TestMasterKeyEnvironmentValidationAndGeneration(t *testing.T) {
 }
 
 func TestPassphraseUsesMemoryHardDerivation(t *testing.T) {
-	SetMasterKey(nil)
-	t.Cleanup(func() { SetMasterKey(nil) })
+	_ = SetMasterKey(nil)
+	t.Cleanup(func() { _ = SetMasterKey(nil) })
 	t.Setenv(EnvMasterKeyHex, "")
 	t.Setenv(EnvSymvaultPassphrase, "passphrase")
 
@@ -180,7 +180,7 @@ func TestConsentListPrunesExpiredAndIgnoresMalformedFiles(t *testing.T) {
 }
 
 func TestBootstrapReadOnlyAndShutdown(t *testing.T) {
-	SetMasterKey([]byte("bootstrap-test-key"))
+	_ = SetMasterKey([]byte("bootstrap-test-key-32-bytes-long"))
 	t.Cleanup(Shutdown)
 	key, err := Bootstrap()
 	if err != nil || len(key) != KeyLength {

@@ -842,7 +842,7 @@ func realInitProfileCommand() *cobra.Command {
 			if err != nil || parsed.Address != email {
 				return fmt.Errorf("invalid email address")
 			}
-			path, err := identity.SaveProfile(&identity.Profile{FullName: fullName, EmailAddresses: []string{email}}, profilePath)
+			path, err := identity.InitProfile(&identity.Profile{FullName: fullName, EmailAddresses: []string{email}}, profilePath)
 			if err != nil {
 				return err
 			}
