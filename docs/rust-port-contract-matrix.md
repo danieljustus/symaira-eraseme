@@ -109,7 +109,7 @@ SQLite, network transcript or process behavior.
 | MCP-007 | MCP | notifications and mixed/empty batch behavior | raw corpus | raw frame test | byte | all | TODO |
 | MCP-008 | MCP | ID types/null/invalid IDs and params | raw corpus | property/fuzz test | byte | all | TODO |
 | MCP-009 | MCP HTTP | POST-only, 5 MiB limit, content type | HTTP corpus | HTTP differential | byte+status | all | TODO |
-| MCP-010 | MCP HTTP | bearer auth exactness | fixed token | HTTP differential | byte+status | all | TODO |
+| MCP-010 | MCP HTTP | bearer auth exactness | `internal/mcp/server.go`; issue #817 | `TestServeHTTPBearerAuthContract` | byte+status | all | PASS |
 | MCP-011 | MCP HTTP | Origin/loopback/`--allow-remote` policy | host/origin matrix | native network tests | side-effect | native OS | TODO |
 | MCP-012 | MCP HTTP | token path/mode/rotation | isolated data dir | filesystem manifest | side-effect | native OS | TODO |
 | MCP-013 | MCP HTTP | SIGINT/SIGTERM and 5s graceful shutdown | process harness | signal tests | side-effect | native OS | TODO |
