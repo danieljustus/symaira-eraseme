@@ -26,6 +26,7 @@
 package identity
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -717,6 +718,17 @@ func encryptProfile(plaintext, key []byte) ([]byte, error) {
 // header bytes, so any tampering with the header is caught.
 // Decryption strictly calls GetExistingMasterKey; it NEVER mints a key.
 func decryptProfile(raw []byte) ([]byte, *ProfileEnvelope, error) {
+	separator := bytes.IndexByte(raw, '\n')
+	if separator < 0 {
+		return nil, nil, fmt.Errorf("%w: no header separator", ErrProfileCorrupt)
+	}
+	var header ProfileEnvelope
+	if err := json.Unmarshal(raw[:separator], &header); err != nil {
+		return nil, nil, fmt.Errorf("%w: header: %v", ErrProfileCorrupt, err)
+	}
+	if header.Version == legacyV0ProfileVersion {
+		return nil, &header, ErrLegacyV0Unsupported
+	}
 	key, err := GetExistingMasterKey()
 	if err != nil {
 		return nil, nil, err

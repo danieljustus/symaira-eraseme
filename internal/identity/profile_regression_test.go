@@ -106,8 +106,8 @@ func TestRegressionDeletionResurrection(t *testing.T) {
 // 3. Write failures do not truncate or corrupt the original profile.
 // 4. Recovery writes succeed and overwrite cleanly.
 func TestRegressionAtomicWriteFailureAndRecovery(t *testing.T) {
-	_ = testKey(t)
 	clearKey(t)
+	_ = testKey(t)
 	t.Cleanup(func() { _ = SetMasterKey(nil) })
 
 	dir := t.TempDir()
