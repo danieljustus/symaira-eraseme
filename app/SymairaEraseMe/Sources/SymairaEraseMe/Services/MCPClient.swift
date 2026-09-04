@@ -32,28 +32,72 @@ actor MCPClient {
         return NSString(string: "~/.local/share/symeraseme").expandingTildeInPath
     }()
 
-    private init() {
+    init(session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
-        self.session = URLSession(configuration: config)
+        return URLSession(configuration: config)
+    }()) {
+        self.session = session
     }
 
     // MARK: - Public API
 
     /// List available tools from the MCP server.
+    /// Parses the raw JSON-RPC 2.0 `{"result": {"tools": [...]}}` response
+    /// without routing through the tools/call content-envelope decoder.
     func listTools() async throws -> [[String: Any]] {
-        let params: [String: Any] = [:]
-        let result = try await call(method: "tools/list", params: params)
-        // The tools list is inside the raw dictionary under a tools key,
-        // or the entire raw value might be the array if the server returns it that way.
-        // Try to extract from raw
-        if let toolsAny = result.raw["tools"]?.value as? [Any] {
-            return toolsAny.compactMap { $0 as? [String: Any] }
+        let data = try await postJSONRPC(method: "tools/list", params: [:])
+        return try Self.decodeToolsListResponse(data)
+    }
+
+    /// Decodes a tools/list JSON-RPC 2.0 response into an array of tool definition dictionaries.
+    /// Does not route through the tools/call content-envelope decoder.
+    static func decodeToolsListResponse(_ data: Data) throws -> [[String: Any]] {
+        let jsonObject: Any
+        do {
+            jsonObject = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw MCPClientError.invalidResponse("Could not decode JSON: \(error.localizedDescription)")
         }
-        // Fallback: if the raw value itself is a dictionary, the tools list may not be present
-        // In that case, return an empty array (tools/list returns the list differently)
-        return []
+
+        guard let dict = jsonObject as? [String: Any] else {
+            throw MCPClientError.invalidResponse("Expected JSON object response")
+        }
+
+        guard let version = dict["jsonrpc"] as? String, version == "2.0" else {
+            throw MCPClientError.invalidResponse("Invalid or missing JSON-RPC version: expected 2.0")
+        }
+
+        if let errorObj = dict["error"] {
+            if let errorDict = errorObj as? [String: Any],
+               let code = errorDict["code"] as? Int,
+               let message = errorDict["message"] as? String {
+                throw MCPClientError.jsonRPCError(JSONRPCError(code: code, message: message))
+            }
+            throw MCPClientError.invalidResponse("Invalid JSON-RPC error object in response")
+        }
+
+        guard let result = dict["result"] as? [String: Any] else {
+            throw MCPClientError.invalidResponse("Missing or invalid 'result' object in response")
+        }
+
+        guard let rawTools = result["tools"] as? [Any] else {
+            throw MCPClientError.invalidResponse("Missing or invalid 'tools' array in result")
+        }
+
+        var tools = [[String: Any]]()
+        tools.reserveCapacity(rawTools.count)
+        for item in rawTools {
+            guard let toolDict = item as? [String: Any],
+                  let name = toolDict["name"] as? String,
+                  !name.isEmpty else {
+                throw MCPClientError.invalidResponse("Invalid tool definition in tools array")
+            }
+            tools.append(toolDict)
+        }
+
+        return tools
     }
 
     /// Call an MCP tool by name with arguments. Returns the decoded data.
@@ -148,6 +192,56 @@ actor MCPClient {
     // MARK: - Internal
 
     private func call(method: String, params: [String: Any]) async throws -> MCPCallResult {
+        let data = try await postJSONRPC(method: method, params: params)
+        return try decodeCallResponse(data)
+    }
+
+    private func decodeCallResponse(_ data: Data) throws -> MCPCallResult {
+        guard let rpcResponse = try? decoder.decode(JSONRPCResponse.self, from: data) else {
+            throw MCPClientError.invalidResponse("Could not decode JSON-RPC response")
+        }
+
+        guard rpcResponse.jsonrpc == "2.0" else {
+            throw MCPClientError.invalidResponse("Invalid or missing JSON-RPC version: expected 2.0")
+        }
+
+        if let error = rpcResponse.error {
+            throw MCPClientError.jsonRPCError(error)
+        }
+
+        guard let result = rpcResponse.result,
+              let content = result.content.first,
+              content.type == "text" else {
+            throw MCPClientError.invalidResponse("Missing or non-text content in result")
+        }
+
+        // Parse the inner JSON string (CliResult.to_json())
+        guard let textData = content.text.data(using: .utf8) else {
+            throw MCPClientError.invalidResponse("Could not encode text as UTF-8")
+        }
+
+        let callResult: MCPCallResult
+        do {
+            callResult = try decoder.decode(MCPCallResult.self, from: textData)
+        } catch {
+            throw MCPClientError.decodingError("Inner payload: \(error.localizedDescription)")
+        }
+
+        // Check success field
+        if !callResult.success {
+            let errMsg = callResult.error ?? callResult.message ?? "Unknown error"
+            throw MCPClientError.toolCallFailed(errMsg)
+        }
+
+        return callResult
+    }
+
+    // MARK: - Transport
+
+    /// Shared private HTTP JSON-RPC transport helper used by both tools/list and tools/call.
+    /// Manages request IDs, JSON-RPC envelope formation, bearer authentication,
+    /// network dispatch, and HTTP status code validation (200...299).
+    private func postJSONRPC(method: String, params: [String: Any]) async throws -> Data {
         requestId += 1
         let currentId = requestId
 
@@ -190,39 +284,7 @@ actor MCPClient {
             throw MCPClientError.serverUnreachable("HTTP \(httpResponse.statusCode): \(bodyStr)")
         }
 
-        guard let rpcResponse = try? decoder.decode(JSONRPCResponse.self, from: data) else {
-            throw MCPClientError.invalidResponse("Could not decode JSON-RPC response")
-        }
-
-        if let error = rpcResponse.error {
-            throw MCPClientError.jsonRPCError(error)
-        }
-
-        guard let result = rpcResponse.result,
-              let content = result.content.first,
-              content.type == "text" else {
-            throw MCPClientError.invalidResponse("Missing or non-text content in result")
-        }
-
-        // Parse the inner JSON string (CliResult.to_json())
-        guard let textData = content.text.data(using: .utf8) else {
-            throw MCPClientError.invalidResponse("Could not encode text as UTF-8")
-        }
-
-        let callResult: MCPCallResult
-        do {
-            callResult = try decoder.decode(MCPCallResult.self, from: textData)
-        } catch {
-            throw MCPClientError.decodingError("Inner payload: \(error.localizedDescription)")
-        }
-
-        // Check success field
-        if !callResult.success {
-            let errMsg = callResult.error ?? callResult.message ?? "Unknown error"
-            throw MCPClientError.toolCallFailed(errMsg)
-        }
-
-        return callResult
+        return data
     }
 
     // MARK: - Auth

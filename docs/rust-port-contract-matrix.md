@@ -113,7 +113,7 @@ SQLite, network transcript or process behavior.
 | MCP-013 | MCP HTTP | SIGINT/SIGTERM and 5s graceful shutdown | process harness | signal tests | side-effect | native OS | TODO |
 | MCP-014 | MCP stdio | newline frames and zero stdout pollution | raw stream | raw stream comparator | byte | all | TODO |
 | MCP-015 | MCP stdio | malformed/truncated/multiple frames | fuzz corpus | parser tests/fuzz | byte+exit | all | TODO |
-| APP-000 | SwiftUI | `listTools()` parses raw `result.tools`, not call content envelope | exact Go response; issue #797 | Swift fixture test | semantic | macOS | BLOCKED #797 |
+| APP-000 | SwiftUI | `listTools()` parses raw `result.tools`, not call content envelope | exact Go response; issue #797 | `MCPClientToolsListTests` | semantic | macOS | PASS |
 | APP-001 | SwiftUI | binary discovery order and name | Swift unit tests | Rust binary fixture | side-effect | macOS | TODO |
 | APP-002 | SwiftUI | launch `mcp --host --port` | supervisor test | Rust E2E | side-effect | macOS | TODO |
 | APP-003 | SwiftUI | token read + authenticated tools/list/call | app tests | Rust E2E | semantic | macOS | TODO |
