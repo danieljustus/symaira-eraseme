@@ -100,7 +100,7 @@ SQLite, network transcript or process behavior.
 | DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | TODO |
 | DOM-010 | domain | manual-task evidence/cleanup retention | temp files/DB | filesystem+DB | side-effect | all | TODO |
 | MCP-001 | MCP | `initialize` protocol version/capabilities/serverInfo | raw frame | raw frame test | byte | all | TODO |
-| MCP-000 | MCP HTTP | bearer secret uses constant-time comparison and strict header parsing | auth corpus; issue #817 | corrected Go oracle test | side-effect | all | BLOCKED #817 |
+| MCP-000 | MCP HTTP | bearer secret uses constant-time comparison and strict header parsing | auth corpus; issue #817 | `TestServeHTTPBearerAuthContract` | side-effect | all | PASS |
 | MCP-002 | MCP | exact 26-tool `tools/list` | `tools.list.json` | shared golden test | byte | all | TODO |
 | MCP-003 | MCP | 26 valid `tools/call` requests | request fixtures | fixture loop | byte/semantic | all | TODO |
 | MCP-004 | MCP | success content envelope | handler fixtures | raw frame test | byte | all | TODO |
@@ -109,7 +109,7 @@ SQLite, network transcript or process behavior.
 | MCP-007 | MCP | notifications and mixed/empty batch behavior | raw corpus | raw frame test | byte | all | TODO |
 | MCP-008 | MCP | ID types/null/invalid IDs and params | raw corpus | property/fuzz test | byte | all | TODO |
 | MCP-009 | MCP HTTP | POST-only, 5 MiB limit, content type | HTTP corpus | HTTP differential | byte+status | all | TODO |
-| MCP-010 | MCP HTTP | bearer auth exactness | fixed token | HTTP differential | byte+status | all | TODO |
+| MCP-010 | MCP HTTP | bearer auth exactness | `internal/mcp/server.go`; issue #817 | `TestServeHTTPBearerAuthContract` | byte+status | all | PASS |
 | MCP-011 | MCP HTTP | Origin/loopback/`--allow-remote` policy | host/origin matrix | native network tests | side-effect | native OS | TODO |
 | MCP-012 | MCP HTTP | token path/mode/rotation | isolated data dir | filesystem manifest | side-effect | native OS | TODO |
 | MCP-013 | MCP HTTP | SIGINT/SIGTERM and 5s graceful shutdown | process harness | signal tests | side-effect | native OS | TODO |

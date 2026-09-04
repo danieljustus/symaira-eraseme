@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -142,8 +143,38 @@ func (s *Server) allowedOrigin(raw string) bool {
 }
 
 func authorized(r *http.Request, token string) bool {
-	value := r.Header.Get("Authorization")
-	return strings.HasPrefix(value, "Bearer ") && value[len("Bearer "):] == token
+	if token == "" || r == nil || r.Header == nil {
+		return false
+	}
+	headers := r.Header.Values("Authorization")
+	if len(headers) != 1 {
+		return false
+	}
+	value := headers[0]
+	const prefix = "Bearer "
+	if !strings.HasPrefix(value, prefix) {
+		return false
+	}
+	supplied := value[len(prefix):]
+	if len(supplied) == 0 {
+		return false
+	}
+	return constantTimeCompare(supplied, token)
+}
+
+func constantTimeCompare(supplied, expected string) bool {
+	suppliedBytes := []byte(supplied)
+	expectedBytes := []byte(expected)
+	if len(expectedBytes) == 0 {
+		return false
+	}
+	lengthMatch := subtle.ConstantTimeEq(int32(len(suppliedBytes)), int32(len(expectedBytes)))
+	toCompare := suppliedBytes
+	if lengthMatch == 0 {
+		toCompare = expectedBytes
+	}
+	contentMatch := subtle.ConstantTimeCompare(toCompare, expectedBytes)
+	return (lengthMatch & contentMatch) == 1
 }
 
 func (s *Server) handle(ctx context.Context, raw json.RawMessage) *response {
