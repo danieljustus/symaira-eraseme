@@ -4,6 +4,11 @@
   "approval_trigger": "go",
   "integration_branch": "main",
   "worktree_root": ".worktrees",
+  "github_tracking": {
+    "milestone": "v0.13.0",
+    "epic": 813,
+    "phases": {"0": 802, "1": 803, "2": 804, "3": 805, "4": 806, "5": 807, "6": 808, "7": 809, "8": 810, "9": 811, "10": 812}
+  },
   "shared_owners": {
     "docs/plans/2026-09-04-go-to-rust-implementation-plan.md": "coordinator",
     "docs/rust-port-contract-matrix.md": "coordinator",
@@ -36,7 +41,7 @@
   },
   "execution_state": {
     "last_completed": null,
-    "active_task": null,
+    "active_task": "0.1",
     "merged_tasks": [],
     "active_worktrees": {},
     "blocked_by": [794, 795, 796, 797, 798, 799, 800],

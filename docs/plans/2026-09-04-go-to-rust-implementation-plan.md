@@ -113,6 +113,23 @@ verbatim: `make fmt-check test lint vet build coverage`.
 
 **Verification:** `gh issue view <epic>` lists every phase and #794–#800.
 
+**GitHub tracking:**
+
+| Scope | Issue |
+|---|---:|
+| Migration epic | #813 |
+| Phase 0 | #802 |
+| Phase 1 | #803 |
+| Phase 2 | #804 |
+| Phase 3 | #805 |
+| Phase 4 | #806 |
+| Phase 5 | #807 |
+| Phase 6 | #808 |
+| Phase 7 | #809 |
+| Phase 8 | #810 |
+| Phase 9 | #811 |
+| Phase 10 | #812 |
+
 ### Task 0.2: Freeze repository and toolchain baselines
 
 **Files:**
