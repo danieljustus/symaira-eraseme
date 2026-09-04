@@ -197,21 +197,21 @@ verbatim: `make fmt-check test lint vet build coverage`.
       rather than trusting only the workspace copy.
 - [ ] Run a packaging dry run and the issue-specific tests.
 - [ ] Merge #794 before Phase 9 begins; rebase the migration work on it.
-- [ ] Resolve #795 before generating crypto vectors: correct the documented
+- [x] Resolve #795 before generating crypto vectors: correct the documented
       lengths to 17 bytes without changing header bytes, and pin the raw bytes
       plus lengths in a Go test.
-- [ ] Merge #795 before Phase 4 begins; regenerate oracle fixtures afterward.
+- [x] Merge #795 before Phase 4 begins; regenerate oracle fixtures afterward.
 - [ ] Resolve #796 before any oracle capture: production CLI/MCP storage must
       honor the documented default, `SYMERASEME_DB_DIR` and
       `SYMERASEME_ENCRYPT_DB`, including safe plaintext/encrypted upgrades.
 - [ ] Prove restart durability and WAL/encryption cleanup in isolated dirs;
       merge #796, then generate the Go oracle fixtures.
-- [ ] Resolve #797 before app parity: parse the raw `tools/list` result separately
+- [x] Resolve #797 before app parity: parse the raw `tools/list` result separately
       from the `tools/call` content envelope and test the exact 26-tool shape.
-- [ ] Resolve #798 before crypto design: generate real standard-Fernet fixtures
+- [x] Resolve #798 before crypto design: generate real standard-Fernet fixtures
       from `python-final`, make Go read them, and assign a distinct version/header
       to any incompatible Go AES-GCM format instead of reusing V1/V2/V3.
-- [ ] As part of #798, sweep `README.md`, `TROUBLESHOOTING.md`, `skills/**` and
+- [x] As part of #798, sweep `README.md`, `TROUBLESHOOTING.md`, `skills/**` and
       code comments for stale “Fernet = AES-GCM” claims; align every statement
       with the corrected versioned formats.
 - [ ] Resolve #799 with a real production IMAP adapter plus persistent HWM and
