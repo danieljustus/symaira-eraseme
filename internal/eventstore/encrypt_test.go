@@ -3,6 +3,7 @@ package eventstore
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -132,4 +133,91 @@ func pad32(s string) string {
 		out[i] = 'x'
 	}
 	return string(out)
+}
+
+// TestEncryptionHeaderContract pins exact raw V1/V2/V3 header bytes and
+// length 17 (issue #795).
+func TestEncryptionHeaderContract(t *testing.T) {
+	cases := []struct {
+		name      string
+		version   int
+		magic     []byte
+		wantBytes []byte
+		wantHex   string
+		wantLen   int
+	}{
+		{
+			name:      "V1",
+			version:   1,
+			magic:     EncHeaderV1,
+			wantBytes: []byte("SYMERASEME_ENCv1\n"),
+			wantHex:   "53594d45524153454d455f454e4376310a",
+			wantLen:   17,
+		},
+		{
+			name:      "V2",
+			version:   2,
+			magic:     EncMagicV2,
+			wantBytes: []byte("SYMERASEME_ENCv2\n"),
+			wantHex:   "53594d45524153454d455f454e4376320a",
+			wantLen:   17,
+		},
+		{
+			name:      "V3",
+			version:   3,
+			magic:     EncMagicV3,
+			wantBytes: []byte("SYMERASEME_ENCv3\n"),
+			wantHex:   "53594d45524153454d455f454e4376330a",
+			wantLen:   17,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if len(tc.magic) != tc.wantLen {
+				t.Errorf("%s runtime header has length %d, want %d", tc.name, len(tc.magic), tc.wantLen)
+			}
+			if !bytes.Equal(tc.magic, tc.wantBytes) {
+				t.Errorf("%s runtime header bytes = %q, want %q", tc.name, tc.magic, tc.wantBytes)
+			}
+			if got := hex.EncodeToString(tc.magic); got != tc.wantHex {
+				t.Errorf("%s hex = %s, want %s", tc.name, got, tc.wantHex)
+			}
+
+			// Verify DetectVersion correctly identifies the header
+			v, ok := DetectVersion(tc.magic)
+			if !ok {
+				t.Errorf("%s DetectVersion failed on exact header bytes", tc.name)
+			} else if v != tc.version {
+				t.Errorf("%s DetectVersion = %d, want %d", tc.name, v, tc.version)
+			}
+		})
+	}
+
+	// Verify byte offsets in encrypted V2/V3 envelopes:
+	// Envelope layout: [17 bytes header] + [16 bytes salt] + [Fernet token ...]
+	master := bytes.Repeat([]byte{0x5a}, 32)
+	payload := []byte("payload for header offset test")
+
+	v2Env, err := EncryptBytesV2(payload, master)
+	if err != nil {
+		t.Fatalf("EncryptBytesV2: %v", err)
+	}
+	if len(v2Env) < 17+SaltLen {
+		t.Fatalf("v2 envelope too short: %d bytes", len(v2Env))
+	}
+	if !bytes.Equal(v2Env[:17], EncMagicV2) {
+		t.Errorf("v2 envelope header mismatch: %q", v2Env[:17])
+	}
+
+	v3Env, err := EncryptBytesV3(payload, master)
+	if err != nil {
+		t.Fatalf("EncryptBytesV3: %v", err)
+	}
+	if len(v3Env) < 17+SaltLen {
+		t.Fatalf("v3 envelope too short: %d bytes", len(v3Env))
+	}
+	if !bytes.Equal(v3Env[:17], EncMagicV3) {
+		t.Errorf("v3 envelope header mismatch: %q", v3Env[:17])
+	}
 }
