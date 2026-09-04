@@ -144,9 +144,9 @@ later events overwrite earlier statuses (no monotonicity check).
 ## 5. Encryption envelope (highest-risk parity area)
 
 The whole database file may be encrypted at rest when
-`SYMERASEME_ENCRYPT_DB` is `1|true|yes`. **The file format is Fernet
-(AES-256-GCM), not raw SQLite**, and decrypt-on-open / encrypt-on-close is
-transparent.
+`SYMERASEME_ENCRYPT_DB` is `1|true|yes`. **The file format is standard
+Fernet (AES-128-CBC with PKCS7 padding and HMAC-SHA256 over the Fernet
+frame, URL-safe base64 encoded), not raw SQLite**.
 
 Three header versions exist; current write version is **V3**:
 
@@ -156,6 +156,16 @@ Three header versions exist; current write version is **V3**:
 | V2 | `SYMERASEME_ENCv2\n` (17 bytes) + 16-byte random salt | Fernet token, key = PBKDF2-HMAC-SHA256(master, salt, 600_000) |
 | V3 (current) | `SYMERASEME_ENCv3\n` (17 bytes) + 16-byte random salt | Fernet token, key = HKDF-SHA256(master, salt=salt, info=`symeraseme-db-encryption-v3`) |
 
+Standard Fernet token layout:
+- URL-safe base64 encoded string of:
+  `Version (0x80, 1 byte) || Timestamp (8 bytes uint64 BE) || IV (16 bytes) || Ciphertext (AES-128-CBC, PKCS7 padded) || HMAC-SHA256 (32 bytes)`
+- Key layout (32 bytes):
+  `signing_key = key[:16]` (HMAC-SHA256 over frame)
+  `encryption_key = key[16:]` (AES-128-CBC)
+- Backward compatibility: Go also retains safe read compatibility for
+  accidental legacy Go payloads (unencoded AES-256-GCM + outer HMAC), and
+  transparently migrates them to standard Fernet V3 on open/write.
+
 Key derivation:
 - master key = 32-byte identity master key (keyring/OS keychain, never on
   disk unencrypted).
@@ -164,17 +174,38 @@ Key derivation:
 - V1 has no per-file salt (fixed `symeraseme-db-encryption-v1`); V2/V3 draw `secrets.token_bytes(16)` per write.
 
 Migrations on open (transparent, log only):
-- V1 file → `_migrate_v1_to_v2` → `_migrate_v2_to_v3`
+- V1 file → `_migrate_v1_to_v2` → `_migrate_v2_to_v3` (or direct V1→V3 in Go)
 - V2 file → `_migrate_v2_to_v3`
+- Legacy accidental Go V3 file → migrate in place to standard Fernet V3
 
 Encrypted-file detection: file begins with the V1 header **or** `V2/V3
 magic + salt` prefix. Decrypted copies live in `$TMPDIR/symeraseme-db-<uid>/`
-(`/dev/shm/symeraseme-db-<uid>` on Linux), mode 0600, and are re-encrypted
-on connection close. `SYMERASEME_ENCRYPT_DB` unset/`0` → plain SQLite file.
+(`/dev/shm/symeraseme-db-<uid>` on Linux), mode 0600. `SYMERASEME_ENCRYPT_DB`
+unset/`0` → plain SQLite file.
+
+Close lifecycle and failure semantics:
+- `OpenEncrypted` associates the returned `Store` with its encrypted path.
+  Calling `Store.Close()` is therefore the normal safe shutdown path: it
+  checkpoints the WAL, closes SQLite, atomically writes the encrypted V3
+  replacement, syncs the containing directory after rename, and removes the
+  decrypted temp plus its `-wal`/`-shm` siblings.
+- `Store.CloseAt(path)` is the explicit equivalent when the encrypted path is
+  supplied by the caller. It is safe to use instead of `Close`; the APIs do
+  not recurse or double-close. `Store.Close()` on a plain `Open` store only
+  closes SQLite and does not encrypt.
+- `FinaliseAll` safely finalizes registrations made by `OpenEncrypted` by
+  checkpointing and closing their owning stores before reading their temp
+  files. Low-level `RegisterTemp` is only for an already-closed database.
+- If checkpoint, close, encryption, atomic replacement, directory sync, or
+  cleanup fails, the replacement is not treated as finalized and registered
+  recovery state is retained. Plain-file WAL siblings are removed only after
+  encryption succeeds; an encryption failure leaves them untouched.
 
 Field-vs-blob scope: encryption is **whole-file**, not per-field. The Go
-port must implement the identical V3 write path (random salt, HKDF,
-Fernet/AES-256-GCM token construction) or user data is unreadable.
+port implements the standard V3 write path (random salt, HKDF, standard Fernet
+token construction). Python↔Go is the corrected interoperability oracle;
+Rust interoperability remains gated by Phase 4 and the CRY rows in
+`docs/rust-port-contract-matrix.md` and is not claimed by this Go milestone.
 
 ## 6. Golden fixture usage
 

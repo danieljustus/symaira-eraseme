@@ -84,8 +84,9 @@ A: No. The system supports one identity vault per machine. Use different
    machines for different identities, or manually backup/restore the vault file.
 
 **Q: How is my data stored?**
-A: Encrypted at rest using the Go event store's AES-256-GCM envelope. The
-   key is resolved through the configured secure secret provider.
+A: The identity profile is encrypted at rest using AES-256-GCM, and the
+   event store database uses a standard Fernet envelope (AES-128-CBC + HMAC-SHA256).
+   The key is resolved through the configured secure secret provider.
 
 **Q: What if I mistype my name?**
 A: Re-run `init-profile` with the correct information. It overwrites the

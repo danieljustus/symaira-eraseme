@@ -40,8 +40,8 @@ symeraseme show-profile --output json
 ```
 
 Use `SYMERASEME_DATA_DIR` for an isolated installation or test directory. The
-Go event store uses an AES-256-GCM envelope and stores private files with
-restrictive permissions. Credentials should be referenced through the canonical
+Go event store uses a standard Fernet envelope (AES-128-CBC with PKCS7 and HMAC-SHA256)
+and stores private files with restrictive permissions. Credentials should be referenced through the canonical
 `symvault://` form or a platform secure store.
 
 ## Migrating an older installation
