@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "plan": "docs/plans/2026-09-04-go-to-rust-implementation-plan.md",
+  "approval_trigger": "go",
+  "integration_branch": "main",
+  "worktree_root": ".worktrees",
+  "github_tracking": {
+    "milestone": "v0.13.0",
+    "epic": 813,
+    "phases": {"0": 802, "1": 803, "2": 804, "3": 805, "4": 806, "5": 807, "6": 808, "7": 809, "8": 810, "9": 811, "10": 812}
+  },
+  "shared_owners": {
+    "docs/plans/2026-09-04-go-to-rust-implementation-plan.md": "coordinator",
+    "docs/rust-port-contract-matrix.md": "coordinator",
+    "rust-tests/parity/cases": "task-0.4 until frozen; coordinator thereafter",
+    "Cargo.lock": "current integrating task only",
+    "Makefile": "task-1.3 until cutover tasks",
+    ".github/workflows": "current CI/release task only"
+  },
+  "merge_policy": {
+    "order": "topological by depends_on; one PR merged at a time",
+    "base": "fresh origin/main after every prior merge",
+    "worker_push": false,
+    "coordinator_push": true,
+    "required_reviews": ["spec", "quality-security"],
+    "revision_limit": 3,
+    "stall_rule": "escalate if issue count does not decrease",
+    "merge": "squash only after local gates and GitHub required checks pass"
+  },
+  "parallelism": {
+    "read_only_reviews": 3,
+    "writers": "parallel only when depends_on is satisfied and writer_scope is disjoint",
+    "shared_outputs": "never written concurrently",
+    "integration": "serial through fresh origin/main"
+  },
+  "field_semantics": {
+    "depends_on": "explicit task inputs: verified merge commits/artifacts from every listed predecessor",
+    "writer_scope": "exclusive expected output paths or external scope for this milestone",
+    "merge_gate": "required acceptance output before dependents become ready",
+    "checkboxes": "bounded worker execution units inside each task; executed serially unless scopes are proven disjoint"
+  },
+  "execution_state": {
+    "last_completed": null,
+    "active_task": "0.1",
+    "merged_tasks": [],
+    "active_worktrees": {},
+    "blocked_by": [794, 795, 796, 797, 798, 799, 800],
+    "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
+  },
+  "external_gates": {
+    "stable-release-plus-7-days": {
+      "owner": "coordinator",
+      "required_by": "10.4",
+      "evidence": [
+        "stable Rust GitHub release publishedAt is at least seven days old",
+        "no open issue labelled parity-regression for that release",
+        "release assets, Homebrew install and rollback smoke evidence re-read from exact targets"
+      ],
+      "failure": "leave Go fallback/source intact and reschedule the gate"
+    }
+  },
+  "tasks": [
+    {"id":"0.1","name":"Accept architecture and open migration epic","depends_on":[],"writer_scope":["docs/plans/**","docs/rust-port-contract-matrix.md","GitHub issues"],"merge_gate":"docs-only PR reviewed and merged"},
+    {"id":"0.2","name":"Freeze repository and toolchain baselines","depends_on":["0.1"],"writer_scope":["rust-tests/parity/baselines/**","rust-tests/parity/README.md","scripts/capture-go-baseline.sh"],"merge_gate":"repeatable baseline capture"},
+    {"id":"0.3","name":"Resolve blockers #794-#800","depends_on":["0.1"],"writer_scope":["issues #794-#800 acceptance files only"],"merge_gate":"DB-000, CRY-000, CRY-000B, DOM-000A, DOM-000B, APP-000, REL-008 pass before affected phases"},
+    {"id":"0.4","name":"Generate complete Go oracle fixtures","depends_on":["0.2","0.3"],"writer_scope":["scripts/generate-go-oracle-fixtures.sh","rust-tests/parity/cases/**","rust-tests/parity/fixtures/**","docs/rust-port-contract-matrix.md oracle commit"],"merge_gate":"two generations from corrected pinned Go oracle are identical"},
+
+    {"id":"1.1","name":"Create pinned Cargo workspace","depends_on":["0.4"],"writer_scope":["Cargo.toml","Cargo.lock","rust-toolchain.toml","deny.toml","crates/*/Cargo.toml","crates/*/src/lib.rs","crates/symeraseme-cli/src/main.rs",".gitignore"],"merge_gate":"fmt/check/clippy/nextest/doctest pass"},
+    {"id":"1.2","name":"Add neutral differential harness","depends_on":["1.1"],"writer_scope":["rust-tests/parity/** excluding frozen cases"],"merge_gate":"intentional mismatch fails; identical dummy programs pass"},
+    {"id":"1.3","name":"Add dual-language Make targets","depends_on":["1.1","1.2"],"writer_scope":["Makefile"],"merge_gate":"legacy Go targets and new Rust/parity targets pass"},
+    {"id":"1.4","name":"Add shadow Rust CI","depends_on":["1.1","1.2","1.3"],"writer_scope":[".github/workflows/rust-ci.yml",".github/dependabot.yml"],"merge_gate":"Go and Rust PR gates run; ruleset check names verified"},
+
+    {"id":"2.1","name":"Port version and build metadata","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/version.rs","crates/symeraseme-cli/src/main.rs","crates/symeraseme-cli/tests/version.rs"],"merge_gate":"CLI-002..004 pass"},
+    {"id":"2.2","name":"Port time and confirmation pure functions","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/timeutil.rs","crates/symeraseme-core/src/confirmation.rs","matching tests"],"merge_gate":"Go/Rust unit, property and differential cases pass"},
+    {"id":"2.3","name":"Port configuration precedence","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/config.rs","crates/symeraseme-core/tests/config_parity.rs"],"merge_gate":"CFG-001..006 and CLI-009 pass"},
+    {"id":"2.4","name":"Scaffold complete Clap command tree","depends_on":["2.1","2.3"],"writer_scope":["crates/symeraseme-cli/src/cli.rs","crates/symeraseme-cli/src/commands/**","crates/symeraseme-cli/tests/command_surface.rs"],"merge_gate":"root/parser/help snapshots pass; no fake success paths"},
+
+    {"id":"3.1","name":"Port registry models and validation","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/registry/model.rs","crates/symeraseme-core/src/registry/validate.rs","crates/symeraseme-core/src/registry/mod.rs","crates/symeraseme-core/tests/registry_contract.rs"],"merge_gate":"four golden, negative and 1277-entry corpus pass"},
+    {"id":"3.2","name":"Port registry loading filtering and sync","depends_on":["3.1"],"writer_scope":["crates/symeraseme-core/src/registry/loader.rs","crates/symeraseme-core/src/registry/filter.rs","crates/symeraseme-core/src/registry/sync.rs","crates/symeraseme-core/build.rs","matching tests"],"merge_gate":"REG-001..008 pass"},
+    {"id":"3.3","name":"Port templates","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/templating.rs","crates/symeraseme-core/templates/**","matching tests"],"merge_gate":"TMP-001..002 byte parity"},
+    {"id":"3.4","name":"Port redaction","depends_on":["2.2"],"writer_scope":["crates/symeraseme-core/src/redaction/**","matching tests","redaction fuzz target"],"merge_gate":"RED-001..002 pass"},
+
+    {"id":"4.1","name":"Prove Rusqlite portability","depends_on":["1.4"],"writer_scope":["crates/symeraseme-core/src/storage/mod.rs","Rust target proof workflow"],"merge_gate":"native supported-target SQLite smoke tests pass"},
+    {"id":"4.2","name":"Port schema and repository queries","depends_on":["4.1","2.3"],"writer_scope":["crates/symeraseme-core/src/storage/store.rs","crates/symeraseme-core/src/storage/repository.rs","crates/symeraseme-core/src/storage/types.rs","matching tests"],"merge_gate":"DB-001..003, DB-006, DB-009..010 pass"},
+    {"id":"4.3","name":"Port append and projection","depends_on":["4.2","2.2"],"writer_scope":["crates/symeraseme-core/src/storage/projection.rs","matching tests"],"merge_gate":"DB-004..005, DB-007..008 pass"},
+    {"id":"4.4","name":"Port corrected encryption compatibility","depends_on":["0.3","1.4"],"writer_scope":["crates/symeraseme-core/src/storage/encryption.rs","rust-tests/parity/fixtures/crypto/**","encryption fuzz target"],"merge_gate":"CRY-000..006 pass using Python-final and corrected Go vectors"},
+    {"id":"4.5","name":"Port encrypted lifecycle and locking","depends_on":["4.2","4.4"],"writer_scope":["crates/symeraseme-core/src/storage/encrypted_store.rs","crates/symeraseme-core/src/storage/locking.rs","matching tests"],"merge_gate":"CRY-007..008 and native crash tests pass"},
+    {"id":"4.6","name":"Port identity profile and secret resolution","depends_on":["2.3","4.4"],"writer_scope":["crates/symeraseme-core/src/identity/mod.rs","crates/symeraseme-core/src/identity/profile.rs","crates/symeraseme-core/src/identity/secrets.rs","crates/symeraseme-core/src/identity/keyring.rs","matching tests"],"merge_gate":"ID-001..003 pass; sentinel secrets absent"},
+    {"id":"4.7","name":"Port consent and destructive gate","depends_on":["4.6"],"writer_scope":["crates/symeraseme-core/src/identity/consent.rs","crates/symeraseme-core/src/identity/gate.rs","matching tests"],"merge_gate":"ID-004..005 and CLI-017 pass"},
+
+    {"id":"5.1","name":"Port deadlines and tick","depends_on":["4.3"],"writer_scope":["crates/symeraseme-core/src/deadlines.rs","matching tests"],"merge_gate":"DOM-001 and CLI-013 pass"},
+    {"id":"5.2","name":"Port manual tasks","depends_on":["4.2"],"writer_scope":["crates/symeraseme-core/src/manual_tasks/**","matching tests"],"merge_gate":"DOM-010 and CLI-020 pass"},
+    {"id":"5.3","name":"Port reporting and read models","depends_on":["3.3","4.3"],"writer_scope":["crates/symeraseme-core/src/reporting/**","matching tests"],"merge_gate":"DOM-003 and CLI-018..019 pass"},
+    {"id":"5.4","name":"Port scheduler","depends_on":["2.3","2.4"],"writer_scope":["crates/symeraseme-engine/src/scheduler/**","matching tests"],"merge_gate":"DOM-009 and CLI-014 pass natively"},
+
+    {"id":"6.1","name":"Freeze transcripts and select email crates","depends_on":["0.3","1.4"],"writer_scope":["rust-tests/parity/fixtures/email/**","docs/rust-email-crate-decision.md"],"merge_gate":"maintained crate choice proven against transcripts and targets"},
+    {"id":"6.2","name":"Port MIME and SMTP","depends_on":["6.1","4.6"],"writer_scope":["crates/symeraseme-engine/src/email/mod.rs","crates/symeraseme-engine/src/email/mime.rs","crates/symeraseme-engine/src/email/smtp.rs","matching tests"],"merge_gate":"DOM-005 pass"},
+    {"id":"6.3","name":"Port IMAP and HWM","depends_on":["6.1","4.2","0.3"],"writer_scope":["crates/symeraseme-engine/src/email/imap.rs","matching tests"],"merge_gate":"DOM-000A and DOM-006 pass"},
+    {"id":"6.4","name":"Port OAuth2","depends_on":["6.1","4.6"],"writer_scope":["crates/symeraseme-engine/src/email/oauth2.rs","matching tests"],"merge_gate":"DOM-007 pass"},
+    {"id":"6.5","name":"Port LLM adapters","depends_on":["4.6","6.1"],"writer_scope":["crates/symeraseme-engine/src/llm/**","crates/symeraseme-engine/contracts/**","scripts/sync-llm-contract.sh","matching tests"],"merge_gate":"DOM-008 and corekit descriptor drift gate pass"},
+
+    {"id":"7.1","name":"Port campaign planning and execution","depends_on":["3.2","3.3","4.3","4.7","6.2"],"writer_scope":["crates/symeraseme-engine/src/campaign/mod.rs","crates/symeraseme-engine/src/campaign/planning.rs","crates/symeraseme-engine/src/campaign/batch.rs","crates/symeraseme-engine/src/campaign/execution.rs","matching tests"],"merge_gate":"DOM-002 and CLI-010 pass"},
+    {"id":"7.2","name":"Port corrected web-form boundary","depends_on":["0.3","3.2","3.4","4.6"],"writer_scope":["crates/symeraseme-engine/src/campaign/web_form.rs","matching tests"],"merge_gate":"DOM-000B and CLI-023 pass"},
+    {"id":"7.3","name":"Port triage and replies","depends_on":["5.2","6.3","6.5","7.2"],"writer_scope":["crates/symeraseme-engine/src/triage.rs","crates/symeraseme-engine/src/replies.rs","matching tests"],"merge_gate":"DOM-004 and CLI-022 pass"},
+    {"id":"7.4","name":"Port Python-era migration command","depends_on":["4.2","4.4","4.6"],"writer_scope":["crates/symeraseme-engine/src/migration/**","crates/symeraseme-cli/src/commands/migrate.rs","matching tests"],"merge_gate":"CLI-024 pass on copied fixtures"},
+
+    {"id":"8.1","name":"Port MCP protocol core","depends_on":["1.2","2.4"],"writer_scope":["crates/symeraseme-cli/src/mcp/mod.rs","crates/symeraseme-cli/src/mcp/protocol.rs","crates/symeraseme-cli/src/mcp/sanitize.rs","matching tests"],"merge_gate":"MCP-001..008 and official conformance pass"},
+    {"id":"8.2","name":"Port MCP stdio","depends_on":["8.1"],"writer_scope":["crates/symeraseme-cli/src/mcp/stdio.rs","fuzz/fuzz_targets/mcp_stdio.rs","matching tests"],"merge_gate":"MCP-014..015 and zero-stdout gate pass"},
+    {"id":"8.3","name":"Port MCP HTTP","depends_on":["8.1","4.7"],"writer_scope":["crates/symeraseme-cli/src/mcp/http.rs","matching tests"],"merge_gate":"MCP-009..013 pass"},
+    {"id":"8.4","name":"Wire all handlers and complete CLI","depends_on":["5.1","5.2","5.3","5.4","6.2","6.3","6.4","6.5","7.1","7.2","7.3","7.4","8.2","8.3"],"writer_scope":["crates/symeraseme-cli/src/commands/**","crates/symeraseme-cli/src/dispatch.rs","matching tests"],"merge_gate":"CLI-001..024 and MCP-001..015 all pass"},
+    {"id":"8.5","name":"Hardening sweep","depends_on":["8.4"],"writer_scope":["fuzz/**","property tests","crates/symeraseme-core/tests/miri_contract.rs","security docs"],"merge_gate":"fuzz, Miri, mutation and secret-sentinel gates pass"},
+
+    {"id":"9.1","name":"Run SwiftUI against Rust","depends_on":["8.5","0.3"],"writer_scope":["app/SymairaEraseMe/build.sh","app/SymairaEraseMe/Tests/**"],"merge_gate":"APP-000..004 pass without protocol concessions"},
+    {"id":"9.2","name":"Replace release build plumbing","depends_on":["9.1","0.3"],"writer_scope":["scripts/package-dmg.sh","scripts/package-rust-release.sh",".github/workflows/release.yml",".github/workflows/publish-homebrew.yml",".goreleaser.yml"],"merge_gate":"REL-001..010 pass in dry run"},
+    {"id":"9.3","name":"Verify Homebrew and release consumers","depends_on":["9.2"],"writer_scope":["separate homebrew-tap worktree after immutable prerelease exists"],"merge_gate":"syntax/style/audit/install/version checks pass from real assets"},
+
+    {"id":"10.1","name":"Ship dual-backend prerelease","depends_on":["9.3"],"writer_scope":["fallback dispatch","release packaging","README.md","AGENTS.md","CONTRIBUTING.md","TROUBLESHOOTING.md","skills/**"],"merge_gate":"CUT-001..003 pass on real prerelease assets"},
+    {"id":"10.2","name":"Canary and stable Rust release","depends_on":["10.1"],"writer_scope":["release metadata and evidence only"],"merge_gate":"all required matrix rows pass; value gate passes or explicit exception"},
+    {"id":"10.3","name":"Final integration review","depends_on":["10.2"],"writer_scope":["review fixes only, each in isolated worktree"],"merge_gate":"contract, quality, security and release reviewers approve"},
+    {"id":"10.4","name":"Retire Go separately","depends_on":["10.3"],"external_gate":"stable-release-plus-7-days","writer_scope":["docs/go-test-rust-port-classification.md","Go source/modules/workflows","fallback removal","final docs"],"merge_gate":"CUT-005, full Rust/app/release gates and verified rollback pass"}
+  ]
+}
