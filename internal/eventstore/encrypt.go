@@ -52,9 +52,9 @@ func defaultNowSeconds() int64 { return time.Now().Unix() }
 
 // Encryption envelope constants (mirror db_encryption.py).
 var (
-	EncHeaderV1 = []byte("SYMERASEME_ENCv1\n") // 15 bytes
-	EncMagicV2  = []byte("SYMERASEME_ENCv2\n") // 16 bytes
-	EncMagicV3  = []byte("SYMERASEME_ENCv3\n") // 16 bytes
+	EncHeaderV1 = []byte("SYMERASEME_ENCv1\n") // 17 bytes
+	EncMagicV2  = []byte("SYMERASEME_ENCv2\n") // 17 bytes
+	EncMagicV3  = []byte("SYMERASEME_ENCv3\n") // 17 bytes
 )
 
 // SaltLen is the length (bytes) of the per-file salt for V2/V3.

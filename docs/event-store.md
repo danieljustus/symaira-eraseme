@@ -152,9 +152,9 @@ Three header versions exist; current write version is **V3**:
 
 | Version | Header | Layout after header |
 |---|---|---|
-| V1 (legacy, still readable) | `SYMERASEME_ENCv1\n` (15 bytes) | Fernet token only (no salt in file); uses fixed PBKDF2 salt |
-| V2 | `SYMERASEME_ENCv2\n` (16 bytes) + 16-byte random salt | Fernet token, key = PBKDF2-HMAC-SHA256(master, salt, 600_000) |
-| V3 (current) | `SYMERASEME_ENCv3\n` (16 bytes) + 16-byte random salt | Fernet token, key = HKDF-SHA256(master, salt=salt, info=`symeraseme-db-encryption-v3`) |
+| V1 (legacy, still readable) | `SYMERASEME_ENCv1\n` (17 bytes) | Fernet token only (no salt in file); uses fixed PBKDF2 salt |
+| V2 | `SYMERASEME_ENCv2\n` (17 bytes) + 16-byte random salt | Fernet token, key = PBKDF2-HMAC-SHA256(master, salt, 600_000) |
+| V3 (current) | `SYMERASEME_ENCv3\n` (17 bytes) + 16-byte random salt | Fernet token, key = HKDF-SHA256(master, salt=salt, info=`symeraseme-db-encryption-v3`) |
 
 Key derivation:
 - master key = 32-byte identity master key (keyring/OS keychain, never on

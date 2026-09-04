@@ -40,11 +40,11 @@
     "checkboxes": "bounded worker execution units inside each task; executed serially unless scopes are proven disjoint"
   },
   "execution_state": {
-    "last_completed": null,
-    "active_task": "0.1",
-    "merged_tasks": [],
+    "last_completed": "0.1",
+    "active_tasks": ["0.2", "0.3"],
+    "merged_tasks": ["0.1"],
     "active_worktrees": {},
-    "blocked_by": [794, 795, 796, 797, 798, 799, 800],
+    "blocked_by": [794, 796, 797, 798, 799, 800],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },
   "external_gates": {

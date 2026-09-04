@@ -71,7 +71,7 @@ SQLite, network transcript or process behavior.
 | DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO |
 | DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
 | DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
-| CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | Go contract + shared vectors | byte | all | BLOCKED #795 |
+| CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
 | CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go/Rust bidirectional vectors | byte | all | BLOCKED #798 |
 | CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
 | CRY-002 | crypto | Python-final standard-Fernet V2 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
