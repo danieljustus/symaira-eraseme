@@ -133,6 +133,14 @@ Parameters:
     -   `campaign_id` (string): Filter by campaign
     -   `folders` (array): IMAP folders to poll (default: ['INBOX']). Deduplicates by Message-ID across folders.
 
+Implementation details:
+- **Adapter**: Production adapter uses `github.com/emersion/go-imap` over TLS 1.2+ (`NetIMAPDialer`).
+- **Authentication**: Supports standard IMAP LOGIN as well as SASL XOAUTH2. Passwords and access tokens are resolved safely and never emitted in logs or error strings.
+- **Persistent HWM**: High-water marks and `UIDVALIDITY` state are persisted per host and folder in the `imap_state` SQLite table in `symeraseme.db`. UIDVALIDITY changes trigger a cold re-scan.
+- **Config Precedence**: Command flags > MCP tool arguments > Environment variables (`IMAP_HOST`, `IMAP_PORT`, `IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_SSL`, `IMAP_FOLDER`, `IMAP_SINCE_DAYS`) > Built-in defaults.
+- **Deduplication**: When polling multiple folders, replies are deduplicated across folders by RFC 5322 `Message-ID`.
+- **Matching & Storage**: Discovered broker replies are correlated against active removal requests and `SENT` events in SQLite, then persisted to `inbox_replies`.
+
 ### `classify_reply`
 
 Classify a broker reply using LLM (e.g. confirmation, rejection, info request).
@@ -427,8 +435,8 @@ two views over the same operations. Decisions made for v1.0.0:
 ### Accidental shapes noted (fix at v1.0.0 boundary)
 
 - `poll_inbox` requires `host`/`port`/`username`/`ssl` inline — the Go
-  server should accept the same params but may default host/port/ssl from
-  the email account config when omitted (backward-compatible superset).
+  server accepts inline params, environment variables (`IMAP_*`), or default values
+  (with CLI flags > arguments > env vars > defaults precedence).
 - `execute`'s `consent_token`/`consent_file` pair is the destructive-op
   consent mechanism; the Go server keeps both, never prompting from the
   MCP layer (tool calls are non-interactive by design).

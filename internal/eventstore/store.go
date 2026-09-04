@@ -26,7 +26,7 @@ import (
 )
 
 // SchemaVersion is the user_version pragma value written by InitSchema.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // DBFileName is the canonical database file name inside the data dir.
 const DBFileName = "symeraseme.db"
@@ -192,65 +192,92 @@ func (s *Store) InitSchema() error {
 	if cur == SchemaVersion {
 		return s.ensureManualTaskSchema()
 	}
+	if cur == 0 {
+		stmts := []string{
+			`CREATE TABLE IF NOT EXISTS campaigns (
+				id              TEXT PRIMARY KEY,
+				created_at      TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+				kind            TEXT NOT NULL DEFAULT 'initial',
+				notes           TEXT
+			)`,
+			`CREATE TABLE IF NOT EXISTS removal_requests (
+				id              INTEGER PRIMARY KEY AUTOINCREMENT,
+				broker_id       TEXT NOT NULL,
+				channel         TEXT NOT NULL DEFAULT 'email',
+				campaign_id     TEXT NOT NULL,
+				created_at      TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+				jurisdiction    TEXT NOT NULL,
+				template_id     TEXT NOT NULL DEFAULT '',
+				identity_snapshot_hash TEXT NOT NULL DEFAULT ''
+			)`,
+			`CREATE TABLE IF NOT EXISTS request_events (
+				id              INTEGER PRIMARY KEY AUTOINCREMENT,
+				request_id      INTEGER NOT NULL REFERENCES removal_requests(id),
+				occurred_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+				recorded_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+				event_type      TEXT NOT NULL,
+				payload_json    TEXT NOT NULL DEFAULT '{}',
+				source          TEXT NOT NULL DEFAULT 'system'
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_events_request
+				ON request_events(request_id, occurred_at)`,
+			`CREATE INDEX IF NOT EXISTS idx_events_occurred_at
+				ON request_events(occurred_at DESC)`,
+			`CREATE TABLE IF NOT EXISTS request_state (
+				request_id      INTEGER PRIMARY KEY REFERENCES removal_requests(id),
+				current_status  TEXT NOT NULL DEFAULT 'PLANNED',
+				last_event_id   INTEGER NOT NULL DEFAULT 0,
+				last_event_at   TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+				sent_at         TIMESTAMP,
+				acknowledged_at TIMESTAMP,
+				resolved_at     TIMESTAMP,
+				deadline_at     TIMESTAMP,
+				next_action_at  TIMESTAMP,
+				reminders_sent  INTEGER NOT NULL DEFAULT 0,
+				escalation_level INTEGER NOT NULL DEFAULT 0
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_request_state_next_action
+				ON request_state(next_action_at, current_status)`,
+			`CREATE INDEX IF NOT EXISTS idx_removal_requests_campaign
+				ON removal_requests(campaign_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_removal_requests_broker
+				ON removal_requests(broker_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_removal_requests_jurisdiction
+				ON removal_requests(jurisdiction)`,
+			`PRAGMA user_version = 1`,
+		}
+		for _, q := range stmts {
+			if _, err := s.db.Exec(q); err != nil {
+				return fmt.Errorf("eventstore: schema exec %q: %w", firstLine(q), err)
+			}
+		}
+	}
+	if cur < 2 {
+		if err := s.migrateToV2(); err != nil {
+			return err
+		}
+	}
+	return s.ensureManualTaskSchema()
+}
+
+func (s *Store) migrateToV2() error {
 	stmts := []string{
-		`CREATE TABLE IF NOT EXISTS campaigns (
-			id              TEXT PRIMARY KEY,
-			created_at      TIMESTAMP NOT NULL DEFAULT (datetime('now')),
-			kind            TEXT NOT NULL DEFAULT 'initial',
-			notes           TEXT
+		`CREATE TABLE IF NOT EXISTS imap_state (
+			host           TEXT NOT NULL,
+			folder         TEXT NOT NULL,
+			uid_validity   INTEGER NOT NULL,
+			last_uid       INTEGER NOT NULL DEFAULT 0,
+			updated_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
+			PRIMARY KEY (host, folder)
 		)`,
-		`CREATE TABLE IF NOT EXISTS removal_requests (
-			id              INTEGER PRIMARY KEY AUTOINCREMENT,
-			broker_id       TEXT NOT NULL,
-			channel         TEXT NOT NULL DEFAULT 'email',
-			campaign_id     TEXT NOT NULL,
-			created_at      TIMESTAMP NOT NULL DEFAULT (datetime('now')),
-			jurisdiction    TEXT NOT NULL,
-			template_id     TEXT NOT NULL DEFAULT '',
-			identity_snapshot_hash TEXT NOT NULL DEFAULT ''
-		)`,
-		`CREATE TABLE IF NOT EXISTS request_events (
-			id              INTEGER PRIMARY KEY AUTOINCREMENT,
-			request_id      INTEGER NOT NULL REFERENCES removal_requests(id),
-			occurred_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
-			recorded_at     TIMESTAMP NOT NULL DEFAULT (datetime('now')),
-			event_type      TEXT NOT NULL,
-			payload_json    TEXT NOT NULL DEFAULT '{}',
-			source          TEXT NOT NULL DEFAULT 'system'
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_events_request
-			ON request_events(request_id, occurred_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_events_occurred_at
-			ON request_events(occurred_at DESC)`,
-		`CREATE TABLE IF NOT EXISTS request_state (
-			request_id      INTEGER PRIMARY KEY REFERENCES removal_requests(id),
-			current_status  TEXT NOT NULL DEFAULT 'PLANNED',
-			last_event_id   INTEGER NOT NULL DEFAULT 0,
-			last_event_at   TIMESTAMP NOT NULL DEFAULT (datetime('now')),
-			sent_at         TIMESTAMP,
-			acknowledged_at TIMESTAMP,
-			resolved_at     TIMESTAMP,
-			deadline_at     TIMESTAMP,
-			next_action_at  TIMESTAMP,
-			reminders_sent  INTEGER NOT NULL DEFAULT 0,
-			escalation_level INTEGER NOT NULL DEFAULT 0
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_request_state_next_action
-			ON request_state(next_action_at, current_status)`,
-		`CREATE INDEX IF NOT EXISTS idx_removal_requests_campaign
-			ON removal_requests(campaign_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_removal_requests_broker
-			ON removal_requests(broker_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_removal_requests_jurisdiction
-			ON removal_requests(jurisdiction)`,
 		fmt.Sprintf(`PRAGMA user_version = %d`, SchemaVersion),
 	}
 	for _, q := range stmts {
 		if _, err := s.db.Exec(q); err != nil {
-			return fmt.Errorf("eventstore: schema exec %q: %w", firstLine(q), err)
+			return fmt.Errorf("eventstore: migrate v2 exec %q: %w", firstLine(q), err)
 		}
 	}
-	return s.ensureManualTaskSchema()
+	return nil
 }
 
 func (s *Store) ensureManualTaskSchema() error {
@@ -306,11 +333,50 @@ func (s *Store) ensureReplySchema() error {
 	return nil
 }
 
+// GetIMAPHWM returns the persisted UIDVALIDITY and highest processed UID for a host/folder.
+func (s *Store) GetIMAPHWM(ctx context.Context, host, folder string) (uidValidity, lastUID *uint32, err error) {
+	row := s.db.QueryRowContext(ctx, "SELECT uid_validity, last_uid FROM imap_state WHERE host = ? AND folder = ?", host, folder)
+	var v, u uint32
+	if err := row.Scan(&v, &u); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	return &v, &u, nil
+}
+
+// SetIMAPHWM persists the UIDVALIDITY and last processed UID for a host/folder.
+func (s *Store) SetIMAPHWM(ctx context.Context, host, folder string, uidValidity, lastUID uint32) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO imap_state (host, folder, uid_validity, last_uid, updated_at)
+		VALUES (?, ?, ?, ?, datetime('now'))
+		ON CONFLICT(host, folder) DO UPDATE SET
+			uid_validity = excluded.uid_validity,
+			last_uid = excluded.last_uid,
+			updated_at = excluded.updated_at`, host, folder, uidValidity, lastUID)
+	return err
+}
+
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return strings.TrimSpace(s[:i])
 	}
 	return strings.TrimSpace(s)
+}
+
+// UserVersion returns the PRAGMA user_version of the open database.
+func (s *Store) UserVersion() (int, error) {
+	return s.userVersion()
+}
+
+// Get implements email.HWMStore interface by delegating to GetIMAPHWM.
+func (s *Store) Get(ctx context.Context, host, folder string) (uidValidity, lastUID *uint32, err error) {
+	return s.GetIMAPHWM(ctx, host, folder)
+}
+
+// Set implements email.HWMStore interface by delegating to SetIMAPHWM.
+func (s *Store) Set(ctx context.Context, host, folder string, uidValidity, lastUID uint32) error {
+	return s.SetIMAPHWM(ctx, host, folder, uidValidity, lastUID)
 }
 
 func (s *Store) userVersion() (int, error) {

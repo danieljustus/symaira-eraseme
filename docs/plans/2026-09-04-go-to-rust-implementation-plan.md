@@ -214,7 +214,7 @@ verbatim: `make fmt-check test lint vet build coverage`.
 - [x] As part of #798, sweep `README.md`, `TROUBLESHOOTING.md`, `skills/**` and
       code comments for stale “Fernet = AES-GCM” claims; align every statement
       with the corrected versioned formats.
-- [ ] Resolve #799 with a real production IMAP adapter plus persistent HWM and
+- [x] Resolve #799 with a real production IMAP adapter plus persistent HWM and
       an executable fake-server transcript; no real mailbox in tests.
 - [ ] Resolve #800 by choosing and testing an honest runtime browser boundary
       or explicit manual fallback; missing `symbrowse` must never claim success.

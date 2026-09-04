@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -589,16 +591,86 @@ func TestCrashSafeAtomicMigrationOnCopies(t *testing.T) {
 				t.Fatal("migrated file should not be legacy Go format")
 			}
 
-			// Decrypt and compare against original golden SQLite bytes
+			// Decrypt and compare the complete logical SQLite contents. Additive
+			// schema migrations may legitimately change page bytes while preserving
+			// every pre-existing row.
 			decrypted, err := DecryptBytes(migratedRaw)
 			if err != nil {
 				t.Fatalf("decrypting migrated file failed: %v", err)
 			}
-			if !bytes.Equal(decrypted, goldenCampaign) {
-				t.Fatal("migrated file content mismatch with golden-campaign.db")
+			if got, want := logicalSQLiteSnapshot(t, decrypted), logicalSQLiteSnapshot(t, goldenCampaign); !bytes.Equal(got, want) {
+				t.Fatalf("migrated logical SQLite content mismatch\n got: %s\nwant: %s", got, want)
 			}
 		})
 	}
+}
+
+func logicalSQLiteSnapshot(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("open logical snapshot: %v", err)
+	}
+	defer store.Close()
+	tables, err := store.DB().Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	if err != nil {
+		t.Fatalf("list logical snapshot tables: %v", err)
+	}
+	var names []string
+	for tables.Next() {
+		var name string
+		if err := tables.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, name)
+	}
+	if err := tables.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tables.Close(); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := make(map[string][][]any, len(names))
+	for _, name := range names {
+		quoted := `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+		rows, err := store.DB().Query(fmt.Sprintf("SELECT * FROM %s ORDER BY rowid", quoted))
+		if err != nil {
+			t.Fatalf("query logical snapshot table %s: %v", name, err)
+		}
+		columns, err := rows.Columns()
+		if err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			values := make([]any, len(columns))
+			dest := make([]any, len(columns))
+			for i := range values {
+				dest[i] = &values[i]
+			}
+			if err := rows.Scan(dest...); err != nil {
+				rows.Close()
+				t.Fatal(err)
+			}
+			snapshot[name] = append(snapshot[name], values)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		if err := rows.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }
 
 // TestFernetStandardFormatVerification verifies byte-level standard Fernet properties:

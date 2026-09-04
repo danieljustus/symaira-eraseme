@@ -1,6 +1,6 @@
 # SQLite Event Store Contract
 
-**Status:** pinned · **Schema version:** `1` (PRAGMA user_version) · **Scope:** milestone v1.0.0 (Go port)
+**Status:** pinned · **Schema version:** `2` (PRAGMA user_version) · **Scope:** milestone v1.0.0 (Go port)
 
 This document specifies the on-disk format of the Symaira EraseMe event
 store so the Go port can read and write the same database files used by the
@@ -15,9 +15,10 @@ the exact JSON from the exact SQLite file.
 - SQLite 3, one file: `~/.local/share/symeraseme/symeraseme.db`
   (`SYMERASEME_DB_DIR` overrides the directory, `SYMERASEME_DATA_DIR` the
   base). The Go port must accept the same two env vars.
-- `PRAGMA user_version = 1` marks the schema version; `init_db()` creates
-  missing tables idempotently and refuses to operate below its expected
-  version only by not downgrading (it never migrates down).
+- `PRAGMA user_version = 2` marks the schema version (bumped from 1 to 2 with
+  the introduction of `imap_state` for persistent IMAP high-water mark tracking).
+  `InitSchema()` runs migrations idempotently and refuses to operate on a newer
+  schema version.
 - **Timestamps are UTC text** in one of three parseable forms (see
   `core/datetime_utils.py`):
   - `%Y-%m-%dT%H:%M:%S` (no tz — interpreted as UTC)
@@ -87,6 +88,18 @@ the log and recomputes every column; `UpsertState` writes it;
 `append_event_and_project()` writes event+projection atomically in one
 transaction. `rebuild_all_states()` rebuilds dirty rows in chunks of 100.
 The golden fixture ships with an **empty** `request_state` on purpose.
+
+### imap_state (schema v2)
+
+| Column | Type | Notes |
+|---|---|---|
+| `host` | TEXT NOT NULL | IMAP server hostname (compound PK) |
+| `folder` | TEXT NOT NULL | IMAP folder name (compound PK) |
+| `uid_validity` | INTEGER NOT NULL | folder UIDVALIDITY |
+| `last_uid` | INTEGER NOT NULL | highest processed UID (default 0) |
+| `updated_at` | TIMESTAMP NOT NULL | default `datetime('now')` |
+
+Persists the UID high-water mark for inbox polling. UIDVALIDITY changes trigger a cold re-scan.
 
 ## 3. Event type catalogue
 

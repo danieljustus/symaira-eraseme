@@ -25,6 +25,12 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/scheduler"
 )
 
+// ContractHandlerOptions allows callers to customize dependencies (e.g. for testing).
+type ContractHandlerOptions struct {
+	IMAPDialer email.IMAPDialer
+	HWMStore   email.HWMStore
+}
+
 func dataStore() (*eventstore.Store, error) {
 	dir := os.Getenv("SYMERASEME_DATA_DIR")
 	if dir == "" {
@@ -145,6 +151,10 @@ func loadRegistry(resourceDirs ...string) ([]registry.Broker, error) {
 }
 
 func ContractHandler() Handler {
+	return ContractHandlerWithOptions(ContractHandlerOptions{})
+}
+
+func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 	return func(ctx context.Context, name string, args map[string]any) (any, error) {
 		switch name {
 
@@ -197,11 +207,7 @@ func ContractHandler() Handler {
 				Account: getStr(args, "account", ""), DryRun: dryRun,
 			}, getInt(args, "batch_size", 5))
 		case "poll_inbox":
-			return email.PollInbox(ctx, email.IMAPConfig{
-				Host: getStr(args, "host", ""), Port: getInt(args, "port", 993),
-				Username: getStr(args, "username", ""), Password: getStr(args, "password", ""),
-				UseTLS: getBool(args, "ssl", true),
-			}, nil, nil) // dialer and state are nil
+			return handlePollInbox(ctx, args, opts)
 		case "classify_reply":
 			store, err := dataStore()
 			if err != nil {

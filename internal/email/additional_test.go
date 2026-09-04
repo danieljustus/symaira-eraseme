@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,34 @@ import (
 
 func testTime() time.Time {
 	return time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
+
+func TestReadBoundedBodyPropagatesErrorsAndRejectsTruncation(t *testing.T) {
+	if _, err := readBoundedBody(failingReader{}); err == nil || !strings.Contains(err.Error(), "read failed") {
+		t.Fatalf("read error = %v", err)
+	}
+	if _, err := readBoundedBody(strings.NewReader(strings.Repeat("x", 64*1024+1))); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("oversized body error = %v", err)
+	}
+}
+
+func TestSetContextDeadlineInterruptsOnCancellation(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cleanup := setContextDeadline(ctx, client, time.Hour)
+	cancel()
+	started := time.Now()
+	_, err := client.Read(make([]byte, 1))
+	cleanup()
+	if err == nil || time.Since(started) > time.Second {
+		t.Fatalf("cancellation did not interrupt read promptly: err=%v elapsed=%s", err, time.Since(started))
+	}
 }
 
 func TestBuildMIMEValidatesAndSanitizesHeaders(t *testing.T) {
@@ -156,7 +185,7 @@ func (s *configurableSession) Select(_ context.Context, folder string) (uint32, 
 	s.selectedFolder = folder
 	return s.uidValidity, s.selectErr
 }
-func (s *configurableSession) SearchUID(context.Context, string) ([]uint32, error) {
+func (s *configurableSession) SearchUID(context.Context, string, ...time.Time) ([]uint32, error) {
 	return nil, s.searchErr
 }
 func (s *configurableSession) Fetch(context.Context, []uint32) ([]FetchedMessage, error) {

@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/danieljustus/symaira-eraseme/internal/email"
+	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
+	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 )
 
 func TestCLIReadOnlyAndDryRunSurfaces(t *testing.T) {
@@ -131,5 +137,97 @@ func TestCLIArgumentAndOutputValidation(t *testing.T) {
 	}
 	if _, err := execute(t, "review"); err == nil {
 		t.Fatal("review without a file path accepted")
+	}
+}
+
+type fakeCLIPollDialer struct {
+	session email.IMAPSession
+	lastCfg email.IMAPConfig
+}
+
+func (d *fakeCLIPollDialer) Dial(_ context.Context, cfg email.IMAPConfig) (email.IMAPSession, error) {
+	d.lastCfg = cfg
+	return d.session, nil
+}
+
+type fakeCLIPollSession struct {
+	uidValidity uint32
+	uids        []uint32
+	messages    []email.FetchedMessage
+	selected    []string
+}
+
+func (s *fakeCLIPollSession) Select(_ context.Context, folder string) (uint32, error) {
+	s.selected = append(s.selected, folder)
+	return s.uidValidity, nil
+}
+
+func (s *fakeCLIPollSession) SearchUID(_ context.Context, _ string, _ ...time.Time) ([]uint32, error) {
+	return append([]uint32(nil), s.uids...), nil
+}
+
+func (s *fakeCLIPollSession) Fetch(_ context.Context, _ []uint32) ([]email.FetchedMessage, error) {
+	return append([]email.FetchedMessage(nil), s.messages...), nil
+}
+
+func (s *fakeCLIPollSession) Close() error {
+	return nil
+}
+
+func TestCLIPollInboxWithFakeDialer(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("SYMERASEME_DATA_DIR", dataDir)
+	dbPath := filepath.Join(dataDir, "symeraseme.db")
+	store, err := eventstore.Open(dbPath)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	reqID, err := store.CreateRemovalRequest(context.Background(), "test-broker", "email", "campaign-1", "US", "tmpl", "hash")
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	_, _, err = store.AppendAndProject(context.Background(), reqID, eventstore.EvtSent, map[string]any{
+		"message_id": "<sent-abc@symeraseme>", "broker_id": "test-broker",
+	}, eventstore.SrcSystem, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("append sent: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+
+	session := &fakeCLIPollSession{
+		uidValidity: 100,
+		uids:        []uint32{10},
+		messages: []email.FetchedMessage{{
+			UID:          10,
+			Header:       []byte("Subject: Re: Removal\r\nFrom: broker@example.com\r\nTo: user@example.com\r\nIn-Reply-To: <sent-abc@symeraseme>\r\nMessage-ID: <reply-xyz@broker>\r\n\r\n"),
+			Body:         []byte("Done."),
+			InternalDate: time.Now().UTC(),
+		}},
+	}
+	dialer := &fakeCLIPollDialer{session: session}
+	handler := mcp.ContractHandlerWithOptions(mcp.ContractHandlerOptions{IMAPDialer: dialer})
+	result, err := handler(context.Background(), "poll_inbox", map[string]any{
+		"host": "imap.fake.test", "username": "testuser", "ssl": true,
+	})
+	if err != nil {
+		t.Fatalf("poll-inbox handler failed: %v", err)
+	}
+	res, ok := result.(map[string]any)
+	if !ok || res["total_fetched"] != 1 || res["total_matched"] != 1 {
+		t.Fatalf("unexpected poll result: %#v", result)
+	}
+	if dialer.lastCfg.Host != "imap.fake.test" || dialer.lastCfg.Username != "testuser" {
+		t.Fatalf("unexpected dial config: %#v", dialer.lastCfg)
+	}
+	store, err = eventstore.Open(dbPath)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	defer store.Close()
+	v, u, err := store.GetIMAPHWM(context.Background(), "imap.fake.test", "INBOX")
+	if err != nil || v == nil || *v != 100 || u == nil || *u != 10 {
+		t.Fatalf("unexpected HWM: val=%v, uid=%v, err=%v", v, u, err)
 	}
 }

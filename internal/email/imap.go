@@ -26,7 +26,7 @@ type IMAPDialer interface {
 
 type IMAPSession interface {
 	Select(ctx context.Context, folder string) (uidValidity uint32, err error)
-	SearchUID(ctx context.Context, uidRange string) ([]uint32, error)
+	SearchUID(ctx context.Context, uidRange string, since ...time.Time) ([]uint32, error)
 	Fetch(ctx context.Context, uids []uint32) ([]FetchedMessage, error)
 	Close() error
 }
@@ -34,10 +34,11 @@ type IMAPSession interface {
 // FetchedMessage is the bounded result of one batch FETCH. Header should be
 // RFC 5322 header bytes and Body is the requested plain-text snippet.
 type FetchedMessage struct {
-	UID    uint32
-	Header []byte
-	Body   []byte
-	Flags  []string
+	UID          uint32
+	Header       []byte
+	Body         []byte
+	Flags        []string
+	InternalDate time.Time
 }
 
 // HWMStore persists the last processed UID per host/folder and its
@@ -56,7 +57,9 @@ type MemoryHWMStore struct {
 	records map[string]hwmRecord
 }
 
-func NewMemoryHWMStore() *MemoryHWMStore { return &MemoryHWMStore{records: make(map[string]hwmRecord)} }
+func NewMemoryHWMStore() *MemoryHWMStore {
+	return &MemoryHWMStore{records: make(map[string]hwmRecord)}
+}
 
 func (s *MemoryHWMStore) Get(_ context.Context, host, folder string) (*uint32, *uint32, error) {
 	s.mu.Lock()
@@ -81,8 +84,8 @@ func (s *MemoryHWMStore) Set(_ context.Context, host, folder string, uidValidity
 
 // PollInbox performs one UID-based poll. It selects once, searches from the
 // persisted HWM, performs one bounded batch fetch, parses messages, and then
-// advances the HWM. A failed fetch still advances to the requested UID range,
-// matching the Python adapter's explicit "UIDs discovered" policy.
+// advances the HWM only after a successful fetch. Callers that also persist
+// replies should use InboxService so the HWM is staged until persistence ends.
 func PollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWMStore) ([]Message, error) {
 	if dialer == nil {
 		return nil, fmt.Errorf("%w: dialer is nil", ErrIMAP)
@@ -99,51 +102,94 @@ func PollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWM
 	if state == nil {
 		state = NewMemoryHWMStore()
 	}
+	return pollInbox(ctx, cfg, dialer, state)
+}
+
+func pollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWMStore) ([]Message, error) {
+	if cfg.Folder == "" {
+		cfg.Folder = "INBOX"
+	}
+	if cfg.MaxMessages <= 0 {
+		cfg.MaxMessages = 50
+	}
 	session, err := dialer.Dial(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("%w: connect/login failed", ErrIMAP)
+		return nil, imapError("connect/login failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
 	}
 	defer session.Close()
+
 	uidValidity, err := session.Select(ctx, cfg.Folder)
 	if err != nil {
-		return nil, fmt.Errorf("%w: folder select failed", ErrIMAP)
+		return nil, imapError("folder select failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
 	}
 	storedValidity, lastUID, err := state.Get(ctx, cfg.Host, cfg.Folder)
 	if err != nil {
-		return nil, fmt.Errorf("%w: read high-water mark failed", ErrIMAP)
+		return nil, imapError("read high-water mark failed", err)
 	}
 	start := uint32(1)
 	if storedValidity != nil && lastUID != nil && *storedValidity == uidValidity {
+		if *lastUID == ^uint32(0) {
+			return nil, imapError("UID range exhausted", errors.New("last UID is UINT32_MAX"))
+		}
 		start = *lastUID + 1
 	}
 	uidRange := strconv.FormatUint(uint64(start), 10) + ":*"
-	uids, err := session.SearchUID(ctx, uidRange)
+	var sinceTime time.Time
+	if cfg.SinceDays > 0 {
+		sinceTime = time.Now().UTC().AddDate(0, 0, -cfg.SinceDays)
+	}
+	var uids []uint32
+	if sinceTime.IsZero() {
+		uids, err = session.SearchUID(ctx, uidRange)
+	} else {
+		uids, err = session.SearchUID(ctx, uidRange, sinceTime)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: UID search failed", ErrIMAP)
+		return nil, imapError("UID search failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
 	}
 	if len(uids) == 0 {
-		return nil, state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, valueOr(lastUID, 0))
+		if err := state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, valueOr(lastUID, 0)); err != nil {
+			return nil, imapError("write high-water mark failed", err)
+		}
+		return nil, nil
 	}
 	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
 	if len(uids) > cfg.MaxMessages {
-		uids = uids[len(uids)-cfg.MaxMessages:]
+		// Consume the oldest pending window first. Keeping the highest UIDs here
+		// would advance the HWM past messages that were never fetched.
+		uids = uids[:cfg.MaxMessages]
 	}
 	messages, err := session.Fetch(ctx, append([]uint32(nil), uids...))
-	maxUID := uids[len(uids)-1]
 	if err != nil {
-		_ = state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, maxUID)
-		return nil, fmt.Errorf("%w: UID fetch failed", ErrIMAP)
+		// Do not advance the HWM on a failed fetch. Retrying the same UIDs is
+		// required to avoid permanent message loss.
+		return nil, imapError("UID fetch failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+	}
+	fetchedByUID := make(map[uint32]FetchedMessage, len(messages))
+	for _, fetched := range messages {
+		fetchedByUID[fetched.UID] = fetched
 	}
 	parsed := make([]Message, 0, len(messages))
-	for _, fetched := range messages {
+	var lastHandled uint32
+	for _, uid := range uids {
+		fetched, ok := fetchedByUID[uid]
+		if !ok {
+			return nil, imapError("UID fetch omitted requested message", fmt.Errorf("UID %d missing from FETCH response", uid))
+		}
 		message, parseErr := ParseFetchedMessage(fetched)
 		if parseErr != nil {
-			continue
+			return nil, imapError("parse fetched message failed", fmt.Errorf("UID %d: %w", uid, parseErr))
+		}
+		lastHandled = uid
+		if !sinceTime.IsZero() {
+			if message.Date == nil || message.Date.Before(sinceTime) {
+				continue
+			}
 		}
 		parsed = append(parsed, message)
 	}
-	if err := state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, maxUID); err != nil {
-		return nil, fmt.Errorf("%w: write high-water mark failed", ErrIMAP)
+	if err := state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, lastHandled); err != nil {
+		return nil, imapError("write high-water mark failed", err)
 	}
 	return parsed, nil
 }
@@ -184,12 +230,15 @@ func ParseFetchedMessage(fetched FetchedMessage) (Message, error) {
 	if threadID == "" {
 		threadID = firstMessageID(messageID)
 	}
-	var dateValue = reader.Header.Get("Date")
 	var parsedDate *time.Time
-	if dateValue != "" {
+	if dateValue := reader.Header.Get("Date"); dateValue != "" {
 		if value, parseErr := mail.ParseDate(dateValue); parseErr == nil {
 			parsedDate = &value
 		}
+	}
+	if parsedDate == nil && !fetched.InternalDate.IsZero() {
+		d := fetched.InternalDate
+		parsedDate = &d
 	}
 	return Message{
 		ID:        strconv.FormatUint(uint64(fetched.UID), 10),
@@ -205,9 +254,7 @@ func ParseFetchedMessage(fetched FetchedMessage) (Message, error) {
 	}, nil
 }
 
-func firstMessageID(value string) string {
-	return messageIDPattern.FindString(value)
-}
+func firstMessageID(value string) string { return messageIDPattern.FindString(value) }
 
 // NormalizeSubject removes the reply/forward prefixes used by common mail
 // clients before matching request subjects.
