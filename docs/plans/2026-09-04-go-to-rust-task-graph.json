@@ -39,12 +39,20 @@
     "merge_gate": "required acceptance output before dependents become ready",
     "checkboxes": "bounded worker execution units inside each task; executed serially unless scopes are proven disjoint"
   },
+  "evidence_policy": {
+    "context_packets": "docs/rust-port/packets/<task>-<base-sha>.md",
+    "review_reports": "docs/rust-port/reviews/<task>-<reviewed-sha>-{spec,quality}.md",
+    "implementation_timeout_minutes": 20,
+    "review_timeout_minutes": 10,
+    "timeout_recovery": "preserve and verify partial worktree; one fresh recovery worker; then escalate",
+    "required_review_fields": ["reviewed_sha", "commands", "results", "findings", "verdict", "reviewer_lane"]
+  },
   "execution_state": {
-    "last_completed": "0.1",
-    "active_tasks": ["0.2", "0.3"],
-    "merged_tasks": ["0.1"],
+    "last_completed": "0.2",
+    "active_tasks": ["0.3"],
+    "merged_tasks": ["0.1", "0.2"],
     "active_worktrees": {},
-    "blocked_by": [794, 796, 798, 799, 800],
+    "blocked_by": [794, 796, 798, 799, 800, 816, 817],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },
   "external_gates": {

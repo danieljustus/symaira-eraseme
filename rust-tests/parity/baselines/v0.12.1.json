@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Symaira EraseMe v0.12.1 Go baseline metrics and cutover reference",
+  "stable_fields": {
+    "release": {
+      "tag": "v0.12.1",
+      "commit": "240bf67cefa05e643e32611a02e6e7ed87a033ea",
+      "validated_commit": true
+    },
+    "source_inventory": {
+      "go_files_count": 122,
+      "go_physical_lines": 23179,
+      "embedded_brokers_count": 1277,
+      "embedded_broker_yaml_files": 1279,
+      "embedded_broker_example_docs": 2,
+      "mcp_tools_count": 26
+    },
+    "go_coverage": {
+      "covered_statements": 5225,
+      "total_statements": 6854,
+      "coverage_percentage": 76.23,
+      "gate_percentage": 75.0,
+      "status": "PASS"
+    },
+    "built_binary": {
+      "name": "symeraseme",
+      "os": "darwin",
+      "arch": "arm64",
+      "cgo_enabled": 0,
+      "build_flags": "-trimpath -buildvcs=false -ldflags \"-s -w -X main.versionValue=0.12.1\"",
+      "size_bytes": 16758114,
+      "sha256": "7849d2470447febcc586d6156e33b9e323fed695dfde97bf951c467c3cc1144d",
+      "released_archive_binary_size_bytes": 16686738,
+      "historical_proposal_stated_size_bytes": 16774642,
+      "notes": "Proposal stated size (16,774,642 bytes) reflected main workspace build prior to untracked registry/brokers/.DS_Store cleanup. Clean pinned v0.12.1 source build produces 16,758,114 bytes (SHA-256 7849d2470447febcc586d6156e33b9e323fed695dfde97bf951c467c3cc1144d); stripped release archive binary is 16,686,738 bytes."
+    },
+    "frozen_performance_baseline": {
+      "command": "symeraseme version",
+      "runs": 100,
+      "median_ms": 9.3,
+      "p95_ms": 9.97,
+      "max_rss_bytes": 22282240,
+      "rss_measurement_method": "/usr/bin/time -l maximum resident set size",
+      "cutover_value_gates": {
+        "max_p95_startup_regression_pct": 20.0,
+        "max_p95_startup_ms": 11.96,
+        "max_rss_regression_pct": 20.0,
+        "max_rss_bytes": 26738688,
+        "max_unpacked_binary_regression_pct": 20.0,
+        "max_unpacked_binary_bytes": 20109736
+      }
+    },
+    "release_archives": [
+      {
+        "name": "symeraseme_0.12.1_darwin_amd64.tar.gz",
+        "os": "darwin",
+        "arch": "amd64",
+        "size_bytes": 6837118,
+        "sha256": "3ff650cc1cab17e23f1c7264006b21b43d5e23a67ee6783daba84e39357869a1"
+      },
+      {
+        "name": "symeraseme_0.12.1_darwin_arm64.tar.gz",
+        "os": "darwin",
+        "arch": "arm64",
+        "size_bytes": 6472923,
+        "sha256": "7fa696829c9bf861ba902a65576d22013e4eeeb655150143975f961078dc906b"
+      },
+      {
+        "name": "symeraseme_0.12.1_linux_amd64.tar.gz",
+        "os": "linux",
+        "arch": "amd64",
+        "size_bytes": 6895950,
+        "sha256": "f64bc2d8456f3e9b7e66763e4f90dc42b43c526df61593e228676a2663d43d15"
+      },
+      {
+        "name": "symeraseme_0.12.1_linux_arm64.tar.gz",
+        "os": "linux",
+        "arch": "arm64",
+        "size_bytes": 6386000,
+        "sha256": "02613a59bd88657c436ee8d748f33cc0910ec0cafb07cd238f3e1fd520e74dfd"
+      },
+      {
+        "name": "symeraseme_0.12.1_windows_amd64.zip",
+        "os": "windows",
+        "arch": "amd64",
+        "size_bytes": 6907665,
+        "sha256": "a4ff2c47c9ff1bc7d9e4becdf390dad398e3fe059ceab598e7e7bff1e1a4e54f"
+      },
+      {
+        "name": "symeraseme_0.12.1_windows_arm64.zip",
+        "os": "windows",
+        "arch": "arm64",
+        "size_bytes": 6296129,
+        "sha256": "d2771bc8d8c68e636b5df2a82bf29ba583e38c26f56bf87af2c86ec825412d9b"
+      }
+    ],
+    "release_checksums": {
+      "filename": "checksums.txt",
+      "size_bytes": 717,
+      "sha256": "a3e7b606ff4f380bf324a81987754d28b78daa2d714d2a22419109954b8e33ad",
+      "format": "sha256sum (<64-character-hex-digest><two spaces><filename><newline>)"
+    },
+    "release_dmg": {
+      "filename": "Symaira-EraseMe-0.12.1-macos.dmg",
+      "size_bytes": 7259990,
+      "sha256": "c0d024c3b1063d14eec39abfc69f14a72ff7e5a4a885bb8fa901d56a68339baf",
+      "volume_name": "Symaira EraseMe",
+      "format": "Apple_HFS / GUID_partition_scheme"
+    },
+    "dmg_bundle_manifest": [
+      {
+        "path": "Applications",
+        "type": "symlink",
+        "target": "/Applications"
+      },
+      {
+        "path": ".background/symaira-dmg-background.png",
+        "type": "file"
+      },
+      {
+        "path": "Symaira EraseMe.app/Contents/Info.plist",
+        "type": "file"
+      },
+      {
+        "path": "Symaira EraseMe.app/Contents/MacOS/Symaira EraseMe",
+        "type": "file"
+      },
+      {
+        "path": "Symaira EraseMe.app/Contents/MacOS/symeraseme",
+        "type": "file"
+      },
+      {
+        "path": "Symaira EraseMe.app/Contents/Resources/AppIcon.icns",
+        "type": "file"
+      },
+      {
+        "path": "Symaira EraseMe.app/Contents/_CodeSignature/CodeResources",
+        "type": "file"
+      }
+    ],
+    "toolchain": {
+      "os": "darwin",
+      "arch": "arm64"
+    }
+  },
+  "dynamic_metadata": {
+    "captured_at": "2026-09-04T14:43:35.819311+00:00",
+    "script": "scripts/capture-go-baseline.sh",
+    "privacy_audit": "PASSED (no home directory, username, tokens, or private keys accessed)",
+    "runner_environment": {
+      "go_version": "go version go1.27.1 darwin/arm64",
+      "git_version": "git version 2.55.0",
+      "swift_version": "Apple Swift version 6.4 (swiftlang-6.4.0.20.104 clang-2100.3.20.102)"
+    },
+    "dmg_inspection": {
+      "status": "inspected",
+      "platform": "darwin",
+      "method": "hdiutil_mount"
+    },
+    "live_100_run_startup": {
+      "runs": 100,
+      "min_ms": 9.21,
+      "p25_ms": 9.6,
+      "median_ms": 9.83,
+      "p75_ms": 10.21,
+      "p90_ms": 10.74,
+      "p95_ms": 10.95,
+      "p99_ms": 11.35,
+      "max_ms": 271.36,
+      "mean_ms": 12.57,
+      "stddev_ms": 26.14,
+      "max_rss_bytes": 22544384
+    }
+  }
+}
