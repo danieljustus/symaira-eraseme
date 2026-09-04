@@ -75,12 +75,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CERTIFICATE_P12:-}" ]; then
-            echo "::warning::CERTIFICATE_P12 is not configured; the DMG will be explicitly recorded as ad-hoc/unsigned."
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::CERTIFICATE_P12 secret is required for GUI release signing."
+            exit 1
+          fi
+          if [ -z "${CERTIFICATE_PASSWORD:-}" ] || [ -z "${KEYCHAIN_PASSWORD:-}" ]; then
+            echo "::error::CERTIFICATE_PASSWORD and KEYCHAIN_PASSWORD secrets are required for GUI release signing."
+            exit 1
           fi
           KEYCHAIN_PATH="$RUNNER_TEMP/symaira-release.keychain-db"
           CERTIFICATE_PATH="$RUNNER_TEMP/symaira-release.p12"
+          trap 'rm -f "$CERTIFICATE_PATH"' EXIT
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -95,35 +99,9 @@ jobs:
           fi
           echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-          echo "signed=true" >> "$GITHUB_OUTPUT"
+          rm -f "$CERTIFICATE_PATH"
 
-      - name: Build and package GUI DMG
-        run: |
-          set -euo pipefail
-          VERSION="${RELEASE_TAG#v}" ./scripts/package-dmg.sh
-          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
-          test -f "$DMG"
-          shasum -a 256 "$DMG"
-
-      - name: Verify DMG bundle contents
-        run: |
-          set -euo pipefail
-          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
-          MOUNT_POINT="$RUNNER_TEMP/symaira-dmg-mount"
-          mkdir -p "$MOUNT_POINT"
-          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT_POINT"
-          trap 'hdiutil detach "$MOUNT_POINT" -quiet || true' EXIT
-          test -d "$MOUNT_POINT/Symaira EraseMe.app"
-          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/Symaira EraseMe"
-          test -x "$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/symeraseme"
-          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
-          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MOUNT_POINT/Symaira EraseMe.app/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
-          NESTED_BINARY="$MOUNT_POINT/Symaira EraseMe.app/Contents/MacOS/symeraseme"
-          codesign --verify --strict --verbose=2 "$NESTED_BINARY"
-          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/Symaira EraseMe.app"
-
-      - name: Notarize and staple signed DMG
-        if: steps.signing.outputs.signed == 'true'
+      - name: Validate notarization credentials
         env:
           NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
           NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
@@ -132,32 +110,131 @@ jobs:
           set -euo pipefail
           for name in NOTARY_API_KEY NOTARY_API_KEY_ID NOTARY_API_ISSUER; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::$name is required when the DMG is signed."
+              echo "::error::$name secret is required for GUI release notarization."
               exit 1
             fi
           done
-          KEY_FILE="$RUNNER_TEMP/notary-api-key.p8"
-          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
-          printf '%s' "$NOTARY_API_KEY" | base64 --decode > "$KEY_FILE"
-          chmod 600 "$KEY_FILE"
-          RESPONSE="$RUNNER_TEMP/notary-response.json"
-          xcrun notarytool submit "$DMG" \
-            --key "$KEY_FILE" \
+
+      - name: Build and sign macOS app bundle
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true ./scripts/package-dmg.sh --app-only
+          APP_PATH="app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"
+          test -d "$APP_PATH"
+          test -x "$APP_PATH/Contents/MacOS/Symaira EraseMe"
+          test -x "$APP_PATH/Contents/MacOS/symeraseme"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
+
+      - name: Notarize and staple macOS app
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          APP_PATH="app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"
+          KEY_PATH="$RUNNER_TEMP/notary-api-key.p8"
+          ZIP_PATH="$RUNNER_TEMP/Symaira-EraseMe-app-notarization.zip"
+          RESPONSE_PATH="$RUNNER_TEMP/app-notary-response.json"
+          cleanup() { rm -f "$KEY_PATH" "$ZIP_PATH" "$RESPONSE_PATH"; }
+          trap cleanup EXIT
+          if echo "$NOTARY_API_KEY" | base64 --decode 2>/dev/null | head -1 | grep -q -- "-----BEGIN"; then
+            echo "$NOTARY_API_KEY" | base64 --decode > "$KEY_PATH"
+          else
+            echo "$NOTARY_API_KEY" > "$KEY_PATH"
+          fi
+          chmod 600 "$KEY_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+          xcrun notarytool submit "$ZIP_PATH" \
+            --key "$KEY_PATH" \
             --key-id "$NOTARY_API_KEY_ID" \
             --issuer "$NOTARY_API_ISSUER" \
             --wait \
-            --output-format json | tee "$RESPONSE"
-          test "$(jq -r '.status' "$RESPONSE")" = "Accepted"
-          xcrun stapler staple "$DMG"
-          xcrun stapler validate "$DMG"
-          rm -f "$KEY_FILE" "$RESPONSE"
+            --output-format json | tee "$RESPONSE_PATH"
+          test "$(jq -r '.status' "$RESPONSE_PATH")" = "Accepted"
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
 
-      - name: Upload GUI DMG to the existing release
+      - name: Create and sign DMG container
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true ./scripts/package-dmg.sh --dmg-only
+          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
+          test -f "$DMG"
+          echo "DMG_PATH=$DMG" >> "$GITHUB_ENV"
+
+      - name: Notarize DMG
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/notary-api-key.p8"
+          RESPONSE_PATH="$RUNNER_TEMP/dmg-notary-response.json"
+          cleanup() { rm -f "$KEY_PATH" "$RESPONSE_PATH"; }
+          trap cleanup EXIT
+          if echo "$NOTARY_API_KEY" | base64 --decode 2>/dev/null | head -1 | grep -q -- "-----BEGIN"; then
+            echo "$NOTARY_API_KEY" | base64 --decode > "$KEY_PATH"
+          else
+            echo "$NOTARY_API_KEY" > "$KEY_PATH"
+          fi
+          chmod 600 "$KEY_PATH"
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$KEY_PATH" \
+            --key-id "$NOTARY_API_KEY_ID" \
+            --issuer "$NOTARY_API_ISSUER" \
+            --wait \
+            --output-format json | tee "$RESPONSE_PATH"
+          test "$(jq -r '.status' "$RESPONSE_PATH")" = "Accepted"
+
+      - name: Staple and Gatekeeper-verify DMG
+        run: |
+          set -euo pipefail
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          codesign --verify --strict --verbose=2 "$DMG_PATH"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+
+      - name: Upload GUI DMG to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
+          gh release upload "$RELEASE_TAG" "$DMG_PATH" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Verify published DMG asset and record release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ASSET_NAME="$(basename "$DMG_PATH")"
+          DOWNLOAD_DIR="$RUNNER_TEMP/published-release"
+          mkdir -p "$DOWNLOAD_DIR"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$ASSET_NAME" \
+            --dir "$DOWNLOAD_DIR" \
+            --clobber
+          PUBLISHED_PATH="$DOWNLOAD_DIR/$ASSET_NAME"
+          test -f "$PUBLISHED_PATH"
+
+          LOCAL_SHA=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+          PUBLISHED_SHA=$(shasum -a 256 "$PUBLISHED_PATH" | awk '{print $1}')
+          echo "Local DMG SHA-256:     $LOCAL_SHA"
+          echo "Published DMG SHA-256: $PUBLISHED_SHA"
+          if [ "$LOCAL_SHA" != "$PUBLISHED_SHA" ]; then
+            echo "::error::Published DMG SHA-256 does not match local DMG."
+            exit 1
+          fi
+          cmp -s "$DMG_PATH" "$PUBLISHED_PATH"
+          codesign --verify --strict --verbose=2 "$PUBLISHED_PATH"
+          xcrun stapler validate "$PUBLISHED_PATH"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$PUBLISHED_PATH"
+
           CHECKSUMS_DIR="$RUNNER_TEMP/release-checksums"
           mkdir -p "$CHECKSUMS_DIR"
           gh release download "$RELEASE_TAG" \
@@ -166,39 +243,37 @@ jobs:
             --dir "$CHECKSUMS_DIR" \
             --clobber
           CHECKSUMS="$CHECKSUMS_DIR/checksums.txt"
-          python3 - "$CHECKSUMS" "$DMG" <<'PY'
+          test -s "$CHECKSUMS"
+          python3 - "$CHECKSUMS" "$PUBLISHED_PATH" "$LOCAL_SHA" <<'PY'
           from pathlib import Path
-          import hashlib
           import sys
 
           checksums = Path(sys.argv[1])
-          artifact = Path(sys.argv[2])
-          lines = [line for line in checksums.read_text().splitlines() if artifact.name not in line]
-          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-          lines.append(f"{digest}  {artifact.name}")
-          checksums.write_text("\n".join(lines) + "\n")
+          artifact_name = Path(sys.argv[2]).name
+          digest = sys.argv[3]
+          existing_lines = [
+              line for line in checksums.read_text().splitlines()
+              if line.strip() and artifact_name not in line
+          ]
+          if not existing_lines:
+              raise SystemExit("checksums.txt is empty; expected existing GoReleaser manifest entries")
+          existing_lines.append(f"{digest}  {artifact_name}")
+          checksums.write_text("\n".join(existing_lines) + "\n")
           PY
-          gh release upload "$RELEASE_TAG" "$DMG" "$CHECKSUMS" \
-            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$RELEASE_TAG" "$CHECKSUMS" --repo "$GITHUB_REPOSITORY" --clobber
 
-      - name: Record GUI signing status in release notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
           NOTES="$RUNNER_TEMP/release-notes.md"
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$NOTES"
           printf '\n\n### macOS GUI distribution\n' >> "$NOTES"
-          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
-            printf '%s\n' 'The GUI DMG was signed with Developer ID Application, notarized, and stapled.' >> "$NOTES"
-          else
-            printf '%s\n' 'The GUI DMG is ad-hoc/unsigned because no Developer ID certificate was configured; it is not presented as Gatekeeper-ready.' >> "$NOTES"
-          fi
+          printf '%s\n' 'The GUI DMG was signed with Developer ID Application, notarized, and stapled. Gatekeeper assessment and published checksum verified.' >> "$NOTES"
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
 
       - name: Clean up signing material
         if: always()
         run: |
-          if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
-            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          KEYCHAIN="${KEYCHAIN_PATH:-$RUNNER_TEMP/symaira-release.keychain-db}"
+          if [ -f "$KEYCHAIN" ]; then
+            security delete-keychain "$KEYCHAIN" 2>/dev/null || true
           fi
+          rm -f "$KEYCHAIN"
+          rm -f "$RUNNER_TEMP"/*.p12 "$RUNNER_TEMP"/*.p8 "$RUNNER_TEMP"/*.zip "$RUNNER_TEMP"/*notary*.json "$RUNNER_TEMP"/*response*.json
