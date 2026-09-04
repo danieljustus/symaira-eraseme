@@ -218,9 +218,9 @@ verbatim: `make fmt-check test lint vet build coverage`.
       an executable fake-server transcript; no real mailbox in tests.
 - [ ] Resolve #800 by choosing and testing an honest runtime browser boundary
       or explicit manual fallback; missing `symbrowse` must never claim success.
-- [ ] Resolve #816 with real Python profile fixtures, frozen path/serialization/
+- [x] Resolve #816 with real Python profile fixtures, frozen path/serialization/
       hash bytes, and read-only key lookup on every decrypt path.
-- [ ] Resolve #817 with strict Bearer parsing and constant-time secret
+- [x] Resolve #817 with strict Bearer parsing and constant-time secret
       comparison while preserving statuses and loopback defaults.
 
 **Gate:** `DB-000 = PASS` before Task 0.4, `CRY-000` and `CRY-000B = PASS`
