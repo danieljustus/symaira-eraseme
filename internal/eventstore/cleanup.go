@@ -70,10 +70,18 @@ func startsWith(s, prefix string) bool {
 
 // CheckpointWAL runs a PRAGMA wal_checkpoint(TRUNCATE) on the
 // given file to flush pending writes into the main DB before
-// re-encrypting.
+// re-encrypting. SQLite reports a busy checkpoint in the first result
+// column, not as a Go error, so all result columns are inspected.
 func (s *Store) CheckpointWAL() error {
-	_, err := s.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
-	return err
+	var busy, logFrames, checkpointed int64
+	row := s.db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)")
+	if err := row.Scan(&busy, &logFrames, &checkpointed); err != nil {
+		return fmt.Errorf("eventstore: WAL checkpoint: %w", err)
+	}
+	if busy != 0 {
+		return fmt.Errorf("eventstore: WAL checkpoint busy (busy=%d log_frames=%d checkpointed=%d)", busy, logFrames, checkpointed)
+	}
+	return nil
 }
 
 // RemoveWALSiblings deletes the .db-wal and .db-shm files next to
@@ -145,34 +153,39 @@ func (l *DBLock) Close() error {
 // Encrypted re-encrypt on exit
 // --------------------------------------------------------------------
 
-// FinaliseAll re-encrypts every still-registered temp file.
-func FinaliseAll() {
+// FinaliseAll finalizes every still-registered encrypted store. Entries
+// registered by OpenEncrypted carry their Store owner, so finalization
+// checkpoints and closes SQLite before reading the temp file. Low-level
+// RegisterTemp entries are intended for already-closed databases and are
+// written directly. All failures are returned and failed entries remain
+// registered with their recovery artifacts intact.
+func FinaliseAll() error {
+	var finaliseErr error
 	encryptedTemps.Range(func(k, v any) bool {
 		origPath, _ := k.(string)
-		tmpPath, _ := v.(string)
-		if origPath == "" || tmpPath == "" {
+		reg, ok := tempRegistration(v)
+		if origPath == "" || !ok {
 			return true
 		}
-		_ = WriteEncrypted(origPath)
-		_ = RemoveWALSiblings(tmpPath)
+		var err error
+		if reg.store != nil {
+			err = reg.store.CloseAt(origPath)
+		} else {
+			err = WriteEncrypted(origPath)
+		}
+		if err != nil {
+			finaliseErr = errors.Join(finaliseErr, fmt.Errorf("%s: %w", origPath, err))
+		}
 		return true
 	})
+	return finaliseErr
 }
 
 // EncryptAndClose re-encrypts the Store's temp file back to
-// encPath, then closes the connection.  Convenience wrapper used
+// encPath, then closes the connection. Convenience wrapper used
 // by callers that opened via OpenEncrypted.
 func (s *Store) EncryptAndClose(encPath string) error {
-	if err := s.CheckpointWAL(); err != nil {
-		// Not fatal — log and continue.  WAL will just be left
-		// around and cleaned by RemoveWALSiblings.
-		_ = err
-	}
-	if err := s.CloseAt(encPath); err != nil {
-		_ = s.db.Close()
-		return err
-	}
-	return nil
+	return s.CloseAt(encPath)
 }
 
 // --------------------------------------------------------------------

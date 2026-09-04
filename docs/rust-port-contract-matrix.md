@@ -2,10 +2,12 @@
 
 > Performance/release baseline: commit
 > `240bf67cefa05e643e32611a02e6e7ed87a033ea` (`v0.12.1`). The executable
-> contract oracle is pinned to the merge commit after #795, #796 and
-> #798–#800 and #816–#817 are fixed;
-> Task 0.4 must replace this sentence with that exact commit before Rust
-> behavior is implemented. Rust may not replace the default binary until every
+> contract oracle is pinned to the merge commit after #795, #796,
+> #798–#800 and #816–#817 are fixed. Task 0.4 must replace this sentence with
+> that exact commit before Rust behavior is implemented. The corrected
+> encryption sub-oracle is the Python↔Go conformance evidence from issue #798;
+> Rust interoperability remains gated to Phase 4 and the CRY rows below. Rust
+> may not replace the default binary until every
 > required row is `PASS`. `TODO` means the contract is known but its
 > differential case has not yet been implemented.
 
@@ -72,7 +74,7 @@ SQLite, network transcript or process behavior.
 | DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
 | DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
 | CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
-| CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go/Rust bidirectional vectors | byte | all | BLOCKED #798 |
+| CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go vectors complete; Rust vectors remain Phase 4 gate | byte | all | PASS (Python↔Go); Rust gated |
 | CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
 | CRY-002 | crypto | Python-final standard-Fernet V2 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
 | CRY-003 | crypto | Python-final standard-Fernet V3 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |

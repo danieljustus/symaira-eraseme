@@ -1,2 +1,3 @@
 # Generated encrypted interoperability fixtures are binary.
 tests/fixtures/identity-contract/*.enc binary
+tests/fixtures/event-store/crypto/*.db binary

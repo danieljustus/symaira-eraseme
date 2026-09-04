@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	// Pure-Go SQLite driver (no CGO).  Registered as the "sqlite"
@@ -100,6 +101,13 @@ func (r rawEvent) toEvent() (Event, error) {
 type Store struct {
 	db   *sql.DB
 	path string
+
+	// encryptedPath is set by OpenEncrypted. closeMu serializes the
+	// checkpoint/close/re-encrypt sequence so Close and CloseAt cannot
+	// race or double-close the database.
+	encryptedPath string
+	closeMu       sync.Mutex
+	dbClosed      bool
 }
 
 // Path returns the resolved file path of the database (may be a
@@ -110,9 +118,33 @@ func (s *Store) Path() string { return s.path }
 // callers that need a raw handle; prefer the Store methods.
 func (s *Store) DB() *sql.DB { return s.db }
 
-// Close closes the underlying connection pool. Any registered temp
-// file (encryption) must be cleaned up via CloseAt.
-func (s *Store) Close() error { return s.db.Close() }
+// Close closes the store. Stores opened by OpenEncrypted use CloseAt
+// internally so WAL contents are checkpointed and the encrypted file is
+// finalized; plain stores only close their database connection.
+//
+// Close is safe to call more than once. If finalization fails, the
+// registration and recovery artifacts remain available for FinaliseAll.
+func (s *Store) Close() error {
+	if s == nil {
+		return nil
+	}
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	if s.dbClosed && s.encryptedPath == "" {
+		return nil
+	}
+	if s.encryptedPath != "" {
+		return s.closeAtLocked(s.encryptedPath)
+	}
+	if s.dbClosed {
+		return nil
+	}
+	err := closeStoreDBFn(s)
+	if err == nil {
+		s.dbClosed = true
+	}
+	return err
+}
 
 // Open opens (or creates) the SQLite database at path and runs the
 // idempotent schema initialisation. Encryption is NOT handled here;

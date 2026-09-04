@@ -25,7 +25,7 @@ Some broker-specific web flows still require manual review.
 - Web-form automation through the `symaira-browse` integration.
 - Shared LLM provider layer for reply classification and rebuttal generation.
 - Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
-- AES-256-GCM encrypted identity/database data and explicit destructive-operation consent.
+- AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.
 - Native SwiftUI dashboard for macOS. Release DMGs contain the Go MCP server.
 
 ## Install

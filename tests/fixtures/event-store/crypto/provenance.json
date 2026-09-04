@@ -1,0 +1,68 @@
+{
+  "generator": "scripts/generate-crypto-fixtures.py",
+  "python_final_commit": "9381296d68c7d674b102196f6d6b25a050bd6a66",
+  "golden_campaign_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120",
+  "golden_campaign_size": 102400,
+  "small_plaintext_sha256": "95920accb349472bc4e9c6e3b97a30b0ca5c156ce86c3d6026957febd894f691",
+  "small_plaintext_size": 73,
+  "parameters": {
+    "master_key_hex": "73796d616972612d65726173656d652d676f6c64656e2d6d61737465722d3332",
+    "master_key_ascii": "symaira-eraseme-golden-master-32",
+    "fixed_timestamp": 1756713900,
+    "fixed_iv_hex": "30313233343536373839616263646566",
+    "v1_salt_hex": "73796d65726173656d652d64622d656e6372797074696f6e2d7631",
+    "v2_salt_hex": "73616c742d7369787465656e2d763221",
+    "v3_salt_hex": "73616c742d7369787465656e2d763321",
+    "legacy_nonce_hex": "303132333435363738396162"
+  },
+  "fixtures": {
+    "golden-campaign-v1-python.db": {
+      "sha256": "cb719251738ff21f09b4f7849028100f2fa377206061a88d937076d893ed16be",
+      "size": 136649,
+      "format": "standard-fernet",
+      "version": 1
+    },
+    "golden-campaign-v2-python.db": {
+      "sha256": "c1ed3ac0214b7e6b392a24827b8f7aa5a03df2b525f9a0b0c47a83c5a83d955f",
+      "size": 136665,
+      "format": "standard-fernet",
+      "version": 2
+    },
+    "golden-campaign-v3-python.db": {
+      "sha256": "24bea1fcc07c71e24d08bb7627d141cfc1d375ca0e69e4ad80899cf645fb001c",
+      "size": 136665,
+      "format": "standard-fernet",
+      "version": 3
+    },
+    "small-vector-v3-python.db": {
+      "sha256": "2b280044ce73358ac21a8eaca5357859bc94a954dc058b0d8582617ab54bd9c8",
+      "size": 217,
+      "format": "standard-fernet",
+      "version": 3
+    },
+    "golden-campaign-v1-legacy-go.db": {
+      "sha256": "0fa7797003791808e1ff8935b155c995bdcf45a4f36373831491633d0c6b7334",
+      "size": 102486,
+      "format": "legacy-go-aes-gcm",
+      "version": 1
+    },
+    "golden-campaign-v2-legacy-go.db": {
+      "sha256": "e6635c673bc608b7fb4bf9618ee8412e6390b5adf4f13d0078bf0a10c2075865",
+      "size": 102502,
+      "format": "legacy-go-aes-gcm",
+      "version": 2
+    },
+    "golden-campaign-v3-legacy-go.db": {
+      "sha256": "1881ad5dcc1c3076b859c5581003c9e91cbd938a0e836bd3c504fe2cbf0cde1c",
+      "size": 102502,
+      "format": "legacy-go-aes-gcm",
+      "version": 3
+    },
+    "small-vector-v3-legacy-go.db": {
+      "sha256": "518314ae09b591a44bfd813d8c94d9f19772dddd22382dcbc5eb5a8b2c9380f5",
+      "size": 175,
+      "format": "legacy-go-aes-gcm",
+      "version": 3
+    }
+  }
+}
