@@ -8,6 +8,42 @@ cd "$(dirname "$0")/.."
 # target names stay unchanged.
 APP_NAME="Symaira EraseMe"
 
+# Parse CLI arguments
+APP_ONLY="${APP_ONLY:-false}"
+DMG_ONLY="${DMG_ONLY:-false}"
+REQUIRE_SIGNING="${REQUIRE_SIGNING:-false}"
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --app-only)
+            APP_ONLY="true"
+            shift
+            ;;
+        --dmg-only)
+            DMG_ONLY="true"
+            shift
+            ;;
+        --require-signing)
+            REQUIRE_SIGNING="true"
+            shift
+            ;;
+        --non-release-test)
+            REQUIRE_SIGNING="false"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            echo "Usage: $0 [--app-only | --dmg-only] [--require-signing] [--non-release-test]" >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ "$APP_ONLY" = "true" ] && [ "$DMG_ONLY" = "true" ]; then
+    echo "Error: cannot specify both --app-only and --dmg-only." >&2
+    exit 2
+fi
+
 # Version for Info.plist and the DMG filename. Release workflows pass VERSION
 # explicitly; local tagged builds use the exact Git tag.
 VERSION="${VERSION:-}"
@@ -23,44 +59,53 @@ if [ -z "$VERSION" ]; then
 fi
 
 # Detect Xcode or Xcode-beta for SwiftUI macro support
-if [ -d "/Applications/Xcode.app/Contents/Developer" ]; then
-    export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
-elif [ -d "/Applications/Xcode-beta.app/Contents/Developer" ]; then
-    export DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"
-else
-    echo "Warning: No Xcode found. SwiftUI macros may not resolve."
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+    if [ -d "/Applications/Xcode.app/Contents/Developer" ]; then
+        export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+    elif [ -d "/Applications/Xcode-beta.app/Contents/Developer" ]; then
+        export DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"
+    else
+        echo "Warning: No Xcode found. SwiftUI macros may not resolve."
+    fi
 fi
 
-echo "Building SymairaEraseMe in Release mode..."
-cd app/SymairaEraseMe
-swift build -c release
-SWIFT_BIN_PATH="$(swift build -c release --show-bin-path)"
-cd ../..
-
-BUILD_DIR="$SWIFT_BIN_PATH"
 STAGE_DIR="app/SymairaEraseMe/.build/dmg-stage"
 APP_BUNDLE="$STAGE_DIR/$APP_NAME.app"
 DMG_PATH="dist/Symaira-EraseMe-${VERSION}-macos.dmg"
 
-echo "Building the self-contained Go MCP server..."
-GO_BINARY="$BUILD_DIR/symeraseme"
-CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X main.versionValue=$VERSION" \
-    -o "$GO_BINARY" ./cmd/symeraseme
+CODESIGN_KEYCHAIN_ARGS=()
+if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
+    CODESIGN_KEYCHAIN_ARGS=(--keychain "$KEYCHAIN_PATH")
+fi
 
-echo "Creating App Bundle structure..."
-rm -rf "$STAGE_DIR"
-mkdir -p "$APP_BUNDLE/Contents/MacOS"
-mkdir -p "$APP_BUNDLE/Contents/Resources"
+if [ "$DMG_ONLY" != "true" ]; then
+    echo "Building SymairaEraseMe in Release mode..."
+    cd app/SymairaEraseMe
+    swift build -c release
+    SWIFT_BIN_PATH="$(swift build -c release --show-bin-path)"
+    cd ../..
 
-echo "Copying Swift and Go binaries..."
-cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-cp "$GO_BINARY" "$APP_BUNDLE/Contents/MacOS/symeraseme"
-chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
-test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    BUILD_DIR="$SWIFT_BIN_PATH"
 
-echo "Writing Info.plist..."
-cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
+    echo "Building the self-contained Go MCP server..."
+    GO_BINARY="$BUILD_DIR/symeraseme"
+    CGO_ENABLED=0 go build -trimpath \
+        -ldflags "-s -w -X main.versionValue=$VERSION" \
+        -o "$GO_BINARY" ./cmd/symeraseme
+
+    echo "Creating App Bundle structure..."
+    rm -rf "$STAGE_DIR"
+    mkdir -p "$APP_BUNDLE/Contents/MacOS"
+    mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+    echo "Copying Swift and Go binaries..."
+    cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+    cp "$GO_BINARY" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
+
+    echo "Writing Info.plist..."
+    cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -89,41 +134,51 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
-SRC_ICON="assets/branding/AppIcon.icns"
-if [ -f "$SRC_ICON" ]; then
-    echo "Installing AppIcon.icns..."
-    cp "$SRC_ICON" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-else
-    echo "Warning: $SRC_ICON not found. App will build without icon."
+    SRC_ICON="assets/branding/AppIcon.icns"
+    if [ -f "$SRC_ICON" ]; then
+        echo "Installing AppIcon.icns..."
+        cp "$SRC_ICON" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    else
+        echo "Warning: $SRC_ICON not found. App will build without icon."
+    fi
+
+    # --- Code Signing ---
+    # Sign nested binary with hardened runtime, then sign app bundle with hardened runtime.
+    if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+        echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
+        # Go emits an ad-hoc linker signature. Remove it before applying the
+        # Developer ID signature so recursive app signing cannot retain it.
+        codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/symeraseme" || true
+        codesign --force --timestamp --options runtime \
+            ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
+            -s "$CODESIGN_IDENTITY" \
+            "$APP_BUNDLE/Contents/MacOS/symeraseme"
+        echo "Verifying nested Go binary signature before app signing..."
+        codesign --verify --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/symeraseme"
+        codesign -dvvv "$APP_BUNDLE/Contents/MacOS/symeraseme" 2>&1
+        codesign --deep --force --timestamp --options runtime \
+            ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
+            -s "$CODESIGN_IDENTITY" \
+            "$APP_BUNDLE"
+        codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+        echo "Verifying signature..."
+        codesign -dvvv "$APP_BUNDLE" 2>&1 | head -5
+    elif [ "$REQUIRE_SIGNING" = "true" ]; then
+        echo "Error: CODESIGN_IDENTITY is required when signing is required." >&2
+        exit 1
+    else
+        echo "CODESIGN_IDENTITY not set. Skipping code signing (non-release test mode only)."
+    fi
+
+    if [ "$APP_ONLY" = "true" ]; then
+        echo "App bundle staged successfully: $APP_BUNDLE"
+        exit 0
+    fi
 fi
 
-# --- Code Signing ---
-# If CODESIGN_IDENTITY is set, sign the app bundle with Developer ID,
-# including Hardened Runtime and timestamp for notarization.
-if [ -n "${CODESIGN_IDENTITY:-}" ]; then
-    echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
-    CODESIGN_KEYCHAIN_ARGS=()
-    if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
-        CODESIGN_KEYCHAIN_ARGS=(--keychain "$KEYCHAIN_PATH")
-    fi
-    # Go emits an ad-hoc linker signature. Remove it before applying the
-    # Developer ID signature so recursive app signing cannot retain it.
-    codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/symeraseme" || true
-    codesign --force --timestamp --options runtime \
-        "${CODESIGN_KEYCHAIN_ARGS[@]}" \
-        -s "$CODESIGN_IDENTITY" \
-        "$APP_BUNDLE/Contents/MacOS/symeraseme"
-    echo "Verifying nested Go binary signature before app signing..."
-    codesign -dvvv "$APP_BUNDLE/Contents/MacOS/symeraseme" 2>&1
-    codesign --deep --force --timestamp --options runtime \
-        "${CODESIGN_KEYCHAIN_ARGS[@]}" \
-        -s "$CODESIGN_IDENTITY" \
-        "$APP_BUNDLE"
-    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-    echo "Verifying signature..."
-    codesign -dvvv "$APP_BUNDLE" 2>&1 | head -5
-else
-    echo "CODESIGN_IDENTITY not set. Skipping code signing (ad-hoc only)."
+if [ ! -d "$APP_BUNDLE" ]; then
+    echo "Error: staged app bundle not found at $APP_BUNDLE" >&2
+    exit 1
 fi
 
 echo "Creating DMG..."
@@ -134,5 +189,21 @@ scripts/create-symaira-dmg.sh \
     "$APP_BUNDLE" \
     "$DMG_PATH" \
     "Symaira EraseMe"
+
+test -f "$DMG_PATH"
+
+if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+    echo "Signing DMG container with Developer ID: $CODESIGN_IDENTITY"
+    codesign --force --sign "$CODESIGN_IDENTITY" --timestamp \
+        ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
+        "$DMG_PATH"
+    echo "Verifying DMG signature..."
+    codesign --verify --strict --verbose=2 "$DMG_PATH"
+elif [ "$REQUIRE_SIGNING" = "true" ]; then
+    echo "Error: CODESIGN_IDENTITY is required for DMG signing." >&2
+    exit 1
+else
+    echo "CODESIGN_IDENTITY not set. Skipping DMG signing (non-release test mode only)."
+fi
 
 echo "DMG successfully created: $DMG_PATH"

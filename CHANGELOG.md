@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+- **Release**: Notarize and staple macOS app before creating DMG, sign DMG
+  container with Developer ID before notarization, staple and validate DMG with
+  Gatekeeper checks, and verify published download bytes before updating release
+  checksums and notes. Fail closed on missing release signing or notarization
+  credentials (#794).
+
 ## [v0.12.1] - 2026-09-01
 
 - **Fix**: Load existing campaigns whose nullable `notes` field is `NULL`
