@@ -10,30 +10,13 @@ import (
 // PollFolders polls each configured folder and deduplicates by RFC Message-ID,
 // matching the Python inbox service's cross-folder behavior.
 func PollFolders(ctx context.Context, cfg IMAPConfig, folders []string, dialer IMAPDialer, state HWMStore) ([]Message, error) {
-	if len(folders) == 0 {
-		folders = []string{"INBOX"}
+	if dialer == nil {
+		return nil, fmt.Errorf("%w: dialer is nil", ErrIMAP)
 	}
-	seen := make(map[string]struct{})
-	var all []Message
-	for _, folder := range folders {
-		cfg.Folder = folder
-		messages, err := PollInbox(ctx, cfg, dialer, state)
-		if err != nil {
-			return nil, err
-		}
-		for _, message := range messages {
-			key := message.MessageID
-			if key == "" {
-				key = message.ID
-			}
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-			all = append(all, message)
-		}
+	if state == nil {
+		state = NewMemoryHWMStore()
 	}
-	return all, nil
+	return pollFoldersWithState(ctx, cfg, folders, dialer, state)
 }
 
 // MatchReplyToRequest prioritizes a recorded thread Message-ID and falls back
@@ -70,19 +53,7 @@ type ReplyStore interface {
 // PollAndMatch is the inbox service core: fetch, correlate, and persist only
 // matched/annotated metadata. It is intentionally adapter-agnostic.
 func PollAndMatch(ctx context.Context, cfg IMAPConfig, folders []string, dialer IMAPDialer, state HWMStore, requests []RemovalRequest, threadMap map[string]int64, store ReplyStore) ([]MatchedMessage, error) {
-	messages, err := PollFolders(ctx, cfg, folders, dialer, state)
-	if err != nil {
-		return nil, err
-	}
-	matched := MatchReplyToRequest(messages, requests, threadMap)
-	if store != nil {
-		for _, reply := range matched {
-			if err := store.Insert(ctx, reply, ParseEmailBody(reply.Message.Body, 200)); err != nil {
-				return nil, fmt.Errorf("email: persist inbox reply: %w", err)
-			}
-		}
-	}
-	return matched, nil
+	return NewInboxService(dialer, state).PollAndMatch(ctx, cfg, folders, requests, threadMap, store)
 }
 
 // SortMessagesByUID is useful to make fakes and callers deterministic.

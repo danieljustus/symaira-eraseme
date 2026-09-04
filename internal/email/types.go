@@ -1,6 +1,9 @@
 package email
 
-import "time"
+import (
+	"crypto/tls"
+	"time"
+)
 
 // EmailMessage is the content and envelope for one outgoing message.
 type EmailMessage struct {
@@ -60,6 +63,11 @@ type IMAPConfig struct {
 	MaxMessages int
 	Timeout     time.Duration
 	OAuth2      *OAuth2Token
+	TLSConfig   *tls.Config
+
+	// AllowInsecureCleartextAuth is an explicit escape hatch for controlled
+	// local tests. Production callers should leave it false.
+	AllowInsecureCleartextAuth bool
 }
 
 // OAuth2Token is sufficient for SASL XOAUTH2/OAUTHBEARER authentication.

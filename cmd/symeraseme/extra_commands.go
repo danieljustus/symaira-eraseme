@@ -99,6 +99,12 @@ func realPollInboxCommand() *cobra.Command {
 		if format == "json" {
 			return writeJSON(cmd, res)
 		}
+		if m, ok := res.(map[string]any); ok {
+			if msg, ok := m["message"].(string); ok && msg != "" {
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
+				return err
+			}
+		}
 		_, err = fmt.Fprintf(cmd.OutOrStdout(), "success\n")
 		return err
 	}}
@@ -109,8 +115,8 @@ func realPollInboxCommand() *cobra.Command {
 	var username string
 	cmd.Flags().StringVar(&username, "username", "", "IMAP username (email address)")
 	var since_days int
-	cmd.Flags().IntVar(&since_days, "since-days", 1, "Fetch messages from the last N days")
-	cmd.Flags().IntVar(&since_days, "since", 1, "Fetch messages from the last N days")
+	cmd.Flags().IntVar(&since_days, "since-days", 14, "Fetch messages from the last N days")
+	cmd.Flags().IntVar(&since_days, "since", 14, "Fetch messages from the last N days")
 	var ssl bool
 	cmd.Flags().BoolVar(&ssl, "ssl", true, "Use SSL/TLS connection")
 	var campaign_id string
@@ -118,13 +124,27 @@ func realPollInboxCommand() *cobra.Command {
 	var folders string
 	cmd.Flags().StringVar(&folders, "folders", "", "IMAP folders to poll (default: ['INBOX']). Deduplicates by Message-ID across folders.")
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
-		argsMap["host"] = host
-		argsMap["port"] = port
-		argsMap["username"] = username
-		argsMap["since_days"] = since_days
-		argsMap["ssl"] = ssl
-		argsMap["campaign_id"] = campaign_id
-		argsMap["folders"] = folders
+		if cmd.Flags().Changed("host") {
+			argsMap["host"] = host
+		}
+		if cmd.Flags().Changed("port") {
+			argsMap["port"] = port
+		}
+		if cmd.Flags().Changed("username") {
+			argsMap["username"] = username
+		}
+		if cmd.Flags().Changed("since-days") || cmd.Flags().Changed("since") {
+			argsMap["since_days"] = since_days
+		}
+		if cmd.Flags().Changed("ssl") {
+			argsMap["ssl"] = ssl
+		}
+		if cmd.Flags().Changed("campaign-id") {
+			argsMap["campaign_id"] = campaign_id
+		}
+		if cmd.Flags().Changed("folders") {
+			argsMap["folders"] = folders
+		}
 		return nil
 	}
 	return cmd

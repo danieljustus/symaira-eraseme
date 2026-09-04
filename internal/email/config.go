@@ -51,7 +51,7 @@ func LoadIMAPConfig() (IMAPConfig, error) {
 		Password:    password,
 		UseTLS:      envBool("IMAP_SSL", true),
 		Folder:      envDefault("IMAP_FOLDER", "INBOX"),
-		SinceDays:   envInt("IMAP_SINCE_DAYS", 1),
+		SinceDays:   envInt("IMAP_SINCE_DAYS", 14),
 		MaxMessages: envInt("IMAP_MAX_MESSAGES", 50),
 	}, nil
 }

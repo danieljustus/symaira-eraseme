@@ -86,7 +86,7 @@ type fakeSession struct {
 }
 
 func (s *fakeSession) Select(context.Context, string) (uint32, error) { return s.uidValidity, nil }
-func (s *fakeSession) SearchUID(_ context.Context, query string) ([]uint32, error) {
+func (s *fakeSession) SearchUID(_ context.Context, query string, _ ...time.Time) ([]uint32, error) {
 	s.searches = append(s.searches, query)
 	return append([]uint32(nil), s.uids...), s.searchErr
 }
@@ -104,7 +104,10 @@ func TestPollInboxUsesUIDHWMAndParsesHeaders(t *testing.T) {
 	session := &fakeSession{
 		uidValidity: 42,
 		uids:        []uint32{1, 2, 6},
-		fetched:     []FetchedMessage{{UID: 6, Header: []byte("Subject: =?UTF-8?Q?Re=3A_Data?=\r\nFrom: Broker <b@example.com>\r\nTo: me@example.com\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\nMessage-ID: <reply@example.com>\r\nReferences: <sent@example.com>\r\n\r\n"), Body: []byte("removed")}},
+		fetched: []FetchedMessage{
+			{UID: 1, Header: []byte("Subject: =?UTF-8?Q?Re=3A_Data?=\r\nFrom: Broker <b@example.com>\r\nTo: me@example.com\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\nMessage-ID: <reply@example.com>\r\nReferences: <sent@example.com>\r\n\r\n"), Body: []byte("removed")},
+			{UID: 2, Header: []byte("Subject: Second\r\nMessage-ID: <second@example.com>\r\n\r\n"), Body: []byte("second")},
+		},
 	}
 	state := NewMemoryHWMStore()
 	cfg := IMAPConfig{Host: "imap.example.com", Folder: "INBOX", MaxMessages: 2}
@@ -112,24 +115,46 @@ func TestPollInboxUsesUIDHWMAndParsesHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(messages) != 1 || messages[0].Subject != "Re: Data" || messages[0].ThreadID != "<sent@example.com>" || messages[0].Body != "removed" {
+	if len(messages) != 2 || messages[0].Subject != "Re: Data" || messages[0].ThreadID != "<sent@example.com>" || messages[0].Body != "removed" {
 		t.Fatalf("messages = %#v", messages)
 	}
-	if session.searches[0] != "1:*" || len(session.fetches[0]) != 2 || session.fetches[0][0] != 2 || session.fetches[0][1] != 6 {
+	if session.searches[0] != "1:*" || len(session.fetches[0]) != 2 || session.fetches[0][0] != 1 || session.fetches[0][1] != 2 {
 		t.Fatalf("search/fetch = %#v / %#v", session.searches, session.fetches)
 	}
 	_, last, err := state.Get(context.Background(), cfg.Host, cfg.Folder)
-	if err != nil || last == nil || *last != 6 {
+	if err != nil || last == nil || *last != 2 {
 		t.Fatalf("HWM = %v, err=%v", last, err)
 	}
 
-	session.uids = nil
-	_, err = PollInbox(context.Background(), cfg, fakeDialer{session}, state)
+	session.uids = []uint32{6}
+	session.fetched = []FetchedMessage{{UID: 6, Header: []byte("Subject: Third\r\nMessage-ID: <third@example.com>\r\n\r\n")}}
+	messages, err = PollInbox(context.Background(), cfg, fakeDialer{session}, state)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.searches[1] != "7:*" {
-		t.Fatalf("second search = %q", session.searches[1])
+	if session.searches[1] != "3:*" || len(messages) != 1 || messages[0].IMAPUID != 6 {
+		t.Fatalf("second batch search/messages = %q / %#v", session.searches[1], messages)
+	}
+	_, last, err = state.Get(context.Background(), cfg.Host, cfg.Folder)
+	if err != nil || last == nil || *last != 6 {
+		t.Fatalf("second batch HWM = %v, err=%v", last, err)
+	}
+}
+
+func TestPollInboxDoesNotAdvancePastOmittedFetchUID(t *testing.T) {
+	state := NewMemoryHWMStore()
+	session := &fakeSession{
+		uidValidity: 7,
+		uids:        []uint32{1, 2},
+		fetched:     []FetchedMessage{{UID: 1, Header: []byte("Subject: One\r\n\r\n")}},
+	}
+	_, err := PollInbox(context.Background(), IMAPConfig{Host: "imap.example.com", Folder: "INBOX"}, fakeDialer{session}, state)
+	if err == nil || !strings.Contains(err.Error(), "omitted requested message") {
+		t.Fatalf("expected omitted UID error, got %v", err)
+	}
+	validity, last, getErr := state.Get(context.Background(), "imap.example.com", "INBOX")
+	if getErr != nil || validity != nil || last != nil {
+		t.Fatalf("omitted UID advanced HWM: validity=%v uid=%v err=%v", validity, last, getErr)
 	}
 }
 
@@ -145,8 +170,8 @@ func TestPollInboxUIDValidityMismatchColdStartsAndFetchErrorAdvances(t *testing.
 		t.Fatalf("cold-start search = %q", session.searches[0])
 	}
 	validity, last, _ := state.Get(context.Background(), "imap.example.com", "INBOX")
-	if validity == nil || last == nil || *validity != 2 || *last != 4 {
-		t.Fatalf("HWM after failed fetch = %v/%v", validity, last)
+	if validity == nil || last == nil || *validity != 1 || *last != 99 {
+		t.Fatalf("HWM changed after failed fetch = %v/%v", validity, last)
 	}
 }
 

@@ -63,7 +63,7 @@ SQLite, network transcript or process behavior.
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | TODO |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | TODO |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | BLOCKED #796 |
-| DB-001 | SQLite | schema v1/table/index SQL and `user_version` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
+| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
 | DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
 | DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | TODO |
 | DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO |
@@ -89,7 +89,7 @@ SQLite, network transcript or process behavior.
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | output scanner | byte | all | TODO |
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | shared cases | byte | all | TODO |
 | ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |
-| DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | BLOCKED #799 |
+| DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | PASS |
 | DOM-000B | domain | production web form has an honest tested runtime/manual boundary | fake process/driver; issue #800 | corrected Go oracle | side-effect | all | BLOCKED #800 |
 | DOM-001 | domain | deadlines/tick transitions | `golden-tick.json` | shared golden test | byte | all | TODO |
 | DOM-002 | domain | campaign plan and execution transitions | `golden-plan.json` | shared golden test | byte+SQLite | all | TODO |
