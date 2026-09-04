@@ -82,7 +82,7 @@ SQLite, network transcript or process behavior.
 | CRY-007 | crypto | decrypted temp dir/file modes and cleanup | isolated TMPDIR | filesystem manifest | side-effect | native OS | TODO |
 | CRY-008 | crypto | WAL checkpoint before re-encryption | write/close/crash corpus | data durability test | side-effect | all | TODO |
 | ID-001 | identity | encrypted profile Go→Rust→Go | deterministic vector | bidirectional harness | byte/semantic | all | TODO |
-| ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | corrected Go oracle test | byte/side-effect | all | BLOCKED #816 |
+| ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | identity interoperability/regression tests | byte/side-effect | all | PASS |
 | ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | adapter tests | semantic | native OS | TODO |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | output scanner | byte | all | TODO |
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | shared cases | byte | all | TODO |

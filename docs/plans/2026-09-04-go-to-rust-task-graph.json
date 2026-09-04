@@ -52,7 +52,7 @@
     "active_tasks": ["0.3"],
     "merged_tasks": ["0.1", "0.2"],
     "active_worktrees": {},
-    "blocked_by": [794, 796, 798, 799, 800, 816],
+    "blocked_by": [794, 796, 798, 799, 800],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },
   "external_gates": {

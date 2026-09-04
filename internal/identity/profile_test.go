@@ -9,9 +9,8 @@ import (
 
 func testKey(t *testing.T) []byte {
 	t.Helper()
-	SetMasterKey([]byte("identity-test-key"))
-	k, err := GetExistingMasterKey()
-	if err != nil {
+	k := []byte("0123456789abcdef0123456789abcdef")
+	if err := SetMasterKey(k); err != nil {
 		t.Fatal(err)
 	}
 	return k
@@ -19,7 +18,8 @@ func testKey(t *testing.T) []byte {
 
 func clearKey(t *testing.T) {
 	t.Helper()
-	t.Cleanup(func() { SetMasterKey(nil) })
+	_ = SetMasterKey(nil)
+	t.Cleanup(func() { _ = SetMasterKey(nil) })
 }
 
 // TestProfileRoundTrip: Save→Load preserves the profile (encrypted at rest).
@@ -71,13 +71,13 @@ func TestLoadProfileMissing(t *testing.T) {
 // TestWrongKeyFails: decrypting with a different master key fails cleanly.
 func TestWrongKeyFails(t *testing.T) {
 	clearKey(t)
-	SetMasterKey([]byte("key-A"))
+	_ = SetMasterKey([]byte("key-A-0123456789abcdef0123456789"))
 	dir := t.TempDir()
 	path := filepath.Join(dir, "identity.encrypted")
 	if _, err := SaveProfile(&Profile{FullName: "A"}, path); err != nil {
 		t.Fatal(err)
 	}
-	SetMasterKey([]byte("key-B"))
+	_ = SetMasterKey([]byte("key-B-0123456789abcdef0123456789"))
 	if _, err := LoadProfile(path); err == nil {
 		t.Fatal("expected failure with wrong key")
 	} else if !strings.Contains(err.Error(), "corrupt") {
@@ -138,13 +138,13 @@ func TestPassphraseDerivationDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	SetMasterKey(nil)
+	_ = SetMasterKey(nil)
 	t.Setenv(EnvSymvaultPassphrase, "op-1")
 	k2, _ := GetExistingMasterKey()
 	if string(k1) != string(k2) {
 		t.Error("passphrase derivation not deterministic")
 	}
-	SetMasterKey(nil)
+	_ = SetMasterKey(nil)
 	t.Setenv(EnvSymvaultPassphrase, "op-2")
 	k3, _ := GetExistingMasterKey()
 	if string(k1) == string(k3) {

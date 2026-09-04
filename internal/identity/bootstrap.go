@@ -52,6 +52,6 @@ func BootstrapReadOnly() error {
 // Shutdown clears the in-process master-key cache and removes the
 // eventstore provider.  Mirrors a clean logout.
 func Shutdown() {
-	SetMasterKey(nil)
+	_ = SetMasterKey(nil)
 	eventstore.SetMasterKeyProvider(nil)
 }

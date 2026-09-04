@@ -14,20 +14,18 @@
 //     passphrase (the secret was fetched from the vault and exposed
 //     as this env var by the calling operator). The value is
 //     derived with scrypt to produce a deterministic AES-256 key.
-//  4. OS keychain via the `keyring` library (best effort).  When
-//     no keychain backend is available, fall through.
+//  4. OS keychain via the KeyringBackend interface (best effort for read,
+//     mandatory durable persistence on explicit initialization).
 //
 // If none of the above produces a key, GetExistingMasterKey
-// returns ErrMasterKeyMissing.  GetOrCreateMasterKey generates a
-// fresh AES-256 key, writes it to the keychain (best effort) and
-// returns it.
+// returns ErrMasterKeyMissing. Key creation is explicit initialization only
+// via InitMasterKey; decrypt/read paths never mint or replace keys.
 package identity
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -58,6 +56,50 @@ const (
 // from all other uses of scrypt. It is public format metadata, not a secret.
 var identityPassphraseSalt = []byte("symeraseme-identity-master-key-v1")
 
+// KeyringBackend defines the interface for interacting with the OS keychain / keyring.
+type KeyringBackend interface {
+	Get(service, username string) (string, error)
+	Set(service, username, password string) error
+	Delete(service, username string) error
+}
+
+type defaultKeyringBackend struct{}
+
+func (defaultKeyringBackend) Get(service, username string) (string, error) {
+	return keyring.Get(service, username)
+}
+
+func (defaultKeyringBackend) Set(service, username, password string) error {
+	return keyring.Set(service, username, password)
+}
+
+func (defaultKeyringBackend) Delete(service, username string) error {
+	return keyring.Delete(service, username)
+}
+
+var (
+	keyringMu      sync.RWMutex
+	currentKeyring KeyringBackend = defaultKeyringBackend{}
+)
+
+// SetKeyringBackend allows tests or alternate runners to inject a fake/mock keyring backend.
+// Passing nil resets to the default OS keyring.
+func SetKeyringBackend(b KeyringBackend) {
+	keyringMu.Lock()
+	defer keyringMu.Unlock()
+	if b == nil {
+		currentKeyring = defaultKeyringBackend{}
+	} else {
+		currentKeyring = b
+	}
+}
+
+func getKeyring() KeyringBackend {
+	keyringMu.RLock()
+	defer keyringMu.RUnlock()
+	return currentKeyring
+}
+
 // keyCache caches the resolved master key in-process.  The cache
 // survives until the process exits, mirroring the Python
 // _get_existing_master_key fast path.
@@ -66,25 +108,21 @@ var (
 	keyCache   []byte
 )
 
-// SetMasterKey explicitly stores a master key in the in-process
-// cache.  Tests use this to inject a deterministic key without
-// touching the keychain or environment.  A zero-length key is
-// treated as "clear" and removes the cache entry.
-func SetMasterKey(key []byte) {
+// SetMasterKey explicitly stores a master key in the in-process cache.
+// A zero-length key clears the cache entry. Malformed key lengths
+// (anything other than 0 or KeyLength) are strictly rejected with an error.
+func SetMasterKey(key []byte) error {
 	keyCacheMu.Lock()
 	defer keyCacheMu.Unlock()
 	if len(key) == 0 {
 		keyCache = nil
-		return
+		return nil
 	}
 	if len(key) != KeyLength {
-		// Hash anything else down to 32 bytes deterministically.
-		sum := sha256.Sum256(key)
-		keyCache = make([]byte, KeyLength)
-		copy(keyCache, sum[:])
-		return
+		return fmt.Errorf("identity: master key must be %d bytes, got %d", KeyLength, len(key))
 	}
 	keyCache = append([]byte(nil), key...)
+	return nil
 }
 
 // GenerateMasterKey returns a fresh 32-byte AES-256 key.
@@ -98,7 +136,7 @@ func GenerateMasterKey() ([]byte, error) {
 
 // GetExistingMasterKey returns the stored master key, or
 // ErrMasterKeyMissing when no source can supply one.  Use this in
-// the read / decrypt path so a missing key fails fast instead of
+// all read / decrypt paths so a missing key fails fast instead of
 // silently minting a new one (which would render the encrypted
 // profile unreadable).
 func GetExistingMasterKey() ([]byte, error) {
@@ -118,7 +156,7 @@ func GetExistingMasterKey() ([]byte, error) {
 		if len(raw) != KeyLength {
 			return nil, fmt.Errorf("identity: %s must be %d bytes, got %d", EnvMasterKeyHex, KeyLength, len(raw))
 		}
-		SetMasterKey(raw)
+		_ = SetMasterKey(raw)
 		return raw, nil
 	}
 
@@ -128,41 +166,58 @@ func GetExistingMasterKey() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("identity: derive master key: %w", err)
 		}
-		SetMasterKey(key)
+		_ = SetMasterKey(key)
 		return key, nil
 	}
 
-	// 3. OS keychain.  Best effort; any error falls through to
-	//    ErrMasterKeyMissing so the caller can show a clean
-	//    "run init-profile" message.
-	if k, err := keyring.Get(ServiceName, KeyringUsername); err == nil && k != "" {
+	// 3. OS keychain via KeyringBackend.
+	if k, err := getKeyring().Get(ServiceName, KeyringUsername); err == nil && k != "" {
 		raw, derr := hex.DecodeString(k)
-		if derr == nil && len(raw) == KeyLength {
-			SetMasterKey(raw)
-			return raw, nil
+		if derr != nil {
+			return nil, fmt.Errorf("identity: stored keychain master key is invalid hex: %w", derr)
 		}
+		if len(raw) != KeyLength {
+			return nil, fmt.Errorf("identity: stored keychain master key must be %d bytes, got %d", KeyLength, len(raw))
+		}
+		_ = SetMasterKey(raw)
+		return raw, nil
 	}
 
 	return nil, ErrMasterKeyMissing
 }
 
-// GetOrCreateMasterKey returns the stored master key, or generates
-// and stores a new one when no key is present.  Use this in the
-// write / encrypt path (save_profile, first-time setup).
-func GetOrCreateMasterKey() ([]byte, error) {
+// InitMasterKey explicitly creates and durably persists a fresh 32-byte
+// master key. Key creation is explicit initialization only; callers must
+// not rely on read/decrypt paths to mint keys. If durable keychain
+// persistence fails, InitMasterKey fails closed and does not cache the key.
+func InitMasterKey() ([]byte, error) {
+	// If a valid key already exists (in memory, env, or keychain), return it.
 	if k, err := GetExistingMasterKey(); err == nil {
 		return k, nil
 	}
+
+	// Generate fresh AES-256 key.
 	k, err := GenerateMasterKey()
 	if err != nil {
 		return nil, err
 	}
-	// Best-effort write to the keychain.  An unwritable keychain
-	// is not fatal — the operator may be relying on an env var
-	// for the next process start.
-	_ = setKeyringBestEffort(hex.EncodeToString(k))
-	SetMasterKey(k)
+
+	// Durable persistence is mandatory.
+	hexKey := hex.EncodeToString(k)
+	if err := getKeyring().Set(ServiceName, KeyringUsername, hexKey); err != nil {
+		return nil, fmt.Errorf("identity: durable keychain persistence failed: %w", err)
+	}
+
+	if err := SetMasterKey(k); err != nil {
+		return nil, err
+	}
 	return k, nil
+}
+
+// GetOrCreateMasterKey returns the stored master key, or explicitly
+// initializes one when none is present.
+func GetOrCreateMasterKey() ([]byte, error) {
+	return InitMasterKey()
 }
 
 // DeleteMasterKey clears the keychain entry (best effort) and the
@@ -171,7 +226,7 @@ func DeleteMasterKey() error {
 	keyCacheMu.Lock()
 	keyCache = nil
 	keyCacheMu.Unlock()
-	if err := keyring.Delete(ServiceName, KeyringUsername); err != nil {
+	if err := getKeyring().Delete(ServiceName, KeyringUsername); err != nil {
 		// keyring returns ErrNotFound when the entry is absent;
 		// treat that as success so the function is idempotent.
 		if errors.Is(err, keyring.ErrNotFound) {
@@ -182,17 +237,8 @@ func DeleteMasterKey() error {
 	return nil
 }
 
-func setKeyringBestEffort(hexKey string) error {
-	// Test stub: a misconfigured keychain on Linux/Windows CI is
-	// common; fall through silently.
-	defer func() { _ = recover() }() //nolint:revive
-	return keyring.Set(ServiceName, KeyringUsername, hexKey)
-}
-
 // EncryptProfileWithKey is a helper used by tests and the bootstrap
-// flow to re-encrypt a profile with a caller-supplied key (e.g. a
-// fresh key generated by GetOrCreateMasterKey when no on-disk
-// profile exists yet).
+// flow to re-encrypt a profile with a caller-supplied key.
 func EncryptProfileWithKey(plaintext, key []byte) ([]byte, error) {
 	return encryptProfile(plaintext, key)
 }
@@ -208,6 +254,9 @@ func DecryptProfileWithKey(raw, key []byte) ([]byte, error) {
 // decryptProfileWithKey is the key-injecting variant of
 // decryptProfile; it skips the master-key lookup.
 func decryptProfileWithKey(raw, key []byte) ([]byte, *ProfileEnvelope, error) {
+	if len(key) != KeyLength {
+		return nil, nil, fmt.Errorf("identity: master key must be %d bytes, got %d", KeyLength, len(key))
+	}
 	nl := -1
 	for i, b := range raw {
 		if b == '\n' {

@@ -1,0 +1,33 @@
+{
+  "generator": "scripts/generate-identity-fixtures.py",
+  "python_final_tag": "python-final",
+  "python_final_commit": "9381296d68c7d674b102196f6d6b25a050bd6a66",
+  "key_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "nonce_hex": "00112233445566778899aabb",
+  "profiles": {
+    "minimal": {
+      "file_enc": "minimal.enc",
+      "canonical_json": "{\"addresses\": [], \"date_of_birth\": null, \"email_addresses\": [\"jane@example.com\"], \"full_name\": \"Jane Doe\", \"jurisdictions\": [], \"name_variants\": [], \"phone_numbers\": []}",
+      "canonical_hash": "f856c1a9514bca91e9c34176a4704e716a2528e36986b1ccc868d05abc98a12c",
+      "header_json": "{\"version\": 2, \"nonce\": \"00112233445566778899aabb\", \"algorithm\": \"AES-256-GCM\"}",
+      "ciphertext_hex": "c64c0cb12a87ca23f7acce726dc61265c77368f23ee386727e9ca392b4eccdb694750619e3d27543b65b967dc73abb0cc3f81b39f39aaea6135da8e4f3740af8ee1dd6b2e01993cac65355208f2398803a77e37ce11183cf1d99e2aa5636866d7ff0d7d2b801c1de99b58140dabd44ce61ee8f2f43f9ef97d26e75ac6960709dfd035d57b8f368c1f62c671dc62af42d74f880916735ae954c1001dc2543ee2b86362d9035b0de09377f20f313c36fbfe858ac3b272c89d7d9b99a3bc8f817972026679bf85c03174f648ca85a8a6d9c0d",
+      "payload_json": "{\n  \"full_name\": \"Jane Doe\",\n  \"name_variants\": [],\n  \"date_of_birth\": null,\n  \"addresses\": [],\n  \"email_addresses\": [\n    \"jane@example.com\"\n  ],\n  \"phone_numbers\": [],\n  \"jurisdictions\": []\n}"
+    },
+    "full": {
+      "file_enc": "full.enc",
+      "canonical_json": "{\"addresses\": [{\"city\": \"Berlin\", \"country\": \"DE\", \"postal_code\": \"10115\", \"state\": \"Berlin\", \"street\": \"123 Main St\", \"valid_from\": \"2020-01-01\", \"valid_to\": null}], \"date_of_birth\": \"1990-01-15\", \"email_addresses\": [\"jane@example.com\", \"jane.doe@work.example.com\"], \"full_name\": \"Jane Doe\", \"jurisdictions\": [\"DE\", \"EU\", \"US-CA\"], \"name_variants\": [\"Jane Roe\", \"Jane Smith\"], \"phone_numbers\": [\"+49-30-123456\", \"+1-555-0199\"]}",
+      "canonical_hash": "76240a6834ebc6c2f6fe416601bc1f9acae48a39c8dfe5d00ad2979860a73b01",
+      "header_json": "{\"version\": 2, \"nonce\": \"00112233445566778899aabb\", \"algorithm\": \"AES-256-GCM\"}",
+      "ciphertext_hex": "c64c0cb12a87ca23f7acce726dc61265c77368f23ee386727e9ca392b4eccdb694750619e3d27543b65b967dc73abb0cc3af1713f39aae881347a89bce7d30b8ab6582fae20391eed2515c2cd66ed1d633318d2ea43fdca04e9bfaee6c1fcf3830b6aad5bc12dcdae4eec50699e10e8d29ad9c385297c79bf86e75ac62657a8ad8155653a6a13e8483452850c400af0709f4aa916737fc8e570c01e63f14b969c1756c812fdde43d755553a7138510eda10be872647a83d1c3b39a3bc88108f82f8010c0d57fa08afb1308ca426c9ddc436c681aa38b9ecb1dd3bf2e5f6f1c788d572df284f7e173553cafcfb925f7b3a15f01453647da1153df2894b33b7e0a101009a6753572df6f30d6407d87bb1feb5cce859a720588c1f012bfb1dad71945b5549dd25591b2db93cd9109be2eed928a15e90778f7c17e08285592a4c3f97d12380046be60a3bc8e81ddf60c015b08b66c362912a1047fe33231cb90238dc45a1c04df6c454e56e8a529b9fe95b9f346ef5bed1225e2dc132ea1f1ad3076944ff1f4c6e22b2cee846186a616b34bc8fd46dbb94116f9ca1b343dd71148c990145e297c5dd6928bbd4e52824fb602e74a053d6d133e07c1674a2aa022d15c3fc6afc88dc572c83855d2d6d6fbf99d2991ab6b44e800b75de693097a851086926b85fc2f798e580f88c9bb11e7a6837eafd42878d95e614052029a53f2fe2cbad5862f1356c578508a979ec15f5f84a1eea7e390701dd3443c0d611704cc6058b3174beeaf7ff23db82b4d578b0d334fa9961a4d61fe0a",
+      "payload_json": "{\n  \"full_name\": \"Jane Doe\",\n  \"name_variants\": [\n    \"Jane Roe\",\n    \"Jane Smith\"\n  ],\n  \"date_of_birth\": \"1990-01-15\",\n  \"addresses\": [\n    {\n      \"street\": \"123 Main St\",\n      \"city\": \"Berlin\",\n      \"postal_code\": \"10115\",\n      \"country\": \"DE\",\n      \"state\": \"Berlin\",\n      \"valid_from\": \"2020-01-01\",\n      \"valid_to\": null\n    }\n  ],\n  \"email_addresses\": [\n    \"jane@example.com\",\n    \"jane.doe@work.example.com\"\n  ],\n  \"phone_numbers\": [\n    \"+49-30-123456\",\n    \"+1-555-0199\"\n  ],\n  \"jurisdictions\": [\n    \"DE\",\n    \"EU\",\n    \"US-CA\"\n  ]\n}"
+    },
+    "unicode": {
+      "file_enc": "unicode.enc",
+      "canonical_json": "{\"addresses\": [{\"city\": \"M\\u00fcnchen\", \"country\": \"DE\", \"postal_code\": \"80331\", \"state\": null, \"street\": \"Goethestra\\u00dfe 42\", \"valid_from\": null, \"valid_to\": null}], \"date_of_birth\": \"1985-12-31\", \"email_addresses\": [\"joerg.mueller@example.de\"], \"full_name\": \"J\\u00f6rg M\\u00fcller\", \"jurisdictions\": [\"DE\", \"EU\"], \"name_variants\": [\"J\\u00f6rg Mueller\"], \"phone_numbers\": [\"+49-89-9876543\"]}",
+      "canonical_hash": "13955144c53fa5171d7989ad5d4e9723d2760506bcfc5615b634446267d5ee82",
+      "header_json": "{\"version\": 2, \"nonce\": \"00112233445566778899aabb\", \"algorithm\": \"AES-256-GCM\"}",
+      "ciphertext_hex": "c64c0cb12a87ca23f7acce726dc61265c7736850e6f4c1165c3a3dd2d2a99fb6d61e4b5c9eca755cba658e68c671e042ecd61509f3e186e25209ed99d6d1e3e8e04fefafa74fdfc1c11d332ca55e94a87b33a56ae51695f501dd87e86419de0f7dead595e4599087ebe5d7099be915910ebd8d3702c681c5973d26eb702324d8e66c0516f5a37faef86f2850c400f67e5da6efd43335e4dd01390be63f5ee63a97363f7190f5a56029572cd911893aeda10bea312d2c999a8dea9a4c2b1f24fe3589178cdb598a8afb1308ca403e82c0447965299f8795ca5acba52c456e1f7a8d4023d4aef7e173553cad8eb53feca9a7545a5d2c45bc1034d10ebeb33b7e0a101258a160206398772a9817538ee579a212cc89b07207de80bc5bf998ddc91f4cc808cfd34ddfe4d7bbdf811bae23fd81d144b44c30a295310a3255dcf3d9f41b5b7c7f12ac48b9bcbdd8bbba26031e45f778505653984c07a66160cb8e60de885e77409b3e001f4fe2b379e4f0a3c6b60aa31ebd3821f4d83e3bb5f5ee247fd36bb2bbf6ec0d06ee8631ceeb12b77ac3a64fd6b97312b4825041528f500599de5a44733e08cdb592a52448bd5ba5029d024a0e244670528e6f5a2aba738f1507b8e687c39672d92c37f5c5c6f6e88d5ee0bc716ce42ab75de4f67e73be1d93fa54d5951dfec895271d060fe4863626b1a5ab",
+      "payload_json": "{\n  \"full_name\": \"J\u00f6rg M\u00fcller\",\n  \"name_variants\": [\n    \"J\u00f6rg Mueller\"\n  ],\n  \"date_of_birth\": \"1985-12-31\",\n  \"addresses\": [\n    {\n      \"street\": \"Goethestra\u00dfe 42\",\n      \"city\": \"M\u00fcnchen\",\n      \"postal_code\": \"80331\",\n      \"country\": \"DE\",\n      \"state\": null,\n      \"valid_from\": null,\n      \"valid_to\": null\n    }\n  ],\n  \"email_addresses\": [\n    \"joerg.mueller@example.de\"\n  ],\n  \"phone_numbers\": [\n    \"+49-89-9876543\"\n  ],\n  \"jurisdictions\": [\n    \"DE\",\n    \"EU\"\n  ]\n}"
+    }
+  }
+}
