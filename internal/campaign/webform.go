@@ -40,6 +40,8 @@ type FormSpec struct {
 	Submit   Selector      `json:"submit"`
 }
 
+const defaultFormExecutorTimeout = 60 * time.Second
+
 // ConfirmationSpec is the local confirmation-link contract.
 type ConfirmationSpec struct {
 	LinkURL string `json:"link_url"`
@@ -110,11 +112,14 @@ func (f FormExecutorFuncs) ConfirmLink(ctx context.Context, spec ConfirmationSpe
 // previews registry forms and persists an explicit manual task when no
 // executor is configured.
 type WebFormAdapter struct {
-	brokers     map[string]registry.Broker
-	executor    FormExecutor
-	Store       *eventstore.Store
-	RequestID   int64
-	ProfilePath string
+	brokers   map[string]registry.Broker
+	executor  FormExecutor
+	Store     *eventstore.Store
+	RequestID int64
+	// DeferManualTask leaves task creation to executeWebformRequest, which has
+	// the concrete request ID for each item in a campaign batch.
+	DeferManualTask bool
+	ProfilePath     string
 }
 
 func NewWebFormAdapter(brokers []registry.Broker, executor FormExecutor) *WebFormAdapter {
@@ -226,14 +231,21 @@ func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) 
 		return map[string]any{"success": false, "code": string(CodeInvalidSpec), "error": err.Error(), "reason": "generic_error", "dry_run": dryRun}
 	}
 	if dryRun {
-		return map[string]any{"success": true, "dry_run": true, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "steps": len(channel.FormSpec.Steps), "fields": spec.Fields}
+		return map[string]any{"success": true, "dry_run": true, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "steps": len(channel.FormSpec.Steps)}
 	}
 	if a.executor == nil {
 		return a.createManualTask(ctx, broker, spec, "dynamic_form")
 	}
 	result, err := a.SubmitForm(ctx, brokerID)
 	if err != nil {
-		return map[string]any{"success": false, "status": "manual_action_required", "code": string(CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "url": spec.StartURL, "dry_run": false}
+		reason := "generic_error"
+		code := CodeInteractionFailed
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason, code = "timeout", CodeNavigationTimeout
+		}
+		out := a.createManualTask(ctx, broker, spec, reason)
+		out["code"], out["error"] = string(code), err.Error()
+		return out
 	}
 	out := formResultMap(result)
 	out["success"] = result.Code == CodeSuccess
@@ -243,11 +255,22 @@ func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) 
 	if result.Evidence != nil && result.Evidence.FinalURL != "" {
 		out["url"] = result.Evidence.FinalURL
 	}
+	if result.Code != CodeSuccess {
+		manual := a.createManualTask(ctx, broker, spec, reasonForCode(result.Code))
+		for key, value := range out {
+			manual[key] = value
+		}
+		manual["status"] = "manual_action_required"
+		return manual
+	}
 	return out
 }
 
 func (a *WebFormAdapter) createManualTask(ctx context.Context, broker registry.Broker, spec FormSpec, reason string) map[string]any {
 	result := map[string]any{"success": false, "status": "manual_action_required", "reason": reason, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "dry_run": false}
+	if a.DeferManualTask {
+		return result
+	}
 	if a.Store == nil {
 		result["error"] = "campaign: manual task store is not configured"
 		return result
@@ -309,7 +332,7 @@ func (a *WebFormAdapter) profile() (*identity.Profile, error) {
 
 func callWithTimeout(ctx context.Context, timeout time.Duration, fn func(context.Context) (*Result, error)) (*Result, error) {
 	if timeout <= 0 {
-		return fn(ctx)
+		timeout = defaultFormExecutorTimeout
 	}
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

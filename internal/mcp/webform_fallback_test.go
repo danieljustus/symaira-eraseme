@@ -14,6 +14,7 @@ import (
 func TestRunWebFormProductionFallbackPersistsAndDryRunsWithoutWrite(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("SYMERASEME_DATA_DIR", dataDir)
+	t.Setenv("PATH", t.TempDir())
 	brokers, err := registry.LoadEmbedded()
 	if err != nil {
 		t.Fatal(err)

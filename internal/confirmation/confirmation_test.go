@@ -22,7 +22,10 @@ func TestAutoConfirmDryRunSkipsClicker(t *testing.T) {
 }
 
 func TestAutoConfirmUsesSenderDomainAndReportsClickError(t *testing.T) {
-	result, err := AutoConfirm(context.Background(), Options{ReplyBody: "https://custom.example/confirm", FromAddress: "broker@custom.example", Click: func(_ context.Context, url string, _ ClickOptions) (Result, error) {
+	result, err := AutoConfirm(context.Background(), Options{ReplyBody: "https://custom.example/confirm", FromAddress: "broker@custom.example", Click: func(ctx context.Context, url string, _ ClickOptions) (Result, error) {
+		if _, ok := ctx.Deadline(); !ok {
+			t.Fatal("confirmation clicker context has no deadline")
+		}
 		return Result{ClickedURL: url}, errors.New("net::ERR_CONNECTION_REFUSED")
 	}})
 	if err == nil || result.ClickedURL != "https://custom.example/confirm" || result.Error == "" {

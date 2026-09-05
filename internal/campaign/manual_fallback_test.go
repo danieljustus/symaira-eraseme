@@ -18,6 +18,7 @@ func TestWebFormNoExecutorPersistsManualFallback(t *testing.T) {
 	}
 	defer store.Close()
 	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	t.Setenv("PATH", t.TempDir())
 	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
 		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Click: "#submit"}}},
 	}}}
@@ -38,7 +39,7 @@ func TestWebFormNoExecutorPersistsManualFallback(t *testing.T) {
 
 func TestWebFormExecutorReceivesBoundedContextAndMapsEvidence(t *testing.T) {
 	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
-		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{TimeoutSeconds: floatPointer(1), Steps: []registry.FormStep{{Fill: map[string]string{"#email": "${email}"}}}},
+		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Fill: map[string]string{"#email": "${email}"}}}},
 	}}}
 	called := false
 	adapter := NewWebFormAdapter([]registry.Broker{broker}, FormExecutorFuncs{Submit: func(ctx context.Context, spec FormSpec) (*Result, error) {
@@ -51,6 +52,29 @@ func TestWebFormExecutorReceivesBoundedContextAndMapsEvidence(t *testing.T) {
 	result := adapter.Run(context.Background(), broker.ID, false)
 	if !called || result["success"] != false || result["reason"] != "captcha_failed" || result["url"] != "https://synthetic.example/blocked" {
 		t.Fatalf("executor result = %#v called=%v", result, called)
+	}
+}
+
+func TestWebFormExecutorFailurePersistsManualFallback(t *testing.T) {
+	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
+		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Click: "#submit"}}},
+	}}}
+	adapter := NewWebFormAdapterWithStore(store, []registry.Broker{broker}, FormExecutorFuncs{Submit: func(context.Context, FormSpec) (*Result, error) {
+		return &Result{Code: CodeFieldNotFound, Message: "synthetic missing field"}, nil
+	}})
+	result := adapter.Run(context.Background(), broker.ID, false)
+	if result["success"] != false || result["status"] != "manual_action_required" || result["reason"] != "unknown_field" || result["task_id"] == nil {
+		t.Fatalf("executor fallback result = %#v", result)
+	}
+	tasks, err := manualtasks.List(context.Background(), store, manualtasks.ListOpts{})
+	if err != nil || len(tasks) != 1 || tasks[0].Status != "pending" || tasks[0].Reason != "unknown_field" {
+		t.Fatalf("executor fallback tasks = %#v, err=%v", tasks, err)
 	}
 }
 
@@ -69,7 +93,12 @@ func TestExecuteWebFormFallbackOrdersManualAndFailedEvents(t *testing.T) {
 	if _, _, err := store.AppendAndProject(ctx, requestID, eventstore.EvtPlanned, map[string]any{"form_url": "https://synthetic.example/optout"}, eventstore.SrcSystem, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	result, err := ExecuteRequest(ctx, store, requestID, ExecuteOpts{})
+	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
+		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Click: "#submit"}}},
+	}}}
+	adapter := NewWebFormAdapterWithStore(store, []registry.Broker{broker}, nil)
+	adapter.DeferManualTask = true
+	result, err := ExecuteRequest(ctx, store, requestID, ExecuteOpts{WebForm: adapter.Run})
 	if err != nil || result["success"] != false || result["task_id"] == nil {
 		t.Fatalf("fallback result=%#v err=%v", result, err)
 	}
@@ -88,5 +117,13 @@ func TestExecuteWebFormFallbackOrdersManualAndFailedEvents(t *testing.T) {
 	}
 	if human == 0 || failed <= human {
 		t.Fatalf("event order=%#v", events)
+	}
+	taskID, ok := result["task_id"].(int64)
+	if !ok || taskID == 0 {
+		t.Fatalf("linked task id = %#v", result["task_id"])
+	}
+	task, err := manualtasks.Get(ctx, store, taskID)
+	if err != nil || task == nil || task.RequestID == nil || *task.RequestID != requestID {
+		t.Fatalf("linked manual task = %#v, err=%v", task, err)
 	}
 }

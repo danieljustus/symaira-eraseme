@@ -294,6 +294,7 @@ Required: `['broker_id']`
 
 Parameters:
     - * `broker_id` (string): Broker identifier
+    -   `request_id` (integer): Optional removal request ID used to link the durable manual fallback task
     -   `headed` (boolean): Run browser in headed mode (visible)
     -   `screenshot_dir` (string): Directory for screenshots
     -   `dry_run` (boolean): Preview without running

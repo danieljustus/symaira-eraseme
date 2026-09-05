@@ -224,6 +224,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			webForm := campaign.NewWebFormAdapter(brokers, nil)
 			if !dryRun {
 				webForm = campaign.NewWebFormAdapterWithStore(store, brokers, nil)
+				webForm.DeferManualTask = true
 			}
 			return campaign.ExecuteCampaign(ctx, store, getStr(args, "campaign_id", ""), campaign.ExecuteOpts{
 				Account: getStr(args, "account", ""), DryRun: dryRun, WebForm: webForm.Run,

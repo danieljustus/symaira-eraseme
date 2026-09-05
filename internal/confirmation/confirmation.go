@@ -10,7 +10,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
+
+const defaultClickTimeout = 60 * time.Second
 
 var URLPattern = regexp.MustCompile(`https?://[^\s<>"']+`)
 
@@ -122,7 +125,9 @@ func AutoConfirm(ctx context.Context, opts Options) (Result, error) {
 		result.Error = "confirmation clicker is not configured"
 		return result, nil
 	}
-	clicked, err := opts.Click(ctx, links[0], ClickOptions{RequestID: opts.RequestID, Headless: opts.Headless, ScreenshotDir: opts.ScreenshotDir})
+	clickCtx, cancel := context.WithTimeout(ctx, defaultClickTimeout)
+	defer cancel()
+	clicked, err := opts.Click(clickCtx, links[0], ClickOptions{RequestID: opts.RequestID, Headless: opts.Headless, ScreenshotDir: opts.ScreenshotDir})
 	if clicked.ClickedURL == "" {
 		clicked.ClickedURL = links[0]
 	}

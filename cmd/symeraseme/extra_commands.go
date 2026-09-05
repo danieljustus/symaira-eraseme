@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danieljustus/symaira-eraseme/internal/confirmation"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 	"github.com/danieljustus/symaira-eraseme/internal/reporting"
@@ -616,8 +617,7 @@ func realRunWebFormCommand() *cobra.Command {
 			if format == "json" {
 				return writeJSON(cmd, res)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "success\n")
-			return err
+			return writeWebActionText(cmd, res)
 		}}
 	var broker_id string
 	cmd.Flags().StringVar(&broker_id, "broker-id", "", "Broker identifier")
@@ -660,8 +660,7 @@ func realAutoConfirmCommand() *cobra.Command {
 			if format == "json" {
 				return writeJSON(cmd, res)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "success\n")
-			return err
+			return writeWebActionText(cmd, res)
 		}}
 	var request_id int
 	cmd.Flags().IntVar(&request_id, "request-id", 0, "Removal request ID")
@@ -684,6 +683,35 @@ func realAutoConfirmCommand() *cobra.Command {
 		return nil
 	}
 	return cmd
+}
+
+func writeWebActionText(cmd *cobra.Command, value any) error {
+	switch result := value.(type) {
+	case map[string]any:
+		if success, _ := result["success"].(bool); success {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "success")
+			return err
+		}
+		if result["status"] == "manual_action_required" {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "manual_action_required task_id=%v url=%v\n%v\n", result["task_id"], result["url"], result["instructions"])
+			return err
+		}
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "not_completed: %v\n", result["error"])
+		return err
+	case confirmation.Result:
+		if result.Success {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "success")
+			return err
+		}
+		if result.ManualActionRequired || result.Step == "manual_confirmation_required" {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "manual_confirmation_required task_id=%d url=%s\n%s\n", result.TaskID, result.ClickedURL, result.Instructions)
+			return err
+		}
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "not_completed step=%s: %s\n", result.Step, result.Error)
+		return err
+	default:
+		return fmt.Errorf("unexpected web action result %T", value)
+	}
 }
 
 func realGetDashboardDataCommand() *cobra.Command {

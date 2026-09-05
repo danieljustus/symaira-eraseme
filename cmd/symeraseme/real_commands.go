@@ -163,6 +163,7 @@ func realPlanCommand() *cobra.Command {
 		webForm := campaign.NewWebFormAdapter(brokers, nil)
 		if !executeDryRun {
 			webForm = campaign.NewWebFormAdapterWithStore(store, brokers, nil)
+			webForm.DeferManualTask = true
 		}
 		result, err := campaign.ExecuteCampaign(context.Background(), store, executeCampaignID, campaign.ExecuteOpts{
 			Account: executeAccount,

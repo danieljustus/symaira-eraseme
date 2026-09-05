@@ -56,6 +56,9 @@ func TestWebFormAdapterDryRunAndConfigurationErrors(t *testing.T) {
 	if result["success"] != true || result["dry_run"] != true || result["broker_id"] != "broker" || result["steps"] != 1 {
 		t.Fatalf("dry run = %#v", result)
 	}
+	if _, ok := result["fields"]; ok {
+		t.Fatalf("dry run exposed resolved identity fields: %#v", result)
+	}
 	missing := adapter.Run(context.Background(), "missing", true)
 	if missing["success"] != false || missing["reason"] != "generic_error" {
 		t.Fatalf("missing broker = %#v", missing)
