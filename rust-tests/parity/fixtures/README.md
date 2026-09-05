@@ -32,7 +32,8 @@ modified and no developer profile, keychain, database, or credential is read.
 All records carry the oracle commit and a schema identifier. Fixture generation
 uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
 root, an empty private executable search path, empty credential variables, and
-no timestamps or host identity. The only
+no timestamps or host identity. A single-writer lock and ownership marker make
+cleanup fail closed instead of deleting an unrelated runtime directory. The only
 nondeterministic values are marked in `nondeterministic_fields`: ephemeral
 ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
 time-derived durable artifacts, HTTP `Date`, and current-time fields in the

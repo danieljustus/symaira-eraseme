@@ -8,6 +8,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PINNED_COMMIT="bf53346eec234929bedf0314b99e3da85dbb991b"
 OUT_DIR="${REPO_ROOT}/rust-tests/parity"
 RUNTIME_ROOT="/tmp/symeraseme-go-oracle"
+RUNTIME_LOCK="${RUNTIME_ROOT}.lock"
 
 usage() {
     printf '%s\n' "Usage: $0" "" "Generate CLI, MCP, HTTP, and filesystem fixtures from ${PINNED_COMMIT}."
@@ -30,10 +31,32 @@ if ! git cat-file -e "${PINNED_COMMIT}^{commit}"; then
 fi
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/symeraseme-oracle.XXXXXX")"
+LOCK_HELD=0
+RUNTIME_OWNED=0
 cleanup() {
-    rm -rf "${SCRATCH}" "${RUNTIME_ROOT}" 2>/dev/null || true
+    rm -rf "${SCRATCH}" 2>/dev/null || true
+    if [[ "${RUNTIME_OWNED}" -eq 1 ]]; then
+        rm -rf "${RUNTIME_ROOT}" 2>/dev/null || true
+    fi
+    if [[ "${LOCK_HELD}" -eq 1 ]]; then
+        rmdir "${RUNTIME_LOCK}" 2>/dev/null || true
+    fi
 }
 trap cleanup EXIT
+
+if ! mkdir "${RUNTIME_LOCK}" 2>/dev/null; then
+    printf 'error: another oracle generator owns %s\n' "${RUNTIME_LOCK}" >&2
+    exit 1
+fi
+LOCK_HELD=1
+if [[ -e "${RUNTIME_ROOT}" && ! -f "${RUNTIME_ROOT}/.symeraseme-oracle-owned" ]]; then
+    printf 'error: refusing to remove unowned runtime root %s\n' "${RUNTIME_ROOT}" >&2
+    exit 1
+fi
+rm -rf "${RUNTIME_ROOT}"
+mkdir -p "${RUNTIME_ROOT}"
+touch "${RUNTIME_ROOT}/.symeraseme-oracle-owned"
+RUNTIME_OWNED=1
 
 SRC="${SCRATCH}/src"
 BIN="${SCRATCH}/symeraseme"
@@ -1045,7 +1068,8 @@ modified and no developer profile, keychain, database, or credential is read.
 All records carry the oracle commit and a schema identifier. Fixture generation
 uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
 root, an empty private executable search path, empty credential variables, and
-no timestamps or host identity. The only
+no timestamps or host identity. A single-writer lock and ownership marker make
+cleanup fail closed instead of deleting an unrelated runtime directory. The only
 nondeterministic values are marked in `nondeterministic_fields`: ephemeral
 ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
 time-derived durable artifacts, HTTP `Date`, and current-time fields in the
