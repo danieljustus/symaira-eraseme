@@ -364,11 +364,6 @@ func loadWebFormProfile(profilePath string) (*identity.Profile, string, error) {
 	return profile, identity.HashProfile(profile), nil
 }
 
-func loadIdentityHash() (string, error) {
-	_, hash, err := loadWebFormProfile("")
-	return hash, err
-}
-
 // storeAppend wraps Store.AppendAndProject with the standard source and
 // "now" timestamp the Python port uses.
 func storeAppend(ctx context.Context, store *eventstore.Store, requestID int64, et eventstore.EventType, payload map[string]any) (int64, eventstore.StateJSON, error) {
