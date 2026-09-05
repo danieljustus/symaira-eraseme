@@ -597,21 +597,39 @@ func TestPlainCloseDirectorySyncFailureKeepsRecoveryCopy(t *testing.T) {
 		t.Fatal("directory sync failure discarded recovery registration")
 	}
 	reg, ok := tempRegistration(regValue)
-	if !ok || reg.tmpPath == encPath {
-		t.Fatalf("recovery registration = %+v, want a separate recovery copy", reg)
+	if !ok || reg.tmpPath != encPath {
+		t.Fatalf("recovery registration = %+v, want canonical source", reg)
 	}
-	recovered, err := os.ReadFile(reg.tmpPath)
+	var recoveryPath string
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".symeraseme_recovery_") {
+			recoveryPath = filepath.Join(dir, entry.Name())
+			break
+		}
+	}
+	if recoveryPath == "" {
+		t.Fatal("directory sync failure discarded encrypted recovery copy")
+	}
+	recovered, err := os.ReadFile(recoveryPath)
 	if err != nil {
 		t.Fatalf("read recovery copy: %v", err)
 	}
-	if !bytes.Equal(recovered, plain) {
-		t.Fatalf("recovery copy = %q, want %q", recovered, plain)
+	if !bytes.HasPrefix(recovered, EncMagicV3) {
+		t.Fatalf("recovery copy is not encrypted replacement: %q", recovered[:min(len(recovered), len(EncMagicV3))])
 	}
-	decrypted, err := DecryptFile(encPath)
+	plainReplacement, err := DecryptBytes(recovered)
+	if err != nil || !bytes.Equal(plainReplacement, plain) {
+		t.Fatalf("recovery copy does not preserve replacement: decrypt=%v", err)
+	}
+	canonical, err := os.ReadFile(encPath)
 	if err != nil {
-		t.Fatalf("decrypt replacement: %v", err)
+		t.Fatal(err)
 	}
-	if !bytes.Equal(decrypted, plain) {
-		t.Fatalf("replacement plaintext = %q, want %q", decrypted, plain)
+	if !bytes.Equal(canonical, plain) {
+		t.Fatalf("canonical source = %q, want prior plaintext %q", canonical, plain)
 	}
 }

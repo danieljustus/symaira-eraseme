@@ -632,10 +632,6 @@ func RegisterTemp(origPath, tmpPath string) {
 	encryptedTemps.Store(origPath, encryptedTempRegistration{tmpPath: tmpPath})
 }
 
-func registerTempForStore(origPath, tmpPath string, store *Store) {
-	registerTempForStoreWithCleanup(origPath, tmpPath, store, "")
-}
-
 func registerTempForStoreWithCleanup(origPath, tmpPath string, store *Store, cleanupPath string) {
 	encryptedTemps.Store(origPath, encryptedTempRegistration{
 		tmpPath: tmpPath, store: store, cleanupPath: cleanupPath,
@@ -669,7 +665,7 @@ func DecryptToTemp(srcPath, tmpDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+	if err := ensurePrivateDir(tmpDir); err != nil {
 		return "", err
 	}
 	f, err := os.CreateTemp(tmpDir, "symeraseme_decrypted_*.db")
@@ -686,7 +682,7 @@ func DecryptToTemp(srcPath, tmpDir string) (string, error) {
 		_ = os.Remove(tmpPath)
 		return "", err
 	}
-	if err := os.Chmod(tmpPath, 0o600); err != nil {
+	if err := ensurePrivateFile(tmpPath, 0o600); err != nil {
 		return "", err
 	}
 	RegisterTemp(srcPath, tmpPath)
@@ -743,48 +739,20 @@ func WriteEncrypted(origPath string) error {
 
 // MigrateV1ToV3 re-encrypts a V1 file to V3 in place atomically.
 func MigrateV1ToV3(path string) error {
-	raw, err := os.ReadFile(path) //nolint:gosec // caller path
-	if err != nil {
-		return err
-	}
-	plain, err := DecryptBytes(raw)
-	if err != nil {
-		return err
-	}
-	mk, err := currentMasterKey()
-	if err != nil {
-		return err
-	}
-	out, err := EncryptBytesV3(plain, mk)
-	if err != nil {
-		return err
-	}
-	return atomicWriteFileFn(path, out, 0o600)
+	return migrateToV3(path)
 }
 
 // MigrateV2ToV3 re-encrypts a V2 file to V3 in place atomically.
 func MigrateV2ToV3(path string) error {
-	raw, err := os.ReadFile(path) //nolint:gosec // caller path
-	if err != nil {
-		return err
-	}
-	plain, err := DecryptBytes(raw)
-	if err != nil {
-		return err
-	}
-	mk, err := currentMasterKey()
-	if err != nil {
-		return err
-	}
-	out, err := EncryptBytesV3(plain, mk)
-	if err != nil {
-		return err
-	}
-	return atomicWriteFileFn(path, out, 0o600)
+	return migrateToV3(path)
 }
 
 // MigrateLegacyToStandardV3 safely re-encrypts an accidental Go V3 payload to standard Fernet V3.
 func MigrateLegacyToStandardV3(path string) error {
+	return migrateToV3(path)
+}
+
+func migrateToV3(path string) error {
 	raw, err := os.ReadFile(path) //nolint:gosec // caller path
 	if err != nil {
 		return err
@@ -801,30 +769,28 @@ func MigrateLegacyToStandardV3(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFileFn(path, out, 0o600)
+	return atomicTransitionFile(path, out, raw)
 }
 
-// makePlaintextRecoveryCopy preserves a plain database before in-place
-// encryption. This is needed because a directory-sync failure can happen
-// after the atomic rename; the copy keeps a plaintext recovery source for a
-// later finalization attempt.
-func makePlaintextRecoveryCopy(path string, plain []byte) (string, error) {
-	f, err := os.CreateTemp(filepath.Dir(path), ".symeraseme_recovery_*.db")
+// makePrivateCopy writes a restrictive, synced copy next to path and
+// returns its name. The caller owns cleanup of the returned file.
+func makePrivateCopy(path string, data []byte, pattern string) (string, error) {
+	f, err := os.CreateTemp(filepath.Dir(path), pattern)
 	if err != nil {
 		return "", err
 	}
-	recoveryPath := f.Name()
+	copyPath := f.Name()
 	keep := false
 	defer func() {
 		if !keep {
 			_ = f.Close()
-			_ = os.Remove(recoveryPath)
+			_ = os.Remove(copyPath)
 		}
 	}()
 	if err := f.Chmod(0o600); err != nil {
 		return "", err
 	}
-	if _, err := f.Write(plain); err != nil {
+	if _, err := f.Write(data); err != nil {
 		return "", err
 	}
 	if err := f.Sync(); err != nil {
@@ -834,7 +800,15 @@ func makePlaintextRecoveryCopy(path string, plain []byte) (string, error) {
 		return "", err
 	}
 	keep = true
-	return recoveryPath, nil
+	return copyPath, nil
+}
+
+func makeRecoveryCopy(path string, data []byte) (string, error) {
+	return makePrivateCopy(path, data, ".symeraseme_recovery_*.db")
+}
+
+func makeTransitionBackup(path string, data []byte) (string, error) {
+	return makePrivateCopy(path, data, ".symeraseme_previous_*.db")
 }
 
 // EncryptExisting encrypts an existing plaintext file in place
@@ -852,85 +826,284 @@ func EncryptExisting(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFileFn(path, out, 0o600)
+	return atomicTransitionFile(path, out, plain)
 }
 
 // nowSeconds returns the current Unix time in seconds. Overridable
 // from tests to make Fernet tokens deterministic.
 var nowSeconds = defaultNowSeconds
 
+type directorySyncFailure struct{ err error }
+
+func (e directorySyncFailure) Error() string { return e.err.Error() }
+func (e directorySyncFailure) Unwrap() error { return e.err }
+
+// atomicTransitionFile replaces path while retaining a restrictive recovery
+// copy. Replacement failures restore the previous canonical bytes and retain
+// the intended replacement; a post-rename directory-sync failure retains the
+// new canonical bytes and swaps the recovery copy to the prior source.
+func atomicTransitionFile(path string, data, _ []byte) error {
+	_, err := atomicTransitionWithRecovery(path, data)
+	return err
+}
+
+// atomicTransitionWithRecovery returns the retained recovery path on failure.
+func atomicTransitionWithRecovery(path string, data []byte) (string, error) {
+	previous, readErr := os.ReadFile(path) //nolint:gosec // caller path
+	existed := readErr == nil
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return "", readErr
+	}
+	recoveryPath, err := makeRecoveryCopy(path, data)
+	if err != nil {
+		return "", err
+	}
+	backupPath := ""
+	if existed {
+		backupPath, err = makeTransitionBackup(path, previous)
+		if err != nil {
+			_ = os.Remove(recoveryPath)
+			return "", err
+		}
+	}
+	if err := atomicWriteFileFn(path, data, 0o600); err != nil {
+		var syncErr directorySyncFailure
+		if errors.As(err, &syncErr) && existed {
+			// The rename already happened. Retain the new canonical file and
+			// expose the prior valid source through the recovery registration.
+			_ = os.Remove(recoveryPath)
+			if renameErr := os.Rename(backupPath, recoveryPath); renameErr != nil {
+				return recoveryPath, errors.Join(err, fmt.Errorf("eventstore: retain previous file: %w", renameErr))
+			}
+			return recoveryPath, err
+		}
+		if existed {
+			if restoreErr := os.Rename(backupPath, path); restoreErr != nil {
+				return recoveryPath, errors.Join(err, fmt.Errorf("eventstore: restore previous file: %w", restoreErr))
+			}
+		} else if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return recoveryPath, errors.Join(err, fmt.Errorf("eventstore: remove failed replacement: %w", removeErr))
+		}
+		return recoveryPath, err
+	}
+	if backupPath != "" {
+		if err := os.Remove(backupPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return recoveryPath, err
+		}
+	}
+	if err := os.Remove(recoveryPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return recoveryPath, err
+	}
+	return "", nil
+}
+
 // --------------------------------------------------------------------
 // OpenEncrypted: full at-rest plumbing
 // --------------------------------------------------------------------
 
-// OpenEncrypted opens an encrypted DB at encPath. If the file is
-// not yet encrypted (plain SQLite), it remains a plain file — but
-// the returned Store registers the path so Close will re-encrypt
-// it. The decrypted plaintext lives in tmpDir (mode 0600).
+// OpenConfigured opens the database using the requested at-rest mode.
+// It is the single production entry point used by CLI and MCP call paths.
+// Switching from plaintext to encryption, or back, is atomic: a failed
+// conversion leaves a restrictive recovery copy when replacement durability
+// is ambiguous.
+func OpenConfigured(path, tmpDir string, encrypt bool) (*Store, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, errors.New("eventstore: database path must not be empty")
+	}
+	if tmpDir == "" {
+		tmpDir = filepath.Join(os.TempDir(), "symeraseme-db")
+	}
+	if encrypt {
+		// Fail before opening a new/plaintext database when encryption was
+		// requested but the identity key is unavailable. Otherwise callers
+		// could successfully perform work and silently ignore the deferred
+		// encrypt-on-close error, leaving sensitive data in plaintext.
+		if _, err := currentMasterKey(); err != nil {
+			return nil, fmt.Errorf("eventstore: encryption requested: %w", err)
+		}
+		return OpenEncrypted(path, tmpDir)
+	}
+	raw, err := os.ReadFile(path) //nolint:gosec // caller path
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	var lock *DBLock
+	if _, encrypted := DetectVersion(raw); encrypted {
+		lock, err = LockDB(path, 1)
+		if err != nil {
+			return nil, err
+		}
+		if err := DecryptExisting(path); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+		if err := lock.Close(); err != nil {
+			return nil, err
+		}
+	}
+	return Open(path)
+}
+
+// DecryptExisting atomically replaces an encrypted database with its
+// plaintext contents. Decryption is completed and authenticated before the
+// replacement is attempted, so malformed or unauthenticated input cannot
+// destroy the source file.
+func DecryptExisting(path string) error {
+	raw, err := os.ReadFile(path) //nolint:gosec // caller path
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	if _, encrypted := DetectVersion(raw); !encrypted {
+		return nil
+	}
+	plain, err := DecryptBytes(raw)
+	if err != nil {
+		return err
+	}
+	return atomicTransitionFile(path, plain, raw)
+}
+
+// OpenEncrypted always keeps the canonical path encrypted while the store is
+// in use. SQLite is opened only on a private decrypted temp file, and the
+// exclusive lock remains held until the encrypted close sequence succeeds.
 func OpenEncrypted(encPath, tmpDir string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(encPath), 0o700); err != nil {
 		return nil, err
 	}
-	raw, err := os.ReadFile(encPath) //nolint:gosec // caller path
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := ensurePrivateDir(tmpDir); err != nil {
 		return nil, err
 	}
+	lock, err := LockDB(encPath, 1)
+	if err != nil {
+		return nil, err
+	}
+	fail := func(err error) (*Store, error) {
+		_ = lock.Close()
+		return nil, err
+	}
+	raw, err := os.ReadFile(encPath) //nolint:gosec // caller path
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fail(err)
+	}
 	if errors.Is(err, os.ErrNotExist) || len(raw) == 0 {
-		// Brand new file: create a plain SQLite and register for
-		// encrypt-on-close.
-		s, err := Open(encPath)
+		// Initialize SQLite away from the canonical path, checkpoint it, and
+		// atomically publish its encrypted form before returning.
+		initPath, err := newPrivateDBPath(tmpDir)
 		if err != nil {
-			return nil, err
+			return fail(err)
 		}
-		s.encryptedPath = encPath
-		registerTempForStore(encPath, encPath, s)
-		return s, nil
+		initStore, err := Open(initPath)
+		if err != nil {
+			_ = os.Remove(initPath)
+			return fail(err)
+		}
+		if err := initStore.Close(); err != nil {
+			_ = os.Remove(initPath)
+			return fail(err)
+		}
+		if err := EncryptExisting(initPath); err != nil {
+			return fail(err)
+		}
+		initialCiphertext, err := os.ReadFile(initPath) //nolint:gosec // private initializer
+		if err != nil {
+			return fail(err)
+		}
+		if err := atomicWriteFileFn(encPath, initialCiphertext, 0o600); err != nil {
+			return fail(err)
+		}
+		if err := cleanupEncryptedTemp(initPath); err != nil {
+			return fail(err)
+		}
+		raw = initialCiphertext
 	}
 	version, ok := DetectVersion(raw)
 	if !ok {
-		// Plaintext DB: open in place, register for encrypt-on-close.
-		s, err := Open(encPath)
-		if err != nil {
-			return nil, err
+		// Checkpoint an existing plaintext database before reading it for
+		// encryption; otherwise committed frames still in its WAL could be
+		// lost by an in-place file transition.
+		plainStore, openErr := Open(encPath)
+		if openErr != nil {
+			return fail(openErr)
 		}
-		s.encryptedPath = encPath
-		registerTempForStore(encPath, encPath, s)
-		return s, nil
+		if checkpointErr := checkpointWALFn(plainStore); checkpointErr != nil {
+			_ = plainStore.db.Close()
+			return fail(checkpointErr)
+		}
+		if closeErr := closeStoreDBFn(plainStore); closeErr != nil {
+			_ = plainStore.db.Close()
+			return fail(closeErr)
+		}
+		plainStore.dbClosed = true
+		// Existing plaintext is converted before the encrypted temp copy is
+		// opened. The restrictive recovery copy remains if replacement or
+		// directory sync is ambiguous.
+		if err := EncryptExisting(encPath); err != nil {
+			return fail(err)
+		}
+		raw, err = os.ReadFile(encPath) //nolint:gosec // caller path
+		if err != nil {
+			return fail(err)
+		}
+		version, ok = DetectVersion(raw)
+		if !ok {
+			return fail(errors.New("eventstore: encrypted conversion did not produce an encrypted file"))
+		}
 	}
-	// Encrypted — transparently migrate to V3, then decrypt to temp.
+	// Encrypted — transparently migrate to V3 while the lock is held, then
+	// decrypt only to the private temp directory.
 	switch version {
 	case 1:
 		if err := MigrateV1ToV3(encPath); err != nil {
-			return nil, err
+			return fail(err)
 		}
 	case 2:
 		if err := MigrateV2ToV3(encPath); err != nil {
-			return nil, err
+			return fail(err)
 		}
 	case 3:
 		if IsLegacyGoEnvelope(raw) {
 			if err := MigrateLegacyToStandardV3(encPath); err != nil {
-				return nil, err
+				return fail(err)
 			}
 		}
 	}
 	tmpPath, err := DecryptToTemp(encPath, tmpDir)
 	if err != nil {
-		return nil, err
+		return fail(err)
 	}
 	s, err := Open(tmpPath)
 	if err != nil {
-		// Keep the decrypted temp and registration for recovery. The stale
-		// temp scavenger handles eventual cleanup without destroying the only
-		// recoverable copy as part of this failed open.
-		return nil, err
+		return fail(err)
 	}
-	// Replace the path so callers see the canonical encrypted path and retain
-	// the owner-aware registration for finalization.
+	// Callers see the canonical path, but all SQLite I/O is on tmpPath.
 	s.path = encPath
 	s.encryptedPath = encPath
-	registerTempForStore(encPath, tmpPath, s)
+	s.dbLock = lock
+	registerTempForStoreWithCleanup(encPath, tmpPath, s, encPath)
 	return s, nil
+}
+
+func newPrivateDBPath(tmpDir string) (string, error) {
+	f, err := os.CreateTemp(tmpDir, "symeraseme_init_*.db")
+	if err != nil {
+		return "", err
+	}
+	path := f.Name()
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := ensurePrivateFile(path, 0o600); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
 }
 
 // CloseAt closes the Store, checkpoints the WAL, and re-encrypts the temp file back to
@@ -972,32 +1145,32 @@ func (s *Store) closeAtLocked(encPath string) error {
 	}
 	tmpPath := reg.tmpPath
 	if tmpPath == encPath {
-		// Preserve a recoverable plaintext copy before in-place encryption.
-		// A directory-sync failure may occur after the atomic rename, so the
-		// copy is retained and registered on every post-close failure.
+		// Preserve a recoverable plaintext source while encrypting in place.
+		// If replacement or directory sync fails, atomicTransitionFile restores
+		// the canonical source and retains the intended encrypted replacement.
 		plain, err := os.ReadFile(encPath) //nolint:gosec // caller path
 		if err != nil {
 			return err
 		}
-		recoveryPath, err := makePlaintextRecoveryCopy(encPath, plain)
+		sourcePath, err := makeTransitionBackup(encPath, plain)
 		if err != nil {
 			return err
 		}
 		if err := EncryptExisting(encPath); err != nil {
-			registerTempForStoreWithCleanup(encPath, recoveryPath, s, encPath)
+			registerTempForStoreWithCleanup(encPath, encPath, s, encPath)
 			return err
 		}
 		if err := removeWALSiblingsFn(encPath); err != nil {
-			registerTempForStoreWithCleanup(encPath, recoveryPath, s, encPath)
+			registerTempForStoreWithCleanup(encPath, sourcePath, s, encPath)
 			return err
 		}
-		if err := os.Remove(recoveryPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			registerTempForStoreWithCleanup(encPath, recoveryPath, s, encPath)
+		if err := os.Remove(sourcePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			registerTempForStoreWithCleanup(encPath, sourcePath, s, encPath)
 			return err
 		}
 		encryptedTemps.Delete(encPath)
 		s.encryptedPath = ""
-		return nil
+		return s.releaseDBLock()
 	}
 
 	// Re-encrypt tmp → encPath. Every failure leaves the temp and its WAL
@@ -1014,7 +1187,7 @@ func (s *Store) closeAtLocked(encPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicWriteFileFn(encPath, out, 0o600); err != nil {
+	if err := atomicTransitionFile(encPath, out, nil); err != nil {
 		return err
 	}
 	if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
@@ -1022,5 +1195,16 @@ func (s *Store) closeAtLocked(encPath string) error {
 	}
 	encryptedTemps.Delete(encPath)
 	s.encryptedPath = ""
+	return s.releaseDBLock()
+}
+
+func (s *Store) releaseDBLock() error {
+	if s == nil || s.dbLock == nil {
+		return nil
+	}
+	if err := s.dbLock.Close(); err != nil {
+		return err
+	}
+	s.dbLock = nil
 	return nil
 }

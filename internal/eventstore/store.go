@@ -108,6 +108,7 @@ type Store struct {
 	encryptedPath string
 	closeMu       sync.Mutex
 	dbClosed      bool
+	dbLock        *DBLock
 }
 
 // Path returns the resolved file path of the database (may be a

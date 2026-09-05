@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/mail"
 	"strconv"
@@ -965,12 +966,12 @@ func realStatusCommand() *cobra.Command {
 		Use:   "status",
 		Short: "Show campaign status",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 			store, err := dataStore()
 			if err != nil {
 				return err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			result, err := reporting.GetCampaignStatus(context.Background(), store, campaignID, time.Now().UTC())
 			if err != nil {
 				return err
