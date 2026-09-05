@@ -280,3 +280,46 @@ func TestEncryptionTransitionFailureLeavesRecoveryCopy(t *testing.T) {
 		t.Fatal("transition failure discarded its restrictive recovery copy")
 	}
 }
+
+func TestConfiguredPlainOpenBlocksModeTransitionUntilClose(t *testing.T) {
+	master := bytes.Repeat([]byte{0x6d}, 32)
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	dir := t.TempDir()
+	path := filepath.Join(dir, DBFileName)
+	tmpDir := filepath.Join(dir, "encrypted-temp")
+
+	plain, err := OpenConfigured(path, tmpDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := plain.CreateCampaign(context.Background(), "before-transition", "initial", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenConfigured(path, tmpDir, true); err == nil {
+		t.Fatal("mode transition acquired the lock while plaintext store was open")
+	}
+	if _, err := plain.CreateCampaign(context.Background(), "after-blocked-transition", "initial", ""); err != nil {
+		t.Fatalf("plaintext writer failed after blocked transition: %v", err)
+	}
+	if err := plain.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	encrypted, err := OpenConfigured(path, tmpDir, true)
+	if err != nil {
+		t.Fatalf("mode transition after plaintext close: %v", err)
+	}
+	for _, campaignID := range []string{"before-transition", "after-blocked-transition"} {
+		created, err := encrypted.CreateCampaign(context.Background(), campaignID, "initial", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if created {
+			t.Fatalf("campaign %q was lost during mode transition", campaignID)
+		}
+	}
+	if err := encrypted.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

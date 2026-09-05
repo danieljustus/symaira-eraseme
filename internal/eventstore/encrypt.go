@@ -923,25 +923,35 @@ func OpenConfigured(path, tmpDir string, encrypt bool) (*Store, error) {
 		}
 		return OpenEncrypted(path, tmpDir)
 	}
-	raw, err := os.ReadFile(path) //nolint:gosec // caller path
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	var lock *DBLock
+	// Plain production opens hold the same sidecar lock for their full
+	// lifetime as encrypted opens. This prevents another process from changing
+	// the at-rest mode while SQLite still has writable handles or WAL frames.
+	lock, err := LockDB(path, 1)
+	if err != nil {
+		return nil, err
+	}
+	fail := func(err error) (*Store, error) {
+		_ = lock.Close()
+		return nil, err
+	}
+	raw, err := os.ReadFile(path) //nolint:gosec // caller path
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fail(err)
+	}
 	if _, encrypted := DetectVersion(raw); encrypted {
-		lock, err = LockDB(path, 1)
-		if err != nil {
-			return nil, err
-		}
 		if err := DecryptExisting(path); err != nil {
-			_ = lock.Close()
-			return nil, err
-		}
-		if err := lock.Close(); err != nil {
-			return nil, err
+			return fail(err)
 		}
 	}
-	return Open(path)
+	store, err := Open(path)
+	if err != nil {
+		return fail(err)
+	}
+	store.dbLock = lock
+	return store, nil
 }
 
 // DecryptExisting atomically replaces an encrypted database with its

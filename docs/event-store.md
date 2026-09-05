@@ -205,6 +205,10 @@ POSIX systems; Windows uses the current user's profile ACLs.
 `SYMERASEME_ENCRYPT_DB` unset/`0` → plain SQLite file.
 
 Close lifecycle and failure semantics:
+- Production stores opened through configured storage hold the sibling database
+  lock for their full lifetime in both plaintext and encrypted modes. A mode
+  transition therefore cannot replace the canonical database while another
+  configured process still has writable SQLite/WAL handles.
 - `OpenEncrypted` associates the returned `Store` with its encrypted path.
   Calling `Store.Close()` is therefore the normal safe shutdown path: it
   checkpoints the WAL, closes SQLite, atomically writes the encrypted V3
