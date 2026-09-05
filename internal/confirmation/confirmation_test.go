@@ -3,6 +3,7 @@ package confirmation
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -26,9 +27,9 @@ func TestAutoConfirmReportsClickError(t *testing.T) {
 		if _, ok := ctx.Deadline(); !ok {
 			t.Fatal("confirmation clicker context has no deadline")
 		}
-		return Result{ClickedURL: url}, errors.New("net::ERR_CONNECTION_REFUSED")
+		return Result{ClickedURL: url}, errors.New("net::ERR_CONNECTION_REFUSED https://acxiom.com/confirm?token=secret")
 	}})
-	if err == nil || result.ClickedURL != "https://acxiom.com/confirm" || result.Error == "" {
+	if err == nil || result.ClickedURL != "https://acxiom.com/confirm" || result.Error == "" || strings.Contains(result.Error, "token=secret") {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
 }

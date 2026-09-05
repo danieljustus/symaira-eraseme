@@ -60,7 +60,7 @@ func TestFailedAutoConfirmWithoutGoErrorSummarizesSensitiveResult(t *testing.T) 
 		t.Fatal(err)
 	}
 	result, err := NewService(store).AutoConfirm(ctx, AutoConfirmRequest{RequestID: requestID, Click: func(_ context.Context, link string, _ confirmation.ClickOptions) (confirmation.Result, error) {
-		return confirmation.Result{Success: false, Step: "click_failed", Error: "failed for jane@example.test", ClickedURL: link, ScreenshotBefore: "before-secret"}, nil
+		return confirmation.Result{Success: false, Step: "click_failed", Error: "failed for jane@example.test at " + link, ClickedURL: link, ScreenshotBefore: "before-secret"}, nil
 	}})
 	if err != nil {
 		t.Fatal(err)
