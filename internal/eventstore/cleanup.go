@@ -21,9 +21,10 @@ import (
 // decrypted-temp files.  Mirrors db_cleanup.STALE_SCAVENGE_AGE.
 const StaleScavengeAge = 300 * time.Second
 
-// ScavengeStaleTemps removes orphaned decrypted temp files older
-// than StaleScavengeAge (and their WAL/-shm siblings).  Mirrors
-// _scavenge_stale_temp_dbs.  No-op when the dir doesn't exist.
+// ScavengeStaleTemps removes orphaned private transition files older
+// than StaleScavengeAge (and their WAL/-shm siblings). This includes
+// decrypted temps, initializer databases, and retained transition recovery
+// copies. No-op when the dir doesn't exist.
 func ScavengeStaleTemps(tmpDir string) error {
 	entries, err := os.ReadDir(tmpDir)
 	if err != nil {
@@ -38,7 +39,7 @@ func ScavengeStaleTemps(tmpDir string) error {
 		if e.IsDir() {
 			continue
 		}
-		if !startsWith(e.Name(), "symeraseme_decrypted_") {
+		if !isStaleTempName(e.Name()) {
 			continue
 		}
 		files = append(files, e)
@@ -66,6 +67,20 @@ func startsWith(s, prefix string) bool {
 		return false
 	}
 	return s[:len(prefix)] == prefix
+}
+
+func isStaleTempName(name string) bool {
+	for _, prefix := range []string{
+		"symeraseme_decrypted_",
+		"symeraseme_init_",
+		".symeraseme_recovery_",
+		".symeraseme_previous_",
+	} {
+		if startsWith(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckpointWAL runs a PRAGMA wal_checkpoint(TRUNCATE) on the

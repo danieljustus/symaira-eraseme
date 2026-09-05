@@ -251,33 +251,21 @@ func TestEncryptionTransitionFailureLeavesRecoveryCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(got, before) {
-		t.Fatal("ambiguous transition did not restore the previous canonical bytes")
+	if !bytes.HasPrefix(got, EncMagicV3) {
+		t.Fatalf("post-rename sync failure did not leave authenticated ciphertext: %q", got[:min(len(got), len(EncMagicV3))])
+	}
+	plainReplacement, err := DecryptBytes(got)
+	if err != nil || !bytes.Equal(plainReplacement, before) {
+		t.Fatalf("canonical replacement lost plaintext: decrypt=%v", err)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	foundRecovery := false
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".symeraseme_recovery_") {
-			foundRecovery = true
-			info, statErr := entry.Info()
-			if statErr != nil || info.Mode().Perm() != 0o600 {
-				t.Fatalf("recovery copy permissions = %v, info=%v", statErr, info)
-			}
-			recovered, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
-			if readErr != nil || !bytes.HasPrefix(recovered, EncMagicV3) {
-				t.Fatalf("recovery copy does not contain encrypted replacement: read=%v", readErr)
-			}
-			plainReplacement, decryptErr := DecryptBytes(recovered)
-			if decryptErr != nil || !bytes.Equal(plainReplacement, before) {
-				t.Fatalf("recovery copy does not preserve replacement contents: decrypt=%v", decryptErr)
-			}
+		if strings.HasPrefix(entry.Name(), ".symeraseme_recovery_") || strings.HasPrefix(entry.Name(), ".symeraseme_previous_") {
+			t.Fatalf("standalone transition left recovery artifact %s", entry.Name())
 		}
-	}
-	if !foundRecovery {
-		t.Fatal("transition failure discarded its restrictive recovery copy")
 	}
 }
 
@@ -320,6 +308,158 @@ func TestConfiguredPlainOpenBlocksModeTransitionUntilClose(t *testing.T) {
 		}
 	}
 	if err := encrypted.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCloseAtRetriesAfterPostRenameSyncFailureUsesPlaintextSource(t *testing.T) {
+	master := bytes.Repeat([]byte{0x81}, 32)
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	restoreCloseHooks(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "retry-post-rename.db")
+	plain := []byte("sqlite plaintext that must not be encrypted twice")
+	if err := os.WriteFile(path, plain, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	RegisterTemp(path, path)
+	t.Cleanup(func() { ForgetTemp(path) })
+	store := openCheckpointStore(t, "eventstore_test_checkpoint_ok")
+
+	syncErr := errors.New("post-rename directory sync failure")
+	syncCalls := 0
+	syncDirectoryFn = func(string) error {
+		syncCalls++
+		if syncCalls == 1 {
+			return syncErr
+		}
+		return nil
+	}
+	if err := store.CloseAt(path); !errors.Is(err, syncErr) {
+		t.Fatalf("first CloseAt = %v, want %v", err, syncErr)
+	}
+	regValue, ok := encryptedTemps.Load(path)
+	if !ok {
+		t.Fatal("failed transition lost its retry registration")
+	}
+	reg, ok := tempRegistration(regValue)
+	if !ok || reg.tmpPath == path {
+		t.Fatalf("retry registration = %+v, want a private plaintext source", reg)
+	}
+	registeredPlain, err := os.ReadFile(reg.tmpPath)
+	if err != nil || !bytes.Equal(registeredPlain, plain) {
+		t.Fatalf("retry source = %q, err=%v", registeredPlain, err)
+	}
+	canonical, err := os.ReadFile(path)
+	if err != nil || !bytes.HasPrefix(canonical, EncMagicV3) {
+		t.Fatalf("canonical after post-rename failure = %q, err=%v", canonical[:min(len(canonical), len(EncMagicV3))], err)
+	}
+
+	if err := store.CloseAt(path); err != nil {
+		t.Fatalf("retry CloseAt = %v", err)
+	}
+	if _, ok := encryptedTemps.Load(path); ok {
+		t.Fatal("successful retry left a transition registration")
+	}
+	got, err := DecryptFile(path)
+	if err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("decrypted retry result = %q, err=%v", got, err)
+	}
+}
+
+func TestDecryptTransitionFailureCleansPlaintextRecovery(t *testing.T) {
+	master := bytes.Repeat([]byte{0x82}, 32)
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	restoreCloseHooks(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "decrypt-failure.db")
+	plain := []byte("authenticated plaintext")
+	if err := os.WriteFile(path, plain, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EncryptExisting(path); err != nil {
+		t.Fatal(err)
+	}
+
+	syncErr := errors.New("decrypt directory sync failure")
+	syncDirectoryFn = func(string) error { return syncErr }
+	if err := DecryptExisting(path); !errors.Is(err, syncErr) {
+		t.Fatalf("DecryptExisting = %v, want %v", err, syncErr)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("canonical after failed decrypt = %q, err=%v", got, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".symeraseme_recovery_") || strings.HasPrefix(entry.Name(), ".symeraseme_previous_") {
+			t.Fatalf("failed decrypt left recovery artifact %s", entry.Name())
+		}
+	}
+}
+
+func TestOpenEncryptedInitializerFailureCleansAllArtifacts(t *testing.T) {
+	master := bytes.Repeat([]byte{0x83}, 32)
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	restoreCloseHooks(t)
+	dir := t.TempDir()
+	tmpDir := filepath.Join(dir, "private-temp")
+	atomicWriteFileFn = func(string, []byte, os.FileMode) error {
+		return errors.New("initializer encryption failure")
+	}
+	if _, err := OpenEncrypted(filepath.Join(dir, "new.db"), tmpDir); err == nil || !strings.Contains(err.Error(), "initializer encryption failure") {
+		t.Fatalf("OpenEncrypted = %v, want initializer failure", err)
+	}
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "symeraseme_init_") || strings.HasPrefix(entry.Name(), ".symeraseme_recovery_") || strings.HasPrefix(entry.Name(), ".symeraseme_previous_") {
+			t.Fatalf("initializer failure left artifact %s", entry.Name())
+		}
+	}
+}
+
+func TestEncryptedOpenBlocksCrossModePlainOpenUntilClose(t *testing.T) {
+	master := bytes.Repeat([]byte{0x84}, 32)
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	dir := t.TempDir()
+	path := filepath.Join(dir, DBFileName)
+	tmpDir := filepath.Join(dir, "private-temp")
+	plain, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := plain.CreateCampaign(context.Background(), "cross-mode", "initial", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := plain.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	encrypted, err := OpenConfigured(path, tmpDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenConfigured(path, tmpDir, false); err == nil {
+		t.Fatal("plain opener acquired the lock while encrypted store was open")
+	}
+	if err := encrypted.Close(); err != nil {
+		t.Fatal(err)
+	}
+	plainAgain, err := OpenConfigured(path, tmpDir, false)
+	if err != nil {
+		t.Fatalf("plain opener after encrypted close = %v", err)
+	}
+	if err := plainAgain.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

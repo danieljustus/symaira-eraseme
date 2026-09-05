@@ -577,7 +577,10 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	// a power loss the new directory entry can still disappear. Keep the
 	// recovery source untouched by reporting this failure to the caller.
 	if err := syncDirectoryFn(dir); err != nil {
-		return err
+		// The replacement has already happened. Preserve that fact so
+		// transition recovery can keep the canonical bytes and register the
+		// previous plaintext source for a safe retry.
+		return directorySyncFailure{err: err}
 	}
 	cleanup = false
 	return nil
@@ -618,9 +621,10 @@ func cleanupEncryptedTemp(tmpPath string, extraCleanupPaths ...string) error {
 // the open Store that owns it. The owner lets FinaliseAll checkpoint and
 // close the database before reading its temp file.
 type encryptedTempRegistration struct {
-	tmpPath     string
-	store       *Store
-	cleanupPath string // optional original path whose WAL siblings also need cleanup
+	tmpPath      string
+	store        *Store
+	cleanupPath  string // optional original path whose WAL siblings also need cleanup
+	recoveryPath string // retained transition artifact cleaned on retry
 }
 
 var encryptedTemps sync.Map // map[string]encryptedTempRegistration (origPath → registration)
@@ -636,6 +640,40 @@ func registerTempForStoreWithCleanup(origPath, tmpPath string, store *Store, cle
 	encryptedTemps.Store(origPath, encryptedTempRegistration{
 		tmpPath: tmpPath, store: store, cleanupPath: cleanupPath,
 	})
+}
+
+func removeTransitionArtifact(path string) error {
+	if path == "" {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func cleanupRegisteredRecovery(reg encryptedTempRegistration) error {
+	if reg.recoveryPath == "" || reg.recoveryPath == reg.tmpPath {
+		return nil
+	}
+	return removeTransitionArtifact(reg.recoveryPath)
+}
+
+// recordTransitionFailure keeps a real plaintext source for the next retry.
+// In particular, never replace it with the canonical path after a post-rename
+// failure: that path is ciphertext once the directory sync has failed.
+func recordTransitionFailure(origPath string, reg encryptedTempRegistration, plaintextSource, recoveryPath string) {
+	if plaintextSource != "" {
+		// Confirm the canonical mode before choosing the retry source. This is
+		// deliberately based on the bytes at rest, not on the old registration.
+		if encrypted, err := IsEncrypted(origPath); err == nil && encrypted {
+			reg.tmpPath = plaintextSource
+		} else if reg.tmpPath == origPath {
+			reg.tmpPath = plaintextSource
+		}
+	}
+	reg.recoveryPath = recoveryPath
+	encryptedTemps.Store(origPath, reg)
 }
 
 func tempRegistration(value any) (encryptedTempRegistration, bool) {
@@ -711,6 +749,9 @@ func WriteEncrypted(origPath string) error {
 		// CloseAt performs the actual write without calling back here.
 		return reg.store.CloseAt(origPath)
 	}
+	if err := cleanupRegisteredRecovery(reg); err != nil {
+		return err
+	}
 	tmpPath := reg.tmpPath
 	plain, err := os.ReadFile(tmpPath) //nolint:gosec // our own temp file
 	if err != nil {
@@ -725,7 +766,10 @@ func WriteEncrypted(origPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicWriteFileFn(origPath, out, 0o600); err != nil {
+	recoveryPath, err := atomicTransitionWithRecovery(origPath, out)
+	if err != nil {
+		reg.recoveryPath = recoveryPath
+		encryptedTemps.Store(origPath, reg)
 		return err
 	}
 	if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
@@ -769,7 +813,7 @@ func migrateToV3(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicTransitionFile(path, out, raw)
+	return atomicTransitionFile(path, out)
 }
 
 // makePrivateCopy writes a restrictive, synced copy next to path and
@@ -826,7 +870,7 @@ func EncryptExisting(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicTransitionFile(path, out, plain)
+	return atomicTransitionFile(path, out)
 }
 
 // nowSeconds returns the current Unix time in seconds. Overridable
@@ -842,8 +886,18 @@ func (e directorySyncFailure) Unwrap() error { return e.err }
 // copy. Replacement failures restore the previous canonical bytes and retain
 // the intended replacement; a post-rename directory-sync failure retains the
 // new canonical bytes and swaps the recovery copy to the prior source.
-func atomicTransitionFile(path string, data, _ []byte) error {
-	_, err := atomicTransitionWithRecovery(path, data)
+func atomicTransitionFile(path string, data []byte) error {
+	recoveryPath, err := atomicTransitionWithRecovery(path, data)
+	if err == nil || recoveryPath == "" {
+		return err
+	}
+	// Standalone transitions have no Store to retry them. Never leave a
+	// retained plaintext recovery copy behind when the caller receives the
+	// error; the canonical path is already restored or contains the new
+	// authenticated replacement.
+	if cleanupErr := removeTransitionArtifact(recoveryPath); cleanupErr != nil {
+		return errors.Join(err, fmt.Errorf("eventstore: cleanup transition recovery: %w", cleanupErr))
+	}
 	return err
 }
 
@@ -873,7 +927,10 @@ func atomicTransitionWithRecovery(path string, data []byte) (string, error) {
 			// expose the prior valid source through the recovery registration.
 			_ = os.Remove(recoveryPath)
 			if renameErr := os.Rename(backupPath, recoveryPath); renameErr != nil {
-				return recoveryPath, errors.Join(err, fmt.Errorf("eventstore: retain previous file: %w", renameErr))
+				// The backup is still the only known copy of the previous
+				// canonical bytes when this rename fails. Return that actual
+				// path so the caller can retain or clean the right artifact.
+				return backupPath, errors.Join(err, fmt.Errorf("eventstore: retain previous file: %w", renameErr))
 			}
 			return recoveryPath, err
 		}
@@ -976,7 +1033,7 @@ func DecryptExisting(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicTransitionFile(path, plain, raw)
+	return atomicTransitionFile(path, plain)
 }
 
 // OpenEncrypted always keeps the canonical path encrypted while the store is
@@ -1008,26 +1065,30 @@ func OpenEncrypted(encPath, tmpDir string) (*Store, error) {
 		if err != nil {
 			return fail(err)
 		}
+		cleanupInitFailure := func(cause error) (*Store, error) {
+			if cleanupErr := cleanupInitializerArtifacts(initPath); cleanupErr != nil {
+				return fail(errors.Join(cause, fmt.Errorf("eventstore: cleanup initializer: %w", cleanupErr)))
+			}
+			return fail(cause)
+		}
 		initStore, err := Open(initPath)
 		if err != nil {
-			_ = os.Remove(initPath)
-			return fail(err)
+			return cleanupInitFailure(err)
 		}
 		if err := initStore.Close(); err != nil {
-			_ = os.Remove(initPath)
-			return fail(err)
+			return cleanupInitFailure(err)
 		}
 		if err := EncryptExisting(initPath); err != nil {
-			return fail(err)
+			return cleanupInitFailure(err)
 		}
 		initialCiphertext, err := os.ReadFile(initPath) //nolint:gosec // private initializer
 		if err != nil {
-			return fail(err)
+			return cleanupInitFailure(err)
 		}
 		if err := atomicWriteFileFn(encPath, initialCiphertext, 0o600); err != nil {
-			return fail(err)
+			return cleanupInitFailure(err)
 		}
-		if err := cleanupEncryptedTemp(initPath); err != nil {
+		if err := cleanupInitializerArtifacts(initPath); err != nil {
 			return fail(err)
 		}
 		raw = initialCiphertext
@@ -1089,6 +1150,13 @@ func OpenEncrypted(encPath, tmpDir string) (*Store, error) {
 	}
 	s, err := Open(tmpPath)
 	if err != nil {
+		// DecryptToTemp registered the plaintext before opening it. If the
+		// SQLite open fails, there is no Store that can own a retry, so clean
+		// the plaintext and its sidecars immediately.
+		encryptedTemps.Delete(encPath)
+		if cleanupErr := cleanupEncryptedTemp(tmpPath); cleanupErr != nil {
+			return fail(errors.Join(err, fmt.Errorf("eventstore: cleanup decrypted temp: %w", cleanupErr)))
+		}
 		return fail(err)
 	}
 	// Callers see the canonical path, but all SQLite I/O is on tmpPath.
@@ -1114,6 +1182,19 @@ func newPrivateDBPath(tmpDir string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// cleanupInitializerArtifacts removes the initializer database and every
+// SQLite sidecar even when one removal fails. Initializers can contain
+// plaintext, so the main file must not be left behind on any error path.
+func cleanupInitializerArtifacts(path string) error {
+	var cleanupErr error
+	for _, artifact := range []string{path + "-wal", path + "-shm", path} {
+		if err := os.Remove(artifact); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("%s: %w", artifact, err))
+		}
+	}
+	return cleanupErr
 }
 
 // CloseAt closes the Store, checkpoints the WAL, and re-encrypts the temp file back to
@@ -1147,45 +1228,17 @@ func (s *Store) closeAtLocked(encPath string) error {
 	v, ok := encryptedTemps.Load(encPath)
 	if !ok {
 		s.encryptedPath = ""
-		return nil
+		return s.releaseDBLock()
 	}
 	reg, ok := tempRegistration(v)
 	if !ok {
 		return errors.New("eventstore: invalid encrypted temp registration")
 	}
-	tmpPath := reg.tmpPath
-	if tmpPath == encPath {
-		// Preserve a recoverable plaintext source while encrypting in place.
-		// If replacement or directory sync fails, atomicTransitionFile restores
-		// the canonical source and retains the intended encrypted replacement.
-		plain, err := os.ReadFile(encPath) //nolint:gosec // caller path
-		if err != nil {
-			return err
-		}
-		sourcePath, err := makeTransitionBackup(encPath, plain)
-		if err != nil {
-			return err
-		}
-		if err := EncryptExisting(encPath); err != nil {
-			registerTempForStoreWithCleanup(encPath, encPath, s, encPath)
-			return err
-		}
-		if err := removeWALSiblingsFn(encPath); err != nil {
-			registerTempForStoreWithCleanup(encPath, sourcePath, s, encPath)
-			return err
-		}
-		if err := os.Remove(sourcePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			registerTempForStoreWithCleanup(encPath, sourcePath, s, encPath)
-			return err
-		}
-		encryptedTemps.Delete(encPath)
-		s.encryptedPath = ""
-		return s.releaseDBLock()
+	if err := cleanupRegisteredRecovery(reg); err != nil {
+		return err
 	}
-
-	// Re-encrypt tmp → encPath. Every failure leaves the temp and its WAL
-	// siblings registered and untouched for recovery.
-	plain, err := os.ReadFile(tmpPath) //nolint:gosec // our own temp file
+	tmpPath := reg.tmpPath
+	plain, err := os.ReadFile(tmpPath) //nolint:gosec // own plaintext source
 	if err != nil {
 		return err
 	}
@@ -1197,10 +1250,45 @@ func (s *Store) closeAtLocked(encPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicTransitionFile(encPath, out, nil); err != nil {
+
+	// Keep an independent plaintext source until every post-encryption cleanup
+	// step succeeds. This is essential when tmpPath == encPath: after a
+	// post-rename directory-sync failure the canonical path is ciphertext, so
+	// retrying from it would encrypt the envelope a second time.
+	plaintextSource := ""
+	if tmpPath == encPath {
+		plaintextSource, err = makeTransitionBackup(encPath, plain)
+		if err != nil {
+			return err
+		}
+	}
+	recoveryPath, transitionErr := atomicTransitionWithRecovery(encPath, out)
+	if transitionErr != nil {
+		if plaintextSource != "" {
+			// IsEncrypted is the canonical mode check. Never register encPath
+			// as the retry source once the post-rename write made it ciphertext.
+			recordTransitionFailure(encPath, reg, plaintextSource, recoveryPath)
+		} else {
+			reg.recoveryPath = recoveryPath
+			encryptedTemps.Store(encPath, reg)
+		}
+		return transitionErr
+	}
+	if err := removeWALSiblingsFn(encPath); err != nil {
+		if plaintextSource != "" {
+			reg.tmpPath = plaintextSource
+		}
+		encryptedTemps.Store(encPath, reg)
 		return err
 	}
-	if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
+	if tmpPath != encPath {
+		if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
+			encryptedTemps.Store(encPath, reg)
+			return err
+		}
+	} else if err := removeTransitionArtifact(plaintextSource); err != nil {
+		reg.tmpPath = plaintextSource
+		encryptedTemps.Store(encPath, reg)
 		return err
 	}
 	encryptedTemps.Delete(encPath)
