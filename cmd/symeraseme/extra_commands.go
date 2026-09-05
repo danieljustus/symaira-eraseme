@@ -621,6 +621,8 @@ func realRunWebFormCommand() *cobra.Command {
 		}}
 	var broker_id string
 	cmd.Flags().StringVar(&broker_id, "broker-id", "", "Broker identifier")
+	var request_id int
+	cmd.Flags().IntVar(&request_id, "request-id", 0, "Optional removal request ID for manual task linking")
 	var headed bool
 	cmd.Flags().BoolVar(&headed, "headed", false, "Run browser in headed mode (visible)")
 	var screenshot_dir string
@@ -632,6 +634,7 @@ func realRunWebFormCommand() *cobra.Command {
 			broker_id = args[0]
 		}
 		argsMap["broker_id"] = broker_id
+		argsMap["request_id"] = request_id
 		argsMap["headed"] = headed
 		argsMap["screenshot_dir"] = screenshot_dir
 		argsMap["dry_run"] = dry_run

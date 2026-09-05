@@ -3,12 +3,14 @@ package replies
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/danieljustus/symaira-eraseme/internal/confirmation"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/llm"
+	"github.com/danieljustus/symaira-eraseme/internal/manualtasks"
 	"github.com/danieljustus/symaira-eraseme/internal/triage"
 )
 
@@ -119,6 +121,22 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 	if err != nil {
 		return result, err
 	}
+	if !req.DryRun && !result.Success && result.Step == "manual_confirmation_required" && result.ClickedURL != "" {
+		brokerID, brokerName := brokerForConfirmation(ctx, s.Store, req.RequestID, result.ClickedURL)
+		task, taskErr := manualtasks.Create(ctx, s.Store, manualtasks.CreateOpts{
+			RequestID: &req.RequestID, BrokerID: brokerID, BrokerName: brokerName,
+			FormURL: result.ClickedURL, Reason: "dynamic_form",
+			ExtraInstructions: "Open the confirmation URL and complete the confirmation manually; no click was attempted.",
+		})
+		if taskErr != nil {
+			return result, taskErr
+		}
+		result.TaskID = task.ID
+		result.Instructions = task.Instructions
+		result.Status = "manual_action_required"
+		result.Reason = "dynamic_form"
+		result.ManualActionRequired = true
+	}
 	if !req.DryRun {
 		if result.Success {
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtConfirmationLinkClicked, map[string]any{
@@ -132,6 +150,19 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		}
 	}
 	return result, err
+}
+
+func brokerForConfirmation(ctx context.Context, store *eventstore.Store, requestID int64, link string) (string, string) {
+	if request, err := store.GetRemovalRequest(ctx, requestID); err == nil && request != nil {
+		if brokerID, ok := request["broker_id"].(string); ok && brokerID != "" {
+			return brokerID, brokerID
+		}
+	}
+	parsed, err := url.Parse(link)
+	if err == nil && parsed.Hostname() != "" {
+		return parsed.Hostname(), parsed.Hostname()
+	}
+	return "", ""
 }
 
 func nowUTC() (t time.Time) { return time.Now().UTC() }

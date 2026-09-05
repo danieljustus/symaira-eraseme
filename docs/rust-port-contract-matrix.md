@@ -90,7 +90,7 @@ SQLite, network transcript or process behavior.
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | shared cases | byte | all | TODO |
 | ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |
 | DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | PASS |
-| DOM-000B | domain | production web form has an honest tested runtime/manual boundary | fake process/driver; issue #800 | corrected Go oracle | side-effect | all | BLOCKED #800 |
+| DOM-000B | domain | production web form has an honest tested runtime/manual boundary | local executor contract + durable manual-task tests; issue #800 | `TestWebFormNoExecutorPersistsManualFallback`, `TestWebFormExecutorReceivesBoundedContextAndMapsEvidence`, `TestAutoConfirmCreatesManualConfirmationTaskWithoutClick` | side-effect | all | PASS |
 | DOM-001 | domain | deadlines/tick transitions | `golden-tick.json` | shared golden test | byte | all | TODO |
 | DOM-002 | domain | campaign plan and execution transitions | `golden-plan.json` | shared golden test | byte+SQLite | all | TODO |
 | DOM-003 | domain | reporting/dashboard aggregation | `golden-reporting.json` | shared golden test | byte | all | TODO |

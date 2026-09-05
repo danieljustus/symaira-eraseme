@@ -3,10 +3,8 @@ package campaign
 import (
 	"context"
 	"encoding/base64"
-	"strings"
 	"testing"
 
-	"github.com/danieljustus/symaira-browse/formflow"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/registry"
 )
@@ -62,8 +60,9 @@ func TestWebFormAdapterDryRunAndConfigurationErrors(t *testing.T) {
 	if missing["success"] != false || missing["reason"] != "generic_error" {
 		t.Fatalf("missing broker = %#v", missing)
 	}
-	if _, err := adapter.SubmitForm(context.Background(), "broker"); err == nil || !strings.Contains(err.Error(), "driver factory") {
-		t.Fatal("missing driver factory was not reported")
+	result = adapter.Run(context.Background(), "broker", false)
+	if result["success"] != false || result["status"] != "manual_action_required" || result["reason"] != "dynamic_form" {
+		t.Fatalf("missing executor fallback = %#v", result)
 	}
 	if _, err := adapter.ConfirmLink(context.Background(), "missing", "https://example.test"); err == nil {
 		t.Fatal("unknown broker accepted for confirmation")
@@ -72,21 +71,21 @@ func TestWebFormAdapterDryRunAndConfigurationErrors(t *testing.T) {
 
 func TestWebFormResultHelpersAndReasonMapping(t *testing.T) {
 	for _, tc := range []struct {
-		code formflow.Code
+		code Code
 		want string
 	}{
-		{formflow.CodeBlockedCaptcha, "captcha_failed"},
-		{formflow.CodeBlockedBotwall, "generic_error"},
-		{formflow.CodeNavigationTimeout, "timeout"},
-		{formflow.CodeFieldNotFound, "unknown_field"},
-		{formflow.CodeConfirmationFailed, "assertion_failed"},
-		{formflow.CodeSuccess, "generic_error"},
+		{CodeBlockedCaptcha, "captcha_failed"},
+		{CodeBlockedBotwall, "generic_error"},
+		{CodeNavigationTimeout, "timeout"},
+		{CodeFieldNotFound, "unknown_field"},
+		{CodeConfirmationFailed, "assertion_failed"},
+		{CodeSuccess, "generic_error"},
 	} {
 		if got := reasonForCode(tc.code); got != tc.want {
 			t.Errorf("reasonForCode(%q) = %q, want %q", tc.code, got, tc.want)
 		}
 	}
-	result := &formflow.Result{Code: formflow.CodeSuccess, Evidence: &formflow.Evidence{FinalURL: "https://done.test", PageText: "done", PreSubmitScreenshot: []byte("pre"), PostSubmitScreenshot: []byte("post")}}
+	result := &Result{Code: CodeSuccess, Evidence: &Evidence{FinalURL: "https://done.test", PageText: "done", PreSubmitScreenshot: []byte("pre"), PostSubmitScreenshot: []byte("post")}}
 	mapped := formResultMap(result)
 	if mapped["final_url"] != "https://done.test" || mapped["page_text"] != "done" {
 		t.Fatalf("mapped evidence = %#v", mapped)

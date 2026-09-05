@@ -286,7 +286,9 @@ Parameters:
 
 ### `run_web_form`
 
-Run a broker web-form opt-out through the `symaira-browse` integration.
+Run a broker web-form opt-out preview or create an explicit durable manual task
+when no browser executor is injected. This tool never claims a non-dry success
+without an executor.
 
 Required: `['broker_id']`
 
@@ -298,7 +300,8 @@ Parameters:
 
 ### `auto_confirm`
 
-Auto-click confirmation links in broker reply emails.
+Auto-click confirmation links when an executor is injected; otherwise create a
+linked durable manual-confirmation task without claiming a click.
 
 Required: `['request_id']`
 

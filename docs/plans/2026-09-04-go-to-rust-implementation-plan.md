@@ -216,8 +216,8 @@ verbatim: `make fmt-check test lint vet build coverage`.
       with the corrected versioned formats.
 - [x] Resolve #799 with a real production IMAP adapter plus persistent HWM and
       an executable fake-server transcript; no real mailbox in tests.
-- [ ] Resolve #800 by choosing and testing an honest runtime browser boundary
-      or explicit manual fallback; missing `symbrowse` must never claim success.
+- [x] Resolve #800 with the local language-neutral form contract and explicit
+      durable manual fallback; missing browser executors never claim success.
 - [x] Resolve #816 with real Python profile fixtures, frozen path/serialization/
       hash bytes, and read-only key lookup on every decrypt path.
 - [x] Resolve #817 with strict Bearer parsing and constant-time secret

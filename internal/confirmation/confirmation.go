@@ -24,13 +24,18 @@ var KnownBrokerDomains = map[string]struct{}{
 }
 
 type Result struct {
-	Success          bool
-	ClickedURL       string
-	Step             string
-	Error            string
-	ScreenshotBefore string
-	ScreenshotAfter  string
-	DryRun           bool
+	Success              bool
+	ClickedURL           string
+	Step                 string
+	Error                string
+	ScreenshotBefore     string
+	ScreenshotAfter      string
+	DryRun               bool
+	TaskID               int64
+	Instructions         string
+	Status               string
+	Reason               string
+	ManualActionRequired bool
 }
 
 type ClickOptions struct {
@@ -111,7 +116,9 @@ func AutoConfirm(ctx context.Context, opts Options) (Result, error) {
 		return result, nil
 	}
 	if opts.Click == nil {
-		result.Step = "no_clicker"
+		result.Step = "manual_confirmation_required"
+		result.Status = "manual_confirmation_required"
+		result.Reason = "dynamic_form"
 		result.Error = "confirmation clicker is not configured"
 		return result, nil
 	}

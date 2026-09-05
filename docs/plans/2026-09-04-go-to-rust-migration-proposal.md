@@ -167,13 +167,13 @@ local Rust adapters. LLM provider descriptors remain sourced from
 artifact with source tag/SHA metadata and a drift check. Provider semantics are
 not manually forked.
 
-### `symaira-browse/formflow`
+### Local web-form boundary
 
-The current Go code imports the Go library, but the shipped handler injects no
-driver and non-dry-run execution cannot automate a form. Issue #800 must first
-settle and test the honest production boundary: stable runtime integration or
-explicit manual fallback. Rust ports that corrected contract exactly; it does
-not invent a third behavior during the rewrite.
+EraseMe keeps a local, language-neutral `FormSpec`/`Result` contract. The
+production path intentionally injects no browser executor: dry-run returns a
+preview, while non-dry execution creates a durable `manual_tasks` entry with
+`reason=dynamic_form`. Tests may inject a bounded executor; Rust must preserve
+this boundary and must not add a sibling-browser dependency or protocol.
 
 ### SQLite portability
 

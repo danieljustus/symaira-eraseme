@@ -8,11 +8,15 @@ rejections, and other action-required scenarios.
 - [Reply classified](triage-broker-replies.md) as `VERIFICATION_REQUIRED`,
   `REJECTED`, or `AUTO_CONFIRM`
 - LLM provider configured for the Go shared provider layer
-- `symaira-browse` available on PATH for automated confirmation links
+- No browser automation dependency is required. `auto-confirm` and complex
+  web forms use the durable manual-task fallback when no executor is injected.
 
 ## Scenario 1: Auto-confirmation links
 
-Many brokers send a confirmation link that needs to be clicked.
+Many brokers send a confirmation link that needs to be clicked. EraseMe only
+claims a click when an executor is explicitly available. Otherwise it creates a
+linked manual task with `step=manual_confirmation_required`; complete that task
+in a user-controlled browser and then mark it completed.
 
 ```bash
 symeraseme auto-confirm 1

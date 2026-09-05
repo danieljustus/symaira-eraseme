@@ -3,7 +3,6 @@ package campaign
 import (
 	"testing"
 
-	"github.com/danieljustus/symaira-browse/formflow"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/registry"
 )
@@ -30,10 +29,10 @@ func TestFormSpecFromBrokerResolvesIdentityAndRequiredFields(t *testing.T) {
 }
 
 func TestReasonForFormflowOutcome(t *testing.T) {
-	cases := map[formflow.Code]string{
-		formflow.CodeBlockedCaptcha:    "captcha_failed",
-		formflow.CodeNavigationTimeout: "timeout",
-		formflow.CodeFieldNotFound:     "unknown_field",
+	cases := map[Code]string{
+		CodeBlockedCaptcha:    "captcha_failed",
+		CodeNavigationTimeout: "timeout",
+		CodeFieldNotFound:     "unknown_field",
 	}
 	for code, want := range cases {
 		if got := reasonForCode(code); got != want {

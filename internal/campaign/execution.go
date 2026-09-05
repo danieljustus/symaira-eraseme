@@ -105,7 +105,11 @@ func executeWebformRequest(
 				"body":       fmt.Sprintf("[dry-run web form for %s]", brokerName),
 			}, nil
 		}
-		return nil, ErrWebFormRunnerRequired
+		fallback, fallbackErr := manualWebFormTaskResult(ctx, store, brokerName, requestID)
+		if fallbackErr != nil {
+			return nil, fallbackErr
+		}
+		runner = func(context.Context, string, bool) map[string]any { return fallback }
 	}
 
 	identityHash, err := loadIdentityHash()
@@ -427,6 +431,32 @@ func defaultRenderer(templateID string, profile *identity.Profile, brokerName st
 		name = profile.FullName
 	}
 	return fmt.Sprintf("[template %s — %s / %s]", templateID, brokerName, name), nil
+}
+
+func manualWebFormTaskResult(ctx context.Context, store *eventstore.Store, brokerName string, requestID int64) (map[string]any, error) {
+	formURL := ""
+	if events, err := store.GetEvents(ctx, requestID, 0); err == nil {
+		for i := len(events) - 1; i >= 0 && formURL == ""; i-- {
+			for _, key := range []string{"form_url", "endpoint", "url"} {
+				if value, ok := events[i].Payload[key].(string); ok && value != "" {
+					formURL = value
+					break
+				}
+			}
+		}
+	}
+	task, err := manualtasks.Create(ctx, store, manualtasks.CreateOpts{
+		RequestID: &requestID, BrokerID: brokerName, BrokerName: brokerName,
+		FormURL: formURL, Reason: "dynamic_form",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"success": false, "status": "manual_action_required", "reason": "dynamic_form",
+		"task_id": task.ID, "broker_id": brokerName, "broker_name": brokerName,
+		"url": formURL, "instructions": task.Instructions, "dry_run": false,
+	}, nil
 }
 
 // pathSafety keeps filepath imported for config-path handling parity in

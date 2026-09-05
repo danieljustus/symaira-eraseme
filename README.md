@@ -22,7 +22,8 @@ Some broker-specific web flows still require manual review.
 - Event-sourced SQLite storage with projections and an audit trail.
 - CLI commands for profile setup, planning, execution, inbox polling, triage,
   rebuttals, scheduling, reports, and manual fallback tasks.
-- Web-form automation through the `symaira-browse` integration.
+- Explicit web-form previews and durable manual fallback tasks; browser execution
+  is an injected boundary and is not a compile-time dependency.
 - Shared LLM provider layer for reply classification and rebuttal generation.
 - Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
 - AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.

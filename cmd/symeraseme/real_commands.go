@@ -156,9 +156,18 @@ func realPlanCommand() *cobra.Command {
 				return err
 			}
 		}
+		brokers, err := loadRegistry()
+		if err != nil {
+			return err
+		}
+		webForm := campaign.NewWebFormAdapter(brokers, nil)
+		if !executeDryRun {
+			webForm = campaign.NewWebFormAdapterWithStore(store, brokers, nil)
+		}
 		result, err := campaign.ExecuteCampaign(context.Background(), store, executeCampaignID, campaign.ExecuteOpts{
 			Account: executeAccount,
 			DryRun:  executeDryRun,
+			WebForm: webForm.Run,
 		}, batchSize)
 		if err != nil {
 			return err
