@@ -1,10 +1,10 @@
 # Go → Rust executable contract matrix
 
 > Performance/release baseline: commit
-> `240bf67cefa05e643e32611a02e6e7ed87a033ea` (`v0.12.1`). The executable
-> contract oracle is pinned to the merge commit after #795, #796,
-> #798–#800 and #816–#817 are fixed. Task 0.4 must replace this sentence with
-> that exact commit before Rust behavior is implemented. The corrected
+> `240bf67cefa05e643e32611a02e6e7ed87a033ea` (`v0.12.1`). The corrected Go
+> executable contract oracle is pinned to
+> `bf53346eec234929bedf0314b99e3da85dbb991b`, after #795–#800 and #816–#817
+> were fixed and independently merged. The corrected
 > encryption sub-oracle is the Python↔Go conformance evidence from issue #798;
 > Rust interoperability remains gated to Phase 4 and the CRY rows below. Rust
 > may not replace the default binary until every

@@ -1,0 +1,3715 @@
+{
+  "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "root": {
+    "order": 0,
+    "path": null,
+    "use": "symeraseme",
+    "name": "symeraseme",
+    "short": "Automated data broker removal tool",
+    "long": "symeraseme is the Go-port command-line entrypoint of Symaira EraseMe. The CLI vocabulary is settled in docs/mcp-contract.md §5; commands land as their port issues are implemented.",
+    "hidden": false,
+    "persistent_flags": [
+      {
+        "order": 0,
+        "name": "output",
+        "type": "string",
+        "default": "text",
+        "usage": "output format: text or json",
+        "hidden": false
+      }
+    ],
+    "effective_flags": [
+      {
+        "order": 0,
+        "name": "output",
+        "type": "string",
+        "default": "text",
+        "usage": "output format: text or json",
+        "hidden": false
+      }
+    ],
+    "children": [
+      {
+        "order": 0,
+        "path": [
+          "auto-confirm"
+        ],
+        "use": "auto-confirm REQUEST_ID",
+        "name": "auto-confirm",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "REQUEST_ID"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without clicking",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "headed",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Run browser in headed mode",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "screenshot-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Directory for screenshots",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without clicking",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "headed",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Run browser in headed mode",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "screenshot-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Directory for screenshots",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 1,
+        "path": [
+          "brokers"
+        ],
+        "use": "brokers",
+        "name": "brokers",
+        "short": "brokers commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "brokers",
+              "list"
+            ],
+            "use": "list",
+            "name": "list",
+            "short": "List brokers",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "include-disabled",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include disabled brokers",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "include-inactive",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include inactive brokers",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "jurisdiction",
+                "type": "string",
+                "default": "",
+                "usage": "jurisdiction filter",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "law",
+                "type": "string",
+                "default": "",
+                "usage": "law filter",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "priority",
+                "type": "string",
+                "default": "",
+                "usage": "priority filter",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "status",
+                "type": "string",
+                "default": "active",
+                "usage": "status filter",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "include-disabled",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include disabled brokers",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "include-inactive",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include inactive brokers",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "jurisdiction",
+                "type": "string",
+                "default": "",
+                "usage": "jurisdiction filter",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "law",
+                "type": "string",
+                "default": "",
+                "usage": "law filter",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "priority",
+                "type": "string",
+                "default": "",
+                "usage": "priority filter",
+                "hidden": false
+              },
+              {
+                "order": 6,
+                "name": "status",
+                "type": "string",
+                "default": "active",
+                "usage": "status filter",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 1,
+            "path": [
+              "brokers",
+              "show"
+            ],
+            "use": "show BROKER_ID",
+            "name": "show",
+            "short": "Show one broker",
+            "hidden": false,
+            "args_validator": "github.com/spf13/cobra.ExactArgs.func1",
+            "usage_positionals": [
+              "BROKER_ID"
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 2,
+        "path": [
+          "calendar"
+        ],
+        "use": "calendar",
+        "name": "calendar",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "campaign",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "weeks",
+            "type": "int",
+            "default": "4",
+            "usage": "Number of weeks to look ahead",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "campaign",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "weeks",
+            "type": "int",
+            "default": "4",
+            "usage": "Number of weeks to look ahead",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 3,
+        "path": [
+          "classify-reply"
+        ],
+        "use": "classify-reply REQUEST_ID",
+        "name": "classify-reply",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "REQUEST_ID"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "model",
+            "type": "string",
+            "default": "",
+            "usage": "LLM model override",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "provider",
+            "type": "string",
+            "default": "",
+            "usage": "LLM provider override",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "save",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Save classification to database",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "model",
+            "type": "string",
+            "default": "",
+            "usage": "LLM model override",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "provider",
+            "type": "string",
+            "default": "",
+            "usage": "LLM provider override",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "save",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Save classification to database",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 4,
+        "path": [
+          "completion"
+        ],
+        "use": "completion [bash|zsh|fish|powershell]",
+        "name": "completion",
+        "short": "Generate shell completion scripts",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.ExactArgs.func1",
+        "usage_positionals": [
+          "[bash|zsh|fish|powershell]"
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 5,
+        "path": [
+          "config"
+        ],
+        "use": "config",
+        "name": "config",
+        "short": "config commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "config",
+              "show"
+            ],
+            "use": "show",
+            "name": "show",
+            "short": "Show effective configuration",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 6,
+        "path": [
+          "dashboard"
+        ],
+        "use": "dashboard",
+        "name": "dashboard",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 7,
+        "path": [
+          "events"
+        ],
+        "use": "events",
+        "name": "events",
+        "short": "events commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "events",
+              "show"
+            ],
+            "use": "show REQUEST_ID",
+            "name": "show",
+            "hidden": false,
+            "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+            "usage_positionals": [
+              "REQUEST_ID"
+            ],
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "after-event-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Only return events with ID greater than this",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "request-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Removal request ID",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "after-event-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Only return events with ID greater than this",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "request-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Removal request ID",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 8,
+        "path": [
+          "generate-dashboard"
+        ],
+        "use": "generate-dashboard",
+        "name": "generate-dashboard",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "auto-open",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Open dashboard in browser after generation",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "auto-refresh",
+            "type": "int",
+            "default": "0",
+            "usage": "Auto-refresh interval in seconds (0 = disabled)",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "open",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Open dashboard in browser after generation",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "output",
+            "type": "string",
+            "default": "report.html",
+            "usage": "Output file path",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "auto-open",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Open dashboard in browser after generation",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "auto-refresh",
+            "type": "int",
+            "default": "0",
+            "usage": "Auto-refresh interval in seconds (0 = disabled)",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "open",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Open dashboard in browser after generation",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "output",
+            "type": "string",
+            "default": "report.html",
+            "usage": "Output file path",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 9,
+        "path": [
+          "generate-rebuttal"
+        ],
+        "use": "generate-rebuttal REQUEST_ID",
+        "name": "generate-rebuttal",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "REQUEST_ID"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "model",
+            "type": "string",
+            "default": "",
+            "usage": "LLM model override",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "provider",
+            "type": "string",
+            "default": "",
+            "usage": "LLM provider override",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "save",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Save rebuttal to database",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "model",
+            "type": "string",
+            "default": "",
+            "usage": "LLM model override",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "provider",
+            "type": "string",
+            "default": "",
+            "usage": "LLM provider override",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Removal request ID",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "save",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Save rebuttal to database",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 10,
+        "path": [
+          "generate-report"
+        ],
+        "use": "generate-report",
+        "name": "generate-report",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "all",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Include all campaigns",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "all-campaigns",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Include all campaigns",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "format",
+            "type": "string",
+            "default": "html",
+            "usage": "Report format",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "output",
+            "type": "string",
+            "default": "",
+            "usage": "Output file path",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "all",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Include all campaigns",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "all-campaigns",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Include all campaigns",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "format",
+            "type": "string",
+            "default": "html",
+            "usage": "Report format",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "output",
+            "type": "string",
+            "default": "",
+            "usage": "Output file path",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 11,
+        "path": [
+          "generate-scheduler"
+        ],
+        "use": "generate-scheduler",
+        "name": "generate-scheduler",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without writing files",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Output directory for config files",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "platform",
+            "type": "string",
+            "default": "",
+            "usage": "Target platform (auto-detected if omitted)",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "poll-hours",
+            "type": "string",
+            "default": "",
+            "usage": "Comma-separated hours for inbox polling",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "project-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Project directory path",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "symeraseme-bin",
+            "type": "string",
+            "default": "",
+            "usage": "Path to symeraseme binary",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "tick-hour",
+            "type": "int",
+            "default": "10",
+            "usage": "Hour to run tick engine",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "tick-minute",
+            "type": "int",
+            "default": "0",
+            "usage": "Minute to run tick engine",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "venv-activate",
+            "type": "string",
+            "default": "",
+            "usage": "Virtualenv activate script path",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without writing files",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Output directory for config files",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "platform",
+            "type": "string",
+            "default": "",
+            "usage": "Target platform (auto-detected if omitted)",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "poll-hours",
+            "type": "string",
+            "default": "",
+            "usage": "Comma-separated hours for inbox polling",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "project-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Project directory path",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "symeraseme-bin",
+            "type": "string",
+            "default": "",
+            "usage": "Path to symeraseme binary",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "tick-hour",
+            "type": "int",
+            "default": "10",
+            "usage": "Hour to run tick engine",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "tick-minute",
+            "type": "int",
+            "default": "0",
+            "usage": "Minute to run tick engine",
+            "hidden": false
+          },
+          {
+            "order": 9,
+            "name": "venv-activate",
+            "type": "string",
+            "default": "",
+            "usage": "Virtualenv activate script path",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 12,
+        "path": [
+          "grant"
+        ],
+        "use": "grant [COMMAND]",
+        "name": "grant",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "[COMMAND]"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "command",
+            "type": "string",
+            "default": "execute",
+            "usage": "Command to grant consent for",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without issuing or revoking",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "list",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "List all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "list-tokens",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "List all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "revoke",
+            "type": "string",
+            "default": "",
+            "usage": "Token value to revoke",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "revoke-all",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Revoke all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "ttl",
+            "type": "int",
+            "default": "86400",
+            "usage": "Token time-to-live in seconds",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "command",
+            "type": "string",
+            "default": "execute",
+            "usage": "Command to grant consent for",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without issuing or revoking",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "list",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "List all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "list-tokens",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "List all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "revoke",
+            "type": "string",
+            "default": "",
+            "usage": "Token value to revoke",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "revoke-all",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Revoke all active tokens",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "ttl",
+            "type": "int",
+            "default": "86400",
+            "usage": "Token time-to-live in seconds",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 13,
+        "path": [
+          "init-profile"
+        ],
+        "use": "init-profile",
+        "name": "init-profile",
+        "short": "Create or replace the encrypted identity profile",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "email",
+            "type": "string",
+            "default": "",
+            "usage": "Email address",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "full-name",
+            "type": "string",
+            "default": "",
+            "usage": "Full name",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "profile",
+            "type": "string",
+            "default": "",
+            "usage": "Identity profile path",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "email",
+            "type": "string",
+            "default": "",
+            "usage": "Email address",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "full-name",
+            "type": "string",
+            "default": "",
+            "usage": "Full name",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "profile",
+            "type": "string",
+            "default": "",
+            "usage": "Identity profile path",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 14,
+        "path": [
+          "manual-tasks"
+        ],
+        "use": "manual-tasks",
+        "name": "manual-tasks",
+        "short": "manual-tasks commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "manual-tasks",
+              "cleanup"
+            ],
+            "use": "cleanup",
+            "name": "cleanup",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Preview without deleting",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Preview without deleting",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 1,
+            "path": [
+              "manual-tasks",
+              "complete"
+            ],
+            "use": "complete TASK_ID",
+            "name": "complete",
+            "hidden": false,
+            "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+            "usage_positionals": [
+              "TASK_ID"
+            ],
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "notes",
+                "type": "string",
+                "default": "",
+                "usage": "Completion notes",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "task-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Manual task ID",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "notes",
+                "type": "string",
+                "default": "",
+                "usage": "Completion notes",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "task-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Manual task ID",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 2,
+            "path": [
+              "manual-tasks",
+              "list"
+            ],
+            "use": "list",
+            "name": "list",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "request-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Filter by request ID",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by task status",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "request-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Filter by request ID",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by task status",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 3,
+            "path": [
+              "manual-tasks",
+              "show"
+            ],
+            "use": "show TASK_ID",
+            "name": "show",
+            "hidden": false,
+            "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+            "usage_positionals": [
+              "TASK_ID"
+            ],
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "task-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Manual task ID",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "task-id",
+                "type": "int",
+                "default": "0",
+                "usage": "Manual task ID",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 15,
+        "path": [
+          "mcp"
+        ],
+        "use": "mcp",
+        "name": "mcp",
+        "short": "Run the MCP JSON-RPC interface",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "allow-remote",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "allow non-loopback HTTP binds",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "host",
+            "type": "string",
+            "default": "127.0.0.1",
+            "usage": "MCP HTTP bind host",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "port",
+            "type": "int",
+            "default": "8000",
+            "usage": "MCP HTTP bind port",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "stdio",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "use newline-delimited JSON-RPC on stdin/stdout",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "allow-remote",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "allow non-loopback HTTP binds",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "host",
+            "type": "string",
+            "default": "127.0.0.1",
+            "usage": "MCP HTTP bind host",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "port",
+            "type": "int",
+            "default": "8000",
+            "usage": "MCP HTTP bind port",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "stdio",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "use newline-delimited JSON-RPC on stdin/stdout",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 16,
+        "path": [
+          "migrate"
+        ],
+        "use": "migrate",
+        "name": "migrate",
+        "short": "Migrate a Python-era installation to the Go layout",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "backup",
+            "type": "string",
+            "default": "",
+            "usage": "backup directory (default: <destination>.migration-backup)",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "binary",
+            "type": "string",
+            "default": "",
+            "usage": "absolute symeraseme binary path for generated schedules",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "copy-secrets",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "copy secrets through an injected SecretStore (never enabled by default)",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "destination",
+            "type": "string",
+            "default": "",
+            "usage": "separate Go destination directory (required)",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "destination-config",
+            "type": "string",
+            "default": "",
+            "usage": "optional separate Go config/profile directory",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "report detected items without creating backups or changing files",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "home",
+            "type": "string",
+            "default": "",
+            "usage": "synthetic or operator-selected home for native scheduler units",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "json",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "write the migration report as JSON",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "platform",
+            "type": "string",
+            "default": "",
+            "usage": "scheduler platform: cron, launchd, or systemd",
+            "hidden": false
+          },
+          {
+            "order": 9,
+            "name": "project-dir",
+            "type": "string",
+            "default": "",
+            "usage": "project directory for generated schedule wrappers",
+            "hidden": false
+          },
+          {
+            "order": 10,
+            "name": "source",
+            "type": "string",
+            "default": "",
+            "usage": "Python-era installation data/config directory (required)",
+            "hidden": false
+          },
+          {
+            "order": 11,
+            "name": "source-config",
+            "type": "string",
+            "default": "",
+            "usage": "optional separate Python config/profile directory",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "backup",
+            "type": "string",
+            "default": "",
+            "usage": "backup directory (default: <destination>.migration-backup)",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "binary",
+            "type": "string",
+            "default": "",
+            "usage": "absolute symeraseme binary path for generated schedules",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "copy-secrets",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "copy secrets through an injected SecretStore (never enabled by default)",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "destination",
+            "type": "string",
+            "default": "",
+            "usage": "separate Go destination directory (required)",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "destination-config",
+            "type": "string",
+            "default": "",
+            "usage": "optional separate Go config/profile directory",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "report detected items without creating backups or changing files",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "home",
+            "type": "string",
+            "default": "",
+            "usage": "synthetic or operator-selected home for native scheduler units",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "json",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "write the migration report as JSON",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 9,
+            "name": "platform",
+            "type": "string",
+            "default": "",
+            "usage": "scheduler platform: cron, launchd, or systemd",
+            "hidden": false
+          },
+          {
+            "order": 10,
+            "name": "project-dir",
+            "type": "string",
+            "default": "",
+            "usage": "project directory for generated schedule wrappers",
+            "hidden": false
+          },
+          {
+            "order": 11,
+            "name": "source",
+            "type": "string",
+            "default": "",
+            "usage": "Python-era installation data/config directory (required)",
+            "hidden": false
+          },
+          {
+            "order": 12,
+            "name": "source-config",
+            "type": "string",
+            "default": "",
+            "usage": "optional separate Python config/profile directory",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 17,
+        "path": [
+          "plan"
+        ],
+        "use": "plan",
+        "name": "plan",
+        "short": "plan commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "plan",
+              "create"
+            ],
+            "use": "create",
+            "name": "create",
+            "short": "Create a removal campaign plan",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "category",
+                "type": "string",
+                "default": "",
+                "usage": "category filter",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "include-inactive",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include inactive brokers",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "jurisdiction",
+                "type": "string",
+                "default": "",
+                "usage": "jurisdiction filter",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "law",
+                "type": "string",
+                "default": "",
+                "usage": "law filter",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "max",
+                "type": "int",
+                "default": "30",
+                "usage": "maximum brokers",
+                "hidden": false
+              },
+              {
+                "order": 6,
+                "name": "notes",
+                "type": "string",
+                "default": "",
+                "usage": "campaign notes",
+                "hidden": false
+              },
+              {
+                "order": 7,
+                "name": "priority",
+                "type": "string",
+                "default": "",
+                "usage": "priority filter",
+                "hidden": false
+              },
+              {
+                "order": 8,
+                "name": "profile",
+                "type": "string",
+                "default": "",
+                "usage": "identity profile path",
+                "hidden": false
+              },
+              {
+                "order": 9,
+                "name": "status",
+                "type": "string",
+                "default": "active",
+                "usage": "broker status filter",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "category",
+                "type": "string",
+                "default": "",
+                "usage": "category filter",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "include-inactive",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "include inactive brokers",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "jurisdiction",
+                "type": "string",
+                "default": "",
+                "usage": "jurisdiction filter",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "law",
+                "type": "string",
+                "default": "",
+                "usage": "law filter",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "max",
+                "type": "int",
+                "default": "30",
+                "usage": "maximum brokers",
+                "hidden": false
+              },
+              {
+                "order": 6,
+                "name": "notes",
+                "type": "string",
+                "default": "",
+                "usage": "campaign notes",
+                "hidden": false
+              },
+              {
+                "order": 7,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 8,
+                "name": "priority",
+                "type": "string",
+                "default": "",
+                "usage": "priority filter",
+                "hidden": false
+              },
+              {
+                "order": 9,
+                "name": "profile",
+                "type": "string",
+                "default": "",
+                "usage": "identity profile path",
+                "hidden": false
+              },
+              {
+                "order": 10,
+                "name": "status",
+                "type": "string",
+                "default": "active",
+                "usage": "broker status filter",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 1,
+            "path": [
+              "plan",
+              "execute"
+            ],
+            "use": "execute",
+            "name": "execute",
+            "short": "Execute planned requests",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "account",
+                "type": "string",
+                "default": "",
+                "usage": "email account name",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "batch-size",
+                "type": "int",
+                "default": "5",
+                "usage": "maximum requests to execute",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "consent",
+                "type": "string",
+                "default": "",
+                "usage": "consent token for destructive execution",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "consent-file",
+                "type": "string",
+                "default": "",
+                "usage": "path to consent token file",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "preview without sending",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "account",
+                "type": "string",
+                "default": "",
+                "usage": "email account name",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "batch-size",
+                "type": "int",
+                "default": "5",
+                "usage": "maximum requests to execute",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "consent",
+                "type": "string",
+                "default": "",
+                "usage": "consent token for destructive execution",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "consent-file",
+                "type": "string",
+                "default": "",
+                "usage": "path to consent token file",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "preview without sending",
+                "hidden": false
+              },
+              {
+                "order": 6,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 2,
+            "path": [
+              "plan",
+              "show"
+            ],
+            "use": "show",
+            "name": "show",
+            "short": "Show planned requests",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "request status filter",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "campaign",
+                "type": "string",
+                "default": "",
+                "usage": "campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "request status filter",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 3,
+            "path": [
+              "plan",
+              "status"
+            ],
+            "use": "status",
+            "name": "status",
+            "short": "Show campaign status",
+            "hidden": false,
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 4,
+            "path": [
+              "plan",
+              "tick"
+            ],
+            "use": "tick",
+            "name": "tick",
+            "short": "Run the deadline tick engine",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "do not mutate requests",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "do not mutate requests",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 18,
+        "path": [
+          "poll-inbox"
+        ],
+        "use": "poll-inbox",
+        "name": "poll-inbox",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "folders",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP folders to poll (default: ['INBOX']). Deduplicates by Message-ID across folders.",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "host",
+            "type": "string",
+            "default": "imap.gmail.com",
+            "usage": "IMAP server hostname",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "oauth2-access-token",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP OAuth2 access token or secret reference (never printed)",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "oauth2-username",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP OAuth2 username (defaults to --username)",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "port",
+            "type": "int",
+            "default": "993",
+            "usage": "IMAP server port",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "since",
+            "type": "int",
+            "default": "14",
+            "usage": "Fetch messages from the last N days",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "since-days",
+            "type": "int",
+            "default": "14",
+            "usage": "Fetch messages from the last N days",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "ssl",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Use SSL/TLS connection",
+            "hidden": false
+          },
+          {
+            "order": 9,
+            "name": "username",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP username (email address)",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "campaign-id",
+            "type": "string",
+            "default": "",
+            "usage": "Filter by campaign",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "folders",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP folders to poll (default: ['INBOX']). Deduplicates by Message-ID across folders.",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "host",
+            "type": "string",
+            "default": "imap.gmail.com",
+            "usage": "IMAP server hostname",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "oauth2-access-token",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP OAuth2 access token or secret reference (never printed)",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "oauth2-username",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP OAuth2 username (defaults to --username)",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 6,
+            "name": "port",
+            "type": "int",
+            "default": "993",
+            "usage": "IMAP server port",
+            "hidden": false
+          },
+          {
+            "order": 7,
+            "name": "since",
+            "type": "int",
+            "default": "14",
+            "usage": "Fetch messages from the last N days",
+            "hidden": false
+          },
+          {
+            "order": 8,
+            "name": "since-days",
+            "type": "int",
+            "default": "14",
+            "usage": "Fetch messages from the last N days",
+            "hidden": false
+          },
+          {
+            "order": 9,
+            "name": "ssl",
+            "type": "bool",
+            "default": "true",
+            "no_opt_value": "true",
+            "usage": "Use SSL/TLS connection",
+            "hidden": false
+          },
+          {
+            "order": 10,
+            "name": "username",
+            "type": "string",
+            "default": "",
+            "usage": "IMAP username (email address)",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 19,
+        "path": [
+          "registry"
+        ],
+        "use": "registry",
+        "name": "registry",
+        "short": "registry commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "registry",
+              "list"
+            ],
+            "use": "list",
+            "name": "list",
+            "short": "List registry brokers",
+            "hidden": false,
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 1,
+            "path": [
+              "registry",
+              "validate"
+            ],
+            "use": "validate",
+            "name": "validate",
+            "short": "Validate the broker registry",
+            "hidden": false,
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 20,
+        "path": [
+          "render-template"
+        ],
+        "use": "render-template TEMPLATE",
+        "name": "render-template",
+        "short": "Render a legal template",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.ExactArgs.func1",
+        "usage_positionals": [
+          "TEMPLATE"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "broker-name",
+            "type": "string",
+            "default": "",
+            "usage": "Name of the data broker",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "broker-website",
+            "type": "string",
+            "default": "",
+            "usage": "Broker website URL",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "broker-name",
+            "type": "string",
+            "default": "",
+            "usage": "Name of the data broker",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "broker-website",
+            "type": "string",
+            "default": "",
+            "usage": "Broker website URL",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 21,
+        "path": [
+          "requests"
+        ],
+        "use": "requests",
+        "name": "requests",
+        "short": "requests commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "requests",
+              "list"
+            ],
+            "use": "list",
+            "name": "list",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "broker-id",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by broker identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "campaign-id",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "page",
+                "type": "int",
+                "default": "1",
+                "usage": "1-indexed page number",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "page-size",
+                "type": "int",
+                "default": "100",
+                "usage": "Maximum items per page",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by request status",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "broker-id",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by broker identifier",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "campaign-id",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by campaign identifier",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "page",
+                "type": "int",
+                "default": "1",
+                "usage": "1-indexed page number",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "page-size",
+                "type": "int",
+                "default": "100",
+                "usage": "Maximum items per page",
+                "hidden": false
+              },
+              {
+                "order": 5,
+                "name": "status",
+                "type": "string",
+                "default": "",
+                "usage": "Filter by request status",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 22,
+        "path": [
+          "review"
+        ],
+        "use": "review FILE",
+        "name": "review",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "FILE"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "path",
+            "type": "string",
+            "default": "",
+            "usage": "The path to the file to redact",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "path",
+            "type": "string",
+            "default": "",
+            "usage": "The path to the file to redact",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 23,
+        "path": [
+          "run-web-form"
+        ],
+        "use": "run-web-form BROKER_ID",
+        "name": "run-web-form",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.MaximumNArgs.func1",
+        "usage_positionals": [
+          "BROKER_ID"
+        ],
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "broker-id",
+            "type": "string",
+            "default": "",
+            "usage": "Broker identifier",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without running",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "headed",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Run browser in headed mode (visible)",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Optional removal request ID for manual task linking",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "screenshot-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Directory for screenshots",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "broker-id",
+            "type": "string",
+            "default": "",
+            "usage": "Broker identifier",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Preview without running",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "headed",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "Run browser in headed mode (visible)",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "request-id",
+            "type": "int",
+            "default": "0",
+            "usage": "Optional removal request ID for manual task linking",
+            "hidden": false
+          },
+          {
+            "order": 5,
+            "name": "screenshot-dir",
+            "type": "string",
+            "default": "",
+            "usage": "Directory for screenshots",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 24,
+        "path": [
+          "schedule"
+        ],
+        "use": "schedule",
+        "name": "schedule",
+        "short": "schedule commands",
+        "hidden": false,
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "children": [
+          {
+            "order": 0,
+            "path": [
+              "schedule",
+              "install"
+            ],
+            "use": "install",
+            "name": "install",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Preview without installing",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "tick-hour",
+                "type": "int",
+                "default": "10",
+                "usage": "Hour to run tick engine",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "tick-minute",
+                "type": "int",
+                "default": "0",
+                "usage": "Minute to run tick engine",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "dry-run",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Preview without installing",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 2,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              },
+              {
+                "order": 3,
+                "name": "tick-hour",
+                "type": "int",
+                "default": "10",
+                "usage": "Hour to run tick engine",
+                "hidden": false
+              },
+              {
+                "order": 4,
+                "name": "tick-minute",
+                "type": "int",
+                "default": "0",
+                "usage": "Minute to run tick engine",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 1,
+            "path": [
+              "schedule",
+              "status"
+            ],
+            "use": "status",
+            "name": "status",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              }
+            ]
+          },
+          {
+            "order": 2,
+            "path": [
+              "schedule",
+              "uninstall"
+            ],
+            "use": "uninstall",
+            "name": "uninstall",
+            "hidden": false,
+            "local_flags": [
+              {
+                "order": 0,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              }
+            ],
+            "inherited_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              }
+            ],
+            "effective_flags": [
+              {
+                "order": 0,
+                "name": "output",
+                "type": "string",
+                "default": "text",
+                "usage": "output format: text or json",
+                "hidden": false
+              },
+              {
+                "order": 1,
+                "name": "platform",
+                "type": "string",
+                "default": "",
+                "usage": "Target platform (auto-detected if omitted)",
+                "hidden": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "order": 25,
+        "path": [
+          "serve"
+        ],
+        "use": "serve",
+        "name": "serve",
+        "short": "Run the MCP JSON-RPC interface",
+        "hidden": true,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "allow-remote",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "allow non-loopback HTTP binds",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "host",
+            "type": "string",
+            "default": "127.0.0.1",
+            "usage": "MCP HTTP bind host",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "port",
+            "type": "int",
+            "default": "8000",
+            "usage": "MCP HTTP bind port",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "stdio",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "use newline-delimited JSON-RPC on stdin/stdout",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "allow-remote",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "allow non-loopback HTTP binds",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "host",
+            "type": "string",
+            "default": "127.0.0.1",
+            "usage": "MCP HTTP bind host",
+            "hidden": false
+          },
+          {
+            "order": 2,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          },
+          {
+            "order": 3,
+            "name": "port",
+            "type": "int",
+            "default": "8000",
+            "usage": "MCP HTTP bind port",
+            "hidden": false
+          },
+          {
+            "order": 4,
+            "name": "stdio",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "use newline-delimited JSON-RPC on stdin/stdout",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 26,
+        "path": [
+          "show-profile"
+        ],
+        "use": "show-profile",
+        "name": "show-profile",
+        "short": "Show the encrypted identity profile",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 27,
+        "path": [
+          "status"
+        ],
+        "use": "status",
+        "name": "status",
+        "short": "Show campaign status",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "campaign",
+            "type": "string",
+            "default": "",
+            "usage": "Campaign identifier",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "campaign",
+            "type": "string",
+            "default": "",
+            "usage": "Campaign identifier",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 28,
+        "path": [
+          "tick"
+        ],
+        "use": "tick",
+        "name": "tick",
+        "short": "Run the deadline tick engine",
+        "hidden": false,
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "do not mutate requests",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "dry-run",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "do not mutate requests",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 29,
+        "path": [
+          "version"
+        ],
+        "use": "version",
+        "name": "version",
+        "short": "Show the installed Symaira EraseMe version",
+        "hidden": false,
+        "args_validator": "github.com/spf13/cobra.NoArgs",
+        "local_flags": [
+          {
+            "order": 0,
+            "name": "json",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "print the versionkit handshake payload (JSON)",
+            "hidden": false
+          }
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "json",
+            "type": "bool",
+            "default": "false",
+            "no_opt_value": "true",
+            "usage": "print the versionkit handshake payload (JSON)",
+            "hidden": false
+          },
+          {
+            "order": 1,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      }
+    ]
+  }
+}

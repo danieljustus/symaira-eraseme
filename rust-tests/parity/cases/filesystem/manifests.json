@@ -1,0 +1,62 @@
+{
+  "schema": "symeraseme.go-oracle.filesystem.v1",
+  "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "cases": [
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "mcp-startup-token",
+      "operation": [
+        "mcp",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "<PORT>"
+      ],
+      "roots": {
+        "home": "isolated",
+        "xdg_config": "isolated",
+        "xdg_data": "isolated",
+        "tmpdir": "isolated"
+      },
+      "manifest_roots": {
+        "home": "/tmp/symeraseme-go-oracle/http/home",
+        "xdg_config": "/tmp/symeraseme-go-oracle/http/xdg-config",
+        "xdg_data": "/tmp/symeraseme-go-oracle/http/xdg-data",
+        "tmpdir": "/tmp/symeraseme-go-oracle/http/tmp",
+        "data_dir": "/tmp/symeraseme-go-oracle/http/data",
+        "db_dir": "/tmp/symeraseme-go-oracle/http/db"
+      },
+      "manifests": {
+        "home": [],
+        "xdg_config": [],
+        "xdg_data": [],
+        "tmpdir": [],
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ],
+        "db_dir": []
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "manifests.data_dir[*].content",
+          "reason": "mcp_token is generated from crypto/rand",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "operation.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    }
+  ]
+}

@@ -48,14 +48,25 @@
     "required_review_fields": ["reviewed_sha", "commands", "results", "findings", "verdict", "reviewer_lane"]
   },
   "execution_state": {
-    "last_completed": "0.2",
-    "active_tasks": ["0.3"],
-    "merged_tasks": ["0.1", "0.2"],
-    "active_worktrees": {},
-    "blocked_by": [794],
+    "last_completed": "0.3",
+    "active_tasks": ["0.4"],
+    "merged_tasks": ["0.1", "0.2", "0.3"],
+    "active_worktrees": {"0.4": ".worktrees/task-0.4-go-oracle-fixtures"},
+    "blocked_by": [],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },
   "external_gates": {
+    "signed-dmg-rc": {
+      "owner": "coordinator",
+      "required_by": "9.1",
+      "issue": 794,
+      "evidence": [
+        "fresh release-candidate app and DMG notarization statuses are Accepted",
+        "public DMG bytes match the verified local artifact",
+        "redownloaded DMG passes codesign, stapler and Gatekeeper assessment"
+      ],
+      "failure": "keep issue #794 open and do not begin Phase 9"
+    },
     "stable-release-plus-7-days": {
       "owner": "coordinator",
       "required_by": "10.4",
