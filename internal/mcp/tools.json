@@ -160,6 +160,14 @@
             "type": "string",
             "description": "IMAP username (email address)"
           },
+          "oauth2_access_token": {
+            "type": "string",
+            "description": "OAuth2 access token or secret reference; resolved server-side and never returned"
+          },
+          "oauth2_username": {
+            "type": "string",
+            "description": "OAuth2 username (defaults to the IMAP username)"
+          },
           "since_days": {
             "type": "integer",
             "description": "Fetch messages from the last N days"

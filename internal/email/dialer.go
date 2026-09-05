@@ -48,7 +48,7 @@ func (d *NetIMAPDialer) Dial(ctx context.Context, cfg IMAPConfig) (IMAPSession, 
 
 	conn, err := (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return nil, imapError("connect/login failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("connect/login failed", err, imapSecrets(cfg)...)
 	}
 	deadlineCleanup := setContextDeadline(ctx, conn, timeout)
 	defer func() { deadlineCleanup() }()
@@ -58,7 +58,7 @@ func (d *NetIMAPDialer) Dial(ctx context.Context, cfg IMAPConfig) (IMAPSession, 
 		tlsConn := tls.Client(conn, tlsConfig)
 		if err := tlsConn.HandshakeContext(ctx); err != nil {
 			_ = conn.Close()
-			return nil, imapError("connect/login failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+			return nil, imapError("connect/login failed", err, imapSecrets(cfg)...)
 		}
 		conn = tlsConn
 		deadlineCleanup()
@@ -68,7 +68,7 @@ func (d *NetIMAPDialer) Dial(ctx context.Context, cfg IMAPConfig) (IMAPSession, 
 	c, err := client.New(conn)
 	if err != nil {
 		_ = conn.Close()
-		return nil, imapError("connect/login failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("connect/login failed", err, imapSecrets(cfg)...)
 	}
 	c.Timeout = timeout
 
@@ -76,13 +76,13 @@ func (d *NetIMAPDialer) Dial(ctx context.Context, cfg IMAPConfig) (IMAPSession, 
 		supported, supportErr := c.SupportStartTLS()
 		if supportErr != nil {
 			_ = c.Close()
-			return nil, imapError("STARTTLS capability check failed", supportErr, cfg.Password, secretFromOAuth(cfg.OAuth2))
+			return nil, imapError("STARTTLS capability check failed", supportErr, imapSecrets(cfg)...)
 		}
 		if supported {
 			tlsConfig := imapTLSConfig(d.TLSConfig, cfg.TLSConfig, cfg.Host)
 			if err := c.StartTLS(tlsConfig); err != nil {
 				_ = c.Close()
-				return nil, imapError("STARTTLS failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+				return nil, imapError("STARTTLS failed", err, imapSecrets(cfg)...)
 			}
 		} else if !cfg.AllowInsecureCleartextAuth {
 			_ = c.Close()
@@ -99,7 +99,7 @@ func (d *NetIMAPDialer) Dial(ctx context.Context, cfg IMAPConfig) (IMAPSession, 
 		auth := &xoauth2Client{username: user, token: cfg.OAuth2.AccessToken}
 		if err := c.Authenticate(auth); err != nil {
 			_ = session.Close()
-			return nil, imapError("connect/login failed", err, cfg.OAuth2.AccessToken, xoauth2Payload(user, cfg.OAuth2.AccessToken))
+			return nil, imapError("connect/login failed", err, imapSecrets(cfg)...)
 		}
 	} else if cfg.Password != "" {
 		if err := c.Login(cfg.Username, cfg.Password); err != nil {
@@ -215,7 +215,7 @@ func (s *netIMAPSession) Select(ctx context.Context, folder string) (uint32, err
 	defer clearDeadline()
 	mbox, err := s.client.Select(folder, true)
 	if err != nil {
-		return 0, imapError("folder select failed", err, s.cfg.Password, secretFromOAuth(s.cfg.OAuth2))
+		return 0, imapError("folder select failed", err, imapSecrets(s.cfg)...)
 	}
 	return mbox.UidValidity, nil
 }
@@ -237,7 +237,7 @@ func (s *netIMAPSession) SearchUID(ctx context.Context, uidRange string, since .
 	}
 	uids, err := s.client.UidSearch(criteria)
 	if err != nil {
-		return nil, imapError("UID search failed", err, s.cfg.Password, secretFromOAuth(s.cfg.OAuth2))
+		return nil, imapError("UID search failed", err, imapSecrets(s.cfg)...)
 	}
 	return uids, nil
 }
@@ -274,7 +274,7 @@ func (s *netIMAPSession) Fetch(ctx context.Context, uids []uint32) ([]FetchedMes
 		case msg, ok := <-messagesChan:
 			if !ok {
 				if err := <-errCh; err != nil {
-					return nil, imapError("UID fetch failed", err, s.cfg.Password, secretFromOAuth(s.cfg.OAuth2))
+					return nil, imapError("UID fetch failed", err, imapSecrets(s.cfg)...)
 				}
 				return fetched, nil
 			}
@@ -283,11 +283,11 @@ func (s *netIMAPSession) Fetch(ctx context.Context, uids []uint32) ([]FetchedMes
 			}
 			headerBytes, err := readFetchBody(msg, headerSection)
 			if err != nil {
-				return nil, imapError("read fetched header failed", err, s.cfg.Password, secretFromOAuth(s.cfg.OAuth2))
+				return nil, imapError("read fetched header failed", err, imapSecrets(s.cfg)...)
 			}
 			bodyBytes, err := readFetchBody(msg, textSection)
 			if err != nil {
-				return nil, imapError("read fetched body failed", err, s.cfg.Password, secretFromOAuth(s.cfg.OAuth2))
+				return nil, imapError("read fetched body failed", err, imapSecrets(s.cfg)...)
 			}
 			fetched = append(fetched, FetchedMessage{UID: msg.Uid, Flags: append([]string(nil), msg.Flags...), Header: headerBytes, Body: bodyBytes, InternalDate: msg.InternalDate})
 		}
@@ -367,9 +367,16 @@ func imapError(stage string, err error, secrets ...string) error {
 	return fmt.Errorf("%w: %s: %w", ErrIMAP, stage, RedactError(err, secrets...))
 }
 
-func secretFromOAuth(tok *OAuth2Token) string {
-	if tok != nil {
-		return tok.AccessToken
+func imapSecrets(cfg IMAPConfig) []string {
+	secrets := []string{cfg.Password}
+	if cfg.OAuth2 == nil || cfg.OAuth2.AccessToken == "" {
+		return secrets
 	}
-	return ""
+	secrets = append(secrets, cfg.OAuth2.AccessToken)
+	username := cfg.OAuth2.Username
+	if username == "" {
+		username = cfg.Username
+	}
+	secrets = append(secrets, xoauth2Payload(username, cfg.OAuth2.AccessToken))
+	return secrets
 }

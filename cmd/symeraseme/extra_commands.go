@@ -85,10 +85,12 @@ func realRedactFileCommand() *cobra.Command {
 	return cmd
 }
 
+var pollInboxHandler = func() mcp.Handler { return mcp.ContractHandler() }
+
 func realPollInboxCommand() *cobra.Command {
 	argsMap := make(map[string]any)
 	cmd := &cobra.Command{Use: "poll-inbox", RunE: func(cmd *cobra.Command, args []string) error {
-		res, err := mcp.ContractHandler()(context.Background(), "poll_inbox", argsMap)
+		res, err := pollInboxHandler()(context.Background(), "poll_inbox", argsMap)
 		if err != nil {
 			return err
 		}
@@ -114,6 +116,10 @@ func realPollInboxCommand() *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 993, "IMAP server port")
 	var username string
 	cmd.Flags().StringVar(&username, "username", "", "IMAP username (email address)")
+	var oauth2AccessToken string
+	cmd.Flags().StringVar(&oauth2AccessToken, "oauth2-access-token", "", "IMAP OAuth2 access token or secret reference (never printed)")
+	var oauth2Username string
+	cmd.Flags().StringVar(&oauth2Username, "oauth2-username", "", "IMAP OAuth2 username (defaults to --username)")
 	var since_days int
 	cmd.Flags().IntVar(&since_days, "since-days", 14, "Fetch messages from the last N days")
 	cmd.Flags().IntVar(&since_days, "since", 14, "Fetch messages from the last N days")
@@ -132,6 +138,12 @@ func realPollInboxCommand() *cobra.Command {
 		}
 		if cmd.Flags().Changed("username") {
 			argsMap["username"] = username
+		}
+		if cmd.Flags().Changed("oauth2-access-token") {
+			argsMap["oauth2_access_token"] = oauth2AccessToken
+		}
+		if cmd.Flags().Changed("oauth2-username") {
+			argsMap["oauth2_username"] = oauth2Username
 		}
 		if cmd.Flags().Changed("since-days") || cmd.Flags().Changed("since") {
 			argsMap["since_days"] = since_days

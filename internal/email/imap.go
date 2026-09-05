@@ -114,13 +114,13 @@ func pollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWM
 	}
 	session, err := dialer.Dial(ctx, cfg)
 	if err != nil {
-		return nil, imapError("connect/login failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("connect/login failed", err, imapSecrets(cfg)...)
 	}
 	defer session.Close()
 
 	uidValidity, err := session.Select(ctx, cfg.Folder)
 	if err != nil {
-		return nil, imapError("folder select failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("folder select failed", err, imapSecrets(cfg)...)
 	}
 	storedValidity, lastUID, err := state.Get(ctx, cfg.Host, cfg.Folder)
 	if err != nil {
@@ -145,7 +145,7 @@ func pollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWM
 		uids, err = session.SearchUID(ctx, uidRange, sinceTime)
 	}
 	if err != nil {
-		return nil, imapError("UID search failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("UID search failed", err, imapSecrets(cfg)...)
 	}
 	if len(uids) == 0 {
 		if err := state.Set(ctx, cfg.Host, cfg.Folder, uidValidity, valueOr(lastUID, 0)); err != nil {
@@ -163,7 +163,7 @@ func pollInbox(ctx context.Context, cfg IMAPConfig, dialer IMAPDialer, state HWM
 	if err != nil {
 		// Do not advance the HWM on a failed fetch. Retrying the same UIDs is
 		// required to avoid permanent message loss.
-		return nil, imapError("UID fetch failed", err, cfg.Password, secretFromOAuth(cfg.OAuth2))
+		return nil, imapError("UID fetch failed", err, imapSecrets(cfg)...)
 	}
 	fetchedByUID := make(map[uint32]FetchedMessage, len(messages))
 	for _, fetched := range messages {

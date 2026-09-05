@@ -2,6 +2,7 @@ package mcp_test
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -232,5 +233,80 @@ func TestMCPContractHandlerRedactsSecretsOnError(t *testing.T) {
 
 	if strings.Contains(err.Error(), secretVal) {
 		t.Fatalf("secret leaked in error: %v", err)
+	}
+}
+
+func TestMCPContractHandlerOAuth2EnvironmentAndArgumentPrecedence(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	t.Setenv("IMAP_PASSWORD", "env-password")
+	t.Setenv("IMAP_USERNAME", "env-user@example.test")
+	t.Setenv("IMAP_OAUTH2_USERNAME", "env-oauth@example.test")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "env-access-token")
+
+	dialer := &fakeMCPDialer{session: &fakeMCPSession{uidValidity: 1}}
+	handler := mcp.ContractHandlerWithOptions(mcp.ContractHandlerOptions{IMAPDialer: dialer})
+	if _, err := handler(context.Background(), "poll_inbox", map[string]any{}); err != nil {
+		t.Fatalf("poll_inbox with env OAuth2 failed: %v", err)
+	}
+	if dialer.lastCfg.OAuth2 == nil || dialer.lastCfg.OAuth2.Username != "env-oauth@example.test" || dialer.lastCfg.OAuth2.AccessToken != "env-access-token" {
+		t.Fatalf("env OAuth2 config = %#v", dialer.lastCfg.OAuth2)
+	}
+
+	if _, err := handler(context.Background(), "poll_inbox", map[string]any{
+		"username":            "arg-user@example.test",
+		"password":            "arg-password",
+		"oauth2_username":     "arg-oauth@example.test",
+		"oauth2_access_token": "arg-access-token",
+	}); err != nil {
+		t.Fatalf("poll_inbox with OAuth2 arguments failed: %v", err)
+	}
+	if dialer.lastCfg.OAuth2 == nil || dialer.lastCfg.OAuth2.Username != "arg-oauth@example.test" || dialer.lastCfg.OAuth2.AccessToken != "arg-access-token" {
+		t.Fatalf("argument OAuth2 config = %#v", dialer.lastCfg.OAuth2)
+	}
+	if dialer.lastCfg.Password != "arg-password" {
+		t.Fatalf("password argument = %q, want argument value", dialer.lastCfg.Password)
+	}
+}
+
+func TestMCPContractHandlerRedactsOAuth2RawAndSASLSecrets(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	token := "oauth-access-token-raw"
+	username := "oauth@example.test"
+	payload := "user=" + username + "\x01auth=Bearer " + token + "\x01\x01"
+	dialer := &fakeMCPDialer{dialErr: errors.New("raw=" + token + " token64=" + base64.StdEncoding.EncodeToString([]byte(token)) + " sasl64=" + base64.StdEncoding.EncodeToString([]byte(payload)))}
+	handler := mcp.ContractHandlerWithOptions(mcp.ContractHandlerOptions{IMAPDialer: dialer})
+
+	_, err := handler(context.Background(), "poll_inbox", map[string]any{
+		"username":            username,
+		"oauth2_username":     username,
+		"oauth2_access_token": token,
+	})
+	if err == nil {
+		t.Fatal("expected OAuth2 dial error")
+	}
+	for _, secret := range []string{token, base64.StdEncoding.EncodeToString([]byte(token)), base64.StdEncoding.EncodeToString([]byte(payload))} {
+		if strings.Contains(err.Error(), secret) {
+			t.Fatalf("secret leaked in error: %q: %v", secret, err)
+		}
+	}
+}
+
+func TestMCPContractHandlerExplicitOAuth2ReferenceDoesNotUseEnvironmentFallback(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	t.Setenv("IMAP_PASSWORD", "env://MISSING_IMAP_PASSWORD")
+	t.Setenv("MISSING_IMAP_PASSWORD", "")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "different-environment-token")
+
+	dialer := &fakeMCPDialer{session: &fakeMCPSession{uidValidity: 1}}
+	handler := mcp.ContractHandlerWithOptions(mcp.ContractHandlerOptions{IMAPDialer: dialer})
+	_, err := handler(context.Background(), "poll_inbox", map[string]any{
+		"oauth2_username":     "arg-oauth@example.test",
+		"oauth2_access_token": "env://MISSING_ARGUMENT_OAUTH2_TOKEN",
+	})
+	if err == nil {
+		t.Fatal("unresolved explicit OAuth2 reference was accepted")
+	}
+	if strings.Contains(err.Error(), "different-environment-token") {
+		t.Fatalf("explicit OAuth2 reference fell back to environment token: %v", err)
 	}
 }

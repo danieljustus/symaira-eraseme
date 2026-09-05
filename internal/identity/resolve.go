@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/danieljustus/symaira-corekit/secretref"
-	"github.com/zalando/go-keyring"
 )
 
 // Vault URI prefixes. The order matters: the longer symvault:// is checked
@@ -45,7 +44,9 @@ var resolveSharedSecret = secretref.Resolve
 
 // keyringGet is indirected for tests so the EraseMe-specific final fallback
 // can be verified without reading the user's real keyring.
-var keyringGet = keyring.Get
+var keyringGet = func(service, username string) (string, error) {
+	return getKeyring().Get(service, username)
+}
 
 // SecretResolver is the EraseMe-specific configuration for ResolveSecret.
 // Shared URI parsing and subprocess timeouts are owned by corekit/secretref.

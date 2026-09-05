@@ -231,3 +231,26 @@ func TestCLIPollInboxWithFakeDialer(t *testing.T) {
 		t.Fatalf("unexpected HWM: val=%v, uid=%v, err=%v", v, u, err)
 	}
 }
+
+func TestCLIPollInboxOAuth2FlagsReachDialer(t *testing.T) {
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	t.Setenv("IMAP_PASSWORD", "password-fallback")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "")
+
+	dialer := &fakeCLIPollDialer{session: &fakeCLIPollSession{uidValidity: 1}}
+	originalHandler := pollInboxHandler
+	pollInboxHandler = func() mcp.Handler {
+		return mcp.ContractHandlerWithOptions(mcp.ContractHandlerOptions{IMAPDialer: dialer})
+	}
+	t.Cleanup(func() { pollInboxHandler = originalHandler })
+
+	if _, err := execute(t, "poll-inbox", "--host", "imap.cli.test", "--username", "cli-user@example.test", "--oauth2-username", "oauth-cli@example.test", "--oauth2-access-token", "cli-access-token"); err != nil {
+		t.Fatalf("poll-inbox CLI failed: %v", err)
+	}
+	if dialer.lastCfg.OAuth2 == nil || dialer.lastCfg.OAuth2.Username != "oauth-cli@example.test" || dialer.lastCfg.OAuth2.AccessToken != "cli-access-token" {
+		t.Fatalf("CLI OAuth2 config = %#v", dialer.lastCfg.OAuth2)
+	}
+	if dialer.lastCfg.Password != "password-fallback" {
+		t.Fatalf("password fallback = %q, want preserved fallback", dialer.lastCfg.Password)
+	}
+}
