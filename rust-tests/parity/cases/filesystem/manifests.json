@@ -1,0 +1,589 @@
+{
+  "schema": "symeraseme.go-oracle.filesystem.v1",
+  "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "toolchain": {
+    "go_version": "go version go1.26.6 darwin/arm64",
+    "go_root": "<GO_ROOT>",
+    "module_cache": "<PINNED_MODULE_CACHE>",
+    "goproxy": "off",
+    "goenv": "off",
+    "gowork": "off",
+    "gotoolchain": "go1.26.6",
+    "cache": "isolated",
+    "home": "isolated"
+  },
+  "normalization": {
+    "exact_runtime_root": {
+      "replacement": "<ORACLE_ROOT>",
+      "scope": [
+        "argv",
+        "stdout",
+        "stderr",
+        "manifest_roots",
+        "artifact_evidence"
+      ],
+      "rule": "replace only the exact unique mktemp-owned runtime root"
+    }
+  },
+  "cases": [
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "profile-init",
+      "operation": [
+        "--output",
+        "json",
+        "init-profile",
+        "--full-name",
+        "Oracle User",
+        "--email",
+        "oracle@example.invalid",
+        "--profile",
+        "<ORACLE_ROOT>/filesystem/profile-init/profile/identity.encrypted"
+      ],
+      "process": {
+        "argv": [
+          "--output",
+          "json",
+          "init-profile",
+          "--full-name",
+          "Oracle User",
+          "--email",
+          "oracle@example.invalid",
+          "--profile",
+          "<ORACLE_ROOT>/filesystem/profile-init/profile/identity.encrypted"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 99,
+        "stderr_bytes": 0,
+        "stdout_sha256": "8a3dc52b0727369532823e3d08ccb96484fbc14cd0d72b2d506aa3e2134c6f82",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "home": "isolated",
+        "data_dir": "isolated",
+        "profile_dir": "isolated"
+      },
+      "manifest_roots": {
+        "home": "<ORACLE_ROOT>/filesystem/profile-init/home",
+        "data_dir": "<ORACLE_ROOT>/filesystem/profile-init/data",
+        "profile_dir": "<ORACLE_ROOT>/filesystem/profile-init/profile"
+      },
+      "manifests": {
+        "home": [],
+        "data_dir": [],
+        "profile_dir": [
+          {
+            "path": "identity.encrypted",
+            "mode": "0o600",
+            "size_bytes": 293,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "AES-GCM random nonce; encrypted identity content intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
+          "path": "manifests.profile_dir[identity.encrypted].content",
+          "reason": "AES-GCM nonce is generated from crypto/rand",
+          "replacement": "declaration only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "consent-grant",
+      "operation": [
+        "grant",
+        "--command",
+        "execute",
+        "--ttl",
+        "3600"
+      ],
+      "process": {
+        "argv": [
+          "grant",
+          "--command",
+          "execute",
+          "--ttl",
+          "3600"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "consent_output_assertion": {
+          "token_bytes_absent": true,
+          "time_derived_bytes_absent": true,
+          "checked_output": "stdout/stderr"
+        },
+        "output_policy": "validated_no_token_or_time_derived_bytes; bytes_not_embedded"
+      },
+      "roots": {
+        "data_dir": "isolated"
+      },
+      "manifest_roots": {
+        "data_dir": "<ORACLE_ROOT>/filesystem/consent-grant/data"
+      },
+      "manifests": {
+        "data_dir": [
+          {
+            "path": "<CONSENT_TOKEN_FILE>",
+            "mode": "0o600",
+            "size_bytes": 101,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand consent token and wall-clock expiry; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
+          "path": "manifests.data_dir[<CONSENT_TOKEN_FILE>]",
+          "reason": "consent token, hashed filename, and expiry are random/time-derived",
+          "replacement": "path and content declarations only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "schedule-generate",
+      "operation": [
+        "generate-scheduler",
+        "--platform",
+        "cron",
+        "--output-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate/scheduler",
+        "--project-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate/project",
+        "--symeraseme-bin",
+        "<ORACLE_ROOT>/bin/symeraseme"
+      ],
+      "process": {
+        "argv": [
+          "generate-scheduler",
+          "--platform",
+          "cron",
+          "--output-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate/scheduler",
+          "--project-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate/project",
+          "--symeraseme-bin",
+          "<ORACLE_ROOT>/bin/symeraseme"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "scheduler_dir": "isolated"
+      },
+      "manifest_roots": {
+        "scheduler_dir": "<ORACLE_ROOT>/filesystem/schedule-generate/scheduler"
+      },
+      "manifests": {
+        "scheduler_dir": [
+          {
+            "path": "crontab.txt",
+            "mode": "0o644",
+            "size_bytes": 395,
+            "type": "file",
+            "sha256": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47"
+          },
+          {
+            "path": "install.sh",
+            "mode": "0o755",
+            "size_bytes": 499,
+            "type": "file",
+            "sha256": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c"
+          },
+          {
+            "path": "symeraseme-poll.sh",
+            "mode": "0o755",
+            "size_bytes": 376,
+            "type": "file",
+            "sha256": "e31636f05996b6fd51705ee23eb2b3a9e6a70d23d19d7089edce5771abbacce2"
+          },
+          {
+            "path": "symeraseme-rescan.sh",
+            "mode": "0o755",
+            "size_bytes": 289,
+            "type": "file",
+            "sha256": "e463dfaee47b54121fb4d303f0a3177c5bda6437a04b290ccbf97fd6571ccddf"
+          },
+          {
+            "path": "symeraseme-tick.sh",
+            "mode": "0o755",
+            "size_bytes": 277,
+            "type": "file",
+            "sha256": "11fe5f6e96d67cadac0a0e3e07a37f0c666da6ac5c2f23d3a03454e78561ba97"
+          },
+          {
+            "path": "uninstall.sh",
+            "mode": "0o755",
+            "size_bytes": 356,
+            "type": "file",
+            "sha256": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "report-generate",
+      "operation": [
+        "generate-report",
+        "--all-campaigns",
+        "--format",
+        "html",
+        "--output",
+        "<ORACLE_ROOT>/filesystem/report-generate/reports/report.html"
+      ],
+      "process": {
+        "argv": [
+          "generate-report",
+          "--all-campaigns",
+          "--format",
+          "html",
+          "--output",
+          "<ORACLE_ROOT>/filesystem/report-generate/reports/report.html"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "reports": "isolated"
+      },
+      "manifest_roots": {
+        "reports": "<ORACLE_ROOT>/filesystem/report-generate/reports"
+      },
+      "manifests": {
+        "reports": [
+          {
+            "path": "report.html",
+            "mode": "0o600",
+            "size_bytes": 2782,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "rendered report contains current UTC time; content intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
+          "path": "manifests.reports[report.html].content",
+          "reason": "report content is represented by normalized evidence below",
+          "replacement": "normalized content evidence"
+        }
+      ],
+      "artifact_evidence": {
+        "path": "reports/report.html",
+        "encoding": "base64",
+        "content_base64": "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAiPgo8dGl0bGU+Q2FtcGFpZ24gUmVwb3J0PC90aXRsZT4KPHN0eWxlPgoqLCAqOjpiZWZvcmUsICo6OmFmdGVyIHsgYm94LXNpemluZzogYm9yZGVyLWJveDsgbWFyZ2luOiAwOyBwYWRkaW5nOiAwOyB9Cjpyb290IHsKICAtLWJnOiAjZjVmN2ZhOwogIC0tY2FyZDogI2ZmZmZmZjsKICAtLXRleHQ6ICMxYTFhMmU7CiAgLS10ZXh0LW11dGVkOiAjNmI3MjgwOwogIC0tYm9yZGVyOiAjZTVlN2ViOwogIC0tZ3JlZW46ICMxMGI5ODE7CiAgLS15ZWxsb3c6ICNmNTllMGI7CiAgLS1yZWQ6ICNlZjQ0NDQ7CiAgLS1ibHVlOiAjM2I4MmY2OwogIC0tZ3JheTogIzljYTNhZjsKfQpAbWVkaWEgKHByZWZlcnMtY29sb3Itc2NoZW1lOiBkYXJrKSB7CiAgOnJvb3QgewogICAgLS1iZzogIzBmMTcyYTsKICAgIC0tY2FyZDogIzFlMjkzYjsKICAgIC0tdGV4dDogI2UyZThmMDsKICAgIC0tdGV4dC1tdXRlZDogIzk0YTNiODsKICAgIC0tYm9yZGVyOiAjMzM0MTU1OwogIH0KfQpib2R5IHsKICBmb250LWZhbWlseTogLWFwcGxlLXN5c3RlbSwgQmxpbmtNYWNTeXN0ZW1Gb250LCAiU2Vnb2UgVUkiLCBSb2JvdG8sIHNhbnMtc2VyaWY7CiAgYmFja2dyb3VuZDogdmFyKC0tYmcpOwogIGNvbG9yOiB2YXIoLS10ZXh0KTsKICBsaW5lLWhlaWdodDogMS41OwogIHBhZGRpbmc6IDIwcHg7Cn0KLmNvbnRhaW5lciB7IG1heC13aWR0aDogOTAwcHg7IG1hcmdpbjogMCBhdXRvOyB9CmgxIHsgZm9udC1zaXplOiAxLjRyZW07IG1hcmdpbi1ib3R0b206IDRweDsgfQouc3VidGl0bGUgeyBjb2xvcjogdmFyKC0tdGV4dC1tdXRlZCk7IGZvbnQtc2l6ZTogMC44cmVtOyBtYXJnaW4tYm90dG9tOiAyMHB4OyB9CmgyIHsgZm9udC1zaXplOiAxLjFyZW07IG1hcmdpbjogMjBweCAwIDEwcHg7IHBhZGRpbmctYm90dG9tOiA2cHg7IGJvcmRlci1ib3R0b206IDJweCBzb2xpZCB2YXIoLS1ib3JkZXIpOyB9CmgzIHsgZm9udC1zaXplOiAwLjk1cmVtOyBtYXJnaW46IDE0cHggMCA4cHg7IH0KCi5tZXRyaWNzLWdyaWQgeyBkaXNwbGF5OiBncmlkOyBncmlkLXRlbXBsYXRlLWNvbHVtbnM6IHJlcGVhdChhdXRvLWZpbGwsIG1pbm1heCgxODBweCwgMWZyKSk7IGdhcDogMTBweDsgbWFyZ2luLWJvdHRvbTogMTZweDsgfQoubWV0cmljLWNhcmQgewogIGJhY2tncm91bmQ6IHZhcigtLWNhcmQpOwogIGJvcmRlci1yYWRpdXM6IDZweDsKICBwYWRkaW5nOiAxMnB4IDE0cHg7CiAgYm94LXNoYWRvdzogMCAxcHggM3B4IHJnYmEoMCwwLDAsMC4wOCk7Cn0KLm1ldHJpYy1jYXJkIC52YWx1ZSB7IGZvbnQtc2l6ZTogMS4zcmVtOyBmb250LXdlaWdodDogNzAwOyB9Ci5tZXRyaWMtY2FyZCAubGFiZWwgeyBmb250LXNpemU6IDAuN3JlbTsgY29sb3I6IHZhcigtLXRleHQtbXV0ZWQpOyB0ZXh0LXRyYW5zZm9ybTogdXBwZXJjYXNlOyBsZXR0ZXItc3BhY2luZzogMC4wNGVtOyB9Ci5tZXRyaWMtY2FyZCAuY2hhbmdlIHsgZm9udC1zaXplOiAwLjc1cmVtOyB9Ci5jaGFuZ2UucG9zaXRpdmUgeyBjb2xvcjogdmFyKC0tZ3JlZW4pOyB9Ci5jaGFuZ2UubmVnYXRpdmUgeyBjb2xvcjogdmFyKC0tcmVkKTsgfQoKdGFibGUgeyB3aWR0aDogMTAwJTsgYm9yZGVyLWNvbGxhcHNlOiBjb2xsYXBzZTsgZm9udC1zaXplOiAwLjhyZW07IG1hcmdpbi1ib3R0b206IDEycHg7IH0KdGgsIHRkIHsgcGFkZGluZzogNnB4IDEwcHg7IHRleHQtYWxpZ246IGxlZnQ7IGJvcmRlci1ib3R0b206IDFweCBzb2xpZCB2YXIoLS1ib3JkZXIpOyB9CnRoIHsgZm9udC13ZWlnaHQ6IDYwMDsgY29sb3I6IHZhcigtLXRleHQtbXV0ZWQpOyBmb250LXNpemU6IDAuN3JlbTsgdGV4dC10cmFuc2Zvcm06IHVwcGVyY2FzZTsgbGV0dGVyLXNwYWNpbmc6IDAuMDRlbTsgfQp0cjpob3ZlciB7IGJhY2tncm91bmQ6IHJnYmEoMCwwLDAsMC4wMik7IH0KCi5mb290ZXIgeyBtYXJnaW4tdG9wOiAzMHB4OyBmb250LXNpemU6IDAuN3JlbTsgY29sb3I6IHZhcigtLXRleHQtbXV0ZWQpOyB0ZXh0LWFsaWduOiBjZW50ZXI7IH0KCi5lcnJvciB7IGJhY2tncm91bmQ6ICNmZWUyZTI7IGNvbG9yOiAjOTkxYjFiOyBwYWRkaW5nOiAxMnB4OyBib3JkZXItcmFkaXVzOiA2cHg7IG1hcmdpbi1ib3R0b206IDE2cHg7IH0KQG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyaykgewogIC5lcnJvciB7IGJhY2tncm91bmQ6ICM3ZjFkMWQ7IGNvbG9yOiAjZmNhNWE1OyB9Cn0KCi5lbXB0eSB7IGNvbG9yOiB2YXIoLS10ZXh0LW11dGVkKTsgZm9udC1zdHlsZTogaXRhbGljOyBmb250LXNpemU6IDAuODVyZW07IH0KPC9zdHlsZT4KPC9oZWFkPgo8Ym9keT4KPGRpdiBjbGFzcz0iY29udGFpbmVyIj4KICA8aDE+Q2FtcGFpZ24gUmVwb3J0PC9oMT4KICA8cCBjbGFzcz0ic3VidGl0bGUiPgogICAgR2VuZXJhdGVkIDxUSU1FU1RBTVA+CiAgICAmbWlkZG90OyAwIHJlcXVlc3RzCiAgICAmbWlkZG90OyAwIGNhbXBhaWduKHMpCiAgPC9wPgoKICA8ZGl2IGNsYXNzPSJlcnJvciI+Q2FtcGFpZ24gJiMzOTtub25lJiMzOTsgbm90IGZvdW5kIG9yIGVtcHR5PC9kaXY+CgogIDxkaXYgY2xhc3M9ImZvb3RlciI+CiAgICBHZW5lcmF0ZWQgYnkgU3ltYWlyYSBFcmFzZU1lICZtZGFzaDsgPFRJTUVTVEFNUD4KICA8L2Rpdj4KPC9kaXY+CjwvYm9keT4KPC9odG1sPg==",
+        "size_bytes": 2764,
+        "sha256": "260cbb3500271df1a06e6a336fc1f34bc4e3cecddb48c9d9cba2137e16d2318a",
+        "normalizations": [
+          {
+            "path": "artifact rendered timestamps",
+            "occurrences": 2,
+            "replacement": "<TIMESTAMP>"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "manual-task-create",
+      "operation": [
+        "run-web-form",
+        "virtual-minds-eu",
+        "--output",
+        "json"
+      ],
+      "process": {
+        "argv": [
+          "run-web-form",
+          "virtual-minds-eu",
+          "--output",
+          "json"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 395,
+        "stderr_bytes": 23,
+        "stdout_sha256": "aba7f4c3454ab986e951b50631d0d5c5721be01956ac4f18d24b9bc439c5d191",
+        "stderr_sha256": "e1c7e824b9777c42df47127691b1ab5f39fb2d46ec1e7cc1a6c0dafba1e45f97",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "data_dir": "isolated",
+        "db_dir": "isolated",
+        "home": "isolated"
+      },
+      "manifest_roots": {
+        "data_dir": "<ORACLE_ROOT>/filesystem/manual-task-create/data",
+        "db_dir": "<ORACLE_ROOT>/filesystem/manual-task-create/db",
+        "home": "<ORACLE_ROOT>/filesystem/manual-task-create/home"
+      },
+      "manifests": {
+        "data_dir": [],
+        "db_dir": [
+          {
+            "path": "symeraseme.db",
+            "mode": "0o644",
+            "size_bytes": 102400,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "operation-generated content contains wall-clock or private state; content intentionally not captured"
+            }
+          },
+          {
+            "path": "symeraseme.db.lock",
+            "mode": "0o600",
+            "size_bytes": 0,
+            "type": "file",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "home": []
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
+          "path": "manifests.db_dir[symeraseme.db].content",
+          "reason": "SQLite database contains wall-clock event/task data",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "manifests.data_dir[manual_tasks/**].content",
+          "reason": "manual evidence can contain private and time-derived data",
+          "replacement": "declaration only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1114,
+        "stderr_bytes": 0,
+        "stdout_sha256": "c63ae8a82c9cdad32853f4751b018193f7df659f56f09e1b7b45f5a08c23262d",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 299,
+            "type": "file",
+            "sha256": "5f658139cb4ae31aec3ece9661badc4a7fa2d56ebc8123cb7b93e9c07e440ba1"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 149,
+            "type": "file",
+            "sha256": "e462ce267d6bdb7f31598e619ae14a7b4fc0e15d447200197a96dadcfbb2b190"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "mcp-token-rotation",
+      "operation": [
+        "mcp",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "<PORT>"
+      ],
+      "process": {
+        "starts": 2,
+        "shutdown": "graceful",
+        "tokens_equal": false
+      },
+      "roots": {
+        "data_dir": "isolated"
+      },
+      "manifest_roots": {
+        "data_dir": "<ORACLE_ROOT>/filesystem/mcp-token-rotation/data"
+      },
+      "before": {
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "after": {
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "manifests": {
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "before.data_dir[*].content",
+          "reason": "server-issued crypto/rand MCP token; secret intentionally not captured",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "after.data_dir[*].content",
+          "reason": "server-issued crypto/rand MCP token; secret intentionally not captured",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "operation.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    }
+  ]
+}

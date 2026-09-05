@@ -1,0 +1,1149 @@
+{
+  "schema": "symeraseme.go-oracle.http.v1",
+  "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "toolchain": {
+    "go_version": "go version go1.26.6 darwin/arm64",
+    "go_root": "<GO_ROOT>",
+    "module_cache": "<PINNED_MODULE_CACHE>",
+    "goproxy": "off",
+    "goenv": "off",
+    "gowork": "off",
+    "gotoolchain": "go1.26.6",
+    "cache": "isolated",
+    "home": "isolated"
+  },
+  "normalization": {
+    "exact_runtime_root": {
+      "replacement": "<ORACLE_ROOT>",
+      "scope": [
+        "argv",
+        "stdout",
+        "stderr",
+        "manifest_roots",
+        "artifact_evidence"
+      ],
+      "rule": "replace only the exact unique mktemp-owned runtime root"
+    }
+  },
+  "server": {
+    "command": [
+      "mcp",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "<PORT>"
+    ],
+    "bind": "127.0.0.1",
+    "port": "<PORT>",
+    "auth_token": "<MCP_TOKEN>"
+  },
+  "cases": [
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "remote-bind-rejected",
+      "phase": "startup_policy",
+      "request": {
+        "host": "192.0.2.1",
+        "allow_remote": false,
+        "port": "<PORT>"
+      },
+      "process": {
+        "argv": [
+          "mcp",
+          "--host",
+          "192.0.2.1",
+          "--port",
+          "<PORT>"
+        ],
+        "exit_code": 1,
+        "stdout_base64": "",
+        "stderr_base64": "cmVmdXNpbmcgbm9uLWxvb3BiYWNrIE1DUCBiaW5kICIxOTIuMC4yLjEiIHdpdGhvdXQgLS1hbGxvdy1yZW1vdGUK",
+        "stdout_bytes": 0,
+        "stderr_bytes": 66
+      },
+      "expected_outcome": "remote_bind_rejected",
+      "observed_listening": false,
+      "nondeterministic_fields": [
+        {
+          "path": "request.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        },
+        {
+          "path": "process.argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "remote-bind-allowed-os-failure",
+      "phase": "startup_policy",
+      "request": {
+        "host": "192.0.2.1",
+        "allow_remote": true,
+        "port": "<PORT>"
+      },
+      "process": {
+        "argv": [
+          "mcp",
+          "--host",
+          "192.0.2.1",
+          "--port",
+          "<PORT>",
+          "--allow-remote"
+        ],
+        "exit_code": 1,
+        "stdout_base64": "",
+        "stderr_base64": "bGlzdGVuIHRjcCAxOTIuMC4yLjE6PFBPUlQ+OiBiaW5kOiBjYW4ndCBhc3NpZ24gcmVxdWVzdGVkIGFkZHJlc3MK",
+        "stdout_bytes": 0,
+        "stderr_bytes": 66
+      },
+      "expected_outcome": "remote_bind_allowed_os_bind_failed",
+      "observed_listening": false,
+      "nondeterministic_fields": [
+        {
+          "path": "request.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        },
+        {
+          "path": "process.argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "get-method",
+      "request": {
+        "method": "GET",
+        "path": "/",
+        "headers": [],
+        "body": {
+          "encoding": "base64",
+          "data": "",
+          "size_bytes": 0
+        }
+      },
+      "response": {
+        "status": 405,
+        "reason": "Method Not Allowed",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "78"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiUE9TVCByZXF1aXJlZCJ9LCJpZCI6bnVsbH0K",
+        "body_bytes": 78
+      },
+      "expected_outcome": "method_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "missing-auth",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 401,
+        "reason": "Unauthorized",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "77"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiVW5hdXRob3JpemVkIn0sImlkIjpudWxsfQo=",
+        "body_bytes": 77
+      },
+      "expected_outcome": "auth_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "wrong-auth",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer wrong"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 401,
+        "reason": "Unauthorized",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "77"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiVW5hdXRob3JpemVkIn0sImlkIjpudWxsfQo=",
+        "body_bytes": 77
+      },
+      "expected_outcome": "auth_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "malformed-scheme",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Basic x"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 401,
+        "reason": "Unauthorized",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "77"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiVW5hdXRob3JpemVkIn0sImlkIjpudWxsfQo=",
+        "body_bytes": 77
+      },
+      "expected_outcome": "auth_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "duplicate-auth",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 401,
+        "reason": "Unauthorized",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "77"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiVW5hdXRob3JpemVkIn0sImlkIjpudWxsfQo=",
+        "body_bytes": 77
+      },
+      "expected_outcome": "auth_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "bad-origin",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ],
+          [
+            "Origin",
+            "https://evil.example"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 403,
+        "reason": "Forbidden",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "93"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiRm9yYmlkZGVuOiBkaXNhbGxvd2VkIE9yaWdpbiJ9LCJpZCI6bnVsbH0K",
+        "body_bytes": 93
+      },
+      "expected_outcome": "origin_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "missing-content-type",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "wrong-content-type",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "text/plain"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "host-localhost",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "host-untrusted",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "valid-initialize",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ],
+          [
+            "Origin",
+            "http://localhost:3000"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "valid-no-origin",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "malformed-json",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "ew==",
+          "size_bytes": 1
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "76"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNzAwLCJtZXNzYWdlIjoicGFyc2UgZXJyb3IifSwiaWQiOm51bGx9Cg==",
+        "body_bytes": 76
+      },
+      "expected_outcome": "parse_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "notification",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoidG9vbHMvbGlzdCIsInBhcmFtcyI6e319",
+          "size_bytes": 51
+        }
+      },
+      "response": {
+        "status": 204,
+        "reason": "No Content",
+        "headers": [
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ]
+        ],
+        "body_base64": "",
+        "body_bytes": 0
+      },
+      "expected_outcome": "notification",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "batch-and-notification",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "W3sianNvbnJwYyI6IjIuMCIsImlkIjoyLCJtZXRob2QiOiJ0b29scy9saXN0IiwicGFyYW1zIjp7fX0seyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoidG9vbHMvbGlzdCIsInBhcmFtcyI6e319XQ==",
+          "size_bytes": 112
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Transfer-Encoding",
+            "chunked"
+          ]
+        ],
+        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsInJlc3VsdCI6eyJ0b29scyI6W3siZGVzY3JpcHRpb24iOiJSZWFkcyBhIGZpbGUsIHJ1bnMgUElJIHJlZGFjdGlvbiBvbiBpdCwgYW5kIHJldHVybnMgdGhlIHJlZGFjdGVkIGNvbnRlbnQuIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJwYXRoIjp7ImRlc2NyaXB0aW9uIjoiVGhlIHBhdGggdG8gdGhlIGZpbGUgdG8gcmVkYWN0IiwidHlwZSI6InN0cmluZyJ9fSwicmVxdWlyZWQiOlsicGF0aCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJyZWRhY3RfZmlsZSJ9LHsiZGVzY3JpcHRpb24iOiJDcmVhdGUgYSByZW1vdmFsIGNhbXBhaWduIHBsYW4gc2VsZWN0aW5nIGJyb2tlcnMgYnkganVyaXNkaWN0aW9uIGFuZCBsYXcuIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJjYW1wYWlnbl9pZCI6eyJkZXNjcmlwdGlvbiI6IkNhbXBhaWduIGlkZW50aWZpZXIiLCJ0eXBlIjoic3RyaW5nIn0sImNhdGVnb3J5Ijp7ImRlc2NyaXB0aW9uIjoiRmlsdGVyIGJ5IGJyb2tlciBjYXRlZ29yeSAoZS5nLiBwZW9wbGUtc2VhcmNoLCBtYXJrZXRpbmcpIiwidHlwZSI6InN0cmluZyJ9LCJpbmNsdWRlX2luYWN0aXZlIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IkluY2x1ZGUgZGVwcmVjYXRlZCwgbWVyZ2VkLCBhbmQgb3V0LW9mLWJ1c2luZXNzIGJyb2tlcnMiLCJ0eXBlIjoiYm9vbGVhbiJ9LCJqdXJpc2RpY3Rpb24iOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkganVyaXNkaWN0aW9uIChlLmcuIEdEUFIsIENDUEEpIiwidHlwZSI6InN0cmluZyJ9LCJsYXciOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkgc3BlY2lmaWMgbGF3IiwidHlwZSI6InN0cmluZyJ9LCJtYXhfYnJva2VycyI6eyJkZWZhdWx0IjozMCwiZGVzY3JpcHRpb24iOiJNYXhpbXVtIG51bWJlciBvZiBicm9rZXJzIHRvIGluY2x1ZGUiLCJ0eXBlIjoiaW50ZWdlciJ9LCJwcmlvcml0eSI6eyJkZXNjcmlwdGlvbiI6IkZpbHRlciBieSBwcmlvcml0eSBsZXZlbCIsInR5cGUiOiJzdHJpbmcifSwic3RhdHVzIjp7ImRlZmF1bHQiOiJhY3RpdmUiLCJkZXNjcmlwdGlvbiI6IkJyb2tlciBsaWZlY3ljbGUgc3RhdHVzIGZpbHRlciAoZGVmYXVsdHMgdG8gYWN0aXZlKSIsImVudW0iOlsiYWN0aXZlIiwiZGVwcmVjYXRlZCIsIm1lcmdlZCIsIm91dC1vZi1idXNpbmVzcyJdLCJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJjYW1wYWlnbl9pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJwbGFuX2NyZWF0ZSJ9LHsiZGVzY3JpcHRpb24iOiJTaG93IHRoZSBjdXJyZW50IHJlbW92YWwgY2FtcGFpZ24gcGxhbi4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImNhbXBhaWduX2lkIjp7ImRlc2NyaXB0aW9uIjoiQ2FtcGFpZ24gaWRlbnRpZmllciIsInR5cGUiOiJzdHJpbmcifSwic3RhdHVzIjp7ImRlc2NyaXB0aW9uIjoiRmlsdGVyIGJ5IHJlcXVlc3Qgc3RhdHVzIiwidHlwZSI6InN0cmluZyJ9fSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoicGxhbl9zaG93In0seyJkZXNjcmlwdGlvbiI6IkV4ZWN1dGUgYSByZW1vdmFsIGNhbXBhaWduIGJ5IHNlbmRpbmcgb3B0LW91dCByZXF1ZXN0cyBpbiBiYXRjaGVzLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsiYWNjb3VudCI6eyJkZXNjcmlwdGlvbiI6IkVtYWlsIGFjY291bnQgbmFtZSAoaGltYWxheWEgYmFja2VuZCkiLCJ0eXBlIjoic3RyaW5nIn0sImJhY2tlbmQiOnsiZGVzY3JpcHRpb24iOiJFbWFpbCBiYWNrZW5kIHRvIHVzZSIsImVudW0iOlsic210cCIsImhpbWFsYXlhIl0sInR5cGUiOiJzdHJpbmcifSwiYmF0Y2hfc2l6ZSI6eyJkZWZhdWx0Ijo1LCJkZXNjcmlwdGlvbiI6Ik51bWJlciBvZiByZXF1ZXN0cyBwZXIgYmF0Y2giLCJ0eXBlIjoiaW50ZWdlciJ9LCJjYW1wYWlnbl9pZCI6eyJkZXNjcmlwdGlvbiI6IkNhbXBhaWduIGlkZW50aWZpZXIiLCJ0eXBlIjoic3RyaW5nIn0sImNvbmN1cnJlbnQiOnsiZGVmYXVsdCI6ZmFsc2UsImRlc2NyaXB0aW9uIjoiVXNlIGNvbmN1cnJlbnQgZXhlY3V0aW9uIiwidHlwZSI6ImJvb2xlYW4ifSwiY29uc2VudF9maWxlIjp7ImRlc2NyaXB0aW9uIjoiUGF0aCB0byBjb25zZW50IHRva2VuIGZpbGUiLCJ0eXBlIjoic3RyaW5nIn0sImNvbnNlbnRfdG9rZW4iOnsiZGVzY3JpcHRpb24iOiJDb25zZW50IHRva2VuIHZhbHVlIGZvciBkZXN0cnVjdGl2ZSBvcGVyYXRpb25zIiwidHlwZSI6InN0cmluZyJ9LCJkcnlfcnVuIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IlByZXZpZXcgYWN0aW9ucyB3aXRob3V0IHNlbmRpbmciLCJ0eXBlIjoiYm9vbGVhbiJ9LCJ3b3JrZXJzIjp7ImRlZmF1bHQiOjMsImRlc2NyaXB0aW9uIjoiTnVtYmVyIG9mIGNvbmN1cnJlbnQgd29ya2VycyIsInR5cGUiOiJpbnRlZ2VyIn19LCJyZXF1aXJlZCI6WyJjYW1wYWlnbl9pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJleGVjdXRlIn0seyJkZXNjcmlwdGlvbiI6IlBvbGwgSU1BUCBpbmJveCBmb3IgYnJva2VyIHJlcGxpZXMgYW5kIG1hdGNoIHRoZW0gdG8gcmVtb3ZhbCByZXF1ZXN0cy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImNhbXBhaWduX2lkIjp7ImRlc2NyaXB0aW9uIjoiRmlsdGVyIGJ5IGNhbXBhaWduIiwidHlwZSI6InN0cmluZyJ9LCJmb2xkZXJzIjp7ImRlc2NyaXB0aW9uIjoiSU1BUCBmb2xkZXJzIHRvIHBvbGwgKGRlZmF1bHQ6IFsnSU5CT1gnXSkuIERlZHVwbGljYXRlcyBieSBNZXNzYWdlLUlEIGFjcm9zcyBmb2xkZXJzLiIsIml0ZW1zIjp7InR5cGUiOiJzdHJpbmcifSwidHlwZSI6ImFycmF5In0sImhvc3QiOnsiZGVzY3JpcHRpb24iOiJJTUFQIHNlcnZlciBob3N0bmFtZSIsInR5cGUiOiJzdHJpbmcifSwib2F1dGgyX2FjY2Vzc190b2tlbiI6eyJkZXNjcmlwdGlvbiI6Ik9BdXRoMiBhY2Nlc3MgdG9rZW4gb3Igc2VjcmV0IHJlZmVyZW5jZTsgcmVzb2x2ZWQgc2VydmVyLXNpZGUgYW5kIG5ldmVyIHJldHVybmVkIiwidHlwZSI6InN0cmluZyJ9LCJvYXV0aDJfdXNlcm5hbWUiOnsiZGVzY3JpcHRpb24iOiJPQXV0aDIgdXNlcm5hbWUgKGRlZmF1bHRzIHRvIHRoZSBJTUFQIHVzZXJuYW1lKSIsInR5cGUiOiJzdHJpbmcifSwicG9ydCI6eyJkZXNjcmlwdGlvbiI6IklNQVAgc2VydmVyIHBvcnQiLCJ0eXBlIjoiaW50ZWdlciJ9LCJzaW5jZV9kYXlzIjp7ImRlc2NyaXB0aW9uIjoiRmV0Y2ggbWVzc2FnZXMgZnJvbSB0aGUgbGFzdCBOIGRheXMiLCJ0eXBlIjoiaW50ZWdlciJ9LCJzc2wiOnsiZGVmYXVsdCI6dHJ1ZSwiZGVzY3JpcHRpb24iOiJVc2UgU1NML1RMUyBjb25uZWN0aW9uIiwidHlwZSI6ImJvb2xlYW4ifSwidXNlcm5hbWUiOnsiZGVzY3JpcHRpb24iOiJJTUFQIHVzZXJuYW1lIChlbWFpbCBhZGRyZXNzKSIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbImhvc3QiLCJwb3J0IiwidXNlcm5hbWUiLCJzaW5jZV9kYXlzIiwic3NsIl0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6InBvbGxfaW5ib3gifSx7ImRlc2NyaXB0aW9uIjoiQ2xhc3NpZnkgYSBicm9rZXIgcmVwbHkgdXNpbmcgTExNIChlLmcuIGNvbmZpcm1hdGlvbiwgcmVqZWN0aW9uLCBpbmZvIHJlcXVlc3QpLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsibW9kZWwiOnsiZGVzY3JpcHRpb24iOiJMTE0gbW9kZWwgb3ZlcnJpZGUiLCJ0eXBlIjoic3RyaW5nIn0sInByb3ZpZGVyIjp7ImRlc2NyaXB0aW9uIjoiTExNIHByb3ZpZGVyIG92ZXJyaWRlIiwidHlwZSI6InN0cmluZyJ9LCJyZXF1ZXN0X2lkIjp7ImRlc2NyaXB0aW9uIjoiUmVtb3ZhbCByZXF1ZXN0IElEIiwidHlwZSI6ImludGVnZXIifSwic2F2ZSI6eyJkZWZhdWx0Ijp0cnVlLCJkZXNjcmlwdGlvbiI6IlNhdmUgY2xhc3NpZmljYXRpb24gdG8gZGF0YWJhc2UiLCJ0eXBlIjoiYm9vbGVhbiJ9fSwicmVxdWlyZWQiOlsicmVxdWVzdF9pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJjbGFzc2lmeV9yZXBseSJ9LHsiZGVzY3JpcHRpb24iOiJHZW5lcmF0ZSBhIGp1cmlzZGljdGlvbi1hd2FyZSByZWJ1dHRhbCBmb3IgYSBicm9rZXIgcmVqZWN0aW9uLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsibW9kZWwiOnsiZGVzY3JpcHRpb24iOiJMTE0gbW9kZWwgb3ZlcnJpZGUiLCJ0eXBlIjoic3RyaW5nIn0sInByb3ZpZGVyIjp7ImRlc2NyaXB0aW9uIjoiTExNIHByb3ZpZGVyIG92ZXJyaWRlIiwidHlwZSI6InN0cmluZyJ9LCJyZXF1ZXN0X2lkIjp7ImRlc2NyaXB0aW9uIjoiUmVtb3ZhbCByZXF1ZXN0IElEIiwidHlwZSI6ImludGVnZXIifSwic2F2ZSI6eyJkZWZhdWx0Ijp0cnVlLCJkZXNjcmlwdGlvbiI6IlNhdmUgcmVidXR0YWwgZXZlbnQgdG8gZGF0YWJhc2UiLCJ0eXBlIjoiYm9vbGVhbiJ9fSwicmVxdWlyZWQiOlsicmVxdWVzdF9pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJnZW5lcmF0ZV9yZWJ1dHRhbCJ9LHsiZGVzY3JpcHRpb24iOiJHZW5lcmF0ZSBhbiBIVE1MIGRhc2hib2FyZCB3aXRoIGNhbXBhaWduIGFuYWx5dGljcy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImF1dG9fb3BlbiI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJPcGVuIGRhc2hib2FyZCBpbiBicm93c2VyIGFmdGVyIGdlbmVyYXRpb24iLCJ0eXBlIjoiYm9vbGVhbiJ9LCJhdXRvX3JlZnJlc2giOnsiZGVmYXVsdCI6MCwiZGVzY3JpcHRpb24iOiJBdXRvLXJlZnJlc2ggaW50ZXJ2YWwgaW4gc2Vjb25kcyAoMCA9IGRpc2FibGVkKSIsInR5cGUiOiJpbnRlZ2VyIn0sIm91dHB1dCI6eyJkZWZhdWx0IjoicmVwb3J0Lmh0bWwiLCJkZXNjcmlwdGlvbiI6Ik91dHB1dCBmaWxlIHBhdGgiLCJ0eXBlIjoic3RyaW5nIn19LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJnZW5lcmF0ZV9kYXNoYm9hcmQifSx7ImRlc2NyaXB0aW9uIjoiR2VuZXJhdGUgYSBjYW1wYWlnbiByZXBvcnQgaW4gSFRNTCwgSlNPTiwgb3IgQ1NWIGZvcm1hdC4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImFsbF9jYW1wYWlnbnMiOnsiZGVmYXVsdCI6ZmFsc2UsImRlc2NyaXB0aW9uIjoiSW5jbHVkZSBhbGwgY2FtcGFpZ25zIiwidHlwZSI6ImJvb2xlYW4ifSwiY2FtcGFpZ25faWQiOnsiZGVzY3JpcHRpb24iOiJDYW1wYWlnbiBpZGVudGlmaWVyIiwidHlwZSI6InN0cmluZyJ9LCJmb3JtYXQiOnsiZGVmYXVsdCI6Imh0bWwiLCJkZXNjcmlwdGlvbiI6IlJlcG9ydCBmb3JtYXQiLCJlbnVtIjpbImh0bWwiLCJqc29uIiwiY3N2Il0sInR5cGUiOiJzdHJpbmcifSwib3V0cHV0Ijp7ImRlc2NyaXB0aW9uIjoiT3V0cHV0IGZpbGUgcGF0aCIsInR5cGUiOiJzdHJpbmcifX0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6ImdlbmVyYXRlX3JlcG9ydCJ9LHsiZGVzY3JpcHRpb24iOiJMaXN0IG1hbnVhbCBmYWxsYmFjayB0YXNrcyBmb3IgZm9ybXMgdGhhdCBjb3VsZCBub3QgYmUgYXV0b21hdGVkLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsicmVxdWVzdF9pZCI6eyJkZXNjcmlwdGlvbiI6IkZpbHRlciBieSByZXF1ZXN0IElEIiwidHlwZSI6ImludGVnZXIifSwic3RhdHVzIjp7ImRlc2NyaXB0aW9uIjoiRmlsdGVyIGJ5IHRhc2sgc3RhdHVzIiwidHlwZSI6InN0cmluZyJ9fSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoibWFudWFsX3Rhc2tzX2xpc3QifSx7ImRlc2NyaXB0aW9uIjoiU2hvdyBkZXRhaWxzIG9mIGEgc3BlY2lmaWMgbWFudWFsIHRhc2suIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJ0YXNrX2lkIjp7ImRlc2NyaXB0aW9uIjoiTWFudWFsIHRhc2sgSUQiLCJ0eXBlIjoiaW50ZWdlciJ9fSwicmVxdWlyZWQiOlsidGFza19pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJtYW51YWxfdGFza3Nfc2hvdyJ9LHsiZGVzY3JpcHRpb24iOiJNYXJrIGEgbWFudWFsIHRhc2sgYXMgY29tcGxldGVkLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsibm90ZXMiOnsiZGVmYXVsdCI6IiIsImRlc2NyaXB0aW9uIjoiQ29tcGxldGlvbiBub3RlcyIsInR5cGUiOiJzdHJpbmcifSwidGFza19pZCI6eyJkZXNjcmlwdGlvbiI6Ik1hbnVhbCB0YXNrIElEIiwidHlwZSI6ImludGVnZXIifX0sInJlcXVpcmVkIjpbInRhc2tfaWQiXSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoibWFudWFsX3Rhc2tzX2NvbXBsZXRlIn0seyJkZXNjcmlwdGlvbiI6IlJlbW92ZSBvbGQgc2NyZWVuc2hvdCBhbmQgSFRNTCBzbmFwc2hvdCBmaWxlcyBmcm9tIG1hbnVhbCB0YXNrcy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImRyeV9ydW4iOnsiZGVmYXVsdCI6ZmFsc2UsImRlc2NyaXB0aW9uIjoiUHJldmlldyB3aXRob3V0IGRlbGV0aW5nIiwidHlwZSI6ImJvb2xlYW4ifX0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6Im1hbnVhbF90YXNrc19jbGVhbnVwIn0seyJkZXNjcmlwdGlvbiI6IkdlbmVyYXRlIGNyb24sIGxhdW5jaGQsIG9yIHN5c3RlbWQgc2NoZWR1bGVyIGNvbmZpZ3VyYXRpb25zLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsiZHJ5X3J1biI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJQcmV2aWV3IHdpdGhvdXQgd3JpdGluZyBmaWxlcyIsInR5cGUiOiJib29sZWFuIn0sIm91dHB1dF9kaXIiOnsiZGVmYXVsdCI6Ii4vc2NoZWR1bGVzIiwiZGVzY3JpcHRpb24iOiJPdXRwdXQgZGlyZWN0b3J5IGZvciBjb25maWcgZmlsZXMiLCJ0eXBlIjoic3RyaW5nIn0sInBsYXRmb3JtIjp7ImRlc2NyaXB0aW9uIjoiVGFyZ2V0IHBsYXRmb3JtIChhdXRvLWRldGVjdGVkIGlmIG9taXR0ZWQpIiwiZW51bSI6WyJjcm9uIiwibGF1bmNoZCIsInN5c3RlbWQiXSwidHlwZSI6InN0cmluZyJ9LCJwb2xsX2hvdXJzIjp7ImRlZmF1bHQiOiI4LDEyLDE2LDIwIiwiZGVzY3JpcHRpb24iOiJDb21tYS1zZXBhcmF0ZWQgaG91cnMgZm9yIGluYm94IHBvbGxpbmciLCJ0eXBlIjoic3RyaW5nIn0sInByb2plY3RfZGlyIjp7ImRlc2NyaXB0aW9uIjoiUHJvamVjdCBkaXJlY3RvcnkgcGF0aCIsInR5cGUiOiJzdHJpbmcifSwic3ltZXJhc2VtZV9iaW4iOnsiZGVzY3JpcHRpb24iOiJQYXRoIHRvIHN5bWVyYXNlbWUgYmluYXJ5IiwidHlwZSI6InN0cmluZyJ9LCJ0aWNrX2hvdXIiOnsiZGVmYXVsdCI6MTAsImRlc2NyaXB0aW9uIjoiSG91ciB0byBydW4gdGljayBlbmdpbmUiLCJ0eXBlIjoiaW50ZWdlciJ9LCJ0aWNrX21pbnV0ZSI6eyJkZWZhdWx0IjowLCJkZXNjcmlwdGlvbiI6Ik1pbnV0ZSB0byBydW4gdGljayBlbmdpbmUiLCJ0eXBlIjoiaW50ZWdlciJ9LCJ2ZW52X2FjdGl2YXRlIjp7ImRlc2NyaXB0aW9uIjoiVmlydHVhbGVudiBhY3RpdmF0ZSBzY3JpcHQgcGF0aCIsInR5cGUiOiJzdHJpbmcifX0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6ImdlbmVyYXRlX3NjaGVkdWxlciJ9LHsiZGVzY3JpcHRpb24iOiJHZW5lcmF0ZSBhbmQgaW5zdGFsbCBzY2hlZHVsZXIgY29uZmlndXJhdGlvbnMuIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJkcnlfcnVuIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IlByZXZpZXcgd2l0aG91dCBpbnN0YWxsaW5nIiwidHlwZSI6ImJvb2xlYW4ifSwicGxhdGZvcm0iOnsiZGVzY3JpcHRpb24iOiJUYXJnZXQgcGxhdGZvcm0gKGF1dG8tZGV0ZWN0ZWQgaWYgb21pdHRlZCkiLCJlbnVtIjpbImNyb24iLCJsYXVuY2hkIiwic3lzdGVtZCJdLCJ0eXBlIjoic3RyaW5nIn0sInRpY2tfaG91ciI6eyJkZWZhdWx0IjoxMCwiZGVzY3JpcHRpb24iOiJIb3VyIHRvIHJ1biB0aWNrIGVuZ2luZSIsInR5cGUiOiJpbnRlZ2VyIn0sInRpY2tfbWludXRlIjp7ImRlZmF1bHQiOjAsImRlc2NyaXB0aW9uIjoiTWludXRlIHRvIHJ1biB0aWNrIGVuZ2luZSIsInR5cGUiOiJpbnRlZ2VyIn19LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJzY2hlZHVsZV9pbnN0YWxsIn0seyJkZXNjcmlwdGlvbiI6IkdldCBpbnN0cnVjdGlvbnMgZm9yIHVuaW5zdGFsbGluZyBzY2hlZHVsZXIgY29uZmlndXJhdGlvbnMuIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJwbGF0Zm9ybSI6eyJkZXNjcmlwdGlvbiI6IlRhcmdldCBwbGF0Zm9ybSAoYXV0by1kZXRlY3RlZCBpZiBvbWl0dGVkKSIsImVudW0iOlsiY3JvbiIsImxhdW5jaGQiLCJzeXN0ZW1kIl0sInR5cGUiOiJzdHJpbmcifX0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6InNjaGVkdWxlX3VuaW5zdGFsbCJ9LHsiZGVzY3JpcHRpb24iOiJDaGVjayBzdGF0dXMgb2YgaW5zdGFsbGVkIHNjaGVkdWxlciBzZXJ2aWNlcy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7InBsYXRmb3JtIjp7ImRlc2NyaXB0aW9uIjoiVGFyZ2V0IHBsYXRmb3JtIChhdXRvLWRldGVjdGVkIGlmIG9taXR0ZWQpIiwiZW51bSI6WyJjcm9uIiwibGF1bmNoZCIsInN5c3RlbWQiXSwidHlwZSI6InN0cmluZyJ9fSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoic2NoZWR1bGVfc3RhdHVzIn0seyJkZXNjcmlwdGlvbiI6IlZhbGlkYXRlIGJyb2tlciByZWdpc3RyeSBZQU1MIGZpbGVzIGFnYWluc3QgdGhlIEpTT04gU2NoZW1hIGFuZCBQeWRhbnRpYyBtb2RlbC4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7InJlZ2lzdHJ5X2RpciI6eyJkZXNjcmlwdGlvbiI6IlBhdGggdG8gcmVnaXN0cnkgZGlyZWN0b3J5IiwidHlwZSI6InN0cmluZyJ9fSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoidmFsaWRhdGUifSx7ImRlc2NyaXB0aW9uIjoiUnVuIGEgYnJva2VyIHdlYi1mb3JtIHByZXZpZXcgb3IgY3JlYXRlIGEgZHVyYWJsZSBtYW51YWwgdGFzayB3aGVuIG5vIGJyb3dzZXIgZXhlY3V0b3IgaXMgaW5qZWN0ZWQuIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJicm9rZXJfaWQiOnsiZGVzY3JpcHRpb24iOiJCcm9rZXIgaWRlbnRpZmllciIsInR5cGUiOiJzdHJpbmcifSwiZHJ5X3J1biI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJQcmV2aWV3IHdpdGhvdXQgcnVubmluZyIsInR5cGUiOiJib29sZWFuIn0sImhlYWRlZCI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJSdW4gYnJvd3NlciBpbiBoZWFkZWQgbW9kZSAodmlzaWJsZSkiLCJ0eXBlIjoiYm9vbGVhbiJ9LCJyZXF1ZXN0X2lkIjp7ImRlc2NyaXB0aW9uIjoiT3B0aW9uYWwgcmVtb3ZhbCByZXF1ZXN0IElEIHVzZWQgdG8gbGluayB0aGUgZHVyYWJsZSBtYW51YWwgZmFsbGJhY2sgdGFzayIsInR5cGUiOiJpbnRlZ2VyIn0sInNjcmVlbnNob3RfZGlyIjp7ImRlc2NyaXB0aW9uIjoiRGlyZWN0b3J5IGZvciBzY3JlZW5zaG90cyIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbImJyb2tlcl9pZCJdLCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJydW5fd2ViX2Zvcm0ifSx7ImRlc2NyaXB0aW9uIjoiQXV0by1jbGljayBjb25maXJtYXRpb24gbGlua3Mgd2hlbiBhbiBleGVjdXRvciBpcyBpbmplY3RlZDsgb3RoZXJ3aXNlIGNyZWF0ZSBhIGxpbmtlZCBkdXJhYmxlIG1hbnVhbC1jb25maXJtYXRpb24gdGFzayB3aXRob3V0IGNsYWltaW5nIGEgY2xpY2suIiwiaW5wdXRTY2hlbWEiOnsicHJvcGVydGllcyI6eyJkcnlfcnVuIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IlByZXZpZXcgd2l0aG91dCBjbGlja2luZyIsInR5cGUiOiJib29sZWFuIn0sImhlYWRlZCI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJSdW4gYnJvd3NlciBpbiBoZWFkZWQgbW9kZSIsInR5cGUiOiJib29sZWFuIn0sInJlcXVlc3RfaWQiOnsiZGVzY3JpcHRpb24iOiJSZW1vdmFsIHJlcXVlc3QgSUQiLCJ0eXBlIjoiaW50ZWdlciJ9LCJzY3JlZW5zaG90X2RpciI6eyJkZXNjcmlwdGlvbiI6IkRpcmVjdG9yeSBmb3Igc2NyZWVuc2hvdHMiLCJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJyZXF1ZXN0X2lkIl0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6ImF1dG9fY29uZmlybSJ9LHsiZGVzY3JpcHRpb24iOiJSZXR1cm4gYWdncmVnYXRlZCBkYXNoYm9hcmQgZGF0YTogY2FtcGFpZ25zLCByZXF1ZXN0IHN0YXR1cyBjb3VudHMsIGJyb2tlciBzdGF0dXMsIGFuZCByZWNlbnQgZXZlbnRzLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnt9LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJnZXRfZGFzaGJvYXJkX2RhdGEifSx7ImRlc2NyaXB0aW9uIjoiUmV0dXJuIHBhZ2luYXRlZCByZW1vdmFsIHJlcXVlc3RzIHdpdGggb3B0aW9uYWwgZmlsdGVycy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImJyb2tlcl9pZCI6eyJkZXNjcmlwdGlvbiI6IkZpbHRlciBieSBicm9rZXIgaWRlbnRpZmllciIsInR5cGUiOiJzdHJpbmcifSwiY2FtcGFpZ25faWQiOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkgY2FtcGFpZ24gaWRlbnRpZmllciIsInR5cGUiOiJzdHJpbmcifSwicGFnZSI6eyJkZWZhdWx0IjoxLCJkZXNjcmlwdGlvbiI6IjEtaW5kZXhlZCBwYWdlIG51bWJlciIsInR5cGUiOiJpbnRlZ2VyIn0sInBhZ2Vfc2l6ZSI6eyJkZWZhdWx0IjoxMDAsImRlc2NyaXB0aW9uIjoiTWF4aW11bSBpdGVtcyBwZXIgcGFnZSIsInR5cGUiOiJpbnRlZ2VyIn0sInN0YXR1cyI6eyJkZXNjcmlwdGlvbiI6IkZpbHRlciBieSByZXF1ZXN0IHN0YXR1cyIsInR5cGUiOiJzdHJpbmcifX0sInR5cGUiOiJvYmplY3QifSwibmFtZSI6Imxpc3RfcmVxdWVzdHMifSx7ImRlc2NyaXB0aW9uIjoiUmV0dXJuIHRoZSBldmVudCBoaXN0b3J5IGZvciBhIHJlbW92YWwgcmVxdWVzdC4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImFmdGVyX2V2ZW50X2lkIjp7ImRlc2NyaXB0aW9uIjoiT25seSByZXR1cm4gZXZlbnRzIHdpdGggSUQgZ3JlYXRlciB0aGFuIHRoaXMiLCJ0eXBlIjoiaW50ZWdlciJ9LCJyZXF1ZXN0X2lkIjp7ImRlc2NyaXB0aW9uIjoiUmVtb3ZhbCByZXF1ZXN0IElEIiwidHlwZSI6ImludGVnZXIifX0sInJlcXVpcmVkIjpbInJlcXVlc3RfaWQiXSwidHlwZSI6Im9iamVjdCJ9LCJuYW1lIjoiZ2V0X2V2ZW50cyJ9LHsiZGVzY3JpcHRpb24iOiJSZXR1cm4gZmlsdGVyZWQgYnJva2VycyBmcm9tIHRoZSByZWdpc3RyeS4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImNhdGVnb3J5Ijp7ImRlc2NyaXB0aW9uIjoiRmlsdGVyIGJ5IGJyb2tlciBjYXRlZ29yeSIsInR5cGUiOiJzdHJpbmcifSwiaW5jbHVkZV9kaXNhYmxlZCI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJJbmNsdWRlIGRpc2FibGVkIGJyb2tlcnMiLCJ0eXBlIjoiYm9vbGVhbiJ9LCJpbmNsdWRlX2luYWN0aXZlIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IkluY2x1ZGUgZGVwcmVjYXRlZCwgbWVyZ2VkLCBhbmQgb3V0LW9mLWJ1c2luZXNzIGJyb2tlcnMiLCJ0eXBlIjoiYm9vbGVhbiJ9LCJqdXJpc2RpY3Rpb24iOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkganVyaXNkaWN0aW9uIChlLmcuIEdEUFIsIENDUEEpIiwidHlwZSI6InN0cmluZyJ9LCJsYXciOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkgc3BlY2lmaWMgbGF3IiwidHlwZSI6InN0cmluZyJ9LCJwcmlvcml0eSI6eyJkZXNjcmlwdGlvbiI6IkZpbHRlciBieSBwcmlvcml0eSBsZXZlbCIsInR5cGUiOiJzdHJpbmcifSwic3RhdHVzIjp7ImRlZmF1bHQiOiJhY3RpdmUiLCJkZXNjcmlwdGlvbiI6IkJyb2tlciBsaWZlY3ljbGUgc3RhdHVzIGZpbHRlciAoZGVmYXVsdHMgdG8gYWN0aXZlKSIsImVudW0iOlsiYWN0aXZlIiwiZGVwcmVjYXRlZCIsIm1lcmdlZCIsIm91dC1vZi1idXNpbmVzcyJdLCJ0eXBlIjoic3RyaW5nIn19LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJsaXN0X2Jyb2tlcnMifSx7ImRlc2NyaXB0aW9uIjoiUmV0dXJuIHVwY29taW5nIGRlYWRsaW5lcyBhbmQgdGljayBhY3Rpb25zIGZvciB0aGUgbmV4dCBOIHdlZWtzLiIsImlucHV0U2NoZW1hIjp7InByb3BlcnRpZXMiOnsiY2FtcGFpZ25faWQiOnsiZGVzY3JpcHRpb24iOiJGaWx0ZXIgYnkgY2FtcGFpZ24gaWRlbnRpZmllciIsInR5cGUiOiJzdHJpbmcifSwid2Vla3MiOnsiZGVmYXVsdCI6NCwiZGVzY3JpcHRpb24iOiJOdW1iZXIgb2Ygd2Vla3MgdG8gbG9vayBhaGVhZCIsInR5cGUiOiJpbnRlZ2VyIn19LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJnZXRfY2FsZW5kYXIifSx7ImRlc2NyaXB0aW9uIjoiSXNzdWUsIHJldm9rZSwgb3IgbGlzdCBjb25zZW50IHRva2VucyBmb3IgZGVzdHJ1Y3RpdmUgb3BlcmF0aW9ucy4iLCJpbnB1dFNjaGVtYSI6eyJwcm9wZXJ0aWVzIjp7ImNvbW1hbmQiOnsiZGVmYXVsdCI6ImV4ZWN1dGUiLCJkZXNjcmlwdGlvbiI6IkNvbW1hbmQgdG8gZ3JhbnQgY29uc2VudCBmb3IiLCJ0eXBlIjoic3RyaW5nIn0sImRyeV9ydW4iOnsiZGVmYXVsdCI6ZmFsc2UsImRlc2NyaXB0aW9uIjoiUHJldmlldyB3aXRob3V0IGlzc3Vpbmcgb3IgcmV2b2tpbmciLCJ0eXBlIjoiYm9vbGVhbiJ9LCJsaXN0X3Rva2VucyI6eyJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJMaXN0IGFsbCBhY3RpdmUgdG9rZW5zIiwidHlwZSI6ImJvb2xlYW4ifSwicmV2b2tlIjp7ImRlc2NyaXB0aW9uIjoiVG9rZW4gdmFsdWUgdG8gcmV2b2tlIiwidHlwZSI6InN0cmluZyJ9LCJyZXZva2VfYWxsIjp7ImRlZmF1bHQiOmZhbHNlLCJkZXNjcmlwdGlvbiI6IlJldm9rZSBhbGwgYWN0aXZlIHRva2VucyIsInR5cGUiOiJib29sZWFuIn0sInR0bCI6eyJkZWZhdWx0Ijo4NjQwMCwiZGVzY3JpcHRpb24iOiJUb2tlbiB0aW1lLXRvLWxpdmUgaW4gc2Vjb25kcyIsInR5cGUiOiJpbnRlZ2VyIn19LCJ0eXBlIjoib2JqZWN0In0sIm5hbWUiOiJncmFudCJ9XX0sImlkIjoyfV0K",
+        "body_bytes": 12765
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "body-at-limit",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "literal_byte",
+          "byte": "x",
+          "size_bytes": 5242880,
+          "sha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "76"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNzAwLCJtZXNzYWdlIjoicGFyc2UgZXJyb3IifSwiaWQiOm51bGx9Cg==",
+        "body_bytes": 76
+      },
+      "expected_outcome": "parse_error",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "oversized-body",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "literal_byte",
+          "byte": "x",
+          "size_bytes": 5242881,
+          "sha256": "0dfe91c1523276cb57173a627b31502cba3d10d606ad32573494f6e134d8b1b0"
+        }
+      },
+      "response": {
+        "status": 413,
+        "reason": "Request Entity Too Large",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "80"
+          ],
+          [
+            "Connection",
+            "close"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiSW52YWxpZCBSZXF1ZXN0In0sImlkIjpudWxsfQo=",
+        "body_bytes": 80
+      },
+      "expected_outcome": "body_too_large",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    }
+  ]
+}

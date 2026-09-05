@@ -183,20 +183,24 @@ verbatim: `make fmt-check test lint vet build coverage`.
 - Modify/test: constant-time MCP bearer comparison required by #817
 
 **Steps:**
-- [ ] Execute each issue in its own worktree/branch/PR; serialize overlapping
+- [x] Execute each issue in its own worktree/branch/PR; serialize overlapping
       storage/crypto changes and base each successor on freshly merged main.
-- [ ] Implement the issue exactly as accepted, independently of Rust.
-- [ ] Notarize and staple the signed app before creating the DMG so its offline
+- [x] Implement the issue exactly as accepted, independently of Rust.
+- [x] Notarize and staple the signed app before creating the DMG so its offline
       ticket survives packaging.
-- [ ] Sign the DMG container after creation and before notarization.
-- [ ] Fail closed when required signing/notarization credentials or stapling
+- [x] Sign the DMG container after creation and before notarization.
+- [x] Fail closed when required signing/notarization credentials or stapling
       fail.
 - [ ] Verify nested binary, app bundle and DMG separately with `codesign`,
       `stapler validate` and the appropriate `spctl` assessment.
 - [ ] Redownload the uploaded release asset and verify the published bytes,
       rather than trusting only the workspace copy.
-- [ ] Run a packaging dry run and the issue-specific tests.
+- [x] Run a packaging dry run and the issue-specific tests.
 - [ ] Merge #794 before Phase 9 begins; rebase the migration work on it.
+
+The #794 implementation merged in #820. Its credentialed RC redownload and
+signature/notarization proof remains an explicit external gate before Phase 9;
+it does not block Task 0.4's corrected-Go oracle capture.
 - [x] Resolve #795 before generating crypto vectors: correct the documented
       lengths to 17 bytes without changing header bytes, and pin the raw bytes
       plus lengths in a Go test.
@@ -239,15 +243,15 @@ before Tasks 6.3 and 7.2, and `APP-000` plus `REL-008 = PASS` before Phase 9.
 - Create: `rust-tests/parity/fixtures/README.md`
 
 **Steps:**
-- [ ] Enumerate the full Cobra command tree recursively, including hidden
+- [x] Enumerate the full Cobra command tree recursively, including hidden
       aliases, positional forms and every flag/default.
-- [ ] Capture help, success, parse failure, missing argument and unknown flag
+- [x] Capture help, success, parse failure, missing argument and unknown flag
       behavior with raw stdout/stderr and exit status.
-- [ ] Add raw MCP initialize/list/call/batch/notification/error cases.
-- [ ] Add HTTP method/auth/origin/body-size cases.
-- [ ] Use isolated HOME/XDG/TMPDIR, UTC, fixed locale and fake network servers.
-- [ ] Never read the developer keychain, profile or real database.
-- [ ] Mark every nondeterministic field explicitly; do not normalize broadly.
+- [x] Add raw MCP initialize/list/call/batch/notification/error cases.
+- [x] Add HTTP method/auth/origin/body-size cases.
+- [x] Use isolated HOME/XDG/TMPDIR, UTC, fixed locale and fake network servers.
+- [x] Never read the developer keychain, profile or real database.
+- [x] Mark every nondeterministic field explicitly; do not normalize broadly.
 
 **Verification:** generator reproduces committed fixtures from the pinned Go
 revision with no diff.
