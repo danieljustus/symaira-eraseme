@@ -136,7 +136,7 @@ func AutoConfirm(ctx context.Context, opts Options) (Result, error) {
 }
 
 func clickerError(err error, currentURL string) string {
-	message := err.Error()
+	message := URLPattern.ReplaceAllString(err.Error(), "[REDACTED-URL]")
 	lower := strings.ToLower(message)
 	kind := "Error"
 	if strings.Contains(message, "Timeout") || strings.Contains(lower, "timed out") {
@@ -145,7 +145,11 @@ func clickerError(err error, currentURL string) string {
 	if strings.Contains(lower, "net::") {
 		kind = "Network error"
 	}
-	return kind + " at " + currentURL + ": " + truncate(message, 200)
+	location := "broker host"
+	if parsed, parseErr := url.Parse(currentURL); parseErr == nil && parsed.Hostname() != "" {
+		location = parsed.Hostname()
+	}
+	return kind + " at " + location + ": " + truncate(message, 200)
 }
 func truncate(value string, limit int) string {
 	if len(value) <= limit {

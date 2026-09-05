@@ -186,6 +186,7 @@ func summarizeClickedConfirmation(result *confirmation.Result) {
 		result.ScreenshotAfterSHA256 = digestString(result.ScreenshotAfter)
 		result.ScreenshotAfter = ""
 	}
+	result.Error = confirmation.URLPattern.ReplaceAllString(result.Error, "[REDACTED-URL]")
 	result.Error = manualtasks.RedactIdentityValues(result.Error, nil)
 }
 
