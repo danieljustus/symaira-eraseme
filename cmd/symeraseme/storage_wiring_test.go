@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
+	"github.com/danieljustus/symaira-eraseme/internal/identity"
 )
 
 func TestCLIDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
@@ -21,7 +22,8 @@ func TestCLIDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
 
 	master := bytes.Repeat([]byte{0x29}, 32)
 	t.Setenv("SYMERASEME_IDENTITY_MASTER_KEY", hex.EncodeToString(master))
-	eventstore.SetMasterKeyProvider(nil)
+	identity.Shutdown()
+	t.Cleanup(identity.Shutdown)
 
 	store, err := dataStore()
 	if err != nil {
@@ -45,7 +47,9 @@ func TestCLIDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
 	}
 
 	// The same production resolver must support an explicit downgrade without
-	// losing the campaign written during the encrypted run.
+	// losing the campaign written during the encrypted run. Clear process-local
+	// key state first to model a fresh CLI process.
+	identity.Shutdown()
 	t.Setenv("SYMERASEME_ENCRYPT_DB", "false")
 	store, err = dataStore()
 	if err != nil {
@@ -67,46 +71,6 @@ func TestCLIDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
 	}
 	if bytes.HasPrefix(raw, eventstore.EncMagicV3) {
 		t.Fatal("encryption-disabled database retained encrypted header")
-	}
-}
-
-func TestConfigShowCommandOutputsStorage(t *testing.T) {
-	home := t.TempDir()
-	dataDir := filepath.Join(home, "data")
-	dbDir := filepath.Join(home, "db")
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg-config"))
-	t.Setenv("SYMERASEME_DATA_DIR", dataDir)
-	t.Setenv("SYMERASEME_DB_DIR", dbDir)
-	t.Setenv("SYMERASEME_ENCRYPT_DB", "true")
-
-	// Test text output
-	buf := new(bytes.Buffer)
-	cmd := configShowCommand()
-	cmd.SetOut(buf)
-	cmd.SetArgs([]string{"--output", "text"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("config show text error: %v", err)
-	}
-	out := buf.String()
-	if !bytes.Contains([]byte(out), []byte("db_dir="+dbDir)) {
-		t.Fatalf("config show output missing db_dir: %s", out)
-	}
-	if !bytes.Contains([]byte(out), []byte("encrypt_db=true")) {
-		t.Fatalf("config show output missing encrypt_db=true: %s", out)
-	}
-
-	// Test json output
-	buf.Reset()
-	cmd = configShowCommand()
-	cmd.SetOut(buf)
-	cmd.SetArgs([]string{"--output", "json"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("config show json error: %v", err)
-	}
-	out = buf.String()
-	if !bytes.Contains([]byte(out), []byte(`"encrypt_db":true`)) {
-		t.Fatalf("config show json output missing encrypt_db: %s", out)
 	}
 }
 

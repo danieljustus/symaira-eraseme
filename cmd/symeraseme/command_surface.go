@@ -50,14 +50,10 @@ func configShowCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			storage, err := config.ResolveStorage()
-			if err != nil {
-				return err
-			}
 			if output == "json" {
-				return writeJSON(cmd, map[string]any{"success": true, "config": cfg, "storage": storage})
+				return writeJSON(cmd, map[string]any{"success": true, "config": cfg})
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "data_dir=%s\ndb_dir=%s\ndb_path=%s\nencrypt_db=%t\nport=%d\n", storage.DataDir, storage.DBDir, storage.DBPath, storage.Encrypt, cfg.Port)
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "data_dir=%s\nport=%d\n", cfg.DataDir, cfg.Port)
 			return err
 		},
 	}

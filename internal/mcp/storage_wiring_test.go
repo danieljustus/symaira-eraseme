@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
+	"github.com/danieljustus/symaira-eraseme/internal/identity"
 )
 
 func TestMCPDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
@@ -22,7 +23,8 @@ func TestMCPDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
 
 	master := bytes.Repeat([]byte{0x33}, 32)
 	t.Setenv("SYMERASEME_IDENTITY_MASTER_KEY", hex.EncodeToString(master))
-	eventstore.SetMasterKeyProvider(nil)
+	identity.Shutdown()
+	t.Cleanup(identity.Shutdown)
 
 	store, err := dataStore()
 	if err != nil {
@@ -45,7 +47,8 @@ func TestMCPDataStoreUsesConfiguredDatabaseAndEncryption(t *testing.T) {
 		t.Fatalf("configured encrypted database has header %q", raw[:min(len(raw), len(eventstore.EncMagicV3))])
 	}
 
-	// Downgrade to plaintext
+	// Downgrade to plaintext from a fresh-process key state.
+	identity.Shutdown()
 	t.Setenv("SYMERASEME_ENCRYPT_DB", "false")
 	store, err = dataStore()
 	if err != nil {
@@ -81,7 +84,8 @@ func TestMCPContractHandlerHonorsConfiguredStorage(t *testing.T) {
 
 	master := bytes.Repeat([]byte{0x44}, 32)
 	t.Setenv("SYMERASEME_IDENTITY_MASTER_KEY", hex.EncodeToString(master))
-	eventstore.SetMasterKeyProvider(nil)
+	identity.Shutdown()
+	t.Cleanup(identity.Shutdown)
 
 	ctx := context.Background()
 	handler := ContractHandler()
@@ -103,25 +107,5 @@ func TestMCPContractHandlerHonorsConfiguredStorage(t *testing.T) {
 	}
 	if !bytes.HasPrefix(raw, eventstore.EncMagicV3) {
 		t.Fatalf("expected encrypted header on db file, got %q", raw[:min(len(raw), len(eventstore.EncMagicV3))])
-	}
-}
-
-func TestMCPLoadRegistryHonorsConfigResources(t *testing.T) {
-	resDir := t.TempDir()
-	t.Setenv("SYMERASEME_RESOURCES", resDir)
-	manifest := `schema_version = "1.0.0"
-manifest_version = "1.0.0"
-generated_at = "2026-01-01T00:00:00Z"
-broker_count = 0
-`
-	if err := os.WriteFile(filepath.Join(resDir, "manifest.toml"), []byte(manifest), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	brokers, err := loadRegistry()
-	if err != nil {
-		t.Fatalf("loadRegistry with custom empty dir error: %v", err)
-	}
-	if len(brokers) != 0 {
-		t.Fatalf("brokers len = %d, want 0", len(brokers))
 	}
 }

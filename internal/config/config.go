@@ -21,7 +21,6 @@ type Config struct {
 	Encrypt     bool   `json:"encrypt_db"`
 	Port        int    `json:"port"`
 	AllowRemote bool   `json:"allow_remote"`
-	Resources   string `json:"resources"`
 }
 
 // Storage is the validated, absolute storage configuration used by the
@@ -70,9 +69,8 @@ func (l *Loader) Load() (*Config, error) {
 func (l *Loader) Reload() (*Config, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.cached, l.cachedErr = loadConfig()
-	l.loaded = true
-	return cloneConfig(l.cached), l.cachedErr
+	cfg, err := loadConfig()
+	return cloneConfig(cfg), err
 }
 
 // ResetCache clears the loader's cached snapshot.
@@ -94,7 +92,7 @@ func cloneConfig(cfg *Config) *Config {
 
 var allowedKeys = map[string]bool{
 	"data_dir": true, "db_dir": true, "encrypt_db": true,
-	"port": true, "allow_remote": true, "resources": true,
+	"port": true, "allow_remote": true,
 }
 
 func loadConfig() (*Config, error) {
@@ -151,12 +149,11 @@ func mergeFile(cfg *Config, path string) error {
 
 func applyEnv(cfg *Config) error {
 	for key, target := range map[string]string{
-		"SYMERASEME_DATA_DIR":         "data_dir",
-		"SYMERASEME_DB_DIR":           "db_dir",
-		"SYMERASEME_ENCRYPT_DB":       "encrypt_db",
-		"SYMERASEME_MCP_PORT":         "port",
-		"SYMERASEME_MCP_ALLOW_REMOTE": "allow_remote",
-		"SYMERASEME_RESOURCES":        "resources",
+		"SYMERASEME_DATA_DIR":     "data_dir",
+		"SYMERASEME_DB_DIR":       "db_dir",
+		"SYMERASEME_ENCRYPT_DB":   "encrypt_db",
+		"SYMERASEME_PORT":         "port",
+		"SYMERASEME_ALLOW_REMOTE": "allow_remote",
 	} {
 		value, ok := os.LookupEnv(key)
 		if !ok || value == "" {
@@ -171,7 +168,7 @@ func applyEnv(cfg *Config) error {
 
 func applyValue(cfg *Config, key string, value any) error {
 	switch key {
-	case "data_dir", "db_dir", "resources":
+	case "data_dir", "db_dir":
 		text, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("must be a string, got %T", value)
@@ -184,8 +181,6 @@ func applyValue(cfg *Config, key string, value any) error {
 			cfg.DataDir = text
 		case "db_dir":
 			cfg.DBDir = text
-		case "resources":
-			cfg.Resources = text
 		}
 	case "encrypt_db", "allow_remote":
 		parsed, err := parseBool(value)

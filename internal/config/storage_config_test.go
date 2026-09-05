@@ -190,6 +190,13 @@ func TestLoaderReloadAndReset(t *testing.T) {
 	if cfgReload.Port != 8080 {
 		t.Fatalf("reload port = %d, want 8080", cfgReload.Port)
 	}
+	cfgCached, err = loader.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfgCached.Port != 8000 {
+		t.Fatalf("reload changed cached port = %d, want 8000", cfgCached.Port)
+	}
 
 	// ResetCache
 	loader.ResetCache()
@@ -199,5 +206,19 @@ func TestLoaderReloadAndReset(t *testing.T) {
 	}
 	if cfgReset.Port != 8080 {
 		t.Fatalf("reset load port = %d, want 8080", cfgReset.Port)
+	}
+}
+
+func TestConfigPreservesConfigkitEnvironmentNames(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SYMERASEME_PORT", "9123")
+	t.Setenv("SYMERASEME_ALLOW_REMOTE", "true")
+	cfg, err := Load().Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Port != 9123 || !cfg.AllowRemote {
+		t.Fatalf("configkit-compatible env mapping changed: %+v", cfg)
 	}
 }

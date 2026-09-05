@@ -22,7 +22,6 @@ import (
 
 	"github.com/danieljustus/symaira-corekit/logkit"
 
-	"github.com/danieljustus/symaira-eraseme/internal/config"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 	"github.com/danieljustus/symaira-eraseme/internal/migration"
@@ -73,18 +72,6 @@ func newMCPServerCommand(use string, deprecated bool) *cobra.Command {
 		Short:  "Run the MCP JSON-RPC interface",
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !cmd.Flags().Changed("port") || !cmd.Flags().Changed("allow-remote") {
-				cfg, err := config.Load().Load()
-				if err != nil {
-					return err
-				}
-				if !cmd.Flags().Changed("port") {
-					port = cfg.Port
-				}
-				if !cmd.Flags().Changed("allow-remote") {
-					allowRemote = cfg.AllowRemote
-				}
-			}
 			if deprecated {
 				cmd.PrintErrln("symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.")
 			}

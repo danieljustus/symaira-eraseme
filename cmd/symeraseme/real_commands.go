@@ -41,7 +41,14 @@ func dataStore() (*eventstore.Store, error) {
 	if err := os.Chmod(storage.DBDir, 0o700); err != nil {
 		return nil, fmt.Errorf("eventstore: secure database directory: %w", err)
 	}
-	if storage.Encrypt {
+	requiresKey := storage.Encrypt
+	if !requiresKey {
+		requiresKey, err = eventstore.IsEncrypted(storage.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("eventstore: inspect database encryption: %w", err)
+		}
+	}
+	if requiresKey {
 		// Read-only bootstrap resolves an operator-provided/keyring key but
 		// never mints one as a side effect of opening storage.
 		if err := identity.BootstrapReadOnly(); err != nil {
@@ -52,12 +59,8 @@ func dataStore() (*eventstore.Store, error) {
 }
 
 func loadRegistry() ([]registry.Broker, error) {
-	cfg, err := config.Load().Load()
-	if err != nil {
-		return nil, err
-	}
-	if cfg.Resources != "" {
-		return registry.LoadFromDir(cfg.Resources)
+	if dir := os.Getenv("SYMERASEME_RESOURCES"); dir != "" {
+		return registry.LoadFromDir(dir)
 	}
 	return registry.LoadEmbedded()
 }
