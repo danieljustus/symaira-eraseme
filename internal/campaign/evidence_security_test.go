@@ -11,6 +11,8 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 )
 
+const sentinelUnknownEvidence = "unknown-executor-field-with-sensitive-data"
+
 func TestExecuteWebFormSummarizesSensitiveEvidence(t *testing.T) {
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
@@ -34,7 +36,8 @@ func TestExecuteWebFormSummarizesSensitiveEvidence(t *testing.T) {
 			"success": false, "code": string(CodeFieldNotFound), "reason": "unknown_field",
 			"url": "https://broker.test/form?email=" + email, "error": "failed for " + email,
 			"page_text": page, "html_snapshot": page, "form_fields": map[string]string{"email": email},
-			"evidence": map[string]any{"page_text": page, "post_submit_screenshot": []byte(screenshot)},
+			"evidence":    map[string]any{"page_text": page, "post_submit_screenshot": []byte(screenshot)},
+			"future_blob": sentinelUnknownEvidence,
 		}
 	}})
 	if err != nil {
@@ -49,7 +52,7 @@ func TestExecuteWebFormSummarizesSensitiveEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(encoded)
-	for _, forbidden := range []string{email, page, screenshot} {
+	for _, forbidden := range []string{email, page, screenshot, sentinelUnknownEvidence} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("sensitive evidence leaked: %s", text)
 		}
