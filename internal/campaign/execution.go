@@ -201,22 +201,28 @@ func sanitizeWebFormResult(raw map[string]any, profile *identity.Profile) map[st
 	result := make(map[string]any, len(raw))
 	for key, value := range raw {
 		switch key {
+		case "success", "dry_run":
+			if flag, ok := value.(bool); ok {
+				result[key] = flag
+			}
+		case "task_id", "step_index", "total_steps", "duration_ms":
+			result[key] = value
+		case "code", "reason", "status", "broker_id", "broker_name", "step", "failed_field":
+			result[key] = boundedRedacted(stringValue(value), profile, 200)
+		case "instructions", "error", "hint":
+			result[key] = boundedRedacted(stringValue(value), profile, 500)
+		case "skipped_fields":
+			result[key] = value
+		case "url", "final_url":
+			result[key] = boundedRedacted(stringValue(value), profile, 2048)
 		case "evidence":
 			if evidence := sanitizeEvidenceMap(value, profile); len(evidence) > 0 {
 				result[key] = evidence
 			}
-		case "page_text", "html_snapshot", "screenshot_path", "pre_submit_screenshot", "post_submit_screenshot":
-			continue
-		case "form_fields":
-			// Field values are identity data. Names alone are not required by the
-			// campaign result or event contracts, so omit the object entirely.
-			continue
-		case "error", "hint":
-			result[key] = boundedRedacted(stringValue(value), profile, 500)
-		case "url", "final_url":
-			result[key] = boundedRedacted(stringValue(value), profile, 2048)
 		default:
-			result[key] = value
+			// Unknown executor fields are untrusted and may contain raw browser or
+			// identity data. The result boundary is an allowlist, not passthrough.
+			continue
 		}
 	}
 	return result
