@@ -48,10 +48,10 @@
     "required_review_fields": ["reviewed_sha", "commands", "results", "findings", "verdict", "reviewer_lane"]
   },
   "execution_state": {
-    "last_completed": "0.3",
-    "active_tasks": ["0.4"],
-    "merged_tasks": ["0.1", "0.2", "0.3"],
-    "active_worktrees": {"0.4": ".worktrees/task-0.4-go-oracle-fixtures"},
+    "last_completed": "0.4",
+    "active_tasks": ["1.1"],
+    "merged_tasks": ["0.1", "0.2", "0.3", "0.4"],
+    "active_worktrees": {},
     "blocked_by": [],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },

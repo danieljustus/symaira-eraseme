@@ -12,26 +12,31 @@ modified and no developer profile, keychain, database, or credential is read.
   and every child include canonical path, public ordering, hidden/deprecated
   status, aliases, positional `Use` forms, validator function, local,
   inherited, persistent, and effective flags with defaults and order.
-- `../cases/cli/behavior.json` — raw CLI help for every command, plus parser
-  unknown-flag/missing-argument cases and successful read-only/completion cases.
+- `../cases/cli/behavior.json` — raw CLI help and unknown-flag behavior for
+  every command, root version/unknown-command cases, true parser-level missing
+  arguments, and one isolated operational invocation for every executable leaf.
+  Each operational record classifies success versus deterministic backend error.
 - `../cases/mcp/transcript.jsonl` — one fresh `mcp --stdio` process per raw
   JSON-RPC transcript, including 26 schema-valid `tools/call` requests (one
-  per pinned tool), batch/notification/legacy/error cases. `stdout_base64`
-  and `stderr_base64` preserve bytes; only explicitly listed current-time
-  result fields use a marker.
-- `../cases/http/transcript.json` — local loopback MCP HTTP method, strict
-  bearer-auth, origin, malformed-body, notification, and 5 MiB ceiling cases.
+  per pinned tool), ID/params, multi-frame, truncation, shutdown,
+  batch/notification/legacy/error cases. `stdout_base64` and `stderr_base64`
+  preserve bytes; only explicitly listed current-time result fields use a marker.
+- `../cases/http/transcript.json` — MCP HTTP bind/remote policy, method,
+  content type, Host, strict bearer auth, origin, malformed body, notification,
+  exact 5 MiB boundary, and oversized-body cases using local listeners only.
 - `../cases/filesystem/manifests.json` — isolated HOME/XDG/TMPDIR side-effect
-  manifest, including file modes and an explicit declaration for the random
-  MCP token without recording its secret.
+  manifests for profile creation, consent, scheduler/report output, durable
+  manual fallback, migration, and MCP-token rotation. Random/private bytes are
+  represented only by path-specific nondeterminism declarations.
 
 All records carry the oracle commit and a schema identifier. Fixture generation
 uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
 root, an empty private executable search path, empty credential variables, and
 no timestamps or host identity. The only
-nondeterministic values are marked in `nondeterministic_fields`: the ephemeral
-HTTP port, server-issued MCP token, HTTP `Date` header, and current-time fields
-in the status/dashboard/calendar CLI and MCP results. The Go `net/http`
+nondeterministic values are marked in `nondeterministic_fields`: ephemeral
+ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
+time-derived durable artifacts, HTTP `Date`, and current-time fields in the
+status/dashboard/calendar/report CLI and MCP results. The Go `net/http`
 `Date` response header is replaced only at `response.headers.Date` with
 `<HTTP_DATE>` and is likewise declared as nondeterministic. The oversized HTTP
 request is represented by its exact byte length and SHA-256, not stored

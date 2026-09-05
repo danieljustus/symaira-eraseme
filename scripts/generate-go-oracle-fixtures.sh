@@ -155,6 +155,12 @@ func TestOracleSurface(t *testing.T) {
         t.Fatal("ORACLE_SURFACE_OUTPUT is required")
     }
     root := newRootCommand()
+    // Cobra creates implicit help/version flags during initialization. Do this
+    // explicitly before serializing metadata so the oracle freezes the same
+    // surface that Execute() exposes to users.
+    root.InitDefaultHelpFlag()
+    root.InitDefaultHelpCmd()
+    root.InitDefaultVersionFlag()
     document := struct {
         Commit string          `json:"commit"`
         Root   oracleCommand   `json:"root"`
@@ -177,6 +183,9 @@ EOF
         GOWORK=off CGO_ENABLED=0 go test -count=1 ./cmd/symeraseme -run '^TestOracleSurface$'
 )
 
+# Remove every prior generated artifact before writing the new corpus. This
+# prevents stale cases from surviving a reduced or changed command surface.
+rm -rf "${OUT_DIR}/cases" "${OUT_DIR}/fixtures/README.md"
 mkdir -p "${OUT_DIR}/cases/cli" "${OUT_DIR}/cases/mcp" "${OUT_DIR}/cases/http" \
     "${OUT_DIR}/cases/filesystem" "${OUT_DIR}/fixtures"
 
@@ -235,6 +244,9 @@ base_env = {
     "ANTHROPIC_API_KEY": "",
     "CAPSOLVER_API_KEY": "",
     "SYMERASEME_MASTER_KEY": "",
+    # Deterministic test-only key source; this prevents InitProfile from
+    # consulting or mutating the host OS keychain.
+    "SYMERASEME_IDENTITY_MASTER_KEY": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
     "SYMERASEME_CONSENT": "",
     "SYMERASEME_CONSENT_FILE": "",
 }
@@ -276,12 +288,43 @@ def run_process(argv, stdin=b"", case_name="case", timeout=20, env_extra=None, c
     }
 
 
-def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=None, normalizers=()):
-    result = run_process(argv, stdin, case_id, env_extra=env_extra)
+def cli_case_environment(case_id):
+    """Return a fresh HOME/XDG/data/db/TMPDIR/cwd for one CLI invocation."""
+    case_root = root / "cli" / case_id
+    shutil.rmtree(case_root, ignore_errors=True)
+    case_root.mkdir(parents=True)
+    env = dict(base_env)
+    paths = {
+        "HOME": case_root / "home",
+        "XDG_CONFIG_HOME": case_root / "xdg-config",
+        "XDG_DATA_HOME": case_root / "xdg-data",
+        "XDG_CACHE_HOME": case_root / "xdg-cache",
+        "TMPDIR": case_root / "tmp",
+        "SYMERASEME_DATA_DIR": case_root / "data",
+        "SYMERASEME_DB_DIR": case_root / "db",
+        "SYMERASEME_CONFIG_DIR": case_root / "config",
+    }
+    for key, value in paths.items():
+        value.mkdir(parents=True, exist_ok=True)
+        env[key] = str(value)
+    cwd = case_root / "cwd"
+    cwd.mkdir()
+    return env, cwd
+
+
+def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=None, normalizers=(), isolate_cli=True):
+    if isolate_cli:
+        isolated_env, isolated_cwd = cli_case_environment(case_id)
+        if env_extra:
+            isolated_env.update(env_extra)
+        env_extra, cwd = isolated_env, str(isolated_cwd)
+    else:
+        cwd = None
+    result = run_process(argv, stdin, case_id, env_extra=env_extra, cwd=cwd)
     # Normalizers run only after raw bytes have been captured. Each one is a
     # field-specific contract exception, never a general trim/sort operation.
     stdout = result.pop("_stdout_raw")
-    result.pop("_stderr_raw")
+    stderr = result.pop("_stderr_raw")
     nondeterministic = []
     for pattern, replacement, path, reason, marker in normalizers:
         stdout, count = re.subn(pattern, replacement, stdout, count=1)
@@ -290,6 +333,8 @@ def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=No
         nondeterministic.append({"path": path, "reason": reason, "replacement": marker})
     result["stdout_base64"] = b64(stdout)
     result["stdout_bytes"] = len(stdout)
+    result["stderr_base64"] = b64(stderr)
+    result["stderr_bytes"] = len(stderr)
     result.update({
         "id": case_id,
         "category": category,
@@ -320,10 +365,22 @@ for node in commands:
     if path:
         unknown_id = "unknown-flag-" + "-".join(path)
         help_cases.append(case_capture(unknown_id, "unknown_flag", path + ["--definitely-unknown"], expected="parse_failure"))
-    if node.get("usage_positionals"):
+    # Only ExactArgs is a parser-level required positional contract. Commands
+    # using MaximumNArgs intentionally accept zero positionals and validate
+    # their operation-specific input later; those are exercised below as
+    # deterministic backend/error cases, never mislabeled parse failures.
+    validator = node.get("args_validator", "")
+    if node.get("usage_positionals") and "ExactArgs" in validator:
         missing_id = "missing-argument-" + ("-".join(path) or "root")
         help_cases.append(case_capture(missing_id, "missing_argument", path, expected="parse_failure"))
 
+# Root implicit behaviors are part of the public CLI, even though --version
+# and unknown-command are not represented as child commands in Cobra metadata.
+root_behavior_cases = [
+    case_capture("root-version", "root_version", ["--version"], expected="success"),
+    case_capture("root-unknown-flag", "unknown_flag", ["--definitely-unknown"], expected="parse_failure"),
+    case_capture("root-unknown-command", "unknown_command", ["definitely-not-a-command"], expected="parse_failure"),
+]
 success_argvs = [
     ("version", ["version"]),
     ("version-json", ["version", "--json"]),
@@ -359,12 +416,81 @@ for case_id, argv in success_argvs:
         raise RuntimeError(f"designated CLI success case failed: {case_id}: {result}")
     success_cases.append(result)
 
+# Every executable leaf gets one operational invocation. A non-zero result is
+# retained as an explicitly classified deterministic backend/error behavior;
+# only the ExactArgs cases above are parser missing-argument failures.
+operational_argvs = {
+    "auto-confirm": ["auto-confirm", "1", "--dry-run", "--output", "json"],
+    "brokers/list": ["brokers", "list", "--output", "json"],
+    "brokers/show": ["brokers", "show", "0ptimus-analytics-us", "--output", "json"],
+    "calendar": ["calendar", "--output", "json"],
+    "classify-reply": ["classify-reply", "1", "--save=false", "--output", "json"],
+    "completion": ["completion", "bash"],
+    "config/show": ["config", "show", "--output", "json"],
+    "dashboard": ["dashboard", "--output", "json"],
+    "events/show": ["events", "show", "1", "--output", "json"],
+    "generate-dashboard": ["generate-dashboard"],
+    "generate-rebuttal": ["generate-rebuttal", "1", "--save=false", "--output", "json"],
+    "generate-report": ["generate-report", "--all-campaigns", "--format", "json", "--output", ""],
+    "generate-scheduler": ["generate-scheduler", "--platform", "cron", "--dry-run"],
+    "grant": ["grant", "--dry-run", "--output", "json"],
+    "help": ["help"],
+    "init-profile": ["--output", "json", "init-profile", "--full-name", "Oracle User", "--email", "oracle@example.invalid"],
+    "manual-tasks/cleanup": ["manual-tasks", "cleanup", "--dry-run", "--output", "json"],
+    "manual-tasks/complete": ["manual-tasks", "complete", "1", "--output", "json"],
+    "manual-tasks/list": ["manual-tasks", "list", "--output", "json"],
+    "manual-tasks/show": ["manual-tasks", "show", "1", "--output", "json"],
+    "mcp": ["mcp", "--stdio"],
+    "migrate": ["migrate", "--source", "/tmp/symeraseme-go-oracle/cli/migrate/source", "--destination", "/tmp/symeraseme-go-oracle/cli/migrate/destination", "--dry-run", "--json"],
+    "plan/create": ["--output", "json", "plan", "create", "--campaign", "oracle-campaign", "--max", "1"],
+    "plan/execute": ["--output", "json", "plan", "execute", "--campaign", "oracle-campaign", "--dry-run"],
+    "plan/show": ["--output", "json", "plan", "show", "--campaign", "oracle-campaign"],
+    "plan/status": ["--output", "json", "plan", "status"],
+    "plan/tick": ["--output", "json", "plan", "tick", "--dry-run"],
+    "poll-inbox": ["--output", "json", "poll-inbox", "--host", "127.0.0.1", "--port", "1", "--username", "oracle@example.invalid", "--since-days", "1", "--ssl=false"],
+    "registry/list": ["registry", "list", "--output", "json"],
+    "registry/validate": ["registry", "validate", "--output", "json"],
+    "render-template": ["render-template", "laws/gdpr-art17.en.md.j2", "--broker-name", "Oracle Broker", "--broker-website", "https://example.invalid"],
+    "requests/list": ["requests", "list", "--output", "json"],
+    "review": ["review", "/tmp/symeraseme-go-oracle/cli/review/missing.txt", "--output", "json"],
+    "run-web-form": ["run-web-form", "virtual-minds-eu", "--dry-run", "--output", "json"],
+    "schedule/install": ["schedule", "install", "--platform", "cron", "--dry-run", "--output", "json"],
+    "schedule/status": ["schedule", "status", "--platform", "cron", "--output", "json"],
+    "schedule/uninstall": ["schedule", "uninstall", "--platform", "cron", "--output", "json"],
+    "serve": ["serve", "--stdio"],
+    "show-profile": ["show-profile", "--output", "json"],
+    "status": ["status", "--output", "json"],
+    "tick": ["tick", "--output", "json", "--dry-run"],
+    "version": ["version", "--json"],
+}
+leaf_paths = [tuple(shell_path(node)) for node in commands if not node.get("children")]
+missing_operations = sorted("/".join(path) for path in leaf_paths if "/".join(path) not in operational_argvs)
+if missing_operations:
+    raise RuntimeError(f"no operational oracle case for leaf commands: {missing_operations}")
+operational_cases = []
+for key in sorted(operational_argvs):
+    argv = operational_argvs[key]
+    normalizers = ()
+    if key in ("status", "plan/status"):
+        normalizers = ((rb'("as_of":")[0-9]{4}-[0-9]{2}-[0-9]{2}T[^"]+"', b'"as_of":"<TIMESTAMP>"', "stdout.as_of", "status uses current UTC time", "<TIMESTAMP>"),)
+    elif key == "dashboard":
+        normalizers = ((rb'("generated_at":")[0-9]{4}-[0-9]{2}-[0-9]{2}T[^"]+"', b'"generated_at":"<TIMESTAMP>"', "stdout.generated_at", "dashboard uses current UTC time", "<TIMESTAMP>"),)
+    elif key == "calendar":
+        normalizers = (
+            (rb'("as_of":")[0-9]{4}-[0-9]{2}-[0-9]{2}T[^"]+"', b'"as_of":"<TIMESTAMP>"', "stdout.as_of", "calendar uses current UTC time", "<TIMESTAMP>"),
+            (rb'("horizon_until":")[0-9]{4}-[0-9]{2}-[0-9]{2}T[^"]+"', b'"horizon_until":"<TIMESTAMP>"', "stdout.horizon_until", "calendar derives horizon from current UTC time", "<TIMESTAMP>"),
+        )
+    result = case_capture("operate-" + key.replace("/", "-"), "operational", argv, expected="operational", normalizers=normalizers)
+    result["classification"] = "success" if result["exit_code"] == 0 else "deterministic_backend_error"
+    result["expected_outcome"] = result["classification"]
+    operational_cases.append(result)
+
 cli_document = {
     "schema": "symeraseme.go-oracle.cli.v1",
     "commit": commit,
-    "environment": {"timezone": "UTC", "locale": "C", "credentials": "cleared", "home": "isolated"},
+    "environment": {"timezone": "UTC", "locale": "C", "credentials": "cleared", "home": "isolated", "keychain": "not_accessed", "path": "private_empty"},
     "surface_file": "surface.json",
-    "cases": help_cases + success_cases,
+    "cases": root_behavior_cases + help_cases + success_cases + operational_cases,
 }
 write_json = lambda path, value: path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 write_json(out / "cases" / "cli" / "surface.json", surface)
@@ -373,16 +499,30 @@ write_json(out / "cases" / "cli" / "behavior.json", cli_document)
 # MCP stdio: each transcript is a fresh process with a fresh isolated tree.
 mcp_inputs = [
     ("initialize", b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n'),
+    ("id-string", b'{"jsonrpc":"2.0","id":"string-id","method":"tools/list","params":{}}\n'),
+    ("id-null", b'{"jsonrpc":"2.0","id":null,"method":"tools/list","params":{}}\n'),
+    ("id-boolean-invalid", b'{"jsonrpc":"2.0","id":true,"method":"tools/list","params":{}}\n'),
+    ("id-array-invalid", b'{"jsonrpc":"2.0","id":[1],"method":"tools/list","params":{}}\n'),
     ("tools-list", b'{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n'),
+    ("tools-list-null-params", b'{"jsonrpc":"2.0","id":2,"method":"tools/list","params":null}\n'),
     ("tools-call-status", b'{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"status","arguments":{}}}\n'),
+    ("tools-call-missing-arguments", b'{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"plan_create"}}\n'),
+    ("tools-call-null-arguments", b'{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"plan_create","arguments":null}}\n'),
+    ("tools-call-string-arguments", b'{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"plan_create","arguments":"bad"}}\n'),
     ("batch-and-notification", b'[{"jsonrpc":"2.0","id":4,"method":"tools/list","params":{}},{"jsonrpc":"2.0","method":"tools/list","params":{}}]\n'),
+    ("mixed-batch-errors", b'[{"jsonrpc":"2.0","id":12,"method":"tools/list","params":[]},{"jsonrpc":"2.0","id":13,"method":"does-not-exist","params":{}},{"jsonrpc":"2.0","method":"tools/list","params":{}}]\n'),
     ("notification", b'{"jsonrpc":"2.0","method":"tools/list","params":{}}\n'),
     ("legacy-list-tools", b'{"jsonrpc":"2.0","id":"legacy","method":"list_tools","params":{}}\n'),
+    ("invalid-jsonrpc-version", b'{"jsonrpc":"1.0","id":14,"method":"tools/list","params":{}}\n'),
     ("unknown-method", b'{"jsonrpc":"2.0","id":5,"method":"does-not-exist","params":{}}\n'),
-    ("invalid-params", b'{"jsonrpc":"2.0","id":6,"method":"tools/list","params":[]}\n'),
+    ("invalid-params-array", b'{"jsonrpc":"2.0","id":6,"method":"tools/list","params":[]}\n'),
+    ("invalid-params-scalar", b'{"jsonrpc":"2.0","id":15,"method":"tools/list","params":"bad"}\n'),
     ("unknown-tool", b'{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"does_not_exist","arguments":{}}}\n'),
     ("missing-tool-name", b'{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"arguments":{}}}\n'),
     ("empty-batch", b'[]\n'),
+    ("multiple-frames", b'{"jsonrpc":"2.0","id":16,"method":"tools/list","params":{}}\n{"jsonrpc":"2.0","id":17,"method":"initialize","params":{}}\n'),
+    ("truncated-frame", b'{"jsonrpc":"2.0","id":18,"method":"tools/list","params":{\n'),
+    ("graceful-shutdown", b""),
     ("malformed-json", b'{\n'),
 ]
 mcp_cases = []
@@ -411,7 +551,12 @@ for case_id, payload in mcp_inputs:
         "commit": commit,
         "id": case_id,
         "input_kind": "jsonl",
-        "expected_outcome": "observed",
+        "expected_outcome": {
+            "graceful-shutdown": "graceful_shutdown",
+            "truncated-frame": "protocol_error",
+            "malformed-json": "protocol_error",
+        }.get(case_id, "protocol_response"),
+        "classification": "graceful_shutdown" if case_id == "graceful-shutdown" else ("protocol_error" if case_id in ("truncated-frame", "malformed-json") else "protocol_response"),
         "nondeterministic_fields": [],
     })
     mcp_cases.append(result)
@@ -541,6 +686,46 @@ for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "TMPDI
     http_env[key] = str(http_root / pathlib.Path(base_env[key]).name)
     pathlib.Path(http_env[key]).mkdir(parents=True, exist_ok=True)
 port = free_port()
+# Exercise the bind policy itself, including a permitted remote bind on a
+# local-only helper process. Both probes use synthetic roots and are terminated
+# explicitly so no server survives generation.
+startup_cases = []
+def http_startup_probe(case_id, host, allow_remote):
+    case_root = root / "http-policy" / case_id
+    shutil.rmtree(case_root, ignore_errors=True)
+    case_root.mkdir(parents=True)
+    env = dict(base_env)
+    for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "TMPDIR", "SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_CONFIG_DIR"):
+        env[key] = str(case_root / pathlib.Path(base_env[key]).name)
+        pathlib.Path(env[key]).mkdir(parents=True, exist_ok=True)
+    probe_port = free_port()
+    proc = subprocess.Popen([binary, "mcp", "--host", host, "--port", str(probe_port)] + (["--allow-remote"] if allow_remote else []), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(case_root), start_new_session=True)
+    listening = False
+    if allow_remote:
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", probe_port), timeout=0.2):
+                    listening = True
+                    break
+            except OSError:
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.05)
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGTERM)
+    stdout, stderr = proc.communicate(timeout=8)
+    startup_cases.append({
+        "schema": "symeraseme.go-oracle.http.v1", "id": case_id,
+        "phase": "startup_policy", "request": {"host": host, "allow_remote": allow_remote, "port": "<PORT>"},
+        "process": {"argv": ["mcp", "--host", host, "--port", "<PORT>"] + (["--allow-remote"] if allow_remote else []), "exit_code": proc.returncode, "stdout_base64": b64(stdout), "stderr_base64": b64(stderr), "stdout_bytes": len(stdout), "stderr_bytes": len(stderr)},
+        "expected_outcome": "remote_bind_allowed" if allow_remote else "remote_bind_rejected",
+        "observed_listening": listening,
+        "nondeterministic_fields": [{"path": "request.port", "reason": "ephemeral local listener", "replacement": "<PORT>"}],
+    })
+http_startup_probe("remote-bind-rejected", "192.0.2.1", False)
+http_startup_probe("remote-bind-allowed", "0.0.0.0", True)
+
 server = subprocess.Popen(
     [binary, "mcp", "--host", "127.0.0.1", "--port", str(port)],
     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -565,26 +750,31 @@ try:
 
     request_body = b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
     cases = [
-        ("get-method", "GET", [], b"", "method_error"),
-        ("missing-auth", "POST", [("Content-Type", "application/json")], request_body, "auth_error"),
-        ("wrong-auth", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer wrong")], request_body, "auth_error"),
-        ("malformed-scheme", "POST", [("Content-Type", "application/json"), ("Authorization", "Basic x")], request_body, "auth_error"),
-        ("duplicate-auth", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Authorization", "Bearer " + token)], request_body, "auth_error"),
-        ("bad-origin", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Origin", "https://evil.example")], request_body, "origin_error"),
-        ("valid-initialize", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Origin", "http://localhost:3000")], request_body, "success"),
-        ("valid-no-origin", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], request_body, "success"),
-        ("malformed-json", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b"{", "parse_error"),
-        ("notification", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b'{"jsonrpc":"2.0","method":"tools/list","params":{}}', "notification"),
-        ("batch-and-notification", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b'[{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}},{"jsonrpc":"2.0","method":"tools/list","params":{}}]', "success"),
-        ("oversized-body", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b"x" * (5 * 1024 * 1024 + 1), "body_too_large"),
+        ("get-method", "GET", [], b"", "method_error", "127.0.0.1"),
+        ("missing-auth", "POST", [("Content-Type", "application/json")], request_body, "auth_error", "127.0.0.1"),
+        ("wrong-auth", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer wrong")], request_body, "auth_error", "127.0.0.1"),
+        ("malformed-scheme", "POST", [("Content-Type", "application/json"), ("Authorization", "Basic x")], request_body, "auth_error", "127.0.0.1"),
+        ("duplicate-auth", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Authorization", "Bearer " + token)], request_body, "auth_error", "127.0.0.1"),
+        ("bad-origin", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Origin", "https://evil.example")], request_body, "origin_error", "127.0.0.1"),
+        ("missing-content-type", "POST", [("Authorization", "Bearer " + token)], request_body, "success", "127.0.0.1"),
+        ("wrong-content-type", "POST", [("Content-Type", "text/plain"), ("Authorization", "Bearer " + token)], request_body, "success", "127.0.0.1"),
+        ("host-localhost", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], request_body, "success", "localhost"),
+        ("host-untrusted", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], request_body, "success", "evil.example"),
+        ("valid-initialize", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token), ("Origin", "http://localhost:3000")], request_body, "success", "127.0.0.1"),
+        ("valid-no-origin", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], request_body, "success", "127.0.0.1"),
+        ("malformed-json", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b"{", "parse_error", "127.0.0.1"),
+        ("notification", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b'{"jsonrpc":"2.0","method":"tools/list","params":{}}', "notification", "127.0.0.1"),
+        ("batch-and-notification", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b'[{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}},{"jsonrpc":"2.0","method":"tools/list","params":{}}]', "success", "127.0.0.1"),
+        ("body-at-limit", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b"x" * (5 * 1024 * 1024), "parse_error", "127.0.0.1"),
+        ("oversized-body", "POST", [("Content-Type", "application/json"), ("Authorization", "Bearer " + token)], b"x" * (5 * 1024 * 1024 + 1), "body_too_large", "127.0.0.1"),
     ]
     http_cases = []
-    for case_id, method, headers, body, outcome in cases:
+    for case_id, method, headers, body, outcome, host_header in cases:
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
         conn.putrequest(method, "/", skip_host=True, skip_accept_encoding=True)
         for key, value in headers:
             conn.putheader(key, value)
-        conn.putheader("Host", "127.0.0.1")
+        conn.putheader("Host", host_header)
         conn.putheader("Content-Length", str(len(body)))
         if len(body) > 5 * 1024 * 1024:
             # ContentLength is rejected before the handler reads the body. Send
@@ -643,19 +833,21 @@ write_json(out / "cases" / "http" / "transcript.json", {
     "schema": "symeraseme.go-oracle.http.v1",
     "commit": commit,
     "server": {"command": ["mcp", "--host", "127.0.0.1", "--port", "<PORT>"], "bind": "127.0.0.1", "port": "<PORT>", "auth_token": "<MCP_TOKEN>"},
-    "cases": http_cases,
+    "cases": startup_cases + http_cases,
 })
 
 # Filesystem manifests are intentionally narrow: type, mode, size, and stable
 # names are captured. Random token content is declared, not hashed or leaked.
-def manifest(path):
+def manifest(path, nondeterministic_prefixes=()):
     entries = []
     if not path.exists():
         return entries
+    prefixes = tuple(nondeterministic_prefixes)
     for item in sorted(path.rglob("*")):
         rel = item.relative_to(path).as_posix()
         st = item.lstat()
-        record = {"path": rel, "mode": oct(st.st_mode & 0o777), "size_bytes": st.st_size}
+        public_rel = "<CONSENT_TOKEN_FILE>" if item.is_file() and item.name.startswith("consent_") else rel
+        record = {"path": public_rel, "mode": oct(st.st_mode & 0o777), "size_bytes": st.st_size}
         if item.is_symlink():
             record["type"] = "symlink"
             record["target"] = os.readlink(item)
@@ -663,8 +855,19 @@ def manifest(path):
             record["type"] = "directory"
         elif item.is_file():
             record["type"] = "file"
-            if item.name == "mcp_token":
-                record["content"] = {"nondeterministic": True, "reason": "crypto/rand token; secret intentionally not captured"}
+            nondeterministic = item.name in ("mcp_token", "identity.encrypted") or item.name.startswith("consent_") or any(rel == prefix or rel.startswith(prefix.rstrip("/") + "/") for prefix in prefixes)
+            if nondeterministic:
+                if item.name == "mcp_token":
+                    reason = "crypto/rand token; secret intentionally not captured"
+                elif item.name.startswith("consent_"):
+                    reason = "crypto/rand consent token and wall-clock expiry; secret intentionally not captured"
+                elif item.name == "identity.encrypted":
+                    reason = "AES-GCM random nonce; encrypted identity content intentionally not captured"
+                elif item.suffix in (".html", ".json", ".csv") and "report" in rel:
+                    reason = "rendered report contains current UTC time; content intentionally not captured"
+                else:
+                    reason = "operation-generated content contains wall-clock or private state; content intentionally not captured"
+                record["content"] = {"nondeterministic": True, "reason": reason}
             else:
                 record["sha256"] = hashlib.sha256(item.read_bytes()).hexdigest()
         else:
@@ -672,34 +875,140 @@ def manifest(path):
         entries.append(record)
     return entries
 
-filesystem_cases = [
-    {
-        "schema": "symeraseme.go-oracle.filesystem.v1",
-        "id": "mcp-startup-token",
-        "operation": ["mcp", "--host", "127.0.0.1", "--port", "<PORT>"],
-        "roots": {"home": "isolated", "xdg_config": "isolated", "xdg_data": "isolated", "tmpdir": "isolated"},
-        "manifest_roots": {
-            "home": str(http_env["HOME"]),
-            "xdg_config": str(http_env["XDG_CONFIG_HOME"]),
-            "xdg_data": str(http_env["XDG_DATA_HOME"]),
-            "tmpdir": str(http_env["TMPDIR"]),
-            "data_dir": str(http_env["SYMERASEME_DATA_DIR"]),
-            "db_dir": str(http_env["SYMERASEME_DB_DIR"]),
-        },
-        "manifests": {
-            "home": manifest(pathlib.Path(http_env["HOME"])),
-            "xdg_config": manifest(pathlib.Path(http_env["XDG_CONFIG_HOME"])),
-            "xdg_data": manifest(pathlib.Path(http_env["XDG_DATA_HOME"])),
-            "tmpdir": manifest(pathlib.Path(http_env["TMPDIR"])),
-            "data_dir": manifest(pathlib.Path(http_env["SYMERASEME_DATA_DIR"])),
-            "db_dir": manifest(pathlib.Path(http_env["SYMERASEME_DB_DIR"])),
-        },
-        "nondeterministic_fields": [
-            {"path": "manifests.data_dir[*].content", "reason": "mcp_token is generated from crypto/rand", "replacement": "declaration only"},
-            {"path": "operation.port", "reason": "ephemeral local listener", "replacement": "<PORT>"},
-        ],
+def side_effect_runtime(case_id):
+    case_root = root / "filesystem" / case_id
+    shutil.rmtree(case_root, ignore_errors=True)
+    case_root.mkdir(parents=True)
+    env = dict(base_env)
+    paths = {
+        "HOME": case_root / "home", "XDG_CONFIG_HOME": case_root / "xdg-config",
+        "XDG_DATA_HOME": case_root / "xdg-data", "XDG_CACHE_HOME": case_root / "xdg-cache",
+        "TMPDIR": case_root / "tmp", "SYMERASEME_DATA_DIR": case_root / "data",
+        "SYMERASEME_DB_DIR": case_root / "db", "SYMERASEME_CONFIG_DIR": case_root / "config",
     }
-]
+    for key, value in paths.items():
+        value.mkdir(parents=True, exist_ok=True)
+        env[key] = str(value)
+    cwd = case_root / "cwd"
+    cwd.mkdir()
+    return case_root, env, cwd
+
+
+def side_effect_process(case_id, argv, env, cwd):
+    result = run_process(argv, case_name=case_id, env_extra=env, cwd=str(cwd))
+    stdout = result.pop("_stdout_raw")
+    stderr = result.pop("_stderr_raw")
+    return {
+        "argv": argv, "exit_code": result["exit_code"],
+        "stdout_bytes": len(stdout), "stderr_bytes": len(stderr),
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        "output_policy": "bytes_not_embedded; secrets and private state excluded",
+    }
+
+
+def fs_case(case_id, argv, env, cwd, roots, nondeterministic_prefixes=(), nondeterministic_fields=(), process=None):
+    return {
+        "schema": "symeraseme.go-oracle.filesystem.v1", "id": case_id,
+        "operation": argv, "process": process or side_effect_process(case_id, argv, env, cwd),
+        "roots": {name: "isolated" for name in roots},
+        "manifest_roots": {name: str(path) for name, path in roots.items()},
+        "manifests": {name: manifest(path, nondeterministic_prefixes) for name, path in roots.items()},
+        "nondeterministic_fields": list(nondeterministic_fields),
+    }
+
+filesystem_cases = []
+
+# Profile creation uses a fixed env-supplied key, so the generator never calls
+# the host keychain. The AES-GCM nonce remains explicitly nondeterministic.
+case_root, env, cwd = side_effect_runtime("profile-init")
+profile_path = case_root / "profile" / "identity.encrypted"
+profile_path.parent.mkdir()
+profile_argv = ["--output", "json", "init-profile", "--full-name", "Oracle User", "--email", "oracle@example.invalid", "--profile", str(profile_path)]
+filesystem_cases.append(fs_case("profile-init", profile_argv, env, cwd, {"home": pathlib.Path(env["HOME"]), "data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"]), "profile_dir": profile_path.parent}, ("identity.encrypted",), ({"path": "manifests.profile_dir[identity.encrypted].content", "reason": "AES-GCM nonce is generated from crypto/rand", "replacement": "declaration only"},), side_effect_process("profile-init", profile_argv, env, cwd)))
+
+# Consent issuance is captured only as process metadata; the token value and
+# its hashed filename are never serialized. Filename and payload are markers.
+case_root, env, cwd = side_effect_runtime("consent-grant")
+consent_argv = ["grant", "--command", "execute", "--ttl", "3600"]
+filesystem_cases.append(fs_case("consent-grant", consent_argv, env, cwd, {"data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"])}, ("<CONSENT_TOKEN_FILE>",), ({"path": "manifests.data_dir[<CONSENT_TOKEN_FILE>]", "reason": "consent token, hashed filename, and expiry are random/time-derived", "replacement": "path and content declarations only"},), side_effect_process("consent-grant", consent_argv, env, cwd)))
+
+# Scheduler generation is a real file-writing path, using cron so no native
+# scheduler or system service is contacted.
+case_root, env, cwd = side_effect_runtime("schedule-generate")
+schedule_dir = case_root / "scheduler"
+schedule_argv = ["generate-scheduler", "--platform", "cron", "--output-dir", str(schedule_dir), "--project-dir", "/tmp/symeraseme-go-oracle/project", "--symeraseme-bin", "/tmp/symeraseme-go-oracle/bin/symeraseme"]
+filesystem_cases.append(fs_case("schedule-generate", schedule_argv, env, cwd, {"scheduler_dir": schedule_dir}, (), side_effect_process("schedule-generate", schedule_argv, env, cwd)))
+
+# Report generation writes an HTML artifact whose rendered current-time fields
+# are excluded by an exact path marker.
+case_root, env, cwd = side_effect_runtime("report-generate")
+report_path = case_root / "reports" / "report.html"
+report_path.parent.mkdir()
+report_argv = ["generate-report", "--all-campaigns", "--format", "html", "--output", str(report_path)]
+filesystem_cases.append(fs_case("report-generate", report_argv, env, cwd, {"reports": report_path.parent}, ("report.html",), ({"path": "manifests.reports[report.html].content", "reason": "rendered report contains current UTC time", "replacement": "declaration only"},), side_effect_process("report-generate", report_argv, env, cwd)))
+
+# A known registry entry with no browser executor creates the durable manual
+# fallback path (and returns a classified manual-action outcome).
+case_root, env, cwd = side_effect_runtime("manual-task-create")
+manual_argv = ["run-web-form", "virtual-minds-eu", "--output", "json"]
+filesystem_cases.append(fs_case("manual-task-create", manual_argv, env, cwd, {"data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"]), "db_dir": pathlib.Path(env["SYMERASEME_DB_DIR"]), "home": pathlib.Path(env["HOME"])}, ("manual_tasks", "symeraseme.db"), ({"path": "manifests.db_dir[symeraseme.db].content", "reason": "SQLite database contains wall-clock event/task data", "replacement": "declaration only"}, {"path": "manifests.data_dir[manual_tasks/**].content", "reason": "manual evidence can contain private and time-derived data", "replacement": "declaration only"}), side_effect_process("manual-task-create", manual_argv, env, cwd)))
+
+# Migration is run against a synthetic legacy tree and a separate destination;
+# this freezes backup/state/config side effects without touching user paths.
+case_root, env, cwd = side_effect_runtime("migration")
+source = case_root / "legacy-source"
+destination = case_root / "go-destination"
+source.mkdir(); (source / "config.toml").write_text("data_dir = 'legacy'\n", encoding="utf-8")
+migration_argv = ["migrate", "--source", str(source), "--destination", str(destination), "--home", str(pathlib.Path(env["HOME"])), "--platform", "cron", "--json"]
+migration_process = side_effect_process("migration", migration_argv, env, cwd)
+filesystem_cases.append(fs_case("migration", migration_argv, env, cwd, {"source": source, "destination": destination, "backup": pathlib.Path(str(destination) + ".migration-backup")}, (), (), migration_process))
+
+# Verify token rotation in one isolated data directory: two independent server
+# starts replace the stable mcp_token path, while both secret values remain
+# absent from the fixture.
+case_root, env, cwd = side_effect_runtime("mcp-token-rotation")
+def one_token_server(env, cwd):
+    port = free_port()
+    proc = subprocess.Popen([binary, "mcp", "--host", "127.0.0.1", "--port", str(port)], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(cwd), start_new_session=True)
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                break
+        except OSError:
+            if proc.poll() is not None:
+                raise RuntimeError("token rotation server exited early")
+            time.sleep(0.05)
+    else:
+        raise RuntimeError("token rotation server did not start")
+    token_path = pathlib.Path(env["SYMERASEME_DATA_DIR"]) / "mcp_token"
+    token = token_path.read_text(encoding="utf-8")
+    os.killpg(proc.pid, signal.SIGTERM)
+    stdout, stderr = proc.communicate(timeout=8)
+    if proc.returncode != 0:
+        raise RuntimeError(f"token rotation server exit={proc.returncode}: {stderr!r}")
+    return token
+rotation_first = one_token_server(env, cwd)
+rotation_before = manifest(pathlib.Path(env["SYMERASEME_DATA_DIR"]))
+rotation_second = one_token_server(env, cwd)
+if not rotation_first or rotation_first == rotation_second:
+    raise RuntimeError("MCP token did not rotate")
+rotation_after = manifest(pathlib.Path(env["SYMERASEME_DATA_DIR"]))
+rotation_roots = {"data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"])}
+filesystem_cases.append({
+    "schema": "symeraseme.go-oracle.filesystem.v1", "id": "mcp-token-rotation",
+    "operation": ["mcp", "--host", "127.0.0.1", "--port", "<PORT>"],
+    "process": {"starts": 2, "shutdown": "graceful", "tokens_equal": False},
+    "roots": {"data_dir": "isolated"}, "manifest_roots": {"data_dir": str(rotation_roots["data_dir"])},
+    "before": {"data_dir": rotation_before}, "after": {"data_dir": rotation_after},
+    "manifests": {"data_dir": rotation_after},
+    "nondeterministic_fields": [
+        {"path": "before.data_dir[*].content", "reason": "server-issued crypto/rand MCP token; secret intentionally not captured", "replacement": "declaration only"},
+        {"path": "after.data_dir[*].content", "reason": "server-issued crypto/rand MCP token; secret intentionally not captured", "replacement": "declaration only"},
+        {"path": "operation.port", "reason": "ephemeral local listener", "replacement": "<PORT>"},
+    ],
+})
 write_json(out / "cases" / "filesystem" / "manifests.json", {"schema": "symeraseme.go-oracle.filesystem.v1", "commit": commit, "cases": filesystem_cases})
 
 fixture_readme = f'''# Go oracle fixtures
@@ -716,26 +1025,31 @@ modified and no developer profile, keychain, database, or credential is read.
   and every child include canonical path, public ordering, hidden/deprecated
   status, aliases, positional `Use` forms, validator function, local,
   inherited, persistent, and effective flags with defaults and order.
-- `../cases/cli/behavior.json` — raw CLI help for every command, plus parser
-  unknown-flag/missing-argument cases and successful read-only/completion cases.
+- `../cases/cli/behavior.json` — raw CLI help and unknown-flag behavior for
+  every command, root version/unknown-command cases, true parser-level missing
+  arguments, and one isolated operational invocation for every executable leaf.
+  Each operational record classifies success versus deterministic backend error.
 - `../cases/mcp/transcript.jsonl` — one fresh `mcp --stdio` process per raw
   JSON-RPC transcript, including 26 schema-valid `tools/call` requests (one
-  per pinned tool), batch/notification/legacy/error cases. `stdout_base64`
-  and `stderr_base64` preserve bytes; only explicitly listed current-time
-  result fields use a marker.
-- `../cases/http/transcript.json` — local loopback MCP HTTP method, strict
-  bearer-auth, origin, malformed-body, notification, and 5 MiB ceiling cases.
+  per pinned tool), ID/params, multi-frame, truncation, shutdown,
+  batch/notification/legacy/error cases. `stdout_base64` and `stderr_base64`
+  preserve bytes; only explicitly listed current-time result fields use a marker.
+- `../cases/http/transcript.json` — MCP HTTP bind/remote policy, method,
+  content type, Host, strict bearer auth, origin, malformed body, notification,
+  exact 5 MiB boundary, and oversized-body cases using local listeners only.
 - `../cases/filesystem/manifests.json` — isolated HOME/XDG/TMPDIR side-effect
-  manifest, including file modes and an explicit declaration for the random
-  MCP token without recording its secret.
+  manifests for profile creation, consent, scheduler/report output, durable
+  manual fallback, migration, and MCP-token rotation. Random/private bytes are
+  represented only by path-specific nondeterminism declarations.
 
 All records carry the oracle commit and a schema identifier. Fixture generation
 uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
 root, an empty private executable search path, empty credential variables, and
 no timestamps or host identity. The only
-nondeterministic values are marked in `nondeterministic_fields`: the ephemeral
-HTTP port, server-issued MCP token, HTTP `Date` header, and current-time fields
-in the status/dashboard/calendar CLI and MCP results. The Go `net/http`
+nondeterministic values are marked in `nondeterministic_fields`: ephemeral
+ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
+time-derived durable artifacts, HTTP `Date`, and current-time fields in the
+status/dashboard/calendar/report CLI and MCP results. The Go `net/http`
 `Date` response header is replaced only at `response.headers.Date` with
 `<HTTP_DATE>` and is likewise declared as nondeterministic. The oversized HTTP
 request is represented by its exact byte length and SHA-256, not stored
@@ -759,5 +1073,5 @@ fixtures must not be hand-edited.
 
 print(f"generated oracle fixtures from {commit}")
 print(f"CLI commands={len(commands)} help_cases={len(help_cases)} success_cases={len(success_cases)}")
-print(f"MCP cases={len(mcp_cases)} HTTP cases={len(http_cases)} filesystem_cases={len(filesystem_cases)}")
+print(f"MCP cases={len(mcp_cases)} HTTP cases={len(startup_cases) + len(http_cases)} filesystem_cases={len(filesystem_cases)}")
 PYEOF

@@ -243,15 +243,15 @@ before Tasks 6.3 and 7.2, and `APP-000` plus `REL-008 = PASS` before Phase 9.
 - Create: `rust-tests/parity/fixtures/README.md`
 
 **Steps:**
-- [ ] Enumerate the full Cobra command tree recursively, including hidden
+- [x] Enumerate the full Cobra command tree recursively, including hidden
       aliases, positional forms and every flag/default.
-- [ ] Capture help, success, parse failure, missing argument and unknown flag
+- [x] Capture help, success, parse failure, missing argument and unknown flag
       behavior with raw stdout/stderr and exit status.
-- [ ] Add raw MCP initialize/list/call/batch/notification/error cases.
-- [ ] Add HTTP method/auth/origin/body-size cases.
-- [ ] Use isolated HOME/XDG/TMPDIR, UTC, fixed locale and fake network servers.
-- [ ] Never read the developer keychain, profile or real database.
-- [ ] Mark every nondeterministic field explicitly; do not normalize broadly.
+- [x] Add raw MCP initialize/list/call/batch/notification/error cases.
+- [x] Add HTTP method/auth/origin/body-size cases.
+- [x] Use isolated HOME/XDG/TMPDIR, UTC, fixed locale and fake network servers.
+- [x] Never read the developer keychain, profile or real database.
+- [x] Mark every nondeterministic field explicitly; do not normalize broadly.
 
 **Verification:** generator reproduces committed fixtures from the pinned Go
 revision with no diff.

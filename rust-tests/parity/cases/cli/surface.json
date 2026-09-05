@@ -18,14 +18,76 @@
         "hidden": false
       }
     ],
+    "local_flags": [
+      {
+        "order": 0,
+        "name": "help",
+        "shorthand": "h",
+        "type": "bool",
+        "default": "false",
+        "no_opt_value": "true",
+        "usage": "help for symeraseme",
+        "hidden": false,
+        "annotations": {
+          "cobra_annotation_flag_set_by_cobra": [
+            "true"
+          ]
+        }
+      },
+      {
+        "order": 1,
+        "name": "version",
+        "shorthand": "v",
+        "type": "bool",
+        "default": "false",
+        "no_opt_value": "true",
+        "usage": "version for symeraseme",
+        "hidden": false,
+        "annotations": {
+          "cobra_annotation_flag_set_by_cobra": [
+            "true"
+          ]
+        }
+      }
+    ],
     "effective_flags": [
       {
         "order": 0,
+        "name": "help",
+        "shorthand": "h",
+        "type": "bool",
+        "default": "false",
+        "no_opt_value": "true",
+        "usage": "help for symeraseme",
+        "hidden": false,
+        "annotations": {
+          "cobra_annotation_flag_set_by_cobra": [
+            "true"
+          ]
+        }
+      },
+      {
+        "order": 1,
         "name": "output",
         "type": "string",
         "default": "text",
         "usage": "output format: text or json",
         "hidden": false
+      },
+      {
+        "order": 2,
+        "name": "version",
+        "shorthand": "v",
+        "type": "bool",
+        "default": "false",
+        "no_opt_value": "true",
+        "usage": "version for symeraseme",
+        "hidden": false,
+        "annotations": {
+          "cobra_annotation_flag_set_by_cobra": [
+            "true"
+          ]
+        }
       }
     ],
     "children": [
@@ -1352,6 +1414,40 @@
       {
         "order": 13,
         "path": [
+          "help"
+        ],
+        "use": "help [command]",
+        "name": "help",
+        "short": "Help about any command",
+        "long": "Help provides help for any command in the application.\nSimply type symeraseme help [path to command] for full details.",
+        "hidden": false,
+        "usage_positionals": [
+          "[command]"
+        ],
+        "inherited_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ],
+        "effective_flags": [
+          {
+            "order": 0,
+            "name": "output",
+            "type": "string",
+            "default": "text",
+            "usage": "output format: text or json",
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "order": 14,
+        "path": [
           "init-profile"
         ],
         "use": "init-profile",
@@ -1431,7 +1527,7 @@
         ]
       },
       {
-        "order": 14,
+        "order": 15,
         "path": [
           "manual-tasks"
         ],
@@ -1697,7 +1793,7 @@
         ]
       },
       {
-        "order": 15,
+        "order": 16,
         "path": [
           "mcp"
         ],
@@ -1798,7 +1894,7 @@
         ]
       },
       {
-        "order": 16,
+        "order": 17,
         "path": [
           "migrate"
         ],
@@ -2029,7 +2125,7 @@
         ]
       },
       {
-        "order": 17,
+        "order": 18,
         "path": [
           "plan"
         ],
@@ -2534,7 +2630,7 @@
         ]
       },
       {
-        "order": 18,
+        "order": 19,
         "path": [
           "poll-inbox"
         ],
@@ -2727,7 +2823,7 @@
         ]
       },
       {
-        "order": 19,
+        "order": 20,
         "path": [
           "registry"
         ],
@@ -2821,7 +2917,7 @@
         ]
       },
       {
-        "order": 20,
+        "order": 21,
         "path": [
           "render-template"
         ],
@@ -2889,7 +2985,7 @@
         ]
       },
       {
-        "order": 21,
+        "order": 22,
         "path": [
           "requests"
         ],
@@ -3033,7 +3129,7 @@
         ]
       },
       {
-        "order": 22,
+        "order": 23,
         "path": [
           "review"
         ],
@@ -3084,7 +3180,7 @@
         ]
       },
       {
-        "order": 23,
+        "order": 24,
         "path": [
           "run-web-form"
         ],
@@ -3203,7 +3299,7 @@
         ]
       },
       {
-        "order": 24,
+        "order": 25,
         "path": [
           "schedule"
         ],
@@ -3429,7 +3525,7 @@
         ]
       },
       {
-        "order": 25,
+        "order": 26,
         "path": [
           "serve"
         ],
@@ -3530,7 +3626,7 @@
         ]
       },
       {
-        "order": 26,
+        "order": 27,
         "path": [
           "show-profile"
         ],
@@ -3561,7 +3657,7 @@
         ]
       },
       {
-        "order": 27,
+        "order": 28,
         "path": [
           "status"
         ],
@@ -3610,7 +3706,7 @@
         ]
       },
       {
-        "order": 28,
+        "order": 29,
         "path": [
           "tick"
         ],
@@ -3660,7 +3756,7 @@
         ]
       },
       {
-        "order": 29,
+        "order": 30,
         "path": [
           "version"
         ],

@@ -4,7 +4,442 @@
   "cases": [
     {
       "schema": "symeraseme.go-oracle.filesystem.v1",
-      "id": "mcp-startup-token",
+      "id": "profile-init",
+      "operation": [
+        "--output",
+        "json",
+        "init-profile",
+        "--full-name",
+        "Oracle User",
+        "--email",
+        "oracle@example.invalid",
+        "--profile",
+        "/tmp/symeraseme-go-oracle/filesystem/profile-init/profile/identity.encrypted"
+      ],
+      "process": {
+        "argv": [
+          "--output",
+          "json",
+          "init-profile",
+          "--full-name",
+          "Oracle User",
+          "--email",
+          "oracle@example.invalid",
+          "--profile",
+          "/tmp/symeraseme-go-oracle/filesystem/profile-init/profile/identity.encrypted"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 111,
+        "stderr_bytes": 0,
+        "stdout_sha256": "478fb36e341a45e18935d57e37e08531dcd742352dd9ee404fcbfba667fd0ef9",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "home": "isolated",
+        "data_dir": "isolated",
+        "profile_dir": "isolated"
+      },
+      "manifest_roots": {
+        "home": "/tmp/symeraseme-go-oracle/filesystem/profile-init/home",
+        "data_dir": "/tmp/symeraseme-go-oracle/filesystem/profile-init/data",
+        "profile_dir": "/tmp/symeraseme-go-oracle/filesystem/profile-init/profile"
+      },
+      "manifests": {
+        "home": [],
+        "data_dir": [],
+        "profile_dir": [
+          {
+            "path": "identity.encrypted",
+            "mode": "0o600",
+            "size_bytes": 293,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "AES-GCM random nonce; encrypted identity content intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "manifests.profile_dir[identity.encrypted].content",
+          "reason": "AES-GCM nonce is generated from crypto/rand",
+          "replacement": "declaration only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "consent-grant",
+      "operation": [
+        "grant",
+        "--command",
+        "execute",
+        "--ttl",
+        "3600"
+      ],
+      "process": {
+        "argv": [
+          "grant",
+          "--command",
+          "execute",
+          "--ttl",
+          "3600"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "data_dir": "isolated"
+      },
+      "manifest_roots": {
+        "data_dir": "/tmp/symeraseme-go-oracle/filesystem/consent-grant/data"
+      },
+      "manifests": {
+        "data_dir": [
+          {
+            "path": "<CONSENT_TOKEN_FILE>",
+            "mode": "0o600",
+            "size_bytes": 101,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand consent token and wall-clock expiry; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "manifests.data_dir[<CONSENT_TOKEN_FILE>]",
+          "reason": "consent token, hashed filename, and expiry are random/time-derived",
+          "replacement": "path and content declarations only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "schedule-generate",
+      "operation": [
+        "generate-scheduler",
+        "--platform",
+        "cron",
+        "--output-dir",
+        "/tmp/symeraseme-go-oracle/filesystem/schedule-generate/scheduler",
+        "--project-dir",
+        "/tmp/symeraseme-go-oracle/project",
+        "--symeraseme-bin",
+        "/tmp/symeraseme-go-oracle/bin/symeraseme"
+      ],
+      "process": {
+        "argv": [
+          "generate-scheduler",
+          "--platform",
+          "cron",
+          "--output-dir",
+          "/tmp/symeraseme-go-oracle/filesystem/schedule-generate/scheduler",
+          "--project-dir",
+          "/tmp/symeraseme-go-oracle/project",
+          "--symeraseme-bin",
+          "/tmp/symeraseme-go-oracle/bin/symeraseme"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "scheduler_dir": "isolated"
+      },
+      "manifest_roots": {
+        "scheduler_dir": "/tmp/symeraseme-go-oracle/filesystem/schedule-generate/scheduler"
+      },
+      "manifests": {
+        "scheduler_dir": [
+          {
+            "path": "crontab.txt",
+            "mode": "0o644",
+            "size_bytes": 395,
+            "type": "file",
+            "sha256": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47"
+          },
+          {
+            "path": "install.sh",
+            "mode": "0o755",
+            "size_bytes": 499,
+            "type": "file",
+            "sha256": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c"
+          },
+          {
+            "path": "symeraseme-poll.sh",
+            "mode": "0o755",
+            "size_bytes": 371,
+            "type": "file",
+            "sha256": "e8bc4fa32584e286785caea182bd63c4cc3ce0cfb1dbca52fc4c597b1cab03cd"
+          },
+          {
+            "path": "symeraseme-rescan.sh",
+            "mode": "0o755",
+            "size_bytes": 284,
+            "type": "file",
+            "sha256": "721da745cfae4341a934b0af20246ea3a81bc7f937afa42c21ff661ee6d18fbd"
+          },
+          {
+            "path": "symeraseme-tick.sh",
+            "mode": "0o755",
+            "size_bytes": 272,
+            "type": "file",
+            "sha256": "fcd6dd725f0da2e1bc16ee75885c5ce0527eb34488b40cdc8302baca060f426f"
+          },
+          {
+            "path": "uninstall.sh",
+            "mode": "0o755",
+            "size_bytes": 356,
+            "type": "file",
+            "sha256": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        "argv",
+        "exit_code",
+        "stdout_bytes",
+        "stderr_bytes",
+        "stdout_sha256",
+        "stderr_sha256",
+        "output_policy"
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "report-generate",
+      "operation": [
+        "generate-report",
+        "--all-campaigns",
+        "--format",
+        "html",
+        "--output",
+        "/tmp/symeraseme-go-oracle/filesystem/report-generate/reports/report.html"
+      ],
+      "process": {
+        "argv": [
+          "generate-report",
+          "--all-campaigns",
+          "--format",
+          "html",
+          "--output",
+          "/tmp/symeraseme-go-oracle/filesystem/report-generate/reports/report.html"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "reports": "isolated"
+      },
+      "manifest_roots": {
+        "reports": "/tmp/symeraseme-go-oracle/filesystem/report-generate/reports"
+      },
+      "manifests": {
+        "reports": [
+          {
+            "path": "report.html",
+            "mode": "0o600",
+            "size_bytes": 2782,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "rendered report contains current UTC time; content intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "manifests.reports[report.html].content",
+          "reason": "rendered report contains current UTC time",
+          "replacement": "declaration only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "manual-task-create",
+      "operation": [
+        "run-web-form",
+        "virtual-minds-eu",
+        "--output",
+        "json"
+      ],
+      "process": {
+        "argv": [
+          "run-web-form",
+          "virtual-minds-eu",
+          "--output",
+          "json"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 395,
+        "stderr_bytes": 23,
+        "stdout_sha256": "aba7f4c3454ab986e951b50631d0d5c5721be01956ac4f18d24b9bc439c5d191",
+        "stderr_sha256": "e1c7e824b9777c42df47127691b1ab5f39fb2d46ec1e7cc1a6c0dafba1e45f97",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "data_dir": "isolated",
+        "db_dir": "isolated",
+        "home": "isolated"
+      },
+      "manifest_roots": {
+        "data_dir": "/tmp/symeraseme-go-oracle/filesystem/manual-task-create/data",
+        "db_dir": "/tmp/symeraseme-go-oracle/filesystem/manual-task-create/db",
+        "home": "/tmp/symeraseme-go-oracle/filesystem/manual-task-create/home"
+      },
+      "manifests": {
+        "data_dir": [],
+        "db_dir": [
+          {
+            "path": "symeraseme.db",
+            "mode": "0o644",
+            "size_bytes": 102400,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "operation-generated content contains wall-clock or private state; content intentionally not captured"
+            }
+          },
+          {
+            "path": "symeraseme.db.lock",
+            "mode": "0o600",
+            "size_bytes": 0,
+            "type": "file",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "home": []
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "manifests.db_dir[symeraseme.db].content",
+          "reason": "SQLite database contains wall-clock event/task data",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "manifests.data_dir[manual_tasks/**].content",
+          "reason": "manual evidence can contain private and time-derived data",
+          "replacement": "declaration only"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration",
+      "operation": [
+        "migrate",
+        "--source",
+        "/tmp/symeraseme-go-oracle/filesystem/migration/legacy-source",
+        "--destination",
+        "/tmp/symeraseme-go-oracle/filesystem/migration/go-destination",
+        "--home",
+        "/tmp/symeraseme-go-oracle/filesystem/migration/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "/tmp/symeraseme-go-oracle/filesystem/migration/legacy-source",
+          "--destination",
+          "/tmp/symeraseme-go-oracle/filesystem/migration/go-destination",
+          "--home",
+          "/tmp/symeraseme-go-oracle/filesystem/migration/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1174,
+        "stderr_bytes": 0,
+        "stdout_sha256": "a8f9ff702d312cecfff00b939e8a915d086909d910a2ff61c1091d3269b57e62",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "/tmp/symeraseme-go-oracle/filesystem/migration/legacy-source",
+        "destination": "/tmp/symeraseme-go-oracle/filesystem/migration/go-destination",
+        "backup": "/tmp/symeraseme-go-oracle/filesystem/migration/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 335,
+            "type": "file",
+            "sha256": "f2965f26607c614fde1882b90c9804c17c74906f3c78fa88b51480b5e926e4ba"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 161,
+            "type": "file",
+            "sha256": "fd1c61df27e0307bab8d73e90eeb37adea6d46cf32613017d82d9de4790b01d4"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o644",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ]
+      },
+      "nondeterministic_fields": []
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "mcp-token-rotation",
       "operation": [
         "mcp",
         "--host",
@@ -12,25 +447,18 @@
         "--port",
         "<PORT>"
       ],
+      "process": {
+        "starts": 2,
+        "shutdown": "graceful",
+        "tokens_equal": false
+      },
       "roots": {
-        "home": "isolated",
-        "xdg_config": "isolated",
-        "xdg_data": "isolated",
-        "tmpdir": "isolated"
+        "data_dir": "isolated"
       },
       "manifest_roots": {
-        "home": "/tmp/symeraseme-go-oracle/http/home",
-        "xdg_config": "/tmp/symeraseme-go-oracle/http/xdg-config",
-        "xdg_data": "/tmp/symeraseme-go-oracle/http/xdg-data",
-        "tmpdir": "/tmp/symeraseme-go-oracle/http/tmp",
-        "data_dir": "/tmp/symeraseme-go-oracle/http/data",
-        "db_dir": "/tmp/symeraseme-go-oracle/http/db"
+        "data_dir": "/tmp/symeraseme-go-oracle/filesystem/mcp-token-rotation/data"
       },
-      "manifests": {
-        "home": [],
-        "xdg_config": [],
-        "xdg_data": [],
-        "tmpdir": [],
+      "before": {
         "data_dir": [
           {
             "path": "mcp_token",
@@ -42,13 +470,45 @@
               "reason": "crypto/rand token; secret intentionally not captured"
             }
           }
-        ],
-        "db_dir": []
+        ]
+      },
+      "after": {
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ]
+      },
+      "manifests": {
+        "data_dir": [
+          {
+            "path": "mcp_token",
+            "mode": "0o600",
+            "size_bytes": 43,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "crypto/rand token; secret intentionally not captured"
+            }
+          }
+        ]
       },
       "nondeterministic_fields": [
         {
-          "path": "manifests.data_dir[*].content",
-          "reason": "mcp_token is generated from crypto/rand",
+          "path": "before.data_dir[*].content",
+          "reason": "server-issued crypto/rand MCP token; secret intentionally not captured",
+          "replacement": "declaration only"
+        },
+        {
+          "path": "after.data_dir[*].content",
+          "reason": "server-issued crypto/rand MCP token; secret intentionally not captured",
           "replacement": "declaration only"
         },
         {

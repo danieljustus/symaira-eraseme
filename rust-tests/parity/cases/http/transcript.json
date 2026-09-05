@@ -16,6 +16,73 @@
   "cases": [
     {
       "schema": "symeraseme.go-oracle.http.v1",
+      "id": "remote-bind-rejected",
+      "phase": "startup_policy",
+      "request": {
+        "host": "192.0.2.1",
+        "allow_remote": false,
+        "port": "<PORT>"
+      },
+      "process": {
+        "argv": [
+          "mcp",
+          "--host",
+          "192.0.2.1",
+          "--port",
+          "<PORT>"
+        ],
+        "exit_code": 1,
+        "stdout_base64": "",
+        "stderr_base64": "cmVmdXNpbmcgbm9uLWxvb3BiYWNrIE1DUCBiaW5kICIxOTIuMC4yLjEiIHdpdGhvdXQgLS1hbGxvdy1yZW1vdGUK",
+        "stdout_bytes": 0,
+        "stderr_bytes": 66
+      },
+      "expected_outcome": "remote_bind_rejected",
+      "observed_listening": false,
+      "nondeterministic_fields": [
+        {
+          "path": "request.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "remote-bind-allowed",
+      "phase": "startup_policy",
+      "request": {
+        "host": "0.0.0.0",
+        "allow_remote": true,
+        "port": "<PORT>"
+      },
+      "process": {
+        "argv": [
+          "mcp",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "<PORT>",
+          "--allow-remote"
+        ],
+        "exit_code": 0,
+        "stdout_base64": "",
+        "stderr_base64": "",
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      "expected_outcome": "remote_bind_allowed",
+      "observed_listening": true,
+      "nondeterministic_fields": [
+        {
+          "path": "request.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
       "id": "get-method",
       "request": {
         "method": "GET",
@@ -377,6 +444,246 @@
     },
     {
       "schema": "symeraseme.go-oracle.http.v1",
+      "id": "missing-content-type",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "wrong-content-type",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "text/plain"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "host-localhost",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "host-untrusted",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "base64",
+          "data": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnt9fQ==",
+          "size_bytes": 58
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "146"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+        "body_bytes": 146
+      },
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
       "id": "valid-initialize",
       "request": {
         "method": "POST",
@@ -658,6 +965,68 @@
         "body_bytes": 12765
       },
       "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "request.headers.Authorization",
+          "reason": "server-issued crypto/rand token",
+          "replacement": "Bearer <MCP_TOKEN>"
+        },
+        {
+          "path": "response.headers.Date",
+          "reason": "net/http server wall clock",
+          "replacement": "<HTTP_DATE>"
+        },
+        {
+          "path": "server.port",
+          "reason": "ephemeral local listener",
+          "replacement": "<PORT>"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.http.v1",
+      "id": "body-at-limit",
+      "request": {
+        "method": "POST",
+        "path": "/",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Authorization",
+            "Bearer <MCP_TOKEN>"
+          ]
+        ],
+        "body": {
+          "encoding": "literal_byte",
+          "byte": "x",
+          "size_bytes": 5242880,
+          "sha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        }
+      },
+      "response": {
+        "status": 200,
+        "reason": "OK",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Date",
+            "<HTTP_DATE>"
+          ],
+          [
+            "Content-Length",
+            "76"
+          ]
+        ],
+        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNzAwLCJtZXNzYWdlIjoicGFyc2UgZXJyb3IifSwiaWQiOm51bGx9Cg==",
+        "body_bytes": 76
+      },
+      "expected_outcome": "parse_error",
       "nondeterministic_fields": [
         {
           "path": "request.headers.Authorization",
