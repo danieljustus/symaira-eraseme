@@ -128,6 +128,8 @@ Parameters:
     - * `host` (string): IMAP server hostname
     - * `port` (integer): IMAP server port
     - * `username` (string): IMAP username (email address)
+    -   `oauth2_access_token` (string): OAuth2 access token or secret reference; resolved server-side and never returned
+    -   `oauth2_username` (string): OAuth2 username (defaults to the IMAP username)
     - * `since_days` (integer): Fetch messages from the last N days
     - * `ssl` (boolean): Use SSL/TLS connection
     -   `campaign_id` (string): Filter by campaign
@@ -137,7 +139,7 @@ Implementation details:
 - **Adapter**: Production adapter uses `github.com/emersion/go-imap` over TLS 1.2+ (`NetIMAPDialer`).
 - **Authentication**: Supports standard IMAP LOGIN as well as SASL XOAUTH2. Passwords and access tokens are resolved safely and never emitted in logs or error strings.
 - **Persistent HWM**: High-water marks and `UIDVALIDITY` state are persisted per host and folder in the `imap_state` SQLite table in `symeraseme.db`. UIDVALIDITY changes trigger a cold re-scan.
-- **Config Precedence**: Command flags > MCP tool arguments > Environment variables (`IMAP_HOST`, `IMAP_PORT`, `IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_SSL`, `IMAP_FOLDER`, `IMAP_SINCE_DAYS`) > Built-in defaults.
+- **Config Precedence**: Command flags > MCP tool arguments > Environment variables (`IMAP_HOST`, `IMAP_PORT`, `IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_OAUTH2_USERNAME`, `IMAP_OAUTH2_ACCESS_TOKEN`, `IMAP_SSL`, `IMAP_FOLDER`, `IMAP_SINCE_DAYS`) > Built-in defaults. The `poll-inbox` CLI exposes `--oauth2-access-token` and `--oauth2-username`; when both credentials are present, XOAUTH2 takes precedence over IMAP LOGIN.
 - **Deduplication**: When polling multiple folders, replies are deduplicated across folders by RFC 5322 `Message-ID`.
 - **Matching & Storage**: Discovered broker replies are correlated against active removal requests and `SENT` events in SQLite, then persisted to `inbox_replies`.
 

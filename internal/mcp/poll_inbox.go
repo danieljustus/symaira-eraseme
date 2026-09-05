@@ -17,7 +17,16 @@ import (
 // transport arguments and loading repositories stays here; polling, matching,
 // persistence ordering, and HWM staging belong to email.InboxService.
 func handlePollInbox(ctx context.Context, args map[string]any, opts ContractHandlerOptions) (any, error) {
-	cfg, err := email.LoadIMAPConfig()
+	usernameArg := getStr(args, "username", "")
+	oauthUsernameArg := getStr(args, "oauth2_username", "")
+	oauthUsernameOverride := oauthUsernameArg
+	if oauthUsernameOverride == "" {
+		oauthUsernameOverride = usernameArg
+	}
+	cfg, err := email.LoadIMAPConfigWithOptions(email.IMAPConfigOptions{
+		OAuth2AccessToken: getStr(args, "oauth2_access_token", ""),
+		OAuth2Username:    oauthUsernameOverride,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -27,17 +36,28 @@ func handlePollInbox(ctx context.Context, args map[string]any, opts ContractHand
 	if p := getInt(args, "port", 0); p > 0 {
 		cfg.Port = p
 	}
-	if u := getStr(args, "username", ""); u != "" {
-		cfg.Username = u
+	if usernameArg != "" {
+		cfg.Username = usernameArg
+	}
+	if cfg.OAuth2 != nil {
+		if oauthUsernameArg != "" {
+			cfg.OAuth2.Username = oauthUsernameArg
+		} else if usernameArg != "" {
+			cfg.OAuth2.Username = usernameArg
+		}
 	}
 	if p := getStr(args, "password", ""); p != "" {
-		resolved, resolveErr := identity.ResolveSecret(p, identity.SecretResolver{
-			EnvFallback:     "IMAP_PASSWORD",
-			KeyringService:  "symeraseme-imap",
-			KeyringUsername: "IMAP_PASSWORD",
-		})
-		if resolveErr != nil {
-			return nil, fmt.Errorf("email: cannot resolve IMAP password: %w", resolveErr)
+		resolved := p
+		if cfg.OAuth2 == nil {
+			var resolveErr error
+			resolved, resolveErr = identity.ResolveSecret(p, identity.SecretResolver{
+				EnvFallback:     "IMAP_PASSWORD",
+				KeyringService:  "symeraseme-imap",
+				KeyringUsername: "IMAP_PASSWORD",
+			})
+			if resolveErr != nil {
+				return nil, fmt.Errorf("email: cannot resolve IMAP password: %w", resolveErr)
+			}
 		}
 		cfg.Password = resolved
 	}

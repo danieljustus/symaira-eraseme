@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/danieljustus/symaira-eraseme/internal/identity"
 )
 
 type recordingSMTP struct {
@@ -68,7 +71,7 @@ func TestLoadConfigAndSafeSecretFailure(t *testing.T) {
 	if err != nil || cfg.Host != "smtp.example.com" || cfg.Port != 2525 || cfg.UseTLS {
 		t.Fatalf("SMTP config = %#v, err=%v", cfg, err)
 	}
-	t.Setenv("IMAP_PASSWORD", "symvault://UNIQUE_SECRET_VALUE")
+	t.Setenv("IMAP_PASSWORD", "env://UNIQUE_SECRET_REFERENCE")
 	_, err = LoadIMAPConfig()
 	if err == nil || strings.Contains(err.Error(), "UNIQUE_SECRET_VALUE") {
 		t.Fatalf("secret leaked or error missing: %v", err)
@@ -230,5 +233,101 @@ func TestOAuthAuthorizeStateAndTokenExchange(t *testing.T) {
 	result, err := client.ExchangeCode(context.Background(), "test", "code", "id", "secret", "http://callback", "verifier")
 	if err != nil || result["access_token"] != "token" {
 		t.Fatalf("token exchange = %#v, err=%v", result, err)
+	}
+}
+
+func TestLoadIMAPConfigOAuth2FromEnvironment(t *testing.T) {
+	t.Setenv("IMAP_PASSWORD", "")
+	t.Setenv("IMAP_USERNAME", "imap-user@example.test")
+	t.Setenv("IMAP_OAUTH2_USERNAME", "oauth-user@example.test")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "environment-access-token")
+
+	cfg, err := LoadIMAPConfig()
+	if err != nil {
+		t.Fatalf("LoadIMAPConfig() error = %v", err)
+	}
+	if cfg.OAuth2 == nil {
+		t.Fatal("LoadIMAPConfig() returned no OAuth2 token")
+	}
+	if cfg.OAuth2.Username != "oauth-user@example.test" || cfg.OAuth2.AccessToken != "environment-access-token" {
+		t.Fatalf("OAuth2 config = %#v", cfg.OAuth2)
+	}
+}
+
+func TestLoadIMAPConfigOAuth2UnresolvedReferenceFailsClosed(t *testing.T) {
+	t.Setenv("IMAP_PASSWORD", "")
+	t.Setenv("IMAP_OAUTH2_USERNAME", "oauth-user@example.test")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "env://MISSING_IMAP_OAUTH2_TOKEN")
+	t.Setenv("MISSING_IMAP_OAUTH2_TOKEN", "")
+
+	_, err := LoadIMAPConfig()
+	if err == nil {
+		t.Fatal("LoadIMAPConfig() accepted an unresolved OAuth2 secret reference")
+	}
+	if strings.Contains(err.Error(), "oauth2-secret-value") {
+		t.Fatalf("error exposed an OAuth2 secret value: %v", err)
+	}
+}
+
+func TestLoadIMAPConfigOAuth2SkipsInvalidPasswordReference(t *testing.T) {
+	t.Setenv("IMAP_PASSWORD", "env://MISSING_IMAP_PASSWORD")
+	t.Setenv("MISSING_IMAP_PASSWORD", "")
+	t.Setenv("IMAP_OAUTH2_USERNAME", "oauth-user@example.test")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "valid-oauth-token")
+
+	cfg, err := LoadIMAPConfig()
+	if err != nil {
+		t.Fatalf("LoadIMAPConfig() error = %v", err)
+	}
+	if cfg.OAuth2 == nil || cfg.OAuth2.AccessToken != "valid-oauth-token" {
+		t.Fatalf("OAuth2 config = %#v", cfg.OAuth2)
+	}
+	if cfg.Password != "env://MISSING_IMAP_PASSWORD" {
+		t.Fatalf("password was changed despite OAuth2 token: %q", cfg.Password)
+	}
+}
+
+type oauthKeyring struct {
+	service  string
+	username string
+	value    string
+	gotSvc   string
+	gotUser  string
+}
+
+func (k *oauthKeyring) Get(service, username string) (string, error) {
+	k.gotSvc, k.gotUser = service, username
+	if service != k.service || username != k.username {
+		return "", errors.New("unexpected keyring lookup")
+	}
+	return k.value, nil
+}
+func (*oauthKeyring) Set(string, string, string) error { return nil }
+func (*oauthKeyring) Delete(string, string) error      { return nil }
+
+func TestLoadIMAPConfigOAuth2UsesOverriddenUsernameForKeyring(t *testing.T) {
+	t.Setenv("IMAP_PASSWORD", "env://MISSING_IMAP_PASSWORD")
+	t.Setenv("MISSING_IMAP_PASSWORD", "")
+	t.Setenv("IMAP_USERNAME", "original@example.test")
+	t.Setenv("IMAP_OAUTH2_USERNAME", "environment@example.test")
+	t.Setenv("IMAP_OAUTH2_ACCESS_TOKEN", "symvault://mail/oauth")
+
+	backend := &oauthKeyring{
+		service:  "symeraseme-oauth2",
+		username: "oauth2:override@example.test:access_token",
+		value:    "keyring-oauth-token",
+	}
+	identity.SetKeyringBackend(backend)
+	t.Cleanup(func() { identity.SetKeyringBackend(nil) })
+
+	cfg, err := LoadIMAPConfigWithOptions(IMAPConfigOptions{OAuth2Username: "override@example.test"})
+	if err != nil {
+		t.Fatalf("LoadIMAPConfigWithOptions() error = %v", err)
+	}
+	if cfg.OAuth2 == nil || cfg.OAuth2.Username != "override@example.test" || cfg.OAuth2.AccessToken != "keyring-oauth-token" {
+		t.Fatalf("OAuth2 config = %#v", cfg.OAuth2)
+	}
+	if backend.gotSvc != backend.service || backend.gotUser != backend.username {
+		t.Fatalf("keyring lookup = %q/%q, want %q/%q", backend.gotSvc, backend.gotUser, backend.service, backend.username)
 	}
 }
