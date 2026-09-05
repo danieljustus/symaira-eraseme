@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/danieljustus/symaira-eraseme"
 	"github.com/danieljustus/symaira-eraseme/internal/campaign"
+	"github.com/danieljustus/symaira-eraseme/internal/config"
 	"github.com/danieljustus/symaira-eraseme/internal/email"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
@@ -32,18 +33,31 @@ type ContractHandlerOptions struct {
 }
 
 func dataStore() (*eventstore.Store, error) {
-	dir := os.Getenv("SYMERASEME_DATA_DIR")
-	if dir == "" {
-		var err error
-		dir, err = identity.DefaultConsentDir()
+	storage, err := config.ResolveStorage()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(storage.DBDir, 0o700); err != nil {
+		return nil, fmt.Errorf("eventstore: create database directory: %w", err)
+	}
+	if err := os.Chmod(storage.DBDir, 0o700); err != nil {
+		return nil, fmt.Errorf("eventstore: secure database directory: %w", err)
+	}
+	requiresKey := storage.Encrypt
+	if !requiresKey {
+		requiresKey, err = eventstore.IsEncrypted(storage.DBPath)
 		if err != nil {
+			return nil, fmt.Errorf("eventstore: inspect database encryption: %w", err)
+		}
+	}
+	if requiresKey {
+		// Read-only bootstrap resolves an operator-provided/keyring key but
+		// never mints one as a side effect of opening storage.
+		if err := identity.BootstrapReadOnly(); err != nil {
 			return nil, err
 		}
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, err
-	}
-	return eventstore.Open(filepath.Join(dir, eventstore.DBFileName))
+	return eventstore.OpenConfigured(storage.DBPath, storage.TempDir, storage.Encrypt)
 }
 
 func writeGeneratedFile(path, content string) (string, error) {
@@ -155,7 +169,7 @@ func ContractHandler() Handler {
 }
 
 func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
-	return func(ctx context.Context, name string, args map[string]any) (any, error) {
+	return func(ctx context.Context, name string, args map[string]any) (result any, runErr error) {
 		switch name {
 
 		case "redact_file":
@@ -165,7 +179,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			brokers, err := loadRegistry()
 			if err != nil {
 				return nil, err
@@ -182,14 +196,14 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			return campaign.GetPlan(ctx, eventstore.NewRepository(store), getStr(args, "campaign_id", ""), getStr(args, "status", ""))
 		case "execute":
 			store, err := dataStore()
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			dryRun := getBool(args, "dry_run", false)
 			if !dryRun {
 				if err := identity.ConsentGate("execute", identity.ConsentOptions{
@@ -213,7 +227,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			client, err := newLLMClient(args)
 			if err != nil {
 				return nil, err
@@ -231,7 +245,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			client, err := newLLMClient(args)
 			if err != nil {
 				return nil, err
@@ -247,7 +261,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			data, err := reporting.GetDashboardData(ctx, store, "", time.Now().UTC())
 			if err != nil {
 				return nil, err
@@ -269,7 +283,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			format := getStr(args, "format", "html")
 			data, err := reporting.GetReportData(ctx, store, reporting.ReportOpts{
 				CampaignID:   getStr(args, "campaign_id", ""),
@@ -295,7 +309,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			var status *string
 			if value := getStr(args, "status", ""); value != "" {
 				status = &value
@@ -311,7 +325,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			result, err := manualtasks.HandleShow(ctx, store, int64(getInt(args, "task_id", 0)))
 			return result, err
 		case "manual_tasks_complete":
@@ -319,7 +333,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			result, err := manualtasks.HandleComplete(ctx, store, int64(getInt(args, "task_id", 0)), getStr(args, "notes", ""))
 			return result, err
 		case "manual_tasks_cleanup":
@@ -393,7 +407,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			return replies.NewService(store).AutoConfirm(ctx, replies.AutoConfirmRequest{
 				RequestID: int64(getInt(args, "request_id", 0)), Headless: !getBool(args, "headed", false),
 				ScreenshotDir: getStr(args, "screenshot_dir", ""), DryRun: getBool(args, "dry_run", false),
@@ -403,14 +417,14 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			return reporting.GetDashboardData(ctx, store, "", time.Now().UTC())
 		case "list_requests":
 			store, err := dataStore()
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			page := getInt(args, "page", 1)
 			if page < 1 {
 				return nil, errors.New("page must be at least 1")
@@ -446,7 +460,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			return eventstore.NewRepository(store).GetEvents(ctx, int64(getInt(args, "request_id", 0)), int64(getInt(args, "after_event_id", 0)))
 		case "list_brokers":
 			items, err := loadRegistry()
@@ -465,7 +479,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			defer store.Close()
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
 			return reporting.GetCalendar(ctx, store, getStr(args, "campaign_id", ""), getInt(args, "weeks", 4), time.Now().UTC())
 		case "grant":
 			listTokens := getBool(args, "list_tokens", false)

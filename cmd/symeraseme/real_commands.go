@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	_ "github.com/danieljustus/symaira-eraseme"
 	"github.com/danieljustus/symaira-eraseme/internal/campaign"
+	"github.com/danieljustus/symaira-eraseme/internal/config"
 	"github.com/danieljustus/symaira-eraseme/internal/deadlines"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
@@ -30,14 +31,31 @@ func outputFormat(cmd *cobra.Command) (string, error) {
 }
 
 func dataStore() (*eventstore.Store, error) {
-	dir := os.Getenv("SYMERASEME_DATA_DIR")
-	if dir == "" {
-		dir = filepath.Join(os.TempDir(), "symeraseme")
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	storage, err := config.ResolveStorage()
+	if err != nil {
 		return nil, err
 	}
-	return eventstore.Open(filepath.Join(dir, eventstore.DBFileName))
+	if err := os.MkdirAll(storage.DBDir, 0o700); err != nil {
+		return nil, fmt.Errorf("eventstore: create database directory: %w", err)
+	}
+	if err := os.Chmod(storage.DBDir, 0o700); err != nil {
+		return nil, fmt.Errorf("eventstore: secure database directory: %w", err)
+	}
+	requiresKey := storage.Encrypt
+	if !requiresKey {
+		requiresKey, err = eventstore.IsEncrypted(storage.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("eventstore: inspect database encryption: %w", err)
+		}
+	}
+	if requiresKey {
+		// Read-only bootstrap resolves an operator-provided/keyring key but
+		// never mints one as a side effect of opening storage.
+		if err := identity.BootstrapReadOnly(); err != nil {
+			return nil, err
+		}
+	}
+	return eventstore.OpenConfigured(storage.DBPath, storage.TempDir, storage.Encrypt)
 }
 
 func loadRegistry() ([]registry.Broker, error) {
@@ -52,7 +70,7 @@ func realPlanCommand() *cobra.Command {
 	var campaignID, jurisdiction, law, priority, category, status, profilePath, notes string
 	var maxBrokers int
 	var includeInactive bool
-	create := &cobra.Command{Use: "create", Short: "Create a removal campaign plan", RunE: func(cmd *cobra.Command, _ []string) error {
+	create := &cobra.Command{Use: "create", Short: "Create a removal campaign plan", RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 		if campaignID == "" {
 			return fmt.Errorf("--campaign is required")
 		}
@@ -64,7 +82,7 @@ func realPlanCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 		result, err := campaign.PlanCampaign(context.Background(), store, brokers, campaign.PlanOpts{CampaignID: campaignID, Jurisdiction: jurisdiction, Law: law, Priority: priority, Category: category, Status: status, IncludeInactive: includeInactive, MaxBrokers: maxBrokers, Notes: notes}, profilePath)
 		if err != nil {
 			return err
@@ -91,12 +109,12 @@ func realPlanCommand() *cobra.Command {
 	create.Flags().StringVar(&notes, "notes", "", "campaign notes")
 
 	var showCampaign, showStatus string
-	show := &cobra.Command{Use: "show", Short: "Show planned requests", RunE: func(cmd *cobra.Command, _ []string) error {
+	show := &cobra.Command{Use: "show", Short: "Show planned requests", RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 		store, err := dataStore()
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 		result, err := campaign.GetPlan(context.Background(), eventstore.NewRepository(store), showCampaign, showStatus)
 		if err != nil {
 			return err
@@ -118,7 +136,7 @@ func realPlanCommand() *cobra.Command {
 	var batchSize int
 	var executeAccount, consentToken, consentFile string
 	var executeDryRun bool
-	execute := &cobra.Command{Use: "execute", Short: "Execute planned requests", RunE: func(cmd *cobra.Command, _ []string) error {
+	execute := &cobra.Command{Use: "execute", Short: "Execute planned requests", RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 		if executeCampaignID == "" {
 			return fmt.Errorf("--campaign is required")
 		}
@@ -126,7 +144,7 @@ func realPlanCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 		if !executeDryRun {
 			if err := identity.ConsentGate("execute", identity.ConsentOptions{
 				ConsentToken:      consentToken,
@@ -169,12 +187,12 @@ func realPlanCommand() *cobra.Command {
 func planTickCommand() *cobra.Command { var dryRun bool; return tickCommandWith(&dryRun) }
 func planStatusCommand() *cobra.Command {
 	var campaignID string
-	return &cobra.Command{Use: "status", Short: "Show campaign status", RunE: func(cmd *cobra.Command, _ []string) error {
+	return &cobra.Command{Use: "status", Short: "Show campaign status", RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 		store, err := dataStore()
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 		result, err := reporting.GetCampaignStatus(context.Background(), store, campaignID, time.Now().UTC())
 		if err != nil {
 			return err
@@ -192,12 +210,12 @@ func planStatusCommand() *cobra.Command {
 }
 
 func tickCommandWith(dryRun *bool) *cobra.Command {
-	cmd := &cobra.Command{Use: "tick", Short: "Run the deadline tick engine", RunE: func(cmd *cobra.Command, _ []string) error {
+	cmd := &cobra.Command{Use: "tick", Short: "Run the deadline tick engine", RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 		store, err := dataStore()
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 		actions, err := deadlines.RunTick(context.Background(), eventstore.NewRepository(store), deadlines.RunOpts{DryRun: *dryRun})
 		if err != nil {
 			return err

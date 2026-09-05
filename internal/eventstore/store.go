@@ -108,6 +108,7 @@ type Store struct {
 	encryptedPath string
 	closeMu       sync.Mutex
 	dbClosed      bool
+	dbLock        *DBLock
 }
 
 // Path returns the resolved file path of the database (may be a
@@ -131,7 +132,7 @@ func (s *Store) Close() error {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 	if s.dbClosed && s.encryptedPath == "" {
-		return nil
+		return s.releaseDBLock()
 	}
 	if s.encryptedPath != "" {
 		return s.closeAtLocked(s.encryptedPath)
@@ -142,6 +143,7 @@ func (s *Store) Close() error {
 	err := closeStoreDBFn(s)
 	if err == nil {
 		s.dbClosed = true
+		return s.releaseDBLock()
 	}
 	return err
 }

@@ -116,10 +116,20 @@ The complete transport and tool contract lives in
 
 ## Configuration and secrets
 
-`SYMERASEME_DATA_DIR` selects the local data directory. Credentials should be
-referenced through the canonical `symvault://` form or a platform secure store;
-resolved values are never logged. Provider-specific configuration is consumed
-by the shared Go LLM layer.
+The event store defaults to `~/.local/share/symeraseme/symeraseme.db`; it never
+falls back to a temporary directory in production. Configuration precedence is
+built-in defaults, `~/.config/symeraseme/config.toml` (or
+`$XDG_CONFIG_HOME/symeraseme/config.toml`), the project
+`.symeraseme.toml`, then environment variables. `SYMERASEME_DATA_DIR` selects
+the base data directory, `SYMERASEME_DB_DIR` overrides only the database
+directory, and `SYMERASEME_ENCRYPT_DB` accepts `1|true|yes|on` or
+`0|false|no|off`. Invalid values fail closed. When encryption is enabled, the
+SQLite file is written as a standard Fernet envelope and decrypted only into a
+private temporary directory during use; switching modes is atomic.
+
+Credentials should be referenced through the canonical `symvault://` form or a
+platform secure store; resolved values are never logged. Provider-specific
+configuration is consumed by the shared Go LLM layer.
 
 ## Development
 

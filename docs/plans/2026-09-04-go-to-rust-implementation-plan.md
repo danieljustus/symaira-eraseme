@@ -201,10 +201,10 @@ verbatim: `make fmt-check test lint vet build coverage`.
       lengths to 17 bytes without changing header bytes, and pin the raw bytes
       plus lengths in a Go test.
 - [x] Merge #795 before Phase 4 begins; regenerate oracle fixtures afterward.
-- [ ] Resolve #796 before any oracle capture: production CLI/MCP storage must
+- [x] Resolve #796 before any oracle capture: production CLI/MCP storage must
       honor the documented default, `SYMERASEME_DB_DIR` and
       `SYMERASEME_ENCRYPT_DB`, including safe plaintext/encrypted upgrades.
-- [ ] Prove restart durability and WAL/encryption cleanup in isolated dirs;
+- [x] Prove restart durability and WAL/encryption cleanup in isolated dirs;
       merge #796, then generate the Go oracle fixtures.
 - [x] Resolve #797 before app parity: parse the raw `tools/list` result separately
       from the `tools/call` content envelope and test the exact 26-tool shape.

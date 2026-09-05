@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ import (
 // handlePollInbox is the MCP adapter for the email inbox service. Parsing
 // transport arguments and loading repositories stays here; polling, matching,
 // persistence ordering, and HWM staging belong to email.InboxService.
-func handlePollInbox(ctx context.Context, args map[string]any, opts ContractHandlerOptions) (any, error) {
+func handlePollInbox(ctx context.Context, args map[string]any, opts ContractHandlerOptions) (result any, runErr error) {
 	usernameArg := getStr(args, "username", "")
 	oauthUsernameArg := getStr(args, "oauth2_username", "")
 	oauthUsernameOverride := oauthUsernameArg
@@ -130,7 +131,7 @@ func handlePollInbox(ctx context.Context, args map[string]any, opts ContractHand
 		return nil, storeErr
 	}
 	if store != nil {
-		defer store.Close()
+		defer func() { runErr = errors.Join(runErr, store.Close()) }()
 	}
 
 	state := opts.HWMStore

@@ -581,16 +581,8 @@ func TestPlainCloseDirectorySyncFailureKeepsRecoveryCopy(t *testing.T) {
 	t.Cleanup(func() { ForgetTemp(encPath) })
 	syncErr := errors.New("directory sync failure")
 	syncDirectoryFn = func(string) error { return syncErr }
-	removed := false
-	removeWALSiblingsFn = func(string) error {
-		removed = true
-		return nil
-	}
 	if err := store.CloseAt(encPath); !errors.Is(err, syncErr) {
 		t.Fatalf("CloseAt error = %v, want %v", err, syncErr)
-	}
-	if removed {
-		t.Fatal("WAL siblings were removed after directory sync failure")
 	}
 	regValue, ok := encryptedTemps.Load(encPath)
 	if !ok {
@@ -598,20 +590,20 @@ func TestPlainCloseDirectorySyncFailureKeepsRecoveryCopy(t *testing.T) {
 	}
 	reg, ok := tempRegistration(regValue)
 	if !ok || reg.tmpPath == encPath {
-		t.Fatalf("recovery registration = %+v, want a separate recovery copy", reg)
+		t.Fatalf("recovery registration = %+v, want plaintext source outside canonical path", reg)
 	}
-	recovered, err := os.ReadFile(reg.tmpPath)
+	registeredPlain, err := os.ReadFile(reg.tmpPath)
+	if err != nil || !bytes.Equal(registeredPlain, plain) {
+		t.Fatalf("registered recovery source = %q, err=%v", registeredPlain, err)
+	}
+	canonical, err := os.ReadFile(encPath)
 	if err != nil {
-		t.Fatalf("read recovery copy: %v", err)
+		t.Fatal(err)
 	}
-	if !bytes.Equal(recovered, plain) {
-		t.Fatalf("recovery copy = %q, want %q", recovered, plain)
+	if !bytes.HasPrefix(canonical, EncMagicV3) {
+		t.Fatalf("canonical source is not ciphertext after post-rename failure: %q", canonical[:min(len(canonical), len(EncMagicV3))])
 	}
-	decrypted, err := DecryptFile(encPath)
-	if err != nil {
-		t.Fatalf("decrypt replacement: %v", err)
-	}
-	if !bytes.Equal(decrypted, plain) {
-		t.Fatalf("replacement plaintext = %q, want %q", decrypted, plain)
+	if recovered, err := DecryptBytes(canonical); err != nil || !bytes.Equal(recovered, plain) {
+		t.Fatalf("canonical ciphertext does not preserve source: decrypt=%v", err)
 	}
 }
