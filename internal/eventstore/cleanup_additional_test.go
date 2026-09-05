@@ -11,9 +11,10 @@ import (
 func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	stale := filepath.Join(dir, "symeraseme_decrypted_old.db")
+	staleWrite := filepath.Join(dir, ".symeraseme_write_crashed.tmp")
 	recent := filepath.Join(dir, "symeraseme_decrypted_recent.db")
 	ignored := filepath.Join(dir, "other.db")
-	for _, path := range []string{stale, stale + "-wal", stale + "-shm", recent, ignored} {
+	for _, path := range []string{stale, stale + "-wal", stale + "-shm", staleWrite, recent, ignored} {
 		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -22,10 +23,13 @@ func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 	if err := os.Chtimes(stale, old, old); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chtimes(staleWrite, old, old); err != nil {
+		t.Fatal(err)
+	}
 	if err := ScavengeStaleTemps(dir); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{stale, stale + "-wal", stale + "-shm"} {
+	for _, path := range []string{stale, stale + "-wal", stale + "-shm", staleWrite} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("stale artifact %s remains", path)
 		}

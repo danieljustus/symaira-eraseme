@@ -73,6 +73,7 @@ func isStaleTempName(name string) bool {
 	for _, prefix := range []string{
 		"symeraseme_decrypted_",
 		"symeraseme_init_",
+		".symeraseme_write_",
 		".symeraseme_recovery_",
 		".symeraseme_previous_",
 	} {
