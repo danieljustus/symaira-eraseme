@@ -100,17 +100,16 @@ func RemoveWALSiblings(path string) error {
 // File locking (encrypted-DB mutual exclusion)
 // --------------------------------------------------------------------
 
-// DBLock is an exclusive lock on a sibling .lock file.  Released
-// by Close.  No-op on platforms where flock is unavailable.
+// DBLock is an exclusive interprocess lock on a sibling .lock file. It uses
+// flock on Unix and LockFileEx on Windows and is released by Close.
 type DBLock struct {
 	path string
 	file *os.File
 }
 
-// LockDB acquires an exclusive lock at dbPath+".lock".  Returns
-// nil when the lock could not be acquired (or the platform has no
-// flock) — encryption callers treat the absence of a lock as a
-// best-effort.  retryMax controls the number of attempts.
+// LockDB acquires an exclusive non-blocking lock at dbPath+".lock".
+// Acquisition failure is fatal after retryMax attempts; callers never proceed
+// with a best-effort or file-existence-only lock.
 func LockDB(dbPath string, retryMax int) (*DBLock, error) {
 	lockPath := dbPath + ".lock"
 	attempts := retryMax
@@ -125,9 +124,7 @@ func LockDB(dbPath string, retryMax int) (*DBLock, error) {
 			time.Sleep(time.Second)
 			continue
 		}
-		// Try non-blocking exclusive lock.  flock is a no-op on
-		// Windows; we accept that the file-exists check is the
-		// best we can do there.
+		// Try the platform's non-blocking exclusive lock.
 		if err := flockExclusive(f); err != nil {
 			_ = f.Close()
 			lastErr = err

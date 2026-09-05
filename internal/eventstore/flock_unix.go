@@ -1,7 +1,5 @@
 // Package eventstore (flock_unix.go): POSIX advisory lock helpers.
-// Builds on macOS and Linux; on Windows this file is replaced by
-// flock_windows.go which falls back to a no-op (the file-exists
-// check is the best we can do without platform support).
+// Builds on macOS and Linux; Windows uses LockFileEx in flock_windows.go.
 //go:build !windows
 
 package eventstore
