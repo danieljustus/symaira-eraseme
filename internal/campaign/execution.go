@@ -117,7 +117,7 @@ func executeWebformRequest(
 		return nil, err
 	}
 
-	result := withoutSensitiveFormEvidence(runner(ctx, brokerName, dryRun))
+	result := runner(ctx, brokerName, dryRun)
 	if success, _ := result["success"].(bool); success {
 		_, _, err = storeAppend(ctx, store, requestID, eventstore.EvtSent, map[string]any{
 			"broker_name":            brokerName,
@@ -125,6 +125,7 @@ func executeWebformRequest(
 			"expected_response_days": 30,
 			"identity_snapshot_hash": identityHash,
 			"formflow_code":          result["code"],
+			"evidence":               result["evidence"],
 		})
 	} else {
 		payload := map[string]any{
@@ -132,13 +133,16 @@ func executeWebformRequest(
 			"broker_name":   brokerName,
 			"formflow_code": result["code"],
 			"reason":        stringOr(result["reason"], reasonForCodeString(result["code"])),
+			"evidence":      result["evidence"],
 		}
 		if result["final_url"] != nil {
 			payload["form_url"] = result["final_url"]
 		} else {
 			payload["form_url"] = result["url"]
 		}
-
+		if result["page_text"] != nil {
+			payload["page_text"] = result["page_text"]
+		}
 		if taskID, ok := result["task_id"]; ok && taskID != nil {
 			payload["task_id"] = taskID
 		} else {
@@ -189,22 +193,6 @@ func executeWebformRequest(
 		out[k] = v
 	}
 	return out, nil
-}
-
-// withoutSensitiveFormEvidence keeps raw browser evidence out of event payloads
-// and campaign command responses. Manual-only production paths have no browser
-// evidence; injected executors must persist approved artifacts separately.
-func withoutSensitiveFormEvidence(raw map[string]any) map[string]any {
-	result := make(map[string]any, len(raw))
-	for key, value := range raw {
-		switch key {
-		case "evidence", "page_text", "html_snapshot", "form_fields", "screenshot_path", "pre_submit_screenshot", "post_submit_screenshot":
-			continue
-		default:
-			result[key] = value
-		}
-	}
-	return result
 }
 
 func executeEmailRequest(
