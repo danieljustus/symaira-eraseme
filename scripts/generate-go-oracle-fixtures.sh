@@ -7,8 +7,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PINNED_COMMIT="bf53346eec234929bedf0314b99e3da85dbb991b"
 OUT_DIR="${REPO_ROOT}/rust-tests/parity"
-RUNTIME_ROOT="/tmp/symeraseme-go-oracle"
-RUNTIME_LOCK="${RUNTIME_ROOT}.lock"
 
 usage() {
     printf '%s\n' "Usage: $0" "" "Generate CLI, MCP, HTTP, and filesystem fixtures from ${PINNED_COMMIT}."
@@ -30,33 +28,40 @@ if ! git cat-file -e "${PINNED_COMMIT}^{commit}"; then
     exit 1
 fi
 
+GO_TOOLCHAIN="go1.26.6"
+GO_ROOT="$(env -i PATH="${PATH}" HOME="${HOME}" GOPROXY=off GOENV=off GOWORK=off GOTOOLCHAIN="${GO_TOOLCHAIN}" go env GOROOT)"
+GO_MODULE_CACHE="$(env -i PATH="${PATH}" HOME="${HOME}" GOPROXY=off GOENV=off GOWORK=off GOTOOLCHAIN="${GO_TOOLCHAIN}" go env GOMODCACHE)"
+PINNED_GO="${GO_ROOT}/bin/go"
+if [[ ! -x "${PINNED_GO}" || ! -d "${GO_MODULE_CACHE}" ]]; then
+    printf 'error: cached %s toolchain or pinned module cache is unavailable\n' "${GO_TOOLCHAIN}" >&2
+    exit 1
+fi
+GO_VERSION="$(env -i PATH="${GO_ROOT}/bin:/usr/bin:/bin" HOME="${HOME}" GOPROXY=off GOENV=off GOWORK=off GOTOOLCHAIN="${GO_TOOLCHAIN}" "${PINNED_GO}" version)"
+if [[ "${GO_VERSION}" != "go version ${GO_TOOLCHAIN} "* ]]; then
+    printf 'error: resolved toolchain is not %s: %s\n' "${GO_TOOLCHAIN}" "${GO_VERSION}" >&2
+    exit 1
+fi
+
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/symeraseme-oracle.XXXXXX")"
-LOCK_HELD=0
-RUNTIME_OWNED=0
+RUNTIME_ROOT="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/symeraseme-go-oracle.XXXXXX")" && pwd -P)"
+STAGE_DIR="$(mktemp -d "${OUT_DIR}/.oracle-staging.XXXXXX")"
+BACKUP_DIR="${OUT_DIR}/.oracle-backup.$$"
+SWAP_STARTED=0
+CASES_BACKED_UP=0
+FIXTURES_BACKED_UP=0
+CASES_INSTALLED=0
+FIXTURES_INSTALLED=0
 cleanup() {
-    rm -rf "${SCRATCH}" 2>/dev/null || true
-    if [[ "${RUNTIME_OWNED}" -eq 1 ]]; then
-        rm -rf "${RUNTIME_ROOT}" 2>/dev/null || true
+    rm -rf "${SCRATCH}" "${RUNTIME_ROOT}" "${STAGE_DIR}" 2>/dev/null || true
+    if [[ "${SWAP_STARTED}" -eq 1 ]]; then
+        if [[ "${CASES_INSTALLED}" -eq 1 ]]; then rm -rf "${OUT_DIR}/cases" 2>/dev/null || true; fi
+        if [[ "${FIXTURES_INSTALLED}" -eq 1 ]]; then rm -rf "${OUT_DIR}/fixtures" 2>/dev/null || true; fi
+        if [[ "${CASES_BACKED_UP}" -eq 1 ]]; then mv "${BACKUP_DIR}/cases" "${OUT_DIR}/cases" 2>/dev/null || true; fi
+        if [[ "${FIXTURES_BACKED_UP}" -eq 1 ]]; then mv "${BACKUP_DIR}/fixtures" "${OUT_DIR}/fixtures" 2>/dev/null || true; fi
     fi
-    if [[ "${LOCK_HELD}" -eq 1 ]]; then
-        rmdir "${RUNTIME_LOCK}" 2>/dev/null || true
-    fi
+    rm -rf "${BACKUP_DIR}" 2>/dev/null || true
 }
 trap cleanup EXIT
-
-if ! mkdir "${RUNTIME_LOCK}" 2>/dev/null; then
-    printf 'error: another oracle generator owns %s\n' "${RUNTIME_LOCK}" >&2
-    exit 1
-fi
-LOCK_HELD=1
-if [[ -e "${RUNTIME_ROOT}" && ! -f "${RUNTIME_ROOT}/.symeraseme-oracle-owned" ]]; then
-    printf 'error: refusing to remove unowned runtime root %s\n' "${RUNTIME_ROOT}" >&2
-    exit 1
-fi
-rm -rf "${RUNTIME_ROOT}"
-mkdir -p "${RUNTIME_ROOT}"
-touch "${RUNTIME_ROOT}/.symeraseme-oracle-owned"
-RUNTIME_OWNED=1
 
 SRC="${SCRATCH}/src"
 BIN="${SCRATCH}/symeraseme"
@@ -185,9 +190,10 @@ func TestOracleSurface(t *testing.T) {
     root.InitDefaultHelpCmd()
     root.InitDefaultVersionFlag()
     document := struct {
+        Schema string          `json:"schema"`
         Commit string          `json:"commit"`
         Root   oracleCommand   `json:"root"`
-    }{Commit: os.Getenv("ORACLE_COMMIT"), Root: commandMetadata(root, nil, 0)}
+    }{Schema: "symeraseme.go-oracle.cli-surface.v1", Commit: os.Getenv("ORACLE_COMMIT"), Root: commandMetadata(root, nil, 0)}
     data, err := json.MarshalIndent(document, "", "  ")
     if err != nil {
         t.Fatal(err)
@@ -201,20 +207,29 @@ EOF
 
 (
     cd "${SRC}"
-    GOWORK=off CGO_ENABLED=0 go build -trimpath -buildvcs=false -o "${BIN}" ./cmd/symeraseme
-    ORACLE_SURFACE_OUTPUT="${SURFACE}" ORACLE_COMMIT="${PINNED_COMMIT}" \
-        GOWORK=off CGO_ENABLED=0 go test -count=1 ./cmd/symeraseme -run '^TestOracleSurface$'
+    GO_BUILD_ENV=(env -i
+        PATH="${GO_ROOT}/bin:/usr/bin:/bin"
+        HOME="${SCRATCH}/go-home"
+        GOCACHE="${SCRATCH}/go-cache"
+        GOPATH="${SCRATCH}/go-path"
+        GOMODCACHE="${GO_MODULE_CACHE}"
+        TMPDIR="${SCRATCH}/go-tmp"
+        GOPROXY=off GOENV=off GOWORK=off GOTOOLCHAIN="${GO_TOOLCHAIN}"
+        CGO_ENABLED=0)
+    mkdir -p "${SCRATCH}/go-home" "${SCRATCH}/go-cache" "${SCRATCH}/go-path" "${SCRATCH}/go-tmp"
+    "${GO_BUILD_ENV[@]}" "${PINNED_GO}" build -trimpath -buildvcs=false -o "${BIN}" ./cmd/symeraseme
+    ORACLE_BUILD_ENV=("${GO_BUILD_ENV[@]}" "ORACLE_SURFACE_OUTPUT=${SURFACE}" "ORACLE_COMMIT=${PINNED_COMMIT}")
+    "${ORACLE_BUILD_ENV[@]}" "${PINNED_GO}" test -count=1 ./cmd/symeraseme -run '^TestOracleSurface$'
 )
 
-# Remove every prior generated artifact before writing the new corpus. This
-# prevents stale cases from surviving a reduced or changed command surface.
-rm -rf "${OUT_DIR}/cases" "${OUT_DIR}/fixtures/README.md"
-mkdir -p "${OUT_DIR}/cases/cli" "${OUT_DIR}/cases/mcp" "${OUT_DIR}/cases/http" \
-    "${OUT_DIR}/cases/filesystem" "${OUT_DIR}/fixtures"
+# Generate only in the same-filesystem staging tree. Existing cases and
+# fixtures remain untouched until every subprocess and artifact succeeds.
+mkdir -p "${STAGE_DIR}/cases/cli" "${STAGE_DIR}/cases/mcp" "${STAGE_DIR}/cases/http" \
+    "${STAGE_DIR}/cases/filesystem" "${STAGE_DIR}/fixtures"
 
 # The Python part is a black-box runner: it launches only the pinned binary,
 # captures bytes before decoding, and writes no timestamp or host identity.
-python3 - "${SURFACE}" "${BIN}" "${OUT_DIR}" "${RUNTIME_ROOT}" "${PINNED_COMMIT}" <<'PYEOF'
+python3 - "${SURFACE}" "${BIN}" "${STAGE_DIR}" "${RUNTIME_ROOT}" "${PINNED_COMMIT}" "${GO_VERSION}" "${GO_ROOT}" "${GO_MODULE_CACHE}" <<'PYEOF'
 import base64
 import hashlib
 import http.client
@@ -227,9 +242,10 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
-surface_path, binary, out_dir, runtime_root, commit = sys.argv[1:]
+surface_path, binary, out_dir, runtime_root, commit, go_version, go_root, go_module_cache = sys.argv[1:]
 out = pathlib.Path(out_dir)
 root = pathlib.Path(runtime_root)
 source_binary = pathlib.Path(binary)
@@ -243,6 +259,26 @@ binary = str(fixed_binary)
 
 with open(surface_path, encoding="utf-8") as fh:
     surface = json.load(fh)
+
+# The generator records the exact pinned toolchain contract without exposing
+# host-specific paths. The module cache is the only dependency source.
+toolchain = {
+    "go_version": go_version,
+    "go_root": "<GO_ROOT>",
+    "module_cache": "<PINNED_MODULE_CACHE>",
+    "goproxy": "off", "goenv": "off", "gowork": "off",
+    "gotoolchain": "go1.26.6",
+    "cache": "isolated", "home": "isolated",
+}
+normalization_contract = {
+    "exact_runtime_root": {
+        "replacement": "<ORACLE_ROOT>",
+        "scope": ["argv", "stdout", "stderr", "manifest_roots", "artifact_evidence"],
+        "rule": "replace only the exact unique mktemp-owned runtime root",
+    },
+}
+surface["toolchain"] = toolchain
+surface["normalization"] = normalization_contract
 
 # Do not inherit application credentials, profile paths, or executable search
 # paths. The pinned binary is launched by absolute path; an empty private PATH
@@ -283,25 +319,99 @@ def b64(data):
     return base64.b64encode(data).decode("ascii")
 
 
+MAX_STDOUT_BYTES = 8 * 1024 * 1024
+MAX_STDERR_BYTES = 2 * 1024 * 1024
+capture_dir = root / "captures"
+capture_dir.mkdir(parents=True, exist_ok=True)
+root_text = str(root)
+root_real_text = os.path.realpath(root_text)
+root_alias_set = {root_text, root_real_text}
+if root_text.startswith("/private/"):
+    root_alias_set.add(root_text[len("/private"):])
+else:
+    root_alias_set.add("/private" + root_text)
+root_aliases = sorted(root_alias_set, key=len, reverse=True)
+root_bytes = tuple(alias.encode() for alias in root_aliases)
+
+
+def normalize_root_bytes(data):
+    # Deliberately replace only the exact generated root (including its macOS
+    # symlink-resolved spelling); no broad temp/path scrubber is allowed.
+    for alias in root_bytes:
+        data = data.replace(alias, b"<ORACLE_ROOT>")
+    return data
+
+
+def normalize_root_value(value):
+    if isinstance(value, str):
+        for alias in root_aliases:
+            value = value.replace(alias, "<ORACLE_ROOT>")
+        return value
+    if isinstance(value, list):
+        return [normalize_root_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: normalize_root_value(item) for key, item in value.items()}
+    return value
+
+
+def bounded_read(path, limit, stream, case_name):
+    size = path.stat().st_size
+    if size > limit:
+        raise RuntimeError(f"{stream} exceeded {limit} bytes in {case_name}: {size}")
+    return path.read_bytes()
+
+
+def start_process(argv, env, cwd, stdin=subprocess.DEVNULL):
+    paths = []
+    try:
+        for stream in ("stdout", "stderr"):
+            fd, name = tempfile.mkstemp(prefix=f"{stream}-", dir=capture_dir)
+            os.close(fd)
+            paths.append(pathlib.Path(name))
+        with paths[0].open("wb") as stdout_file, paths[1].open("wb") as stderr_file:
+            proc = subprocess.Popen(
+                [binary, *argv], stdin=stdin, stdout=stdout_file,
+                stderr=stderr_file, env=env, cwd=cwd, start_new_session=True,
+            )
+        return proc, paths
+    except Exception:
+        for path in paths:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def stop_process(proc, paths, case_name, terminate=False, timeout=8):
+    try:
+        if terminate and proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
+        stdout = bounded_read(paths[0], MAX_STDOUT_BYTES, "stdout", case_name)
+        stderr = bounded_read(paths[1], MAX_STDERR_BYTES, "stderr", case_name)
+        return proc.returncode, stdout, stderr
+    finally:
+        for path in paths:
+            path.unlink(missing_ok=True)
+
+
 def run_process(argv, stdin=b"", case_name="case", timeout=20, env_extra=None, cwd=None):
     env = dict(base_env)
     if env_extra:
         env.update(env_extra)
-    proc = subprocess.Popen(
-        [binary, *argv], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, env=env, cwd=cwd or str(root / "cwd"),
-        start_new_session=True,
-    )
+    proc, paths = start_process(argv, env, cwd or str(root / "cwd"), stdin=subprocess.PIPE)
     try:
-        stdout, stderr = proc.communicate(stdin, timeout=timeout)
+        proc.communicate(stdin, timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
-        stdout, stderr = proc.communicate()
+        stop_process(proc, paths, case_name, terminate=True)
         raise RuntimeError(f"timeout in {case_name}: argv={argv!r}")
+    return_code, stdout, stderr = stop_process(proc, paths, case_name)
     return {
         "argv": argv,
         "stdin_base64": b64(stdin),
-        "exit_code": proc.returncode,
+        "exit_code": return_code,
         "stdout_base64": b64(stdout),
         "stderr_base64": b64(stderr),
         "stdout_bytes": len(stdout),
@@ -346,14 +456,15 @@ def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=No
     result = run_process(argv, stdin, case_id, env_extra=env_extra, cwd=cwd)
     # Normalizers run only after raw bytes have been captured. Each one is a
     # field-specific contract exception, never a general trim/sort operation.
-    stdout = result.pop("_stdout_raw")
-    stderr = result.pop("_stderr_raw")
-    nondeterministic = []
+    stdout = normalize_root_bytes(result.pop("_stdout_raw"))
+    stderr = normalize_root_bytes(result.pop("_stderr_raw"))
+    nondeterministic = [{"path": "argv/stdout/stderr", "reason": "only the exact unique runtime root is normalized", "replacement": "<ORACLE_ROOT>"}]
     for pattern, replacement, path, reason, marker in normalizers:
         stdout, count = re.subn(pattern, replacement, stdout, count=1)
         if count != 1:
             raise RuntimeError(f"expected one nondeterministic field in {case_id}: {path}")
         nondeterministic.append({"path": path, "reason": reason, "replacement": marker})
+    result["argv"] = normalize_root_value(result["argv"])
     result["stdout_base64"] = b64(stdout)
     result["stdout_bytes"] = len(stdout)
     result["stderr_base64"] = b64(stderr)
@@ -464,7 +575,7 @@ operational_argvs = {
     "manual-tasks/list": ["manual-tasks", "list", "--output", "json"],
     "manual-tasks/show": ["manual-tasks", "show", "1", "--output", "json"],
     "mcp": ["mcp", "--stdio"],
-    "migrate": ["migrate", "--source", "/tmp/symeraseme-go-oracle/cli/migrate/source", "--destination", "/tmp/symeraseme-go-oracle/cli/migrate/destination", "--dry-run", "--json"],
+    "migrate": ["migrate", "--source", str(root / "cli" / "migrate" / "source"), "--destination", str(root / "cli" / "migrate" / "destination"), "--dry-run", "--json"],
     "plan/create": ["--output", "json", "plan", "create", "--campaign", "oracle-campaign", "--max", "1"],
     "plan/execute": ["--output", "json", "plan", "execute", "--campaign", "oracle-campaign", "--dry-run"],
     "plan/show": ["--output", "json", "plan", "show", "--campaign", "oracle-campaign"],
@@ -475,7 +586,7 @@ operational_argvs = {
     "registry/validate": ["registry", "validate", "--output", "json"],
     "render-template": ["render-template", "laws/gdpr-art17.en.md.j2", "--broker-name", "Oracle Broker", "--broker-website", "https://example.invalid"],
     "requests/list": ["requests", "list", "--output", "json"],
-    "review": ["review", "/tmp/symeraseme-go-oracle/cli/review/missing.txt", "--output", "json"],
+    "review": ["review", str(root / "cli" / "review" / "missing.txt"), "--output", "json"],
     "run-web-form": ["run-web-form", "virtual-minds-eu", "--dry-run", "--output", "json"],
     "schedule/install": ["schedule", "install", "--platform", "cron", "--dry-run", "--output", "json"],
     "schedule/status": ["schedule", "status", "--platform", "cron", "--output", "json"],
@@ -511,6 +622,8 @@ for key in sorted(operational_argvs):
 cli_document = {
     "schema": "symeraseme.go-oracle.cli.v1",
     "commit": commit,
+    "toolchain": toolchain,
+    "normalization": normalization_contract,
     "environment": {"timezone": "UTC", "locale": "C", "credentials": "cleared", "home": "isolated", "keychain": "not_accessed", "path": "private_empty"},
     "surface_file": "surface.json",
     "cases": root_behavior_cases + help_cases + success_cases + operational_cases,
@@ -567,11 +680,17 @@ for case_id, payload in mcp_inputs:
     for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "TMPDIR", "SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_CONFIG_DIR"):
         pathlib.Path(env_extra[key]).mkdir(parents=True, exist_ok=True)
     result = run_process(["mcp", "--stdio"], payload, case_id, env_extra=env_extra, cwd=str(case_root))
-    result.pop("_stdout_raw")
-    result.pop("_stderr_raw")
+    raw_stdout = normalize_root_bytes(result.pop("_stdout_raw"))
+    raw_stderr = normalize_root_bytes(result.pop("_stderr_raw"))
+    result["stdout_base64"] = b64(raw_stdout)
+    result["stdout_bytes"] = len(raw_stdout)
+    result["stderr_base64"] = b64(raw_stderr)
+    result["stderr_bytes"] = len(raw_stderr)
     result.update({
         "schema": "symeraseme.go-oracle.mcp.v1",
         "commit": commit,
+        "toolchain": toolchain,
+        "normalization": normalization_contract,
         "id": case_id,
         "input_kind": "jsonl",
         "expected_outcome": {
@@ -580,7 +699,7 @@ for case_id, payload in mcp_inputs:
             "malformed-json": "protocol_error",
         }.get(case_id, "protocol_response"),
         "classification": "graceful_shutdown" if case_id == "graceful-shutdown" else ("protocol_error" if case_id in ("truncated-frame", "malformed-json") else "protocol_response"),
-        "nondeterministic_fields": [],
+        "nondeterministic_fields": [{"path": "argv/stdout/stderr", "reason": "only the exact unique runtime root is normalized", "replacement": "<ORACLE_ROOT>"}],
     })
     mcp_cases.append(result)
 # The matrix freezes a valid tools/call request for every one of the 26
@@ -636,7 +755,7 @@ def normalize_mcp_timestamps(raw, tool_name):
         fields = [("generated_at", "result.content[0].text.generated_at")]
     elif tool_name == "get_calendar":
         fields = [("as_of", "result.content[0].text.as_of"), ("horizon_until", "result.content[0].text.horizon_until")]
-    nondeterministic = []
+    nondeterministic = [{"path": "stdout", "reason": "only the exact unique runtime root is normalized", "replacement": "<ORACLE_ROOT>"}]
     for field, path in fields:
         prefix = field.encode("ascii") + b'\\":\\"'
         suffix = b'\\"'
@@ -674,18 +793,23 @@ for tool in tools_frame["result"]["tools"]:
     for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "TMPDIR", "SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_CONFIG_DIR"):
         pathlib.Path(env_extra[key]).mkdir(parents=True, exist_ok=True)
     result = run_process(["mcp", "--stdio"], payload, case_id, env_extra=env_extra, cwd=str(case_root))
-    raw_stdout = result.pop("_stdout_raw")
-    result.pop("_stderr_raw")
+    raw_stdout = normalize_root_bytes(result.pop("_stdout_raw"))
+    raw_stderr = normalize_root_bytes(result.pop("_stderr_raw"))
     normalized_stdout, nondeterministic = normalize_mcp_timestamps(raw_stdout, tool["name"])
+    result["stdin_base64"] = b64(normalize_root_bytes(payload))
     result["stdout_base64"] = b64(normalized_stdout)
     result["stdout_bytes"] = len(normalized_stdout)
+    result["stderr_base64"] = b64(raw_stderr)
+    result["stderr_bytes"] = len(raw_stderr)
     result.update({
         "schema": "symeraseme.go-oracle.mcp.v1",
         "commit": commit,
+        "toolchain": toolchain,
+        "normalization": normalization_contract,
         "id": case_id,
         "input_kind": "valid_tools_call",
         "tool": tool["name"],
-        "arguments": args,
+        "arguments": normalize_root_value(args),
         "expected_outcome": "observed",
         "nondeterministic_fields": nondeterministic,
     })
@@ -722,9 +846,12 @@ def http_startup_probe(case_id, host, allow_remote):
         env[key] = str(case_root / pathlib.Path(base_env[key]).name)
         pathlib.Path(env[key]).mkdir(parents=True, exist_ok=True)
     probe_port = free_port()
-    proc = subprocess.Popen([binary, "mcp", "--host", host, "--port", str(probe_port)] + (["--allow-remote"] if allow_remote else []), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(case_root), start_new_session=True)
+    proc, capture_paths = start_process(
+        ["mcp", "--host", host, "--port", str(probe_port)] + (["--allow-remote"] if allow_remote else []),
+        env, str(case_root),
+    )
     listening = False
-    if allow_remote:
+    try:
         deadline = time.time() + 10
         while time.time() < deadline:
             try:
@@ -735,24 +862,37 @@ def http_startup_probe(case_id, host, allow_remote):
                 if proc.poll() is not None:
                     break
                 time.sleep(0.05)
-        if proc.poll() is None:
-            os.killpg(proc.pid, signal.SIGTERM)
-    stdout, stderr = proc.communicate(timeout=8)
+    finally:
+        return_code, stdout, stderr = stop_process(
+            proc, capture_paths, case_id, terminate=proc.poll() is None,
+        )
+    stdout = normalize_root_bytes(stdout)
+    stderr = normalize_root_bytes(stderr)
+    stderr, port_count = re.subn(rb":" + str(probe_port).encode() + rb":", b":<PORT>:", stderr, count=1)
+    expected_port_count = 1 if allow_remote else 0
+    if port_count != expected_port_count:
+        raise RuntimeError(f"expected {expected_port_count} startup port occurrence(s) in {case_id} stderr, got {port_count}")
+    if allow_remote and b"refusing non-loopback" in stderr:
+        raise RuntimeError("allow-remote probe was rejected by policy before OS bind")
+    if allow_remote and (listening or return_code == 0):
+        raise RuntimeError("TEST-NET allow-remote probe unexpectedly listened")
     startup_cases.append({
         "schema": "symeraseme.go-oracle.http.v1", "id": case_id,
         "phase": "startup_policy", "request": {"host": host, "allow_remote": allow_remote, "port": "<PORT>"},
-        "process": {"argv": ["mcp", "--host", host, "--port", "<PORT>"] + (["--allow-remote"] if allow_remote else []), "exit_code": proc.returncode, "stdout_base64": b64(stdout), "stderr_base64": b64(stderr), "stdout_bytes": len(stdout), "stderr_bytes": len(stderr)},
-        "expected_outcome": "remote_bind_allowed" if allow_remote else "remote_bind_rejected",
+        "process": {"argv": normalize_root_value(["mcp", "--host", host, "--port", "<PORT>"] + (["--allow-remote"] if allow_remote else [])), "exit_code": return_code, "stdout_base64": b64(stdout), "stderr_base64": b64(stderr), "stdout_bytes": len(stdout), "stderr_bytes": len(stderr)},
+        "expected_outcome": "remote_bind_allowed_os_bind_failed" if allow_remote else "remote_bind_rejected",
         "observed_listening": listening,
-        "nondeterministic_fields": [{"path": "request.port", "reason": "ephemeral local listener", "replacement": "<PORT>"}],
+        "nondeterministic_fields": [
+            {"path": "request.port", "reason": "ephemeral local listener", "replacement": "<PORT>"},
+            {"path": "process.argv/stdout/stderr", "reason": "only the exact unique runtime root is normalized", "replacement": "<ORACLE_ROOT>"},
+        ],
     })
 http_startup_probe("remote-bind-rejected", "192.0.2.1", False)
-http_startup_probe("remote-bind-allowed", "0.0.0.0", True)
+http_startup_probe("remote-bind-allowed-os-failure", "192.0.2.1", True)
 
-server = subprocess.Popen(
-    [binary, "mcp", "--host", "127.0.0.1", "--port", str(port)],
-    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    env=http_env, cwd=str(http_root), start_new_session=True,
+server, server_capture_paths = start_process(
+    ["mcp", "--host", "127.0.0.1", "--port", str(port)],
+    http_env, str(http_root),
 )
 try:
     deadline = time.time() + 10
@@ -806,7 +946,7 @@ try:
         else:
             conn.endheaders(body)
         response = conn.getresponse()
-        response_body = response.read()
+        response_body = normalize_root_bytes(response.read())
         response_headers = response.getheaders()
         conn.close()
         public_headers = []
@@ -841,20 +981,17 @@ try:
             ],
         })
 finally:
-    if server.poll() is None:
-        os.killpg(server.pid, signal.SIGTERM)
-    try:
-        server_stdout, server_stderr = server.communicate(timeout=8)
-    except subprocess.TimeoutExpired:
-        os.killpg(server.pid, signal.SIGKILL)
-        server_stdout, server_stderr = server.communicate()
-        raise RuntimeError("MCP HTTP server did not honor graceful shutdown")
-    if server.returncode != 0:
-        raise RuntimeError(f"MCP HTTP server exit={server.returncode}, stderr={server_stderr!r}")
+    server_returncode, server_stdout, server_stderr = stop_process(
+        server, server_capture_paths, "http-server", terminate=server.poll() is None,
+    )
+    if server_returncode != 0:
+        raise RuntimeError(f"MCP HTTP server exit={server_returncode}, stderr={server_stderr!r}")
 
 write_json(out / "cases" / "http" / "transcript.json", {
     "schema": "symeraseme.go-oracle.http.v1",
     "commit": commit,
+    "toolchain": toolchain,
+    "normalization": normalization_contract,
     "server": {"command": ["mcp", "--host", "127.0.0.1", "--port", "<PORT>"], "bind": "127.0.0.1", "port": "<PORT>", "auth_token": "<MCP_TOKEN>"},
     "cases": startup_cases + http_cases,
 })
@@ -873,7 +1010,7 @@ def manifest(path, nondeterministic_prefixes=()):
         record = {"path": public_rel, "mode": oct(st.st_mode & 0o777), "size_bytes": st.st_size}
         if item.is_symlink():
             record["type"] = "symlink"
-            record["target"] = os.readlink(item)
+            record["target"] = normalize_root_value(os.readlink(item))
         elif item.is_dir():
             record["type"] = "directory"
         elif item.is_file():
@@ -892,7 +1029,9 @@ def manifest(path, nondeterministic_prefixes=()):
                     reason = "operation-generated content contains wall-clock or private state; content intentionally not captured"
                 record["content"] = {"nondeterministic": True, "reason": reason}
             else:
-                record["sha256"] = hashlib.sha256(item.read_bytes()).hexdigest()
+                data = normalize_root_bytes(item.read_bytes())
+                record["size_bytes"] = len(data)
+                record["sha256"] = hashlib.sha256(data).hexdigest()
         else:
             record["type"] = "other"
         entries.append(record)
@@ -919,10 +1058,10 @@ def side_effect_runtime(case_id):
 
 def side_effect_process(case_id, argv, env, cwd):
     result = run_process(argv, case_name=case_id, env_extra=env, cwd=str(cwd))
-    stdout = result.pop("_stdout_raw")
-    stderr = result.pop("_stderr_raw")
+    stdout = normalize_root_bytes(result.pop("_stdout_raw"))
+    stderr = normalize_root_bytes(result.pop("_stderr_raw"))
     return {
-        "argv": argv, "exit_code": result["exit_code"],
+        "argv": normalize_root_value(argv), "exit_code": result["exit_code"],
         "stdout_bytes": len(stdout), "stderr_bytes": len(stderr),
         "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
         "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
@@ -930,14 +1069,41 @@ def side_effect_process(case_id, argv, env, cwd):
     }
 
 
+def consent_side_effect_process(case_id, argv, env, cwd):
+    result = run_process(argv, case_name=case_id, env_extra=env, cwd=str(cwd))
+    stdout = normalize_root_bytes(result.pop("_stdout_raw"))
+    stderr = normalize_root_bytes(result.pop("_stderr_raw"))
+    token_files = sorted(pathlib.Path(env["SYMERASEME_DATA_DIR"]).glob("consent_*.json"))
+    if len(token_files) != 1:
+        raise RuntimeError(f"expected exactly one consent token file, found {len(token_files)}")
+    record = json.loads(token_files[0].read_text(encoding="utf-8"))
+    token = record.get("token", "").encode("utf-8")
+    time_pattern = rb"(?:20[0-9]{2}-[0-9]{2}-[0-9]{2}|issued_at|expires_at)"
+    if token and (token in stdout or token in stderr):
+        raise RuntimeError("consent output leaked the issued token")
+    if re.search(time_pattern, stdout) or re.search(time_pattern, stderr):
+        raise RuntimeError("consent output contained a time-derived field")
+    return {
+        "argv": normalize_root_value(argv), "exit_code": result["exit_code"],
+        "stdout_bytes": len(stdout), "stderr_bytes": len(stderr),
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        "consent_output_assertion": {
+            "token_bytes_absent": True, "time_derived_bytes_absent": True,
+            "checked_output": "stdout/stderr",
+        },
+        "output_policy": "validated_no_token_or_time_derived_bytes; bytes_not_embedded",
+    }
+
+
 def fs_case(case_id, argv, env, cwd, roots, nondeterministic_prefixes=(), nondeterministic_fields=(), process=None):
     return {
         "schema": "symeraseme.go-oracle.filesystem.v1", "id": case_id,
-        "operation": argv, "process": process or side_effect_process(case_id, argv, env, cwd),
+        "operation": normalize_root_value(argv), "process": process or side_effect_process(case_id, argv, env, cwd),
         "roots": {name: "isolated" for name in roots},
-        "manifest_roots": {name: str(path) for name, path in roots.items()},
+        "manifest_roots": {name: normalize_root_value(str(path)) for name, path in roots.items()},
         "manifests": {name: manifest(path, nondeterministic_prefixes) for name, path in roots.items()},
-        "nondeterministic_fields": list(nondeterministic_fields),
+        "nondeterministic_fields": [{"path": "operation/process.argv/manifest_roots", "reason": "only the exact unique runtime root is normalized", "replacement": "<ORACLE_ROOT>"}] + list(nondeterministic_fields),
     }
 
 filesystem_cases = []
@@ -954,22 +1120,35 @@ filesystem_cases.append(fs_case("profile-init", profile_argv, env, cwd, {"home":
 # its hashed filename are never serialized. Filename and payload are markers.
 case_root, env, cwd = side_effect_runtime("consent-grant")
 consent_argv = ["grant", "--command", "execute", "--ttl", "3600"]
-filesystem_cases.append(fs_case("consent-grant", consent_argv, env, cwd, {"data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"])}, ("<CONSENT_TOKEN_FILE>",), ({"path": "manifests.data_dir[<CONSENT_TOKEN_FILE>]", "reason": "consent token, hashed filename, and expiry are random/time-derived", "replacement": "path and content declarations only"},), side_effect_process("consent-grant", consent_argv, env, cwd)))
+filesystem_cases.append(fs_case("consent-grant", consent_argv, env, cwd, {"data_dir": pathlib.Path(env["SYMERASEME_DATA_DIR"])}, ("<CONSENT_TOKEN_FILE>",), ({"path": "manifests.data_dir[<CONSENT_TOKEN_FILE>]", "reason": "consent token, hashed filename, and expiry are random/time-derived", "replacement": "path and content declarations only"},), consent_side_effect_process("consent-grant", consent_argv, env, cwd)))
 
 # Scheduler generation is a real file-writing path, using cron so no native
 # scheduler or system service is contacted.
 case_root, env, cwd = side_effect_runtime("schedule-generate")
 schedule_dir = case_root / "scheduler"
-schedule_argv = ["generate-scheduler", "--platform", "cron", "--output-dir", str(schedule_dir), "--project-dir", "/tmp/symeraseme-go-oracle/project", "--symeraseme-bin", "/tmp/symeraseme-go-oracle/bin/symeraseme"]
-filesystem_cases.append(fs_case("schedule-generate", schedule_argv, env, cwd, {"scheduler_dir": schedule_dir}, (), side_effect_process("schedule-generate", schedule_argv, env, cwd)))
+schedule_argv = ["generate-scheduler", "--platform", "cron", "--output-dir", str(schedule_dir), "--project-dir", str(case_root / "project"), "--symeraseme-bin", str(root / "bin" / "symeraseme")]
+filesystem_cases.append(fs_case("schedule-generate", schedule_argv, env, cwd, {"scheduler_dir": schedule_dir}, (), (), side_effect_process("schedule-generate", schedule_argv, env, cwd)))
 
-# Report generation writes an HTML artifact whose rendered current-time fields
-# are excluded by an exact path marker.
+# Report generation writes an HTML artifact. Its two structurally known
+# rendered timestamps are normalized, then the normalized bytes remain as
+# evidence (both content and hash) instead of being discarded.
 case_root, env, cwd = side_effect_runtime("report-generate")
 report_path = case_root / "reports" / "report.html"
 report_path.parent.mkdir()
 report_argv = ["generate-report", "--all-campaigns", "--format", "html", "--output", str(report_path)]
-filesystem_cases.append(fs_case("report-generate", report_argv, env, cwd, {"reports": report_path.parent}, ("report.html",), ({"path": "manifests.reports[report.html].content", "reason": "rendered report contains current UTC time", "replacement": "declaration only"},), side_effect_process("report-generate", report_argv, env, cwd)))
+report_process = side_effect_process("report-generate", report_argv, env, cwd)
+report_bytes = bounded_read(report_path, 16 * 1024 * 1024, "report artifact", "report-generate")
+report_bytes = normalize_root_bytes(report_bytes)
+report_bytes, report_timestamp_count = re.subn(rb"20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC", b"<TIMESTAMP>", report_bytes)
+if report_timestamp_count != 2:
+    raise RuntimeError(f"expected exactly two report timestamps, got {report_timestamp_count}")
+report_case = fs_case("report-generate", report_argv, env, cwd, {"reports": report_path.parent}, ("report.html",), ({"path": "manifests.reports[report.html].content", "reason": "report content is represented by normalized evidence below", "replacement": "normalized content evidence"},), report_process)
+report_case["artifact_evidence"] = {
+    "path": "reports/report.html", "encoding": "base64", "content_base64": b64(report_bytes),
+    "size_bytes": len(report_bytes), "sha256": hashlib.sha256(report_bytes).hexdigest(),
+    "normalizations": [{"path": "artifact rendered timestamps", "occurrences": report_timestamp_count, "replacement": "<TIMESTAMP>"}],
+}
+filesystem_cases.append(report_case)
 
 # A known registry entry with no browser executor creates the durable manual
 # fallback path (and returns a classified manual-action outcome).
@@ -993,24 +1172,29 @@ filesystem_cases.append(fs_case("migration", migration_argv, env, cwd, {"source"
 case_root, env, cwd = side_effect_runtime("mcp-token-rotation")
 def one_token_server(env, cwd):
     port = free_port()
-    proc = subprocess.Popen([binary, "mcp", "--host", "127.0.0.1", "--port", str(port)], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(cwd), start_new_session=True)
-    deadline = time.time() + 10
-    while time.time() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                break
-        except OSError:
-            if proc.poll() is not None:
-                raise RuntimeError("token rotation server exited early")
-            time.sleep(0.05)
-    else:
-        raise RuntimeError("token rotation server did not start")
-    token_path = pathlib.Path(env["SYMERASEME_DATA_DIR"]) / "mcp_token"
-    token = token_path.read_text(encoding="utf-8")
-    os.killpg(proc.pid, signal.SIGTERM)
-    stdout, stderr = proc.communicate(timeout=8)
-    if proc.returncode != 0:
-        raise RuntimeError(f"token rotation server exit={proc.returncode}: {stderr!r}")
+    proc, capture_paths = start_process(
+        ["mcp", "--host", "127.0.0.1", "--port", str(port)], env, str(cwd),
+    )
+    try:
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                    break
+            except OSError:
+                if proc.poll() is not None:
+                    raise RuntimeError("token rotation server exited early")
+                time.sleep(0.05)
+        else:
+            raise RuntimeError("token rotation server did not start")
+        token_path = pathlib.Path(env["SYMERASEME_DATA_DIR"]) / "mcp_token"
+        token = token_path.read_text(encoding="utf-8")
+    finally:
+        return_code, stdout, stderr = stop_process(
+            proc, capture_paths, "token-rotation", terminate=proc.poll() is None,
+        )
+    if return_code != 0:
+        raise RuntimeError(f"token rotation server exit={return_code}: {stderr!r}")
     return token
 rotation_first = one_token_server(env, cwd)
 rotation_before = manifest(pathlib.Path(env["SYMERASEME_DATA_DIR"]))
@@ -1023,7 +1207,7 @@ filesystem_cases.append({
     "schema": "symeraseme.go-oracle.filesystem.v1", "id": "mcp-token-rotation",
     "operation": ["mcp", "--host", "127.0.0.1", "--port", "<PORT>"],
     "process": {"starts": 2, "shutdown": "graceful", "tokens_equal": False},
-    "roots": {"data_dir": "isolated"}, "manifest_roots": {"data_dir": str(rotation_roots["data_dir"])},
+    "roots": {"data_dir": "isolated"}, "manifest_roots": {"data_dir": normalize_root_value(str(rotation_roots["data_dir"]))},
     "before": {"data_dir": rotation_before}, "after": {"data_dir": rotation_after},
     "manifests": {"data_dir": rotation_after},
     "nondeterministic_fields": [
@@ -1032,7 +1216,7 @@ filesystem_cases.append({
         {"path": "operation.port", "reason": "ephemeral local listener", "replacement": "<PORT>"},
     ],
 })
-write_json(out / "cases" / "filesystem" / "manifests.json", {"schema": "symeraseme.go-oracle.filesystem.v1", "commit": commit, "cases": filesystem_cases})
+write_json(out / "cases" / "filesystem" / "manifests.json", {"schema": "symeraseme.go-oracle.filesystem.v1", "commit": commit, "toolchain": toolchain, "normalization": normalization_contract, "cases": filesystem_cases})
 
 fixture_readme = f'''# Go oracle fixtures
 
@@ -1066,19 +1250,29 @@ modified and no developer profile, keychain, database, or credential is read.
   represented only by path-specific nondeterminism declarations.
 
 All records carry the oracle commit and a schema identifier. Fixture generation
-uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
-root, an empty private executable search path, empty credential variables, and
-no timestamps or host identity. A single-writer lock and ownership marker make
-cleanup fail closed instead of deleting an unrelated runtime directory. The only
-nondeterministic values are marked in `nondeterministic_fields`: ephemeral
-ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
-time-derived durable artifacts, HTTP `Date`, and current-time fields in the
-status/dashboard/calendar/report CLI and MCP results. The Go `net/http`
-`Date` response header is replaced only at `response.headers.Date` with
-`<HTTP_DATE>` and is likewise declared as nondeterministic. The oversized HTTP
-request is represented by its exact byte length and SHA-256, not stored
-verbatim. The token is represented by
-`<MCP_TOKEN>` in the request transcript and its file content is never captured.
+uses Go `go1.26.6` resolved with `GOTOOLCHAIN=go1.26.6` and `GOPROXY=off`,
+`GOENV=off`, `GOWORK=off`, an isolated `HOME`/build cache, and only the pinned
+module cache. It also uses UTC, locale `C`, an empty private executable search
+path, empty credential variables, and no host identity. The runtime root is a
+unique `mktemp` directory owned by this invocation. Only that exact root is
+replaced with `<ORACLE_ROOT>` in argv/stdout/stderr/manifests and artifact
+content; this narrow rule is declared in each corpus document's `normalization`.
+The only other nondeterministic values are marked in `nondeterministic_fields`:
+ephemeral ports, server-issued MCP/consent tokens, encrypted-profile nonces,
+private or time-derived durable artifacts, HTTP `Date`, and current-time fields
+in status/dashboard/calendar/report results. Report HTML retains normalized
+content and SHA-256 evidence. Consent output is checked to contain neither the
+issued token nor known time-derived fields. The oversized HTTP request is
+represented by its exact byte length and SHA-256, not stored verbatim. The MCP
+token is represented by `<MCP_TOKEN>` in the request transcript and its file
+content is never captured. The remote-policy allow probe accepts policy for
+TEST-NET `192.0.2.1` and then records the expected OS bind failure; it never
+binds `0.0.0.0` or a LAN interface.
+
+The generator builds a complete same-filesystem staging corpus and swaps
+`cases` and `fixtures` only after all generation and count checks pass. Any
+failure leaves the previous corpus byte-identical and rollback restores it if a
+swap is interrupted.
 
 The generator is an executable drift gate:
 
@@ -1099,3 +1293,48 @@ print(f"generated oracle fixtures from {commit}")
 print(f"CLI commands={len(commands)} help_cases={len(help_cases)} success_cases={len(success_cases)}")
 print(f"MCP cases={len(mcp_cases)} HTTP cases={len(startup_cases) + len(http_cases)} filesystem_cases={len(filesystem_cases)}")
 PYEOF
+
+# Validate the complete staged corpus before touching the existing checkout.
+python3 - "${STAGE_DIR}" "${RUNTIME_ROOT}" <<'PYEOF'
+import json
+import pathlib
+import sys
+
+stage = pathlib.Path(sys.argv[1])
+runtime_root = sys.argv[2].encode()
+cases = stage / "cases"
+cli = json.loads((cases / "cli" / "behavior.json").read_text())
+mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_text().splitlines() if line]
+http = json.loads((cases / "http" / "transcript.json").read_text())
+filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
+surface = json.loads((cases / "cli" / "surface.json").read_text())
+expected = {"cli": 165, "mcp": 52, "http": 19, "filesystem": 7}
+actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
+if actual != expected:
+    raise SystemExit(f"coverage changed: expected {expected}, got {actual}")
+if surface.get("schema") != "symeraseme.go-oracle.cli-surface.v1":
+    raise SystemExit("surface schema identifier is missing")
+for document in (cli, http, filesystem):
+    if not document.get("toolchain", {}).get("go_version", "").startswith("go version go1.26.6 "):
+        raise SystemExit("fixture toolchain record is not Go 1.26.6")
+    if document.get("toolchain", {}).get("goproxy") != "off":
+        raise SystemExit("fixture toolchain is not offline")
+for path in stage.rglob("*"):
+    if path.is_file() and runtime_root in path.read_bytes():
+        raise SystemExit(f"un-normalized runtime root in {path}")
+print(f"validated staged coverage: {actual}")
+PYEOF
+
+# Swap the two generated roots only after complete success. The EXIT trap
+# restores the old pair if either move fails or the process is interrupted.
+mkdir "${BACKUP_DIR}"
+SWAP_STARTED=1
+if [[ -e "${OUT_DIR}/cases" ]]; then mv "${OUT_DIR}/cases" "${BACKUP_DIR}/cases"; CASES_BACKED_UP=1; fi
+if [[ -e "${OUT_DIR}/fixtures" ]]; then mv "${OUT_DIR}/fixtures" "${BACKUP_DIR}/fixtures"; FIXTURES_BACKED_UP=1; fi
+mv "${STAGE_DIR}/cases" "${OUT_DIR}/cases"
+CASES_INSTALLED=1
+mv "${STAGE_DIR}/fixtures" "${OUT_DIR}/fixtures"
+FIXTURES_INSTALLED=1
+SWAP_STARTED=0
+rm -rf "${BACKUP_DIR}" "${STAGE_DIR}"
+printf 'generated oracle fixtures from %s\n' "${PINNED_COMMIT}"

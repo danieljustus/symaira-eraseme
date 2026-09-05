@@ -1,6 +1,30 @@
 {
   "schema": "symeraseme.go-oracle.http.v1",
   "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "toolchain": {
+    "go_version": "go version go1.26.6 darwin/arm64",
+    "go_root": "<GO_ROOT>",
+    "module_cache": "<PINNED_MODULE_CACHE>",
+    "goproxy": "off",
+    "goenv": "off",
+    "gowork": "off",
+    "gotoolchain": "go1.26.6",
+    "cache": "isolated",
+    "home": "isolated"
+  },
+  "normalization": {
+    "exact_runtime_root": {
+      "replacement": "<ORACLE_ROOT>",
+      "scope": [
+        "argv",
+        "stdout",
+        "stderr",
+        "manifest_roots",
+        "artifact_evidence"
+      ],
+      "rule": "replace only the exact unique mktemp-owned runtime root"
+    }
+  },
   "server": {
     "command": [
       "mcp",
@@ -44,15 +68,20 @@
           "path": "request.port",
           "reason": "ephemeral local listener",
           "replacement": "<PORT>"
+        },
+        {
+          "path": "process.argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
         }
       ]
     },
     {
       "schema": "symeraseme.go-oracle.http.v1",
-      "id": "remote-bind-allowed",
+      "id": "remote-bind-allowed-os-failure",
       "phase": "startup_policy",
       "request": {
-        "host": "0.0.0.0",
+        "host": "192.0.2.1",
         "allow_remote": true,
         "port": "<PORT>"
       },
@@ -60,24 +89,29 @@
         "argv": [
           "mcp",
           "--host",
-          "0.0.0.0",
+          "192.0.2.1",
           "--port",
           "<PORT>",
           "--allow-remote"
         ],
-        "exit_code": 0,
+        "exit_code": 1,
         "stdout_base64": "",
-        "stderr_base64": "",
+        "stderr_base64": "bGlzdGVuIHRjcCAxOTIuMC4yLjE6PFBPUlQ+OiBiaW5kOiBjYW4ndCBhc3NpZ24gcmVxdWVzdGVkIGFkZHJlc3MK",
         "stdout_bytes": 0,
-        "stderr_bytes": 0
+        "stderr_bytes": 66
       },
-      "expected_outcome": "remote_bind_allowed",
-      "observed_listening": true,
+      "expected_outcome": "remote_bind_allowed_os_bind_failed",
+      "observed_listening": false,
       "nondeterministic_fields": [
         {
           "path": "request.port",
           "reason": "ephemeral local listener",
           "replacement": "<PORT>"
+        },
+        {
+          "path": "process.argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
         }
       ]
     },

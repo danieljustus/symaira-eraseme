@@ -30,19 +30,29 @@ modified and no developer profile, keychain, database, or credential is read.
   represented only by path-specific nondeterminism declarations.
 
 All records carry the oracle commit and a schema identifier. Fixture generation
-uses UTC, locale `C`, a fixed dedicated `/tmp/symeraseme-go-oracle` runtime
-root, an empty private executable search path, empty credential variables, and
-no timestamps or host identity. A single-writer lock and ownership marker make
-cleanup fail closed instead of deleting an unrelated runtime directory. The only
-nondeterministic values are marked in `nondeterministic_fields`: ephemeral
-ports, server-issued MCP/consent tokens, encrypted-profile nonces, private or
-time-derived durable artifacts, HTTP `Date`, and current-time fields in the
-status/dashboard/calendar/report CLI and MCP results. The Go `net/http`
-`Date` response header is replaced only at `response.headers.Date` with
-`<HTTP_DATE>` and is likewise declared as nondeterministic. The oversized HTTP
-request is represented by its exact byte length and SHA-256, not stored
-verbatim. The token is represented by
-`<MCP_TOKEN>` in the request transcript and its file content is never captured.
+uses Go `go1.26.6` resolved with `GOTOOLCHAIN=go1.26.6` and `GOPROXY=off`,
+`GOENV=off`, `GOWORK=off`, an isolated `HOME`/build cache, and only the pinned
+module cache. It also uses UTC, locale `C`, an empty private executable search
+path, empty credential variables, and no host identity. The runtime root is a
+unique `mktemp` directory owned by this invocation. Only that exact root is
+replaced with `<ORACLE_ROOT>` in argv/stdout/stderr/manifests and artifact
+content; this narrow rule is declared in each corpus document's `normalization`.
+The only other nondeterministic values are marked in `nondeterministic_fields`:
+ephemeral ports, server-issued MCP/consent tokens, encrypted-profile nonces,
+private or time-derived durable artifacts, HTTP `Date`, and current-time fields
+in status/dashboard/calendar/report results. Report HTML retains normalized
+content and SHA-256 evidence. Consent output is checked to contain neither the
+issued token nor known time-derived fields. The oversized HTTP request is
+represented by its exact byte length and SHA-256, not stored verbatim. The MCP
+token is represented by `<MCP_TOKEN>` in the request transcript and its file
+content is never captured. The remote-policy allow probe accepts policy for
+TEST-NET `192.0.2.1` and then records the expected OS bind failure; it never
+binds `0.0.0.0` or a LAN interface.
+
+The generator builds a complete same-filesystem staging corpus and swaps
+`cases` and `fixtures` only after all generation and count checks pass. Any
+failure leaves the previous corpus byte-identical and rollback restores it if a
+swap is interrupted.
 
 The generator is an executable drift gate:
 

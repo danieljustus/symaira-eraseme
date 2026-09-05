@@ -1,6 +1,30 @@
 {
   "schema": "symeraseme.go-oracle.cli.v1",
   "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "toolchain": {
+    "go_version": "go version go1.26.6 darwin/arm64",
+    "go_root": "<GO_ROOT>",
+    "module_cache": "<PINNED_MODULE_CACHE>",
+    "goproxy": "off",
+    "goenv": "off",
+    "gowork": "off",
+    "gotoolchain": "go1.26.6",
+    "cache": "isolated",
+    "home": "isolated"
+  },
+  "normalization": {
+    "exact_runtime_root": {
+      "replacement": "<ORACLE_ROOT>",
+      "scope": [
+        "argv",
+        "stdout",
+        "stderr",
+        "manifest_roots",
+        "artifact_evidence"
+      ],
+      "rule": "replace only the exact unique mktemp-owned runtime root"
+    }
+  },
   "environment": {
     "timezone": "UTC",
     "locale": "C",
@@ -24,7 +48,13 @@
       "id": "root-version",
       "category": "root_version",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -39,7 +69,13 @@
       "id": "root-unknown-flag",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -54,7 +90,13 @@
       "id": "root-unknown-command",
       "category": "unknown_command",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -69,7 +111,13 @@
       "id": "help-root",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -85,7 +133,13 @@
       "id": "help-auto-confirm",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -101,7 +155,13 @@
       "id": "unknown-flag-auto-confirm",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -117,7 +177,13 @@
       "id": "help-brokers",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -133,7 +199,13 @@
       "id": "unknown-flag-brokers",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -150,7 +222,13 @@
       "id": "help-brokers-list",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -167,7 +245,13 @@
       "id": "unknown-flag-brokers-list",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -184,7 +268,13 @@
       "id": "help-brokers-show",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -201,7 +291,13 @@
       "id": "unknown-flag-brokers-show",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -217,7 +313,13 @@
       "id": "missing-argument-brokers-show",
       "category": "missing_argument",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -233,7 +335,13 @@
       "id": "help-calendar",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -249,7 +357,13 @@
       "id": "unknown-flag-calendar",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -265,7 +379,13 @@
       "id": "help-classify-reply",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -281,7 +401,13 @@
       "id": "unknown-flag-classify-reply",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -297,7 +423,13 @@
       "id": "help-completion",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -313,7 +445,13 @@
       "id": "unknown-flag-completion",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -328,7 +466,13 @@
       "id": "missing-argument-completion",
       "category": "missing_argument",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -344,7 +488,13 @@
       "id": "help-config",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -360,7 +510,13 @@
       "id": "unknown-flag-config",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -377,7 +533,13 @@
       "id": "help-config-show",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -394,7 +556,13 @@
       "id": "unknown-flag-config-show",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -410,7 +578,13 @@
       "id": "help-dashboard",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -426,7 +600,13 @@
       "id": "unknown-flag-dashboard",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -442,7 +622,13 @@
       "id": "help-events",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -458,7 +644,13 @@
       "id": "unknown-flag-events",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -475,7 +667,13 @@
       "id": "help-events-show",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -492,7 +690,13 @@
       "id": "unknown-flag-events-show",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -508,7 +712,13 @@
       "id": "help-generate-dashboard",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -524,7 +734,13 @@
       "id": "unknown-flag-generate-dashboard",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -540,7 +756,13 @@
       "id": "help-generate-rebuttal",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -556,7 +778,13 @@
       "id": "unknown-flag-generate-rebuttal",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -572,7 +800,13 @@
       "id": "help-generate-report",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -588,7 +822,13 @@
       "id": "unknown-flag-generate-report",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -604,7 +844,13 @@
       "id": "help-generate-scheduler",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -620,7 +866,13 @@
       "id": "unknown-flag-generate-scheduler",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -636,7 +888,13 @@
       "id": "help-grant",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -652,7 +910,13 @@
       "id": "unknown-flag-grant",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -668,7 +932,13 @@
       "id": "help-help",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -684,7 +954,13 @@
       "id": "unknown-flag-help",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -700,7 +976,13 @@
       "id": "help-init-profile",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -716,7 +998,13 @@
       "id": "unknown-flag-init-profile",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -732,7 +1020,13 @@
       "id": "help-manual-tasks",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -748,7 +1042,13 @@
       "id": "unknown-flag-manual-tasks",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -765,7 +1065,13 @@
       "id": "help-manual-tasks-cleanup",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -782,7 +1088,13 @@
       "id": "unknown-flag-manual-tasks-cleanup",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -799,7 +1111,13 @@
       "id": "help-manual-tasks-complete",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -816,7 +1134,13 @@
       "id": "unknown-flag-manual-tasks-complete",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -833,7 +1157,13 @@
       "id": "help-manual-tasks-list",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -850,7 +1180,13 @@
       "id": "unknown-flag-manual-tasks-list",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -867,7 +1203,13 @@
       "id": "help-manual-tasks-show",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -884,7 +1226,13 @@
       "id": "unknown-flag-manual-tasks-show",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -900,7 +1248,13 @@
       "id": "help-mcp",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -916,7 +1270,13 @@
       "id": "unknown-flag-mcp",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -932,7 +1292,13 @@
       "id": "help-migrate",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -948,7 +1314,13 @@
       "id": "unknown-flag-migrate",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -964,7 +1336,13 @@
       "id": "help-plan",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -980,7 +1358,13 @@
       "id": "unknown-flag-plan",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -997,7 +1381,13 @@
       "id": "help-plan-create",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1014,7 +1404,13 @@
       "id": "unknown-flag-plan-create",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1031,7 +1427,13 @@
       "id": "help-plan-execute",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1048,7 +1450,13 @@
       "id": "unknown-flag-plan-execute",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1065,7 +1473,13 @@
       "id": "help-plan-show",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1082,7 +1496,13 @@
       "id": "unknown-flag-plan-show",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1099,7 +1519,13 @@
       "id": "help-plan-status",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1116,7 +1542,13 @@
       "id": "unknown-flag-plan-status",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1133,7 +1565,13 @@
       "id": "help-plan-tick",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1150,7 +1588,13 @@
       "id": "unknown-flag-plan-tick",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1166,7 +1610,13 @@
       "id": "help-poll-inbox",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1182,7 +1632,13 @@
       "id": "unknown-flag-poll-inbox",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1198,7 +1654,13 @@
       "id": "help-registry",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1214,7 +1676,13 @@
       "id": "unknown-flag-registry",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1231,7 +1699,13 @@
       "id": "help-registry-list",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1248,7 +1722,13 @@
       "id": "unknown-flag-registry-list",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1265,7 +1745,13 @@
       "id": "help-registry-validate",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1282,7 +1768,13 @@
       "id": "unknown-flag-registry-validate",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1298,7 +1790,13 @@
       "id": "help-render-template",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1314,7 +1812,13 @@
       "id": "unknown-flag-render-template",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1329,7 +1833,13 @@
       "id": "missing-argument-render-template",
       "category": "missing_argument",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1345,7 +1855,13 @@
       "id": "help-requests",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1361,7 +1877,13 @@
       "id": "unknown-flag-requests",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1378,7 +1900,13 @@
       "id": "help-requests-list",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1395,7 +1923,13 @@
       "id": "unknown-flag-requests-list",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1411,7 +1945,13 @@
       "id": "help-review",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1427,7 +1967,13 @@
       "id": "unknown-flag-review",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1443,7 +1989,13 @@
       "id": "help-run-web-form",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1459,7 +2011,13 @@
       "id": "unknown-flag-run-web-form",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1475,7 +2033,13 @@
       "id": "help-schedule",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1491,7 +2055,13 @@
       "id": "unknown-flag-schedule",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1508,7 +2078,13 @@
       "id": "help-schedule-install",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1525,7 +2101,13 @@
       "id": "unknown-flag-schedule-install",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1542,7 +2124,13 @@
       "id": "help-schedule-status",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1559,7 +2147,13 @@
       "id": "unknown-flag-schedule-status",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1576,7 +2170,13 @@
       "id": "help-schedule-uninstall",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1593,7 +2193,13 @@
       "id": "unknown-flag-schedule-uninstall",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1609,7 +2215,13 @@
       "id": "help-serve",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1625,7 +2237,13 @@
       "id": "unknown-flag-serve",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1641,7 +2259,13 @@
       "id": "help-show-profile",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1657,7 +2281,13 @@
       "id": "unknown-flag-show-profile",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1673,7 +2303,13 @@
       "id": "help-status",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1689,7 +2325,13 @@
       "id": "unknown-flag-status",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1705,7 +2347,13 @@
       "id": "help-tick",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1721,7 +2369,13 @@
       "id": "unknown-flag-tick",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1737,7 +2391,13 @@
       "id": "help-version",
       "category": "help",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1753,7 +2413,13 @@
       "id": "unknown-flag-version",
       "category": "unknown_flag",
       "expected_outcome": "parse_failure",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1768,7 +2434,13 @@
       "id": "version",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1784,7 +2456,13 @@
       "id": "version-json",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1793,14 +2471,20 @@
       ],
       "stdin_base64": "",
       "exit_code": 0,
-      "stdout_base64": "ZGF0YV9kaXI9L3RtcC9zeW1lcmFzZW1lLWdvLW9yYWNsZS9jbGkvY29uZmlnLXNob3cvZGF0YQpwb3J0PTgwMDAK",
+      "stdout_base64": "ZGF0YV9kaXI9PE9SQUNMRV9ST09UPi9jbGkvY29uZmlnLXNob3cvZGF0YQpwb3J0PTgwMDAK",
       "stderr_base64": "",
-      "stdout_bytes": 66,
+      "stdout_bytes": 54,
       "stderr_bytes": 0,
       "id": "config-show",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1811,14 +2495,20 @@
       ],
       "stdin_base64": "",
       "exit_code": 0,
-      "stdout_base64": "eyJjb25maWciOnsiZGF0YV9kaXIiOiIvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9jb25maWctc2hvdy1qc29uL2RhdGEiLCJkYl9kaXIiOiIvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9jb25maWctc2hvdy1qc29uL2RiIiwiZW5jcnlwdF9kYiI6ZmFsc2UsInBvcnQiOjgwMDAsImFsbG93X3JlbW90ZSI6ZmFsc2V9LCJzdWNjZXNzIjp0cnVlfQo=",
+      "stdout_base64": "eyJjb25maWciOnsiZGF0YV9kaXIiOiI8T1JBQ0xFX1JPT1Q+L2NsaS9jb25maWctc2hvdy1qc29uL2RhdGEiLCJkYl9kaXIiOiI8T1JBQ0xFX1JPT1Q+L2NsaS9jb25maWctc2hvdy1qc29uL2RiIiwiZW5jcnlwdF9kYiI6ZmFsc2UsInBvcnQiOjgwMDAsImFsbG93X3JlbW90ZSI6ZmFsc2V9LCJzdWNjZXNzIjp0cnVlfQo=",
       "stderr_base64": "",
-      "stdout_bytes": 206,
+      "stdout_bytes": 182,
       "stderr_bytes": 0,
       "id": "config-show-json",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1834,7 +2524,13 @@
       "id": "registry-validate",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1852,7 +2548,13 @@
       "id": "registry-list-json",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1870,6 +2572,11 @@
       "category": "success",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.as_of",
           "reason": "status uses current UTC time",
@@ -1894,6 +2601,11 @@
       "expected_outcome": "success",
       "nondeterministic_fields": [
         {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
           "path": "stdout.generated_at",
           "reason": "dashboard uses current UTC time",
           "replacement": "<TIMESTAMP>"
@@ -1916,6 +2628,11 @@
       "category": "success",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.as_of",
           "reason": "calendar uses current UTC time",
@@ -1944,7 +2661,13 @@
       "id": "requests-list-json",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1962,7 +2685,13 @@
       "id": "manual-tasks-list-json",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1978,7 +2707,13 @@
       "id": "grant-dry-run",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -1994,7 +2729,13 @@
       "id": "completion-bash",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -2010,7 +2751,13 @@
       "id": "completion-zsh",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -2026,7 +2773,13 @@
       "id": "completion-fish",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -2042,7 +2795,13 @@
       "id": "completion-powershell",
       "category": "success",
       "expected_outcome": "success",
-      "nondeterministic_fields": []
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
     },
     {
       "argv": [
@@ -2061,7 +2820,13 @@
       "id": "operate-auto-confirm",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2080,7 +2845,13 @@
       "id": "operate-brokers-list",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2100,7 +2871,13 @@
       "id": "operate-brokers-show",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2119,6 +2896,11 @@
       "category": "operational",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.as_of",
           "reason": "calendar uses current UTC time",
@@ -2149,7 +2931,13 @@
       "id": "operate-classify-reply",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2166,7 +2954,13 @@
       "id": "operate-completion",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2178,14 +2972,20 @@
       ],
       "stdin_base64": "",
       "exit_code": 0,
-      "stdout_base64": "eyJjb25maWciOnsiZGF0YV9kaXIiOiIvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9vcGVyYXRlLWNvbmZpZy1zaG93L2RhdGEiLCJkYl9kaXIiOiIvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9vcGVyYXRlLWNvbmZpZy1zaG93L2RiIiwiZW5jcnlwdF9kYiI6ZmFsc2UsInBvcnQiOjgwMDAsImFsbG93X3JlbW90ZSI6ZmFsc2V9LCJzdWNjZXNzIjp0cnVlfQo=",
+      "stdout_base64": "eyJjb25maWciOnsiZGF0YV9kaXIiOiI8T1JBQ0xFX1JPT1Q+L2NsaS9vcGVyYXRlLWNvbmZpZy1zaG93L2RhdGEiLCJkYl9kaXIiOiI8T1JBQ0xFX1JPT1Q+L2NsaS9vcGVyYXRlLWNvbmZpZy1zaG93L2RiIiwiZW5jcnlwdF9kYiI6ZmFsc2UsInBvcnQiOjgwMDAsImFsbG93X3JlbW90ZSI6ZmFsc2V9LCJzdWNjZXNzIjp0cnVlfQo=",
       "stderr_base64": "",
-      "stdout_bytes": 212,
+      "stdout_bytes": 188,
       "stderr_bytes": 0,
       "id": "operate-config-show",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2204,6 +3004,11 @@
       "category": "operational",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.generated_at",
           "reason": "dashboard uses current UTC time",
@@ -2229,7 +3034,13 @@
       "id": "operate-events-show",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2245,7 +3056,13 @@
       "id": "operate-generate-dashboard",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2265,7 +3082,13 @@
       "id": "operate-generate-rebuttal",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2286,7 +3109,13 @@
       "id": "operate-generate-report",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2305,7 +3134,13 @@
       "id": "operate-generate-scheduler",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2324,7 +3159,13 @@
       "id": "operate-grant",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2340,7 +3181,13 @@
       "id": "operate-help",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2355,14 +3202,20 @@
       ],
       "stdin_base64": "",
       "exit_code": 0,
-      "stdout_base64": "eyJwcm9maWxlX3BhdGgiOiIvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9vcGVyYXRlLWluaXQtcHJvZmlsZS9kYXRhL2lkZW50aXR5LmVuY3J5cHRlZCIsInN1Y2Nlc3MiOnRydWV9Cg==",
+      "stdout_base64": "eyJwcm9maWxlX3BhdGgiOiI8T1JBQ0xFX1JPT1Q+L2NsaS9vcGVyYXRlLWluaXQtcHJvZmlsZS9kYXRhL2lkZW50aXR5LmVuY3J5cHRlZCIsInN1Y2Nlc3MiOnRydWV9Cg==",
       "stderr_base64": "",
-      "stdout_bytes": 109,
+      "stdout_bytes": 97,
       "stderr_bytes": 0,
       "id": "operate-init-profile",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2382,7 +3235,13 @@
       "id": "operate-manual-tasks-cleanup",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2402,7 +3261,13 @@
       "id": "operate-manual-tasks-complete",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2421,7 +3286,13 @@
       "id": "operate-manual-tasks-list",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2441,7 +3312,13 @@
       "id": "operate-manual-tasks-show",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2458,29 +3335,41 @@
       "id": "operate-mcp",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
       "argv": [
         "migrate",
         "--source",
-        "/tmp/symeraseme-go-oracle/cli/migrate/source",
+        "<ORACLE_ROOT>/cli/migrate/source",
         "--destination",
-        "/tmp/symeraseme-go-oracle/cli/migrate/destination",
+        "<ORACLE_ROOT>/cli/migrate/destination",
         "--dry-run",
         "--json"
       ],
       "stdin_base64": "",
       "exit_code": 1,
       "stdout_base64": "",
-      "stderr_base64": "c3RhdCBzb3VyY2UgZGlyZWN0b3J5OiBsc3RhdCAvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9taWdyYXRlL3NvdXJjZTogbm8gc3VjaCBmaWxlIG9yIGRpcmVjdG9yeQo=",
+      "stderr_base64": "c3RhdCBzb3VyY2UgZGlyZWN0b3J5OiBsc3RhdCA8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlL3NvdXJjZTogbm8gc3VjaCBmaWxlIG9yIGRpcmVjdG9yeQo=",
       "stdout_bytes": 0,
-      "stderr_bytes": 101,
+      "stderr_bytes": 89,
       "id": "operate-migrate",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2503,7 +3392,13 @@
       "id": "operate-plan-create",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2525,7 +3420,13 @@
       "id": "operate-plan-execute",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2546,7 +3447,13 @@
       "id": "operate-plan-show",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2566,6 +3473,11 @@
       "category": "operational",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.as_of",
           "reason": "status uses current UTC time",
@@ -2591,7 +3503,13 @@
       "id": "operate-plan-tick",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2618,7 +3536,13 @@
       "id": "operate-poll-inbox",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2637,7 +3561,13 @@
       "id": "operate-registry-list",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2656,7 +3586,13 @@
       "id": "operate-registry-validate",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2677,7 +3613,13 @@
       "id": "operate-render-template",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2696,13 +3638,19 @@
       "id": "operate-requests-list",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
       "argv": [
         "review",
-        "/tmp/symeraseme-go-oracle/cli/review/missing.txt",
+        "<ORACLE_ROOT>/cli/review/missing.txt",
         "--output",
         "json"
       ],
@@ -2715,7 +3663,13 @@
       "id": "operate-review",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2735,7 +3689,13 @@
       "id": "operate-run-web-form",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2750,14 +3710,20 @@
       ],
       "stdin_base64": "",
       "exit_code": 0,
-      "stdout_base64": "eyJkcnlfcnVuIjp0cnVlLCJmaWxlcyI6eyJjcm9udGFiLnR4dCI6IiMgU3ltYWlyYSBFcmFzZU1lIHNjaGVkdWxlZCB0YXNrc1xuIyBHZW5lcmF0ZWQgYnkgc3ltZXJhc2VtZSBnZW5lcmF0ZS1zY2hlZHVsZXIgKEdvKVxuXG4jIFRpY2sgKGRhaWx5IGF0IDEwOjAwKVxuMCAxMCAqICogKiB7d3JhcHBlcl9kaXJ9L3N5bWVyYXNlbWUtdGljay5zaFxuXG4jIFBvbGwgaW5ib3ggKGhvdXJseSB3cmFwcGVyIGNoZWNrcyBjb25maWd1cmVkIHRpbWVzKVxuMCAqICogKiAqIHt3cmFwcGVyX2Rpcn0vc3ltZXJhc2VtZS1wb2xsLnNoXG5cbiMgUmUtc2NhbiAocXVhcnRlcmx5IG9uIDFzdCBvZiBKYW4sIEFwciwgSnVsLCBPY3QpXG4wIDEwIDEgMSw0LDcsMTAgKiB7d3JhcHBlcl9kaXJ9L3N5bWVyYXNlbWUtcmVzY2FuLnNoXG5cbiMgRW5kIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3NcbiIsImluc3RhbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG5zZXQgLWV1byBwaXBlZmFpbFxuU0NSSVBUX0RJUj1cIiQoY2QgXCIkKGRpcm5hbWUgXCIkMFwiKVwiIFx1MDAyNlx1MDAyNiBwd2QpXCJcbmNobW9kICt4IFwiJFNDUklQVF9ESVJcIi8qLnNoXG5URU1QPSQobWt0ZW1wKVxudHJhcCAncm0gLWYgXCIkVEVNUFwiJyBFWElUXG4oY3JvbnRhYiAtbCAyXHUwMDNlL2Rldi9udWxsIHx8IHRydWUpIHwgYXdrICdcbiAgL14jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3MkLyB7IHNraXA9MTsgbmV4dCB9XG4gIC9eIyBFbmQgU3ltYWlyYSBFcmFzZU1lIHNjaGVkdWxlZCB0YXNrcyQvIHsgc2tpcD0wOyBuZXh0IH1cbiAgc2tpcCB7IG5leHQgfVxuICB7IHByaW50IH1cbicgXHUwMDNlIFwiJFRFTVBcIlxuc2VkIFwic3x7d3JhcHBlcl9kaXJ9fCRTQ1JJUFRfRElSfGdcIiBcIiRTQ1JJUFRfRElSL2Nyb250YWIudHh0XCIgXHUwMDNlXHUwMDNlIFwiJFRFTVBcIlxuY3JvbnRhYiBcIiRURU1QXCJcbnByaW50ZiAnQ3JvbnRhYiBpbnN0YWxsZWQuIFdyYXBwZXJzIGluOiAlc1xcbicgXCIkU0NSSVBUX0RJUlwiXG4iLCJzeW1lcmFzZW1lLXBvbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG4jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgaW5ib3ggcG9sbCB3cmFwcGVyXG4jIEdlbmVyYXRlZCBieSBzeW1lcmFzZW1lIGdlbmVyYXRlLXNjaGVkdWxlciAoR28pXG5zZXQgLWV1byBwaXBlZmFpbFxuXG5leHBvcnQgU1lNRVJBU0VNRV9IRUFETEVTUz0xXG5jZCAnL3ByaXZhdGUvdG1wL3N5bWVyYXNlbWUtZ28tb3JhY2xlL2NsaS9vcGVyYXRlLXNjaGVkdWxlLWluc3RhbGwvY3dkJ1xuXG5DVVJSRU5UX0hITU09JChkYXRlICslSDolTSlcbmNhc2UgXCIkQ1VSUkVOVF9ISE1NXCIgaW5cbjA4OjAwfDEyOjAwfDE2OjAwfDIwOjAwKVxuICAgIGV4ZWMgJy90bXAvc3ltZXJhc2VtZS1nby1vcmFjbGUvYmluL3N5bWVyYXNlbWUnIHBvbGwtaW5ib3ggLS1vdXRwdXQganNvblxuICAgIDs7XG5lc2FjXG4iLCJzeW1lcmFzZW1lLXJlc2Nhbi5zaCI6IiMhL3Vzci9iaW4vZW52IGJhc2hcbiMgU3ltYWlyYSBFcmFzZU1lIHNjaGVkdWxlZCB0YXNrIHdyYXBwZXJcbiMgR2VuZXJhdGVkIGJ5IHN5bWVyYXNlbWUgZ2VuZXJhdGUtc2NoZWR1bGVyIChHbylcbnNldCAtZXVvIHBpcGVmYWlsXG5cbmV4cG9ydCBTWU1FUkFTRU1FX0hFQURMRVNTPTFcbmNkICcvcHJpdmF0ZS90bXAvc3ltZXJhc2VtZS1nby1vcmFjbGUvY2xpL29wZXJhdGUtc2NoZWR1bGUtaW5zdGFsbC9jd2QnXG5cbmV4ZWMgJy90bXAvc3ltZXJhc2VtZS1nby1vcmFjbGUvYmluL3N5bWVyYXNlbWUnICd0aWNrJyAnLS1vdXRwdXQnICdqc29uJyAnLS1kcnktcnVuJ1xuIiwic3ltZXJhc2VtZS10aWNrLnNoIjoiIyEvdXNyL2Jpbi9lbnYgYmFzaFxuIyBTeW1haXJhIEVyYXNlTWUgc2NoZWR1bGVkIHRhc2sgd3JhcHBlclxuIyBHZW5lcmF0ZWQgYnkgc3ltZXJhc2VtZSBnZW5lcmF0ZS1zY2hlZHVsZXIgKEdvKVxuc2V0IC1ldW8gcGlwZWZhaWxcblxuZXhwb3J0IFNZTUVSQVNFTUVfSEVBRExFU1M9MVxuY2QgJy9wcml2YXRlL3RtcC9zeW1lcmFzZW1lLWdvLW9yYWNsZS9jbGkvb3BlcmF0ZS1zY2hlZHVsZS1pbnN0YWxsL2N3ZCdcblxuZXhlYyAnL3RtcC9zeW1lcmFzZW1lLWdvLW9yYWNsZS9iaW4vc3ltZXJhc2VtZScgJ3RpY2snICctLW91dHB1dCcgJ2pzb24nXG4iLCJ1bmluc3RhbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG5zZXQgLWV1byBwaXBlZmFpbFxuVEVNUD0kKG1rdGVtcClcbnRyYXAgJ3JtIC1mIFwiJFRFTVBcIicgRVhJVFxuKGNyb250YWIgLWwgMlx1MDAzZS9kZXYvbnVsbCB8fCB0cnVlKSB8IGF3ayAnXG4gIC9eIyBTeW1haXJhIEVyYXNlTWUgc2NoZWR1bGVkIHRhc2tzJC8geyBza2lwPTE7IG5leHQgfVxuICAvXiMgRW5kIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3MkLyB7IHNraXA9MDsgbmV4dCB9XG4gIHNraXAgeyBuZXh0IH1cbiAgeyBwcmludCB9XG4nIFx1MDAzZSBcIiRURU1QXCJcbmNyb250YWIgXCIkVEVNUFwiXG5wcmludGYgJyVzXFxuJyAnU3ltYWlyYSBFcmFzZU1lIGVudHJpZXMgcmVtb3ZlZCBmcm9tIGNyb250YWIuJ1xuIn0sInN1Y2Nlc3MiOnRydWV9Cg==",
+      "stdout_base64": "eyJkcnlfcnVuIjp0cnVlLCJmaWxlcyI6eyJjcm9udGFiLnR4dCI6IiMgU3ltYWlyYSBFcmFzZU1lIHNjaGVkdWxlZCB0YXNrc1xuIyBHZW5lcmF0ZWQgYnkgc3ltZXJhc2VtZSBnZW5lcmF0ZS1zY2hlZHVsZXIgKEdvKVxuXG4jIFRpY2sgKGRhaWx5IGF0IDEwOjAwKVxuMCAxMCAqICogKiB7d3JhcHBlcl9kaXJ9L3N5bWVyYXNlbWUtdGljay5zaFxuXG4jIFBvbGwgaW5ib3ggKGhvdXJseSB3cmFwcGVyIGNoZWNrcyBjb25maWd1cmVkIHRpbWVzKVxuMCAqICogKiAqIHt3cmFwcGVyX2Rpcn0vc3ltZXJhc2VtZS1wb2xsLnNoXG5cbiMgUmUtc2NhbiAocXVhcnRlcmx5IG9uIDFzdCBvZiBKYW4sIEFwciwgSnVsLCBPY3QpXG4wIDEwIDEgMSw0LDcsMTAgKiB7d3JhcHBlcl9kaXJ9L3N5bWVyYXNlbWUtcmVzY2FuLnNoXG5cbiMgRW5kIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3NcbiIsImluc3RhbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG5zZXQgLWV1byBwaXBlZmFpbFxuU0NSSVBUX0RJUj1cIiQoY2QgXCIkKGRpcm5hbWUgXCIkMFwiKVwiIFx1MDAyNlx1MDAyNiBwd2QpXCJcbmNobW9kICt4IFwiJFNDUklQVF9ESVJcIi8qLnNoXG5URU1QPSQobWt0ZW1wKVxudHJhcCAncm0gLWYgXCIkVEVNUFwiJyBFWElUXG4oY3JvbnRhYiAtbCAyXHUwMDNlL2Rldi9udWxsIHx8IHRydWUpIHwgYXdrICdcbiAgL14jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3MkLyB7IHNraXA9MTsgbmV4dCB9XG4gIC9eIyBFbmQgU3ltYWlyYSBFcmFzZU1lIHNjaGVkdWxlZCB0YXNrcyQvIHsgc2tpcD0wOyBuZXh0IH1cbiAgc2tpcCB7IG5leHQgfVxuICB7IHByaW50IH1cbicgXHUwMDNlIFwiJFRFTVBcIlxuc2VkIFwic3x7d3JhcHBlcl9kaXJ9fCRTQ1JJUFRfRElSfGdcIiBcIiRTQ1JJUFRfRElSL2Nyb250YWIudHh0XCIgXHUwMDNlXHUwMDNlIFwiJFRFTVBcIlxuY3JvbnRhYiBcIiRURU1QXCJcbnByaW50ZiAnQ3JvbnRhYiBpbnN0YWxsZWQuIFdyYXBwZXJzIGluOiAlc1xcbicgXCIkU0NSSVBUX0RJUlwiXG4iLCJzeW1lcmFzZW1lLXBvbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG4jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgaW5ib3ggcG9sbCB3cmFwcGVyXG4jIEdlbmVyYXRlZCBieSBzeW1lcmFzZW1lIGdlbmVyYXRlLXNjaGVkdWxlciAoR28pXG5zZXQgLWV1byBwaXBlZmFpbFxuXG5leHBvcnQgU1lNRVJBU0VNRV9IRUFETEVTUz0xXG5jZCAnPE9SQUNMRV9ST09UPi9jbGkvb3BlcmF0ZS1zY2hlZHVsZS1pbnN0YWxsL2N3ZCdcblxuQ1VSUkVOVF9ISE1NPSQoZGF0ZSArJUg6JU0pXG5jYXNlIFwiJENVUlJFTlRfSEhNTVwiIGluXG4wODowMHwxMjowMHwxNjowMHwyMDowMClcbiAgICBleGVjICc8T1JBQ0xFX1JPT1Q+L2Jpbi9zeW1lcmFzZW1lJyBwb2xsLWluYm94IC0tb3V0cHV0IGpzb25cbiAgICA7O1xuZXNhY1xuIiwic3ltZXJhc2VtZS1yZXNjYW4uc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG4jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFzayB3cmFwcGVyXG4jIEdlbmVyYXRlZCBieSBzeW1lcmFzZW1lIGdlbmVyYXRlLXNjaGVkdWxlciAoR28pXG5zZXQgLWV1byBwaXBlZmFpbFxuXG5leHBvcnQgU1lNRVJBU0VNRV9IRUFETEVTUz0xXG5jZCAnPE9SQUNMRV9ST09UPi9jbGkvb3BlcmF0ZS1zY2hlZHVsZS1pbnN0YWxsL2N3ZCdcblxuZXhlYyAnPE9SQUNMRV9ST09UPi9iaW4vc3ltZXJhc2VtZScgJ3RpY2snICctLW91dHB1dCcgJ2pzb24nICctLWRyeS1ydW4nXG4iLCJzeW1lcmFzZW1lLXRpY2suc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG4jIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFzayB3cmFwcGVyXG4jIEdlbmVyYXRlZCBieSBzeW1lcmFzZW1lIGdlbmVyYXRlLXNjaGVkdWxlciAoR28pXG5zZXQgLWV1byBwaXBlZmFpbFxuXG5leHBvcnQgU1lNRVJBU0VNRV9IRUFETEVTUz0xXG5jZCAnPE9SQUNMRV9ST09UPi9jbGkvb3BlcmF0ZS1zY2hlZHVsZS1pbnN0YWxsL2N3ZCdcblxuZXhlYyAnPE9SQUNMRV9ST09UPi9iaW4vc3ltZXJhc2VtZScgJ3RpY2snICctLW91dHB1dCcgJ2pzb24nXG4iLCJ1bmluc3RhbGwuc2giOiIjIS91c3IvYmluL2VudiBiYXNoXG5zZXQgLWV1byBwaXBlZmFpbFxuVEVNUD0kKG1rdGVtcClcbnRyYXAgJ3JtIC1mIFwiJFRFTVBcIicgRVhJVFxuKGNyb250YWIgLWwgMlx1MDAzZS9kZXYvbnVsbCB8fCB0cnVlKSB8IGF3ayAnXG4gIC9eIyBTeW1haXJhIEVyYXNlTWUgc2NoZWR1bGVkIHRhc2tzJC8geyBza2lwPTE7IG5leHQgfVxuICAvXiMgRW5kIFN5bWFpcmEgRXJhc2VNZSBzY2hlZHVsZWQgdGFza3MkLyB7IHNraXA9MDsgbmV4dCB9XG4gIHNraXAgeyBuZXh0IH1cbiAgeyBwcmludCB9XG4nIFx1MDAzZSBcIiRURU1QXCJcbmNyb250YWIgXCIkVEVNUFwiXG5wcmludGYgJyVzXFxuJyAnU3ltYWlyYSBFcmFzZU1lIGVudHJpZXMgcmVtb3ZlZCBmcm9tIGNyb250YWIuJ1xuIn0sInN1Y2Nlc3MiOnRydWV9Cg==",
       "stderr_base64": "",
-      "stdout_bytes": 2587,
+      "stdout_bytes": 2491,
       "stderr_bytes": 0,
       "id": "operate-schedule-install",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2778,7 +3744,13 @@
       "id": "operate-schedule-status",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2799,7 +3771,13 @@
       "id": "operate-schedule-uninstall",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2816,7 +3794,13 @@
       "id": "operate-serve",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2834,7 +3818,13 @@
       "id": "operate-show-profile",
       "category": "operational",
       "expected_outcome": "deterministic_backend_error",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "deterministic_backend_error"
     },
     {
@@ -2853,6 +3843,11 @@
       "category": "operational",
       "expected_outcome": "success",
       "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
         {
           "path": "stdout.as_of",
           "reason": "status uses current UTC time",
@@ -2877,7 +3872,13 @@
       "id": "operate-tick",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     },
     {
@@ -2894,7 +3895,13 @@
       "id": "operate-version",
       "category": "operational",
       "expected_outcome": "success",
-      "nondeterministic_fields": [],
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
       "classification": "success"
     }
   ]
