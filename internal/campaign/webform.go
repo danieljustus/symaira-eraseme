@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -234,7 +235,7 @@ func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) 
 		return map[string]any{"success": true, "dry_run": true, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "steps": len(channel.FormSpec.Steps)}
 	}
 	if a.executor == nil {
-		return a.createManualTask(ctx, broker, spec, "dynamic_form")
+		return a.createManualTask(ctx, broker, spec, "dynamic_form", profile)
 	}
 	result, err := a.SubmitForm(ctx, brokerID)
 	if err != nil {
@@ -243,20 +244,25 @@ func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) 
 		if errors.Is(err, context.DeadlineExceeded) {
 			reason, code = "timeout", CodeNavigationTimeout
 		}
-		out := a.createManualTask(ctx, broker, spec, reason)
-		out["code"], out["error"] = string(code), err.Error()
+		out := a.createManualTask(ctx, broker, spec, reason, profile)
+		out["code"], out["error"] = string(code), boundedRedacted(err.Error(), profile, 500)
 		return out
 	}
-	out := formResultMap(result)
+	if result == nil {
+		out := a.createManualTask(ctx, broker, spec, "generic_error", profile)
+		out["code"], out["error"] = string(CodeInteractionFailed), "web form executor returned no result"
+		return out
+	}
+	out := formResultMap(result, profile)
 	out["success"] = result.Code == CodeSuccess
 	out["dry_run"] = false
 	out["broker_id"], out["broker_name"], out["url"] = broker.ID, broker.Name, spec.StartURL
 	out["reason"] = reasonForCode(result.Code)
 	if result.Evidence != nil && result.Evidence.FinalURL != "" {
-		out["url"] = result.Evidence.FinalURL
+		out["url"] = boundedRedacted(result.Evidence.FinalURL, profile, 2048)
 	}
 	if result.Code != CodeSuccess {
-		manual := a.createManualTask(ctx, broker, spec, reasonForCode(result.Code))
+		manual := a.createManualTask(ctx, broker, spec, reasonForCode(result.Code), profile)
 		for key, value := range out {
 			manual[key] = value
 		}
@@ -266,7 +272,7 @@ func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) 
 	return out
 }
 
-func (a *WebFormAdapter) createManualTask(ctx context.Context, broker registry.Broker, spec FormSpec, reason string) map[string]any {
+func (a *WebFormAdapter) createManualTask(ctx context.Context, broker registry.Broker, spec FormSpec, reason string, profile *identity.Profile) map[string]any {
 	result := map[string]any{"success": false, "status": "manual_action_required", "reason": reason, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "dry_run": false}
 	if a.DeferManualTask {
 		return result
@@ -279,7 +285,7 @@ func (a *WebFormAdapter) createManualTask(ctx context.Context, broker registry.B
 	if a.RequestID != 0 {
 		requestID = &a.RequestID
 	}
-	task, err := manualtasks.Create(ctx, a.Store, manualtasks.CreateOpts{RequestID: requestID, BrokerID: broker.ID, BrokerName: broker.Name, FormURL: spec.StartURL, Reason: reason})
+	task, err := manualtasks.Create(ctx, a.Store, manualtasks.CreateOpts{RequestID: requestID, BrokerID: broker.ID, BrokerName: broker.Name, FormURL: spec.StartURL, Reason: reason, Profile: profile})
 	if err != nil {
 		result["error"] = err.Error()
 		return result
@@ -293,10 +299,14 @@ func (a *WebFormAdapter) Confirm(ctx context.Context, brokerID, linkURL string) 
 	if err != nil {
 		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "url": linkURL}
 	}
-	out := formResultMap(result)
-	out["success"], out["url"], out["reason"] = result.Code == CodeSuccess, linkURL, reasonForCode(result.Code)
+	if result == nil {
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": "web form executor returned no result", "reason": "generic_error", "url": linkURL}
+	}
+	profile, _ := a.profile()
+	out := formResultMap(result, profile)
+	out["success"], out["url"], out["reason"] = result.Code == CodeSuccess, boundedRedacted(linkURL, profile, 2048), reasonForCode(result.Code)
 	if result.Evidence != nil && result.Evidence.FinalURL != "" {
-		out["url"] = result.Evidence.FinalURL
+		out["url"] = boundedRedacted(result.Evidence.FinalURL, profile, 2048)
 	}
 	return out
 }
@@ -325,7 +335,7 @@ func (a *WebFormAdapter) profile() (*identity.Profile, error) {
 	}
 	profile, err := identity.LoadProfile(path)
 	if errors.Is(err, identity.ErrProfileNotFound) {
-		return &identity.Profile{}, nil
+		return nil, nil
 	}
 	return profile, err
 }
@@ -414,13 +424,46 @@ func ptrString(value *string) string {
 	return *value
 }
 
-func formResultMap(result *Result) map[string]any {
-	out := map[string]any{"code": string(result.Code), "error": result.Message, "step": result.FailedStep, "failed_field": result.FailedField, "hint": result.Hint, "skipped_fields": result.Skipped, "duration_ms": result.DurationMS}
+func formResultMap(result *Result, profile *identity.Profile) map[string]any {
+	if result == nil {
+		return map[string]any{"code": string(CodeInteractionFailed), "error": "web form executor returned no result"}
+	}
+	out := map[string]any{
+		"code": string(result.Code), "error": boundedRedacted(result.Message, profile, 500),
+		"step": result.FailedStep, "failed_field": result.FailedField,
+		"hint": boundedRedacted(result.Hint, profile, 500), "skipped_fields": result.Skipped,
+		"duration_ms": result.DurationMS,
+	}
 	if result.Evidence != nil {
-		out["evidence"] = map[string]any{"final_url": result.Evidence.FinalURL, "page_text": result.Evidence.PageText, "pre_submit_screenshot": result.Evidence.PreSubmitScreenshot, "post_submit_screenshot": result.Evidence.PostSubmitScreenshot}
-		out["final_url"], out["page_text"] = result.Evidence.FinalURL, result.Evidence.PageText
+		evidence := map[string]any{}
+		if finalURL := boundedRedacted(result.Evidence.FinalURL, profile, 2048); finalURL != "" {
+			evidence["final_url"] = finalURL
+			out["final_url"] = finalURL
+		}
+		addEvidenceDigest(evidence, "page_text", []byte(result.Evidence.PageText))
+		addEvidenceDigest(evidence, "pre_submit_screenshot", result.Evidence.PreSubmitScreenshot)
+		addEvidenceDigest(evidence, "post_submit_screenshot", result.Evidence.PostSubmitScreenshot)
+		out["evidence"] = evidence
 	}
 	return out
+}
+
+func addEvidenceDigest(target map[string]any, name string, value []byte) {
+	if len(value) == 0 {
+		return
+	}
+	sum := sha256.Sum256(value)
+	target[name+"_sha256"] = fmt.Sprintf("%x", sum[:])
+	target[name+"_bytes"] = len(value)
+}
+
+func boundedRedacted(value string, profile *identity.Profile, limit int) string {
+	redacted := manualtasks.RedactIdentityValues(value, profile)
+	runes := []rune(redacted)
+	if limit > 0 && len(runes) > limit {
+		return string(runes[:limit])
+	}
+	return redacted
 }
 
 func reasonForCode(code Code) string {

@@ -75,7 +75,7 @@ func ExtractConfirmationLinks(text string, allowed ...map[string]struct{}) []str
 		}
 		seen[link] = struct{}{}
 		parsed, err := url.Parse(link)
-		if err != nil || parsed.Host == "" {
+		if err != nil || parsed.Host == "" || parsed.Scheme != "https" {
 			continue
 		}
 		host := strings.ToLower(parsed.Hostname())
@@ -101,15 +101,7 @@ func ExtractConfirmationLinks(text string, allowed ...map[string]struct{}) []str
 // AutoConfirm validates the first trusted link and delegates the side effect
 // to Click. No clicker is invoked during dry-run.
 func AutoConfirm(ctx context.Context, opts Options) (Result, error) {
-	allowed := KnownBrokerDomains
-	if opts.FromAddress != "" {
-		parts := strings.Split(opts.FromAddress, "@")
-		if len(parts) > 1 {
-			allowed = copyDomains(KnownBrokerDomains)
-			allowed[strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))] = struct{}{}
-		}
-	}
-	links := ExtractConfirmationLinks(opts.ReplyBody, allowed)
+	links := ExtractConfirmationLinks(opts.ReplyBody, KnownBrokerDomains)
 	if len(links) == 0 {
 		return Result{Step: "no_links", Error: "No confirmation links found in reply body"}, nil
 	}
@@ -135,14 +127,6 @@ func AutoConfirm(ctx context.Context, opts Options) (Result, error) {
 		clicked.Error = clickerError(err, clicked.ClickedURL)
 	}
 	return clicked, err
-}
-
-func copyDomains(src map[string]struct{}) map[string]struct{} {
-	out := make(map[string]struct{}, len(src)+1)
-	for domain := range src {
-		out[domain] = struct{}{}
-	}
-	return out
 }
 
 func clickerError(err error, currentURL string) string {

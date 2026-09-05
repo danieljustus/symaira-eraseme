@@ -112,7 +112,7 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		return confirmation.Result{}, err
 	}
 	if reply == nil {
-		return confirmation.Result{Step: "no_reply", Error: fmt.Sprintf("no inbox reply found for request #%d", req.RequestID)}, nil
+		return confirmation.Result{Step: "no_reply", Error: fmt.Sprintf("no inbox reply found for request #%d", req.RequestID), DryRun: req.DryRun}, nil
 	}
 	result, err := confirmation.AutoConfirm(ctx, confirmation.Options{
 		RequestID: req.RequestID, ReplyBody: reply.Snippet, FromAddress: reply.From,
@@ -136,6 +136,9 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		result.Status = "manual_action_required"
 		result.Reason = "dynamic_form"
 		result.ManualActionRequired = true
+		// HUMAN_ACTION_REQUIRED is canonical; this expected fallback is not a
+		// claimed click or an additional failure note.
+		result.Error = ""
 	}
 	if !req.DryRun {
 		if result.Success {

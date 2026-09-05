@@ -302,7 +302,9 @@ Parameters:
 ### `auto_confirm`
 
 Auto-click confirmation links when an executor is injected; otherwise create a
-linked durable manual-confirmation task without claiming a click.
+linked durable manual-confirmation task without claiming a click. Only HTTPS
+links on the fixed broker-domain allowlist are eligible; sender headers never
+expand that allowlist.
 
 Required: `['request_id']`
 

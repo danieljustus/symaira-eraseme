@@ -69,7 +69,7 @@ func ExecuteRequest(ctx context.Context, store *eventstore.Store, requestID int6
 	}
 
 	if channelType == "web_form" {
-		return executeWebformRequest(ctx, store, brokerName, opts.WebForm, opts.DryRun, requestID)
+		return executeWebformRequest(ctx, store, brokerName, opts.WebForm, opts.DryRun, requestID, opts.ProfilePath)
 	}
 
 	// Email path: build payload from the last event (mirrors Python).
@@ -94,6 +94,7 @@ func executeWebformRequest(
 	runner WebFormRunner,
 	dryRun bool,
 	requestID int64,
+	profilePath string,
 ) (map[string]any, error) {
 	if runner == nil {
 		if dryRun {
@@ -112,12 +113,13 @@ func executeWebformRequest(
 		runner = func(context.Context, string, bool) map[string]any { return fallback }
 	}
 
-	identityHash, err := loadIdentityHash()
+	profile, identityHash, err := loadWebFormProfile(profilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	result := withoutSensitiveFormEvidence(runner(ctx, brokerName, dryRun))
+	rawResult := runner(ctx, brokerName, dryRun)
+	result := sanitizeWebFormResult(rawResult, profile)
 	if success, _ := result["success"].(bool); success {
 		_, _, err = storeAppend(ctx, store, requestID, eventstore.EvtSent, map[string]any{
 			"broker_name":            brokerName,
@@ -125,6 +127,7 @@ func executeWebformRequest(
 			"expected_response_days": 30,
 			"identity_snapshot_hash": identityHash,
 			"formflow_code":          result["code"],
+			"evidence":               result["evidence"],
 		})
 	} else {
 		payload := map[string]any{
@@ -132,6 +135,7 @@ func executeWebformRequest(
 			"broker_name":   brokerName,
 			"formflow_code": result["code"],
 			"reason":        stringOr(result["reason"], reasonForCodeString(result["code"])),
+			"evidence":      result["evidence"],
 		}
 		if result["final_url"] != nil {
 			payload["form_url"] = result["final_url"]
@@ -145,15 +149,11 @@ func executeWebformRequest(
 			// The Python web-form service creates the task before execution
 			// records SEND_FAILED. Keep that ordering so HUMAN_ACTION_REQUIRED
 			// projects first, then SEND_FAILED becomes the final status.
-			screenshotPath := stringValue(result["screenshot_path"])
-			if screenshotPath == "" {
-				if path, saveErr := manualtasks.SaveScreenshot(resultScreenshot(result)); saveErr == nil {
-					screenshotPath = path
-				}
-			}
-			htmlSnapshot := stringValue(result["html_snapshot"])
+			// Raw screenshots cannot be safely redacted at this boundary.
+			screenshotPath := ""
+			htmlSnapshot := stringValue(rawResult["html_snapshot"])
 			if htmlSnapshot == "" {
-				htmlSnapshot = stringValue(result["page_text"])
+				htmlSnapshot = stringValue(rawResult["page_text"])
 			}
 			formURL := stringValue(result["url"])
 			if formURL == "" {
@@ -167,10 +167,11 @@ func executeWebformRequest(
 				Reason:         stringOr(result["reason"], reasonForCodeString(result["code"])),
 				ScreenshotPath: screenshotPath,
 				HTMLSnapshot:   htmlSnapshot,
-				FormFields:     stringMap(result["form_fields"]),
-				StepIndex:      intValue(result["step_index"]),
-				TotalSteps:     intValue(result["total_steps"]),
-				ErrorMessage:   stringValue(result["error"]),
+				FormFields:     stringMap(rawResult["form_fields"]),
+				StepIndex:      intValue(rawResult["step_index"]),
+				TotalSteps:     intValue(rawResult["total_steps"]),
+				ErrorMessage:   stringValue(rawResult["error"]),
+				Profile:        profile,
 			})
 			if taskErr != nil {
 				return nil, taskErr
@@ -191,19 +192,48 @@ func executeWebformRequest(
 	return out, nil
 }
 
-// withoutSensitiveFormEvidence keeps raw browser evidence out of event payloads
-// and campaign command responses. Manual-only production paths have no browser
-// evidence; injected executors must persist approved artifacts separately.
-func withoutSensitiveFormEvidence(raw map[string]any) map[string]any {
+// sanitizeWebFormResult preserves deterministic evidence metadata without
+// returning or persisting raw page text, screenshots, form values, or paths.
+func sanitizeWebFormResult(raw map[string]any, profile *identity.Profile) map[string]any {
+	if raw == nil {
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": "web form executor returned no result"}
+	}
 	result := make(map[string]any, len(raw))
 	for key, value := range raw {
 		switch key {
-		case "evidence", "page_text", "html_snapshot", "form_fields", "screenshot_path", "pre_submit_screenshot", "post_submit_screenshot":
+		case "evidence":
+			if evidence := sanitizeEvidenceMap(value, profile); len(evidence) > 0 {
+				result[key] = evidence
+			}
+		case "page_text", "html_snapshot", "screenshot_path", "pre_submit_screenshot", "post_submit_screenshot":
 			continue
+		case "form_fields":
+			// Field values are identity data. Names alone are not required by the
+			// campaign result or event contracts, so omit the object entirely.
+			continue
+		case "error", "hint":
+			result[key] = boundedRedacted(stringValue(value), profile, 500)
+		case "url", "final_url":
+			result[key] = boundedRedacted(stringValue(value), profile, 2048)
 		default:
 			result[key] = value
 		}
 	}
+	return result
+}
+
+func sanitizeEvidenceMap(value any, profile *identity.Profile) map[string]any {
+	evidence, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	result := map[string]any{}
+	if finalURL := boundedRedacted(stringValue(evidence["final_url"]), profile, 2048); finalURL != "" {
+		result["final_url"] = finalURL
+	}
+	addEvidenceDigest(result, "page_text", []byte(stringValue(evidence["page_text"])))
+	addEvidenceDigest(result, "pre_submit_screenshot", screenshotBytes(evidence["pre_submit_screenshot"]))
+	addEvidenceDigest(result, "post_submit_screenshot", screenshotBytes(evidence["post_submit_screenshot"]))
 	return result
 }
 
@@ -313,22 +343,30 @@ func loadProfile(ctx context.Context, profilePath string) (*identity.Profile, st
 	return profile, identity.HashProfile(profile), nil
 }
 
-// loadIdentityHash loads the hash for web-form execution; a missing
-// profile yields an empty hash (mirrors the planning try/except
-// FileNotFoundError branch).
-func loadIdentityHash() (string, error) {
-	path, err := identity.DefaultProfilePath()
-	if err != nil {
-		return "", err
+// loadWebFormProfile loads the profile used to redact executor output. A
+// missing profile is valid for manual fallback and yields an empty hash.
+func loadWebFormProfile(profilePath string) (*identity.Profile, string, error) {
+	path := profilePath
+	if path == "" {
+		var err error
+		path, err = identity.DefaultProfilePath()
+		if err != nil {
+			return nil, "", err
+		}
 	}
 	profile, err := identity.LoadProfile(path)
-	if err != nil {
-		if errors.Is(err, identity.ErrProfileNotFound) {
-			return "", nil
-		}
-		return "", &ErrIdentityProfile{msg: err.Error()}
+	if errors.Is(err, identity.ErrProfileNotFound) {
+		return nil, "", nil
 	}
-	return identity.HashProfile(profile), nil
+	if err != nil {
+		return nil, "", &ErrIdentityProfile{msg: err.Error()}
+	}
+	return profile, identity.HashProfile(profile), nil
+}
+
+func loadIdentityHash() (string, error) {
+	_, hash, err := loadWebFormProfile("")
+	return hash, err
 }
 
 // storeAppend wraps Store.AppendAndProject with the standard source and

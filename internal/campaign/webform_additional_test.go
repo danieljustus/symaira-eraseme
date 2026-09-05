@@ -89,8 +89,9 @@ func TestWebFormResultHelpersAndReasonMapping(t *testing.T) {
 		}
 	}
 	result := &Result{Code: CodeSuccess, Evidence: &Evidence{FinalURL: "https://done.test", PageText: "done", PreSubmitScreenshot: []byte("pre"), PostSubmitScreenshot: []byte("post")}}
-	mapped := formResultMap(result)
-	if mapped["final_url"] != "https://done.test" || mapped["page_text"] != "done" {
+	mapped := formResultMap(result, nil)
+	evidence, _ := mapped["evidence"].(map[string]any)
+	if mapped["final_url"] != "https://done.test" || mapped["page_text"] != nil || evidence["page_text_sha256"] == nil || evidence["post_submit_screenshot_sha256"] == nil {
 		t.Fatalf("mapped evidence = %#v", mapped)
 	}
 	post := base64.StdEncoding.EncodeToString([]byte("post"))

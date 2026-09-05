@@ -37,8 +37,8 @@ func TestWriteWebActionTextReportsManualFallbackHonestly(t *testing.T) {
 			var out bytes.Buffer
 			cmd := &cobra.Command{}
 			cmd.SetOut(&out)
-			if err := writeWebActionText(cmd, testCase.value); err != nil {
-				t.Fatal(err)
+			if err := writeWebActionText(cmd, testCase.value); err == nil {
+				t.Fatal("manual fallback returned a successful exit status")
 			}
 			if !strings.Contains(out.String(), testCase.want) || strings.TrimSpace(out.String()) == "success" {
 				t.Fatalf("text output = %q", out.String())

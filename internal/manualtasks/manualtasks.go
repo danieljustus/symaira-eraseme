@@ -78,6 +78,7 @@ type CreateOpts struct {
 	TotalSteps        int
 	ErrorMessage      string
 	ExtraInstructions string
+	Profile           *identity.Profile
 }
 
 // ListOpts controls optional queue filters.
@@ -104,24 +105,45 @@ func RedactIdentityValues(html string, profile *identity.Profile) string {
 	redacted := html
 	if profile != nil {
 		for _, value := range profile.EmailAddresses {
-			redacted = strings.ReplaceAll(redacted, value, "[REDACTED-EMAIL]")
+			redacted = replaceNonEmpty(redacted, value, "[REDACTED-EMAIL]")
 		}
 		for _, value := range profile.PhoneNumbers {
-			redacted = strings.ReplaceAll(redacted, value, "[REDACTED-PHONE]")
+			redacted = replaceNonEmpty(redacted, value, "[REDACTED-PHONE]")
 		}
-		redacted = strings.ReplaceAll(redacted, profile.FullName, "[REDACTED-NAME]")
+		redacted = replaceNonEmpty(redacted, profile.FullName, "[REDACTED-NAME]")
 		for _, value := range profile.NameVariants {
-			redacted = strings.ReplaceAll(redacted, value, "[REDACTED-NAME]")
+			redacted = replaceNonEmpty(redacted, value, "[REDACTED-NAME]")
+		}
+		if profile.DateOfBirth != nil {
+			redacted = replaceNonEmpty(redacted, *profile.DateOfBirth, "[REDACTED-DOB]")
 		}
 		for _, address := range profile.Addresses {
-			redacted = strings.ReplaceAll(redacted, address.Street, "[REDACTED-STREET]")
-			redacted = strings.ReplaceAll(redacted, address.City, "[REDACTED-CITY]")
-			redacted = strings.ReplaceAll(redacted, address.PostalCode, "[REDACTED-POSTAL]")
+			redacted = replaceNonEmpty(redacted, address.Street, "[REDACTED-STREET]")
+			redacted = replaceNonEmpty(redacted, address.City, "[REDACTED-CITY]")
+			redacted = replaceNonEmpty(redacted, address.PostalCode, "[REDACTED-POSTAL]")
+			if address.State != nil {
+				redacted = replaceNonEmpty(redacted, *address.State, "[REDACTED-STATE]")
+			}
 		}
 		return redacted
 	}
 	redacted = emailPattern.ReplaceAllString(redacted, "[REDACTED-EMAIL]")
 	return phonePattern.ReplaceAllString(redacted, "[REDACTED-PHONE]")
+}
+
+func replaceNonEmpty(value, sensitive, marker string) string {
+	if sensitive == "" {
+		return value
+	}
+	return strings.ReplaceAll(value, sensitive, marker)
+}
+
+func redactFields(fields map[string]string, profile *identity.Profile) map[string]string {
+	redacted := make(map[string]string, len(fields))
+	for key, value := range fields {
+		redacted[key] = RedactIdentityValues(value, profile)
+	}
+	return redacted
 }
 
 // TasksDir returns the Python-compatible manual task artifact directory.
@@ -178,16 +200,45 @@ func instructionsForReason(reason, brokerName string) string {
 // Create persists a pending task, stores a redacted snapshot, and records the
 // HUMAN_ACTION_REQUIRED event when a request id is present.
 func Create(ctx context.Context, store *eventstore.Store, opts CreateOpts) (ManualTask, error) {
+	if store == nil {
+		return ManualTask{}, errors.New("manualtasks: store is required")
+	}
 	reason := opts.Reason
 	if _, ok := fallbackReasons[reason]; !ok {
 		reason = "generic_error"
 	}
+	formURL := RedactIdentityValues(opts.FormURL, opts.Profile)
+	screenshotPath := RedactIdentityValues(opts.ScreenshotPath, opts.Profile)
 	instructions := instructionsForReason(reason, opts.BrokerName)
 	if opts.ExtraInstructions != "" {
-		instructions += "\n\n" + opts.ExtraInstructions
+		instructions += "\n\n" + RedactIdentityValues(opts.ExtraInstructions, opts.Profile)
 	}
-	formFieldsJSON, err := json.Marshal(nonNilFields(opts.FormFields))
+	formFieldsJSON, err := json.Marshal(redactFields(nonNilFields(opts.FormFields), opts.Profile))
 	if err != nil {
+		return ManualTask{}, err
+	}
+	tx, err := store.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return ManualTask{}, err
+	}
+	rollback := true
+	defer func() {
+		if rollback {
+			_ = tx.Rollback()
+		}
+	}()
+	requestArg := nullableRequestID(opts.RequestID)
+	existing, err := scanTask(tx.QueryRowContext(ctx, `SELECT id, request_id, broker_id, broker_name,
+		form_url, reason, instructions, screenshot_path, html_snapshot_path,
+		form_fields_json, status, created_at, completed_at, notes
+		FROM manual_tasks
+		WHERE status = 'pending' AND broker_id = ? AND form_url = ? AND reason = ?
+		  AND ((request_id IS NULL AND ? IS NULL) OR request_id = ?)
+		ORDER BY id LIMIT 1`, opts.BrokerID, formURL, reason, requestArg, requestArg))
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
 		return ManualTask{}, err
 	}
 	htmlPath := ""
@@ -199,20 +250,27 @@ func Create(ctx context.Context, store *eventstore.Store, opts CreateOpts) (Manu
 		if err := ensureTasksDir(tasksDir); err != nil {
 			return ManualTask{}, err
 		}
-		htmlPath = filepath.Join(tasksDir, fmt.Sprintf("snapshot_%d.html", time.Now().Unix()))
-		if err := os.WriteFile(htmlPath, []byte(RedactIdentityValues(opts.HTMLSnapshot, nil)), 0o600); err != nil {
+		htmlPath = filepath.Join(tasksDir, fmt.Sprintf("snapshot_%d.html", time.Now().UnixNano()))
+		if err := os.WriteFile(htmlPath, []byte(RedactIdentityValues(opts.HTMLSnapshot, opts.Profile)), 0o600); err != nil {
 			// Python logs snapshot failures and continues with an empty path.
 			htmlPath = ""
 		} else if err := os.Chmod(htmlPath, 0o600); err != nil {
+			_ = os.Remove(htmlPath)
 			htmlPath = ""
 		}
 	}
-	result, err := store.DB().ExecContext(ctx, `INSERT INTO manual_tasks
+	removeHTML := htmlPath != ""
+	defer func() {
+		if rollback && removeHTML {
+			_ = os.Remove(htmlPath)
+		}
+	}()
+	result, err := tx.ExecContext(ctx, `INSERT INTO manual_tasks
 		(request_id, broker_id, broker_name, form_url, reason, instructions,
 		 screenshot_path, html_snapshot_path, form_fields_json, status)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-		nullableRequestID(opts.RequestID), opts.BrokerID, opts.BrokerName, opts.FormURL,
-		reason, instructions, opts.ScreenshotPath, htmlPath, string(formFieldsJSON))
+		requestArg, opts.BrokerID, opts.BrokerName, formURL,
+		reason, instructions, screenshotPath, htmlPath, string(formFieldsJSON))
 	if err != nil {
 		return ManualTask{}, err
 	}
@@ -222,20 +280,23 @@ func Create(ctx context.Context, store *eventstore.Store, opts CreateOpts) (Manu
 	}
 	createdAt := time.Now().UTC().Format("2006-01-02T15:04:05")
 	if opts.RequestID != nil && *opts.RequestID != 0 {
-		_, _, eventErr := store.AppendAndProject(ctx, *opts.RequestID, eventstore.EvtHumanActionRequired, map[string]any{
-			"manual_task_id": taskID, "reason": reason, "form_url": opts.FormURL,
-			"instructions": instructions, "screenshot_path": opts.ScreenshotPath,
+		_, _, err = eventstore.AppendAndProjectTx(ctx, tx, *opts.RequestID, eventstore.EvtHumanActionRequired, map[string]any{
+			"manual_task_id": taskID, "reason": reason, "form_url": formURL,
+			"instructions": instructions, "screenshot_path": screenshotPath,
 			"broker_name": opts.BrokerName, "step_index": opts.StepIndex,
-			"total_steps": opts.TotalSteps, "error_message": opts.ErrorMessage,
+			"total_steps": opts.TotalSteps, "error_message": RedactIdentityValues(opts.ErrorMessage, opts.Profile),
 		}, eventstore.SrcSystem, time.Now().UTC())
-		if eventErr != nil {
-			// Preserve Python's best-effort event behavior: the task remains usable.
-			_ = eventErr
+		if err != nil {
+			return ManualTask{}, err
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return ManualTask{}, err
+	}
+	rollback = false
 	return ManualTask{ID: taskID, RequestID: opts.RequestID, BrokerID: opts.BrokerID,
-		BrokerName: opts.BrokerName, FormURL: opts.FormURL, Reason: reason,
-		Instructions: instructions, ScreenshotPath: opts.ScreenshotPath,
+		BrokerName: opts.BrokerName, FormURL: formURL, Reason: reason,
+		Instructions: instructions, ScreenshotPath: screenshotPath,
 		HTMLSnapshotPath: htmlPath, FormFieldsJSON: string(formFieldsJSON),
 		Status: "pending", CreatedAt: createdAt, Notes: ""}, nil
 }
@@ -327,25 +388,46 @@ func scanTaskValues(row rowScanner) (ManualTask, error) {
 
 // Complete marks a task completed or cancelled and records NOTE_ADDED.
 func Complete(ctx context.Context, store *eventstore.Store, taskID int64, notes string, completed bool) (*ManualTask, error) {
-	task, err := Get(ctx, store, taskID)
-	if err != nil || task == nil {
-		return task, err
+	if store == nil {
+		return nil, errors.New("manualtasks: store is required")
 	}
+	tx, err := store.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	taskValue, err := scanTask(tx.QueryRowContext(ctx, `SELECT id, request_id, broker_id, broker_name,
+		form_url, reason, instructions, screenshot_path, html_snapshot_path,
+		form_fields_json, status, created_at, completed_at, notes
+		FROM manual_tasks WHERE id = ?`, taskID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	task := &taskValue
 	status := "cancelled"
 	if completed {
 		status = "completed"
 	}
 	completedAt := time.Now().UTC().Format("2006-01-02T15:04:05")
-	if _, err := store.DB().ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		"UPDATE manual_tasks SET status = ?, completed_at = ?, notes = ? WHERE id = ?",
 		status, completedAt, notes, taskID); err != nil {
 		return nil, err
 	}
 	if task.RequestID != nil && *task.RequestID != 0 {
-		_, _, _ = store.AppendAndProject(ctx, *task.RequestID, eventstore.EvtNoteAdded, map[string]any{
+		_, _, err = eventstore.AppendAndProjectTx(ctx, tx, *task.RequestID, eventstore.EvtNoteAdded, map[string]any{
 			"note":           fmt.Sprintf("Manual task #%d %s: %s", taskID, status, notes),
 			"manual_task_id": taskID, "form_url": task.FormURL,
 		}, eventstore.SrcUser, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	task.Status, task.CompletedAt, task.Notes = status, &completedAt, notes
 	return task, nil

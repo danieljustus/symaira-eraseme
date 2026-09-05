@@ -2,7 +2,9 @@ package campaign
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +80,25 @@ func TestWebFormExecutorFailurePersistsManualFallback(t *testing.T) {
 	}
 }
 
+func TestWebFormNilExecutorResultBecomesManualFallback(t *testing.T) {
+	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
+		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Click: "#submit"}}},
+	}}}
+	adapter := NewWebFormAdapterWithStore(store, []registry.Broker{broker}, FormExecutorFuncs{Submit: func(context.Context, FormSpec) (*Result, error) {
+		return nil, nil
+	}})
+	result := adapter.Run(context.Background(), broker.ID, false)
+	if result["success"] != false || result["task_id"] == nil || result["code"] != string(CodeInteractionFailed) {
+		t.Fatalf("nil executor result = %#v", result)
+	}
+}
+
 func TestExecuteWebFormFallbackOrdersManualAndFailedEvents(t *testing.T) {
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
@@ -125,5 +146,47 @@ func TestExecuteWebFormFallbackOrdersManualAndFailedEvents(t *testing.T) {
 	task, err := manualtasks.Get(ctx, store, taskID)
 	if err != nil || task == nil || task.RequestID == nil || *task.RequestID != requestID {
 		t.Fatalf("linked manual task = %#v, err=%v", task, err)
+	}
+}
+
+func TestExecuteWebFormFailureDropsSensitiveBrowserEvidence(t *testing.T) {
+	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	t.Setenv("SYMERASEME_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	requestID, err := store.CreateRemovalRequest(ctx, "synthetic-broker", "web_form", "campaign", "DE", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.AppendAndProject(ctx, requestID, eventstore.EvtPlanned, map[string]any{"form_url": "https://synthetic.example/optout"}, eventstore.SrcSystem, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	const sentinel = "SENSITIVE-PERSON-1980-01-02"
+	runner := func(context.Context, string, bool) map[string]any {
+		return map[string]any{
+			"success": false, "code": string(CodeFieldNotFound), "reason": "unknown_field",
+			"url": "https://synthetic.example/optout", "page_text": sentinel,
+			"html_snapshot": sentinel, "screenshot_path": sentinel,
+			"form_fields": map[string]string{"name": sentinel},
+			"evidence":    map[string]any{"page_text": sentinel, "post_submit_screenshot": []byte(sentinel)},
+		}
+	}
+	result, err := ExecuteRequest(ctx, store, requestID, ExecuteOpts{WebForm: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.GetEvents(ctx, requestID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(map[string]any{"result": result, "events": events})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), sentinel) {
+		t.Fatalf("sensitive browser evidence leaked into result/event payload: %s", encoded)
 	}
 }

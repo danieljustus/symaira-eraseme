@@ -23,12 +23,12 @@ func TestRepositoryAndAutoConfirmService(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := NewRepository(store)
-	if _, err := repo.InsertReply(ctx, &requestID, "message-1", "thread-1", "broker@custom.example", "Reply", "Click https://custom.example/confirm", ""); err != nil {
+	if _, err := repo.InsertReply(ctx, &requestID, "message-1", "thread-1", "broker@acxiom.com", "Reply", "Click https://acxiom.com/confirm", ""); err != nil {
 		t.Fatal(err)
 	}
 	service := NewService(store)
 	result, err := service.AutoConfirm(ctx, AutoConfirmRequest{RequestID: requestID, DryRun: true})
-	if err != nil || !result.Success || result.ClickedURL != "https://custom.example/confirm" {
+	if err != nil || !result.Success || result.ClickedURL != "https://acxiom.com/confirm" {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
 	events, err := store.GetEvents(ctx, requestID, 0)
