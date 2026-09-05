@@ -63,8 +63,10 @@ backup until the new CLI has been exercised successfully.
 
 ## Web forms and manual tasks
 
-Web-form automation uses the `symaira-browse` integration. If a broker requires
-an unsupported interaction, inspect the fallback queue:
+The Go implementation provides a truthful dry-run preview and an explicit
+manual fallback. Non-dry web-form execution without an injected executor creates
+an entry in the durable `manual_tasks` queue with `reason=dynamic_form`; it does
+not invoke a browser or claim success. Inspect and complete the task:
 
 ```bash
 symeraseme manual-tasks list

@@ -519,13 +519,17 @@
     },
     {
       "name": "run_web_form",
-      "description": "Run a broker web-form opt-out through the symaira-browse integration.",
+      "description": "Run a broker web-form preview or create a durable manual task when no browser executor is injected.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "broker_id": {
             "type": "string",
             "description": "Broker identifier"
+          },
+          "request_id": {
+            "type": "integer",
+            "description": "Optional removal request ID used to link the durable manual fallback task"
           },
           "headed": {
             "type": "boolean",
@@ -549,7 +553,7 @@
     },
     {
       "name": "auto_confirm",
-      "description": "Auto-click confirmation links in broker reply emails.",
+      "description": "Auto-click confirmation links when an executor is injected; otherwise create a linked durable manual-confirmation task without claiming a click.",
       "inputSchema": {
         "type": "object",
         "properties": {

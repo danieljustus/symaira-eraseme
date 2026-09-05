@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,131 +11,179 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danieljustus/symaira-browse/formflow"
+	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
+	"github.com/danieljustus/symaira-eraseme/internal/manualtasks"
 	"github.com/danieljustus/symaira-eraseme/internal/registry"
 )
 
-// FormDriverFactory supplies the narrow browser driver used by formflow. The
-// factory keeps browser/session creation outside EraseMe and makes the adapter
-// fully testable with a fake driver; this package never performs a live broker
-// submission on its own.
-type FormDriverFactory func(context.Context, string) (formflow.Driver, error)
-
-// WebFormAdapter is the EraseMe boundary around symaira-browse/formflow. It
-// resolves a broker's registry definition, converts its declarative steps to a
-// semantic-first formflow spec, and maps typed outcomes to the campaign
-// execution result shape.
-type WebFormAdapter struct {
-	brokers       map[string]registry.Broker
-	driverFactory FormDriverFactory
-	driver        formflow.Driver
-	Pacer         *formflow.Pacer
-	ProfilePath   string
+// Selector is the language-neutral selector contract shared by registry
+// previews and injected test executors. It intentionally has no browser
+// implementation or dependency on a sibling browser project.
+type Selector struct {
+	CSS string `json:"css,omitempty"`
 }
 
-// NewWebFormAdapter creates an adapter backed by a driver factory. A factory
-// is preferred for campaign execution because each request can receive its
-// own browser page/session.
-func NewWebFormAdapter(brokers []registry.Broker, factory FormDriverFactory) *WebFormAdapter {
+// Field is one declarative form value.
+type Field struct {
+	Name     string   `json:"name"`
+	Selector Selector `json:"selector"`
+	Value    string   `json:"value"`
+	Required bool     `json:"required"`
+}
+
+// FormSpec is the local, serializable web-form preview contract.
+type FormSpec struct {
+	Name     string        `json:"name"`
+	StartURL string        `json:"start_url"`
+	Timeout  time.Duration `json:"-"`
+	Fields   []Field       `json:"fields"`
+	Submit   Selector      `json:"submit"`
+}
+
+const defaultFormExecutorTimeout = 60 * time.Second
+
+// ConfirmationSpec is the local confirmation-link contract.
+type ConfirmationSpec struct {
+	LinkURL string `json:"link_url"`
+}
+
+// Code is a stable result code returned by an injected executor.
+type Code string
+
+const (
+	CodeSuccess            Code = "success"
+	CodeInteractionFailed  Code = "interaction_failed"
+	CodeInvalidSpec        Code = "invalid_spec"
+	CodeBlockedCaptcha     Code = "blocked_captcha"
+	CodeBlockedBotwall     Code = "blocked_botwall"
+	CodeNavigationTimeout  Code = "navigation_timeout"
+	CodeFieldNotFound      Code = "field_not_found"
+	CodeConfirmationFailed Code = "confirmation_failed"
+)
+
+// Evidence contains executor-produced, non-sensitive evidence. Screenshot
+// bytes are encoded by the normal JSON encoder when persisted in an event.
+type Evidence struct {
+	FinalURL             string `json:"final_url"`
+	PageText             string `json:"page_text"`
+	PreSubmitScreenshot  []byte `json:"pre_submit_screenshot,omitempty"`
+	PostSubmitScreenshot []byte `json:"post_submit_screenshot,omitempty"`
+}
+
+// Result is the deterministic result contract used by injected executors.
+type Result struct {
+	Code        Code
+	Message     string
+	FailedStep  string
+	FailedField string
+	Hint        string
+	Skipped     []string
+	DurationMS  int64
+	Evidence    *Evidence
+}
+
+// FormExecutor is the only side-effect boundary for web forms. Production
+// does not provide one; tests may inject a deterministic implementation.
+type FormExecutor interface {
+	SubmitForm(context.Context, FormSpec) (*Result, error)
+	ConfirmLink(context.Context, ConfirmationSpec) (*Result, error)
+}
+
+type FormExecutorFuncs struct {
+	Submit  func(context.Context, FormSpec) (*Result, error)
+	Confirm func(context.Context, ConfirmationSpec) (*Result, error)
+}
+
+func (f FormExecutorFuncs) SubmitForm(ctx context.Context, spec FormSpec) (*Result, error) {
+	if f.Submit == nil {
+		return nil, errors.New("campaign: form executor submit function is required")
+	}
+	return f.Submit(ctx, spec)
+}
+
+func (f FormExecutorFuncs) ConfirmLink(ctx context.Context, spec ConfirmationSpec) (*Result, error) {
+	if f.Confirm == nil {
+		return nil, errors.New("campaign: form executor confirmation function is required")
+	}
+	return f.Confirm(ctx, spec)
+}
+
+// WebFormAdapter is the EraseMe boundary around the local form contract. It
+// previews registry forms and persists an explicit manual task when no
+// executor is configured.
+type WebFormAdapter struct {
+	brokers   map[string]registry.Broker
+	executor  FormExecutor
+	Store     *eventstore.Store
+	RequestID int64
+	// DeferManualTask leaves task creation to executeWebformRequest, which has
+	// the concrete request ID for each item in a campaign batch.
+	DeferManualTask bool
+	ProfilePath     string
+}
+
+func NewWebFormAdapter(brokers []registry.Broker, executor FormExecutor) *WebFormAdapter {
 	byID := make(map[string]registry.Broker, len(brokers))
 	for _, broker := range brokers {
 		byID[broker.ID] = broker
 	}
-	return &WebFormAdapter{
-		brokers:       byID,
-		driverFactory: factory,
-		Pacer:         formflow.NewPacer(0),
-	}
+	return &WebFormAdapter{brokers: byID, executor: executor}
 }
 
-// NewWebFormAdapterWithDriver creates an adapter for one supplied driver. It
-// is useful for deterministic tests and single-request callers.
-func NewWebFormAdapterWithDriver(brokers []registry.Broker, driver formflow.Driver) *WebFormAdapter {
-	adapter := NewWebFormAdapter(brokers, nil)
-	adapter.driver = driver
+func NewWebFormAdapterWithStore(store *eventstore.Store, brokers []registry.Broker, executor FormExecutor) *WebFormAdapter {
+	adapter := NewWebFormAdapter(brokers, executor)
+	adapter.Store = store
 	return adapter
 }
 
-// FormSpecFromBroker converts one registry web_form channel to formflow's
-// public spec. Registry selectors remain CSS fallbacks, while values are
-// resolved from semantic identity field names such as ${email}; required_fields
-// controls the loud pre-submit missing-field guarantee.
-func FormSpecFromBroker(broker registry.Broker, channel registry.Channel, profile *identity.Profile) (formflow.FormSpec, error) {
+func FormSpecFromBroker(broker registry.Broker, channel registry.Channel, profile *identity.Profile) (FormSpec, error) {
 	if channel.Type != "web_form" || channel.FormSpec == nil {
-		return formflow.FormSpec{}, errors.New("campaign: broker channel is not a web form")
+		return FormSpec{}, errors.New("campaign: broker channel is not a web form")
 	}
 	fields := identityFieldValues(profile)
 	required := make(map[string]bool, len(channel.RequiredFields))
 	for _, name := range channel.RequiredFields {
 		required[name] = true
 	}
-
-	spec := formflow.FormSpec{
-		Name:     broker.ID,
-		StartURL: channel.URL,
-	}
+	spec := FormSpec{Name: broker.ID, StartURL: channel.URL}
 	if channel.FormSpec.TimeoutSeconds != nil && *channel.FormSpec.TimeoutSeconds > 0 {
 		spec.Timeout = time.Duration(*channel.FormSpec.TimeoutSeconds * float64(time.Second))
 	}
-
 	var submitCSS string
 	fieldIndex := 0
 	for _, step := range channel.FormSpec.Steps {
 		for _, selector := range sortedKeys(step.Fill) {
-			value := step.Fill[selector]
-			name, resolved := resolveIdentityValue(value, fields)
+			name, resolved := resolveIdentityValue(step.Fill[selector], fields)
 			if name == "" {
 				name = fmt.Sprintf("field-%d", fieldIndex)
 			}
-			spec.Fields = append(spec.Fields, formflow.Field{
-				Name:     name,
-				Selector: formflow.Selector{CSS: selector},
-				Value:    resolved,
-				Required: requiredField(name, required),
-			})
+			spec.Fields = append(spec.Fields, Field{Name: name, Selector: Selector{CSS: selector}, Value: resolved, Required: requiredField(name, required)})
 			fieldIndex++
 		}
-		// formflow's narrow Driver intentionally exposes Fill rather than a
-		// separate select operation. A select value is therefore represented
-		// as another field fill; the live driver handles the selector.
 		for _, selector := range sortedKeys(step.Select) {
-			value := step.Select[selector]
-			name, resolved := resolveIdentityValue(value, fields)
+			name, resolved := resolveIdentityValue(step.Select[selector], fields)
 			if name == "" {
 				name = fmt.Sprintf("field-%d", fieldIndex)
 			}
-			spec.Fields = append(spec.Fields, formflow.Field{
-				Name:     name,
-				Selector: formflow.Selector{CSS: selector},
-				Value:    resolved,
-				Required: requiredField(name, required),
-			})
+			spec.Fields = append(spec.Fields, Field{Name: name, Selector: Selector{CSS: selector}, Value: resolved, Required: requiredField(name, required)})
 			fieldIndex++
 		}
 		if step.Click != "" {
-			// The final click in the registry DSL is the contracted submit
-			// control. Earlier clicks (for example cookie consent) are not
-			// representable by formflow's deliberately narrow surface.
 			submitCSS = step.Click
 		}
 	}
 	if submitCSS != "" {
-		spec.Submit = formflow.Selector{CSS: submitCSS}
+		spec.Submit = Selector{CSS: submitCSS}
 	}
 	return spec, nil
 }
 
-// ConvertBrokerFormSpec is a descriptive alias for callers that prefer an
-// explicitly named conversion entry point.
-func ConvertBrokerFormSpec(broker registry.Broker, channel registry.Channel, profile *identity.Profile) (formflow.FormSpec, error) {
+func ConvertBrokerFormSpec(broker registry.Broker, channel registry.Channel, profile *identity.Profile) (FormSpec, error) {
 	return FormSpecFromBroker(broker, channel, profile)
 }
 
-// SubmitForm executes the selected broker's web form and returns formflow's
-// typed result. Page outcomes are returned in Result.Code; Go errors are
-// reserved for missing registry/driver configuration.
-func (a *WebFormAdapter) SubmitForm(ctx context.Context, brokerID string) (*formflow.Result, error) {
+func (a *WebFormAdapter) SubmitForm(ctx context.Context, brokerID string) (*Result, error) {
 	broker, channel, err := a.webForm(brokerID)
 	if err != nil {
 		return nil, err
@@ -147,89 +196,117 @@ func (a *WebFormAdapter) SubmitForm(ctx context.Context, brokerID string) (*form
 	if err != nil {
 		return nil, err
 	}
-	driver, err := a.newDriver(ctx, brokerID)
-	if err != nil {
-		return nil, err
+	if a.executor == nil {
+		return nil, errors.New("campaign: web form executor is not configured")
 	}
-	runner := formflow.NewRunner(driver)
-	if a.Pacer != nil {
-		runner.Pacer = a.Pacer
-	}
-	return runner.SubmitForm(ctx, spec)
+	return callWithTimeout(ctx, spec.Timeout, func(callCtx context.Context) (*Result, error) {
+		return a.executor.SubmitForm(callCtx, spec)
+	})
 }
 
-// ConfirmLink executes a confirmation link with the same in-process driver
-// boundary as form submission.
-func (a *WebFormAdapter) ConfirmLink(ctx context.Context, brokerID, linkURL string) (*formflow.Result, error) {
+func (a *WebFormAdapter) ConfirmLink(ctx context.Context, brokerID, linkURL string) (*Result, error) {
 	if _, ok := a.brokers[brokerID]; !ok {
 		return nil, fmt.Errorf("campaign: broker %q not found", brokerID)
 	}
-	driver, err := a.newDriver(ctx, brokerID)
-	if err != nil {
-		return nil, err
+	if a.executor == nil {
+		return nil, errors.New("campaign: web form executor is not configured")
 	}
-	runner := formflow.NewRunner(driver)
-	if a.Pacer != nil {
-		runner.Pacer = a.Pacer
-	}
-	return runner.ConfirmLink(ctx, formflow.ConfirmationSpec{LinkURL: linkURL})
+	return callWithTimeout(ctx, 0, func(callCtx context.Context) (*Result, error) {
+		return a.executor.ConfirmLink(callCtx, ConfirmationSpec{LinkURL: linkURL})
+	})
 }
 
-// Run adapts SubmitForm to campaign.WebFormRunner. Evidence is intentionally
-// kept as raw screenshot bytes here so eventstore JSON encoding stores them as
-// base64 without losing the typed formflow data.
+// Run returns a preview in dry-run mode. Without an injected executor it
+// persists a durable manual task rather than claiming that a form succeeded.
 func (a *WebFormAdapter) Run(ctx context.Context, brokerID string, dryRun bool) map[string]any {
 	broker, channel, err := a.webForm(brokerID)
 	if err != nil {
-		return map[string]any{"success": false, "code": string(formflow.CodeInvalidSpec), "error": err.Error(), "reason": "generic_error"}
+		return map[string]any{"success": false, "code": string(CodeInvalidSpec), "error": err.Error(), "reason": "generic_error", "dry_run": dryRun}
 	}
 	profile, err := a.profile()
 	if err != nil {
-		return map[string]any{"success": false, "code": string(formflow.CodeInteractionFailed), "error": err.Error(), "reason": "generic_error"}
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "dry_run": dryRun}
 	}
 	spec, err := FormSpecFromBroker(broker, channel, profile)
 	if err != nil {
-		return map[string]any{"success": false, "code": string(formflow.CodeInvalidSpec), "error": err.Error(), "reason": "generic_error"}
+		return map[string]any{"success": false, "code": string(CodeInvalidSpec), "error": err.Error(), "reason": "generic_error", "dry_run": dryRun}
 	}
 	if dryRun {
-		return map[string]any{
-			"success":     true,
-			"dry_run":     true,
-			"broker_id":   broker.ID,
-			"broker_name": broker.Name,
-			"url":         spec.StartURL,
-			"steps":       len(channel.FormSpec.Steps),
-		}
+		return map[string]any{"success": true, "dry_run": true, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "steps": len(channel.FormSpec.Steps)}
+	}
+	if a.executor == nil {
+		return a.createManualTask(ctx, broker, spec, "dynamic_form", profile)
 	}
 	result, err := a.SubmitForm(ctx, brokerID)
 	if err != nil {
-		return map[string]any{"success": false, "code": string(formflow.CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "url": spec.StartURL}
+		reason := "generic_error"
+		code := CodeInteractionFailed
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason, code = "timeout", CodeNavigationTimeout
+		}
+		out := a.createManualTask(ctx, broker, spec, reason, profile)
+		out["code"], out["error"] = string(code), boundedRedacted(err.Error(), profile, 500)
+		return out
 	}
-	out := formResultMap(result)
-	out["success"] = result.Code == formflow.CodeSuccess
-	out["broker_id"] = broker.ID
-	out["broker_name"] = broker.Name
-	out["url"] = spec.StartURL
+	if result == nil {
+		out := a.createManualTask(ctx, broker, spec, "generic_error", profile)
+		out["code"], out["error"] = string(CodeInteractionFailed), "web form executor returned no result"
+		return out
+	}
+	out := formResultMap(result, profile)
+	out["success"] = result.Code == CodeSuccess
+	out["dry_run"] = false
+	out["broker_id"], out["broker_name"], out["url"] = broker.ID, broker.Name, spec.StartURL
 	out["reason"] = reasonForCode(result.Code)
 	if result.Evidence != nil && result.Evidence.FinalURL != "" {
-		out["url"] = result.Evidence.FinalURL
+		out["url"] = boundedRedacted(result.Evidence.FinalURL, profile, 2048)
+	}
+	if result.Code != CodeSuccess {
+		manual := a.createManualTask(ctx, broker, spec, reasonForCode(result.Code), profile)
+		for key, value := range out {
+			manual[key] = value
+		}
+		manual["status"] = "manual_action_required"
+		return manual
 	}
 	return out
 }
 
-// Confirm adapts ConfirmLink to the confirmation runner shape used by the
-// event-store entry point.
+func (a *WebFormAdapter) createManualTask(ctx context.Context, broker registry.Broker, spec FormSpec, reason string, profile *identity.Profile) map[string]any {
+	result := map[string]any{"success": false, "status": "manual_action_required", "reason": reason, "broker_id": broker.ID, "broker_name": broker.Name, "url": spec.StartURL, "dry_run": false}
+	if a.DeferManualTask {
+		return result
+	}
+	if a.Store == nil {
+		result["error"] = "campaign: manual task store is not configured"
+		return result
+	}
+	var requestID *int64
+	if a.RequestID != 0 {
+		requestID = &a.RequestID
+	}
+	task, err := manualtasks.Create(ctx, a.Store, manualtasks.CreateOpts{RequestID: requestID, BrokerID: broker.ID, BrokerName: broker.Name, FormURL: spec.StartURL, Reason: reason, Profile: profile})
+	if err != nil {
+		result["error"] = err.Error()
+		return result
+	}
+	result["task_id"], result["instructions"] = task.ID, task.Instructions
+	return result
+}
+
 func (a *WebFormAdapter) Confirm(ctx context.Context, brokerID, linkURL string) map[string]any {
 	result, err := a.ConfirmLink(ctx, brokerID, linkURL)
 	if err != nil {
-		return map[string]any{"success": false, "code": string(formflow.CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "url": linkURL}
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": err.Error(), "reason": "generic_error", "url": linkURL}
 	}
-	out := formResultMap(result)
-	out["success"] = result.Code == formflow.CodeSuccess
-	out["url"] = linkURL
-	out["reason"] = reasonForCode(result.Code)
+	if result == nil {
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": "web form executor returned no result", "reason": "generic_error", "url": linkURL}
+	}
+	profile, _ := a.profile()
+	out := formResultMap(result, profile)
+	out["success"], out["url"], out["reason"] = result.Code == CodeSuccess, boundedRedacted(linkURL, profile, 2048), reasonForCode(result.Code)
 	if result.Evidence != nil && result.Evidence.FinalURL != "" {
-		out["url"] = result.Evidence.FinalURL
+		out["url"] = boundedRedacted(result.Evidence.FinalURL, profile, 2048)
 	}
 	return out
 }
@@ -247,16 +324,6 @@ func (a *WebFormAdapter) webForm(brokerID string) (registry.Broker, registry.Cha
 	return registry.Broker{}, registry.Channel{}, fmt.Errorf("campaign: broker %q has no active web form channel", brokerID)
 }
 
-func (a *WebFormAdapter) newDriver(ctx context.Context, brokerID string) (formflow.Driver, error) {
-	if a.driver != nil {
-		return a.driver, nil
-	}
-	if a.driverFactory == nil {
-		return nil, errors.New("campaign: web form driver factory is required")
-	}
-	return a.driverFactory(ctx, brokerID)
-}
-
 func (a *WebFormAdapter) profile() (*identity.Profile, error) {
 	path := a.ProfilePath
 	if path == "" {
@@ -268,9 +335,18 @@ func (a *WebFormAdapter) profile() (*identity.Profile, error) {
 	}
 	profile, err := identity.LoadProfile(path)
 	if errors.Is(err, identity.ErrProfileNotFound) {
-		return &identity.Profile{}, nil
+		return nil, nil
 	}
 	return profile, err
+}
+
+func callWithTimeout(ctx context.Context, timeout time.Duration, fn func(context.Context) (*Result, error)) (*Result, error) {
+	if timeout <= 0 {
+		timeout = defaultFormExecutorTimeout
+	}
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return fn(callCtx)
 }
 
 var identityPlaceholder = regexp.MustCompile(`\$\{([^}]+)\}`)
@@ -283,8 +359,7 @@ func identityFieldValues(profile *identity.Profile) map[string]string {
 	values["full_name"] = profile.FullName
 	parts := strings.Fields(profile.FullName)
 	if len(parts) > 0 {
-		values["first_name"] = parts[0]
-		values["last_name"] = strings.Join(parts[1:], " ")
+		values["first_name"], values["last_name"] = parts[0], strings.Join(parts[1:], " ")
 	}
 	if len(profile.EmailAddresses) > 0 {
 		values["email"] = profile.EmailAddresses[0]
@@ -297,9 +372,7 @@ func identityFieldValues(profile *identity.Profile) map[string]string {
 	}
 	if len(profile.Addresses) > 0 {
 		address := profile.Addresses[0]
-		values["address"] = address.Street
-		values["state"] = ptrString(address.State)
-		values["country"] = address.Country
+		values["address"], values["state"], values["country"] = address.Street, ptrString(address.State), address.Country
 		for i, current := range profile.Addresses {
 			values[fmt.Sprintf("address_street_%d", i)] = current.Street
 			values[fmt.Sprintf("address_city_%d", i)] = current.City
@@ -327,10 +400,7 @@ func requiredField(name string, required map[string]bool) bool {
 	if required[name] {
 		return true
 	}
-	aliases := map[string][]string{
-		"email":        {"email_addresses"},
-		"phone_number": {"phone_numbers"},
-	}
+	aliases := map[string][]string{"email": {"email_addresses"}, "phone_number": {"phone_numbers"}}
 	for _, alias := range aliases[name] {
 		if required[alias] {
 			return true
@@ -347,7 +417,6 @@ func sortedKeys(values map[string]string) []string {
 	sort.Strings(keys)
 	return keys
 }
-
 func ptrString(value *string) string {
 	if value == nil {
 		return ""
@@ -355,51 +424,66 @@ func ptrString(value *string) string {
 	return *value
 }
 
-func formResultMap(result *formflow.Result) map[string]any {
+func formResultMap(result *Result, profile *identity.Profile) map[string]any {
+	if result == nil {
+		return map[string]any{"code": string(CodeInteractionFailed), "error": "web form executor returned no result"}
+	}
 	out := map[string]any{
-		"code":           string(result.Code),
-		"error":          result.Message,
-		"step":           result.FailedStep,
-		"failed_field":   result.FailedField,
-		"hint":           result.Hint,
-		"skipped_fields": result.Skipped,
-		"duration_ms":    result.DurationMS,
+		"code": string(result.Code), "error": boundedRedacted(result.Message, profile, 500),
+		"step": result.FailedStep, "failed_field": result.FailedField,
+		"hint": boundedRedacted(result.Hint, profile, 500), "skipped_fields": result.Skipped,
+		"duration_ms": result.DurationMS,
 	}
 	if result.Evidence != nil {
-		out["evidence"] = map[string]any{
-			"final_url":              result.Evidence.FinalURL,
-			"page_text":              result.Evidence.PageText,
-			"pre_submit_screenshot":  result.Evidence.PreSubmitScreenshot,
-			"post_submit_screenshot": result.Evidence.PostSubmitScreenshot,
+		evidence := map[string]any{}
+		if finalURL := boundedRedacted(result.Evidence.FinalURL, profile, 2048); finalURL != "" {
+			evidence["final_url"] = finalURL
+			out["final_url"] = finalURL
 		}
-		out["final_url"] = result.Evidence.FinalURL
-		out["page_text"] = result.Evidence.PageText
+		addEvidenceDigest(evidence, "page_text", []byte(result.Evidence.PageText))
+		addEvidenceDigest(evidence, "pre_submit_screenshot", result.Evidence.PreSubmitScreenshot)
+		addEvidenceDigest(evidence, "post_submit_screenshot", result.Evidence.PostSubmitScreenshot)
+		out["evidence"] = evidence
 	}
 	return out
 }
 
-func reasonForCode(code formflow.Code) string {
+func addEvidenceDigest(target map[string]any, name string, value []byte) {
+	if len(value) == 0 {
+		return
+	}
+	sum := sha256.Sum256(value)
+	target[name+"_sha256"] = fmt.Sprintf("%x", sum[:])
+	target[name+"_bytes"] = len(value)
+}
+
+func boundedRedacted(value string, profile *identity.Profile, limit int) string {
+	redacted := manualtasks.RedactIdentityValues(value, profile)
+	runes := []rune(redacted)
+	if limit > 0 && len(runes) > limit {
+		return string(runes[:limit])
+	}
+	return redacted
+}
+
+func reasonForCode(code Code) string {
 	switch code {
-	case formflow.CodeBlockedCaptcha:
+	case CodeBlockedCaptcha:
 		return "captcha_failed"
-	case formflow.CodeBlockedBotwall:
-		return "generic_error"
-	case formflow.CodeNavigationTimeout:
+	case CodeNavigationTimeout:
 		return "timeout"
-	case formflow.CodeFieldNotFound:
+	case CodeFieldNotFound:
 		return "unknown_field"
-	case formflow.CodeConfirmationFailed:
+	case CodeConfirmationFailed:
 		return "assertion_failed"
 	default:
 		return "generic_error"
 	}
 }
-
 func reasonForCodeString(value any) string {
 	code, _ := value.(string)
-	return reasonForCode(formflow.Code(code))
+	return reasonForCode(Code(code))
 }
-
 func resultScreenshot(result map[string]any) []byte {
 	evidence, _ := result["evidence"].(map[string]any)
 	if evidence == nil {
@@ -410,7 +494,6 @@ func resultScreenshot(result map[string]any) []byte {
 	}
 	return screenshotBytes(evidence["pre_submit_screenshot"])
 }
-
 func screenshotBytes(value any) []byte {
 	switch data := value.(type) {
 	case []byte:

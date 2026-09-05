@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danieljustus/symaira-eraseme/internal/confirmation"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 	"github.com/danieljustus/symaira-eraseme/internal/reporting"
@@ -614,13 +615,17 @@ func realRunWebFormCommand() *cobra.Command {
 				return err
 			}
 			if format == "json" {
-				return writeJSON(cmd, res)
+				if err := writeJSON(cmd, res); err != nil {
+					return err
+				}
+				return webActionError(res)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "success\n")
-			return err
+			return writeWebActionText(cmd, res)
 		}}
 	var broker_id string
 	cmd.Flags().StringVar(&broker_id, "broker-id", "", "Broker identifier")
+	var request_id int
+	cmd.Flags().IntVar(&request_id, "request-id", 0, "Optional removal request ID for manual task linking")
 	var headed bool
 	cmd.Flags().BoolVar(&headed, "headed", false, "Run browser in headed mode (visible)")
 	var screenshot_dir string
@@ -632,6 +637,7 @@ func realRunWebFormCommand() *cobra.Command {
 			broker_id = args[0]
 		}
 		argsMap["broker_id"] = broker_id
+		argsMap["request_id"] = request_id
 		argsMap["headed"] = headed
 		argsMap["screenshot_dir"] = screenshot_dir
 		argsMap["dry_run"] = dry_run
@@ -655,10 +661,12 @@ func realAutoConfirmCommand() *cobra.Command {
 				return err
 			}
 			if format == "json" {
-				return writeJSON(cmd, res)
+				if err := writeJSON(cmd, res); err != nil {
+					return err
+				}
+				return webActionError(res)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "success\n")
-			return err
+			return writeWebActionText(cmd, res)
 		}}
 	var request_id int
 	cmd.Flags().IntVar(&request_id, "request-id", 0, "Removal request ID")
@@ -681,6 +689,58 @@ func realAutoConfirmCommand() *cobra.Command {
 		return nil
 	}
 	return cmd
+}
+
+func writeWebActionText(cmd *cobra.Command, value any) error {
+	switch result := value.(type) {
+	case map[string]any:
+		if success, _ := result["success"].(bool); success {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "success")
+			return err
+		}
+		if result["status"] == "manual_action_required" {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "manual_action_required task_id=%v url=%v\n%v\n", result["task_id"], result["url"], result["instructions"])
+			return errors.Join(err, webActionError(value))
+		}
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "not_completed: %v\n", result["error"])
+		return errors.Join(err, webActionError(value))
+	case confirmation.Result:
+		if result.Success {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "success")
+			return err
+		}
+		if result.ManualActionRequired || result.Step == "manual_confirmation_required" {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "manual_confirmation_required task_id=%d url=%s\n%s\n", result.TaskID, result.ClickedURL, result.Instructions)
+			return errors.Join(err, webActionError(value))
+		}
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "not_completed step=%s: %s\n", result.Step, result.Error)
+		return errors.Join(err, webActionError(value))
+	default:
+		return fmt.Errorf("unexpected web action result %T", value)
+	}
+}
+
+func webActionError(value any) error {
+	switch result := value.(type) {
+	case map[string]any:
+		if success, _ := result["success"].(bool); success {
+			return nil
+		}
+		if result["status"] == "manual_action_required" {
+			return errors.New("manual action required")
+		}
+		return errors.New("action not completed")
+	case confirmation.Result:
+		if result.Success {
+			return nil
+		}
+		if result.ManualActionRequired || result.Step == "manual_confirmation_required" {
+			return errors.New("manual confirmation required")
+		}
+		return errors.New("action not completed")
+	default:
+		return fmt.Errorf("unexpected web action result %T", value)
+	}
 }
 
 func realGetDashboardDataCommand() *cobra.Command {

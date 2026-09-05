@@ -2,13 +2,16 @@ package replies
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/danieljustus/symaira-eraseme/internal/confirmation"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/llm"
+	"github.com/danieljustus/symaira-eraseme/internal/manualtasks"
 	"github.com/danieljustus/symaira-eraseme/internal/triage"
 )
 
@@ -110,28 +113,98 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		return confirmation.Result{}, err
 	}
 	if reply == nil {
-		return confirmation.Result{Step: "no_reply", Error: fmt.Sprintf("no inbox reply found for request #%d", req.RequestID)}, nil
+		return confirmation.Result{Step: "no_reply", Error: fmt.Sprintf("no inbox reply found for request #%d", req.RequestID), DryRun: req.DryRun}, nil
 	}
 	result, err := confirmation.AutoConfirm(ctx, confirmation.Options{
 		RequestID: req.RequestID, ReplyBody: reply.Snippet, FromAddress: reply.From,
 		Headless: req.Headless, ScreenshotDir: req.ScreenshotDir, DryRun: req.DryRun, Click: req.Click,
 	})
 	if err != nil {
+		summarizeClickedConfirmation(&result)
 		return result, err
+	}
+	if !req.DryRun && !result.Success && result.Step == "manual_confirmation_required" && result.ClickedURL != "" {
+		brokerID, brokerName := brokerForConfirmation(ctx, s.Store, req.RequestID, result.ClickedURL)
+		task, taskErr := manualtasks.Create(ctx, s.Store, manualtasks.CreateOpts{
+			RequestID: &req.RequestID, BrokerID: brokerID, BrokerName: brokerName,
+			FormURL: result.ClickedURL, Reason: "dynamic_form",
+			ExtraInstructions: "Open the confirmation URL and complete the confirmation manually; no click was attempted.",
+		})
+		if taskErr != nil {
+			return result, taskErr
+		}
+		result.TaskID = task.ID
+		result.Instructions = task.Instructions
+		result.Status = "manual_action_required"
+		result.Reason = "dynamic_form"
+		result.ManualActionRequired = true
+		// HUMAN_ACTION_REQUIRED is canonical; this expected fallback is not a
+		// claimed click or an additional failure note.
+		result.Error = ""
+	}
+	if !req.DryRun && result.Step != "manual_confirmation_required" {
+		summarizeClickedConfirmation(&result)
 	}
 	if !req.DryRun {
 		if result.Success {
+			summarizeClickedConfirmation(&result)
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtConfirmationLinkClicked, map[string]any{
-				"url": result.ClickedURL, "step": result.Step,
-				"screenshot_before": result.ScreenshotBefore, "screenshot_after": result.ScreenshotAfter,
+				"url_host": result.ClickedHost, "url_sha256": result.ClickedURLSHA256, "step": result.Step,
+				"screenshot_before_sha256": result.ScreenshotBeforeSHA256,
+				"screenshot_before_bytes":  result.ScreenshotBeforeBytes,
+				"screenshot_after_sha256":  result.ScreenshotAfterSHA256,
+				"screenshot_after_bytes":   result.ScreenshotAfterBytes,
 			}, eventstore.SrcSystem, nowUTC())
 		} else if result.Error != "" {
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtNoteAdded, map[string]any{
-				"note": "Auto-confirm failed: " + result.Error, "url": result.ClickedURL,
+				"note":     "Auto-confirm failed: " + result.Error,
+				"url_host": result.ClickedHost, "url_sha256": result.ClickedURLSHA256,
 			}, eventstore.SrcSystem, nowUTC())
 		}
 	}
 	return result, err
+}
+
+func summarizeClickedConfirmation(result *confirmation.Result) {
+	if result == nil || result.DryRun || result.Step == "manual_confirmation_required" {
+		return
+	}
+	if result.ClickedURL != "" {
+		if parsed, err := url.Parse(result.ClickedURL); err == nil {
+			result.ClickedHost = parsed.Hostname()
+		}
+		result.ClickedURLSHA256 = digestString(result.ClickedURL)
+		result.ClickedURL = ""
+	}
+	if result.ScreenshotBefore != "" {
+		result.ScreenshotBeforeBytes = len([]byte(result.ScreenshotBefore))
+		result.ScreenshotBeforeSHA256 = digestString(result.ScreenshotBefore)
+		result.ScreenshotBefore = ""
+	}
+	if result.ScreenshotAfter != "" {
+		result.ScreenshotAfterBytes = len([]byte(result.ScreenshotAfter))
+		result.ScreenshotAfterSHA256 = digestString(result.ScreenshotAfter)
+		result.ScreenshotAfter = ""
+	}
+	result.Error = manualtasks.RedactIdentityValues(result.Error, nil)
+}
+
+func digestString(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func brokerForConfirmation(ctx context.Context, store *eventstore.Store, requestID int64, link string) (string, string) {
+	if request, err := store.GetRemovalRequest(ctx, requestID); err == nil && request != nil {
+		if brokerID, ok := request["broker_id"].(string); ok && brokerID != "" {
+			return brokerID, brokerID
+		}
+	}
+	parsed, err := url.Parse(link)
+	if err == nil && parsed.Hostname() != "" {
+		return parsed.Hostname(), parsed.Hostname()
+	}
+	return "", ""
 }
 
 func nowUTC() (t time.Time) { return time.Now().UTC() }

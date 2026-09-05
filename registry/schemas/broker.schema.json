@@ -151,7 +151,7 @@
         },
         "form_spec": {
           "$ref": "#/$defs/formSpec",
-          "description": "symaira-browse form specification (web_form channels only)."
+          "description": "Declarative form specification for local previews and injected executors (web_form channels only)."
         },
         "template": {
           "type": "string",
@@ -233,7 +233,7 @@
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
-      "description": "One step in a symaira-browse form_spec. Standard DSL: goto/fill/select/click/wait keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
+      "description": "One declarative web-form step. Standard DSL: goto/fill/select/click/wait keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
       "properties": {
         "goto": { "type": "string", "description": "URL to navigate to. Use '.' for the form's own URL." },
         "fill": {

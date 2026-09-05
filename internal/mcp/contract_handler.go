@@ -217,8 +217,17 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 					return nil, err
 				}
 			}
+			brokers, err := loadRegistry()
+			if err != nil {
+				return nil, err
+			}
+			webForm := campaign.NewWebFormAdapter(brokers, nil)
+			if !dryRun {
+				webForm = campaign.NewWebFormAdapterWithStore(store, brokers, nil)
+				webForm.DeferManualTask = true
+			}
 			return campaign.ExecuteCampaign(ctx, store, getStr(args, "campaign_id", ""), campaign.ExecuteOpts{
-				Account: getStr(args, "account", ""), DryRun: dryRun,
+				Account: getStr(args, "account", ""), DryRun: dryRun, WebForm: webForm.Run,
 			}, getInt(args, "batch_size", 5))
 		case "poll_inbox":
 			return handlePollInbox(ctx, args, opts)
@@ -400,8 +409,19 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			adapter := campaign.NewWebFormAdapter(brokers, nil)
-			return adapter.Run(ctx, getStr(args, "broker_id", ""), getBool(args, "dry_run", false)), nil
+			dryRun := getBool(args, "dry_run", false)
+			if dryRun {
+				adapter := campaign.NewWebFormAdapter(brokers, nil)
+				return adapter.Run(ctx, getStr(args, "broker_id", ""), true), nil
+			}
+			store, err := dataStore()
+			if err != nil {
+				return nil, err
+			}
+			defer func() { runErr = errors.Join(runErr, store.Close()) }()
+			adapter := campaign.NewWebFormAdapterWithStore(store, brokers, nil)
+			adapter.RequestID = int64(getInt(args, "request_id", 0))
+			return adapter.Run(ctx, getStr(args, "broker_id", ""), false), nil
 		case "auto_confirm":
 			store, err := dataStore()
 			if err != nil {

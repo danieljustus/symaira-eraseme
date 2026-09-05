@@ -69,7 +69,7 @@ func ExecuteRequest(ctx context.Context, store *eventstore.Store, requestID int6
 	}
 
 	if channelType == "web_form" {
-		return executeWebformRequest(ctx, store, brokerName, opts.WebForm, opts.DryRun, requestID)
+		return executeWebformRequest(ctx, store, brokerName, opts.WebForm, opts.DryRun, requestID, opts.ProfilePath)
 	}
 
 	// Email path: build payload from the last event (mirrors Python).
@@ -94,6 +94,7 @@ func executeWebformRequest(
 	runner WebFormRunner,
 	dryRun bool,
 	requestID int64,
+	profilePath string,
 ) (map[string]any, error) {
 	if runner == nil {
 		if dryRun {
@@ -105,15 +106,20 @@ func executeWebformRequest(
 				"body":       fmt.Sprintf("[dry-run web form for %s]", brokerName),
 			}, nil
 		}
-		return nil, ErrWebFormRunnerRequired
+		fallback, fallbackErr := manualWebFormTaskResult(ctx, store, brokerName, requestID)
+		if fallbackErr != nil {
+			return nil, fallbackErr
+		}
+		runner = func(context.Context, string, bool) map[string]any { return fallback }
 	}
 
-	identityHash, err := loadIdentityHash()
+	profile, identityHash, err := loadWebFormProfile(profilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	result := runner(ctx, brokerName, dryRun)
+	rawResult := runner(ctx, brokerName, dryRun)
+	result := sanitizeWebFormResult(rawResult, profile)
 	if success, _ := result["success"].(bool); success {
 		_, _, err = storeAppend(ctx, store, requestID, eventstore.EvtSent, map[string]any{
 			"broker_name":            brokerName,
@@ -136,24 +142,18 @@ func executeWebformRequest(
 		} else {
 			payload["form_url"] = result["url"]
 		}
-		if result["page_text"] != nil {
-			payload["page_text"] = result["page_text"]
-		}
+
 		if taskID, ok := result["task_id"]; ok && taskID != nil {
 			payload["task_id"] = taskID
 		} else {
 			// The Python web-form service creates the task before execution
 			// records SEND_FAILED. Keep that ordering so HUMAN_ACTION_REQUIRED
 			// projects first, then SEND_FAILED becomes the final status.
-			screenshotPath := stringValue(result["screenshot_path"])
-			if screenshotPath == "" {
-				if path, saveErr := manualtasks.SaveScreenshot(resultScreenshot(result)); saveErr == nil {
-					screenshotPath = path
-				}
-			}
-			htmlSnapshot := stringValue(result["html_snapshot"])
+			// Raw screenshots cannot be safely redacted at this boundary.
+			screenshotPath := ""
+			htmlSnapshot := stringValue(rawResult["html_snapshot"])
 			if htmlSnapshot == "" {
-				htmlSnapshot = stringValue(result["page_text"])
+				htmlSnapshot = stringValue(rawResult["page_text"])
 			}
 			formURL := stringValue(result["url"])
 			if formURL == "" {
@@ -167,10 +167,11 @@ func executeWebformRequest(
 				Reason:         stringOr(result["reason"], reasonForCodeString(result["code"])),
 				ScreenshotPath: screenshotPath,
 				HTMLSnapshot:   htmlSnapshot,
-				FormFields:     stringMap(result["form_fields"]),
-				StepIndex:      intValue(result["step_index"]),
-				TotalSteps:     intValue(result["total_steps"]),
-				ErrorMessage:   stringValue(result["error"]),
+				FormFields:     stringMap(rawResult["form_fields"]),
+				StepIndex:      intValue(rawResult["step_index"]),
+				TotalSteps:     intValue(rawResult["total_steps"]),
+				ErrorMessage:   stringValue(rawResult["error"]),
+				Profile:        profile,
 			})
 			if taskErr != nil {
 				return nil, taskErr
@@ -189,6 +190,57 @@ func executeWebformRequest(
 		out[k] = v
 	}
 	return out, nil
+}
+
+// sanitizeWebFormResult preserves deterministic evidence metadata without
+// returning or persisting raw page text, screenshots, form values, or paths.
+func sanitizeWebFormResult(raw map[string]any, profile *identity.Profile) map[string]any {
+	if raw == nil {
+		return map[string]any{"success": false, "code": string(CodeInteractionFailed), "error": "web form executor returned no result"}
+	}
+	result := make(map[string]any, len(raw))
+	for key, value := range raw {
+		switch key {
+		case "success", "dry_run":
+			if flag, ok := value.(bool); ok {
+				result[key] = flag
+			}
+		case "task_id", "step_index", "total_steps", "duration_ms":
+			result[key] = value
+		case "code", "reason", "status", "broker_id", "broker_name", "step", "failed_field":
+			result[key] = boundedRedacted(stringValue(value), profile, 200)
+		case "instructions", "error", "hint":
+			result[key] = boundedRedacted(stringValue(value), profile, 500)
+		case "skipped_fields":
+			result[key] = value
+		case "url", "final_url":
+			result[key] = boundedRedacted(stringValue(value), profile, 2048)
+		case "evidence":
+			if evidence := sanitizeEvidenceMap(value, profile); len(evidence) > 0 {
+				result[key] = evidence
+			}
+		default:
+			// Unknown executor fields are untrusted and may contain raw browser or
+			// identity data. The result boundary is an allowlist, not passthrough.
+			continue
+		}
+	}
+	return result
+}
+
+func sanitizeEvidenceMap(value any, profile *identity.Profile) map[string]any {
+	evidence, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	result := map[string]any{}
+	if finalURL := boundedRedacted(stringValue(evidence["final_url"]), profile, 2048); finalURL != "" {
+		result["final_url"] = finalURL
+	}
+	addEvidenceDigest(result, "page_text", []byte(stringValue(evidence["page_text"])))
+	addEvidenceDigest(result, "pre_submit_screenshot", screenshotBytes(evidence["pre_submit_screenshot"]))
+	addEvidenceDigest(result, "post_submit_screenshot", screenshotBytes(evidence["post_submit_screenshot"]))
+	return result
 }
 
 func executeEmailRequest(
@@ -297,22 +349,25 @@ func loadProfile(ctx context.Context, profilePath string) (*identity.Profile, st
 	return profile, identity.HashProfile(profile), nil
 }
 
-// loadIdentityHash loads the hash for web-form execution; a missing
-// profile yields an empty hash (mirrors the planning try/except
-// FileNotFoundError branch).
-func loadIdentityHash() (string, error) {
-	path, err := identity.DefaultProfilePath()
-	if err != nil {
-		return "", err
+// loadWebFormProfile loads the profile used to redact executor output. A
+// missing profile is valid for manual fallback and yields an empty hash.
+func loadWebFormProfile(profilePath string) (*identity.Profile, string, error) {
+	path := profilePath
+	if path == "" {
+		var err error
+		path, err = identity.DefaultProfilePath()
+		if err != nil {
+			return nil, "", err
+		}
 	}
 	profile, err := identity.LoadProfile(path)
-	if err != nil {
-		if errors.Is(err, identity.ErrProfileNotFound) {
-			return "", nil
-		}
-		return "", &ErrIdentityProfile{msg: err.Error()}
+	if errors.Is(err, identity.ErrProfileNotFound) {
+		return nil, "", nil
 	}
-	return identity.HashProfile(profile), nil
+	if err != nil {
+		return nil, "", &ErrIdentityProfile{msg: err.Error()}
+	}
+	return profile, identity.HashProfile(profile), nil
 }
 
 // storeAppend wraps Store.AppendAndProject with the standard source and
@@ -427,6 +482,32 @@ func defaultRenderer(templateID string, profile *identity.Profile, brokerName st
 		name = profile.FullName
 	}
 	return fmt.Sprintf("[template %s — %s / %s]", templateID, brokerName, name), nil
+}
+
+func manualWebFormTaskResult(ctx context.Context, store *eventstore.Store, brokerName string, requestID int64) (map[string]any, error) {
+	formURL := ""
+	if events, err := store.GetEvents(ctx, requestID, 0); err == nil {
+		for i := len(events) - 1; i >= 0 && formURL == ""; i-- {
+			for _, key := range []string{"form_url", "endpoint", "url"} {
+				if value, ok := events[i].Payload[key].(string); ok && value != "" {
+					formURL = value
+					break
+				}
+			}
+		}
+	}
+	task, err := manualtasks.Create(ctx, store, manualtasks.CreateOpts{
+		RequestID: &requestID, BrokerID: brokerName, BrokerName: brokerName,
+		FormURL: formURL, Reason: "dynamic_form",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"success": false, "status": "manual_action_required", "reason": "dynamic_form",
+		"task_id": task.ID, "broker_id": brokerName, "broker_name": brokerName,
+		"url": formURL, "instructions": task.Instructions, "dry_run": false,
+	}, nil
 }
 
 // pathSafety keeps filepath imported for config-path handling parity in

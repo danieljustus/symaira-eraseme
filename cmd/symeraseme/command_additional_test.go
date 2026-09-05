@@ -77,12 +77,12 @@ func TestCLIProfileTemplateAndAdapterPaths(t *testing.T) {
 		t.Fatalf("grant dry-run failed: %v\\n%s", err, grantOut)
 	}
 	webOut, err := execute(t, "--output", "json", "run-web-form", "missing", "--dry-run")
-	if err != nil || !strings.Contains(webOut, "success") {
-		t.Fatalf("web-form dry-run failed: %v\\n%s", err, webOut)
+	if err == nil || !strings.Contains(webOut, `"success":false`) {
+		t.Fatalf("missing web-form dry-run did not fail honestly: %v\\n%s", err, webOut)
 	}
 	autoOut, err := execute(t, "--output", "json", "auto-confirm", "999", "--dry-run")
-	if err != nil || !strings.Contains(autoOut, "no inbox reply") {
-		t.Fatalf("auto-confirm dry-run failed: %v\\n%s", err, autoOut)
+	if err == nil || !strings.Contains(autoOut, "no inbox reply") {
+		t.Fatalf("missing-reply auto-confirm did not fail honestly: %v\\n%s", err, autoOut)
 	}
 	reportPath := filepath.Join(t.TempDir(), "dashboard.html")
 	reportOut, err := execute(t, "generate-dashboard", "--output", reportPath)

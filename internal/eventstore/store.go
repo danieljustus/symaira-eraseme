@@ -476,6 +476,31 @@ func (s *Store) AppendAndProject(
 	return id, state, nil
 }
 
+// AppendAndProjectTx appends an event and rebuilds its projection inside a
+// caller-owned transaction. The caller must commit or roll back the transaction.
+func AppendAndProjectTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	requestID int64,
+	eventType EventType,
+	payload map[string]any,
+	source Source,
+	occurredAt time.Time,
+) (int64, StateJSON, error) {
+	if tx == nil {
+		return 0, StateJSON{}, errors.New("eventstore: transaction is required")
+	}
+	id, err := appendTx(ctx, tx, requestID, eventType, payload, source, occurredAt)
+	if err != nil {
+		return 0, StateJSON{}, err
+	}
+	state, err := upsertStateTx(ctx, tx, requestID)
+	if err != nil {
+		return 0, StateJSON{}, err
+	}
+	return id, state, nil
+}
+
 // CreateCampaign inserts a campaign row, returning false if the id is
 // already present.
 func (s *Store) CreateCampaign(ctx context.Context, id, kind, notes string) (bool, error) {
