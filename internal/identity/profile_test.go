@@ -18,8 +18,17 @@ func testKey(t *testing.T) []byte {
 
 func clearKey(t *testing.T) {
 	t.Helper()
-	_ = SetMasterKey(nil)
-	t.Cleanup(func() { _ = SetMasterKey(nil) })
+	// Identity tests share process-global key, provider, and keyring state.
+	// Reset all of it before each test so ambient credentials and preceding
+	// tests cannot change which key source GetExistingMasterKey observes.
+	Shutdown()
+	SetKeyringBackend(NewFakeKeyring())
+	t.Setenv(EnvMasterKeyHex, "")
+	t.Setenv(EnvSymvaultPassphrase, "")
+	t.Cleanup(func() {
+		Shutdown()
+		SetKeyringBackend(nil)
+	})
 }
 
 // TestProfileRoundTrip: Save→Load preserves the profile (encrypted at rest).
