@@ -142,6 +142,9 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		// claimed click or an additional failure note.
 		result.Error = ""
 	}
+	if !req.DryRun && result.Step != "manual_confirmation_required" {
+		summarizeClickedConfirmation(&result)
+	}
 	if !req.DryRun {
 		if result.Success {
 			summarizeClickedConfirmation(&result)
@@ -154,7 +157,8 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 			}, eventstore.SrcSystem, nowUTC())
 		} else if result.Error != "" {
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtNoteAdded, map[string]any{
-				"note": "Auto-confirm failed: " + result.Error, "url": result.ClickedURL,
+				"note":     "Auto-confirm failed: " + result.Error,
+				"url_host": result.ClickedHost, "url_sha256": result.ClickedURLSHA256,
 			}, eventstore.SrcSystem, nowUTC())
 		}
 	}
@@ -182,6 +186,7 @@ func summarizeClickedConfirmation(result *confirmation.Result) {
 		result.ScreenshotAfterSHA256 = digestString(result.ScreenshotAfter)
 		result.ScreenshotAfter = ""
 	}
+	result.Error = manualtasks.RedactIdentityValues(result.Error, nil)
 }
 
 func digestString(value string) string {
