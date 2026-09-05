@@ -27,18 +27,24 @@ var KnownBrokerDomains = map[string]struct{}{
 }
 
 type Result struct {
-	Success              bool
-	ClickedURL           string
-	Step                 string
-	Error                string
-	ScreenshotBefore     string
-	ScreenshotAfter      string
-	DryRun               bool
-	TaskID               int64
-	Instructions         string
-	Status               string
-	Reason               string
-	ManualActionRequired bool
+	Success                bool
+	ClickedURL             string
+	ClickedHost            string
+	ClickedURLSHA256       string
+	Step                   string
+	Error                  string
+	ScreenshotBefore       string
+	ScreenshotAfter        string
+	ScreenshotBeforeSHA256 string
+	ScreenshotAfterSHA256  string
+	ScreenshotBeforeBytes  int
+	ScreenshotAfterBytes   int
+	DryRun                 bool
+	TaskID                 int64
+	Instructions           string
+	Status                 string
+	Reason                 string
+	ManualActionRequired   bool
 }
 
 type ClickOptions struct {

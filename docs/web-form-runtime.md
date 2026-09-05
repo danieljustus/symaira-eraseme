@@ -27,6 +27,9 @@ private daemon protocol.
 - Injected executors receive a bounded context (60-second default). Raw page
   text, screenshots, field values, and local paths never enter command output or
   event payloads; deterministic hashes and byte counts preserve evidence mapping.
+- Successful confirmation clicks likewise expose only the allowlisted host plus
+  URL/screenshot hashes and byte counts; dry-run and manual fallback retain the
+  validated link because the user still needs to act on it.
 - Manual-task rows and their `HUMAN_ACTION_REQUIRED` events commit atomically,
   profile values are redacted, and repeated pending fallbacks reuse one task.
 

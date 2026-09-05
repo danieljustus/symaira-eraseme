@@ -2,6 +2,7 @@ package replies
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/url"
 	"time"
@@ -119,6 +120,7 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		Headless: req.Headless, ScreenshotDir: req.ScreenshotDir, DryRun: req.DryRun, Click: req.Click,
 	})
 	if err != nil {
+		summarizeClickedConfirmation(&result)
 		return result, err
 	}
 	if !req.DryRun && !result.Success && result.Step == "manual_confirmation_required" && result.ClickedURL != "" {
@@ -142,9 +144,13 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 	}
 	if !req.DryRun {
 		if result.Success {
+			summarizeClickedConfirmation(&result)
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtConfirmationLinkClicked, map[string]any{
-				"url": result.ClickedURL, "step": result.Step,
-				"screenshot_before": result.ScreenshotBefore, "screenshot_after": result.ScreenshotAfter,
+				"url_host": result.ClickedHost, "url_sha256": result.ClickedURLSHA256, "step": result.Step,
+				"screenshot_before_sha256": result.ScreenshotBeforeSHA256,
+				"screenshot_before_bytes":  result.ScreenshotBeforeBytes,
+				"screenshot_after_sha256":  result.ScreenshotAfterSHA256,
+				"screenshot_after_bytes":   result.ScreenshotAfterBytes,
 			}, eventstore.SrcSystem, nowUTC())
 		} else if result.Error != "" {
 			_, _, err = s.Store.AppendAndProject(ctx, req.RequestID, eventstore.EvtNoteAdded, map[string]any{
@@ -153,6 +159,34 @@ func (s *Service) AutoConfirm(ctx context.Context, req AutoConfirmRequest) (conf
 		}
 	}
 	return result, err
+}
+
+func summarizeClickedConfirmation(result *confirmation.Result) {
+	if result == nil || result.DryRun || result.Step == "manual_confirmation_required" {
+		return
+	}
+	if result.ClickedURL != "" {
+		if parsed, err := url.Parse(result.ClickedURL); err == nil {
+			result.ClickedHost = parsed.Hostname()
+		}
+		result.ClickedURLSHA256 = digestString(result.ClickedURL)
+		result.ClickedURL = ""
+	}
+	if result.ScreenshotBefore != "" {
+		result.ScreenshotBeforeBytes = len([]byte(result.ScreenshotBefore))
+		result.ScreenshotBeforeSHA256 = digestString(result.ScreenshotBefore)
+		result.ScreenshotBefore = ""
+	}
+	if result.ScreenshotAfter != "" {
+		result.ScreenshotAfterBytes = len([]byte(result.ScreenshotAfter))
+		result.ScreenshotAfterSHA256 = digestString(result.ScreenshotAfter)
+		result.ScreenshotAfter = ""
+	}
+}
+
+func digestString(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("%x", sum[:])
 }
 
 func brokerForConfirmation(ctx context.Context, store *eventstore.Store, requestID int64, link string) (string, string) {
