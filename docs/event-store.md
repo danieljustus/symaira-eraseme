@@ -190,11 +190,19 @@ Migrations on open (transparent, log only):
 - V1 file → `_migrate_v1_to_v2` → `_migrate_v2_to_v3` (or direct V1→V3 in Go)
 - V2 file → `_migrate_v2_to_v3`
 - Legacy accidental Go V3 file → migrate in place to standard Fernet V3
+- `SYMERASEME_ENCRYPT_DB=true` with an existing plaintext database → acquire
+  the database lock, checkpoint and close SQLite, then atomically replace the
+  canonical file with V3 ciphertext before opening a private decrypted copy.
+- `SYMERASEME_ENCRYPT_DB=false` with an existing encrypted database → resolve
+  the existing identity key without creating one, authenticate/decrypt the
+  envelope, and atomically replace it with plaintext. A missing/wrong key or
+  failed replacement leaves the existing canonical data recoverable.
 
 Encrypted-file detection: file begins with the V1 header **or** `V2/V3
-magic + salt` prefix. Decrypted copies live in `$TMPDIR/symeraseme-db-<uid>/`
-(`/dev/shm/symeraseme-db-<uid>` on Linux), mode 0600. `SYMERASEME_ENCRYPT_DB`
-unset/`0` → plain SQLite file.
+magic + salt` prefix. Decrypted copies live below the current user's cache
+directory in `symeraseme/database/`, with 0700 directories and 0600 files on
+POSIX systems; Windows uses the current user's profile ACLs.
+`SYMERASEME_ENCRYPT_DB` unset/`0` → plain SQLite file.
 
 Close lifecycle and failure semantics:
 - `OpenEncrypted` associates the returned `Store` with its encrypted path.
