@@ -62,7 +62,7 @@ SQLite, network transcript or process behavior.
 | TMP-002 | templates | missing/invalid variables and template names | negative corpus | error snapshots | byte | all | TODO |
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | TODO |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | TODO |
-| DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | BLOCKED #796 |
+| DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |
 | DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
 | DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
 | DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | TODO |
