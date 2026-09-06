@@ -7,6 +7,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -205,6 +206,30 @@ fn raw_status(status: &std::process::ExitStatus, timed_out: bool) -> RawStatus {
     }
 }
 
+const WRITER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
+
+fn finish_stdin_writer(
+    writer: thread::JoinHandle<()>,
+    result: Receiver<std::io::Result<()>>,
+) -> std::io::Result<()> {
+    let write_result = result
+        .recv_timeout(WRITER_CLEANUP_TIMEOUT)
+        .map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!("stdin writer cleanup exceeded bounded timeout: {error}"),
+            )
+        })?;
+    writer
+        .join()
+        .map_err(|_| std::io::Error::other("stdin writer panicked"))?;
+    match write_result {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult> {
     reject_reserved_environment(case)?;
     let sandbox = unique_dir(&case.id)?;
@@ -223,7 +248,7 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
     let http_server = case
         .http
         .as_ref()
-        .map(|fixture| MockHttpServer::start(&fixture.response))
+        .map(|fixture| MockHttpServer::start(&fixture.responses))
         .transpose()?;
     let mut command = Command::new(&program.executable);
     command
@@ -249,12 +274,13 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
     configure_process_group(&mut command)?;
     let mut child = command.spawn()?;
 
+    let (stdin_done, stdin_result) = mpsc::channel();
     let stdin_thread = child.stdin.take().map(|mut stdin| {
         let input = case.stdin.clone();
         thread::spawn(move || {
             let result = stdin.write_all(&input);
             drop(stdin);
-            result
+            let _ = stdin_done.send(result);
         })
     });
     let stdout = child.stdout.take().expect("stdout was piped");
@@ -283,10 +309,11 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
         }
         thread::sleep(Duration::from_millis(5));
     };
+    // The child may have exited while a descendant still owns the inherited
+    // stdin pipe. Terminate the dedicated group before bounded writer cleanup.
+    kill_process_group(&mut child);
     if let Some(writer) = stdin_thread {
-        writer
-            .join()
-            .map_err(|_| std::io::Error::other("stdin writer panicked"))??;
+        finish_stdin_writer(writer, stdin_result)?;
     }
     let stdout = stdout_thread
         .join()
@@ -295,7 +322,7 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
         .join()
         .map_err(|_| std::io::Error::other("stderr reader panicked"))??;
     let http_exchanges = http_server
-        .map(|server| server.finish().map(|exchange| vec![exchange]))
+        .map(|server| server.finish())
         .transpose()?
         .unwrap_or_default();
     let mcp_frames = if case.capture_mcp {
@@ -361,6 +388,21 @@ mod tests {
             argv: vec!["-c".into(), "wc -c >/dev/null".into()],
         };
         let result = run_program(&case, &case.go).expect("stdin writer must not deadlock");
+        assert_eq!(result.status.exit_code, Some(0));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn descendant_holding_inherited_stdin_is_cleaned_up_boundedly() {
+        let mut case = Case::new("stdin-descendant", dummy("same"), dummy("same"));
+        case.stdin = vec![b'x'; 2 * 1024 * 1024];
+        case.go = Program {
+            executable: PathBuf::from("/bin/sh"),
+            argv: vec!["-c".into(), "sleep 10 & exit 0".into()],
+        };
+        let started = Instant::now();
+        let result = run_program(&case, &case.go).expect("descendant cleanup must be bounded");
+        assert!(started.elapsed() < Duration::from_secs(3));
         assert_eq!(result.status.exit_code, Some(0));
     }
 

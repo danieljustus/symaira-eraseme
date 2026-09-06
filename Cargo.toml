@@ -17,6 +17,7 @@ license = "Apache-2.0"
 repository = "https://github.com/danieljustus/symaira-eraseme"
 
 [workspace.dependencies]
+rusqlite = { version = "0.37", features = ["backup", "bundled"] }
 serde_json = "1.0"
 
 [profile.release]

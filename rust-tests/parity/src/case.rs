@@ -110,7 +110,8 @@ impl Normalizer {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HttpFixture {
-    pub response: Vec<u8>,
+    /// Responses are served in order; at least one response is required.
+    pub responses: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

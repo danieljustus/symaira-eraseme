@@ -15,33 +15,44 @@ pub struct HttpExchange {
     pub response: Vec<u8>,
 }
 
+/// A configured sequence is served one request at a time, in order.
 pub struct MockHttpServer {
     address: std::net::SocketAddr,
     stop: Arc<AtomicBool>,
-    join: Option<thread::JoinHandle<std::io::Result<HttpExchange>>>,
+    join: Option<thread::JoinHandle<std::io::Result<Vec<HttpExchange>>>>,
+    expected_exchanges: usize,
 }
 
 impl MockHttpServer {
-    pub fn start(response: &[u8]) -> std::io::Result<Self> {
+    pub fn start(responses: &[Vec<u8>]) -> std::io::Result<Self> {
+        if responses.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "HTTP fixture requires at least one configured response",
+            ));
+        }
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         listener.set_nonblocking(true)?;
         let address = listener.local_addr()?;
-        let response = response.to_vec();
+        let responses = responses.to_vec();
+        let expected_exchanges = responses.len();
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
         let join = thread::spawn(move || {
             let deadline = Instant::now() + Duration::from_secs(5);
-            loop {
+            let mut exchanges = Vec::with_capacity(responses.len());
+            while exchanges.len() < responses.len() {
                 if thread_stop.load(Ordering::Acquire) {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Interrupted,
-                        "HTTP mock stopped before receiving a request",
-                    ));
+                    return Ok(exchanges);
                 }
                 if Instant::now() >= deadline {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::TimedOut,
-                        "HTTP mock timed out waiting for a request",
+                        format!(
+                            "HTTP mock timed out after {} of {} configured exchanges",
+                            exchanges.len(),
+                            responses.len()
+                        ),
                     ));
                 }
                 match listener.accept() {
@@ -50,9 +61,10 @@ impl MockHttpServer {
                         stream.set_read_timeout(Some(Duration::from_secs(2)))?;
                         stream.set_write_timeout(Some(Duration::from_secs(2)))?;
                         let request = read_http_request(&mut stream)?;
+                        let response = responses[exchanges.len()].clone();
                         stream.write_all(&response)?;
                         stream.flush()?;
-                        return Ok(HttpExchange { request, response });
+                        exchanges.push(HttpExchange { request, response });
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(5));
@@ -60,11 +72,13 @@ impl MockHttpServer {
                     Err(error) => return Err(error),
                 }
             }
+            Ok(exchanges)
         });
         Ok(Self {
             address,
             stop,
             join: Some(join),
+            expected_exchanges,
         })
     }
 
@@ -72,12 +86,24 @@ impl MockHttpServer {
         self.address
     }
 
-    pub fn finish(mut self) -> std::io::Result<HttpExchange> {
-        self.join
+    pub fn finish(mut self) -> std::io::Result<Vec<HttpExchange>> {
+        let exchanges = self
+            .join
             .take()
             .expect("mock join handle exists")
             .join()
-            .map_err(|_| std::io::Error::other("HTTP mock panicked"))?
+            .map_err(|_| std::io::Error::other("HTTP mock panicked"))??;
+        if exchanges.len() != self.expected_exchanges {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "HTTP fixture expected {} exchanges but received {}",
+                    self.expected_exchanges,
+                    exchanges.len()
+                ),
+            ));
+        }
+        Ok(exchanges)
     }
 }
 
@@ -136,22 +162,51 @@ pub fn record_exchange(request: &[u8], response: &[u8]) -> HttpExchange {
 mod tests {
     use super::*;
 
+    const NO_CONTENT: &[u8] = b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n";
+
     #[test]
     fn records_raw_loopback_exchange() {
-        let server =
-            MockHttpServer::start(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n").unwrap();
+        let server = MockHttpServer::start(&[NO_CONTENT.to_vec()]).unwrap();
         let mut client = TcpStream::connect(server.address()).unwrap();
         client
             .write_all(b"POST /mock HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc")
             .unwrap();
-        let exchange = server.finish().unwrap();
-        assert!(exchange.request.ends_with(b"abc"));
-        assert!(exchange.response.starts_with(b"HTTP/1.1 204"));
+        let exchanges = server.finish().unwrap();
+        assert_eq!(exchanges.len(), 1);
+        assert!(exchanges[0].request.ends_with(b"abc"));
+        assert!(exchanges[0].response.starts_with(b"HTTP/1.1 204"));
+    }
+
+    #[test]
+    fn serves_configured_exchange_sequence_in_order() {
+        let server = MockHttpServer::start(&[NO_CONTENT.to_vec(), NO_CONTENT.to_vec()]).unwrap();
+        let mut first = TcpStream::connect(server.address()).unwrap();
+        first
+            .write_all(b"GET /one HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+            .unwrap();
+        let mut second = TcpStream::connect(server.address()).unwrap();
+        second
+            .write_all(b"GET /two HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+            .unwrap();
+        let exchanges = server.finish().unwrap();
+        assert_eq!(exchanges.len(), 2);
+        assert!(exchanges[0].request.starts_with(b"GET /one"));
+        assert!(exchanges[1].request.starts_with(b"GET /two"));
+    }
+
+    #[test]
+    fn rejects_an_empty_exchange_sequence() {
+        let error = match MockHttpServer::start(&[]) {
+            Ok(_) => panic!("empty sequence must be explicit"),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("at least one"));
     }
 
     #[test]
     fn drop_stops_a_mock_that_received_no_request() {
-        let server = MockHttpServer::start(b"HTTP/1.1 204 No Content\r\n\r\n").unwrap();
+        let server = MockHttpServer::start(&[NO_CONTENT.to_vec()]).unwrap();
         drop(server);
     }
 }

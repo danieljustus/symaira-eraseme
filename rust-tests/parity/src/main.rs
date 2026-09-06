@@ -16,7 +16,7 @@ use std::path::PathBuf;
 fn usage() -> &'static str {
     "usage: parity run --go <path> --rust <path> [--go-arg <arg>] [--rust-arg <arg>]\n\
      [--stdin-file <path>] [--json-semantic] [--sqlite <relative-path>]\n\
-     [--sqlite-query <sql>] [--http-response-file <path>] [--no-mcp]\n\
+     [--sqlite-query <sql>] [--http-response-file <path>]... [--no-mcp]\n\
      [--normalize <scope> <reason> <from> <to>]"
 }
 
@@ -39,7 +39,7 @@ fn build_case(args: &[String]) -> Result<Case, String> {
     let mut comparison = ComparisonMode::Exact;
     let mut sqlite_database = None;
     let mut sqlite_queries = Vec::new();
-    let mut http_response = None;
+    let mut http_responses = Vec::new();
     let mut normalizers = Vec::new();
     let mut capture_mcp = true;
     let mut index = 1;
@@ -59,7 +59,7 @@ fn build_case(args: &[String]) -> Result<Case, String> {
             }
             "--sqlite-query" => sqlite_queries.push(next(args, &mut index, "--sqlite-query")?),
             "--http-response-file" => {
-                http_response = Some(
+                http_responses.push(
                     fs::read(next(args, &mut index, "--http-response-file")?)
                         .map_err(|error| error.to_string())?,
                 );
@@ -98,7 +98,9 @@ fn build_case(args: &[String]) -> Result<Case, String> {
     case.comparison = comparison;
     case.sqlite_database = sqlite_database;
     case.sqlite_queries = sqlite_queries;
-    case.http = http_response.map(|response| case::HttpFixture { response });
+    case.http = (!http_responses.is_empty()).then_some(case::HttpFixture {
+        responses: http_responses,
+    });
     case.capture_mcp = capture_mcp;
     case.normalizers = normalizers;
     Ok(case)

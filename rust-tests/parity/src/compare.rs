@@ -144,7 +144,11 @@ fn format_json(value: &serde_json::Value) -> String {
     if rendered.len() <= 512 {
         rendered
     } else {
-        format!("{}…", &rendered[..512])
+        let mut end = 512;
+        while end > 0 && !rendered.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}…", &rendered[..end])
     }
 }
 
@@ -423,6 +427,23 @@ mod tests {
         case.capture_mcp = false;
         let differences = compare_case(&case).unwrap().expect_err("JSON differs");
         assert!(format_differences(&differences).contains("stdout.json"));
+    }
+
+    #[test]
+    fn semantic_json_mismatch_preview_is_utf8_boundary_safe() {
+        let expected = format!(r#"{{"text":"{}"}}"#, "é".repeat(300));
+        let actual = format!(r#"{{"text":"{}"}}"#, "é".repeat(299) + "x");
+        let mut case = Case::new(
+            "semantic-unicode-mismatch",
+            dummy(&expected),
+            dummy(&actual),
+        );
+        case.comparison = ComparisonMode::JsonSemantic;
+        case.capture_mcp = false;
+        let differences = compare_case(&case).unwrap().expect_err("JSON differs");
+        let report = format_differences(&differences);
+        assert!(report.contains("stdout.json"), "{report}");
+        assert!(report.contains('…'), "{report}");
     }
 
     #[test]
