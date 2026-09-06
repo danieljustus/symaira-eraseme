@@ -40,7 +40,7 @@ Cargo-deny and Windows compile gates.
 | 2.1 | Deterministic version/build metadata and exact Go CLI bytes | PASS |
 | 2.2 | Time and confirmation pure functions with committed Go differential oracle | PASS |
 | 2.3 | Configuration precedence, native paths and hardened executable Go oracle | PASS |
-| 2.4 | 51-node Clap tree; 120 exact CLI cases; 45 backend handlers fail closed | PASS |
+| 2.4 | 51-node Clap tree; 120 exact CLI cases; 45 deferred CLI cases fail closed | PASS |
 
 The Go production route remains unchanged until the later cutover phase.
 
