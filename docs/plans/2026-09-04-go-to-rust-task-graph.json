@@ -49,9 +49,18 @@
   },
   "execution_state": {
     "last_completed": "0.4",
-    "active_tasks": ["1.1"],
+    "active_tasks": [],
     "merged_tasks": ["0.1", "0.2", "0.3", "0.4"],
-    "active_worktrees": {},
+    "pending_merge_tasks": ["1.1", "1.2", "1.3", "1.4"],
+    "pending_branch": "agent/issue-803-phase1-foundation",
+    "pending_head_sha": "dabb907b56da8d90d743de013e31628f9278bc0f",
+    "active_worktrees": {
+      "issue-803-phase1": {
+        "branch": "agent/issue-803-phase1-foundation",
+        "head_sha": "dabb907b56da8d90d743de013e31628f9278bc0f",
+        "tasks": ["1.1", "1.2", "1.3", "1.4"]
+      }
+    },
     "blocked_by": [],
     "resume_rule": "read back merged PRs and origin/main, then resume at the first dependency-ready unmerged task; never trust stale session summaries"
   },

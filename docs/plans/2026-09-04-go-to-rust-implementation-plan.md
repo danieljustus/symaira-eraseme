@@ -276,13 +276,13 @@ revision with no diff.
 - Modify: `.gitignore`
 
 **Steps:**
-- [ ] Pin Rust `1.98.0` with rustfmt and Clippy components.
-- [ ] Set workspace resolver, common package metadata, `rust-version = "1.98"`
+- [x] Pin Rust `1.98.0` with rustfmt and Clippy components.
+- [x] Set workspace resolver, common package metadata, `rust-version = "1.98"`
       and release profile explicitly.
-- [ ] Start every production crate with `#![deny(unsafe_code)]`.
-- [ ] Add only dependencies needed for the empty executable and tests.
-- [ ] Commit `Cargo.lock`.
-- [ ] Build a Rust executable named `symeraseme-rust` during shadowing; reserve
+- [x] Start every production crate with `#![deny(unsafe_code)]`.
+- [x] Add only dependencies needed for the empty executable and tests.
+- [x] Commit `Cargo.lock`.
+- [x] Build a Rust executable named `symeraseme-rust` during shadowing; reserve
       final output name `symeraseme` for cutover packaging.
 
 **Verification:** `cargo fmt --all --check`, `cargo check --workspace
@@ -297,15 +297,15 @@ revision with no diff.
 - Add to workspace: `rust-tests/parity`
 
 **Steps:**
-- [ ] Define data-driven cases containing argv, stdin bytes, env allowlist,
+- [x] Define data-driven cases containing argv, stdin bytes, env allowlist,
       cwd layout, timeout and expected comparison modes.
-- [ ] Launch Go and Rust in separate process groups with fresh HOME/XDG trees.
-- [ ] Capture raw status/signal/stdout/stderr before decoding.
-- [ ] Hash recursive filesystem manifests including type and mode.
-- [ ] Snapshot SQLite schema and ordered queries from copied databases.
-- [ ] Record mock HTTP exchanges and raw MCP frames.
-- [ ] Kill the process group on timeout.
-- [ ] Implement only narrow, reason-tagged normalizers.
+- [x] Launch Go and Rust in separate process groups with fresh HOME/XDG trees.
+- [x] Capture raw status/signal/stdout/stderr before decoding.
+- [x] Hash recursive filesystem manifests including type and mode.
+- [x] Snapshot SQLite schema and ordered queries from copied databases.
+- [x] Record mock HTTP exchanges and raw MCP frames.
+- [x] Kill the process group on timeout.
+- [x] Implement only narrow, reason-tagged normalizers.
 
 **Verification:** a deliberately different dummy Rust output fails with an
 actionable field-level diff; identical fixture programs pass.
@@ -316,12 +316,12 @@ actionable field-level diff; identical fixture programs pass.
 - Modify: `Makefile`
 
 **Steps:**
-- [ ] Preserve current `build`, `test`, `coverage`, `lint` semantics for Go
+- [x] Preserve current `build`, `test`, `coverage`, `lint` semantics for Go
       until cutover.
-- [ ] Add `build-go`, `go-gate`, `build-rust`, `rust-gate`, `parity`,
+- [x] Add `build-go`, `go-gate`, `build-rust`, `rust-gate`, `parity`,
       `app-test`, `release-dry-run`.
-- [ ] Keep output paths separate and prevent stale binary reuse.
-- [ ] Make `clean` remove generated Rust/Go test artifacts without touching
+- [x] Keep output paths separate and prevent stale binary reuse.
+- [x] Make `clean` remove generated Rust/Go test artifacts without touching
       committed fixtures.
 
 **Verification:** current Go commands still pass exactly; new Rust targets pass.
@@ -333,16 +333,16 @@ actionable field-level diff; identical fixture programs pass.
 - Modify: `.github/dependabot.yml`
 
 **Steps:**
-- [ ] Add Ubuntu PR gate: fmt, check, Clippy, Nextest, doctests and parity subset.
-- [ ] Enforce Rust line coverage at 80% overall and 90% for first-party crypto,
+- [x] Add Ubuntu PR gate: fmt, check, Clippy, Nextest, doctests and parity subset.
+- [x] Enforce Rust line coverage at 80% overall and 90% for first-party crypto,
       consent/auth and MCP protocol modules; report exact covered/total counts.
-- [ ] Add comprehensive main/schedule native matrix for macOS, Linux and
+- [x] Add comprehensive main/schedule native matrix for macOS, Linux and
       Windows.
-- [ ] Add `cargo audit`, `cargo deny check` and feature checks.
-- [ ] Cache Cargo safely using lockfile keys.
-- [ ] Keep Go CI required and unchanged.
-- [ ] Do not add path filters that make a required PR check disappear.
-- [ ] Read back the current ruleset contexts (`lint`, `test (3.12)`,
+- [x] Add `cargo audit`, `cargo deny check` and feature checks.
+- [x] Cache Cargo safely using lockfile keys.
+- [x] Keep Go CI required and unchanged.
+- [x] Do not add path filters that make a required PR check disappear.
+- [x] Read back the current ruleset contexts (`lint`, `test (3.12)`,
       `schema-validate`, `secrets-scan`). Add a stable Rust aggregate gate only
       after that check has run successfully on the default branch; never point
       protection at a check name that has not existed yet.
