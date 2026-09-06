@@ -1,0 +1,49 @@
+{
+  "notes": [
+    "RFC numeric zones retain Go's bounded +24:00/+25:00 normalization, including +2400, +2360, and -2400."
+  ],
+  "timestamps": [
+    {"input": " 2026-08-31T12:34:56.123456789Z "},
+    {"input": "2026-08-31T12:34:56,123456Z"},
+    {"input": "2026-08-31T12:34:56,123456"},
+    {"input": "2026-08-31 14:34:56.987654321+02:00"},
+    {"input": "2026-08-31 12:34:56,123456+02:00"},
+    {"input": "2026-08-31T12:34:56"},
+    {"input": "2026-08-31 12:34:56.5"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.123456 +0000"},
+    {"input": "Tue, 31 Aug 2026 12:34:56,654321 +0000"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.333333 UTC"},
+    {"input": "Tuesday, 31-Aug-68 12:34:56.444444 UTC"},
+    {"input": "Monday, 31-Aug-69 12:34:56.555555 UTC"},
+    {"input": "Tuesday, 31-Aug-26 12:34:56.666666 UTC"},
+    {"input": "Monday, 31-Aug-26 12:34:56.123456 +0000"},
+    {"input": "Monday, 31-Aug-26 12:34:56,123456 +0000"},
+    {"input": "Funday, 31 Aug 2026 12:34:56 UTC"},
+    {"input": "Funday, 31-Aug-26 12:34:56 UTC"},
+    {"input": "   "},
+    {"input": "not-a-timestamp"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.123456 +1261"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.123456 +2400"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.123456 +2360"},
+    {"input": "Mon, 31 Aug 2026 12:34:56.123456 -2400"},
+    {"input": "Monday, 31-Aug-26 12:34:56 +0001"},
+    {"input": "Monday, 31-Aug-26 12:34:56 -0001"},
+    {"input": "Monday, 31-Aug-26 12:34:56 -0000"},
+    {"input": "Monday, 31-Aug-26 12:34:56 +0023"},
+    {"input": "Monday, 31-Aug-26 12:34:56 -0023"},
+    {"input": "Monday, 31-Aug-26 12:34:56 +0024"},
+    {"input": "Monday, 31-Aug-26 12:34:56 -0024"},
+    {"input": "Monday, 31-Aug-26 12:34:56 +0060"},
+    {"input": "Monday, 31-Aug-26 12:34:56 -0060"}
+  ],
+  "urls": [
+    {"input": "Visit https://acxiom.com/long-path, https://acxiom.com/a%20b; https://www.acxiom.com/%C3%A4! https://acxiom.com/a%2Fb. https://acxiom.com/short https://acxiom.com/a%20b"},
+    {"input": "http://acxiom.com/insecure https://evil.example/confirm https://acxiom.com.evil.example/confirm https://acxiom.com/%zz https://acxiom.com/%"},
+    {"input": "https://WWW.ACXIOM.COM/confirm https://www.www.acxiom.com/confirm https://acxiom.com/confirm."},
+    {"input": "https://acxiom.com/path?next=https://evil.example/x#fragment; https://oracle.com/a"},
+    {"input": "https://acxiom.com/a\u00a0https://oracle.com/b"},
+    {"input": "https://acxiom.com/a\u2003https://oracle.com/b"},
+    {"input": "https://acxiom.com/a\u000bhttps://oracle.com/b"},
+    {"input": "https://acxiom.com/a\u000chttps://oracle.com/b"}
+  ]
+}

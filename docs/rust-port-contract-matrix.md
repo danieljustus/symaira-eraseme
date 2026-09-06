@@ -25,8 +25,24 @@ Tasks `1.1`–`1.4` are implemented and reviewed on branch
 | 1.4 | SHA-pinned Rust PR/native CI, audit/deny/coverage handling, Cargo Dependabot | PASS |
 
 All local Go/Rust/Parity gates and the independent specification and
-quality/security reviews pass. GitHub PR required checks remain pending until
-the coordinator pushes this branch and reads back exact-head CI.
+quality/security reviews passed. PR #831 merged the phase as `24126f0` and
+issue #803 is closed.
+
+## Phase 2 execution evidence
+
+Tasks `2.1`–`2.4` are implemented and independently reviewed on branch
+`agent/issue-804-phase2-foundations`; implementation head
+`095eb5051ae90f209855f07e3c197326a1cab6f3` passes the local Go, Rust, parity,
+Cargo-deny and Windows compile gates.
+
+| Task | Evidence | Status |
+|---|---|---|
+| 2.1 | Deterministic version/build metadata and exact Go CLI bytes | PASS |
+| 2.2 | Time and confirmation pure functions with committed Go differential oracle | PASS |
+| 2.3 | Configuration precedence, native paths and hardened executable Go oracle | PASS |
+| 2.4 | 51-node Clap tree; 120 exact CLI cases; 45 deferred CLI cases fail closed | PASS |
+
+The Go production route remains unchanged until the later cutover phase.
 
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
@@ -37,15 +53,15 @@ SQLite, network transcript or process behavior.
 | BASE-001 | baseline | Go format/test/lint/vet/build | `make fmt-check test lint vet build` | pre-flight script | side-effect | macOS/Linux | PASS |
 | BASE-002 | baseline | exact coverage gate | `make coverage` | retain Go gate until retirement | semantic | Linux | PASS (76.23%) |
 | BASE-003 | baseline | binary size/startup/RSS and release asset manifest | `v0.12.1`; `scripts/capture-go-baseline.sh` | `rust-tests/parity/baselines/v0.12.1.json` | semantic | macOS arm64 | PASS |
-| CLI-001 | CLI | root help and command ordering | `symeraseme --help` | `cli_root_help.snap` | byte | all | TODO |
-| CLI-002 | CLI | root `--version` | `symeraseme --version` | `cli_root_version.snap` | byte | all | TODO |
-| CLI-003 | CLI | `version` text | `symeraseme version` | `cli_version_text.snap` | byte | all | TODO |
-| CLI-004 | CLI | `version --json` schema v1 | `symeraseme version --json` | `cli_version_json.snap` | byte | all | TODO |
-| CLI-005 | CLI | global `--output text|json` inheritance | command corpus | `cli_output_modes.json` | byte | all | TODO |
-| CLI-006 | CLI | unknown command/flag, usage and exit code | command corpus | `cli_invalid_args.json` | byte | all | TODO |
-| CLI-007 | CLI | shell completion: bash/zsh/fish/powershell | `completion` commands | completion snapshots | byte | all | TODO |
-| CLI-008 | CLI | hidden deprecated `serve` alias and stderr notice | `serve --stdio` | alias fixture | byte | all | TODO |
-| CLI-009 | CLI | `config show` text/JSON | isolated config trees | config CLI cases | byte | all | TODO |
+| CLI-001 | CLI | root help and command ordering | `symeraseme --help` | `cli_root_help.snap` | byte | all | PASS |
+| CLI-002 | CLI | root `--version` | `symeraseme --version` | `cli_root_version.snap` | byte | all | PASS |
+| CLI-003 | CLI | `version` text | `symeraseme version` | `cli_version_text.snap` | byte | all | PASS |
+| CLI-004 | CLI | `version --json` schema v1 | `symeraseme version --json` | `cli_version_json.snap` | byte | all | PASS |
+| CLI-005 | CLI | global `--output text|json` inheritance | command corpus | `cli_output_modes.json` | byte | all | PASS |
+| CLI-006 | CLI | unknown command/flag, usage and exit code | command corpus | `cli_invalid_args.json` | byte | all | PASS |
+| CLI-007 | CLI | shell completion: bash/zsh/fish/powershell | `completion` commands | completion snapshots | byte | all | PASS |
+| CLI-008 | CLI | hidden deprecated `serve` alias and stderr notice | `serve --stdio` | alias fixture | byte | all | PASS |
+| CLI-009 | CLI | `config show` text/JSON | isolated config trees | config CLI cases | byte | all | PASS |
 | CLI-010 | CLI | `plan create/show/execute` flags/defaults | generated argv corpus | plan CLI cases | byte+side-effect | all | TODO |
 | CLI-011 | CLI | `brokers list/show` filters/defaults | embedded registry | broker CLI cases | byte | all | TODO |
 | CLI-012 | CLI | `registry list/validate/sync` | embedded/temp registry | registry CLI cases | byte+side-effect | all | TODO |
@@ -61,12 +77,12 @@ SQLite, network transcript or process behavior.
 | CLI-022 | CLI | inbox/classify/rebuttal argument aliases/defaults | mock adapters | reply CLI cases | byte+transcript | all | TODO |
 | CLI-023 | CLI | web form/auto-confirm dry-run and fallback | fake driver | web CLI cases | byte+side-effect | all | TODO |
 | CLI-024 | CLI | migrate inspect/run/verify/rollback/resume | migration fixtures | migration CLI cases | byte+filesystem | all | TODO |
-| CFG-001 | config | defaults | no config/env | unit + differential | semantic | all | TODO |
-| CFG-002 | config | global TOML path | isolated HOME/XDG | unit + differential | semantic | all | TODO |
-| CFG-003 | config | project `.symeraseme.toml` | isolated cwd | unit + differential | semantic | all | TODO |
-| CFG-004 | config | defaults→global→project→env precedence | conflict fixture | unit + differential | semantic | all | TODO |
-| CFG-005 | config | `SYMERASEME_DATA_DIR/DB_DIR/ENCRYPT_DB/RESOURCES` | env matrix | unit + differential | semantic | all | TODO |
-| CFG-006 | config | missing/malformed/unknown TOML values | config corpus | negative cases | byte+exit | all | TODO |
+| CFG-001 | config | defaults | no config/env | unit + differential | semantic | all | PASS |
+| CFG-002 | config | global TOML path | isolated HOME/XDG | unit + differential | semantic | all | PASS |
+| CFG-003 | config | project `.symeraseme.toml` | isolated cwd | unit + differential | semantic | all | PASS |
+| CFG-004 | config | defaults→global→project→env precedence | conflict fixture | unit + differential | semantic | all | PASS |
+| CFG-005 | config | `SYMERASEME_DATA_DIR/DB_DIR/ENCRYPT_DB/PORT/ALLOW_REMOTE` | env matrix | unit + differential | semantic | all | PASS |
+| CFG-006 | config | missing/malformed/unknown TOML values | config corpus | negative cases | byte+exit | all | PASS |
 | REG-001 | registry | manifest/schema version agreement | committed registry | registry conformance | semantic | all | TODO |
 | REG-002 | registry | all 1,277 embedded brokers load | `registry validate` | full-corpus test | semantic | all | TODO |
 | REG-003 | registry | four golden + one invalid fixture | `tests/fixtures/registry-contract` | shared fixtures | semantic | all | TODO |

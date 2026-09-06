@@ -1,0 +1,107 @@
+{
+  "provenance": {
+    "source_revision": "119ee9f84fe7c9e1485d25ab10aac8582e98395c",
+    "source_path": "internal/config/config.go",
+    "source_sha256": "d197afc83776a85880428994e32b0c1585c245ed52d86f9a31fe51889cbce32c",
+    "schema": "symaira-eraseme.config-parity.v1"
+  },
+  "cases": {
+    "CFG-001": {
+      "runs": [
+        {
+          "files": {},
+          "environment": {}
+        }
+      ]
+    },
+    "CFG-002": {
+      "runs": [
+        {
+          "files": {
+            "xdg/symeraseme/config.toml": "data_dir = \"global-data\"\ndb_dir = \"global-db\"\nencrypt_db = true\nport = 8100\nallow_remote = false\n",
+            "project/.symeraseme.toml": "data_dir = \"project-data\"\nencrypt_db = false\n"
+          },
+          "environment": {
+            "values": {
+              "SYMERASEME_DATA_DIR": "~/env-data",
+              "SYMERASEME_DB_DIR": "env-db",
+              "SYMERASEME_ENCRYPT_DB": "true",
+              "SYMERASEME_PORT": "8123",
+              "SYMERASEME_ALLOW_REMOTE": "yes"
+            },
+            "sandbox_xdg_path": "$ROOT/xdg"
+          }
+        }
+      ]
+    },
+    "CFG-003": {
+      "runs": [
+        {
+          "files": {
+            "project/.symeraseme.toml": "data_dir = \"~/custom/data\"\ndb_dir = \"relative-db\"\n"
+          },
+          "environment": {}
+        }
+      ]
+    },
+    "CFG-004": {
+      "runs": [
+        {
+          "files": {
+            "xdg/symeraseme/config.toml": "encrypt_db = 1\nallow_remote = \" oN \"\nport = \"8124\"\nunknown = true\n[legacy.server]\nport = 1\n"
+          },
+          "environment": {
+            "sandbox_xdg_path": "$ROOT/xdg"
+          }
+        }
+      ]
+    },
+    "CFG-005": {
+      "runs": [
+        {
+          "files": {},
+          "environment": {
+            "values": {
+              "SYMERASEME_ENCRYPT_DB": "maybe"
+            }
+          }
+        },
+        {
+          "files": {},
+          "environment": {
+            "values": {
+              "SYMERASEME_ENCRYPT_DB": "false",
+              "SYMERASEME_PORT": "65536"
+            }
+          }
+        },
+        {
+          "files": {
+            "project/.symeraseme.toml": "db_dir = \"   \"\n"
+          },
+          "environment": {}
+        },
+        {
+          "files": {
+            "project/.symeraseme.toml": "db_dir = \"bad\\u0000path\"\n"
+          },
+          "environment": {}
+        }
+      ]
+    },
+    "CFG-006": {
+      "runs": [
+        {
+          "files": {
+            "home/.config/symeraseme/config.toml": "data_dir = \"default-global\"\nencrypt_db = 1\nport = 9000\n"
+          },
+          "environment": {
+            "values": {
+              "XDG_CONFIG_HOME": "relative-xdg"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
