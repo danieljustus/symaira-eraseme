@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use symeraseme_core::registry::{Broker, Channel, RegistryError, load_from_dir};
 
@@ -239,101 +238,102 @@ fn added_date_is_calendar_valid_and_uri_format_remains_compatibility_only() {
 
 #[test]
 fn loader_rejects_symlinks_duplicates_deep_paths_and_oversize_documents() {
-    use std::os::unix::fs::symlink;
-
     let root = tempfile_root();
-    let brokers = root.join("brokers");
+    let brokers = root.path().join("brokers");
     fs::create_dir_all(brokers.join("us")).unwrap();
     fs::write(brokers.join("us/test.yaml"), base_broker()).unwrap();
-    let target = root.join("outside.yaml");
+    let target = root.path().join("outside.yaml");
     fs::write(&target, base_broker()).unwrap();
-    symlink(&target, brokers.join("us/link.yaml")).unwrap();
-    assert!(load_from_dir(&root).is_err());
+    symlink_file(&target, &brokers.join("us/link.yaml")).unwrap();
+    assert!(load_from_dir(root.path()).is_err());
 
     let duplicate = tempfile_root();
-    fs::create_dir_all(duplicate.join("brokers/us")).unwrap();
-    fs::create_dir_all(duplicate.join("brokers/eu")).unwrap();
-    fs::write(duplicate.join("brokers/us/test.yaml"), base_broker()).unwrap();
-    fs::write(duplicate.join("brokers/eu/test.yaml"), base_broker()).unwrap();
-    assert!(load_from_dir(&duplicate).is_err());
+    fs::create_dir_all(duplicate.path().join("brokers/us")).unwrap();
+    fs::create_dir_all(duplicate.path().join("brokers/eu")).unwrap();
+    fs::write(duplicate.path().join("brokers/us/test.yaml"), base_broker()).unwrap();
+    fs::write(duplicate.path().join("brokers/eu/test.yaml"), base_broker()).unwrap();
+    assert!(load_from_dir(duplicate.path()).is_err());
 
     let deep = tempfile_root();
-    let mut path = deep.join("brokers");
+    let mut path = deep.path().join("brokers");
     for index in 0..10 {
         path = path.join(format!("d{index}"));
     }
     fs::create_dir_all(&path).unwrap();
     fs::write(path.join("test.yaml"), base_broker()).unwrap();
-    assert!(load_from_dir(&deep).is_err());
+    assert!(load_from_dir(deep.path()).is_err());
 
     let large = tempfile_root();
-    fs::create_dir_all(large.join("brokers/us")).unwrap();
+    fs::create_dir_all(large.path().join("brokers/us")).unwrap();
     fs::write(
-        large.join("brokers/us/test.yaml"),
+        large.path().join("brokers/us/test.yaml"),
         format!("{}{}", base_broker(), "x".repeat(1 << 20)),
     )
     .unwrap();
-    assert!(load_from_dir(&large).is_err());
+    assert!(load_from_dir(large.path()).is_err());
 }
 
 #[test]
 fn loader_rejects_aliases_and_malformed_yaml_deterministically() {
     let root = tempfile_root();
-    fs::create_dir_all(root.join("brokers/us")).unwrap();
+    fs::create_dir_all(root.path().join("brokers/us")).unwrap();
     let anchored = base_broker().replace(
         "endpoint: a@example.test",
         "endpoint: &email a@example.test",
     );
-    fs::write(root.join("brokers/us/test.yaml"), anchored).unwrap();
-    assert!(load_from_dir(&root).is_err());
+    fs::write(root.path().join("brokers/us/test.yaml"), anchored).unwrap();
+    assert!(load_from_dir(root.path()).is_err());
 
     let malformed = tempfile_root();
-    fs::create_dir_all(malformed.join("brokers/us")).unwrap();
+    fs::create_dir_all(malformed.path().join("brokers/us")).unwrap();
     fs::write(
-        malformed.join("brokers/us/test.yaml"),
+        malformed.path().join("brokers/us/test.yaml"),
         "id: test\n: malformed\n",
     )
     .unwrap();
-    assert!(load_from_dir(&malformed).is_err());
+    assert!(load_from_dir(malformed.path()).is_err());
 
     for marker in ["&email a@example.test", "*email"] {
         let guarded = tempfile_root();
-        fs::create_dir_all(guarded.join("brokers/us")).unwrap();
+        fs::create_dir_all(guarded.path().join("brokers/us")).unwrap();
         let source =
             base_broker().replace("endpoint: a@example.test", &format!("endpoint: {marker}"));
-        fs::write(guarded.join("brokers/us/test.yaml"), source).unwrap();
-        assert!(load_from_dir(&guarded).is_err(), "{marker}");
+        fs::write(guarded.path().join("brokers/us/test.yaml"), source).unwrap();
+        assert!(load_from_dir(guarded.path()).is_err(), "{marker}");
     }
 
     let nested = tempfile_root();
-    fs::create_dir_all(nested.join("brokers/us")).unwrap();
+    fs::create_dir_all(nested.path().join("brokers/us")).unwrap();
     let deeply_nested = format!("{}null{}", "[".repeat(70), "]".repeat(70));
     fs::write(
-        nested.join("brokers/us/test.yaml"),
+        nested.path().join("brokers/us/test.yaml"),
         format!("id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out: {deeply_nested}\n"),
     )
     .unwrap();
-    assert!(load_from_dir(&nested).is_err());
+    assert!(load_from_dir(nested.path()).is_err());
 
     let too_many_nodes = tempfile_root();
-    fs::create_dir_all(too_many_nodes.join("brokers/us")).unwrap();
+    fs::create_dir_all(too_many_nodes.path().join("brokers/us")).unwrap();
     let values = (0..20_000).map(|_| "null").collect::<Vec<_>>().join(",");
     let prefix = base_broker().split("opt_out:").next().unwrap();
     fs::write(
-        too_many_nodes.join("brokers/us/test.yaml"),
+        too_many_nodes.path().join("brokers/us/test.yaml"),
         format!("{prefix}opt_out: [{values}]\n"),
     )
     .unwrap();
-    assert!(load_from_dir(&too_many_nodes).is_err());
+    assert!(load_from_dir(too_many_nodes.path()).is_err());
 }
 
-fn tempfile_root() -> PathBuf {
-    static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
-    let root = std::env::temp_dir().join(format!(
-        "symeraseme-registry-contract-{}-{}",
-        std::process::id(),
-        NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed)
-    ));
-    fs::create_dir_all(&root).unwrap();
-    root
+#[cfg(unix)]
+fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(original, link)
+}
+
+#[cfg(windows)]
+fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::windows::fs::symlink_file(original, link)
+}
+
+fn tempfile_root() -> tempfile::TempDir {
+    tempfile::tempdir().unwrap()
 }
