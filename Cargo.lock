@@ -533,6 +533,8 @@ name = "symeraseme-cli"
 version = "0.13.0"
 dependencies = [
  "clap",
+ "serde",
+ "serde_json",
  "symeraseme-core",
  "symeraseme-engine",
 ]
