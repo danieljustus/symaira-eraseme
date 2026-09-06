@@ -143,8 +143,12 @@ fn decoded_path_len(path: &str) -> usize {
             length += 1;
             index += 3;
         } else {
-            length += 1;
-            index += 1;
+            let character = path[index..]
+                .chars()
+                .next()
+                .expect("path index stays on a UTF-8 boundary");
+            length += character.len_utf8();
+            index += character.len_utf8();
         }
     }
     length

@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 rusqlite.workspace = true
 serde_json.workspace = true
+symeraseme-core = { path = "../../crates/symeraseme-core", version = "0.13.0" }
 
 [[bin]]
 name = "parity"

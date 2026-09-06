@@ -128,7 +128,7 @@ where
 fn parse_rfc1123_numeric(input: &str) -> Option<DateTime<Utc>> {
     let (prefix, zone) = input.rsplit_once(' ')?;
     let prefix = without_weekday(rfc1123_prefix(prefix)?)?;
-    let value = NaiveDateTime::parse_from_str(prefix, "%d %b %Y %H:%M:%S").ok()?;
+    let value = parse_rfc1123_datetime(prefix)?;
     let zone = parse_numeric_offset(zone)?;
     Some(Utc.from_utc_datetime(&(value - Duration::seconds(zone))))
 }
@@ -136,18 +136,36 @@ fn parse_rfc1123_numeric(input: &str) -> Option<DateTime<Utc>> {
 fn parse_rfc1123_alpha(input: &str) -> Option<DateTime<Utc>> {
     let prefix = rfc_prefix(input)?;
     let prefix = without_weekday(rfc1123_prefix(prefix)?)?;
-    let value = NaiveDateTime::parse_from_str(prefix, "%d %b %Y %H:%M:%S").ok()?;
+    let value = parse_rfc1123_datetime(prefix)?;
     Some(Utc.from_utc_datetime(&value))
 }
 
 fn parse_rfc850(input: &str) -> Option<DateTime<Utc>> {
-    let prefix = rfc_prefix(input)?;
+    let prefix = rfc_prefix(input).or_else(|| {
+        input
+            .rsplit_once(' ')
+            .and_then(|(prefix, zone)| (zone == "+0000").then_some(prefix))
+    })?;
     let prefix = without_weekday(rfc850_prefix(prefix)?)?;
-    let value = NaiveDateTime::parse_from_str(prefix, "%d-%b-%y %H:%M:%S").ok()?;
+    let value = parse_rfc850_datetime(prefix)?;
     let year = value.year() % 100;
     let year = if year >= 69 { 1900 + year } else { 2000 + year };
     let date = value.date().with_year(year)?;
     Some(Utc.from_utc_datetime(&date.and_time(value.time())))
+}
+
+fn parse_rfc1123_datetime(value: &str) -> Option<NaiveDateTime> {
+    let value = value.replace(',', ".");
+    NaiveDateTime::parse_from_str(&value, "%d %b %Y %H:%M:%S%.f")
+        .or_else(|_| NaiveDateTime::parse_from_str(&value, "%d %b %Y %H:%M:%S"))
+        .ok()
+}
+
+fn parse_rfc850_datetime(value: &str) -> Option<NaiveDateTime> {
+    let value = value.replace(',', ".");
+    NaiveDateTime::parse_from_str(&value, "%d-%b-%y %H:%M:%S%.f")
+        .or_else(|_| NaiveDateTime::parse_from_str(&value, "%d-%b-%y %H:%M:%S"))
+        .ok()
 }
 
 fn without_weekday(prefix: &str) -> Option<&str> {
@@ -202,7 +220,9 @@ fn parse_numeric_offset(zone: &str) -> Option<i64> {
         .ok()?
         .parse::<i64>()
         .ok()?;
-    if hours > 23 || minutes > 59 {
+    // Go's numeric-zone parser deliberately accepts 24 hours and 60 minutes
+    // and normalizes the total offset; retain that observable extension.
+    if hours > 24 || minutes > 60 {
         return None;
     }
     let seconds = hours * 60 * 60 + minutes * 60;

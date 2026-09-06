@@ -311,6 +311,7 @@ version = "0.13.0"
 dependencies = [
  "rusqlite",
  "serde_json",
+ "symeraseme-core",
 ]
 
 [[package]]
