@@ -1,0 +1,17 @@
+[package]
+name = "symeraseme-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "symeraseme-rust"
+path = "src/main.rs"
+
+[dependencies]
+symeraseme-engine = { path = "../symeraseme-engine", version = "0.13.0" }
