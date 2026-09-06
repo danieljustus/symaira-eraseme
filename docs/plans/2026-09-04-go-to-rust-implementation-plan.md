@@ -362,10 +362,10 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-cli/tests/version.rs`
 
 **Steps:**
-- [ ] Add failing tests for text, root `--version` and JSON schema v1.
-- [ ] Inject version through Cargo build environment without timestamps.
-- [ ] Match trailing newlines and key order exactly.
-- [ ] Pass `CLI-002..004` and the Swift `version --json` handshake expectation.
+- [x] Add failing tests for text, root `--version` and JSON schema v1.
+- [x] Inject version through Cargo build environment without timestamps.
+- [x] Match trailing newlines and key order exactly.
+- [x] Pass `CLI-002..004` and the Swift `version --json` handshake expectation.
 
 ### Task 2.2: Port time and confirmation pure functions
 
@@ -375,10 +375,10 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: matching module tests plus parity cases
 
 **Steps:**
-- [ ] Port all accepted timestamp layouts and UTC formatting.
-- [ ] Port link extraction/scoring and negative cases.
-- [ ] Add proptest coverage for timestamp round trips and hostile URLs.
-- [ ] Compare against Go fixtures, not rewritten expectations.
+- [x] Port all accepted timestamp layouts and UTC formatting.
+- [x] Port link extraction/scoring and negative cases.
+- [x] Add proptest coverage for timestamp round trips and hostile URLs.
+- [x] Compare against Go fixtures, not rewritten expectations.
 
 ### Task 2.3: Port configuration precedence
 
@@ -387,11 +387,11 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-core/tests/config_parity.rs`
 
 **Steps:**
-- [ ] Reproduce defaults/global/project/env order and exact paths.
-- [ ] Cover all supported `SYMERASEME_*` names and boolean parsing.
-- [ ] Test missing home, malformed TOML, unknown fields and relative paths.
-- [ ] Keep tests inside isolated HOME/CWD.
-- [ ] Pass `CFG-001..006` and `CLI-009`.
+- [x] Reproduce defaults/global/project/env order and exact paths.
+- [x] Cover all supported `SYMERASEME_*` names and boolean parsing.
+- [x] Test missing home, malformed TOML, unknown fields and relative paths.
+- [x] Keep tests inside isolated HOME/CWD.
+- [x] Pass `CFG-001..006` and `CLI-009`.
 
 ### Task 2.4: Scaffold the complete Clap command tree
 
@@ -402,12 +402,12 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-cli/tests/command_surface.rs`
 
 **Steps:**
-- [ ] Define every visible command, hidden alias, positional and flag/default.
-- [ ] Snapshot help and parser errors from the oracle corpus.
-- [ ] Route unported handlers to an internal test-only boundary; never ship a
+- [x] Define every visible command, hidden alias, positional and flag/default.
+- [x] Snapshot help and parser errors from the oracle corpus.
+- [x] Route unported handlers to an internal test-only boundary; never ship a
       fake success response.
-- [ ] Match Cobra output deliberately where Clap defaults differ.
-- [ ] Pass `CLI-001`, `CLI-005..008` parser/help portions.
+- [x] Match Cobra output deliberately where Clap defaults differ.
+- [x] Pass `CLI-001`, `CLI-005..008` parser/help portions.
 
 ---
 
