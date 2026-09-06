@@ -43,10 +43,14 @@ pub fn parse(input: &str) -> Result<DateTime<Utc>, TimestampError> {
         return Err(TimestampError::Empty);
     }
 
-    let normalized_z = input
+    let normalized_fraction = normalize_comma_fraction(input);
+    let normalized_z = normalized_fraction
         .strip_suffix('Z')
         .map(|prefix| format!("{prefix}+00:00"));
-    let offset_inputs = normalized_z.iter().map(String::as_str).chain([input]);
+    let offset_inputs = normalized_z
+        .iter()
+        .map(String::as_str)
+        .chain([normalized_fraction.as_str(), input]);
     for value in offset_inputs {
         for layout in [
             "%Y-%m-%dT%H:%M:%S%.f%:z",
@@ -61,10 +65,10 @@ pub fn parse(input: &str) -> Result<DateTime<Utc>, TimestampError> {
     }
 
     for (value, layout) in [
-        (input, "%Y-%m-%dT%H:%M:%S%.f"),
-        (input, "%Y-%m-%d %H:%M:%S%.f"),
-        (input, "%Y-%m-%dT%H:%M:%S"),
-        (input, "%Y-%m-%d %H:%M:%S"),
+        (normalized_fraction.as_str(), "%Y-%m-%dT%H:%M:%S%.f"),
+        (normalized_fraction.as_str(), "%Y-%m-%d %H:%M:%S%.f"),
+        (normalized_fraction.as_str(), "%Y-%m-%dT%H:%M:%S"),
+        (normalized_fraction.as_str(), "%Y-%m-%d %H:%M:%S"),
     ] {
         if let Ok(value) = NaiveDateTime::parse_from_str(value, layout) {
             return Ok(Utc.from_utc_datetime(&value));
@@ -141,17 +145,32 @@ fn parse_rfc1123_alpha(input: &str) -> Option<DateTime<Utc>> {
 }
 
 fn parse_rfc850(input: &str) -> Option<DateTime<Utc>> {
-    let prefix = rfc_prefix(input).or_else(|| {
-        input
-            .rsplit_once(' ')
-            .and_then(|(prefix, zone)| (zone == "+0000").then_some(prefix))
-    })?;
+    let (prefix, zone) = input.rsplit_once(' ')?;
     let prefix = without_weekday(rfc850_prefix(prefix)?)?;
     let value = parse_rfc850_datetime(prefix)?;
+    if !valid_rfc850_zone(zone) {
+        return None;
+    }
     let year = value.year() % 100;
     let year = if year >= 69 { 1900 + year } else { 2000 + year };
     let date = value.date().with_year(year)?;
     Some(Utc.from_utc_datetime(&date.and_time(value.time())))
+}
+
+fn valid_rfc850_zone(zone: &str) -> bool {
+    if zone.len() == 3
+        && zone
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
+    {
+        return true;
+    }
+    let Some(digits) = zone.strip_prefix(['+', '-']) else {
+        return false;
+    };
+    !digits.is_empty()
+        && digits.bytes().all(|byte| byte.is_ascii_digit())
+        && digits.parse::<u32>().is_ok_and(|hours| hours <= 23)
 }
 
 fn parse_rfc1123_datetime(value: &str) -> Option<NaiveDateTime> {
@@ -207,6 +226,21 @@ fn rfc_prefix(input: &str) -> Option<&str> {
     (zone.len() == 3).then_some(prefix)
 }
 
+fn normalize_comma_fraction(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut normalized = input.to_owned();
+    for index in 3..bytes.len() {
+        if bytes[index] == b','
+            && bytes[index - 1].is_ascii_digit()
+            && bytes[index - 2].is_ascii_digit()
+            && bytes[index - 3] == b':'
+        {
+            normalized.replace_range(index..=index, ".");
+        }
+    }
+    normalized
+}
+
 fn parse_numeric_offset(zone: &str) -> Option<i64> {
     let bytes = zone.as_bytes();
     if bytes.len() != 5 || !matches!(bytes[0], b'+' | b'-') {
@@ -251,6 +285,32 @@ mod tests {
         ] {
             let value = parse(input).unwrap_or_else(|error| panic!("{input:?}: {error}"));
             assert_eq!(value.offset(), &chrono::offset::Utc);
+        }
+    }
+
+    #[test]
+    fn accepts_comma_fractions_and_rfc850_numeric_zones() {
+        for input in [
+            "2026-08-31T12:34:56,123456Z",
+            "2026-08-31T12:34:56,123456",
+            "2026-08-31 12:34:56,123456+02:00",
+            "Monday, 31-Aug-26 12:34:56 +0001",
+            "Monday, 31-Aug-26 12:34:56 -0001",
+            "Monday, 31-Aug-26 12:34:56 -0000",
+        ] {
+            assert!(parse(input).is_ok(), "{input:?} must be accepted");
+        }
+        assert_eq!(
+            format_iso(parse("2026-08-31 12:34:56,123456+02:00").unwrap()),
+            "2026-08-31T10:34:56+00:00"
+        );
+        for input in [
+            "Monday, 31-Aug-26 12:34:56 +0024",
+            "Monday, 31-Aug-26 12:34:56 -0024",
+            "Monday, 31-Aug-26 12:34:56 +0060",
+            "Monday, 31-Aug-26 12:34:56 -0060",
+        ] {
+            assert_eq!(parse(input), Err(TimestampError::Malformed), "{input:?}");
         }
     }
 

@@ -53,7 +53,7 @@ pub fn extract_confirmation_links(text: &str) -> Vec<String> {
         let candidate_end = text[start + scheme_len..]
             .char_indices()
             .find_map(|(offset, character)| {
-                (character.is_whitespace() || "<>\"'".contains(character))
+                (is_go_url_separator(character) || "<>\"'".contains(character))
                     .then_some(start + scheme_len + offset)
             })
             .unwrap_or(text.len());
@@ -83,6 +83,10 @@ pub fn extract_confirmation_links(text: &str) -> Vec<String> {
 #[derive(Clone, Copy)]
 struct ParsedUrl {
     path_len: usize,
+}
+
+fn is_go_url_separator(character: char) -> bool {
+    matches!(character, ' ' | '\t' | '\n' | '\r' | '\x0c')
 }
 
 fn parse_allowed_url(candidate: &str) -> Option<ParsedUrl> {
@@ -182,6 +186,26 @@ mod tests {
                 "https://acxiom.com/confirm",
                 "https://www.acxiom.com/long-confirm"
             ]
+        );
+    }
+
+    #[test]
+    fn matches_go_ascii_url_separator_behavior() {
+        assert_eq!(
+            extract_confirmation_links("https://acxiom.com/a\u{a0}https://oracle.com/b"),
+            ["https://acxiom.com/a\u{a0}https://oracle.com/b"]
+        );
+        assert_eq!(
+            extract_confirmation_links("https://acxiom.com/a\u{2003}https://oracle.com/b"),
+            ["https://acxiom.com/a\u{2003}https://oracle.com/b"]
+        );
+        assert_eq!(
+            extract_confirmation_links("https://acxiom.com/a\u{b}https://oracle.com/b"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            extract_confirmation_links("https://acxiom.com/a\u{c}https://oracle.com/b"),
+            ["https://acxiom.com/a", "https://oracle.com/b"]
         );
     }
 
