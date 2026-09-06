@@ -129,7 +129,7 @@ jobs:
 
       - name: Check every feature combination
         shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" hack check --workspace --each-feature --no-dev-deps --locked
+        run: cargo +"$RUST_TOOLCHAIN" hack check --workspace --each-feature --locked
 
       - name: Audit dependencies
         shell: bash
