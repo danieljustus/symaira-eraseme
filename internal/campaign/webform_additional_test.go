@@ -48,6 +48,7 @@ func TestFormSpecFromBrokerMapsSelectAndTimeout(t *testing.T) {
 }
 
 func TestWebFormAdapterDryRunAndConfigurationErrors(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	broker := registry.Broker{ID: "broker", Name: "Broker", OptOut: []registry.Channel{{
 		Type: "web_form", URL: "https://broker.test/form", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Click: "#submit"}}},
 	}}}

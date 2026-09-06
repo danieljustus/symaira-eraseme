@@ -13,7 +13,13 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/registry"
 )
 
+func isolateMissingIdentityProfile(t *testing.T) {
+	t.Helper()
+	t.Setenv("SYMERASEME_IDENTITY_PATH", filepath.Join(t.TempDir(), "missing-identity.enc"))
+}
+
 func TestWebFormNoExecutorPersistsManualFallback(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +46,7 @@ func TestWebFormNoExecutorPersistsManualFallback(t *testing.T) {
 }
 
 func TestWebFormExecutorReceivesBoundedContextAndMapsEvidence(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	broker := registry.Broker{ID: "synthetic-broker", Name: "Synthetic Broker", OptOut: []registry.Channel{{
 		Type: "web_form", URL: "https://synthetic.example/optout", FormSpec: &registry.FormSpec{Steps: []registry.FormStep{{Fill: map[string]string{"#email": "${email}"}}}},
 	}}}
@@ -58,6 +65,7 @@ func TestWebFormExecutorReceivesBoundedContextAndMapsEvidence(t *testing.T) {
 }
 
 func TestWebFormExecutorFailurePersistsManualFallback(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +89,7 @@ func TestWebFormExecutorFailurePersistsManualFallback(t *testing.T) {
 }
 
 func TestWebFormNilExecutorResultBecomesManualFallback(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -100,6 +109,7 @@ func TestWebFormNilExecutorResultBecomesManualFallback(t *testing.T) {
 }
 
 func TestExecuteWebFormFallbackOrdersManualAndFailedEvents(t *testing.T) {
+	isolateMissingIdentityProfile(t)
 	store, err := eventstore.Open(filepath.Join(t.TempDir(), "db.sqlite"))
 	if err != nil {
 		t.Fatal(err)
