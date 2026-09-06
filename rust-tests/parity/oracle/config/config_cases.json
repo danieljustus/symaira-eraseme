@@ -1,0 +1,90 @@
+{
+  "CFG-001": {
+    "config": {
+      "data_dir": "~/.local/share/symeraseme",
+      "db_dir": "",
+      "encrypt_db": false,
+      "port": 8000,
+      "allow_remote": false
+    },
+    "storage": {
+      "data_dir": "$ROOT/home/.local/share/symeraseme",
+      "db_dir": "$ROOT/home/.local/share/symeraseme",
+      "db_path": "$ROOT/home/.local/share/symeraseme/symeraseme.db",
+      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "encrypt_db": false
+    }
+  },
+  "CFG-002": {
+    "config": {
+      "data_dir": "~/env-data",
+      "db_dir": "env-db",
+      "encrypt_db": true,
+      "port": 8123,
+      "allow_remote": true
+    },
+    "storage": {
+      "data_dir": "$ROOT/home/env-data",
+      "db_dir": "$ROOT/project/env-db",
+      "db_path": "$ROOT/project/env-db/symeraseme.db",
+      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "encrypt_db": true
+    }
+  },
+  "CFG-003": {
+    "config": {
+      "data_dir": "~/custom/data",
+      "db_dir": "relative-db",
+      "encrypt_db": false,
+      "port": 8000,
+      "allow_remote": false
+    },
+    "storage": {
+      "data_dir": "$ROOT/home/custom/data",
+      "db_dir": "$ROOT/project/relative-db",
+      "db_path": "$ROOT/project/relative-db/symeraseme.db",
+      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "encrypt_db": false
+    }
+  },
+  "CFG-004": {
+    "config": {
+      "data_dir": "~/.local/share/symeraseme",
+      "db_dir": "",
+      "encrypt_db": true,
+      "port": 8124,
+      "allow_remote": true
+    },
+    "storage": {
+      "data_dir": "$ROOT/home/.local/share/symeraseme",
+      "db_dir": "$ROOT/home/.local/share/symeraseme",
+      "db_path": "$ROOT/home/.local/share/symeraseme/symeraseme.db",
+      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "encrypt_db": true
+    }
+  },
+  "CFG-005": {
+    "errors": [
+      "encrypt_db",
+      "port",
+      "db_dir",
+      "db_dir"
+    ]
+  },
+  "CFG-006": {
+    "config": {
+      "data_dir": "default-global",
+      "db_dir": "",
+      "encrypt_db": true,
+      "port": 9000,
+      "allow_remote": false
+    },
+    "storage": {
+      "data_dir": "$ROOT/project/default-global",
+      "db_dir": "$ROOT/project/default-global",
+      "db_path": "$ROOT/project/default-global/symeraseme.db",
+      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "encrypt_db": true
+    }
+  }
+}

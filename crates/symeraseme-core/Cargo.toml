@@ -16,6 +16,7 @@ path = "src/lib.rs"
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 proptest = "1.11.0"
