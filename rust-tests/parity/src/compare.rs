@@ -91,16 +91,64 @@ fn bytes_difference(
 }
 
 fn format_bytes(bytes: &[u8]) -> String {
-    let preview = bytes
-        .iter()
-        .take(64)
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if bytes.len() > 64 {
-        format!("0x{preview}… ({} bytes)", bytes.len())
-    } else {
-        format!("0x{preview} ({} bytes)", bytes.len())
+    format!("<redacted bytes: {} bytes>", bytes.len())
+}
+
+#[derive(Default)]
+struct JsonShape {
+    nodes: usize,
+    objects: usize,
+    arrays: usize,
+    strings: usize,
+    numbers: usize,
+    booleans: usize,
+    nulls: usize,
+    max_depth: usize,
+    truncated: bool,
+}
+
+fn collect_json_shape(value: &serde_json::Value, depth: usize, shape: &mut JsonShape) {
+    if shape.nodes >= 128 {
+        shape.truncated = true;
+        return;
     }
+    shape.nodes += 1;
+    shape.max_depth = shape.max_depth.max(depth);
+    match value {
+        serde_json::Value::Object(fields) => {
+            shape.objects += 1;
+            for value in fields.values() {
+                collect_json_shape(value, depth + 1, shape);
+            }
+        }
+        serde_json::Value::Array(values) => {
+            shape.arrays += 1;
+            for value in values {
+                collect_json_shape(value, depth + 1, shape);
+            }
+        }
+        serde_json::Value::String(_) => shape.strings += 1,
+        serde_json::Value::Number(_) => shape.numbers += 1,
+        serde_json::Value::Bool(_) => shape.booleans += 1,
+        serde_json::Value::Null => shape.nulls += 1,
+    }
+}
+
+fn format_json_shape(value: &serde_json::Value) -> String {
+    let mut shape = JsonShape::default();
+    collect_json_shape(value, 0, &mut shape);
+    format!(
+        "<redacted JSON shape: nodes={}, objects={}, arrays={}, strings={}, numbers={}, booleans={}, nulls={}, depth={}, truncated={}>",
+        shape.nodes,
+        shape.objects,
+        shape.arrays,
+        shape.strings,
+        shape.numbers,
+        shape.booleans,
+        shape.nulls,
+        shape.max_depth,
+        shape.truncated
+    )
 }
 
 fn json_semantic_difference(
@@ -111,10 +159,10 @@ fn json_semantic_difference(
 ) -> Option<Difference> {
     let expected_value = match serde_json::from_slice::<serde_json::Value>(expected) {
         Ok(value) => value,
-        Err(error) => {
+        Err(_error) => {
             return Some(Difference {
                 field: format!("{field}.json"),
-                expected: format!("invalid JSON: {error}"),
+                expected: "<invalid JSON>".into(),
                 actual: format_bytes(actual),
                 reason,
             });
@@ -122,49 +170,49 @@ fn json_semantic_difference(
     };
     let actual_value = match serde_json::from_slice::<serde_json::Value>(actual) {
         Ok(value) => value,
-        Err(error) => {
+        Err(_error) => {
             return Some(Difference {
                 field: format!("{field}.json"),
-                expected: format_json(&expected_value),
-                actual: format!("invalid JSON: {error}"),
+                expected: format_json_shape(&expected_value),
+                actual: "<invalid JSON>".into(),
                 reason,
             });
         }
     };
     (expected_value != actual_value).then(|| Difference {
         field: format!("{field}.json"),
-        expected: format_json(&expected_value),
-        actual: format_json(&actual_value),
+        expected: format_json_shape(&expected_value),
+        actual: format_json_shape(&actual_value),
         reason,
     })
-}
-
-fn format_json(value: &serde_json::Value) -> String {
-    let rendered = value.to_string();
-    if rendered.len() <= 512 {
-        rendered
-    } else {
-        let mut end = 512;
-        while end > 0 && !rendered.is_char_boundary(end) {
-            end -= 1;
-        }
-        format!("{}…", &rendered[..end])
-    }
 }
 
 fn manifest_difference(expected: &Manifest, actual: &Manifest) -> Option<Difference> {
     if expected == actual {
         None
     } else {
-        let first_expected = expected.entries.first();
-        let first_actual = actual.entries.first();
+        let structure = |manifest: &Manifest| {
+            let files = manifest
+                .entries
+                .iter()
+                .filter(|entry| matches!(entry.entry_type, crate::filesystem::EntryType::File))
+                .count();
+            let directories = manifest
+                .entries
+                .iter()
+                .filter(|entry| matches!(entry.entry_type, crate::filesystem::EntryType::Directory))
+                .count();
+            format!(
+                "<redacted manifest: {} entries, {} files, {} directories>",
+                manifest.entries.len(),
+                files,
+                directories
+            )
+        };
         Some(Difference {
             field: "filesystem.manifest".into(),
-            expected: format!(
-                "{} entries; first={first_expected:?}",
-                expected.entries.len()
-            ),
-            actual: format!("{} entries; first={first_actual:?}", actual.entries.len()),
+            expected: structure(expected),
+            actual: structure(actual),
             reason: None,
         })
     }
@@ -244,21 +292,43 @@ fn compare_mcp(
     differences
 }
 
+fn sqlite_text_structure(text: &str) -> String {
+    format!(
+        "<redacted SQLite text: {} bytes, {} rows>",
+        text.len(),
+        text.lines().count()
+    )
+}
+
+fn sqlite_results_structure(results: &[String]) -> String {
+    let bytes = results.iter().map(String::len).sum::<usize>();
+    let rows = results
+        .iter()
+        .map(|result| result.lines().count())
+        .sum::<usize>();
+    format!(
+        "<redacted SQLite results: {} queries, {} bytes, {} rows>",
+        results.len(),
+        bytes,
+        rows
+    )
+}
+
 fn compare_sqlite(expected: &SqliteSnapshot, actual: &SqliteSnapshot) -> Vec<Difference> {
     let mut differences = Vec::new();
     if expected.schema != actual.schema {
         differences.push(Difference {
             field: "sqlite.schema".into(),
-            expected: expected.schema.clone(),
-            actual: actual.schema.clone(),
+            expected: sqlite_text_structure(&expected.schema),
+            actual: sqlite_text_structure(&actual.schema),
             reason: None,
         });
     }
     if expected.ordered_results != actual.ordered_results {
         differences.push(Difference {
             field: "sqlite.ordered_results".into(),
-            expected: format!("{:?}", expected.ordered_results),
-            actual: format!("{:?}", actual.ordered_results),
+            expected: sqlite_results_structure(&expected.ordered_results),
+            actual: sqlite_results_structure(&actual.ordered_results),
             reason: None,
         });
     }
@@ -342,12 +412,18 @@ pub fn compare_case(case: &Case) -> std::io::Result<Result<(), Vec<Difference>>>
     let go_sqlite = case
         .sqlite_database
         .as_ref()
-        .map(|database| snapshot_database(&go.cwd.join(database), &case.sqlite_queries))
+        .map(|database| {
+            crate::sqlite::reject_symlink_components(&go.cwd, database)?;
+            snapshot_database(&go.cwd.join(database), &case.sqlite_queries)
+        })
         .transpose()?;
     let rust_sqlite = case
         .sqlite_database
         .as_ref()
-        .map(|database| snapshot_database(&rust.cwd.join(database), &case.sqlite_queries))
+        .map(|database| {
+            crate::sqlite::reject_symlink_components(&rust.cwd, database)?;
+            snapshot_database(&rust.cwd.join(database), &case.sqlite_queries)
+        })
         .transpose()?;
     let differences = compare_results(
         case,
@@ -400,8 +476,8 @@ mod tests {
             .expect_err("mismatch must fail");
         let report = format_differences(&differences);
         assert!(report.contains("stdout[byte 0]"), "{report}");
-        assert!(report.contains("expected 0x6f7261636c65"), "{report}");
-        assert!(report.contains("got 0x72657772697465"), "{report}");
+        assert!(report.contains("<redacted bytes: 6 bytes>"), "{report}");
+        assert!(report.contains("<redacted bytes: 7 bytes>"), "{report}");
     }
 
     #[test]
@@ -443,7 +519,8 @@ mod tests {
         let differences = compare_case(&case).unwrap().expect_err("JSON differs");
         let report = format_differences(&differences);
         assert!(report.contains("stdout.json"), "{report}");
-        assert!(report.contains('…'), "{report}");
+        assert!(report.contains("<redacted JSON shape:"), "{report}");
+        assert!(!report.contains("é"), "{report}");
     }
 
     #[test]

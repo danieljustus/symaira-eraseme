@@ -7,6 +7,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -50,17 +51,27 @@ impl Drop for SandboxGuard {
     }
 }
 
-fn unique_dir(label: &str) -> std::io::Result<PathBuf> {
+fn unique_dir() -> std::io::Result<PathBuf> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "symeraseme-parity-{label}-{}-{nanos}",
-        std::process::id()
-    ));
-    fs::create_dir_all(&path)?;
-    Ok(path)
+    let sequence = COUNTER.fetch_add(1, AtomicOrdering::Relaxed);
+    loop {
+        let path = std::env::temp_dir().join(format!(
+            "symeraseme-parity-{}-{nanos}-{sequence}",
+            std::process::id()
+        ));
+        match fs::create_dir(&path) {
+            Ok(()) => {
+                set_mode(&path, 0o700)?;
+                return Ok(path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 pub fn validate_fixture_path(path: &Path) -> std::io::Result<()> {
@@ -74,7 +85,7 @@ pub fn validate_fixture_path(path: &Path) -> std::io::Result<()> {
     {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            format!("fixture path must be relative: {}", path.display()),
+            "fixture path must be relative and sandbox-local",
         ));
     }
     for component in path.components() {
@@ -84,7 +95,7 @@ pub fn validate_fixture_path(path: &Path) -> std::io::Result<()> {
         ) {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("fixture path escapes the sandbox: {}", path.display()),
+                "fixture path escapes the sandbox",
             ));
         }
     }
@@ -93,17 +104,17 @@ pub fn validate_fixture_path(path: &Path) -> std::io::Result<()> {
 
 fn create_layout(root: &Path, files: &[FixtureFile]) -> std::io::Result<PathBuf> {
     let cwd = root.join("cwd");
-    fs::create_dir_all(&cwd)?;
+    fs::create_dir(&cwd)?;
+    set_mode(&cwd, 0o700)?;
     for fixture in files {
         validate_fixture_path(&fixture.relative_path)?;
         let path = cwd.join(&fixture.relative_path);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
+            set_mode(parent, 0o700)?;
         }
         fs::write(&path, &fixture.contents)?;
-        if let Some(mode) = fixture.mode {
-            set_mode(&path, mode)?;
-        }
+        set_mode(&path, fixture.mode.unwrap_or(0o600))?;
     }
     Ok(cwd)
 }
@@ -230,9 +241,54 @@ fn finish_stdin_writer(
     }
 }
 
+const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
+const READER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
+
+fn read_capped(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::with_capacity(8192);
+    let mut buffer = [0u8; 8192];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(bytes);
+        }
+        if bytes.len().saturating_add(count) > MAX_CAPTURE_BYTES {
+            return Err(std::io::Error::other(
+                "subprocess output exceeded the bounded capture limit",
+            ));
+        }
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+}
+
+fn finish_reader(
+    reader: thread::JoinHandle<()>,
+    result: Receiver<std::io::Result<Vec<u8>>>,
+    captured: Option<std::io::Result<Vec<u8>>>,
+    child: &mut Child,
+    stream: &str,
+) -> std::io::Result<Vec<u8>> {
+    let value = match captured {
+        Some(value) => value,
+        None => result
+            .recv_timeout(READER_CLEANUP_TIMEOUT)
+            .map_err(|error| {
+                kill_process_group(child);
+                std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("{stream} reader cleanup exceeded bounded timeout: {error}"),
+                )
+            })?,
+    };
+    reader
+        .join()
+        .map_err(|_| std::io::Error::other(format!("{stream} reader panicked")))?;
+    value
+}
+
 pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult> {
     reject_reserved_environment(case)?;
-    let sandbox = unique_dir(&case.id)?;
+    let sandbox = unique_dir()?;
     let mut cleanup = SandboxGuard {
         path: sandbox.clone(),
         keep: false,
@@ -241,14 +297,17 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
     let home = sandbox.join("home");
     let xdg = sandbox.join("xdg");
     let tmp = sandbox.join("tmp");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&xdg)?;
-    fs::create_dir_all(&tmp)?;
+    fs::create_dir(&home)?;
+    fs::create_dir(&xdg)?;
+    fs::create_dir(&tmp)?;
+    set_mode(&home, 0o700)?;
+    set_mode(&xdg, 0o700)?;
+    set_mode(&tmp, 0o700)?;
 
     let http_server = case
         .http
         .as_ref()
-        .map(|fixture| MockHttpServer::start(&fixture.responses))
+        .map(|fixture| MockHttpServer::start_with_timeout(&fixture.responses, case.timeout))
         .transpose()?;
     let mut command = Command::new(&program.executable);
     command
@@ -285,20 +344,43 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
     });
     let stdout = child.stdout.take().expect("stdout was piped");
     let stderr = child.stderr.take().expect("stderr was piped");
+    let (stdout_done, stdout_result) = mpsc::channel();
     let stdout_thread = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stdout;
-        reader.read_to_end(&mut bytes).map(|_| bytes)
+        let result = read_capped(stdout);
+        let _ = stdout_done.send(result);
     });
+    let (stderr_done, stderr_result) = mpsc::channel();
     let stderr_thread = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stderr;
-        reader.read_to_end(&mut bytes).map(|_| bytes)
+        let result = read_capped(stderr);
+        let _ = stderr_done.send(result);
     });
 
     let deadline = Instant::now() + case.timeout;
     let mut timed_out = false;
+    let mut capture_error = None;
+    let mut stdout_captured = None;
+    let mut stderr_captured = None;
     let status = loop {
+        if let Ok(result) = stdout_result.try_recv() {
+            if let Err(error) = &result {
+                capture_error = Some(std::io::Error::other(error.to_string()));
+                kill_process_group(&mut child);
+            }
+            stdout_captured = Some(result);
+            if capture_error.is_some() {
+                break child.wait()?;
+            }
+        }
+        if let Ok(result) = stderr_result.try_recv() {
+            if let Err(error) = &result {
+                capture_error = Some(std::io::Error::other(error.to_string()));
+                kill_process_group(&mut child);
+            }
+            stderr_captured = Some(result);
+            if capture_error.is_some() {
+                break child.wait()?;
+            }
+        }
         if let Some(status) = child.try_wait()? {
             break status;
         }
@@ -309,18 +391,29 @@ pub fn run_program(case: &Case, program: &Program) -> std::io::Result<RunResult>
         }
         thread::sleep(Duration::from_millis(5));
     };
-    // The child may have exited while a descendant still owns the inherited
-    // stdin pipe. Terminate the dedicated group before bounded writer cleanup.
+    // The child may have exited while a descendant still owns an inherited
+    // pipe. Terminate the dedicated group before bounded reader cleanup.
     kill_process_group(&mut child);
     if let Some(writer) = stdin_thread {
         finish_stdin_writer(writer, stdin_result)?;
     }
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| std::io::Error::other("stdout reader panicked"))??;
-    let stderr = stderr_thread
-        .join()
-        .map_err(|_| std::io::Error::other("stderr reader panicked"))??;
+    let stdout = finish_reader(
+        stdout_thread,
+        stdout_result,
+        stdout_captured,
+        &mut child,
+        "stdout",
+    )?;
+    let stderr = finish_reader(
+        stderr_thread,
+        stderr_result,
+        stderr_captured,
+        &mut child,
+        "stderr",
+    )?;
+    if let Some(error) = capture_error {
+        return Err(error);
+    }
     let http_exchanges = http_server
         .map(|server| server.finish())
         .transpose()?
