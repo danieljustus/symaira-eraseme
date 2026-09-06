@@ -6,11 +6,9 @@ use serde::Serialize;
 pub const TOOL_NAME: &str = "symeraseme";
 /// The version of the machine-readable handshake payload.
 pub const SCHEMA_VERSION: u8 = 1;
-/// The version injected by Cargo at build time, with no runtime clock input.
-pub const BUILD_VERSION: &str = match option_env!("SYMERASEME_VERSION") {
-    Some(version) => version,
-    None => env!("CARGO_PKG_VERSION"),
-};
+/// The version provided by Cargo package metadata, with no ambient override or
+/// runtime clock input.
+pub const BUILD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The machine-readable version handshake shared with Symaira clients.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

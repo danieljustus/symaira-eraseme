@@ -1,18 +1,26 @@
 #![deny(unsafe_code)]
 
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand};
 use symeraseme_core::version;
 
 #[derive(Debug, Parser)]
 #[command(
     name = "symeraseme",
     bin_name = "symeraseme",
-    version = concat!("version ", env!("SYMERASEME_VERSION")),
+    version = concat!("version ", env!("CARGO_PKG_VERSION")),
+    disable_version_flag = true,
     about = "Automated data broker removal tool",
     subcommand_required = true,
     arg_required_else_help = false
 )]
 struct Cli {
+    #[arg(
+        short = 'v',
+        long = "version",
+        action = ArgAction::SetTrue,
+        required = false
+    )]
+    version_flag: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -31,7 +39,7 @@ struct VersionArgs {
 }
 
 fn main() {
-    reject_root_version_trailing_arguments();
+    handle_version_compatibility_errors();
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
@@ -46,13 +54,29 @@ fn main() {
     }
 }
 
-fn reject_root_version_trailing_arguments() {
-    let mut args = std::env::args_os().skip(1);
-    let Some(first) = args.next() else {
-        return;
-    };
-    if (first == "--version" || first == "-V") && args.next().is_some() {
-        eprintln!("unexpected argument after --version");
+fn handle_version_compatibility_errors() {
+    let args: Vec<String> = std::env::args_os()
+        .skip(1)
+        .filter_map(|arg| arg.into_string().ok())
+        .collect();
+
+    if args
+        .first()
+        .is_some_and(|arg| arg == "--version" || arg == "-v")
+    {
+        println!("symeraseme version {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
+
+    if args.first().is_some_and(|arg| arg == "-V") {
+        eprintln!("unknown shorthand flag: 'V' in -V");
+        std::process::exit(1);
+    }
+
+    let version_extra = (args.len() == 2 && args[0] == "version" && args[1] == "extra")
+        || (args.len() == 3 && args[0] == "version" && args[1] == "--json" && args[2] == "extra");
+    if version_extra {
+        eprintln!("unknown command \"extra\" for \"symeraseme version\"");
         std::process::exit(1);
     }
 }
