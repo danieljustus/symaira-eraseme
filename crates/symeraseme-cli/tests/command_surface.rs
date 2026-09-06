@@ -70,6 +70,9 @@ fn run(argv: &[&str], home: &Path, cwd: &Path, capture: &Path, index: usize) -> 
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
+    if let Some(profile_path) = std::env::var_os("LLVM_PROFILE_FILE") {
+        command.env("LLVM_PROFILE_FILE", profile_path);
+    }
     configure_process_group(&mut command);
     let mut child = command.spawn().expect("bounded CLI subprocess starts");
     let started = Instant::now();

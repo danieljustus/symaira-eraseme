@@ -79,13 +79,53 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          critical_pattern='(crypto|consent|auth|mcp)'
-          if ! find crates -type f -name '*.rs' -print | grep -Eiq "$critical_pattern"; then
+          critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)'
+          critical_files=()
+          while IFS= read -r file; do
+            critical_files+=("$file")
+          done < <(
+            find crates -type f -name '*.rs' -not -path '*/commands/*' -print |
+              grep -Ei "$critical_pattern" || true
+          )
+          if [[ ${#critical_files[@]} -eq 0 ]]; then
             echo '::notice::Rust coverage thresholds are fail-closed for the foundation scaffold: no first-party crypto, consent/auth, or MCP modules exist yet, so no coverage claim is reported.'
             exit 0
           fi
-          cargo +"$RUST_TOOLCHAIN" llvm-cov --workspace --all-features --summary-only --fail-under-lines 80
-          cargo +"$RUST_TOOLCHAIN" llvm-cov --workspace --all-features --include-regex "$critical_pattern" --summary-only --fail-under-lines 90
+          coverage_json="$RUNNER_TEMP/rust-coverage.json"
+          cargo +"$RUST_TOOLCHAIN" llvm-cov --workspace --all-features --json \
+            --output-path "$coverage_json" --fail-under-lines 80
+          python3 - "$coverage_json" 90 "${critical_files[@]}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report_path = pathlib.Path(sys.argv[1])
+          threshold = float(sys.argv[2])
+          expected = {(pathlib.Path.cwd() / path).resolve() for path in sys.argv[3:]}
+          report = json.loads(report_path.read_text())
+          data = report.get("data")
+          if not isinstance(data, list) or len(data) != 1:
+              raise SystemExit("coverage report must contain exactly one data entry")
+          files = {}
+          for entry in data[0].get("files", []):
+              filename = pathlib.Path(entry.get("filename", "")).resolve()
+              lines = entry.get("summary", {}).get("lines", {})
+              files[filename] = (lines.get("count"), lines.get("covered"))
+          missing = sorted(str(path) for path in expected if path not in files)
+          if missing:
+              raise SystemExit(f"critical coverage files missing from report: {missing}")
+          counts = [files[path] for path in expected]
+          if any(not isinstance(count, int) or not isinstance(covered, int) for count, covered in counts):
+              raise SystemExit("critical coverage report has malformed line counts")
+          total = sum(count for count, _ in counts)
+          covered = sum(value for _, value in counts)
+          if total == 0:
+              raise SystemExit("critical coverage files contain no measurable lines")
+          percent = covered * 100 / total
+          print(f"Critical Rust line coverage: {percent:.2f}% ({covered}/{total}), gate: {threshold:.0f}%")
+          if percent < threshold:
+              raise SystemExit(1)
+          PY
 
       - name: Check every feature combination
         shell: bash
