@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -60,6 +60,7 @@ fn fixture(case: &str) -> Value {
     document.get(case).cloned().expect("fixture case")
 }
 
+#[derive(Debug)]
 struct OracleCommandOutput {
     status: std::process::ExitStatus,
     stdout: Vec<u8>,
@@ -68,6 +69,7 @@ struct OracleCommandOutput {
 
 const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
 const ORACLE_MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
+const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
 fn run_go_config_oracle() -> Value {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
@@ -136,6 +138,22 @@ fn run_file_backed(
     stderr_path: &Path,
     timeout: Duration,
 ) -> std::io::Result<OracleCommandOutput> {
+    run_file_backed_with_limit(
+        command,
+        stdout_path,
+        stderr_path,
+        timeout,
+        ORACLE_MAX_OUTPUT_BYTES,
+    )
+}
+
+fn run_file_backed_with_limit(
+    command: &mut Command,
+    stdout_path: &Path,
+    stderr_path: &Path,
+    timeout: Duration,
+    output_limit: u64,
+) -> std::io::Result<OracleCommandOutput> {
     let stdout = fs::File::create(stdout_path)?;
     let stderr = fs::File::create(stderr_path)?;
     configure_process_group(command)?;
@@ -144,12 +162,19 @@ fn run_file_backed(
     let mut child = command.spawn()?;
     let deadline = Instant::now() + timeout;
     let status = loop {
+        if output_exceeded(stdout_path, stderr_path, output_limit)? {
+            if child.try_wait()?.is_none() {
+                terminate_child_bounded(&mut child, ORACLE_CLEANUP_TIMEOUT)?;
+            }
+            return Err(std::io::Error::other(
+                "oracle subprocess output exceeded its bounded limit",
+            ));
+        }
         if let Some(status) = child.try_wait()? {
             break status;
         }
         if Instant::now() >= deadline {
-            kill_process_tree(&mut child)?;
-            let _ = child.wait()?;
+            terminate_child_bounded(&mut child, ORACLE_CLEANUP_TIMEOUT)?;
             return Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "oracle subprocess exceeded its bounded timeout",
@@ -159,8 +184,8 @@ fn run_file_backed(
     };
     drop(stdout);
     drop(stderr);
-    let stdout = read_capped_file(stdout_path, ORACLE_MAX_OUTPUT_BYTES)?;
-    let stderr = read_capped_file(stderr_path, ORACLE_MAX_OUTPUT_BYTES)?;
+    let stdout = read_capped_file(stdout_path, output_limit)?;
+    let stderr = read_capped_file(stderr_path, output_limit)?;
     Ok(OracleCommandOutput {
         status,
         stdout,
@@ -168,10 +193,59 @@ fn run_file_backed(
     })
 }
 
+fn output_exceeded(stdout_path: &Path, stderr_path: &Path, limit: u64) -> std::io::Result<bool> {
+    for path in [stdout_path, stderr_path] {
+        match fs::metadata(path) {
+            Ok(metadata) if metadata.len() > limit => return Ok(true),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(false)
+}
+
+fn terminate_child_bounded(child: &mut Child, timeout: Duration) -> std::io::Result<()> {
+    let tree_cleanup = kill_process_tree(child);
+    let direct_cleanup = child.kill();
+    let deadline = Instant::now() + timeout;
+    loop {
+        if child.try_wait()?.is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "oracle subprocess cleanup exceeded its bounded timeout",
+            ));
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    if let Err(error) = tree_cleanup {
+        return Err(std::io::Error::other(format!(
+            "oracle process-tree cleanup failed: {error}"
+        )));
+    }
+    if let Err(error) = direct_cleanup {
+        let already_exited = matches!(
+            error.kind(),
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::NotFound
+        ) || error.raw_os_error() == Some(3);
+        if !already_exited {
+            return Err(std::io::Error::other(format!(
+                "oracle direct-child cleanup failed: {error}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn read_capped_file(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
     let mut file = fs::File::open(path)?;
     let mut output = Vec::new();
-    file.by_ref().take(limit + 1).read_to_end(&mut output)?;
+    Read::by_ref(&mut file)
+        .take(limit + 1)
+        .read_to_end(&mut output)?;
     if output.len() as u64 > limit {
         return Err(std::io::Error::other(
             "oracle subprocess output exceeded its bounded limit",
@@ -256,6 +330,75 @@ fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
     }
 }
 
+fn helper_command(test_name: &str, marker: &str) -> Command {
+    let mut command = Command::new(std::env::current_exe().expect("current test executable"));
+    command
+        .args(["--exact", test_name, "--nocapture"])
+        .env(marker, "1");
+    command
+}
+
+#[test]
+fn oracle_runner_output_helper() {
+    if std::env::var_os("SYMERASEME_CONFIG_ORACLE_OUTPUT_HELPER").is_none() {
+        return;
+    }
+    let chunk = [b'x'; 4096];
+    let mut stdout = std::io::stdout().lock();
+    for _ in 0..1024 {
+        stdout.write_all(&chunk).expect("write helper output");
+    }
+    stdout.flush().expect("flush helper output");
+}
+
+#[test]
+fn oracle_runner_timeout_helper() {
+    if std::env::var_os("SYMERASEME_CONFIG_ORACLE_TIMEOUT_HELPER").is_some() {
+        thread::sleep(Duration::from_secs(30));
+    }
+}
+
+#[test]
+fn run_file_backed_enforces_live_output_limit() {
+    let tree = TestTree::new("runner-output-limit");
+    let mut command = helper_command(
+        "oracle_runner_output_helper",
+        "SYMERASEME_CONFIG_ORACLE_OUTPUT_HELPER",
+    );
+    let error = run_file_backed_with_limit(
+        &mut command,
+        &tree.root.join("stdout"),
+        &tree.root.join("stderr"),
+        Duration::from_secs(5),
+        1024,
+    )
+    .expect_err("oversized output must fail closed");
+    assert!(
+        error.to_string().contains("bounded limit"),
+        "unexpected runner error: {error}"
+    );
+}
+
+#[test]
+fn run_file_backed_timeout_cleanup_is_bounded() {
+    let tree = TestTree::new("runner-timeout");
+    let mut command = helper_command(
+        "oracle_runner_timeout_helper",
+        "SYMERASEME_CONFIG_ORACLE_TIMEOUT_HELPER",
+    );
+    let started = Instant::now();
+    let error = run_file_backed_with_limit(
+        &mut command,
+        &tree.root.join("stdout"),
+        &tree.root.join("stderr"),
+        Duration::from_millis(50),
+        1024 * 1024,
+    )
+    .expect_err("timed-out subprocess must fail closed");
+    assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+    assert!(started.elapsed() < Duration::from_secs(3));
+}
+
 #[test]
 fn go_config_oracle_provenance_fixture_and_rust_results_match() {
     let fixture: Value = serde_json::from_str(GO_FIXTURE).expect("valid Go config fixture");
@@ -276,8 +419,14 @@ fn go_config_oracle_provenance_fixture_and_rust_results_match() {
 }
 
 fn normalized_result(root: &Path, config: &Config, storage: &Storage) -> Value {
+    let cache_root = storage
+        .temp_dir
+        .parent()
+        .and_then(Path::parent)
+        .expect("encrypted temp dir has cache/tool/database shape");
     let encoded = serde_json::to_string(&json!({ "config": config, "storage": storage }))
         .expect("serialize result")
+        .replace(cache_root.to_str().expect("UTF-8 cache root"), "$CACHE")
         .replace(root.to_str().expect("UTF-8 test root"), "$ROOT");
     serde_json::from_str(&encoded).expect("normalized result JSON")
 }

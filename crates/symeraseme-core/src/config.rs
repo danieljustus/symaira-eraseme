@@ -565,4 +565,36 @@ mod tests {
         );
         assert!(windows_cache_root(None, Path::new("relative-home"), None).is_err());
     }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn native_cache_root_matches_macos_contract() {
+        let root = std::env::temp_dir().join("symeraseme-native-cache-macos");
+        let home = root.join("home");
+        let context = ConfigContext::new(home.clone(), root, BTreeMap::new());
+        assert_eq!(
+            user_cache_dir(&context).unwrap(),
+            home.join("Library/Caches")
+        );
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[test]
+    fn native_cache_root_matches_xdg_and_unix_fallback_contract() {
+        let root = std::env::temp_dir().join("symeraseme-native-cache-unix");
+        let home = root.join("home");
+        let xdg = root.join("xdg-cache");
+        let context = ConfigContext::new(
+            home.clone(),
+            root.clone(),
+            BTreeMap::from([(
+                "XDG_CACHE_HOME".to_owned(),
+                xdg.to_string_lossy().into_owned(),
+            )]),
+        );
+        assert_eq!(user_cache_dir(&context).unwrap(), xdg);
+
+        let fallback = ConfigContext::new(home.clone(), root, BTreeMap::new());
+        assert_eq!(user_cache_dir(&fallback).unwrap(), home.join(".cache"));
+    }
 }

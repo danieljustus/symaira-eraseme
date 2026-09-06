@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -279,10 +280,8 @@ func runBoundedCommand(
 	var runErr error
 	for {
 		if commandOutputExceeded(stdoutPath, stderrPath, maxChildOutput) {
-			cleanupErr := killProcessTree(command)
-			<-done
-			if cleanupErr != nil {
-				return commandOutput{}, cleanupErr
+			if err := cleanupCommandBounded(command, done, killProcessTree, 2*time.Second); err != nil {
+				return commandOutput{}, err
 			}
 			return commandOutput{}, fmt.Errorf("oracle child output exceeded the bounded capture limit")
 		}
@@ -290,15 +289,10 @@ func runBoundedCommand(
 		case runErr = <-done:
 			goto finished
 		case <-ctx.Done():
-			cleanupErr := killProcessTree(command)
-			runErr = <-done
-			if cleanupErr != nil {
-				return commandOutput{}, cleanupErr
+			if err := cleanupCommandBounded(command, done, killProcessTree, 2*time.Second); err != nil {
+				return commandOutput{}, err
 			}
-			if runErr == nil {
-				runErr = ctx.Err()
-			}
-			goto finished
+			return commandOutput{}, ctx.Err()
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -316,6 +310,31 @@ finished:
 		return captured, runErr
 	}
 	return captured, nil
+}
+
+func cleanupCommandBounded(
+	command *exec.Cmd,
+	done <-chan error,
+	treeKiller func(*exec.Cmd) error,
+	waitLimit time.Duration,
+) error {
+	treeErr := treeKiller(command)
+	var directErr error
+	if command.Process != nil {
+		directErr = command.Process.Kill()
+	}
+	select {
+	case <-done:
+	case <-time.After(waitLimit):
+		return fmt.Errorf("oracle child cleanup exceeded the bounded wait")
+	}
+	if treeErr != nil {
+		return fmt.Errorf("oracle process-tree cleanup failed: %w", treeErr)
+	}
+	if directErr != nil && !errors.Is(directErr, os.ErrProcessDone) {
+		return fmt.Errorf("oracle direct-child cleanup failed: %w", directErr)
+	}
+	return nil
 }
 
 func commandOutputExceeded(stdoutPath, stderrPath string, limit int64) bool {
@@ -422,8 +441,6 @@ func isolatedEnvironment(root string, fixture fixtureEnvironment) ([]string, err
 	}
 	for key, value := range fixture.Values {
 		switch key {
-		case "HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP", "XDG_DATA_HOME", "XDG_CACHE_HOME":
-			return nil, fmt.Errorf("fixture cannot override reserved environment")
 		case "XDG_CONFIG_HOME":
 			// A relative value exercises the production fallback. Absolute XDG
 			// roots must use SandboxXDGPath instead.
@@ -435,8 +452,11 @@ func isolatedEnvironment(root string, fixture fixtureEnvironment) ([]string, err
 				return nil, fmt.Errorf("fixture cannot override reserved environment")
 			}
 			values[key] = expanded
-		default:
+		case "SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_ENCRYPT_DB",
+			"SYMERASEME_PORT", "SYMERASEME_ALLOW_REMOTE":
 			values[key] = strings.ReplaceAll(value, "$ROOT", root)
+		default:
+			return nil, fmt.Errorf("fixture environment key is not allowed")
 		}
 	}
 	keys := make([]string, 0, len(values))
@@ -499,14 +519,29 @@ func unsafeFixturePath(path string) bool {
 
 func normalizePaths(root string, storage *config.Storage) *config.Storage {
 	copy := *storage
-	copy.DataDir = normalizePath(root, copy.DataDir)
-	copy.DBDir = normalizePath(root, copy.DBDir)
-	copy.DBPath = normalizePath(root, copy.DBPath)
-	copy.TempDir = normalizePath(root, copy.TempDir)
+	cacheRoot := nativeCacheRoot(copy.TempDir)
+	copy.DataDir = normalizePath(root, cacheRoot, copy.DataDir)
+	copy.DBDir = normalizePath(root, cacheRoot, copy.DBDir)
+	copy.DBPath = normalizePath(root, cacheRoot, copy.DBPath)
+	copy.TempDir = normalizePath(root, cacheRoot, copy.TempDir)
 	return &copy
 }
 
-func normalizePath(root, value string) string {
+func nativeCacheRoot(tempDir string) string {
+	if filepath.Base(tempDir) != "database" {
+		return ""
+	}
+	toolDir := filepath.Dir(tempDir)
+	if filepath.Base(toolDir) != "symeraseme" {
+		return ""
+	}
+	return filepath.Dir(toolDir)
+}
+
+func normalizePath(root, cacheRoot, value string) string {
+	if cacheRoot != "" && (value == cacheRoot || strings.HasPrefix(value, cacheRoot+string(filepath.Separator))) {
+		return "$CACHE" + strings.TrimPrefix(value, cacheRoot)
+	}
 	if strings.HasPrefix(value, root) {
 		return "$ROOT" + strings.TrimPrefix(value, root)
 	}

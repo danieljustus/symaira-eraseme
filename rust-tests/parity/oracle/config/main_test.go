@@ -25,7 +25,9 @@ func TestVerifySourceHashRejectsWrongExpectedHash(t *testing.T) {
 func TestIsolatedEnvironmentRejectsReservedFixtureOverrides(t *testing.T) {
 	reserved := []string{
 		"HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP",
-		"XDG_DATA_HOME", "XDG_CACHE_HOME",
+		"XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "XDG_STATE_HOME",
+		"LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "PATH",
+		"UNKNOWN", "SYMERASEME_UNKNOWN",
 	}
 	for _, key := range reserved {
 		t.Run(key, func(t *testing.T) {
@@ -46,6 +48,18 @@ func TestIsolatedEnvironmentRejectsReservedFixtureOverrides(t *testing.T) {
 		SandboxXDGPath: "$ROOT/not-the-generated-sandbox",
 	}); err == nil {
 		t.Fatal("unvalidated sandbox XDG path was accepted")
+	}
+	for _, key := range []string{
+		"SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR", "SYMERASEME_ENCRYPT_DB",
+		"SYMERASEME_PORT", "SYMERASEME_ALLOW_REMOTE",
+	} {
+		t.Run("allowed_"+key, func(t *testing.T) {
+			if _, err := isolatedEnvironment(t.TempDir(), fixtureEnvironment{
+				Values: map[string]string{key: "test-value"},
+			}); err != nil {
+				t.Fatalf("documented environment key %s was rejected: %v", key, err)
+			}
+		})
 	}
 }
 
@@ -100,5 +114,50 @@ func TestBoundedCommandKillsDescendantsOnTimeout(t *testing.T) {
 	}
 	if elapsed := time.Since(started); elapsed > 2*time.Second {
 		t.Fatalf("timeout cleanup took too long: %s", elapsed)
+	}
+}
+
+func TestCleanupCommandBoundedFallsBackToDirectChildKill(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("Unix shell unavailable")
+	}
+	command := exec.Command("sh", "-c", "sleep 30")
+	if err := configureProcessGroup(command); err != nil {
+		t.Fatal(err)
+	}
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	started := time.Now()
+	err := cleanupCommandBounded(
+		command,
+		done,
+		func(*exec.Cmd) error { return errors.New("sentinel tree cleanup failure") },
+		time.Second,
+	)
+	if err == nil || !strings.Contains(err.Error(), "process-tree cleanup failed") {
+		t.Fatalf("expected reported tree cleanup failure, got %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("fallback cleanup took too long: %s", elapsed)
+	}
+}
+
+func TestCleanupCommandBoundedCapsSecondaryWait(t *testing.T) {
+	done := make(chan error)
+	started := time.Now()
+	err := cleanupCommandBounded(
+		&exec.Cmd{},
+		done,
+		func(*exec.Cmd) error { return nil },
+		20*time.Millisecond,
+	)
+	if err == nil || !strings.Contains(err.Error(), "bounded wait") {
+		t.Fatalf("expected bounded-wait error, got %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("secondary cleanup wait took too long: %s", elapsed)
 	}
 }

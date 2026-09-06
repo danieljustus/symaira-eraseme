@@ -11,7 +11,7 @@
       "data_dir": "$ROOT/home/.local/share/symeraseme",
       "db_dir": "$ROOT/home/.local/share/symeraseme",
       "db_path": "$ROOT/home/.local/share/symeraseme/symeraseme.db",
-      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "temp_dir": "$CACHE/symeraseme/database",
       "encrypt_db": false
     }
   },
@@ -27,7 +27,7 @@
       "data_dir": "$ROOT/home/env-data",
       "db_dir": "$ROOT/project/env-db",
       "db_path": "$ROOT/project/env-db/symeraseme.db",
-      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "temp_dir": "$CACHE/symeraseme/database",
       "encrypt_db": true
     }
   },
@@ -43,7 +43,7 @@
       "data_dir": "$ROOT/home/custom/data",
       "db_dir": "$ROOT/project/relative-db",
       "db_path": "$ROOT/project/relative-db/symeraseme.db",
-      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "temp_dir": "$CACHE/symeraseme/database",
       "encrypt_db": false
     }
   },
@@ -59,7 +59,7 @@
       "data_dir": "$ROOT/home/.local/share/symeraseme",
       "db_dir": "$ROOT/home/.local/share/symeraseme",
       "db_path": "$ROOT/home/.local/share/symeraseme/symeraseme.db",
-      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "temp_dir": "$CACHE/symeraseme/database",
       "encrypt_db": true
     }
   },
@@ -83,7 +83,7 @@
       "data_dir": "$ROOT/project/default-global",
       "db_dir": "$ROOT/project/default-global",
       "db_path": "$ROOT/project/default-global/symeraseme.db",
-      "temp_dir": "$ROOT/home/Library/Caches/symeraseme/database",
+      "temp_dir": "$CACHE/symeraseme/database",
       "encrypt_db": true
     }
   }
