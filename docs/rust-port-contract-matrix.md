@@ -11,6 +11,23 @@
 > required row is `PASS`. `TODO` means the contract is known but its
 > differential case has not yet been implemented.
 
+## Phase 1 execution evidence
+
+Tasks `1.1`–`1.4` are implemented and reviewed on branch
+`agent/issue-803-phase1-foundation` at
+`dabb907b56da8d90d743de013e31628f9278bc0f`.
+
+| Task | Evidence | Status |
+|---|---|---|
+| 1.1 | Pinned Rust 1.98 workspace, three crates, Cargo.lock, shadow binary | PASS |
+| 1.2 | Neutral Go↔Rust harness with process/filesystem/SQLite/HTTP/MCP comparisons | PASS |
+| 1.3 | Dual-language Make targets with isolated outputs and shell-safe overrides | PASS |
+| 1.4 | SHA-pinned Rust PR/native CI, audit/deny/coverage handling, Cargo Dependabot | PASS |
+
+All local Go/Rust/Parity gates and the independent specification and
+quality/security reviews pass. GitHub PR required checks remain pending until
+the coordinator pushes this branch and reads back exact-head CI.
+
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
 SQLite, network transcript or process behavior.
