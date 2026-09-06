@@ -1,10 +1,11 @@
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symeraseme_core::config::{
     Config, ConfigContext, ConfigError, Storage, default_encrypted_temp_dir, defaults, load,
     resolve_storage,
@@ -59,40 +60,199 @@ fn fixture(case: &str) -> Value {
     document.get(case).cloned().expect("fixture case")
 }
 
+struct OracleCommandOutput {
+    status: std::process::ExitStatus,
+    stdout: Vec<u8>,
+    _stderr: Vec<u8>,
+}
+
+const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
+const ORACLE_MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
+
 fn run_go_config_oracle() -> Value {
-    const TIMEOUT: Duration = Duration::from_secs(30);
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let mut child = Command::new("go")
-        .args(["run", "./rust-tests/parity/oracle/config"])
+    let temp_root = std::env::temp_dir().join(format!(
+        "symeraseme-config-oracle-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_nanos()
+    ));
+    fs::create_dir(&temp_root).expect("create isolated oracle build directory");
+    let _cleanup = TempRootGuard(temp_root.clone());
+    let executable = temp_root.join(if cfg!(windows) {
+        "config-oracle.exe"
+    } else {
+        "config-oracle"
+    });
+
+    let mut build = Command::new("go");
+    build
+        .args(["build", "-o"])
+        .arg(&executable)
+        .arg("./rust-tests/parity/oracle/config")
         .current_dir(&root)
-        .env("GOWORK", "off")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("Go must be available for the committed config oracle");
-    let deadline = Instant::now() + TIMEOUT;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                assert!(status.success(), "Go config oracle exited unsuccessfully");
-                let output = child
-                    .wait_with_output()
-                    .expect("Go config oracle output must be readable");
-                return serde_json::from_slice(&output.stdout)
-                    .expect("Go config oracle must emit valid JSON");
+        .env("GOWORK", "off");
+    let build_output = run_file_backed(
+        &mut build,
+        &temp_root.join("build.stdout"),
+        &temp_root.join("build.stderr"),
+        ORACLE_TIMEOUT,
+    )
+    .expect("Go must be available for the committed config oracle");
+    assert!(
+        build_output.status.success(),
+        "Go config oracle build failed"
+    );
+
+    let mut oracle = Command::new(&executable);
+    oracle.current_dir(&root).env_clear();
+    let output = run_file_backed(
+        &mut oracle,
+        &temp_root.join("oracle.stdout"),
+        &temp_root.join("oracle.stderr"),
+        ORACLE_TIMEOUT,
+    )
+    .expect("Go config oracle execution must complete within its bounded timeout");
+    assert!(
+        output.status.success(),
+        "Go config oracle exited unsuccessfully"
+    );
+    serde_json::from_slice(&output.stdout).expect("Go config oracle must emit valid JSON")
+}
+
+struct TempRootGuard(PathBuf);
+
+impl Drop for TempRootGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn run_file_backed(
+    command: &mut Command,
+    stdout_path: &Path,
+    stderr_path: &Path,
+    timeout: Duration,
+) -> std::io::Result<OracleCommandOutput> {
+    let stdout = fs::File::create(stdout_path)?;
+    let stderr = fs::File::create(stderr_path)?;
+    configure_process_group(command)?;
+    command.stdout(Stdio::from(stdout.try_clone()?));
+    command.stderr(Stdio::from(stderr.try_clone()?));
+    let mut child = command.spawn()?;
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            kill_process_tree(&mut child)?;
+            let _ = child.wait()?;
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "oracle subprocess exceeded its bounded timeout",
+            ));
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    drop(stdout);
+    drop(stderr);
+    let stdout = read_capped_file(stdout_path, ORACLE_MAX_OUTPUT_BYTES)?;
+    let stderr = read_capped_file(stderr_path, ORACLE_MAX_OUTPUT_BYTES)?;
+    Ok(OracleCommandOutput {
+        status,
+        stdout,
+        _stderr: stderr,
+    })
+}
+
+fn read_capped_file(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
+    let mut file = fs::File::open(path)?;
+    let mut output = Vec::new();
+    file.by_ref().take(limit + 1).read_to_end(&mut output)?;
+    if output.len() as u64 > limit {
+        return Err(std::io::Error::other(
+            "oracle subprocess output exceeded its bounded limit",
+        ));
+    }
+    Ok(output)
+}
+
+#[cfg(unix)]
+fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
+    use std::os::unix::process::CommandExt;
+    unsafe extern "C" {
+        fn setpgid(pid: i32, pgid: i32) -> i32;
+    }
+    unsafe {
+        command.pre_exec(|| {
+            if setpgid(0, 0) == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
             }
-            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("Go config oracle exceeded its bounded timeout");
-            }
-            Err(_) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("Go config oracle status could not be read");
+        });
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    command.creation_flags(CREATE_NEW_PROCESS_GROUP);
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn configure_process_group(_command: &mut Command) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "oracle process-tree cleanup is unsupported on this platform",
+    ))
+}
+
+fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        unsafe extern "C" {
+            fn kill(pid: i32, signal: i32) -> i32;
+        }
+        let pid =
+            i32::try_from(child.id()).map_err(|_| std::io::Error::other("invalid child pid"))?;
+        const SIGKILL: i32 = 9;
+        let result = unsafe { kill(-pid, SIGKILL) };
+        if result != 0 {
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() != Some(3) {
+                return Err(error);
             }
         }
+        Ok(())
+    }
+    #[cfg(windows)]
+    {
+        let status = Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(
+                "taskkill failed to clean oracle tree",
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = child;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "oracle process-tree cleanup is unsupported on this platform",
+        ))
     }
 }
 
@@ -105,6 +265,7 @@ fn go_config_oracle_provenance_fixture_and_rust_results_match() {
         json!({
             "source_revision": "119ee9f84fe7c9e1485d25ab10aac8582e98395c",
             "source_path": "internal/config/config.go",
+            "source_sha256": "d197afc83776a85880428994e32b0c1585c245ed52d86f9a31fe51889cbce32c",
             "schema": "symaira-eraseme.config-parity.v1"
         })
     );

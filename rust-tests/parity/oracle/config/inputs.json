@@ -2,6 +2,7 @@
   "provenance": {
     "source_revision": "119ee9f84fe7c9e1485d25ab10aac8582e98395c",
     "source_path": "internal/config/config.go",
+    "source_sha256": "d197afc83776a85880428994e32b0c1585c245ed52d86f9a31fe51889cbce32c",
     "schema": "symaira-eraseme.config-parity.v1"
   },
   "cases": {
@@ -21,12 +22,14 @@
             "project/.symeraseme.toml": "data_dir = \"project-data\"\nencrypt_db = false\n"
           },
           "environment": {
-            "XDG_CONFIG_HOME": "$ROOT/xdg",
-            "SYMERASEME_DATA_DIR": "~/env-data",
-            "SYMERASEME_DB_DIR": "env-db",
-            "SYMERASEME_ENCRYPT_DB": "true",
-            "SYMERASEME_PORT": "8123",
-            "SYMERASEME_ALLOW_REMOTE": "yes"
+            "values": {
+              "SYMERASEME_DATA_DIR": "~/env-data",
+              "SYMERASEME_DB_DIR": "env-db",
+              "SYMERASEME_ENCRYPT_DB": "true",
+              "SYMERASEME_PORT": "8123",
+              "SYMERASEME_ALLOW_REMOTE": "yes"
+            },
+            "sandbox_xdg_path": "$ROOT/xdg"
           }
         }
       ]
@@ -48,7 +51,7 @@
             "xdg/symeraseme/config.toml": "encrypt_db = 1\nallow_remote = \" oN \"\nport = \"8124\"\nunknown = true\n[legacy.server]\nport = 1\n"
           },
           "environment": {
-            "XDG_CONFIG_HOME": "$ROOT/xdg"
+            "sandbox_xdg_path": "$ROOT/xdg"
           }
         }
       ]
@@ -58,14 +61,18 @@
         {
           "files": {},
           "environment": {
-            "SYMERASEME_ENCRYPT_DB": "maybe"
+            "values": {
+              "SYMERASEME_ENCRYPT_DB": "maybe"
+            }
           }
         },
         {
           "files": {},
           "environment": {
-            "SYMERASEME_ENCRYPT_DB": "false",
-            "SYMERASEME_PORT": "65536"
+            "values": {
+              "SYMERASEME_ENCRYPT_DB": "false",
+              "SYMERASEME_PORT": "65536"
+            }
           }
         },
         {
@@ -89,7 +96,9 @@
             "home/.config/symeraseme/config.toml": "data_dir = \"default-global\"\nencrypt_db = 1\nport = 9000\n"
           },
           "environment": {
-            "XDG_CONFIG_HOME": "relative-xdg"
+            "values": {
+              "XDG_CONFIG_HOME": "relative-xdg"
+            }
           }
         }
       ]

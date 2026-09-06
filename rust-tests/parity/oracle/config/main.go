@@ -1,39 +1,55 @@
 // Command config is the committed Go configuration provenance oracle.
 //
-// The parent process creates isolated HOME/XDG/CWD/TEMP inputs under /tmp and
-// invokes the existing internal/config package in a child process. This keeps
-// process-global state out of the Rust test while exercising the Go contract.
+// The parent process creates isolated HOME/XDG/CWD/TEMP inputs under the
+// platform's native temporary root and invokes the existing internal/config
+// package in a child process. This keeps process-global state out of the Rust
+// test while exercising the Go contract.
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/danieljustus/symaira-eraseme/internal/config"
 )
 
 const (
-	inputFile      = "inputs.json"
-	sourceRevision = "119ee9f84fe7c9e1485d25ab10aac8582e98395c"
-	oracleSchema   = "symaira-eraseme.config-parity.v1"
-	temporaryRoot  = "/tmp"
+	inputFile         = "inputs.json"
+	sourceRevision    = "119ee9f84fe7c9e1485d25ab10aac8582e98395c"
+	sourceSHA256      = "d197afc83776a85880428994e32b0c1585c245ed52d86f9a31fe51889cbce32c"
+	oracleSchema      = "symaira-eraseme.config-parity.v1"
+	maxChildOutput    = int64(4 * 1024 * 1024)
+	childCommandLimit = 10 * time.Second
 )
 
 type provenance struct {
 	SourceRevision string `json:"source_revision"`
 	SourcePath     string `json:"source_path"`
+	SourceSHA256   string `json:"source_sha256"`
 	Schema         string `json:"schema"`
 }
 
+type fixtureEnvironment struct {
+	// Values contains only non-reserved fixture overrides. The XDG sandbox is
+	// represented separately so arbitrary absolute roots cannot enter a child.
+	Values         map[string]string `json:"values,omitempty"`
+	SandboxXDGPath string            `json:"sandbox_xdg_path,omitempty"`
+}
+
 type runInput struct {
-	Files       map[string]string `json:"files"`
-	Environment map[string]string `json:"environment"`
+	Files       map[string]string  `json:"files"`
+	Environment fixtureEnvironment `json:"environment"`
 }
 
 type caseInput struct {
@@ -56,14 +72,25 @@ type oracleOutput struct {
 	Cases      map[string]json.RawMessage `json:"cases"`
 }
 
+type commandOutput struct {
+	Stdout []byte
+	Stderr []byte
+}
+
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "--child" {
 		runChild(os.Args[2])
 	}
 
+	source := oracleSourcePath()
+	configSource := filepath.Clean(filepath.Join(filepath.Dir(source), "../../../../internal/config/config.go"))
+	if err := verifySourceHash(configSource, sourceSHA256); err != nil {
+		fatal("oracle source provenance verification failed")
+	}
 	inputs := readInputs()
 	if inputs.Provenance.SourceRevision != sourceRevision ||
 		inputs.Provenance.SourcePath != "internal/config/config.go" ||
+		inputs.Provenance.SourceSHA256 != sourceSHA256 ||
 		inputs.Provenance.Schema != oracleSchema {
 		fatal("oracle input provenance does not match the committed contract")
 	}
@@ -92,11 +119,7 @@ func main() {
 }
 
 func readInputs() inputDocument {
-	_, source, _, ok := runtimeCaller()
-	if !ok {
-		fatal("oracle source path unavailable")
-	}
-	contents, err := os.ReadFile(filepath.Join(filepath.Dir(source), inputFile))
+	contents, err := os.ReadFile(filepath.Join(filepath.Dir(oracleSourcePath()), inputFile))
 	if err != nil {
 		fatal("oracle inputs unavailable")
 	}
@@ -107,14 +130,34 @@ func readInputs() inputDocument {
 	return inputs
 }
 
-// runtimeCaller is kept as a variable so the source path remains resolved from
-// the executable rather than from the caller's working directory.
+// runtimeCaller is kept as a variable so source paths can be tested without
+// modifying tracked source files.
 var runtimeCaller = func() (uintptr, string, int, bool) {
 	return runtime.Caller(0)
 }
 
+func oracleSourcePath() string {
+	_, source, _, ok := runtimeCaller()
+	if !ok {
+		fatal("oracle source path unavailable")
+	}
+	return source
+}
+
+func verifySourceHash(path, expected string) error {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(contents)
+	if hex.EncodeToString(digest[:]) != expected {
+		return fmt.Errorf("source hash mismatch")
+	}
+	return nil
+}
+
 func runCase(name string, input caseInput) map[string]any {
-	root, err := os.MkdirTemp(temporaryRoot, "symeraseme-config-oracle-")
+	root, err := os.MkdirTemp("", "symeraseme-config-oracle-")
 	if err != nil {
 		fatal("create oracle temporary root")
 	}
@@ -154,7 +197,7 @@ func runCase(name string, input caseInput) map[string]any {
 	}
 }
 
-func runChildProcess(root string, environment map[string]string) childResult {
+func runChildProcess(root string, environment fixtureEnvironment) childResult {
 	inputPath := filepath.Join(root, "child-input.json")
 	encoded, err := json.Marshal(runInput{Environment: environment})
 	if err != nil {
@@ -164,22 +207,153 @@ func runChildProcess(root string, environment map[string]string) childResult {
 		fatal("write child input")
 	}
 
-	command := exec.Command(os.Args[0], "--child", inputPath)
-	command.Dir = filepath.Join(root, "project")
-	command.Env = isolatedEnvironment(root, environment)
-	output, err := command.CombinedOutput()
+	env, err := isolatedEnvironment(root, environment)
 	if err != nil {
+		fatal("reject unsafe child environment")
+	}
+	output, runErr := runBoundedCommand(
+		context.Background(),
+		os.Args[0],
+		[]string{"--child", inputPath},
+		filepath.Join(root, "project"),
+		env,
+		filepath.Join(root, "child.stdout"),
+		filepath.Join(root, "child.stderr"),
+		childCommandLimit,
+	)
+	if runErr != nil {
 		var result childResult
-		if json.Unmarshal(output, &result) == nil && result.ErrorField != "" {
+		if json.Unmarshal(output.Stdout, &result) == nil && result.ErrorField != "" {
 			return result
 		}
 		fatal("Go configuration child failed")
 	}
 	var result childResult
-	if err := json.Unmarshal(output, &result); err != nil {
+	if err := json.Unmarshal(output.Stdout, &result); err != nil {
 		fatal("decode Go configuration child")
 	}
 	return result
+}
+
+func runBoundedCommand(
+	parent context.Context,
+	executable string,
+	args []string,
+	directory string,
+	environment []string,
+	stdoutPath string,
+	stderrPath string,
+	limit time.Duration,
+) (commandOutput, error) {
+	ctx, cancel := context.WithTimeout(parent, limit)
+	defer cancel()
+
+	stdout, err := os.OpenFile(stdoutPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return commandOutput{}, err
+	}
+	defer stdout.Close()
+	stderr, err := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return commandOutput{}, err
+	}
+	defer stderr.Close()
+
+	command := exec.CommandContext(ctx, executable, args...)
+	command.Dir = directory
+	command.Env = environment
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if err := configureProcessGroup(command); err != nil {
+		return commandOutput{}, err
+	}
+	// CommandContext kills the direct child when the context expires. Replacing
+	// that cancellation hook makes timeout cleanup cover the whole process tree.
+	command.Cancel = func() error { return killProcessTree(command) }
+
+	if err := command.Start(); err != nil {
+		return commandOutput{}, err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	var runErr error
+	for {
+		if commandOutputExceeded(stdoutPath, stderrPath, maxChildOutput) {
+			cleanupErr := killProcessTree(command)
+			<-done
+			if cleanupErr != nil {
+				return commandOutput{}, cleanupErr
+			}
+			return commandOutput{}, fmt.Errorf("oracle child output exceeded the bounded capture limit")
+		}
+		select {
+		case runErr = <-done:
+			goto finished
+		case <-ctx.Done():
+			cleanupErr := killProcessTree(command)
+			runErr = <-done
+			if cleanupErr != nil {
+				return commandOutput{}, cleanupErr
+			}
+			if runErr == nil {
+				runErr = ctx.Err()
+			}
+			goto finished
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+finished:
+	captured, captureErr := readCommandOutput(stdoutPath, stderrPath, maxChildOutput)
+	if captureErr != nil {
+		return commandOutput{}, captureErr
+	}
+	if ctx.Err() != nil {
+		return captured, ctx.Err()
+	}
+	if runErr != nil {
+		return captured, runErr
+	}
+	return captured, nil
+}
+
+func commandOutputExceeded(stdoutPath, stderrPath string, limit int64) bool {
+	for _, path := range []string{stdoutPath, stderrPath} {
+		info, err := os.Stat(path)
+		if err == nil && info.Size() > limit {
+			return true
+		}
+	}
+	return false
+}
+
+func readCommandOutput(stdoutPath, stderrPath string, limit int64) (commandOutput, error) {
+	stdout, err := readCappedFile(stdoutPath, limit)
+	if err != nil {
+		return commandOutput{}, err
+	}
+	stderr, err := readCappedFile(stderrPath, limit)
+	if err != nil {
+		return commandOutput{}, err
+	}
+	return commandOutput{Stdout: stdout, Stderr: stderr}, nil
+}
+
+func readCappedFile(path string, limit int64) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	contents, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(contents)) > limit {
+		return nil, fmt.Errorf("oracle child output exceeded the bounded capture limit")
+	}
+	return contents, nil
 }
 
 func runChild(path string) {
@@ -205,9 +379,6 @@ func writeChildResult(result childResult) {
 	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 		fatal("write child result")
 	}
-	if result.ErrorField != "" {
-		os.Exit(0)
-	}
 	os.Exit(0)
 }
 
@@ -232,7 +403,7 @@ func classifyField(err error) string {
 	return "unknown"
 }
 
-func isolatedEnvironment(root string, environment map[string]string) []string {
+func isolatedEnvironment(root string, fixture fixtureEnvironment) ([]string, error) {
 	values := map[string]string{
 		"HOME":        filepath.Join(root, "home"),
 		"USERPROFILE": filepath.Join(root, "home"),
@@ -240,8 +411,33 @@ func isolatedEnvironment(root string, environment map[string]string) []string {
 		"TEMP":        filepath.Join(root, "tmp"),
 		"TMP":         filepath.Join(root, "tmp"),
 	}
-	for key, value := range environment {
-		values[key] = strings.ReplaceAll(value, "$ROOT", root)
+	if fixture.SandboxXDGPath != "" {
+		if fixture.SandboxXDGPath != "$ROOT/xdg" {
+			return nil, fmt.Errorf("sandbox XDG path is not the generated sandbox")
+		}
+		xdg := filepath.Join(root, "xdg")
+		values["XDG_CONFIG_HOME"] = xdg
+		values["XDG_DATA_HOME"] = xdg
+		values["XDG_CACHE_HOME"] = xdg
+	}
+	for key, value := range fixture.Values {
+		switch key {
+		case "HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP", "XDG_DATA_HOME", "XDG_CACHE_HOME":
+			return nil, fmt.Errorf("fixture cannot override reserved environment")
+		case "XDG_CONFIG_HOME":
+			// A relative value exercises the production fallback. Absolute XDG
+			// roots must use SandboxXDGPath instead.
+			if fixture.SandboxXDGPath != "" {
+				return nil, fmt.Errorf("fixture cannot override reserved environment")
+			}
+			expanded := strings.ReplaceAll(value, "$ROOT", root)
+			if filepath.IsAbs(expanded) || isWindowsAbsolute(expanded) {
+				return nil, fmt.Errorf("fixture cannot override reserved environment")
+			}
+			values[key] = expanded
+		default:
+			values[key] = strings.ReplaceAll(value, "$ROOT", root)
+		}
 	}
 	keys := make([]string, 0, len(values))
 	for key := range values {
@@ -252,7 +448,13 @@ func isolatedEnvironment(root string, environment map[string]string) []string {
 	for _, key := range keys {
 		env = append(env, key+"="+values[key])
 	}
-	return env
+	return env, nil
+}
+
+func isWindowsAbsolute(path string) bool {
+	return (len(path) >= 2 && path[1] == ':' &&
+		((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z'))) ||
+		strings.HasPrefix(path, `\\`)
 }
 
 func resetRunTree(root string) error {
@@ -269,11 +471,10 @@ func resetRunTree(root string) error {
 
 func writeRunFiles(root string, files map[string]string) error {
 	for relative, contents := range files {
-		clean := filepath.Clean(relative)
-		if filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		if unsafeFixturePath(relative) {
 			return fmt.Errorf("unsafe oracle input path")
 		}
-		path := filepath.Join(root, clean)
+		path := filepath.Join(root, filepath.FromSlash(strings.ReplaceAll(relative, `\`, "/")))
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return err
 		}
@@ -282,6 +483,18 @@ func writeRunFiles(root string, files map[string]string) error {
 		}
 	}
 	return nil
+}
+
+func unsafeFixturePath(path string) bool {
+	if path == "" || filepath.IsAbs(path) || isWindowsAbsolute(path) {
+		return true
+	}
+	for _, component := range strings.Split(strings.ReplaceAll(path, `\`, "/"), "/") {
+		if component == "" || component == "." || component == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizePaths(root string, storage *config.Storage) *config.Storage {

@@ -494,17 +494,19 @@ mod tests {
 
     #[test]
     fn clean_absolute_is_lexical() {
+        let root = std::env::temp_dir().join("symeraseme-clean-root");
         assert_eq!(
-            clean_absolute(Path::new("/tmp/symeraseme/../data")),
-            PathBuf::from("/tmp/data")
+            clean_absolute(&root.join("symeraseme/../data")),
+            root.join("data")
         );
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn windows_cache_root_prefers_local_app_data_then_home_then_explicit_temp() {
-        let local_app_data = Path::new("/tmp/local-app-data");
-        let home = Path::new("/tmp/home");
-        let temp = Path::new("/tmp/explicit-temp");
+        let local_app_data = Path::new(r"C:\Users\Test\AppData\Local");
+        let home = Path::new(r"C:\Users\Test");
+        let temp = Path::new(r"C:\Users\Test\AppData\Local\Temp");
 
         assert_eq!(
             windows_cache_root(
@@ -517,6 +519,39 @@ mod tests {
         );
         assert_eq!(
             windows_cache_root(None, home, Some(temp.to_str().unwrap())).unwrap(),
+            home
+        );
+        assert_eq!(
+            windows_cache_root(
+                None,
+                Path::new("relative-home"),
+                Some(temp.to_str().unwrap())
+            )
+            .unwrap(),
+            temp
+        );
+        assert!(windows_cache_root(None, Path::new("relative-home"), None).is_err());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn windows_cache_root_precedence_uses_portable_absolute_test_paths() {
+        let root = std::env::temp_dir().join("symeraseme-windows-cache");
+        let local_app_data = root.join("local-app-data");
+        let home = root.join("home");
+        let temp = root.join("explicit-temp");
+
+        assert_eq!(
+            windows_cache_root(
+                Some(local_app_data.to_str().unwrap()),
+                &home,
+                Some(temp.to_str().unwrap())
+            )
+            .unwrap(),
+            local_app_data
+        );
+        assert_eq!(
+            windows_cache_root(None, &home, Some(temp.to_str().unwrap())).unwrap(),
             home
         );
         assert_eq!(
