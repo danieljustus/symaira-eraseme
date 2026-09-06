@@ -2,6 +2,9 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use symeraseme_core::config::{
     Config, ConfigContext, ConfigError, Storage, default_encrypted_temp_dir, defaults, load,
     resolve_storage,
@@ -54,6 +57,61 @@ impl Drop for TestTree {
 fn fixture(case: &str) -> Value {
     let document: Value = serde_json::from_str(GO_FIXTURE).expect("valid Go config fixture");
     document.get(case).cloned().expect("fixture case")
+}
+
+fn run_go_config_oracle() -> Value {
+    const TIMEOUT: Duration = Duration::from_secs(30);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let mut child = Command::new("go")
+        .args(["run", "./rust-tests/parity/oracle/config"])
+        .current_dir(&root)
+        .env("GOWORK", "off")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("Go must be available for the committed config oracle");
+    let deadline = Instant::now() + TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                assert!(status.success(), "Go config oracle exited unsuccessfully");
+                let output = child
+                    .wait_with_output()
+                    .expect("Go config oracle output must be readable");
+                return serde_json::from_slice(&output.stdout)
+                    .expect("Go config oracle must emit valid JSON");
+            }
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("Go config oracle exceeded its bounded timeout");
+            }
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("Go config oracle status could not be read");
+            }
+        }
+    }
+}
+
+#[test]
+fn go_config_oracle_provenance_fixture_and_rust_results_match() {
+    let fixture: Value = serde_json::from_str(GO_FIXTURE).expect("valid Go config fixture");
+    let oracle = run_go_config_oracle();
+    assert_eq!(
+        oracle["provenance"],
+        json!({
+            "source_revision": "119ee9f84fe7c9e1485d25ab10aac8582e98395c",
+            "source_path": "internal/config/config.go",
+            "schema": "symaira-eraseme.config-parity.v1"
+        })
+    );
+    assert_eq!(
+        oracle["cases"], fixture,
+        "normalized Go config oracle output differs from the committed fixture"
+    );
 }
 
 fn normalized_result(root: &Path, config: &Config, storage: &Storage) -> Value {

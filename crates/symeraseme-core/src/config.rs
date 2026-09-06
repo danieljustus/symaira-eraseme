@@ -423,15 +423,16 @@ fn user_cache_dir(context: &ConfigContext) -> Result<PathBuf, ConfigError> {
 
     #[cfg(target_os = "windows")]
     {
-        let Some(local_app_data) = context.environment.get("LOCALAPPDATA") else {
-            return Err(ConfigError::Context(
-                "LOCALAPPDATA is required for the cache directory",
-            ));
-        };
-        if local_app_data.is_empty() || !Path::new(local_app_data).is_absolute() {
-            return Err(ConfigError::Context("LOCALAPPDATA must be absolute"));
-        }
-        Ok(PathBuf::from(local_app_data))
+        let local_app_data = context.environment.get("LOCALAPPDATA");
+        let explicit_temp = context
+            .environment
+            .get("TEMP")
+            .or_else(|| context.environment.get("TMP"));
+        windows_cache_root(
+            local_app_data.map(String::as_str),
+            &context.home_dir,
+            explicit_temp.map(String::as_str),
+        )
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -443,6 +444,32 @@ fn user_cache_dir(context: &ConfigContext) -> Result<PathBuf, ConfigError> {
         }
         Ok(context.home_dir.join(".cache"))
     }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_cache_root(
+    local_app_data: Option<&str>,
+    home_dir: &Path,
+    explicit_temp: Option<&str>,
+) -> Result<PathBuf, ConfigError> {
+    if let Some(local_app_data) = local_app_data
+        && !local_app_data.is_empty()
+        && Path::new(local_app_data).is_absolute()
+    {
+        return Ok(PathBuf::from(local_app_data));
+    }
+    if home_dir.is_absolute() {
+        return Ok(home_dir.to_path_buf());
+    }
+    if let Some(explicit_temp) = explicit_temp
+        && !explicit_temp.is_empty()
+        && Path::new(explicit_temp).is_absolute()
+    {
+        return Ok(PathBuf::from(explicit_temp));
+    }
+    Err(ConfigError::Context(
+        "cache directory requires an absolute LOCALAPPDATA, home, or explicit temp directory",
+    ))
 }
 
 fn clean_absolute(path: &Path) -> PathBuf {
@@ -471,5 +498,36 @@ mod tests {
             clean_absolute(Path::new("/tmp/symeraseme/../data")),
             PathBuf::from("/tmp/data")
         );
+    }
+
+    #[test]
+    fn windows_cache_root_prefers_local_app_data_then_home_then_explicit_temp() {
+        let local_app_data = Path::new("/tmp/local-app-data");
+        let home = Path::new("/tmp/home");
+        let temp = Path::new("/tmp/explicit-temp");
+
+        assert_eq!(
+            windows_cache_root(
+                Some(local_app_data.to_str().unwrap()),
+                home,
+                Some(temp.to_str().unwrap())
+            )
+            .unwrap(),
+            local_app_data
+        );
+        assert_eq!(
+            windows_cache_root(None, home, Some(temp.to_str().unwrap())).unwrap(),
+            home
+        );
+        assert_eq!(
+            windows_cache_root(
+                None,
+                Path::new("relative-home"),
+                Some(temp.to_str().unwrap())
+            )
+            .unwrap(),
+            temp
+        );
+        assert!(windows_cache_root(None, Path::new("relative-home"), None).is_err());
     }
 }
