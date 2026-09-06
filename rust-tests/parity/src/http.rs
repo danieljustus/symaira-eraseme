@@ -2,7 +2,12 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HttpExchange {
@@ -12,23 +17,53 @@ pub struct HttpExchange {
 
 pub struct MockHttpServer {
     address: std::net::SocketAddr,
+    stop: Arc<AtomicBool>,
     join: Option<thread::JoinHandle<std::io::Result<HttpExchange>>>,
 }
 
 impl MockHttpServer {
     pub fn start(response: &[u8]) -> std::io::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        listener.set_nonblocking(true)?;
         let address = listener.local_addr()?;
         let response = response.to_vec();
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
         let join = thread::spawn(move || {
-            let (mut stream, _) = listener.accept()?;
-            let request = read_http_request(&mut stream)?;
-            stream.write_all(&response)?;
-            stream.flush()?;
-            Ok(HttpExchange { request, response })
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if thread_stop.load(Ordering::Acquire) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
+                        "HTTP mock stopped before receiving a request",
+                    ));
+                }
+                if Instant::now() >= deadline {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "HTTP mock timed out waiting for a request",
+                    ));
+                }
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        stream.set_nonblocking(false)?;
+                        stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+                        stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+                        let request = read_http_request(&mut stream)?;
+                        stream.write_all(&response)?;
+                        stream.flush()?;
+                        return Ok(HttpExchange { request, response });
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
         });
         Ok(Self {
             address,
+            stop,
             join: Some(join),
         })
     }
@@ -43,6 +78,15 @@ impl MockHttpServer {
             .expect("mock join handle exists")
             .join()
             .map_err(|_| std::io::Error::other("HTTP mock panicked"))?
+    }
+}
+
+impl Drop for MockHttpServer {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
     }
 }
 
@@ -103,5 +147,11 @@ mod tests {
         let exchange = server.finish().unwrap();
         assert!(exchange.request.ends_with(b"abc"));
         assert!(exchange.response.starts_with(b"HTTP/1.1 204"));
+    }
+
+    #[test]
+    fn drop_stops_a_mock_that_received_no_request() {
+        let server = MockHttpServer::start(b"HTTP/1.1 204 No Content\r\n\r\n").unwrap();
+        drop(server);
     }
 }

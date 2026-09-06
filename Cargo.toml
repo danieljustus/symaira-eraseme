@@ -16,6 +16,9 @@ description = "Privacy-first data broker removal automation"
 license = "Apache-2.0"
 repository = "https://github.com/danieljustus/symaira-eraseme"
 
+[workspace.dependencies]
+serde_json = "1.0"
+
 [profile.release]
 opt-level = 3
 lto = "thin"
