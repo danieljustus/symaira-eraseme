@@ -93,6 +93,7 @@ fn parse_allowed_url(candidate: &str) -> Option<ParsedUrl> {
     if !candidate.starts_with("https://")
         || !has_valid_percent_escapes(candidate)
         || candidate.chars().any(char::is_control)
+        || candidate.contains('\\')
     {
         return None;
     }
@@ -216,6 +217,7 @@ mod tests {
             "https://evil.example/confirm",
             "https://acxiom.com.evil.example/confirm",
             "https://acxiom.com@evil.example/confirm",
+            "https://evil.example\\@acxiom.com/confirm",
             "https://acxiom.com/%zz",
             "https:///confirm",
             "javascript://acxiom.com/confirm",
