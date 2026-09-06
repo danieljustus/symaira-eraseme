@@ -437,10 +437,11 @@ fn user_cache_dir(context: &ConfigContext) -> Result<PathBuf, ConfigError> {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        if let Some(xdg_cache_home) = context.environment.get("XDG_CACHE_HOME") {
-            if !xdg_cache_home.is_empty() && Path::new(xdg_cache_home).is_absolute() {
-                return Ok(PathBuf::from(xdg_cache_home));
-            }
+        if let Some(xdg_cache_home) = context.environment.get("XDG_CACHE_HOME")
+            && !xdg_cache_home.is_empty()
+            && Path::new(xdg_cache_home).is_absolute()
+        {
+            return Ok(PathBuf::from(xdg_cache_home));
         }
         Ok(context.home_dir.join(".cache"))
     }
