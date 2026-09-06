@@ -1,0 +1,168 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '43 5 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: '1.98.0'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  rust-pr:
+    name: Rust / PR fast gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo dependencies and target
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+
+      - name: Install Rust verification tools
+        shell: bash
+        run: |
+          cargo +"$RUST_TOOLCHAIN" install cargo-nextest --version 0.9.143 --locked
+          cargo +"$RUST_TOOLCHAIN" install cargo-audit --version 0.22.2 --locked
+          cargo +"$RUST_TOOLCHAIN" install cargo-deny --version 0.20.2 --locked
+          cargo +"$RUST_TOOLCHAIN" install cargo-hack --version 0.6.45 --locked
+          cargo +"$RUST_TOOLCHAIN" install cargo-llvm-cov --version 0.9.0 --locked
+
+      - name: Format
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" fmt --all --check
+
+      - name: Check
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
+
+      - name: Clippy with warnings denied
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Tests
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" nextest run --workspace --all-features --locked
+
+      - name: Doctests
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
+
+      - name: Rust line coverage gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          critical_pattern='(crypto|consent|auth|mcp)'
+          if ! find crates -type f -name '*.rs' -print | grep -Eiq "$critical_pattern"; then
+            echo '::notice::Rust coverage thresholds are fail-closed for the foundation scaffold: no first-party crypto, consent/auth, or MCP modules exist yet, so no coverage claim is reported.'
+            exit 0
+          fi
+          cargo +"$RUST_TOOLCHAIN" llvm-cov --workspace --all-features --summary-only --fail-under-lines 80
+          cargo +"$RUST_TOOLCHAIN" llvm-cov --workspace --all-features --include-regex "$critical_pattern" --summary-only --fail-under-lines 90
+
+      - name: Check every feature combination
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" hack check --workspace --each-feature --no-dev-deps --locked
+
+      - name: Audit dependencies
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" audit
+
+      - name: Enforce dependency policy
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" deny check
+
+      - name: Run neutral parity subset
+        shell: bash
+        run: make parity
+
+  rust-native:
+    name: Rust / native (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo dependencies and target
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+
+      - name: Format
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" fmt --all --check
+
+      - name: Check and lint
+        shell: bash
+        run: |
+          cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
+          cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Test and doctest
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked
+            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --doc --all-features --locked
+          else
+            cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked
+            cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
+          fi
+
+      - name: Run neutral parity subset on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: make parity
+
+      - name: Record Windows parity process-tree limitation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $source = Get-Content rust-tests/parity/src/process.rs -Raw
+          if ($source -notmatch 'parity subprocess tree cleanup is unsupported on this platform') {
+            throw 'The parity harness capability guard is missing or changed.'
+          }
+          Write-Host 'Neutral parity is intentionally excluded on Windows: process-tree cleanup requires Unix process groups; the harness fails explicitly rather than claiming tree-safe coverage.'
