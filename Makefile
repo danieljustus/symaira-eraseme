@@ -4,16 +4,83 @@ BINARY := symeraseme
 RAW_VERSION := $(shell git describe --exact-match --tags 2>/dev/null || true)
 VERSION ?= $(if $(filter v%,$(RAW_VERSION)),$(patsubst v%,%,$(RAW_VERSION)),dev)
 GO ?= go
+CARGO ?= cargo
+GORELEASER ?= goreleaser
+SWIFT ?= swift
 CGO_ENABLED ?= 0
 GOFLAGS ?=
 COVERAGE_FILE ?= coverage.out
 COVERAGE_THRESHOLD ?= 75
+GO_BUILD_DIR ?= build/go
+RUST_TARGET_DIR ?= build/rust
 LDFLAGS ?= -s -w -X main.versionValue=$(VERSION)
 
-.PHONY: build test test-race lint fmt-check vet coverage clean
+GO_BINARY := $(GO_BUILD_DIR)/$(BINARY)
+RUST_BINARY := $(RUST_TARGET_DIR)/debug/symeraseme-rust
+PARITY_BINARY := $(RUST_TARGET_DIR)/debug/parity
+
+.PHONY: build test test-race lint fmt-check vet coverage clean \
+	build-go go-gate build-rust rust-gate parity app-test release-dry-run
 
 build:
 	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GOFLAGS) -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/symeraseme
+
+build-go:
+	@rm -f "$(GO_BINARY)"
+	@mkdir -p "$(GO_BUILD_DIR)"
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GOFLAGS) -trimpath -ldflags "$(LDFLAGS)" -o "$(GO_BINARY)" ./cmd/symeraseme
+	@test -x "$(GO_BINARY)"
+
+go-gate: fmt-check test lint vet coverage build-go
+
+build-rust:
+	@if ! command -v "$(CARGO)" >/dev/null 2>&1; then \
+		printf '%s\n' 'build-rust requires cargo on PATH (or set CARGO=...).' >&2; \
+		exit 127; \
+	fi
+	@rm -f "$(RUST_BINARY)"
+	@mkdir -p "$(RUST_TARGET_DIR)"
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" build -p symeraseme-cli --bin symeraseme-rust
+	@test -x "$(RUST_BINARY)"
+
+rust-gate: build-rust
+	@if ! command -v "$(CARGO)" >/dev/null 2>&1; then \
+		printf '%s\n' 'rust-gate requires cargo on PATH (or set CARGO=...).' >&2; \
+		exit 127; \
+	fi
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" fmt --all --check
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" check --workspace --all-targets
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" clippy --workspace --all-targets -- -D warnings
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" test --workspace --all-targets
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" test --workspace --doc
+
+parity: build-go build-rust
+	@if ! command -v "$(CARGO)" >/dev/null 2>&1; then \
+		printf '%s\n' 'parity requires cargo on PATH (or set CARGO=...).' >&2; \
+		exit 127; \
+	fi
+	@rm -f "$(PARITY_BINARY)"
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" build -p parity --bin parity
+	@test -x "$(PARITY_BINARY)"
+	CARGO_TARGET_DIR="$(RUST_TARGET_DIR)" "$(CARGO)" test -p parity --all-targets
+
+app-test:
+	@if ! command -v "$(SWIFT)" >/dev/null 2>&1; then \
+		printf '%s\n' 'app-test requires swift on PATH (or set SWIFT=...).' >&2; \
+		exit 127; \
+	fi
+	@if ! xcodebuild -version >/dev/null 2>&1; then \
+		printf '%s\n' 'app-test requires a full Xcode installation selected by xcode-select.' >&2; \
+		exit 2; \
+	fi
+	cd app/SymairaEraseMe && "$(SWIFT)" test
+
+release-dry-run:
+	@if ! command -v "$(GORELEASER)" >/dev/null 2>&1; then \
+		printf '%s\n' 'release-dry-run requires goreleaser on PATH (or set GORELEASER=...).' >&2; \
+		exit 127; \
+	fi
+	"$(GORELEASER)" release --snapshot --clean
 
 test:
 	CGO_ENABLED=$(CGO_ENABLED) $(GO) test $(GOFLAGS) -count=1 ./...
@@ -49,4 +116,5 @@ fmt-check:
 	fi
 
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) $(COVERAGE_FILE)
+	rm -rf "$(GO_BUILD_DIR)" "$(RUST_TARGET_DIR)" dist
