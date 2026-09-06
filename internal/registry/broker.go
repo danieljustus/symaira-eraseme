@@ -39,6 +39,7 @@ var (
 	// selectorPrefix: contract §6 says keys must "look like CSS selectors".
 	// Real data uses attribute selectors like input[name=x], so accept any
 	// selector-ish token: must contain a tag/attr/id/class marker.
+	datePattern    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	selectorPrefix = regexp.MustCompile(`^[a-zA-Z\[#.*][a-zA-Z0-9\[\]=.'"_:#.\- *>,~+]*$`)
 )
 
@@ -212,7 +213,7 @@ func decodeAndValidate(d *doc) (Broker, error) {
 	if b.Status != "" && !statuses[b.Status] {
 		return Broker{}, verr("status %q is not in the closed enum", b.Status)
 	}
-	if b.AddedDate != "" && !datePattern.MatchString(b.AddedDate) {
+	if b.AddedDate != "" && !isISODate(b.AddedDate) {
 		return Broker{}, verr("added_date %q is not ISO 8601 date", b.AddedDate)
 	}
 
@@ -227,7 +228,23 @@ func decodeAndValidate(d *doc) (Broker, error) {
 	return b, nil
 }
 
-var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+func isISODate(value string) bool {
+	if !datePattern.MatchString(value) {
+		return false
+	}
+	year := (int(value[0]-'0') * 1000) + (int(value[1]-'0') * 100) + (int(value[2]-'0') * 10) + int(value[3]-'0')
+	month := (int(value[5]-'0') * 10) + int(value[6]-'0')
+	day := (int(value[8]-'0') * 10) + int(value[9]-'0')
+	if month < 1 || month > 12 {
+		return false
+	}
+	leap := year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	days := [...]int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if leap {
+		days[2] = 29
+	}
+	return day >= 1 && day <= days[month]
+}
 
 // validateChannel enforces contract §4: exactly one variant, closed enums,
 // unknown channel fields rejected.

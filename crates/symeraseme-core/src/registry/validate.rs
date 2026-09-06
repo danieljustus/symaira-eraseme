@@ -1,8 +1,15 @@
 use super::model::{Broker, Channel, FormSpec, FormStep, SolveCaptcha};
 use serde_yaml::Value;
+use std::collections::HashSet;
 use std::fmt;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+
+const MAX_DOCUMENT_BYTES: usize = 1 << 20;
+const MAX_YAML_NODES: usize = 16_384;
+const MAX_YAML_DEPTH: usize = 64;
+const MAX_DIRECTORY_DEPTH: usize = 8;
 
 const BROKER_KEYS: &[&str] = &[
     "id",
@@ -93,11 +100,14 @@ impl std::error::Error for RegistryError {
 
 /// Loads every non-documentation broker YAML under `registry/brokers`.
 pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
+    reject_symlink(root.as_ref())?;
     let brokers_root = root.as_ref().join("brokers");
+    reject_symlink(&brokers_root)?;
     let mut paths = Vec::new();
-    collect_yaml(&brokers_root, &mut paths)?;
+    collect_yaml(&brokers_root, &mut paths, 0)?;
     paths.sort();
 
+    let mut seen_ids = HashSet::new();
     let mut brokers = Vec::with_capacity(paths.len());
     for path in paths {
         let file_name = path
@@ -117,10 +127,13 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
                 field: path.display().to_string(),
                 message: "filename has no valid stem".to_owned(),
             })?;
-        let source = fs::read_to_string(&path).map_err(|source| RegistryError::Io {
-            path: path.clone(),
-            source,
-        })?;
+        if !seen_ids.insert(stem.to_owned()) {
+            return Err(validation(
+                "id",
+                format!("duplicate broker id {stem:?} across directories"),
+            ));
+        }
+        let source = read_bounded(&path)?;
         let broker = decode(stem, &source).map_err(|error| with_path(error, &path))?;
         brokers.push(broker);
     }
@@ -134,14 +147,233 @@ pub fn load(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
 }
 
 pub(crate) fn decode(file_stem: &str, source: &str) -> Result<Broker, RegistryError> {
+    preflight_source(source)?;
     let raw: Value = serde_yaml::from_str(source).map_err(RegistryError::Yaml)?;
+    check_value_budget(&raw)?;
+    reject_explicit_nulls(&raw)?;
     validate_object_keys(&raw, BROKER_KEYS, "top-level")?;
     validate_channel_keys(&raw)?;
     let broker: Broker = serde_yaml::from_value(raw).map_err(RegistryError::Yaml)?;
     validate_broker(file_stem, broker)
 }
 
-fn collect_yaml(path: &Path, output: &mut Vec<PathBuf>) -> Result<(), RegistryError> {
+fn preflight_source(source: &str) -> Result<(), RegistryError> {
+    if source.len() > MAX_DOCUMENT_BYTES {
+        return Err(validation(
+            "document",
+            format!("exceeds {MAX_DOCUMENT_BYTES} bytes"),
+        ));
+    }
+    let bytes = source.as_bytes();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut comment = false;
+    let mut flow_depth = 0usize;
+    let mut line_start = true;
+    let mut indent = 0usize;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        if line_start {
+            if byte == b' ' {
+                indent += 1;
+                if indent > MAX_YAML_DEPTH * 4 {
+                    return Err(validation("document", "excessive YAML nesting"));
+                }
+                continue;
+            }
+            if byte == b'\t' && indent == 0 {
+                return Err(validation("document", "tab indentation is not allowed"));
+            }
+            line_start = false;
+        }
+        if byte == b'\n' {
+            line_start = true;
+            indent = 0;
+            comment = false;
+            continue;
+        }
+        if comment {
+            continue;
+        }
+        if let Some(active_quote) = quote {
+            if active_quote == b'"' && escaped {
+                escaped = false;
+            } else if active_quote == b'"' && byte == b'\\' {
+                escaped = true;
+            } else if byte == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        match byte {
+            b'\'' | b'"' => quote = Some(byte),
+            b'#' => comment = true,
+            b'[' | b'{' => {
+                flow_depth += 1;
+                if flow_depth > MAX_YAML_DEPTH {
+                    return Err(validation("document", "excessive YAML nesting"));
+                }
+            }
+            b']' | b'}' => flow_depth = flow_depth.saturating_sub(1),
+            b'&' | b'*'
+                if bytes.get(index + 1).is_some_and(|next| {
+                    next.is_ascii_alphanumeric() || *next == b'_' || *next == b'-'
+                }) && (index == 0
+                    || bytes[index - 1].is_ascii_whitespace()
+                    || matches!(bytes[index - 1], b'[' | b'{' | b',')) =>
+            {
+                return Err(validation(
+                    "document",
+                    "YAML anchors and aliases are not allowed",
+                ));
+            }
+            _ => {}
+        }
+    }
+    if quote.is_some() {
+        return Err(validation("document", "unterminated YAML quote"));
+    }
+    Ok(())
+}
+
+fn check_value_budget(root: &Value) -> Result<(), RegistryError> {
+    let mut stack = vec![(root, 1usize)];
+    let mut nodes = 0usize;
+    while let Some((value, depth)) = stack.pop() {
+        nodes += 1;
+        if nodes > MAX_YAML_NODES {
+            return Err(validation("document", "YAML node budget exceeded"));
+        }
+        if depth > MAX_YAML_DEPTH {
+            return Err(validation("document", "YAML depth budget exceeded"));
+        }
+        match value {
+            Value::Mapping(mapping) => {
+                for (key, value) in mapping {
+                    stack.push((key, depth + 1));
+                    stack.push((value, depth + 1));
+                }
+            }
+            Value::Sequence(sequence) => {
+                for value in sequence {
+                    stack.push((value, depth + 1));
+                }
+            }
+            Value::Tagged(tagged) => stack.push((&tagged.value, depth + 1)),
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+        }
+    }
+    Ok(())
+}
+
+fn reject_explicit_nulls(root: &Value) -> Result<(), RegistryError> {
+    let mut stack = vec![root];
+    while let Some(value) = stack.pop() {
+        match value {
+            Value::Mapping(mapping) => {
+                for (key, value) in mapping {
+                    if key.as_str().is_some_and(is_optional_field) && matches!(value, Value::Null) {
+                        return Err(validation(
+                            key.as_str().unwrap_or("field"),
+                            "explicit YAML null is not allowed; omit the field instead",
+                        ));
+                    }
+                    stack.push(key);
+                    stack.push(value);
+                }
+            }
+            Value::Sequence(sequence) => stack.extend(sequence),
+            Value::Tagged(tagged) => stack.push(&tagged.value),
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+        }
+    }
+    Ok(())
+}
+
+fn is_optional_field(field: &str) -> bool {
+    matches!(
+        field,
+        "verification"
+            | "disabled"
+            | "added_date"
+            | "source"
+            | "status"
+            | "notes"
+            | "endpoint"
+            | "url"
+            | "form_spec"
+            | "template"
+            | "locale"
+            | "required_fields"
+            | "supports_suppression"
+            | "expected_response_days"
+            | "ack_keywords"
+            | "rejection_keywords"
+            | "human_required_keywords"
+            | "timeout_seconds"
+            | "rate_limit_delay"
+            | "headless"
+            | "goto"
+            | "fill"
+            | "select"
+            | "click"
+            | "wait_for"
+            | "wait_seconds"
+            | "screenshot"
+            | "assert_text"
+            | "solve_captcha"
+            | "provider"
+            | "action"
+            | "min_score"
+            | "is_invisible"
+            | "data_sensitivity"
+    )
+}
+
+fn reject_symlink(path: &Path) -> Result<(), RegistryError> {
+    let metadata = fs::symlink_metadata(path).map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(validation(
+            "registry layout",
+            format!("symlink is not allowed: {}", path.display()),
+        ));
+    }
+    Ok(())
+}
+
+fn read_bounded(path: &Path) -> Result<String, RegistryError> {
+    let file = fs::File::open(path).map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    let mut bytes = Vec::new();
+    file.take((MAX_DOCUMENT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|source| RegistryError::Io {
+            path: path.to_owned(),
+            source,
+        })?;
+    if bytes.len() > MAX_DOCUMENT_BYTES {
+        return Err(validation(
+            path.display().to_string(),
+            format!("document exceeds {MAX_DOCUMENT_BYTES} bytes"),
+        ));
+    }
+    String::from_utf8(bytes).map_err(|error| RegistryError::Io {
+        path: path.to_owned(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+    })
+}
+
+fn collect_yaml(path: &Path, output: &mut Vec<PathBuf>, depth: usize) -> Result<(), RegistryError> {
+    if depth > MAX_DIRECTORY_DEPTH {
+        return Err(validation(
+            "registry layout",
+            format!("directory nesting exceeds {MAX_DIRECTORY_DEPTH} levels"),
+        ));
+    }
     let entries = fs::read_dir(path).map_err(|source| RegistryError::Io {
         path: path.to_owned(),
         source,
@@ -151,9 +383,19 @@ fn collect_yaml(path: &Path, output: &mut Vec<PathBuf>) -> Result<(), RegistryEr
             path: path.to_owned(),
             source,
         })?;
+        let file_type = entry.file_type().map_err(|source| RegistryError::Io {
+            path: entry.path(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            return Err(validation(
+                "registry layout",
+                format!("symlink is not allowed: {}", entry.path().display()),
+            ));
+        }
         let child = entry.path();
-        if child.is_dir() {
-            collect_yaml(&child, output)?;
+        if file_type.is_dir() {
+            collect_yaml(&child, output, depth + 1)?;
             continue;
         }
         let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
@@ -266,12 +508,12 @@ fn validate_form_spec(form_spec: &FormSpec) -> Result<(), RegistryError> {
         return Err(validation("form_spec", "requires at least 1 step"));
     }
     if let Some(timeout) = form_spec.timeout_seconds
-        && timeout < 1.0
+        && (!timeout.is_finite() || timeout < 1.0)
     {
         return Err(validation("timeout_seconds", "must be >= 1"));
     }
     if let Some(delay) = form_spec.rate_limit_delay
-        && delay < 0.0
+        && (!delay.is_finite() || delay < 0.0)
     {
         return Err(validation("rate_limit_delay", "must be >= 0"));
     }
@@ -304,7 +546,7 @@ fn validate_form_step(step: &FormStep) -> Result<(), RegistryError> {
         return Err(validation("step", "must contain at least 1 action"));
     }
     if let Some(wait) = step.wait_seconds
-        && wait < 0.0
+        && (!wait.is_finite() || wait < 0.0)
     {
         return Err(validation("wait_seconds", "must be >= 0"));
     }
@@ -335,7 +577,7 @@ fn validate_captcha(captcha: &SolveCaptcha) -> Result<(), RegistryError> {
         ));
     }
     if let Some(score) = captcha.min_score
-        && !(0.0..=1.0).contains(&score)
+        && (!score.is_finite() || !(0.0..=1.0).contains(&score))
     {
         return Err(validation("solve_captcha.min_score", "out of range 0..1"));
     }
@@ -417,6 +659,8 @@ fn validate_object_keys(
 }
 
 fn valid_uri(field: &str, value: &str) -> Result<(), RegistryError> {
+    // `format: uri` remains a compatibility annotation: match the Go oracle's
+    // non-empty runtime rule until the coordinated #843 corpus cleanup.
     if value.is_empty() {
         return Err(validation(field, "is required"));
     }
@@ -436,13 +680,34 @@ fn valid_email(value: &str) -> bool {
 }
 
 fn is_iso_date(value: &str) -> bool {
-    value.len() == 10
-        && value.as_bytes()[4] == b'-'
-        && value.as_bytes()[7] == b'-'
-        && value
+    if value.len() != 10
+        || value.as_bytes()[4] != b'-'
+        || value.as_bytes()[7] != b'-'
+        || !value
             .bytes()
             .enumerate()
             .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    let year = u32::from(bytes[0] - b'0') * 1000
+        + u32::from(bytes[1] - b'0') * 100
+        + u32::from(bytes[2] - b'0') * 10
+        + u32::from(bytes[3] - b'0');
+    let month = u32::from(bytes[5] - b'0') * 10 + u32::from(bytes[6] - b'0');
+    let day = u32::from(bytes[8] - b'0') * 10 + u32::from(bytes[9] - b'0');
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    (1..=days).contains(&day)
 }
 
 fn is_locale(value: &str) -> bool {

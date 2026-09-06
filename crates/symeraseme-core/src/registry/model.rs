@@ -9,6 +9,19 @@ fn default_status() -> Status {
     Status::Active
 }
 
+fn reject_null_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    match Option::<T>::deserialize(deserializer)? {
+        Some(value) => Ok(Some(value)),
+        None => Err(serde::de::Error::custom(
+            "explicit YAML null is not allowed",
+        )),
+    }
+}
+
 /// A registry broker document from schema version 1.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -23,17 +36,37 @@ pub struct Broker {
     pub data_sensitivity: u8,
     pub priority: Priority,
     pub opt_out: Vec<Channel>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub verification: Option<Verification>,
-    #[serde(default)]
-    pub disabled: bool,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub disabled: Option<bool>,
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub added_date: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub source: Option<String>,
     #[serde(default = "default_status")]
     pub status: Status,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub notes: Option<String>,
 }
 
@@ -141,42 +174,117 @@ pub enum ChannelType {
 /// An opt-out channel. The internally tagged representation makes the
 /// `type` discriminator part of the wire contract while keeping email and
 /// web-form requirements distinct in the Rust model.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum Channel {
     #[serde(rename = "email")]
     Email {
         endpoint: String,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         template: Option<Template>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         locale: Option<String>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         required_fields: Option<Vec<RequiredField>>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         supports_suppression: Option<bool>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         expected_response_days: Option<u32>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         disabled: Option<bool>,
     },
     #[serde(rename = "web_form")]
     WebForm {
         url: String,
         form_spec: FormSpec,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         template: Option<Template>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         locale: Option<String>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         required_fields: Option<Vec<RequiredField>>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         supports_suppression: Option<bool>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         expected_response_days: Option<u32>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         disabled: Option<bool>,
     },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct ChannelWire {
+    #[serde(rename = "type")]
+    channel_type: ChannelType,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    endpoint: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    url: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    form_spec: Option<FormSpec>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    template: Option<Template>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    locale: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    required_fields: Option<Vec<RequiredField>>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    supports_suppression: Option<bool>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    expected_response_days: Option<u32>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    disabled: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for Channel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ChannelWire::deserialize(deserializer)?;
+        match wire.channel_type {
+            ChannelType::Email => {
+                if wire.endpoint.is_none() {
+                    return Err(serde::de::Error::missing_field("endpoint"));
+                }
+                if wire.url.is_some() || wire.form_spec.is_some() {
+                    return Err(serde::de::Error::custom(
+                        "email channel must not carry web_form fields",
+                    ));
+                }
+                Ok(Self::Email {
+                    endpoint: wire.endpoint.expect("checked above"),
+                    template: wire.template,
+                    locale: wire.locale,
+                    required_fields: wire.required_fields,
+                    supports_suppression: wire.supports_suppression,
+                    expected_response_days: wire.expected_response_days,
+                    disabled: wire.disabled,
+                })
+            }
+            ChannelType::WebForm => {
+                if wire.url.is_none() || wire.form_spec.is_none() {
+                    return Err(serde::de::Error::missing_field("url/form_spec"));
+                }
+                if wire.endpoint.is_some() {
+                    return Err(serde::de::Error::custom(
+                        "web_form channel must not carry email fields",
+                    ));
+                }
+                Ok(Self::WebForm {
+                    url: wire.url.expect("checked above"),
+                    form_spec: wire.form_spec.expect("checked above"),
+                    template: wire.template,
+                    locale: wire.locale,
+                    required_fields: wire.required_fields,
+                    supports_suppression: wire.supports_suppression,
+                    expected_response_days: wire.expected_response_days,
+                    disabled: wire.disabled,
+                })
+            }
+        }
+    }
 }
 
 impl Channel {
@@ -214,11 +322,23 @@ pub enum RequiredField {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct Verification {
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub ack_keywords: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub rejection_keywords: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub human_required_keywords: Option<Vec<String>>,
 }
 
@@ -227,11 +347,23 @@ pub struct Verification {
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct FormSpec {
     pub steps: Vec<FormStep>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout_seconds: Option<f64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub rate_limit_delay: Option<f64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub headless: Option<bool>,
 }
 
@@ -239,23 +371,60 @@ pub struct FormSpec {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct FormStep {
-    #[serde(rename = "goto", default)]
+    #[serde(
+        rename = "goto",
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub goto: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub fill: Option<std::collections::BTreeMap<String, String>>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub select: Option<std::collections::BTreeMap<String, String>>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub click: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub wait_for: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub wait_seconds: Option<f64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub screenshot: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub assert_text: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub solve_captcha: Option<SolveCaptcha>,
 }
 
@@ -288,12 +457,28 @@ pub struct SolveCaptcha {
     #[serde(rename = "type")]
     pub captcha_type: CaptchaType,
     pub site_key: String,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub provider: Option<CaptchaProvider>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub action: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub min_score: Option<f64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "reject_null_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub is_invisible: Option<bool>,
 }

@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use symeraseme_core::registry::{Broker, Channel, RegistryError, load_from_dir};
 
@@ -117,4 +118,222 @@ fn errors_are_classified_as_registry_errors() {
         error,
         RegistryError::Validation { .. } | RegistryError::Yaml(_)
     ));
+}
+
+fn base_broker() -> &'static str {
+    "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: email\n    endpoint: a@example.test\n"
+}
+
+#[test]
+fn direct_deserialization_is_strict_for_broker_and_channel_variants() {
+    let broker_unknown = format!("{}bogus: true\n", base_broker());
+    assert!(serde_yaml::from_str::<Broker>(&broker_unknown).is_err());
+
+    let channel_unknown = "type: email\nendpoint: a@example.test\nbogus: true\n";
+    assert!(serde_yaml::from_str::<Channel>(channel_unknown).is_err());
+
+    let channel_variant = "type: email\nendpoint: a@example.test\nurl: https://example.test\n";
+    assert!(serde_yaml::from_str::<Channel>(channel_variant).is_err());
+
+    let channel_null = "type: email\nendpoint: a@example.test\ntemplate: null\n";
+    assert!(serde_yaml::from_str::<Channel>(channel_null).is_err());
+    let broker_null = format!("{}disabled: null\n", base_broker());
+    assert!(serde_yaml::from_str::<Broker>(&broker_null).is_err());
+}
+
+#[test]
+fn explicit_nulls_are_rejected_but_omitted_fields_serialize_without_nulls() {
+    for field in [
+        "data_sensitivity",
+        "verification",
+        "disabled",
+        "added_date",
+        "source",
+        "status",
+        "notes",
+    ] {
+        let source = format!("{}{field}: null\n", base_broker());
+        assert!(Broker::from_yaml("test", &source).is_err(), "{field}");
+    }
+    for field in [
+        "endpoint",
+        "template",
+        "locale",
+        "required_fields",
+        "supports_suppression",
+        "expected_response_days",
+        "disabled",
+    ] {
+        let source = format!("{}  {field}: null\n", base_broker());
+        assert!(
+            Broker::from_yaml("test", &source).is_err(),
+            "channel {field}"
+        );
+    }
+
+    let web = "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - goto: https://example.test\n";
+    for field in ["timeout_seconds", "rate_limit_delay", "headless"] {
+        let source = format!("{}      {field}: null\n", web);
+        assert!(Broker::from_yaml("test", &source).is_err(), "form {field}");
+    }
+    let step_null = format!("{}          wait_seconds: null\n", web);
+    assert!(Broker::from_yaml("test", &step_null).is_err());
+
+    let broker = Broker::from_yaml("test", base_broker()).unwrap();
+    let json = serde_json::to_value(&broker).unwrap();
+    let object = json.as_object().unwrap();
+    for field in ["verification", "disabled", "added_date", "source", "notes"] {
+        assert!(!object.contains_key(field), "serialized {field} as null");
+    }
+    assert_eq!(object["status"], "active");
+    let explicit_false =
+        Broker::from_yaml("test", &format!("{}disabled: false\n", base_broker())).unwrap();
+    assert_eq!(
+        serde_json::to_value(explicit_false).unwrap()["disabled"],
+        false
+    );
+}
+
+#[test]
+fn nonfinite_numeric_values_are_rejected() {
+    let web = "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - goto: https://example.test\n";
+    for field in ["timeout_seconds", "rate_limit_delay"] {
+        for value in [".nan", ".inf", "-.inf"] {
+            let source = format!("{}      {field}: {value}\n", web);
+            assert!(
+                Broker::from_yaml("test", &source).is_err(),
+                "{field} {value}"
+            );
+        }
+    }
+    for value in [".nan", ".inf", "-.inf"] {
+        let source = format!("{}          wait_seconds: {value}\n", web);
+        assert!(Broker::from_yaml("test", &source).is_err(), "wait {value}");
+    }
+    for value in [".nan", ".inf", "-.inf"] {
+        let source = format!(
+            "{}          solve_captcha:\n            type: turnstile\n            site_key: 12345678\n            min_score: {value}\n",
+            web
+        );
+        assert!(Broker::from_yaml("test", &source).is_err(), "score {value}");
+    }
+}
+
+#[test]
+fn added_date_is_calendar_valid_and_uri_format_remains_compatibility_only() {
+    for (date, valid) in [
+        ("2024-02-29", true),
+        ("2000-02-29", true),
+        ("2023-02-29", false),
+        ("1900-02-29", false),
+        ("2024-00-10", false),
+        ("2024-13-01", false),
+        ("2024-04-31", false),
+    ] {
+        let source = format!("{}added_date: {date}\n", base_broker());
+        assert_eq!(Broker::from_yaml("test", &source).is_ok(), valid, "{date}");
+    }
+    let source = base_broker().replace("https://example.test", "privacy@host");
+    assert!(Broker::from_yaml("test", &source).is_ok());
+}
+
+#[test]
+fn loader_rejects_symlinks_duplicates_deep_paths_and_oversize_documents() {
+    use std::os::unix::fs::symlink;
+
+    let root = tempfile_root();
+    let brokers = root.join("brokers");
+    fs::create_dir_all(brokers.join("us")).unwrap();
+    fs::write(brokers.join("us/test.yaml"), base_broker()).unwrap();
+    let target = root.join("outside.yaml");
+    fs::write(&target, base_broker()).unwrap();
+    symlink(&target, brokers.join("us/link.yaml")).unwrap();
+    assert!(load_from_dir(&root).is_err());
+
+    let duplicate = tempfile_root();
+    fs::create_dir_all(duplicate.join("brokers/us")).unwrap();
+    fs::create_dir_all(duplicate.join("brokers/eu")).unwrap();
+    fs::write(duplicate.join("brokers/us/test.yaml"), base_broker()).unwrap();
+    fs::write(duplicate.join("brokers/eu/test.yaml"), base_broker()).unwrap();
+    assert!(load_from_dir(&duplicate).is_err());
+
+    let deep = tempfile_root();
+    let mut path = deep.join("brokers");
+    for index in 0..10 {
+        path = path.join(format!("d{index}"));
+    }
+    fs::create_dir_all(&path).unwrap();
+    fs::write(path.join("test.yaml"), base_broker()).unwrap();
+    assert!(load_from_dir(&deep).is_err());
+
+    let large = tempfile_root();
+    fs::create_dir_all(large.join("brokers/us")).unwrap();
+    fs::write(
+        large.join("brokers/us/test.yaml"),
+        format!("{}{}", base_broker(), "x".repeat(1 << 20)),
+    )
+    .unwrap();
+    assert!(load_from_dir(&large).is_err());
+}
+
+#[test]
+fn loader_rejects_aliases_and_malformed_yaml_deterministically() {
+    let root = tempfile_root();
+    fs::create_dir_all(root.join("brokers/us")).unwrap();
+    let anchored = base_broker().replace(
+        "endpoint: a@example.test",
+        "endpoint: &email a@example.test",
+    );
+    fs::write(root.join("brokers/us/test.yaml"), anchored).unwrap();
+    assert!(load_from_dir(&root).is_err());
+
+    let malformed = tempfile_root();
+    fs::create_dir_all(malformed.join("brokers/us")).unwrap();
+    fs::write(
+        malformed.join("brokers/us/test.yaml"),
+        "id: test\n: malformed\n",
+    )
+    .unwrap();
+    assert!(load_from_dir(&malformed).is_err());
+
+    for marker in ["&email a@example.test", "*email"] {
+        let guarded = tempfile_root();
+        fs::create_dir_all(guarded.join("brokers/us")).unwrap();
+        let source =
+            base_broker().replace("endpoint: a@example.test", &format!("endpoint: {marker}"));
+        fs::write(guarded.join("brokers/us/test.yaml"), source).unwrap();
+        assert!(load_from_dir(&guarded).is_err(), "{marker}");
+    }
+
+    let nested = tempfile_root();
+    fs::create_dir_all(nested.join("brokers/us")).unwrap();
+    let deeply_nested = format!("{}null{}", "[".repeat(70), "]".repeat(70));
+    fs::write(
+        nested.join("brokers/us/test.yaml"),
+        format!("id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out: {deeply_nested}\n"),
+    )
+    .unwrap();
+    assert!(load_from_dir(&nested).is_err());
+
+    let too_many_nodes = tempfile_root();
+    fs::create_dir_all(too_many_nodes.join("brokers/us")).unwrap();
+    let values = (0..20_000).map(|_| "null").collect::<Vec<_>>().join(",");
+    let prefix = base_broker().split("opt_out:").next().unwrap();
+    fs::write(
+        too_many_nodes.join("brokers/us/test.yaml"),
+        format!("{prefix}opt_out: [{values}]\n"),
+    )
+    .unwrap();
+    assert!(load_from_dir(&too_many_nodes).is_err());
+}
+
+fn tempfile_root() -> PathBuf {
+    static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
+    let root = std::env::temp_dir().join(format!(
+        "symeraseme-registry-contract-{}-{}",
+        std::process::id(),
+        NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed)
+    ));
+    fs::create_dir_all(&root).unwrap();
+    root
 }
