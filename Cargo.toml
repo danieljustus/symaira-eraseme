@@ -24,6 +24,7 @@ serde_json = "1.0"
 serde_yaml = "0.9.34"
 tempfile = "3.27.0"
 toml = "0.5.11"
+yaml-rust2 = "0.10.2"
 
 [profile.release]
 opt-level = 3

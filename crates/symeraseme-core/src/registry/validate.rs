@@ -1,15 +1,26 @@
-use super::model::{Broker, Channel, FormSpec, FormStep, SolveCaptcha};
+use super::model::{Broker, BrokerWire, Channel, FormSpec, FormStep, SolveCaptcha};
 use serde_yaml::Value;
 use std::collections::HashSet;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use yaml_rust2::parser::{Event, EventReceiver, Parser};
 
 const MAX_DOCUMENT_BYTES: usize = 1 << 20;
 const MAX_YAML_NODES: usize = 16_384;
 const MAX_YAML_DEPTH: usize = 64;
 const MAX_DIRECTORY_DEPTH: usize = 8;
+/// Maximum number of filesystem entries traversed by one registry load.
+const MAX_DIRECTORY_ENTRIES: usize = 16_384;
+/// Maximum number of broker YAML files accepted by one registry load.
+const MAX_BROKER_FILES: usize = 4_096;
+/// Maximum number of brokers returned by one registry load.
+const MAX_OUTPUT_BROKERS: usize = 4_096;
+/// Maximum aggregate UTF-8 input read by one registry load.
+const MAX_INPUT_BYTES: usize = 16 << 20;
+/// Maximum aggregate decoded YAML nodes across one registry load.
+const MAX_AGGREGATE_YAML_NODES: usize = 1 << 20;
 
 const BROKER_KEYS: &[&str] = &[
     "id",
@@ -98,18 +109,34 @@ impl std::error::Error for RegistryError {
     }
 }
 
+#[derive(Default)]
+struct LoadBudget {
+    directory_entries: usize,
+    broker_files: usize,
+    input_bytes: usize,
+    yaml_nodes: usize,
+}
+
 /// Loads every non-documentation broker YAML under `registry/brokers`.
 pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
-    reject_symlink(root.as_ref())?;
-    let brokers_root = root.as_ref().join("brokers");
+    let root = root.as_ref();
+    reject_symlink(root)?;
+    let brokers_root = root.join("brokers");
     reject_symlink(&brokers_root)?;
     let mut paths = Vec::new();
-    collect_yaml(&brokers_root, &mut paths, 0)?;
+    let mut budget = LoadBudget::default();
+    collect_yaml(&brokers_root, &mut paths, &mut budget, 0)?;
     paths.sort();
 
     let mut seen_ids = HashSet::new();
-    let mut brokers = Vec::with_capacity(paths.len());
+    let mut brokers = Vec::with_capacity(paths.len().min(MAX_OUTPUT_BROKERS));
     for path in paths {
+        if brokers.len() >= MAX_OUTPUT_BROKERS {
+            return Err(validation(
+                "registry",
+                format!("output broker limit {MAX_OUTPUT_BROKERS} exceeded"),
+            ));
+        }
         let file_name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -133,8 +160,24 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
                 format!("duplicate broker id {stem:?} across directories"),
             ));
         }
-        let source = read_bounded(&path)?;
-        let broker = decode(stem, &source).map_err(|error| with_path(error, &path))?;
+        let remaining_bytes = MAX_INPUT_BYTES.saturating_sub(budget.input_bytes);
+        let (source, bytes_read) = read_bounded(&path, remaining_bytes)?;
+        budget.input_bytes = budget
+            .input_bytes
+            .checked_add(bytes_read)
+            .ok_or_else(|| validation("registry", "aggregate input byte counter overflowed"))?;
+        let (broker, nodes) =
+            decode_with_metrics(stem, &source).map_err(|error| with_path(error, &path))?;
+        budget.yaml_nodes = budget
+            .yaml_nodes
+            .checked_add(nodes)
+            .ok_or_else(|| validation("registry", "aggregate YAML node counter overflowed"))?;
+        if budget.yaml_nodes > MAX_AGGREGATE_YAML_NODES {
+            return Err(validation(
+                "registry",
+                format!("aggregate YAML node limit {MAX_AGGREGATE_YAML_NODES} exceeded"),
+            ));
+        }
         brokers.push(broker);
     }
     brokers.sort_by(|left, right| left.id.cmp(&right.id));
@@ -147,14 +190,21 @@ pub fn load(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
 }
 
 pub(crate) fn decode(file_stem: &str, source: &str) -> Result<Broker, RegistryError> {
+    decode_with_metrics(file_stem, source).map(|(broker, _)| broker)
+}
+
+fn decode_with_metrics(file_stem: &str, source: &str) -> Result<(Broker, usize), RegistryError> {
     preflight_source(source)?;
     let raw: Value = serde_yaml::from_str(source).map_err(RegistryError::Yaml)?;
-    check_value_budget(&raw)?;
+    let nodes = check_value_budget(&raw)?;
     reject_explicit_nulls(&raw)?;
     validate_object_keys(&raw, BROKER_KEYS, "top-level")?;
     validate_channel_keys(&raw)?;
-    let broker: Broker = serde_yaml::from_value(raw).map_err(RegistryError::Yaml)?;
-    validate_broker(file_stem, broker)
+    let wire: BrokerWire = serde_yaml::from_value(raw).map_err(RegistryError::Yaml)?;
+    let broker = wire
+        .into_model()
+        .map_err(|message| validation("channel", message))?;
+    Ok((validate_broker(file_stem, broker)?, nodes))
 }
 
 fn preflight_source(source: &str) -> Result<(), RegistryError> {
@@ -164,78 +214,62 @@ fn preflight_source(source: &str) -> Result<(), RegistryError> {
             format!("exceeds {MAX_DOCUMENT_BYTES} bytes"),
         ));
     }
-    let bytes = source.as_bytes();
-    let mut quote = None;
-    let mut escaped = false;
-    let mut comment = false;
-    let mut flow_depth = 0usize;
-    let mut line_start = true;
-    let mut indent = 0usize;
-    for (index, byte) in bytes.iter().copied().enumerate() {
-        if line_start {
-            if byte == b' ' {
-                indent += 1;
-                if indent > MAX_YAML_DEPTH * 4 {
-                    return Err(validation("document", "excessive YAML nesting"));
-                }
-                continue;
-            }
-            if byte == b'\t' && indent == 0 {
-                return Err(validation("document", "tab indentation is not allowed"));
-            }
-            line_start = false;
-        }
-        if byte == b'\n' {
-            line_start = true;
-            indent = 0;
-            comment = false;
-            continue;
-        }
-        if comment {
-            continue;
-        }
-        if let Some(active_quote) = quote {
-            if active_quote == b'"' && escaped {
-                escaped = false;
-            } else if active_quote == b'"' && byte == b'\\' {
-                escaped = true;
-            } else if byte == active_quote {
-                quote = None;
-            }
-            continue;
-        }
-        match byte {
-            b'\'' | b'"' => quote = Some(byte),
-            b'#' => comment = true,
-            b'[' | b'{' => {
-                flow_depth += 1;
-                if flow_depth > MAX_YAML_DEPTH {
-                    return Err(validation("document", "excessive YAML nesting"));
-                }
-            }
-            b']' | b'}' => flow_depth = flow_depth.saturating_sub(1),
-            b'&' | b'*'
-                if bytes.get(index + 1).is_some_and(|next| {
-                    next.is_ascii_alphanumeric() || *next == b'_' || *next == b'-'
-                }) && (index == 0
-                    || bytes[index - 1].is_ascii_whitespace()
-                    || matches!(bytes[index - 1], b'[' | b'{' | b',')) =>
-            {
-                return Err(validation(
-                    "document",
-                    "YAML anchors and aliases are not allowed",
-                ));
-            }
-            _ => {}
-        }
+    let mut checker = YamlPreflight::default();
+    Parser::new_from_str(source)
+        .load(&mut checker, false)
+        .map_err(|error| validation("document", error.to_string()))?;
+    if checker.saw_anchor || checker.saw_alias {
+        return Err(validation(
+            "document",
+            "YAML anchors and aliases are not allowed",
+        ));
     }
-    if quote.is_some() {
-        return Err(validation("document", "unterminated YAML quote"));
+    if checker.depth != 0 {
+        return Err(validation("document", "YAML nesting is unbalanced"));
+    }
+    if checker.nodes > MAX_YAML_NODES {
+        return Err(validation("document", "YAML node budget exceeded"));
     }
     Ok(())
 }
 
-fn check_value_budget(root: &Value) -> Result<(), RegistryError> {
+#[derive(Default)]
+struct YamlPreflight {
+    nodes: usize,
+    depth: usize,
+    saw_anchor: bool,
+    saw_alias: bool,
+}
+
+impl EventReceiver for YamlPreflight {
+    fn on_event(&mut self, event: Event) {
+        match event {
+            Event::Scalar(_, _, anchor, _) => {
+                self.nodes = self.nodes.saturating_add(1);
+                self.saw_anchor |= anchor != 0;
+            }
+            Event::SequenceStart(anchor, _) | Event::MappingStart(anchor, _) => {
+                self.nodes = self.nodes.saturating_add(1);
+                self.depth = self.depth.saturating_add(1);
+                self.saw_anchor |= anchor != 0;
+            }
+            Event::SequenceEnd | Event::MappingEnd => {
+                self.depth = self.depth.saturating_sub(1);
+            }
+            Event::Alias(_) => {
+                self.nodes = self.nodes.saturating_add(1);
+                self.saw_alias = true;
+            }
+            Event::Nothing
+            | Event::StreamStart
+            | Event::StreamEnd
+            | Event::DocumentStart
+            | Event::DocumentEnd => {}
+        }
+    }
+}
+
+fn check_value_budget(root: &Value) -> Result<usize, RegistryError> {
     let mut stack = vec![(root, 1usize)];
     let mut nodes = 0usize;
     while let Some((value, depth)) = stack.pop() {
@@ -262,7 +296,7 @@ fn check_value_budget(root: &Value) -> Result<(), RegistryError> {
             Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
         }
     }
-    Ok(())
+    Ok(nodes)
 }
 
 fn reject_explicit_nulls(root: &Value) -> Result<(), RegistryError> {
@@ -343,31 +377,117 @@ fn reject_symlink(path: &Path) -> Result<(), RegistryError> {
     Ok(())
 }
 
-fn read_bounded(path: &Path) -> Result<String, RegistryError> {
-    let file = fs::File::open(path).map_err(|source| RegistryError::Io {
+fn open_regular(path: &Path) -> Result<File, RegistryError> {
+    #[cfg(unix)]
+    let file = {
+        use std::os::unix::fs::OpenOptionsExt;
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(NO_FOLLOW)
+            .open(path)
+    };
+    #[cfg(windows)]
+    let file = {
+        use std::os::windows::fs::OpenOptionsExt;
+        // FILE_FLAG_OPEN_REPARSE_POINT prevents following a final reparse point.
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(0x0020_0000)
+            .open(path)
+    };
+    #[cfg(not(any(unix, windows)))]
+    let file = OpenOptions::new().read(true).open(path);
+    let file = file.map_err(|source| RegistryError::Io {
         path: path.to_owned(),
         source,
     })?;
+    let opened_metadata = file.metadata().map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    let path_metadata = fs::symlink_metadata(path).map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    if !opened_metadata.file_type().is_file()
+        || !path_metadata.file_type().is_file()
+        || opened_metadata.len() != path_metadata.len()
+    {
+        return Err(validation(
+            "registry layout",
+            format!(
+                "YAML entry is not a stable regular file: {}",
+                path.display()
+            ),
+        ));
+    }
+    Ok(file)
+}
+
+#[cfg(target_os = "linux")]
+const NO_FOLLOW: i32 = 0x20000;
+#[cfg(target_os = "android")]
+const NO_FOLLOW: i32 = 0x20000;
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+const NO_FOLLOW: i32 = 0x0100;
+
+fn read_bounded(path: &Path, remaining_bytes: usize) -> Result<(String, usize), RegistryError> {
+    if remaining_bytes == 0 {
+        return Err(validation(
+            "registry",
+            format!("aggregate input byte limit {MAX_INPUT_BYTES} exceeded"),
+        ));
+    }
+    let file = open_regular(path)?;
+    let metadata = file.metadata().map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    let limit = MAX_DOCUMENT_BYTES.min(remaining_bytes);
+    if metadata.len() > limit as u64 {
+        let message = if remaining_bytes < MAX_DOCUMENT_BYTES {
+            format!("aggregate input byte limit {MAX_INPUT_BYTES} exceeded")
+        } else {
+            format!("document exceeds {MAX_DOCUMENT_BYTES} bytes")
+        };
+        return Err(validation(path.display().to_string(), message));
+    }
     let mut bytes = Vec::new();
-    file.take((MAX_DOCUMENT_BYTES + 1) as u64)
+    file.take((limit + 1) as u64)
         .read_to_end(&mut bytes)
         .map_err(|source| RegistryError::Io {
             path: path.to_owned(),
             source,
         })?;
-    if bytes.len() > MAX_DOCUMENT_BYTES {
-        return Err(validation(
-            path.display().to_string(),
-            format!("document exceeds {MAX_DOCUMENT_BYTES} bytes"),
-        ));
+    if bytes.len() > limit {
+        let message = if remaining_bytes < MAX_DOCUMENT_BYTES {
+            format!("aggregate input byte limit {MAX_INPUT_BYTES} exceeded")
+        } else {
+            format!("document exceeds {MAX_DOCUMENT_BYTES} bytes")
+        };
+        return Err(validation(path.display().to_string(), message));
     }
-    String::from_utf8(bytes).map_err(|error| RegistryError::Io {
+    let bytes_read = bytes.len();
+    let source = String::from_utf8(bytes).map_err(|error| RegistryError::Io {
         path: path.to_owned(),
         source: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
-    })
+    })?;
+    Ok((source, bytes_read))
 }
 
-fn collect_yaml(path: &Path, output: &mut Vec<PathBuf>, depth: usize) -> Result<(), RegistryError> {
+fn collect_yaml(
+    path: &Path,
+    output: &mut Vec<PathBuf>,
+    budget: &mut LoadBudget,
+    depth: usize,
+) -> Result<(), RegistryError> {
     if depth > MAX_DIRECTORY_DEPTH {
         return Err(validation(
             "registry layout",
@@ -379,36 +499,66 @@ fn collect_yaml(path: &Path, output: &mut Vec<PathBuf>, depth: usize) -> Result<
         source,
     })?;
     for entry in entries {
+        budget.directory_entries = budget
+            .directory_entries
+            .checked_add(1)
+            .ok_or_else(|| validation("registry", "directory entry counter overflowed"))?;
+        if budget.directory_entries > MAX_DIRECTORY_ENTRIES {
+            return Err(validation(
+                "registry",
+                format!("directory entry limit {MAX_DIRECTORY_ENTRIES} exceeded"),
+            ));
+        }
         let entry = entry.map_err(|source| RegistryError::Io {
             path: path.to_owned(),
             source,
         })?;
+        let child = entry.path();
         let file_type = entry.file_type().map_err(|source| RegistryError::Io {
-            path: entry.path(),
+            path: child.clone(),
             source,
         })?;
+        let is_yaml = matches!(
+            child.extension().and_then(|ext| ext.to_str()),
+            Some("yaml" | "yml")
+        );
         if file_type.is_symlink() {
             return Err(validation(
                 "registry layout",
-                format!("symlink is not allowed: {}", entry.path().display()),
+                format!("symlink is not allowed: {}", child.display()),
             ));
         }
-        let child = entry.path();
-        if file_type.is_dir() {
-            collect_yaml(&child, output, depth + 1)?;
-            continue;
-        }
-        let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if name.starts_with('_') {
-            continue;
-        }
-        if matches!(
-            child.extension().and_then(|ext| ext.to_str()),
-            Some("yaml" | "yml")
-        ) {
+        if is_yaml {
+            if !file_type.is_file() {
+                return Err(validation(
+                    "registry layout",
+                    format!("YAML entry is not a regular file: {}", child.display()),
+                ));
+            }
+            let Some(name) = child.file_name().and_then(|name| name.to_str()) else {
+                return Err(validation(
+                    "registry layout",
+                    format!("filename is not valid UTF-8: {}", child.display()),
+                ));
+            };
+            if name.starts_with('_') {
+                continue;
+            }
+            budget.broker_files = budget
+                .broker_files
+                .checked_add(1)
+                .ok_or_else(|| validation("registry", "broker file counter overflowed"))?;
+            if budget.broker_files > MAX_BROKER_FILES {
+                return Err(validation(
+                    "registry",
+                    format!("broker YAML file limit {MAX_BROKER_FILES} exceeded"),
+                ));
+            }
             output.push(child);
+            continue;
+        }
+        if file_type.is_dir() {
+            collect_yaml(&child, output, budget, depth + 1)?;
         }
     }
     Ok(())

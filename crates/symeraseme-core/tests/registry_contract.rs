@@ -124,20 +124,29 @@ fn base_broker() -> &'static str {
 }
 
 #[test]
-fn direct_deserialization_is_strict_for_broker_and_channel_variants() {
+fn validated_entry_point_rejects_strict_variants_and_nulls() {
     let broker_unknown = format!("{}bogus: true\n", base_broker());
-    assert!(serde_yaml::from_str::<Broker>(&broker_unknown).is_err());
+    assert!(Broker::from_yaml("test", &broker_unknown).is_err());
 
-    let channel_unknown = "type: email\nendpoint: a@example.test\nbogus: true\n";
-    assert!(serde_yaml::from_str::<Channel>(channel_unknown).is_err());
+    let channel_unknown = format!(
+        "{}  - type: email\n    endpoint: a@example.test\n    bogus: true\n",
+        base_broker().replace("  - type: email\n    endpoint: a@example.test\n", "")
+    );
+    assert!(Broker::from_yaml("test", &channel_unknown).is_err());
 
-    let channel_variant = "type: email\nendpoint: a@example.test\nurl: https://example.test\n";
-    assert!(serde_yaml::from_str::<Channel>(channel_variant).is_err());
+    let channel_variant = base_broker().replace(
+        "endpoint: a@example.test",
+        "endpoint: a@example.test\n    url: https://example.test",
+    );
+    assert!(Broker::from_yaml("test", &channel_variant).is_err());
 
-    let channel_null = "type: email\nendpoint: a@example.test\ntemplate: null\n";
-    assert!(serde_yaml::from_str::<Channel>(channel_null).is_err());
+    let channel_null = base_broker().replace(
+        "endpoint: a@example.test",
+        "endpoint: a@example.test\n    template: null",
+    );
+    assert!(Broker::from_yaml("test", &channel_null).is_err());
     let broker_null = format!("{}disabled: null\n", base_broker());
-    assert!(serde_yaml::from_str::<Broker>(&broker_null).is_err());
+    assert!(Broker::from_yaml("test", &broker_null).is_err());
 }
 
 #[test]
@@ -271,6 +280,94 @@ fn loader_rejects_symlinks_duplicates_deep_paths_and_oversize_documents() {
     )
     .unwrap();
     assert!(load_from_dir(large.path()).is_err());
+}
+
+#[test]
+fn yaml_scalars_are_parsed_in_context() {
+    let source = format!(
+        "{}notes: |\n  hand &foot *bar #tag\n  apostrophe's\n",
+        base_broker().replace("name: Test", "name: O'Reilly")
+    );
+    let broker = Broker::from_yaml("test", &source).unwrap();
+    assert_eq!(broker.name, "O'Reilly");
+    assert!(broker.notes.unwrap().contains("&foot *bar #tag"));
+}
+
+#[test]
+fn loader_rejects_non_regular_yaml_entries_and_enforces_file_caps() {
+    let directory = tempfile_root();
+    fs::create_dir_all(directory.path().join("brokers/us/not-a-file.yaml")).unwrap();
+    assert!(load_from_dir(directory.path()).is_err());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::net::UnixListener;
+        let socket = tempfile_root();
+        fs::create_dir_all(socket.path().join("brokers/us")).unwrap();
+        let socket_path = socket.path().join("brokers/us/socket.yaml");
+        let _listener = UnixListener::bind(&socket_path).unwrap();
+        assert!(load_from_dir(socket.path()).is_err());
+    }
+
+    let many_files = tempfile_root();
+    fs::create_dir_all(many_files.path().join("brokers/us")).unwrap();
+    for index in 0..=4_096 {
+        fs::write(
+            many_files
+                .path()
+                .join("brokers/us")
+                .join(format!("broker-{index}.yaml")),
+            "",
+        )
+        .unwrap();
+    }
+    let error = load_from_dir(many_files.path()).unwrap_err();
+    assert!(error.to_string().contains("broker YAML file limit"));
+}
+
+#[test]
+fn loader_enforces_aggregate_bytes_and_nodes() {
+    let bytes_root = tempfile_root();
+    fs::create_dir_all(bytes_root.path().join("brokers/us")).unwrap();
+    for index in 0..17 {
+        let document = base_broker().replace("id: test", &format!("id: broker-{index}"));
+        let padding = "x".repeat((1 << 20) - document.len() - 32);
+        let padded = format!("{document}notes: |\n  {padding}\n");
+        fs::write(
+            bytes_root
+                .path()
+                .join("brokers/us")
+                .join(format!("broker-{index}.yaml")),
+            &padded,
+        )
+        .unwrap();
+    }
+    let error = load_from_dir(bytes_root.path()).unwrap_err();
+    assert!(
+        error.to_string().contains("aggregate input byte limit"),
+        "unexpected aggregate byte error: {error}"
+    );
+
+    let nodes_root = tempfile_root();
+    fs::create_dir_all(nodes_root.path().join("brokers/us")).unwrap();
+    let jurisdictions = (0..7_500).map(|_| "US").collect::<Vec<_>>().join(",");
+    let source_template = base_broker().replace(
+        "jurisdictions: [US]",
+        &format!("jurisdictions: [{jurisdictions}]"),
+    );
+    for index in 0..140 {
+        let source = source_template.replace("id: test", &format!("id: broker-{index}"));
+        fs::write(
+            nodes_root
+                .path()
+                .join("brokers/us")
+                .join(format!("broker-{index}.yaml")),
+            &source,
+        )
+        .unwrap();
+    }
+    let error = load_from_dir(nodes_root.path()).unwrap_err();
+    assert!(error.to_string().contains("aggregate YAML node limit"));
 }
 
 #[test]

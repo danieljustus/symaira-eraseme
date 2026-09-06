@@ -23,8 +23,8 @@ where
 }
 
 /// A registry broker document from schema version 1.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Broker {
     pub id: String,
     pub name: String,
@@ -77,6 +77,60 @@ impl Broker {
         source: &str,
     ) -> Result<Self, crate::registry::RegistryError> {
         super::validate::decode(file_stem, source)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub(crate) struct BrokerWire {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) website: String,
+    pub(crate) category: Category,
+    pub(crate) jurisdictions: Vec<Jurisdiction>,
+    pub(crate) laws: Vec<Law>,
+    #[serde(default = "default_data_sensitivity")]
+    pub(crate) data_sensitivity: u8,
+    pub(crate) priority: Priority,
+    pub(crate) opt_out: Vec<ChannelWire>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) verification: Option<VerificationWire>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) disabled: Option<bool>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) added_date: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) source: Option<String>,
+    #[serde(default = "default_status")]
+    pub(crate) status: Status,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) notes: Option<String>,
+}
+
+impl BrokerWire {
+    pub(crate) fn into_model(self) -> Result<Broker, &'static str> {
+        let opt_out = self
+            .opt_out
+            .into_iter()
+            .map(ChannelWire::into_model)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Broker {
+            id: self.id,
+            name: self.name,
+            website: self.website,
+            category: self.category,
+            jurisdictions: self.jurisdictions,
+            laws: self.laws,
+            data_sensitivity: self.data_sensitivity,
+            priority: self.priority,
+            opt_out,
+            verification: self.verification.map(Verification::from),
+            disabled: self.disabled,
+            added_date: self.added_date,
+            source: self.source,
+            status: self.status,
+            notes: self.notes,
+        })
     }
 }
 
@@ -214,7 +268,7 @@ pub enum Channel {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-struct ChannelWire {
+pub(crate) struct ChannelWire {
     #[serde(rename = "type")]
     channel_type: ChannelType,
     #[serde(default, deserialize_with = "reject_null_option")]
@@ -222,7 +276,7 @@ struct ChannelWire {
     #[serde(default, deserialize_with = "reject_null_option")]
     url: Option<String>,
     #[serde(default, deserialize_with = "reject_null_option")]
-    form_spec: Option<FormSpec>,
+    form_spec: Option<FormSpecWire>,
     #[serde(default, deserialize_with = "reject_null_option")]
     template: Option<Template>,
     #[serde(default, deserialize_with = "reject_null_option")]
@@ -237,50 +291,42 @@ struct ChannelWire {
     disabled: Option<bool>,
 }
 
-impl<'de> Deserialize<'de> for Channel {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let wire = ChannelWire::deserialize(deserializer)?;
-        match wire.channel_type {
+impl ChannelWire {
+    fn into_model(self) -> Result<Channel, &'static str> {
+        match self.channel_type {
             ChannelType::Email => {
-                if wire.endpoint.is_none() {
-                    return Err(serde::de::Error::missing_field("endpoint"));
+                if self.endpoint.is_none() {
+                    return Err("email channel requires endpoint");
                 }
-                if wire.url.is_some() || wire.form_spec.is_some() {
-                    return Err(serde::de::Error::custom(
-                        "email channel must not carry web_form fields",
-                    ));
+                if self.url.is_some() || self.form_spec.is_some() {
+                    return Err("email channel must not carry web_form fields");
                 }
-                Ok(Self::Email {
-                    endpoint: wire.endpoint.expect("checked above"),
-                    template: wire.template,
-                    locale: wire.locale,
-                    required_fields: wire.required_fields,
-                    supports_suppression: wire.supports_suppression,
-                    expected_response_days: wire.expected_response_days,
-                    disabled: wire.disabled,
+                Ok(Channel::Email {
+                    endpoint: self.endpoint.expect("checked above"),
+                    template: self.template,
+                    locale: self.locale,
+                    required_fields: self.required_fields,
+                    supports_suppression: self.supports_suppression,
+                    expected_response_days: self.expected_response_days,
+                    disabled: self.disabled,
                 })
             }
             ChannelType::WebForm => {
-                if wire.url.is_none() || wire.form_spec.is_none() {
-                    return Err(serde::de::Error::missing_field("url/form_spec"));
+                if self.url.is_none() || self.form_spec.is_none() {
+                    return Err("web_form channel requires url and form_spec");
                 }
-                if wire.endpoint.is_some() {
-                    return Err(serde::de::Error::custom(
-                        "web_form channel must not carry email fields",
-                    ));
+                if self.endpoint.is_some() {
+                    return Err("web_form channel must not carry email fields");
                 }
-                Ok(Self::WebForm {
-                    url: wire.url.expect("checked above"),
-                    form_spec: wire.form_spec.expect("checked above"),
-                    template: wire.template,
-                    locale: wire.locale,
-                    required_fields: wire.required_fields,
-                    supports_suppression: wire.supports_suppression,
-                    expected_response_days: wire.expected_response_days,
-                    disabled: wire.disabled,
+                Ok(Channel::WebForm {
+                    url: self.url.expect("checked above"),
+                    form_spec: self.form_spec.expect("checked above").into(),
+                    template: self.template,
+                    locale: self.locale,
+                    required_fields: self.required_fields,
+                    supports_suppression: self.supports_suppression,
+                    expected_response_days: self.expected_response_days,
+                    disabled: self.disabled,
                 })
             }
         }
@@ -319,8 +365,8 @@ pub enum RequiredField {
 }
 
 /// Keyword sets used to classify broker replies.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Verification {
     #[serde(
         default,
@@ -342,9 +388,30 @@ pub struct Verification {
     pub human_required_keywords: Option<Vec<String>>,
 }
 
-/// Declarative web-form specification.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub(crate) struct VerificationWire {
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) ack_keywords: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) rejection_keywords: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) human_required_keywords: Option<Vec<String>>,
+}
+
+impl From<VerificationWire> for Verification {
+    fn from(wire: VerificationWire) -> Self {
+        Self {
+            ack_keywords: wire.ack_keywords,
+            rejection_keywords: wire.rejection_keywords,
+            human_required_keywords: wire.human_required_keywords,
+        }
+    }
+}
+
+/// Declarative web-form specification.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct FormSpec {
     pub steps: Vec<FormStep>,
     #[serde(
@@ -367,9 +434,32 @@ pub struct FormSpec {
     pub headless: Option<bool>,
 }
 
-/// One web-form action step.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub(crate) struct FormSpecWire {
+    pub(crate) steps: Vec<FormStepWire>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) timeout_seconds: Option<f64>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) rate_limit_delay: Option<f64>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) headless: Option<bool>,
+}
+
+impl From<FormSpecWire> for FormSpec {
+    fn from(wire: FormSpecWire) -> Self {
+        Self {
+            steps: wire.steps.into_iter().map(FormStep::from).collect(),
+            timeout_seconds: wire.timeout_seconds,
+            rate_limit_delay: wire.rate_limit_delay,
+            headless: wire.headless,
+        }
+    }
+}
+
+/// One web-form action step.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct FormStep {
     #[serde(
         rename = "goto",
@@ -428,6 +518,45 @@ pub struct FormStep {
     pub solve_captcha: Option<SolveCaptcha>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub(crate) struct FormStepWire {
+    #[serde(rename = "goto", default, deserialize_with = "reject_null_option")]
+    pub(crate) goto: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) fill: Option<std::collections::BTreeMap<String, String>>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) select: Option<std::collections::BTreeMap<String, String>>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) click: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) wait_for: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) wait_seconds: Option<f64>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) screenshot: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) assert_text: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) solve_captcha: Option<SolveCaptchaWire>,
+}
+
+impl From<FormStepWire> for FormStep {
+    fn from(wire: FormStepWire) -> Self {
+        Self {
+            goto: wire.goto,
+            fill: wire.fill,
+            select: wire.select,
+            click: wire.click,
+            wait_for: wire.wait_for,
+            wait_seconds: wire.wait_seconds,
+            screenshot: wire.screenshot,
+            assert_text: wire.assert_text,
+            solve_captcha: wire.solve_captcha.map(SolveCaptcha::from),
+        }
+    }
+}
+
 /// CAPTCHA type enum from the registry contract.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -451,8 +580,8 @@ pub enum CaptchaProvider {
 }
 
 /// CAPTCHA-solving action.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub struct SolveCaptcha {
     #[serde(rename = "type")]
     pub captcha_type: CaptchaType,
@@ -481,4 +610,33 @@ pub struct SolveCaptcha {
         skip_serializing_if = "Option::is_none"
     )]
     pub is_invisible: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub(crate) struct SolveCaptchaWire {
+    #[serde(rename = "type")]
+    pub(crate) captcha_type: CaptchaType,
+    pub(crate) site_key: String,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) provider: Option<CaptchaProvider>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) action: Option<String>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) min_score: Option<f64>,
+    #[serde(default, deserialize_with = "reject_null_option")]
+    pub(crate) is_invisible: Option<bool>,
+}
+
+impl From<SolveCaptchaWire> for SolveCaptcha {
+    fn from(wire: SolveCaptchaWire) -> Self {
+        Self {
+            captcha_type: wire.captcha_type,
+            site_key: wire.site_key,
+            provider: wire.provider,
+            action: wire.action,
+            min_score: wire.min_score,
+            is_invisible: wire.is_invisible,
+        }
+    }
 }
