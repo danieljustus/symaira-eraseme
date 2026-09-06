@@ -104,12 +104,10 @@ fn parse_allowed_url(candidate: &str) -> Option<ParsedUrl> {
             .find(['/', '?', '#'])
             .unwrap_or(candidate[scheme_end..].len());
     let authority = &candidate[scheme_end..authority_end];
-    if authority.is_empty() {
+    if authority.is_empty() || authority.contains('@') {
         return None;
     }
-    let hostport = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_, host)| host);
+    let hostport = authority;
     if hostport.starts_with('[') {
         return None;
     }
@@ -217,6 +215,7 @@ mod tests {
             "https://evil.example/confirm",
             "https://acxiom.com.evil.example/confirm",
             "https://acxiom.com@evil.example/confirm",
+            "https://user@acxiom.com/confirm",
             "https://evil.example\\@acxiom.com/confirm",
             "https://acxiom.com/%zz",
             "https:///confirm",
