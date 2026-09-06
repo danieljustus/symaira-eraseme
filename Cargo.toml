@@ -4,6 +4,7 @@ members = [
     "crates/symeraseme-core",
     "crates/symeraseme-engine",
     "crates/symeraseme-cli",
+    "rust-tests/parity",
 ]
 
 [workspace.package]

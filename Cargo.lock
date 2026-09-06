@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "parity"
+version = "0.13.0"
+
+[[package]]
 name = "symeraseme-cli"
 version = "0.13.0"
 dependencies = [
