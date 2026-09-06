@@ -106,21 +106,37 @@ jobs:
           data = report.get("data")
           if not isinstance(data, list) or len(data) != 1:
               raise SystemExit("coverage report must contain exactly one data entry")
+          if not isinstance(data[0], dict) or not isinstance(data[0].get("files"), list):
+              raise SystemExit("coverage report has a malformed files list")
           files = {}
-          for entry in data[0].get("files", []):
-              filename = pathlib.Path(entry.get("filename", "")).resolve()
-              lines = entry.get("summary", {}).get("lines", {})
-              files[filename] = (lines.get("count"), lines.get("covered"))
+          for entry in data[0]["files"]:
+              if not isinstance(entry, dict):
+                  raise SystemExit("coverage report has a malformed file entry")
+              raw_filename = entry.get("filename")
+              summary = entry.get("summary")
+              if not isinstance(raw_filename, str) or not raw_filename or not isinstance(summary, dict):
+                  raise SystemExit("coverage report has a malformed file entry")
+              lines = summary.get("lines")
+              if not isinstance(lines, dict):
+                  raise SystemExit("coverage report has a malformed line summary")
+              count = lines.get("count")
+              covered = lines.get("covered")
+              if type(count) is not int or type(covered) is not int:
+                  raise SystemExit("coverage report has malformed line counts")
+              if count < 0 or covered < 0 or covered > count:
+                  raise SystemExit("coverage report has invalid line counts")
+              filename = pathlib.Path(raw_filename).resolve()
+              if filename in files:
+                  raise SystemExit(f"coverage report has duplicate file entry: {filename}")
+              files[filename] = (count, covered)
           missing = sorted(str(path) for path in expected if path not in files)
           if missing:
               raise SystemExit(f"critical coverage files missing from report: {missing}")
           counts = [files[path] for path in expected]
-          if any(not isinstance(count, int) or not isinstance(covered, int) for count, covered in counts):
-              raise SystemExit("critical coverage report has malformed line counts")
+          if any(count == 0 for count, _ in counts):
+              raise SystemExit("critical coverage file contains no measurable lines")
           total = sum(count for count, _ in counts)
           covered = sum(value for _, value in counts)
-          if total == 0:
-              raise SystemExit("critical coverage files contain no measurable lines")
           percent = covered * 100 / total
           print(f"Critical Rust line coverage: {percent:.2f}% ({covered}/{total}), gate: {threshold:.0f}%")
           if percent < threshold:
