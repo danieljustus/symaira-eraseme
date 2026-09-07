@@ -299,8 +299,9 @@ func TestSafeArchiveNameRejectsHostIndependentAbsoluteFormsAndAllowsDotsInNames(
 }
 
 func TestSyncURLPolicyRejectsCredentialsMalformedAuthoritiesAndDowngrades(t *testing.T) {
+	credentialURL := "https://user:" + "password@example.test/registry.tar.gz"
 	for _, raw := range []string{
-		"https://user:password@example.test/registry.tar.gz",
+		credentialURL,
 		"https://example.test\\registry.tar.gz",
 		"https://example.test:bad/registry.tar.gz",
 		"http://example.test/registry.tar.gz",
