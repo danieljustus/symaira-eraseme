@@ -467,11 +467,12 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: shared redaction corpus and property tests
 
 **Steps:**
-- [ ] Port every PII detector and profile-aware literal replacement.
-- [ ] Preserve replacement ordering, overlap and UTF-8 behavior.
-- [ ] Port safe path and consent-bound file review.
-- [ ] Fuzz text input; assert no panic and no matched sentinel leaks.
-- [ ] Pass `RED-001..002`.
+- [x] Port every PII detector and profile-aware literal replacement.
+- [x] Preserve replacement ordering, overlap and UTF-8 behavior.
+- [x] Port safe path and consent-bound file review.
+- [x] Fuzz text input; assert no panic and no matched sentinel leaks.
+- [x] Pass `RED-001..002` locally; native exact-head CI remains required before
+      merge.
 
 ---
 

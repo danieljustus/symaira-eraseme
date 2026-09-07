@@ -55,7 +55,9 @@ quality/security reviews are `APPROVED`. Task `3.3` is independently approved
 at `9fb768805de213972db6f5437f1dd218e09e88d9`; all 11 canonical templates
 match the external golden fixture byte-for-byte with bounded rendering.
 Native Linux/Windows exact-head CI remains mandatory before merge. Task `3.4`
-remains active.
+is independently approved at `0cfa8c0a5dccd0b189ad2cbbc076f53eab38ded2`;
+the shared redaction corpus, profile-aware byte behavior, bounded review and
+capability-safe file reads pass locally. Phase 3 is locally complete.
 
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
@@ -106,8 +108,8 @@ SQLite, network transcript or process behavior.
 | REG-008 | registry | HTTPS sync, validation and atomic replacement | mock server/temp dir | transcript+manifest | side-effect | all | PASS (local; native CI pending) |
 | TMP-001 | templates | all 11 legal templates | `golden-templates.json` | shared golden test | byte | all | PASS (local; native CI pending) |
 | TMP-002 | templates | missing/invalid variables and template names | negative corpus | error snapshots | byte | all | PASS (local; native CI pending) |
-| RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | TODO |
-| RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | TODO |
+| RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | PASS (local; native CI pending) |
+| RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | PASS (local; native CI pending) |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |
 | DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
 | DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
