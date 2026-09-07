@@ -29,6 +29,8 @@ if [ ! -f "$BACKGROUND_PATH" ]; then
   exit 1
 fi
 
+"$SCRIPT_DIR/verify-app-icon.sh" "$APP_PATH"
+
 OUTPUT_DIR="$(dirname "$DMG_PATH")"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
