@@ -1,8 +1,4 @@
 {
-  "features": [
-    "refractivity",
-    "specular-location"
-  ],
   "fill": "automatic",
   "groups": [
     {
@@ -35,12 +31,6 @@
       ],
       "lighting": "individual",
       "specular": false,
-      "specular-highlight-placement": "inside",
-      "refractivity": {
-        "enabled": false,
-        "strength": 0,
-        "depth": 0
-      },
       "shadow": {
         "kind": "neutral",
         "opacity": 0.16
@@ -64,12 +54,6 @@
       ],
       "lighting": "individual",
       "specular": true,
-      "specular-highlight-placement": "inside",
-      "refractivity": {
-        "enabled": true,
-        "strength": 0.15,
-        "depth": 0.24
-      },
       "shadow": {
         "kind": "neutral",
         "opacity": 0.25
