@@ -36,8 +36,11 @@ impl WorkspaceRoot {
         let path = path.as_ref();
         let canonical =
             std::fs::canonicalize(path).map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        let pre_open =
-            std::fs::metadata(&canonical).map_err(|_| WorkspaceRootError::RootUnavailable)?;
+        let probe = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
+            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
+        let pre_open = probe
+            .metadata(".")
+            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
         if !pre_open.is_dir() {
             return Err(WorkspaceRootError::RootUnavailable);
         }
@@ -170,27 +173,9 @@ fn map_open_error(error: io::Error) -> WorkspaceRootError {
     }
 }
 
-fn same_file(expected: &std::fs::Metadata, opened: &cap_std::fs::Metadata) -> bool {
-    #[cfg(unix)]
-    {
-        use cap_std::fs::MetadataExt as CapMetadataExt;
-        use std::os::unix::fs::MetadataExt as StdMetadataExt;
-        StdMetadataExt::dev(expected) == CapMetadataExt::dev(opened)
-            && StdMetadataExt::ino(expected) == CapMetadataExt::ino(opened)
-    }
-    #[cfg(windows)]
-    {
-        use cap_std::fs::MetadataExt as CapMetadataExt;
-        use std::os::windows::fs::MetadataExt as StdMetadataExt;
-        StdMetadataExt::volume_serial_number(expected)
-            == CapMetadataExt::volume_serial_number(opened)
-            && StdMetadataExt::file_index(expected) == CapMetadataExt::file_index(opened)
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = (expected, opened);
-        true
-    }
+fn same_file(expected: &cap_std::fs::Metadata, opened: &cap_std::fs::Metadata) -> bool {
+    use cap_fs_ext::MetadataExt;
+    expected.dev() == opened.dev() && expected.ino() == opened.ino()
 }
 pub fn read_workspace_file(
     path: &Path,
