@@ -183,8 +183,7 @@ test_package_dmg_modes() {
     test -d "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     test -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     "$REPO_ROOT/scripts/verify-app-icon.sh" "$APP_BUNDLE"
-    /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$APP_BUNDLE/Contents/Info.plist" | grep -Fx 'AppIcon'
-    /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$APP_BUNDLE/Contents/Info.plist" | grep -Fx 'AppIcon.icns'
+    python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$APP_BUNDLE/Contents/Info.plist"
     test ! -f "$REPO_ROOT/dist/Symaira-EraseMe-0.13.0-macos.dmg"
 
     # Verify nested Go binary signed before outer app bundle

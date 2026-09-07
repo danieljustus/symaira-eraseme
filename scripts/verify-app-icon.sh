@@ -55,9 +55,6 @@ diff -qr "$ICON_SOURCE" "$RESOURCES/AppIcon.icon" >/dev/null || {
   exit 1
 }
 
-ICON_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$INFO_PLIST")
-ICON_FILE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$INFO_PLIST")
-[[ "$ICON_NAME" == "AppIcon" ]] || { printf 'Unexpected CFBundleIconName: %s\n' "$ICON_NAME" >&2; exit 1; }
-[[ "$ICON_FILE" == "AppIcon.icns" ]] || { printf 'Unexpected CFBundleIconFile: %s\n' "$ICON_FILE" >&2; exit 1; }
+python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$INFO_PLIST"
 
 printf 'App icon guard passed: %s (compiled Assets.car + native AppIcon.icon + AppIcon.icns fallback)\n' "$APP_PATH"
