@@ -1,0 +1,70 @@
+{
+  "fill": "automatic",
+  "groups": [
+    {
+      "name": "Symaira EraseMe \u2014 Radierer",
+      "layers": [
+        {
+          "name": "Radierer",
+          "image-name": "signet.png",
+          "glass": false,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:0.65882,0.26667,0.34902,1.0"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.87059,0.49804,0.58039,1.0"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "gray:0.86,1"
+              }
+            }
+          ]
+        }
+      ],
+      "lighting": "individual",
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.16
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "name": "Original Symaira S \u2014 hinter Signet freigestellt",
+      "layers": [
+        {
+          "name": "Original Symaira S",
+          "image-name": "S.png",
+          "glass": true,
+          "fill": {
+            "automatic-gradient": "extended-srgb:0.80392,0.74902,0.66275,1.0"
+          }
+        }
+      ],
+      "lighting": "individual",
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.25
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

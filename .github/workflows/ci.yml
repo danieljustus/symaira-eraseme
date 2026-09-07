@@ -17,6 +17,30 @@ permissions:
   contents: read
 
 jobs:
+  icon-compile:
+    name: app icon compile
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: '26.4.1'
+      - name: Verify Xcode toolchain
+        run: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version)"
+          echo "$XCODE_VERSION"
+          XCODE_MAJOR="${XCODE_VERSION#Xcode }"
+          XCODE_MAJOR="${XCODE_MAJOR%%.*}"
+          if ! [[ "$XCODE_MAJOR" =~ ^[0-9]+$ ]] || (( XCODE_MAJOR < 26 )); then
+            echo "::error::Expected Xcode 26 or newer, got: $XCODE_VERSION" >&2
+            exit 1
+          fi
+      - name: Compile and inspect native icon
+        run: ./scripts/test-app-icon.sh
+
   lint:
     name: lint
     runs-on: ubuntu-latest

@@ -85,7 +85,7 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		if _, ok := doc.Jobs["release-cli"]; !ok {
 			t.Errorf("missing job 'release-cli' in release workflow")
 		}
-		if guiJob.RunsOn != "macos-15" {
+		if guiJob.RunsOn != "macos-26" {
 			t.Errorf("release-gui runs-on: got %q, want %q", guiJob.RunsOn, "macos-15")
 		}
 		if guiJob.Environment != "release" {
@@ -115,6 +115,8 @@ func TestReleaseWorkflowContract(t *testing.T) {
 
 		expectedOrder := []string{
 			"Checkout workflow source",
+			"Select Xcode 26",
+			"Verify Xcode toolchain",
 			"Set up Go",
 			"Import Developer ID certificate",
 			"Validate notarization credentials",
@@ -171,10 +173,27 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		}
 	})
 
+	t.Run("XcodeIconToolchain", func(t *testing.T) {
+		selectStep := getWorkflowStep(t, guiJob.Steps, "Select Xcode 26")
+		if selectStep.Uses != "maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90" {
+			t.Errorf("unexpected Xcode setup action: %q", selectStep.Uses)
+		}
+		verifyStep := getWorkflowStep(t, guiJob.Steps, "Verify Xcode toolchain")
+		for _, expected := range []string{"xcodebuild -version", "Expected Xcode 26 or newer", "XCODE_MAJOR", "XCODE_MAJOR < 26"} {
+			if !strings.Contains(verifyStep.Run, expected) {
+				t.Errorf("Xcode verification missing %q", expected)
+			}
+		}
+		if !strings.Contains(rawYAML, "runs-on: macos-26") || !strings.Contains(rawYAML, "xcode-version: '26.4.1'") {
+			t.Error("release workflow must pin the GUI lane to macOS 26 and Xcode 26.4.1")
+		}
+	})
+
 	t.Run("BuildAndSignAppBundle", func(t *testing.T) {
 		step := getWorkflowStep(t, guiJob.Steps, "Build and sign macOS app bundle")
 		for _, expected := range []string{
 			"REQUIRE_SIGNING=true",
+			"REQUIRE_COMPILED_ICON=true",
 			"./scripts/package-dmg.sh --app-only",
 			`APP_PATH="app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"`,
 			`test -d "$APP_PATH"`,

@@ -49,7 +49,7 @@ jobs:
     name: Release / macOS GUI DMG
     needs: release-cli
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success')) }}
-    runs-on: macos-15
+    runs-on: macos-26
     environment: release
     env:
       RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
@@ -59,6 +59,23 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.ref }}
+
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: '26.4.1'
+
+      - name: Verify Xcode toolchain
+        run: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version)"
+          echo "$XCODE_VERSION"
+          XCODE_MAJOR="${XCODE_VERSION#Xcode }"
+          XCODE_MAJOR="${XCODE_MAJOR%%.*}"
+          if ! [[ "$XCODE_MAJOR" =~ ^[0-9]+$ ]] || (( XCODE_MAJOR < 26 )); then
+            echo "::error::Expected Xcode 26 or newer, got: $XCODE_VERSION"
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -118,13 +135,14 @@ jobs:
       - name: Build and sign macOS app bundle
         run: |
           set -euo pipefail
-          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true ./scripts/package-dmg.sh --app-only
+          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true REQUIRE_COMPILED_ICON=true ./scripts/package-dmg.sh --app-only
           APP_PATH="app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"
           test -d "$APP_PATH"
           test -x "$APP_PATH/Contents/MacOS/Symaira EraseMe"
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
+          REQUIRE_COMPILED_ICON=true ./scripts/verify-app-icon.sh "$APP_PATH"
 
       - name: Notarize and staple macOS app
         env:
@@ -161,7 +179,7 @@ jobs:
       - name: Create and sign DMG container
         run: |
           set -euo pipefail
-          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true ./scripts/package-dmg.sh --dmg-only
+          VERSION="${RELEASE_TAG#v}" REQUIRE_SIGNING=true REQUIRE_COMPILED_ICON=true ./scripts/package-dmg.sh --dmg-only
           DMG="dist/Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg"
           test -f "$DMG"
           echo "DMG_PATH=$DMG" >> "$GITHUB_ENV"
