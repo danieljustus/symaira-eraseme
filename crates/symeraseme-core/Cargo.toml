@@ -27,6 +27,7 @@ toml.workspace = true
 ureq.workspace = true
 yaml-rust2.workspace = true
 minijinja.workspace = true
+regex.workspace = true
 
 [build-dependencies]
 cap-fs-ext.workspace = true

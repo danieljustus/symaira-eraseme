@@ -3,6 +3,7 @@ package redaction
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,24 @@ var (
 	// ErrPathNotString is retained as a typed equivalent for callers that
 	// validate decoded JSON before converting to a Go string.
 	ErrPathNotString = errors.New("path must be a string")
+	// ErrPathInvalid is returned for ambiguous or unsafe relative names.
+	ErrPathInvalid = errors.New("path is not a safe workspace-relative file name")
+	// ErrFileTooLarge prevents an unbounded read into memory.
+	ErrFileTooLarge = errors.New("workspace file exceeds the maximum size")
+	// ErrNotRegularFile rejects directories, FIFOs, devices and sockets.
+	ErrNotRegularFile = errors.New("workspace target is not a regular file")
 )
+
+type workspaceReadError struct{ cause error }
+
+func (e workspaceReadError) Error() string { return "workspace file read failed" }
+func (e workspaceReadError) Unwrap() error { return e.cause }
+func opaqueWorkspaceError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return workspaceReadError{cause: err}
+}
 
 // ResolveWorkspacePath canonicalizes path and verifies that it remains inside
 // workspaceRoot. If workspaceRoot is omitted, the current working directory
@@ -63,15 +81,114 @@ func ResolveWorkspacePath(path string, workspaceRoots ...string) (string, error)
 	return candidate, nil
 }
 
-// ReadWorkspaceFile reads a UTF-8 file under the workspace boundary. It
-// returns bytes rather than a string so callers can preserve file bytes that
-// are not part of a replacement.
+const maxWorkspaceFileBytes int64 = 16 << 20
+
+// ReadWorkspaceFile acquires a workspace capability and reads a root-relative
+// regular file through that capability. It deliberately does not call
+// ResolveWorkspacePath: path validation followed by ambient os.ReadFile is a
+// TOCTOU authorization check. The opened handle is statted and streamed with a
+// practical bound; special files are opened nonblocking to prevent hangs.
 func ReadWorkspaceFile(path string, workspaceRoots ...string) ([]byte, error) {
-	candidate, err := ResolveWorkspacePath(path, workspaceRoots...)
-	if err != nil {
+	if err := validateWorkspaceRelativePath(path); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(candidate) //nolint:gosec // canonicalized and confined above
+	rootPath := ""
+	if len(workspaceRoots) > 0 {
+		rootPath = workspaceRoots[0]
+	}
+	if rootPath == "" {
+		var err error
+		rootPath, err = os.Getwd()
+		if err != nil {
+			return nil, opaqueWorkspaceError(err)
+		}
+	}
+	canonical, err := canonicalExistingPath(rootPath)
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	root, err := os.OpenRoot(canonical)
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	defer root.Close()
+
+	parts := strings.Split(path, "/")
+	current := root
+	for _, part := range parts[:len(parts)-1] {
+		info, statErr := current.Lstat(part)
+		if statErr != nil {
+			return nil, opaqueWorkspaceError(statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return nil, ErrPathOutsideWorkspace
+		}
+		next, openErr := current.OpenRoot(part)
+		if openErr != nil {
+			return nil, opaqueWorkspaceError(openErr)
+		}
+		if current != root {
+			_ = current.Close()
+		}
+		current = next
+	}
+	name := parts[len(parts)-1]
+	info, err := current.Lstat(name)
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, ErrPathOutsideWorkspace
+	}
+	file, err := current.OpenFile(name, os.O_RDONLY|redactionOpenNonblock|redactionOpenNoFollow, 0)
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	defer file.Close()
+	openedInfo, err := file.Stat()
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	if !openedInfo.Mode().IsRegular() {
+		return nil, ErrNotRegularFile
+	}
+	if openedInfo.Size() < 0 || openedInfo.Size() > maxWorkspaceFileBytes {
+		return nil, ErrFileTooLarge
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxWorkspaceFileBytes+1))
+	if err != nil {
+		return nil, opaqueWorkspaceError(err)
+	}
+	if int64(len(data)) > maxWorkspaceFileBytes {
+		return nil, ErrFileTooLarge
+	}
+	return data, nil
+}
+
+func validateWorkspaceRelativePath(path string) error {
+	if path == "" {
+		return ErrPathInvalid
+	}
+	if filepath.IsAbs(path) || strings.HasPrefix(path, "/") || (len(path) >= 2 && path[1] == ':' && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))) {
+		return ErrPathOutsideWorkspace
+	}
+	if strings.Contains(path, "\\") {
+		return ErrPathInvalid
+	}
+	for _, r := range path {
+		if r == 0 || r < 0x20 || r == 0x7f {
+			return ErrPathInvalid
+		}
+	}
+	for _, part := range strings.Split(path, "/") {
+		if part == ".." {
+			return ErrPathOutsideWorkspace
+		}
+		if part == "" || part == "." {
+			return ErrPathInvalid
+		}
+	}
+	return nil
 }
 
 // ReadWorkspaceText is the string-oriented counterpart to ReadWorkspaceFile.
@@ -88,7 +205,7 @@ func RedactFile(path string, workspaceRoots ...string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte(Redact(string(content))), nil
+	return RedactBytes(content), nil
 }
 
 // RedactFileText is the string-oriented counterpart to RedactFile.
@@ -103,7 +220,7 @@ func RedactFileWithProfile(path, workspaceRoot string, profile *identity.Profile
 	if err != nil {
 		return nil, err
 	}
-	return []byte(Redact(string(content), profile)), nil
+	return RedactBytes(content, profile), nil
 }
 
 func expandUser(path string) string {

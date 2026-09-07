@@ -182,12 +182,18 @@ func validEmail(value string) bool {
 
 func scrubEmail(value string) string {
 	parts := strings.SplitN(value, "@", 2)
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return value
+	}
 	local, domain := parts[0], parts[1]
 	visible := local[:1]
 	if len(local) > 2 {
 		visible += strings.Repeat("*", len(local)-2) + local[len(local)-1:]
 	}
 	domainParts := strings.Split(domain, ".")
+	if len(domainParts) == 0 || len(domainParts[0]) == 0 {
+		return value
+	}
 	domainDisplay := domainParts[0][:1] + ".*"
 	if len(domainParts) >= 2 {
 		domainDisplay = domainParts[0][:1] + "*." + strings.Join(domainParts[1:], ".")
@@ -202,6 +208,9 @@ func scrubPhone(value string) string {
 			digits = append(digits, value[i])
 		}
 	}
+	if len(digits) < 4 {
+		return value
+	}
 	if len(digits) == 11 {
 		return "+1-***-***-" + string(digits[len(digits)-4:])
 	}
@@ -210,11 +219,29 @@ func scrubPhone(value string) string {
 
 func scrubSSN(string) string { return "***-**-****" }
 func scrubIBAN(value string) string {
+	if len(value) < 6 {
+		return value
+	}
 	return value[:2] + "**" + strings.Repeat("*", len(value)-4) + value[len(value)-4:]
 }
-func scrubGermanID(value string) string  { return "*******" + value[len(value)-2:] }
-func scrubFrenchID(value string) string  { return "***" + value[len(value)-3:] }
-func scrubSpanishID(value string) string { return "****-****-" + value[len(value)-1:] }
+func scrubGermanID(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+	return "*******" + value[len(value)-2:]
+}
+func scrubFrenchID(value string) string {
+	if len(value) < 3 {
+		return value
+	}
+	return "***" + value[len(value)-3:]
+}
+func scrubSpanishID(value string) string {
+	if len(value) < 1 {
+		return value
+	}
+	return "****-****-" + value[len(value)-1:]
+}
 
 func scrubPassport(value string) string {
 	match := passportPattern.FindStringSubmatch(value)
@@ -222,6 +249,9 @@ func scrubPassport(value string) string {
 		return value
 	}
 	passport := match[3]
+	if len(passport) < 2 {
+		return value
+	}
 	mask := strings.Repeat("*", max(3, len(passport)-2)) + passport[len(passport)-2:]
 	return strings.Replace(value, passport, mask, 1)
 }
@@ -235,20 +265,30 @@ func max(a, b int) int {
 
 // Redact applies every accepted match while preserving all unmatched bytes.
 func Redact(content string, profiles ...*identity.Profile) string {
-	matches := CollectMatches(content, profiles...)
+	return string(RedactBytes([]byte(content), profiles...))
+}
+
+// RedactBytes is the byte-oriented entry point. It preserves invalid UTF-8 and
+// all unmatched bytes exactly; only ASCII detector matches and valid profile
+// literal matches are replaced.
+func RedactBytes(content []byte, profiles ...*identity.Profile) []byte {
+	matches := CollectMatches(string(content), profiles...)
 	if len(matches) == 0 {
-		return content
+		return append([]byte(nil), content...)
 	}
 	var out strings.Builder
 	out.Grow(len(content))
 	position := 0
 	for _, match := range matches {
-		out.WriteString(content[position:match.Start])
+		if match.Start < position || match.End < match.Start || match.End > len(content) {
+			return append([]byte(nil), content...)
+		}
+		out.Write(content[position:match.Start])
 		out.WriteString(match.Replacement())
 		position = match.End
 	}
-	out.WriteString(content[position:])
-	return out.String()
+	out.Write(content[position:])
+	return []byte(out.String())
 }
 
 // RedactText is a descriptive alias for Redact.

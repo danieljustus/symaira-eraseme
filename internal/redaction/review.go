@@ -47,11 +47,16 @@ type ReviewResult struct {
 	Skipped  int
 }
 
+const maxReviewOutputBytes = 32 << 20
+
 // Review applies decisions to already-collected, non-overlapping matches.
 // ActionQuit stops at that match, returning changes made earlier; the caller
 // decides whether to persist those partial changes, exactly as interactive.py
 // asks whether to save after q. A nil decision function keeps every match.
 func Review(content []byte, matches []Match, decide DecisionFunc) (ReviewResult, error) {
+	if err := validateReviewMatches(content, matches); err != nil {
+		return ReviewResult{}, err
+	}
 	result := ReviewResult{Content: append([]byte(nil), content...)}
 	if len(matches) == 0 {
 		return result, nil
@@ -93,6 +98,30 @@ func Review(content []byte, matches []Match, decide DecisionFunc) (ReviewResult,
 		result.Content = out.Bytes()
 	}
 	return result, nil
+}
+
+func validateReviewMatches(content []byte, matches []Match) error {
+	lastEnd := 0
+	outputSize := len(content)
+	for index, match := range matches {
+		if match.Start < 0 || match.End < match.Start || match.End > len(content) || match.Start < lastEnd || !bytes.Equal(content[match.Start:match.End], []byte(match.Value)) {
+			return fmt.Errorf("invalid match %d: range or value does not match original content", index)
+		}
+		if len(match.Replacement()) > maxReviewOutputBytes {
+			return fmt.Errorf("invalid match %d: replacement is too large", index)
+		}
+		span := match.End - match.Start
+		if span > outputSize {
+			return fmt.Errorf("invalid match %d: output underflow", index)
+		}
+		outputSize -= span
+		if len(match.Replacement()) > maxReviewOutputBytes-outputSize {
+			return fmt.Errorf("invalid match %d: output exceeds limit", index)
+		}
+		outputSize += len(match.Replacement())
+		lastEnd = match.End
+	}
+	return nil
 }
 
 // ReviewText is the string convenience wrapper for Review. Match offsets must
