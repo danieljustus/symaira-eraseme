@@ -110,8 +110,11 @@ if [ "$DMG_ONLY" != "true" ]; then
             --compile "$ICON_BUILD_DIR" \
             --platform macosx \
             --target-device mac \
-            --minimum-deployment-target 14.0 \
+            --minimum-deployment-target 26.0 \
             --app-icon AppIcon \
+            --include-all-app-icons \
+            --enable-on-demand-resources NO \
+            --development-region en \
             --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
             "$ICON_SOURCE"
         cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"

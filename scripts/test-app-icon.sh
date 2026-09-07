@@ -25,8 +25,11 @@ cp "$ICNS_SOURCE" "$APP_PATH/Contents/Resources/AppIcon.icns"
   --compile "$COMPILED_DIR" \
   --platform macosx \
   --target-device mac \
-  --minimum-deployment-target 14.0 \
+  --minimum-deployment-target 26.0 \
   --app-icon AppIcon \
+  --include-all-app-icons \
+  --enable-on-demand-resources NO \
+  --development-region en \
   --output-partial-info-plist "$TMP_DIR/partial.plist" \
   "$ICON_SOURCE"
 cp "$COMPILED_DIR/Assets.car" "$APP_PATH/Contents/Resources/Assets.car"
