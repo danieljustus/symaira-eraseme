@@ -434,14 +434,15 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: loader/filter/sync parity tests
 
 **Steps:**
-- [ ] Embed committed registry data without runtime filesystem dependency.
-- [ ] Preserve underscore skipping, deterministic ordering and first/all-error
+- [x] Embed committed registry data without runtime filesystem dependency.
+- [x] Preserve underscore skipping, deterministic ordering and first/all-error
       behavior.
-- [ ] Preserve status/disabled filter semantics.
-- [ ] Mock HTTPS sync and verify safe validated replacement.
-- [ ] Measure lazy/eager loading; do not add a binary cache unless measured and
+- [x] Preserve status/disabled filter semantics.
+- [x] Mock HTTPS sync and verify safe validated replacement.
+- [x] Measure lazy/eager loading; do not add a binary cache unless measured and
       contract-neutral.
-- [ ] Pass `REG-001..008`.
+- [x] Pass `REG-001..008` locally; native Linux/Windows exact-head CI remains
+      required before merge.
 
 ### Task 3.3: Port legal and report templates
 

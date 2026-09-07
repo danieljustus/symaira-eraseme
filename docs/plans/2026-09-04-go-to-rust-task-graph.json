@@ -48,17 +48,17 @@
     "required_review_fields": ["reviewed_sha", "commands", "results", "findings", "verdict", "reviewer_lane"]
   },
   "execution_state": {
-    "last_completed": "3.1",
-    "active_tasks": ["3.2"],
+    "last_completed": "3.2",
+    "active_tasks": ["3.3"],
     "merged_tasks": ["0.1", "0.2", "0.3", "0.4", "1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4"],
-    "pending_merge_tasks": ["3.1"],
+    "pending_merge_tasks": ["3.1", "3.2"],
     "pending_branch": "agent/issue-805-phase3-registry-templates-redaction",
-    "pending_head_sha": "b3b7ce642944c4fd0c123150e25d5d990f043b05",
+    "pending_head_sha": "4a64892d5eaa0c5f435d4ceb2ce42e28a8ec449c",
     "active_worktrees": {
       "issue-805-phase3": {
         "branch": "agent/issue-805-phase3-registry-templates-redaction",
-        "head_sha": "b3b7ce642944c4fd0c123150e25d5d990f043b05",
-        "tasks": ["3.1", "3.2"]
+        "head_sha": "4a64892d5eaa0c5f435d4ceb2ce42e28a8ec449c",
+        "tasks": ["3.1", "3.2", "3.3"]
       }
     },
     "blocked_by": [],
