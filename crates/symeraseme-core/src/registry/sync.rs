@@ -114,26 +114,17 @@ pub fn sync_with_transport(
 }
 
 fn validate_url(raw: &str) -> Result<(), RegistryError> {
-    let (scheme, remainder) = raw
-        .split_once("://")
+    let uri: ureq::http::Uri = raw.parse().map_err(|_| validation("sync", "invalid URL"))?;
+    let scheme = uri
+        .scheme_str()
         .ok_or_else(|| validation("sync", "invalid URL"))?;
-    let authority = remainder.split(['/', '?', '#']).next().unwrap_or_default();
-    let authority = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_, host)| host);
-    let host = if let Some(rest) = authority.strip_prefix('[') {
-        rest.split_once(']').map_or(rest, |(host, _)| host)
-    } else {
-        authority
-            .rsplit_once(':')
-            .map_or(authority, |(host, port)| {
-                if port.bytes().all(|byte| byte.is_ascii_digit()) {
-                    host
-                } else {
-                    authority
-                }
-            })
-    };
+    let authority = uri
+        .authority()
+        .ok_or_else(|| validation("sync", "invalid URL"))?;
+    if authority.as_str().contains('@') {
+        return Err(validation("sync", "URL userinfo is not allowed"));
+    }
+    let host = authority.host();
     if host.is_empty() {
         return Err(validation("sync", "invalid URL"));
     }
@@ -143,6 +134,7 @@ fn validate_url(raw: &str) -> Result<(), RegistryError> {
     if scheme == "http"
         && (host == "localhost"
             || host
+                .trim_matches(['[', ']'])
                 .parse::<std::net::IpAddr>()
                 .map(|address| address.is_loopback())
                 .unwrap_or(false))
@@ -396,6 +388,27 @@ mod tests {
     use super::*;
     use std::cell::Cell;
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn url_validation_uses_strict_authority_semantics() {
+        for valid in [
+            "https://example.test/registry.tar.gz",
+            "http://localhost/test",
+            "http://127.0.0.1:8080/test",
+            "http://[::1]:8080/test",
+        ] {
+            assert!(validate_url(valid).is_ok(), "rejected {valid}");
+        }
+        for invalid in [
+            "http://example.test/registry.tar.gz",
+            r"http://evil.example\@127.0.0.1/test",
+            r"http://127.0.0.1\@evil.example/test",
+            "https://user@example.test/test",
+            "not-a-url",
+        ] {
+            assert!(validate_url(invalid).is_err(), "accepted {invalid}");
+        }
+    }
 
     fn make_tree(root: &Path, name: &str, content: &[u8]) -> PathBuf {
         let path = root.join(name);
