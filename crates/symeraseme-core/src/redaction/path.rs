@@ -72,6 +72,12 @@ impl WorkspaceRoot {
                 .open_dir_nofollow(component)
                 .map_err(map_open_error)?;
         }
+        let metadata = parent
+            .symlink_metadata(&file_name)
+            .map_err(map_open_error)?;
+        if !metadata.is_file() {
+            return Err(WorkspaceRootError::NotRegularFile);
+        }
         let mut options = cap_fs_ext::OpenOptions::new();
         options.read(true).follow(FollowSymlinks::No).nonblock(true);
         let file = parent
