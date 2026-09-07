@@ -29,20 +29,27 @@ impl std::error::Error for WorkspaceRootError {}
 
 pub struct WorkspaceRoot {
     dir: Dir,
+    canonical: PathBuf,
 }
 impl WorkspaceRoot {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, WorkspaceRootError> {
         let path = path.as_ref();
-        let metadata =
-            std::fs::symlink_metadata(path).map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(WorkspaceRootError::RootUnavailable);
-        }
         let canonical =
             std::fs::canonicalize(path).map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        let dir = Dir::open_ambient_dir(canonical, cap_std::ambient_authority())
+        let pre_open =
+            std::fs::metadata(&canonical).map_err(|_| WorkspaceRootError::RootUnavailable)?;
+        if !pre_open.is_dir() {
+            return Err(WorkspaceRootError::RootUnavailable);
+        }
+        let dir = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
             .map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        Ok(Self { dir })
+        let opened = dir
+            .metadata(".")
+            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
+        if !same_file(&pre_open, &opened) {
+            return Err(WorkspaceRootError::RootUnavailable);
+        }
+        Ok(Self { dir, canonical })
     }
 
     pub fn current() -> Result<Self, WorkspaceRootError> {
@@ -50,7 +57,8 @@ impl WorkspaceRoot {
     }
 
     pub fn read(&self, relative: &str) -> Result<Vec<u8>, WorkspaceRootError> {
-        let components = validate_relative(relative)?;
+        let relative = self.relative_path(Path::new(relative))?;
+        let components = validate_relative(&relative)?;
         let mut parent = self.dir.try_clone().map_err(WorkspaceRootError::Io)?;
         let file_name = components
             .last()
@@ -67,6 +75,29 @@ impl WorkspaceRoot {
             .open_with(&file_name, &options)
             .map_err(map_open_error)?;
         read_open_file(file)
+    }
+    fn relative_path(&self, path: &Path) -> Result<String, WorkspaceRootError> {
+        if !path.is_absolute() {
+            return path
+                .to_str()
+                .map(str::to_owned)
+                .ok_or(WorkspaceRootError::InvalidPath);
+        }
+        let absolute = if let Ok(canonical) = std::fs::canonicalize(path) {
+            canonical
+        } else {
+            let parent = path.parent().ok_or(WorkspaceRootError::InvalidPath)?;
+            let parent = std::fs::canonicalize(parent).map_err(WorkspaceRootError::Io)?;
+            parent.join(path.file_name().ok_or(WorkspaceRootError::InvalidPath)?)
+        };
+        let relative = absolute
+            .strip_prefix(&self.canonical)
+            .map_err(|_| WorkspaceRootError::InvalidPath)?;
+        if relative.as_os_str().is_empty() {
+            return Err(WorkspaceRootError::InvalidPath);
+        }
+        let value = relative.to_str().ok_or(WorkspaceRootError::InvalidPath)?;
+        Ok(value.replace(std::path::MAIN_SEPARATOR, "/"))
     }
 }
 
@@ -139,6 +170,28 @@ fn map_open_error(error: io::Error) -> WorkspaceRootError {
     }
 }
 
+fn same_file(expected: &std::fs::Metadata, opened: &cap_std::fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use cap_std::fs::MetadataExt as CapMetadataExt;
+        use std::os::unix::fs::MetadataExt as StdMetadataExt;
+        StdMetadataExt::dev(expected) == CapMetadataExt::dev(opened)
+            && StdMetadataExt::ino(expected) == CapMetadataExt::ino(opened)
+    }
+    #[cfg(windows)]
+    {
+        use cap_std::fs::MetadataExt as CapMetadataExt;
+        use std::os::windows::fs::MetadataExt as StdMetadataExt;
+        StdMetadataExt::volume_serial_number(expected)
+            == CapMetadataExt::volume_serial_number(opened)
+            && StdMetadataExt::file_index(expected) == CapMetadataExt::file_index(opened)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (expected, opened);
+        true
+    }
+}
 pub fn read_workspace_file(
     path: &Path,
     root: Option<&Path>,

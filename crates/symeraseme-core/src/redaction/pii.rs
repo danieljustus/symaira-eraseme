@@ -1,11 +1,16 @@
 use regex::RegexBuilder as TextRegexBuilder;
 use regex::bytes::{Regex as ByteRegex, RegexBuilder};
 use std::fmt;
+use std::sync::OnceLock;
 
 pub const MAX_INPUT_BYTES: usize = 16 << 20;
 pub const MAX_MATCHES: usize = 100_000;
 pub const MAX_OUTPUT_BYTES: usize = 32 << 20;
-const MAX_PROFILE_LITERAL_BYTES: usize = 16 << 10;
+pub const MAX_PROFILE_LITERAL_BYTES: usize = 16 << 10;
+pub const MAX_PROFILE_LITERAL_COUNT: usize = 4_096;
+pub const MAX_PROFILE_TOTAL_BYTES: usize = 1 << 20;
+pub const MAX_PROFILE_ADDRESSES: usize = 4_096;
+pub const MAX_PROFILE_VECTOR_ENTRIES: usize = 4_096;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Address {
@@ -151,16 +156,69 @@ fn default_rules() -> Vec<Rule> {
     ]
 }
 
-pub fn rules() -> Vec<Rule> {
-    default_rules()
+fn builtin_rules() -> &'static Vec<Rule> {
+    static RULES: OnceLock<Vec<Rule>> = OnceLock::new();
+    RULES.get_or_init(default_rules)
 }
 
+pub fn rules() -> Vec<Rule> {
+    builtin_rules().clone()
+}
+
+fn validate_profile(profile: &RedactionProfile) -> Result<(), RedactionError> {
+    if profile.name_variants.len() > MAX_PROFILE_VECTOR_ENTRIES
+        || profile.email_addresses.len() > MAX_PROFILE_VECTOR_ENTRIES
+        || profile.phone_numbers.len() > MAX_PROFILE_VECTOR_ENTRIES
+        || profile.addresses.len() > MAX_PROFILE_ADDRESSES
+    {
+        return Err(RedactionError::InvalidProfileLiteral);
+    }
+    let mut count = 0usize;
+    let mut total = 0usize;
+    let mut check = |value: &str| -> Result<(), RedactionError> {
+        if value.is_empty() {
+            return Ok(());
+        }
+        if value.len() > MAX_PROFILE_LITERAL_BYTES || value.as_bytes().contains(&0) {
+            return Err(RedactionError::InvalidProfileLiteral);
+        }
+        count = count
+            .checked_add(1)
+            .ok_or(RedactionError::InvalidProfileLiteral)?;
+        total = total
+            .checked_add(value.len())
+            .ok_or(RedactionError::InvalidProfileLiteral)?;
+        if count > MAX_PROFILE_LITERAL_COUNT || total > MAX_PROFILE_TOTAL_BYTES {
+            return Err(RedactionError::InvalidProfileLiteral);
+        }
+        Ok(())
+    };
+    check(&profile.full_name)?;
+    for value in &profile.name_variants {
+        check(value)?;
+    }
+    for value in &profile.email_addresses {
+        check(value)?;
+    }
+    for value in &profile.phone_numbers {
+        check(value)?;
+    }
+    for address in &profile.addresses {
+        check(&address.street)?;
+        check(&address.city)?;
+        check(&address.postal_code)?;
+    }
+    Ok(())
+}
 pub fn collect_matches(
     input: &[u8],
     profile: Option<&RedactionProfile>,
 ) -> Result<Vec<Match>, RedactionError> {
     if input.len() > MAX_INPUT_BYTES {
         return Err(RedactionError::InputTooLarge);
+    }
+    if let Some(profile) = profile {
+        validate_profile(profile)?;
     }
     let mut found = Vec::new();
     if let Some(profile) = profile {
@@ -216,7 +274,7 @@ pub fn collect_matches(
             )?;
         }
     }
-    for rule in default_rules() {
+    for rule in builtin_rules() {
         for capture in rule.regex.find_iter(input) {
             let value = capture.as_bytes();
             if rule.name == "SSN" && invalid_ssn(value) {

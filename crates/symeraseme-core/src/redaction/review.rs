@@ -112,14 +112,23 @@ where
 
 fn validate_matches(input: &[u8], matches: &[Match]) -> Result<(), ReviewError> {
     let mut last_end = 0;
+    let mut output_len = input.len();
     for (index, item) in matches.iter().enumerate() {
         if item.start < last_end
-            || item.start > item.end
+            || item.start >= item.end
             || item.end > input.len()
             || input.get(item.start..item.end) != Some(item.value.as_slice())
             || item.replacement().len() > MAX_OUTPUT_BYTES
         {
             return Err(ReviewError::InvalidMatch(index));
+        }
+        let span = item.end - item.start;
+        output_len = output_len
+            .checked_sub(span)
+            .and_then(|length| length.checked_add(item.replacement().len()))
+            .ok_or(ReviewError::OutputTooLarge)?;
+        if output_len > MAX_OUTPUT_BYTES {
+            return Err(ReviewError::OutputTooLarge);
         }
         last_end = item.end;
     }

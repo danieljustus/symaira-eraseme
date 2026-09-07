@@ -47,13 +47,17 @@ type ReviewResult struct {
 	Skipped  int
 }
 
-const maxReviewOutputBytes = 32 << 20
-
 // Review applies decisions to already-collected, non-overlapping matches.
 // ActionQuit stops at that match, returning changes made earlier; the caller
 // decides whether to persist those partial changes, exactly as interactive.py
 // asks whether to save after q. A nil decision function keeps every match.
 func Review(content []byte, matches []Match, decide DecisionFunc) (ReviewResult, error) {
+	if len(content) > maxRedactionInputBytes {
+		return ReviewResult{}, ErrInputTooLarge
+	}
+	if len(matches) > maxRedactionMatches {
+		return ReviewResult{}, ErrMatchLimit
+	}
 	if err := validateReviewMatches(content, matches); err != nil {
 		return ReviewResult{}, err
 	}
@@ -104,22 +108,26 @@ func validateReviewMatches(content []byte, matches []Match) error {
 	lastEnd := 0
 	outputSize := len(content)
 	for index, match := range matches {
-		if match.Start < 0 || match.End < match.Start || match.End > len(content) || match.Start < lastEnd || !bytes.Equal(content[match.Start:match.End], []byte(match.Value)) {
-			return fmt.Errorf("invalid match %d: range or value does not match original content", index)
+		replacement := match.Replacement()
+		if match.Start < 0 || match.End <= match.Start || match.End > len(content) || match.Start < lastEnd || !bytes.Equal(content[match.Start:match.End], []byte(match.Value)) {
+			return fmt.Errorf("invalid review match %d", index)
 		}
-		if len(match.Replacement()) > maxReviewOutputBytes {
-			return fmt.Errorf("invalid match %d: replacement is too large", index)
+		if len(replacement) > maxRedactionOutputBytes {
+			return ErrOutputTooLarge
 		}
 		span := match.End - match.Start
 		if span > outputSize {
-			return fmt.Errorf("invalid match %d: output underflow", index)
+			return ErrInvalidMatch
 		}
 		outputSize -= span
-		if len(match.Replacement()) > maxReviewOutputBytes-outputSize {
-			return fmt.Errorf("invalid match %d: output exceeds limit", index)
+		if len(replacement) > maxRedactionOutputBytes-outputSize {
+			return ErrOutputTooLarge
 		}
-		outputSize += len(match.Replacement())
+		outputSize += len(replacement)
 		lastEnd = match.End
+	}
+	if outputSize > maxRedactionOutputBytes {
+		return ErrOutputTooLarge
 	}
 	return nil
 }
@@ -134,7 +142,11 @@ func ReviewText(content string, matches []Match, decide DecisionFunc) (string, R
 // ReviewMatches collects matches and applies a deterministic decision
 // function. It is the no-TTY entry point used by command adapters and tests.
 func ReviewMatches(content []byte, profile *identity.Profile, decide DecisionFunc) (ReviewResult, error) {
-	return Review(content, CollectMatches(string(content), profile), decide)
+	matches, err := CollectMatchesChecked(string(content), profile)
+	if err != nil {
+		return ReviewResult{}, err
+	}
+	return Review(content, matches, decide)
 }
 
 // ReviewTextWithProfile is the string equivalent of ReviewMatches.

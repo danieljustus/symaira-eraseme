@@ -213,3 +213,37 @@ func TestReviewRejectsInvalidMatchAndAction(t *testing.T) {
 		t.Fatal("expected invalid action error")
 	}
 }
+
+func TestCheckedRedactionRejectsResourceLimits(t *testing.T) {
+	if _, err := RedactChecked(strings.Repeat("x", 16<<20+1)); !errors.Is(err, ErrInputTooLarge) {
+		t.Fatalf("input limit error = %v", err)
+	}
+	profile := &identity.Profile{FullName: strings.Repeat("x", 16<<10+1)}
+	if _, err := RedactChecked("x", profile); !errors.Is(err, ErrProfileTooLarge) {
+		t.Fatalf("profile limit error = %v", err)
+	}
+}
+
+func TestWorkspacePathValidationRejectsInvalidUTF8AndUnicodeControls(t *testing.T) {
+	root := t.TempDir()
+	for _, path := range []string{"bad\u0085name.txt", string([]byte{'b', 0xff, 'd'}), "bad\u009fname.txt"} {
+		if _, err := ReadWorkspaceFile(path, root); !errors.Is(err, ErrPathInvalid) {
+			t.Errorf("path %q error = %v, want ErrPathInvalid", path, err)
+		}
+	}
+}
+
+func TestWorkspaceFileAcceptsAbsolutePathInsideRoot(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "inside.txt")
+	if err := os.WriteFile(path, []byte("jane@example.com"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadWorkspaceFile(path, root)
+	if err != nil || string(got) != "jane@example.com" {
+		t.Fatalf("absolute inside read = %q, %v", got, err)
+	}
+	if _, err := ReadWorkspaceFile(filepath.Join(filepath.Dir(root), "sibling", "inside.txt"), root); !errors.Is(err, ErrPathOutsideWorkspace) {
+		t.Fatalf("absolute sibling error = %v, want ErrPathOutsideWorkspace", err)
+	}
+}

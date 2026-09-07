@@ -5,8 +5,8 @@ mod review;
 
 pub use path::{WorkspaceRoot, WorkspaceRootError, read_workspace_file, read_workspace_text};
 pub use pii::{
-    Address, Match, RedactionError, RedactionProfile, Rule, collect_matches, redact_bytes,
-    redact_text, rules,
+    Address, MAX_PROFILE_LITERAL_BYTES, MAX_PROFILE_VECTOR_ENTRIES, Match, RedactionError,
+    RedactionProfile, Rule, collect_matches, redact_bytes, redact_text, rules,
 };
 pub use review::{Action, Decision, ReviewError, ReviewResult, review_bytes, review_text};
 
@@ -160,6 +160,48 @@ mod tests {
             root.read("oversized"),
             Err(WorkspaceRootError::FileTooLarge)
         ));
+    }
+
+    #[test]
+    fn profile_limits_are_checked_before_matching() {
+        let profile = RedactionProfile {
+            full_name: "x".repeat(MAX_PROFILE_LITERAL_BYTES + 1),
+            ..RedactionProfile::default()
+        };
+        assert!(matches!(
+            collect_matches(b"x", Some(&profile)),
+            Err(RedactionError::InvalidProfileLiteral)
+        ));
+        let profile = RedactionProfile {
+            name_variants: vec!["x".to_owned(); MAX_PROFILE_VECTOR_ENTRIES + 1],
+            ..RedactionProfile::default()
+        };
+        assert!(matches!(
+            collect_matches(b"x", Some(&profile)),
+            Err(RedactionError::InvalidProfileLiteral)
+        ));
+    }
+
+    #[test]
+    fn forged_empty_match_is_rejected_without_zero_length_windows() {
+        let item = Match::new("test", 0, 0, Vec::new(), b"x".to_vec());
+        assert!(matches!(
+            review_bytes(b"abc", &[item], None::<fn(&Match) -> Action>),
+            Err(ReviewError::InvalidMatch(0))
+        ));
+    }
+
+    #[test]
+    fn absolute_inside_path_is_confined_to_the_open_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("inside.txt");
+        fs::write(&path, b"jane@example.com").unwrap();
+        assert_eq!(
+            read_workspace_file(&path, Some(temp.path())).unwrap(),
+            b"jane@example.com"
+        );
+        let outside = temp.path().parent().unwrap().join("sibling-nope.txt");
+        assert!(read_workspace_file(&outside, Some(temp.path())).is_err());
     }
 
     #[test]
