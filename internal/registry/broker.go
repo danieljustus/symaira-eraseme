@@ -282,7 +282,7 @@ func rejectYAMLNodeContracts(root *yaml.Node) error {
 				if key.Kind == yaml.ScalarNode && key.Value != "" {
 					fieldPath = path + "." + key.Value
 				}
-				if isFormStepPath(path) && key.Kind == yaml.ScalarNode && isStringAction(key.Value) && value.Kind == yaml.ScalarNode && value.Tag == "!!str" && value.Value == "" {
+				if isFormStepPath(path) && key.Kind == yaml.ScalarNode && isStringAction(key.Value) && value.Kind == yaml.ScalarNode && value.Value == "" {
 					return verr("yaml: %s must not be empty when present", fieldPath)
 				}
 				if err := walk(key, fieldPath+"[name]"); err != nil {

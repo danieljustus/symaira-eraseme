@@ -474,14 +474,24 @@ func TestScalarPunctuationAndNodeContracts(t *testing.T) {
 			t.Errorf("%s accepted", marker)
 		}
 	}
+	quotedFlow := base + "verification:\n  ack_keywords: [ok,\"[\"]\n"
+	if _, err := decodeAndValidate(&doc{id: "test", content: []byte(quotedFlow)}); err != nil {
+		t.Errorf("quoted flow punctuation rejected: %v", err)
+	}
 }
 
 func TestExplicitlyEmptyStringActionsAreRejectedWithOtherActions(t *testing.T) {
 	base := "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - wait_seconds: 0\n"
 	for _, field := range []string{"goto", "click", "wait_for", "screenshot", "assert_text"} {
-		source := base + "          " + field + ": ''\n"
-		if _, err := decodeAndValidate(&doc{id: "test", content: []byte(source)}); err == nil {
-			t.Errorf("explicitly empty %s accepted alongside another action", field)
+		for _, value := range []string{"''", "!custom ''", `!custom ""`} {
+			source := base + "          " + field + ": " + value + "\n"
+			if _, err := decodeAndValidate(&doc{id: "test", content: []byte(source)}); err == nil {
+				t.Errorf("explicitly empty %s value %s accepted alongside another action", field, value)
+			}
 		}
+	}
+	validNestedEmpty := strings.Replace(base, "        - wait_seconds: 0\n", "        - fill:\n            input: ''\n", 1)
+	if _, err := decodeAndValidate(&doc{id: "test", content: []byte(validNestedEmpty)}); err != nil {
+		t.Errorf("empty nested fill value rejected: %v", err)
 	}
 }

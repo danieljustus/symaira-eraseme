@@ -132,7 +132,7 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 		}
 		switch character {
 		case '\'', '"':
-			if isYAMLNodeStart(line, index) {
+			if isYAMLNodeStart(line, index, *flowDepth > 0) {
 				quote = character
 			}
 		case '#':
@@ -140,7 +140,7 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 				return lineNodes, compactDepth, nil
 			}
 		case '[', '{':
-			if *flowDepth > 0 || isYAMLNodeStart(line, index) {
+			if isYAMLNodeStart(line, index, *flowDepth > 0) {
 				*flowDepth++
 				lineNodes++
 				if blockLevels+compactDepth+*flowDepth > maxYAMLDepth {
@@ -164,7 +164,7 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 // isYAMLNodeStart reports whether index follows syntax that can introduce a
 // new YAML node. Punctuation in an already-started plain scalar is data, not
 // flow syntax (for example, "notes: hello [world").
-func isYAMLNodeStart(line []byte, index int) bool {
+func isYAMLNodeStart(line []byte, index int, inFlow bool) bool {
 	previous := index - 1
 	for previous >= 0 && (line[previous] == ' ' || line[previous] == '	') {
 		previous--
@@ -174,9 +174,11 @@ func isYAMLNodeStart(line []byte, index int) bool {
 	}
 	switch line[previous] {
 	case ':':
-		return index-previous > 1
+		return inFlow || index-previous > 1
+	case ',':
+		return inFlow
 	case '[', '{':
-		return true
+		return inFlow
 	case '-':
 		for before := 0; before < previous; before++ {
 			if line[before] != ' ' && line[before] != '	' && line[before] != '-' {
