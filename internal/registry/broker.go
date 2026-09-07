@@ -151,9 +151,17 @@ func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
 	if err != nil {
 		return Broker{}, 0, err
 	}
-	var raw map[string]yaml.Node
+	var document yaml.Node
 	dec := yaml.NewDecoder(strings.NewReader(string(d.content)))
-	if err := dec.Decode(&raw); err != nil {
+	if err := dec.Decode(&document); err != nil {
+		return Broker{}, 0, verr("yaml decode: %v", err)
+	}
+	nodes, err = exactYAMLNodeBudget(&document)
+	if err != nil {
+		return Broker{}, 0, err
+	}
+	var raw map[string]yaml.Node
+	if err := document.Decode(&raw); err != nil {
 		return Broker{}, 0, verr("yaml decode: %v", err)
 	}
 	var extra yaml.Node
@@ -244,6 +252,41 @@ func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
 		b.Status = "active"
 	}
 	return b, nodes, nil
+}
+
+func exactYAMLNodeBudget(root *yaml.Node) (int, error) {
+	var walk func(*yaml.Node, int) (int, int)
+	walk = func(node *yaml.Node, depth int) (int, int) {
+		if node.Kind == yaml.DocumentNode {
+			count, maxDepth := 0, 0
+			for _, child := range node.Content {
+				childCount, childDepth := walk(child, depth)
+				count += childCount
+				if childDepth > maxDepth {
+					maxDepth = childDepth
+				}
+			}
+			return count, maxDepth
+		}
+		count, maxDepth := 1, depth
+		for _, child := range node.Content {
+			childCount, childDepth := walk(child, depth+1)
+			count += childCount
+			if childDepth > maxDepth {
+				maxDepth = childDepth
+			}
+		}
+		return count, maxDepth
+	}
+
+	nodes, depth := walk(root, 1)
+	if nodes > maxYAMLNodes {
+		return 0, verr("yaml: node budget exceeded (%d > %d)", nodes, maxYAMLNodes)
+	}
+	if depth > maxYAMLDepth {
+		return 0, verr("yaml: depth budget exceeded (%d > %d)", depth, maxYAMLDepth)
+	}
+	return nodes, nil
 }
 
 func isISODate(value string) bool {

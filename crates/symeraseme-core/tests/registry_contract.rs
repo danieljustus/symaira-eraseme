@@ -317,12 +317,33 @@ fn loader_rejects_non_regular_yaml_entries_and_enforces_file_caps() {
                 .path()
                 .join("brokers/us")
                 .join(format!("broker-{index}.yaml")),
-            "",
+            base_broker().replace("id: test", &format!("id: broker-{index}")),
         )
         .unwrap();
     }
     let error = load_from_dir(many_files.path()).unwrap_err();
     assert!(error.to_string().contains("broker YAML file limit"));
+}
+
+#[test]
+fn loader_enforces_directory_entry_cap_while_iterating() {
+    let root = tempfile_root();
+    fs::create_dir_all(root.path().join("brokers/us")).unwrap();
+    for index in 0..=16_384 {
+        fs::write(
+            root.path()
+                .join("brokers/us")
+                .join(format!("entry-{index}.txt")),
+            "",
+        )
+        .unwrap();
+    }
+    let error = load_from_dir(root.path()).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("directory entry limit 16384 exceeded")
+    );
 }
 
 #[test]

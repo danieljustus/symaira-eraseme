@@ -166,13 +166,7 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
             ));
         }
         seen_ids.insert(pending.stem.clone(), pending.display_path.clone());
-        let (source, bytes_read) =
-            read_bounded(pending.file, &pending.display_path, budget.input_bytes)?;
-        budget.input_bytes = budget
-            .input_bytes
-            .checked_add(bytes_read)
-            .ok_or_else(|| validation("registry", "aggregate input byte counter overflowed"))?;
-        let (broker, nodes) = decode_with_metrics(&pending.stem, &source)
+        let (broker, nodes) = decode_with_metrics(&pending.stem, &pending.content)
             .map_err(|error| with_path(error, &pending.display_path))?;
         budget.yaml_nodes = budget
             .yaml_nodes
@@ -434,10 +428,10 @@ fn is_optional_field(field: &str) -> bool {
     )
 }
 
-struct PendingFile {
+struct PendingDocument {
     stem: String,
     display_path: PathBuf,
-    file: File,
+    content: String,
 }
 
 fn read_bounded(
@@ -497,7 +491,7 @@ fn read_bounded(
 fn collect_yaml(
     dir: &Dir,
     display_dir: &Path,
-    output: &mut Vec<PendingFile>,
+    output: &mut Vec<PendingDocument>,
     budget: &mut LoadBudget,
     depth: usize,
 ) -> Result<(), RegistryError> {
@@ -507,20 +501,15 @@ fn collect_yaml(
             format!("directory nesting exceeds {MAX_DIRECTORY_DEPTH} levels"),
         ));
     }
-    let mut entries = dir
-        .entries()
-        .map_err(|source| RegistryError::Io {
-            path: display_dir.to_owned(),
-            source,
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|source| RegistryError::Io {
+    let mut entries = Vec::new();
+    for entry in dir.entries().map_err(|source| RegistryError::Io {
+        path: display_dir.to_owned(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| RegistryError::Io {
             path: display_dir.to_owned(),
             source,
         })?;
-    entries.sort_by_key(|left| left.file_name());
-
-    for entry in entries {
         budget.directory_entries = budget
             .directory_entries
             .checked_add(1)
@@ -531,6 +520,11 @@ fn collect_yaml(
                 format!("directory entry limit {MAX_DIRECTORY_ENTRIES} exceeded"),
             ));
         }
+        entries.push(entry);
+    }
+    entries.sort_by_key(|left| left.file_name());
+
+    for entry in entries {
         let name = entry.file_name();
         let name = name.to_str().ok_or_else(|| {
             validation(
@@ -594,23 +588,15 @@ fn collect_yaml(
                     path: display_path.clone(),
                     source,
                 })?;
-            let metadata = file.metadata().map_err(|source| RegistryError::Io {
-                path: display_path.clone(),
-                source,
-            })?;
-            if !metadata.is_file() {
-                return Err(validation(
-                    "registry layout",
-                    format!(
-                        "YAML entry is not a stable regular file: {}",
-                        display_path.display()
-                    ),
-                ));
-            }
-            output.push(PendingFile {
+            let (content, bytes_read) = read_bounded(file, &display_path, budget.input_bytes)?;
+            budget.input_bytes = budget
+                .input_bytes
+                .checked_add(bytes_read)
+                .ok_or_else(|| validation("registry", "aggregate input byte counter overflowed"))?;
+            output.push(PendingDocument {
                 stem,
                 display_path,
-                file,
+                content,
             });
             continue;
         }
