@@ -85,7 +85,7 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		if _, ok := doc.Jobs["release-cli"]; !ok {
 			t.Errorf("missing job 'release-cli' in release workflow")
 		}
-		if guiJob.RunsOn != "macos-15" {
+		if guiJob.RunsOn != "macos-26" {
 			t.Errorf("release-gui runs-on: got %q, want %q", guiJob.RunsOn, "macos-15")
 		}
 		if guiJob.Environment != "release" {
@@ -183,6 +183,9 @@ func TestReleaseWorkflowContract(t *testing.T) {
 			if !strings.Contains(verifyStep.Run, expected) {
 				t.Errorf("Xcode verification missing %q", expected)
 			}
+		}
+		if !strings.Contains(rawYAML, "runs-on: macos-26") || !strings.Contains(rawYAML, "xcode-version: '26.6'") {
+			t.Error("release workflow must pin the GUI lane to macOS 26 and Xcode 26.6")
 		}
 	})
 
