@@ -1,3 +1,6 @@
 # Generated encrypted interoperability fixtures are binary.
 tests/fixtures/identity-contract/*.enc binary
 tests/fixtures/event-store/crypto/*.db binary
+
+# Embedded completion scripts have byte-exact Go/Rust golden contracts.
+crates/symeraseme-cli/src/commands/completion/*.txt text eol=lf
