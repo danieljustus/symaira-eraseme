@@ -339,12 +339,12 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
                 .get("json")
                 .is_some_and(|value| value == "true")
             {
-                match version::current().json_line() {
+                match version::json_line(&version::current()) {
                     Ok(bytes) => Outcome::Stdout(bytes),
                     Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
                 }
             } else {
-                Outcome::Stdout(format!("{}\n", version::current().text()).into_bytes())
+                Outcome::Stdout(format!("{}\n", version::text(&version::current())).into_bytes())
             }
         }
         "config show" => config_show(parsed),

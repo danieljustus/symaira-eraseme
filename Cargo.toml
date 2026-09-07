@@ -21,6 +21,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 rusqlite = { version = "0.37", features = ["backup", "bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "27177f25f551cecefa7bd6c4524abf175b3a75c7" }
 toml = "0.5.11"
 
 [profile.release]
