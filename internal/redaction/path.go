@@ -132,6 +132,9 @@ func ReadWorkspaceFile(path string, workspaceRoots ...string) ([]byte, error) {
 		}
 		current = next
 	}
+	if current != root {
+		defer current.Close()
+	}
 	name := parts[len(parts)-1]
 	info, err := current.Lstat(name)
 	if err != nil {

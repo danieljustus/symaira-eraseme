@@ -128,9 +128,10 @@ mod tests {
 
     #[test]
     fn long_domain_email_matches_go_rule_bounds() {
-        let input = "a@b.c.d.e.f.g.h.i.j.k.l.m.n";
-        let output = redact_text(input, None).unwrap();
-        assert_eq!(output, "a@b*.c.d.e.f.g.h.i.j.k.l.m.n");
+        let domain = std::iter::repeat_n("a", 127).collect::<Vec<_>>().join(".");
+        let input = format!("x@{domain}");
+        let output = redact_text(&input, None).unwrap();
+        assert_eq!(output, format!("x@a*.{}", domain[2..].to_owned()));
     }
 
     #[test]
