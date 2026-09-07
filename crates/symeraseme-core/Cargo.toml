@@ -21,6 +21,7 @@ flate2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+symaira-core-version.workspace = true
 tar.workspace = true
 tempfile.workspace = true
 toml.workspace = true

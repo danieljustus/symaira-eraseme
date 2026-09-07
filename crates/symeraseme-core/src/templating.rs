@@ -27,8 +27,8 @@ const MAX_TOTAL_COLLECTION_ENTRIES: usize = 65_536;
 const MAX_JSON_NODES: usize = 65_536;
 const MAX_JSON_DEPTH: usize = 32;
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
-// 100,000 instructions leaves substantial margin over all eleven goldens,
-// while bounding template work independently from input and output sizes.
+// The fixed templates render within this budget; context, collection and
+// output limits independently bound data-driven work.
 const MAX_RENDER_FUEL: u64 = 100_000;
 const MAX_RECURSION_LIMIT: usize = 64;
 const TEMPLATE_COUNT: usize = 11;
@@ -352,7 +352,7 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
         }
     });
 
-    let variables = context_values(context)?;
+    let variables: Value = context_values(context)?.into_iter().collect();
     let template = environment
         .template_from_named_str(name, template.source)
         .map_err(|_| TemplateError::named("template could not be parsed", name))?;
@@ -612,16 +612,43 @@ fn context_values(context: &RenderContext) -> Result<BTreeMap<String, Value>, Te
 
     let mut values = BTreeMap::new();
     for (key, value) in object {
-        values.insert(key, Value::from_serialize(value));
+        values.insert(key, json_value(value)?);
     }
     values.insert(
         "now".to_owned(),
         Value::from_object(FrozenDateTimeObject { value: now }),
     );
     for (key, value) in extra {
-        values.insert(key, Value::from_serialize(value));
+        values.insert(key, json_value(value)?);
     }
     Ok(values)
+}
+
+fn json_value(value: JsonValue) -> Result<Value, TemplateError> {
+    match value {
+        JsonValue::Null => Ok(Value::from(())),
+        JsonValue::Bool(value) => Ok(Value::from(value)),
+        JsonValue::Number(value) => {
+            if let Some(value) = value.as_i64() {
+                Ok(Value::from(value))
+            } else if let Some(value) = value.as_u64() {
+                Ok(Value::from(value))
+            } else if let Some(value) = value.as_f64() {
+                Ok(Value::from(value))
+            } else {
+                Err(TemplateError::new("invalid render context"))
+            }
+        }
+        JsonValue::String(value) => Ok(Value::from(value)),
+        JsonValue::Array(values) => values
+            .into_iter()
+            .map(json_value)
+            .collect::<Result<Value, TemplateError>>(),
+        JsonValue::Object(values) => values
+            .into_iter()
+            .map(|(key, value)| Ok((Value::from(key), json_value(value)?)))
+            .collect::<Result<Value, TemplateError>>(),
+    }
 }
 
 /// Internal source inventory used by the drift-contract tests.
