@@ -24,6 +24,7 @@ cp "$ICNS_SOURCE" "$APP_PATH/Contents/Resources/AppIcon.icns"
 "$ACTOOL" \
   --compile "$COMPILED_DIR" \
   --platform macosx \
+  --target-device mac \
   --minimum-deployment-target 14.0 \
   --app-icon AppIcon \
   --output-partial-info-plist "$TMP_DIR/partial.plist" \

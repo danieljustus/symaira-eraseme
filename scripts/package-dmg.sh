@@ -109,6 +109,7 @@ if [ "$DMG_ONLY" != "true" ]; then
         "$ACTOOL" \
             --compile "$ICON_BUILD_DIR" \
             --platform macosx \
+            --target-device mac \
             --minimum-deployment-target 14.0 \
             --app-icon AppIcon \
             --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
