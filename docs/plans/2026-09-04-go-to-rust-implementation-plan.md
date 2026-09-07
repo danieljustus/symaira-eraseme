@@ -420,11 +420,11 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-core/tests/registry_contract.rs`
 
 **Steps:**
-- [ ] Model every schema-v1 field with exact snake_case names/defaults.
-- [ ] Reject unknown keys at every closed object boundary.
-- [ ] Implement channel variant, enum, selector, URI/date and filename rules.
-- [ ] Run all four golden and negative fixtures.
-- [ ] Run the full real corpus; expected count is 1,277.
+- [x] Model every schema-v1 field with exact snake_case names/defaults.
+- [x] Reject unknown keys at every closed object boundary.
+- [x] Implement channel variant, enum, selector, URI/date and filename rules.
+- [x] Run all four golden and negative fixtures.
+- [x] Run the full real corpus; expected count is 1,277.
 
 ### Task 3.2: Port registry embedding, loading, filtering and sync
 

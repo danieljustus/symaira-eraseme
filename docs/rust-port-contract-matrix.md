@@ -44,6 +44,16 @@ Cargo-deny and Windows compile gates.
 
 The Go production route remains unchanged until the later cutover phase.
 
+## Phase 3 execution evidence
+
+Task `3.1` is implemented and independently reviewed at
+`b3b7ce642944c4fd0c123150e25d5d990f043b05`. The schema-v1 models, strict
+validation, four golden fixtures, negative cases, metadata/resource gates and
+the complete 1,277-broker corpus pass in Go and Rust. Specification review is
+`PASS`; quality/security review is `APPROVED`. Tasks `3.2`–`3.4` remain active
+or pending, so `REG-001..008`, `TMP-001..002` and `RED-001..002` stay `TODO`
+until their complete task gates pass.
+
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
 SQLite, network transcript or process behavior.
