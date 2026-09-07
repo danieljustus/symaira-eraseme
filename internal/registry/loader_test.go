@@ -495,3 +495,33 @@ func TestExplicitlyEmptyStringActionsAreRejectedWithOtherActions(t *testing.T) {
 		t.Errorf("empty nested fill value rejected: %v", err)
 	}
 }
+
+func TestLoadFromDirEnforcesCanonicalBrokerLayout(t *testing.T) {
+	manifest := `{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}`
+	schema := `{"schema_version":1}`
+	base := []byte("id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: email\n    endpoint: a@example.test\n")
+	for _, relative := range []string{"brokers/direct.yaml", "brokers/ca/test.yaml", "brokers/us/deep/test.yaml"} {
+		root := t.TempDir()
+		writeRegistryMetadata(t, root, manifest, schema)
+		path := filepath.Join(root, relative)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, base, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFromDir(root); err == nil || !strings.Contains(err.Error(), "layout") {
+			t.Fatalf("%s: error=%v", relative, err)
+		}
+	}
+
+	root := t.TempDir()
+	writeRegistryMetadata(t, root, manifest, schema)
+	doc := filepath.Join(root, "brokers", "us", "_example.yaml")
+	if err := os.WriteFile(doc, base, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if brokers, err := LoadFromDir(root); err != nil || len(brokers) != 0 {
+		t.Fatalf("underscore documentation file: brokers=%d err=%v", len(brokers), err)
+	}
+}

@@ -1,8 +1,11 @@
 use super::RegistryError;
 use super::loader::load_from_dir;
-use flate2::read::GzDecoder;
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Cursor, Read, Write};
+use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt, OpenOptionsSyncExt};
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir, File, OpenOptions};
+use flate2::bufread::GzDecoder;
+use std::fs;
+use std::io::{self, BufReader, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 use tar::Archive;
@@ -106,8 +109,10 @@ pub fn sync_with_transport(
         ));
     }
     let compressed = read_bounded(&mut response.body, MAX_COMPRESSED_BYTES)?;
-    let decoder = GzDecoder::new(Cursor::new(compressed));
-    extract_archive(decoder, staging.path())?;
+    let decoder = GzDecoder::new(BufReader::new(Cursor::new(compressed)));
+    let staging_dir = Dir::open_ambient_dir(staging.path(), ambient_authority())
+        .map_err(|source| io_error(staging.path(), source))?;
+    extract_archive(decoder, &staging_dir)?;
     load_from_dir(staging.path())?;
 
     replace_directory(destination, staging.path())
@@ -168,7 +173,10 @@ fn read_bounded(reader: &mut dyn Read, limit: usize) -> Result<Vec<u8>, Registry
     Ok(bytes)
 }
 
-fn extract_archive<R: Read>(reader: R, staging: &Path) -> Result<(), RegistryError> {
+fn extract_archive(
+    reader: GzDecoder<BufReader<Cursor<Vec<u8>>>>,
+    staging: &Dir,
+) -> Result<(), RegistryError> {
     let mut archive = Archive::new(reader);
     let mut entries = 0_usize;
     let mut files = 0_usize;
@@ -186,14 +194,12 @@ fn extract_archive<R: Read>(reader: R, staging: &Path) -> Result<(), RegistryErr
         }
         let mut entry = item.map_err(|source| io_error(Path::new("archive"), source))?;
         let path = safe_archive_path(entry.path_bytes().as_ref())?;
-        let target = staging.join(&path);
         let entry_type = entry.header().entry_type();
         if entry_type.is_dir() {
             if entry.size() != 0 {
                 return Err(validation("sync", "directory entry contains data"));
             }
-            fs::create_dir_all(&target).map_err(|source| io_error(&path, source))?;
-            set_mode(&target, 0o700)?;
+            create_relative_dir_all(staging, &path)?;
         } else if entry_type.is_file() {
             let size = entry.size();
             if size > MAX_FILE_BYTES {
@@ -218,21 +224,99 @@ fn extract_archive<R: Read>(reader: R, staging: &Path) -> Result<(), RegistryErr
                     format!("expanded archive limit {MAX_EXPANDED_BYTES} exceeded"),
                 ));
             }
-            if let Some(parent) = target.parent() {
-                fs::create_dir_all(parent).map_err(|source| io_error(parent, source))?;
-            }
-            let mut file = OpenOptions::new()
+            let (parent, name) = open_parent_dir(staging, &path)?;
+            let mut options = OpenOptions::new();
+            options
                 .write(true)
                 .create_new(true)
-                .open(&target)
+                .follow(FollowSymlinks::No)
+                .nonblock(true);
+            let mut file = parent
+                .open_with(name, &options)
                 .map_err(|source| io_error(&path, source))?;
             copy_exact(&mut entry, &mut file, size, &path)?;
             file.flush().map_err(|source| io_error(&path, source))?;
-            set_mode(&target, 0o600)?;
+            set_file_mode(&file, &path)?;
         } else {
             return Err(validation("sync", "unsupported archive entry type"));
         }
     }
+
+    // Force checksum/trailer validation and reject bytes after the tar end.
+    let mut decoder = archive.into_inner();
+    let mut trailing_decompressed = Vec::new();
+    decoder
+        .read_to_end(&mut trailing_decompressed)
+        .map_err(|source| io_error(Path::new("archive"), source))?;
+    if trailing_decompressed.iter().any(|byte| *byte != 0) {
+        return Err(validation("sync", "decompressed bytes after tar end"));
+    }
+    let mut compressed = decoder.into_inner();
+    let mut trailing_compressed = Vec::new();
+    compressed
+        .read_to_end(&mut trailing_compressed)
+        .map_err(|source| io_error(Path::new("archive"), source))?;
+    if !trailing_compressed.is_empty() {
+        return Err(validation(
+            "sync",
+            "trailing compressed bytes are not allowed",
+        ));
+    }
+    Ok(())
+}
+
+fn create_relative_dir_all(root: &Dir, path: &Path) -> Result<(), RegistryError> {
+    let mut current = root.try_clone().map_err(|source| io_error(path, source))?;
+    for component in path.components() {
+        let Component::Normal(name) = component else {
+            return Err(validation("sync", "unsafe archive path"));
+        };
+        match current.open_dir_nofollow(name) {
+            Ok(next) => current = next,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {
+                current
+                    .create_dir(name)
+                    .map_err(|source| io_error(path, source))?;
+                current = current
+                    .open_dir_nofollow(name)
+                    .map_err(|source| io_error(path, source))?;
+            }
+            Err(source) => return Err(io_error(path, source)),
+        }
+    }
+    Ok(())
+}
+
+fn open_parent_dir(root: &Dir, path: &Path) -> Result<(Dir, PathBuf), RegistryError> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| validation("sync", "empty archive path"))?
+        .to_owned();
+    let parent_path = path.parent().unwrap_or_else(|| Path::new(""));
+    create_relative_dir_all(root, parent_path)?;
+    let mut parent = root.try_clone().map_err(|source| io_error(path, source))?;
+    for component in parent_path.components() {
+        let Component::Normal(component) = component else {
+            return Err(validation("sync", "unsafe archive path"));
+        };
+        parent = parent
+            .open_dir_nofollow(component)
+            .map_err(|source| io_error(path, source))?;
+    }
+    Ok((parent, name.into()))
+}
+
+#[cfg(unix)]
+fn set_file_mode(file: &File, path: &Path) -> Result<(), RegistryError> {
+    use std::os::unix::fs::PermissionsExt;
+    file.set_permissions(cap_std::fs::Permissions::from_std(
+        std::fs::Permissions::from_mode(0o600),
+    ))
+    .map_err(|source| io_error(path, source))
+}
+
+#[cfg(not(unix))]
+fn set_file_mode(_file: &File, _path: &Path) -> Result<(), RegistryError> {
     Ok(())
 }
 
@@ -259,11 +343,15 @@ fn safe_archive_path(raw: &[u8]) -> Result<PathBuf, RegistryError> {
     }
     let value =
         std::str::from_utf8(raw).map_err(|_| validation("sync", "archive path is not UTF-8"))?;
-    if value.starts_with('/') || value.starts_with('\\') || value.contains('\0') {
+    if value.contains(char::from(0))
+        || value.contains('\\')
+        || value.starts_with('/')
+        || windows_absolute(value)
+    {
         return Err(validation("sync", "absolute or invalid archive path"));
     }
     let mut path = PathBuf::new();
-    for component in value.replace('\\', "/").split('/') {
+    for component in value.split('/') {
         if component.is_empty() {
             continue;
         }
@@ -284,6 +372,11 @@ fn safe_archive_path(raw: &[u8]) -> Result<PathBuf, RegistryError> {
         return Err(validation("sync", "empty archive path"));
     }
     Ok(path)
+}
+
+fn windows_absolute(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() >= 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic()
 }
 
 fn replace_directory(destination: &Path, staging: &Path) -> Result<(), RegistryError> {
@@ -472,5 +565,21 @@ mod tests {
         assert_eq!(fs::read(backup.join("state")).unwrap(), b"old");
         let container = backup.parent().unwrap();
         fs::remove_dir_all(container).unwrap();
+    }
+
+    #[test]
+    fn archive_paths_reject_backslashes_and_windows_absolute_forms_but_keep_safe_dots() {
+        for path in [
+            br"dir\\file.txt".as_slice(),
+            br"C:/escape.txt".as_slice(),
+            br"//server/share.txt".as_slice(),
+            br"../escape.txt".as_slice(),
+        ] {
+            assert!(safe_archive_path(path).is_err(), "accepted {:?}", path);
+        }
+        assert_eq!(
+            safe_archive_path(br"nested/safe..name.txt").unwrap(),
+            PathBuf::from("nested/safe..name.txt")
+        );
     }
 }

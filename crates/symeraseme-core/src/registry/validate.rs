@@ -121,9 +121,29 @@ struct LoadBudget {
     yaml_nodes: usize,
 }
 
-/// Loads every non-documentation broker YAML under `registry/brokers`.
-pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
+/// A filesystem load result that preserves valid brokers while reporting every
+/// validation error in deterministic path order.
+pub struct LoadReport {
+    pub brokers: Vec<Broker>,
+    pub errors: Vec<RegistryError>,
+}
+
+/// Loads a registry and returns all per-file validation errors. Metadata,
+/// filesystem, and resource-limit failures remain fatal because the corpus
+/// cannot be trusted or reported deterministically after those failures.
+pub fn load_reporting_from_dir(root: impl AsRef<Path>) -> Result<LoadReport, RegistryError> {
     let root_path = root.as_ref();
+    let root_metadata =
+        std::fs::symlink_metadata(root_path).map_err(|source| RegistryError::Io {
+            path: root_path.to_owned(),
+            source,
+        })?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.file_type().is_dir() {
+        return Err(validation(
+            "registry layout",
+            "registry root must be a real directory",
+        ));
+    }
     let root_dir =
         Dir::open_ambient_dir(root_path, cap_std::ambient_authority()).map_err(|source| {
             RegistryError::Io {
@@ -132,6 +152,19 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
             }
         })?;
     validate_registry_metadata(&root_dir)?;
+    let brokers_metadata =
+        root_dir
+            .symlink_metadata("brokers")
+            .map_err(|source| RegistryError::Io {
+                path: root_path.join("brokers"),
+                source,
+            })?;
+    if brokers_metadata.file_type().is_symlink() || !brokers_metadata.is_dir() {
+        return Err(validation(
+            "registry layout",
+            "brokers must be a real directory",
+        ));
+    }
     let brokers_dir = root_dir
         .open_dir("brokers")
         .map_err(|source| RegistryError::Io {
@@ -151,15 +184,10 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
     files.sort_by(|left, right| left.display_path.cmp(&right.display_path));
     let mut seen_ids: HashMap<String, PathBuf> = HashMap::new();
     let mut brokers = Vec::with_capacity(files.len().min(MAX_OUTPUT_BROKERS));
+    let mut errors = Vec::new();
     for pending in files {
-        if brokers.len() >= MAX_OUTPUT_BROKERS {
-            return Err(validation(
-                "registry",
-                format!("output broker limit {MAX_OUTPUT_BROKERS} exceeded"),
-            ));
-        }
         if let Some(previous) = seen_ids.get(&pending.stem) {
-            return Err(validation(
+            errors.push(validation(
                 "id",
                 format!(
                     "duplicate broker id {:?} in {} and {}",
@@ -168,10 +196,16 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
                     pending.display_path.display()
                 ),
             ));
+            continue;
         }
         seen_ids.insert(pending.stem.clone(), pending.display_path.clone());
-        let (broker, nodes) = decode_with_metrics(&pending.stem, &pending.content)
-            .map_err(|error| with_path(error, &pending.display_path))?;
+        let (broker, nodes) = match decode_with_metrics(&pending.stem, &pending.content) {
+            Ok(value) => value,
+            Err(error) => {
+                errors.push(with_path(error, &pending.display_path));
+                continue;
+            }
+        };
         budget.yaml_nodes = budget
             .yaml_nodes
             .checked_add(nodes)
@@ -182,10 +216,25 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
                 format!("aggregate YAML node limit {MAX_AGGREGATE_YAML_NODES} exceeded"),
             ));
         }
+        if brokers.len() >= MAX_OUTPUT_BROKERS {
+            return Err(validation(
+                "registry",
+                format!("output broker limit {MAX_OUTPUT_BROKERS} exceeded"),
+            ));
+        }
         brokers.push(broker);
     }
     brokers.sort_by(|left, right| left.id.cmp(&right.id));
-    Ok(brokers)
+    Ok(LoadReport { brokers, errors })
+}
+
+/// Loads the registry and preserves the historical first-error convenience.
+pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
+    let report = load_reporting_from_dir(root)?;
+    if let Some(error) = report.errors.into_iter().next() {
+        return Err(error);
+    }
+    Ok(report.brokers)
 }
 
 #[derive(serde::Deserialize)]
@@ -610,12 +659,53 @@ fn collect_yaml(
                 format!("symlink is not allowed: {}", display_path.display()),
             ));
         }
+        if depth == 0 {
+            if !file_type.is_dir() || !allowed_jurisdiction(name) {
+                return Err(validation(
+                    "registry layout",
+                    format!(
+                        "expected brokers/{{eu,uk,us}}/<filename>.yaml|yml, got {}",
+                        display_path.display()
+                    ),
+                ));
+            }
+            let child = entry.open_dir().map_err(|source| RegistryError::Io {
+                path: display_path.clone(),
+                source,
+            })?;
+            collect_yaml(&child, &display_path, output, budget, depth + 1)?;
+            continue;
+        }
+        if depth != 1 || file_type.is_dir() {
+            return Err(validation(
+                "registry layout",
+                format!(
+                    "broker files must be directly under brokers/{{eu,uk,us}}: {}",
+                    display_path.display()
+                ),
+            ));
+        }
+        if !file_type.is_file() {
+            return Err(validation(
+                "registry layout",
+                format!(
+                    "registry entry is not a regular file: {}",
+                    display_path.display()
+                ),
+            ));
+        }
         let is_yaml = matches!(
             Path::new(name)
                 .extension()
                 .and_then(|extension| extension.to_str()),
             Some("yaml" | "yml")
         );
+        if !is_yaml {
+            return Err(validation(
+                "registry layout",
+                format!("broker entry must be YAML: {}", display_path.display()),
+            ));
+        }
         if is_yaml {
             if !file_type.is_file() {
                 return Err(validation(
@@ -673,6 +763,10 @@ fn collect_yaml(
         }
     }
     Ok(())
+}
+
+fn allowed_jurisdiction(value: &str) -> bool {
+    matches!(value, "eu" | "uk" | "us")
 }
 
 fn validate_broker(file_stem: &str, broker: Broker) -> Result<Broker, RegistryError> {
@@ -1047,6 +1141,12 @@ pub(crate) fn with_path(error: RegistryError, path: &Path) -> RegistryError {
         RegistryError::Validation { field, message } => {
             validation(path.display().to_string() + ": " + &field, message)
         }
-        other => other,
+        RegistryError::Yaml(error) => {
+            validation(path.display().to_string(), format!("YAML: {error}"))
+        }
+        RegistryError::Io { source, .. } => RegistryError::Io {
+            path: path.to_owned(),
+            source,
+        },
     }
 }

@@ -2,6 +2,7 @@ package registry
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -23,18 +24,13 @@ const DefaultSyncURL = "https://github.com/danieljustus/symaira-eraseme/releases
 
 const (
 	syncTimeout           = 60 * time.Second
+	syncMaxRedirects      = 10
 	syncMaxCompressed     = 64 << 20
 	syncMaxExpanded       = 64 << 20
 	syncMaxFile           = 1 << 20
 	syncMaxFiles          = 4096
 	syncMaxArchiveEntries = 8192
 	syncMaxPathBytes      = 4096
-)
-
-var (
-	httpClient    = &http.Client{Timeout: syncTimeout}
-	renamePath    = os.Rename
-	removeAllPath = os.RemoveAll
 )
 
 // Sync downloads, validates, and atomically installs a registry archive.
@@ -44,12 +40,13 @@ func Sync(ctx context.Context, dst string, rawURL string) error {
 	if rawURL == "" {
 		rawURL = DefaultSyncURL
 	}
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	parsed, err := parseSyncURL(rawURL)
+	if err != nil {
 		return fmt.Errorf("registry sync: invalid URL")
 	}
-	if parsed.Scheme != "https" && !loopbackHTTP(parsed) {
-		return fmt.Errorf("registry sync: HTTPS is required")
+	loopbackTest := loopbackHTTP(parsed)
+	if err := validateSyncURL(parsed, loopbackTest); err != nil {
+		return fmt.Errorf("registry sync: %w", err)
 	}
 
 	rootPath, err := filepath.Abs(dst)
@@ -67,7 +64,7 @@ func Sync(ctx context.Context, dst string, rawURL string) error {
 	stageReady := true
 	defer func() {
 		if stageReady {
-			_ = removeAllPath(stage)
+			_ = os.RemoveAll(stage)
 		}
 	}()
 	if err := os.Chmod(stage, 0o700); err != nil {
@@ -78,11 +75,14 @@ func Sync(ctx context.Context, dst string, rawURL string) error {
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return fmt.Errorf("registry sync: request: %w", err)
+		// Do not return the request error: net/url errors can echo userinfo.
+		return fmt.Errorf("registry sync: invalid URL")
 	}
-	resp, err := httpClient.Do(req)
+	client := newSyncHTTPClient(loopbackTest)
+	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("registry sync: download: %w", err)
+		// Do not wrap *url.Error: it may include a credential-bearing URL.
+		return fmt.Errorf("registry sync: download failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -91,24 +91,33 @@ func Sync(ctx context.Context, dst string, rawURL string) error {
 
 	counted := &countingReader{reader: resp.Body}
 	limited := io.LimitReader(counted, syncMaxCompressed+1)
-	gz, err := gzip.NewReader(limited)
+	compressed := bufio.NewReader(limited)
+	gz, err := gzip.NewReader(compressed)
 	if err != nil {
 		return fmt.Errorf("registry sync: gzip: malformed archive")
 	}
+	gz.Multistream(false)
 	if err := extractArchive(gz, stage); err != nil {
 		_ = gz.Close()
 		return err
 	}
+	// Tar can stop at its end marker before gzip has consumed its checksum.
+	// Drain the decoder so corrupt trailers are rejected deterministically.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		_ = gz.Close()
+		return fmt.Errorf("registry sync: gzip: malformed archive")
+	}
 	if err := gz.Close(); err != nil {
 		return fmt.Errorf("registry sync: gzip: malformed archive")
 	}
-	if _, err := io.Copy(io.Discard, limited); err != nil {
-		return fmt.Errorf("registry sync: download body read failed")
+	// Multistream(false) leaves a second gzip member or raw compressed bytes in
+	// the buffered reader. Neither is part of the canonical one-member format.
+	trailingCompressed, err := io.ReadAll(compressed)
+	if err != nil {
+		return fmt.Errorf("registry sync: compressed body read failed")
 	}
-	// Drain trailing response bytes so the compressed-body bound also covers
-	// bytes after a valid gzip member.
-	if counted.n > syncMaxCompressed {
-		return fmt.Errorf("registry sync: compressed archive limit %d bytes exceeded", syncMaxCompressed)
+	if len(trailingCompressed) != 0 || counted.n > syncMaxCompressed {
+		return fmt.Errorf("registry sync: compressed archive limit %d bytes exceeded or trailing bytes present", syncMaxCompressed)
 	}
 
 	if _, err := VerifySynced(stage); err != nil {
@@ -121,11 +130,69 @@ func Sync(ctx context.Context, dst string, rawURL string) error {
 	return nil
 }
 
-func loopbackHTTP(parsed *url.URL) bool {
-	if parsed.Scheme != "http" {
-		return false
+func newSyncHTTPClient(loopbackTest bool) *http.Client {
+	return &http.Client{
+		Timeout: syncTimeout,
+		CheckRedirect: func(next *http.Request, via []*http.Request) error {
+			if len(via) >= syncMaxRedirects {
+				return errors.New("redirect limit exceeded")
+			}
+			parsed, err := parseSyncURL(next.URL.String())
+			if err != nil {
+				return errors.New("invalid redirect URL")
+			}
+			if err := validateSyncURL(parsed, loopbackTest); err != nil {
+				return errors.New("redirect URL rejected")
+			}
+			return nil
+		},
 	}
-	host := parsed.Hostname()
+}
+
+func parseSyncURL(raw string) (*url.URL, error) {
+	if raw == "" || strings.ContainsAny(raw, "\\\x00") {
+		return nil, errors.New("invalid URL")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.Opaque != "" || parsed.User != nil {
+		return nil, errors.New("invalid URL")
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return nil, errors.New("invalid URL")
+	}
+	if parsed.Hostname() == "" || strings.ContainsAny(parsed.Host, "\r\n\x00") {
+		return nil, errors.New("invalid URL")
+	}
+	// url.Parse rejects most malformed authorities, but explicitly require a
+	// numeric port so the policy never relies on a later network dial failure.
+	if port := parsed.Port(); port != "" {
+		for _, character := range port {
+			if character < '0' || character > '9' {
+				return nil, errors.New("invalid URL")
+			}
+		}
+	}
+	return parsed, nil
+}
+
+func validateSyncURL(parsed *url.URL, loopbackTest bool) error {
+	if parsed.Scheme == "https" {
+		if loopbackTest && !isLoopbackHost(parsed.Hostname()) {
+			return errors.New("redirect must remain on loopback")
+		}
+		return nil
+	}
+	if parsed.Scheme == "http" && loopbackTest && isLoopbackHost(parsed.Hostname()) {
+		return nil
+	}
+	return errors.New("HTTPS is required")
+}
+
+func loopbackHTTP(parsed *url.URL) bool {
+	return parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())
+}
+
+func isLoopbackHost(host string) bool {
 	if host == "localhost" {
 		return true
 	}
@@ -213,6 +280,14 @@ func extractArchive(reader io.Reader, stage string) error {
 			return fmt.Errorf("registry sync: unsupported archive entry type")
 		}
 	}
+	// Reject bytes after tar's two zero blocks rather than silently installing a
+	// valid prefix. This also leaves gzip checksum verification to Sync.
+	var trailing [1]byte
+	if n, err := reader.Read(trailing[:]); n != 0 || (err != nil && err != io.EOF) {
+		return fmt.Errorf("registry sync: decompressed bytes after tar end")
+	} else if n != 0 {
+		return fmt.Errorf("registry sync: decompressed bytes after tar end")
+	}
 	return nil
 }
 
@@ -220,13 +295,13 @@ func safeArchiveName(raw string) (string, error) {
 	if raw == "" || len(raw) > syncMaxPathBytes || strings.IndexByte(raw, 0) >= 0 {
 		return "", fmt.Errorf("invalid archive path")
 	}
-	normalized := filepath.FromSlash(strings.ReplaceAll(raw, "\\", "/"))
-	if filepath.IsAbs(normalized) || filepath.VolumeName(normalized) != "" {
-		return "", fmt.Errorf("absolute archive path")
+	// Backslashes are rejected before any host-dependent normalization. This
+	// closes Windows drive, UNC, and separator interpretations on every host.
+	if strings.Contains(raw, "\\") || strings.HasPrefix(raw, "/") || windowsAbsolute(raw) {
+		return "", fmt.Errorf("absolute or invalid archive path")
 	}
-	parts := strings.Split(filepath.ToSlash(normalized), "/")
-	clean := make([]string, 0, len(parts))
-	for _, part := range parts {
+	clean := make([]string, 0, strings.Count(raw, "/")+1)
+	for _, part := range strings.Split(raw, "/") {
 		if part == "" {
 			continue
 		}
@@ -241,21 +316,37 @@ func safeArchiveName(raw string) (string, error) {
 	return filepath.Join(clean...), nil
 }
 
+func windowsAbsolute(raw string) bool {
+	return len(raw) >= 2 && ((raw[0] >= 'a' && raw[0] <= 'z') || (raw[0] >= 'A' && raw[0] <= 'Z')) && raw[1] == ':'
+}
+
+type replacementOps struct {
+	rename    func(string, string) error
+	removeAll func(string) error
+}
+
 func replaceDirectory(dst, stage string) error {
+	return replaceDirectoryWithOps(dst, stage, replacementOps{
+		rename:    os.Rename,
+		removeAll: os.RemoveAll,
+	})
+}
+
+func replaceDirectoryWithOps(dst, stage string, ops replacementOps) error {
 	parent := filepath.Dir(dst)
 	backupRoot, err := os.MkdirTemp(parent, ".registry-backup-")
 	if err != nil {
 		return fmt.Errorf("registry sync: create replacement backup: %w", err)
 	}
 	if err := os.Chmod(backupRoot, 0o700); err != nil {
-		_ = removeAllPath(backupRoot)
+		_ = ops.removeAll(backupRoot)
 		return fmt.Errorf("registry sync: secure replacement backup: %w", err)
 	}
 	backup := filepath.Join(backupRoot, "old")
-	cleanupBackup := func() error { return removeAllPath(backupRoot) }
+	cleanupBackup := func() error { return ops.removeAll(backupRoot) }
 	hadOld := false
 	if _, err := os.Lstat(dst); err == nil {
-		if err := renamePath(dst, backup); err != nil {
+		if err := ops.rename(dst, backup); err != nil {
 			cleanupErr := cleanupBackup()
 			if cleanupErr != nil {
 				return fmt.Errorf("registry sync: preserve old destination failed; backup cleanup failed: %w", errors.Join(err, cleanupErr))
@@ -267,12 +358,12 @@ func replaceDirectory(dst, stage string) error {
 		_ = cleanupBackup()
 		return fmt.Errorf("registry sync: inspect destination: %w", err)
 	}
-	if err := renamePath(stage, dst); err != nil {
+	if err := ops.rename(stage, dst); err != nil {
 		if !hadOld {
 			_ = cleanupBackup()
 			return fmt.Errorf("registry sync: install staged registry: %w", err)
 		}
-		if rollbackErr := renamePath(backup, dst); rollbackErr != nil {
+		if rollbackErr := ops.rename(backup, dst); rollbackErr != nil {
 			return fmt.Errorf("registry sync: install staged registry failed; rollback failed; backup retained at %s: %w", backupRoot, errors.Join(err, rollbackErr))
 		}
 		if cleanupErr := cleanupBackup(); cleanupErr != nil {
@@ -281,8 +372,6 @@ func replaceDirectory(dst, stage string) error {
 		return fmt.Errorf("registry sync: install staged registry: %w", err)
 	}
 	if err := cleanupBackup(); err != nil {
-		// Installation succeeded; retaining the owned backup is safer than
-		// claiming cleanup succeeded and does not affect the installed registry.
 		return fmt.Errorf("registry sync: remove replacement backup: %w", err)
 	}
 	return nil

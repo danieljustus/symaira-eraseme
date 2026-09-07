@@ -1,5 +1,9 @@
+use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir, File as CapFile, OpenOptions as CapOpenOptions};
 use std::env;
-use std::fs::{self, DirEntry};
+use std::fs::{self, DirEntry, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 const EXPECTED_BROKERS: usize = 1_277;
@@ -18,7 +22,8 @@ struct CollectionBudget {
 
 struct SelectedFile {
     relative: String,
-    source: PathBuf,
+    source: CapFile,
+    size: u64,
 }
 
 fn main() {
@@ -29,9 +34,17 @@ fn main() {
 
     let mut files = Vec::new();
     let mut budget = CollectionBudget::default();
-    collect(&registry, &registry, 0, &mut budget, &mut files).unwrap_or_else(|error| {
-        panic!("registry embedding rejected: {error}");
-    });
+    let registry_dir = Dir::open_ambient_dir(&registry, ambient_authority())
+        .expect("open registry source directory");
+    collect(
+        &registry,
+        &registry,
+        &registry_dir,
+        0,
+        &mut budget,
+        &mut files,
+    )
+    .unwrap_or_else(|error| panic!("registry embedding rejected: {error}"));
     files.sort_by(|left, right| left.relative.cmp(&right.relative));
 
     let broker_count = files
@@ -50,21 +63,24 @@ fn main() {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).expect("create embedded asset directory");
         }
-        fs::copy(&file.source, &target).expect("copy embedded registry asset");
+        copy_asset(file.source, file.size, &target).unwrap_or_else(|error| {
+            panic!("copy embedded asset {}: {error}", file.relative);
+        });
+        let relative_literal = format!("{:#?}", file.relative);
+        let include_path_literal = format!("{:#?}", format!("/{}", file.relative));
         generated.push_str(&format!(
-            "    ({:?}, include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{relative}\"))),\n",
-            file.relative,
-            relative = file.relative
+            "    ({relative_literal}, include_bytes!(concat!(env!(\"OUT_DIR\"), {include_path_literal}))),\n"
         ));
     }
     generated.push_str("];\n");
-    fs::write(out_dir.join("embedded_registry.rs"), generated)
+    write_atomic(&out_dir.join("embedded_registry.rs"), generated.as_bytes())
         .expect("write embedded registry index");
 }
 
 fn collect(
     root: &Path,
     directory: &Path,
+    root_dir: &Dir,
     depth: usize,
     budget: &mut CollectionBudget,
     files: &mut Vec<SelectedFile>,
@@ -113,7 +129,27 @@ fn collect(
             ));
         }
         if file_type.is_dir() {
-            collect(root, &entry.path(), depth + 1, budget, files)?;
+            let entry_path = entry.path();
+            let relative = entry_path
+                .strip_prefix(root)
+                .map_err(|error| format!("registry path: {error}"))?;
+            let components = relative.components().collect::<Vec<_>>();
+            if components
+                .first()
+                .is_some_and(|value| value.as_os_str() == "brokers")
+                && !(components.len() == 1
+                    || (components.len() == 2
+                        && components[1]
+                            .as_os_str()
+                            .to_str()
+                            .is_some_and(|value| matches!(value, "eu" | "uk" | "us"))))
+            {
+                return Err(format!(
+                    "invalid broker directory layout: {}",
+                    relative.display()
+                ));
+            }
+            collect(root, &entry_path, root_dir, depth + 1, budget, files)?;
             continue;
         }
         if !file_type.is_file() {
@@ -124,12 +160,35 @@ fn collect(
         }
 
         let relative = relative_utf8(root, &entry)?;
+        let path = Path::new(&relative);
+        let is_yaml = matches!(
+            path.extension().and_then(|value| value.to_str()),
+            Some("yaml" | "yml")
+        );
+        if relative.starts_with("brokers/")
+            && is_yaml
+            && !is_doc_file(&relative)
+            && !is_broker_file(&relative)
+        {
+            return Err(format!("invalid broker file layout: {relative}"));
+        }
         if !is_selected(&relative) {
             continue;
         }
         let metadata = fs::symlink_metadata(entry.path())
             .map_err(|error| format!("inspect {relative}: {error}"))?;
-        let size = metadata.len();
+        let mut options = CapOpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        let source = root_dir
+            .open_with(Path::new(&relative), &options)
+            .map_err(|error| format!("open {relative} without following symlinks: {error}"))?;
+        let opened_metadata = source
+            .metadata()
+            .map_err(|error| format!("inspect opened {relative}: {error}"))?;
+        if !opened_metadata.is_file() || opened_metadata.len() != metadata.len() {
+            return Err(format!("source metadata changed before copy: {relative}"));
+        }
+        let size = opened_metadata.len();
         if size > MAX_SELECTED_FILE_BYTES {
             return Err(format!(
                 "selected file {relative} exceeds {MAX_SELECTED_FILE_BYTES} bytes"
@@ -155,7 +214,8 @@ fn collect(
         }
         files.push(SelectedFile {
             relative,
-            source: entry.path(),
+            source,
+            size,
         });
     }
     Ok(())
@@ -174,6 +234,12 @@ fn relative_utf8(root: &Path, entry: &DirEntry) -> Result<String, String> {
         let value = value
             .to_str()
             .ok_or_else(|| format!("registry path is not UTF-8: {}", relative.display()))?;
+        if value.contains('\\') || value.chars().any(char::is_control) {
+            return Err(format!(
+                "registry path contains control or backslash: {}",
+                relative.display()
+            ));
+        }
         components.push(value);
     }
     if components.is_empty() {
@@ -188,16 +254,91 @@ fn is_selected(relative: &str) -> bool {
         || is_broker_file(relative)
 }
 
+fn is_doc_file(relative: &str) -> bool {
+    relative
+        .split('/')
+        .next_back()
+        .is_some_and(|name| name.starts_with('_'))
+}
+
 fn is_broker_file(relative: &str) -> bool {
-    if !relative.starts_with("brokers/") {
+    let components = relative.split('/').collect::<Vec<_>>();
+    if components.len() != 3 || components[0] != "brokers" {
         return false;
     }
-    let path = Path::new(relative);
+    if !matches!(components[1], "eu" | "uk" | "us") {
+        return false;
+    }
+    let path = Path::new(components[2]);
     matches!(
         path.extension().and_then(|value| value.to_str()),
         Some("yaml" | "yml")
-    ) && !path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .is_some_and(|name| name.starts_with('_'))
+    ) && !components[2].starts_with('_')
+}
+
+fn copy_asset(mut source: CapFile, expected_size: u64, target: &Path) -> io::Result<()> {
+    let opened_meta = source.metadata()?;
+    if !opened_meta.is_file() || opened_meta.len() != expected_size {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "source metadata changed before copy",
+        ));
+    }
+
+    let temp = target.with_file_name(format!(
+        ".{}.tmp",
+        target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("asset")
+    ));
+    let _ = fs::remove_file(&temp);
+    let result = (|| {
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        let copied = io::copy(
+            &mut (&mut source).take(MAX_SELECTED_FILE_BYTES + 1),
+            &mut output,
+        )?;
+        if copied > MAX_SELECTED_FILE_BYTES || copied != expected_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source grew or copied size differs from metadata",
+            ));
+        }
+        output.flush()?;
+        if source.metadata()?.len() != copied {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source size changed during copy",
+            ));
+        }
+        drop(output);
+        let _ = fs::remove_file(target);
+        fs::rename(&temp, target)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
+}
+
+fn write_atomic(target: &Path, bytes: &[u8]) -> io::Result<()> {
+    let temp = target.with_file_name(".embedded_registry.rs.tmp");
+    let result = (|| {
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        output.write_all(bytes)?;
+        output.flush()?;
+        drop(output);
+        fs::rename(&temp, target)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }

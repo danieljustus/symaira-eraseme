@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -218,10 +219,9 @@ func TestReplaceDirectoryInstallFailureRollsBackAndCleansOwnedBackup(t *testing.
 		t.Fatal(err)
 	}
 
-	originalRename := renamePath
-	t.Cleanup(func() { renamePath = originalRename })
+	originalRename := os.Rename
 	calls := 0
-	renamePath = func(source, destination string) error {
+	rename := func(source, destination string) error {
 		calls++
 		if calls == 2 {
 			return errors.New("forced install failure")
@@ -229,7 +229,7 @@ func TestReplaceDirectoryInstallFailureRollsBackAndCleansOwnedBackup(t *testing.
 		return originalRename(source, destination)
 	}
 
-	if err := replaceDirectory(dst, stage); err == nil {
+	if err := replaceDirectoryWithOps(dst, stage, replacementOps{rename: rename, removeAll: os.RemoveAll}); err == nil {
 		t.Fatal("forced install failure unexpectedly succeeded")
 	}
 	if got, err := os.ReadFile(filepath.Join(dst, "state")); err != nil || string(got) != "old" {
@@ -258,10 +258,9 @@ func TestReplaceDirectoryRollbackFailureRetainsRecoverableBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	originalRename := renamePath
-	t.Cleanup(func() { renamePath = originalRename })
+	originalRename := os.Rename
 	calls := 0
-	renamePath = func(source, destination string) error {
+	rename := func(source, destination string) error {
 		calls++
 		if calls >= 2 {
 			return errors.New("forced replacement failure")
@@ -269,7 +268,7 @@ func TestReplaceDirectoryRollbackFailureRetainsRecoverableBackup(t *testing.T) {
 		return originalRename(source, destination)
 	}
 
-	err := replaceDirectory(dst, stage)
+	err := replaceDirectoryWithOps(dst, stage, replacementOps{rename: rename, removeAll: os.RemoveAll})
 	if err == nil || !strings.Contains(err.Error(), "backup retained") || !strings.Contains(err.Error(), "rollback failed") {
 		t.Fatalf("rollback failure error = %v", err)
 	}
@@ -285,5 +284,115 @@ func TestReplaceDirectoryRollbackFailureRetainsRecoverableBackup(t *testing.T) {
 	}
 	if err := os.RemoveAll(matches[0]); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSafeArchiveNameRejectsHostIndependentAbsoluteFormsAndAllowsDotsInNames(t *testing.T) {
+	for _, raw := range []string{`C:/escape.txt`, `//server/share.txt`, `\\server\\share.txt`, `dir\\file.txt`, `../escape.txt`, `dir/../escape.txt`} {
+		if _, err := safeArchiveName(raw); err == nil {
+			t.Errorf("safeArchiveName(%q) accepted unsafe path", raw)
+		}
+	}
+	if got, err := safeArchiveName("nested/safe..name.txt"); err != nil || got != filepath.Join("nested", "safe..name.txt") {
+		t.Fatalf("safe component rejected: got %q err=%v", got, err)
+	}
+}
+
+func TestSyncURLPolicyRejectsCredentialsMalformedAuthoritiesAndDowngrades(t *testing.T) {
+	for _, raw := range []string{
+		"https://user:password@example.test/registry.tar.gz",
+		"https://example.test\\registry.tar.gz",
+		"https://example.test:bad/registry.tar.gz",
+		"http://example.test/registry.tar.gz",
+	} {
+		if parsed, err := parseSyncURL(raw); err == nil && validateSyncURL(parsed, loopbackHTTP(parsed)) == nil {
+			t.Errorf("accepted unsafe URL %q", raw)
+		}
+	}
+	loopback, err := parseSyncURL("http://127.0.0.1:1234/registry.tar.gz")
+	if err != nil || validateSyncURL(loopback, true) != nil {
+		t.Fatalf("loopback test URL rejected: %v", err)
+	}
+	https, err := parseSyncURL("https://127.0.0.1/registry.tar.gz")
+	if err != nil || validateSyncURL(https, true) != nil {
+		t.Fatalf("loopback HTTPS redirect rejected: %v", err)
+	}
+	downgrade, err := parseSyncURL("http://127.0.0.1/registry.tar.gz")
+	if err != nil || validateSyncURL(downgrade, false) == nil {
+		t.Fatal("HTTPS-to-HTTP downgrade accepted")
+	}
+	if external, err := parseSyncURL("https://example.test/registry.tar.gz"); err != nil || validateSyncURL(external, true) == nil {
+		t.Fatal("loopback redirect escaped to external host")
+	}
+}
+
+func TestSyncFollowsOnlyValidatedLoopbackRedirectChain(t *testing.T) {
+	body := syncValidArchive(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/start":
+			http.Redirect(w, r, "/middle", http.StatusFound)
+		case "/middle":
+			http.Redirect(w, r, "/final", http.StatusTemporaryRedirect)
+		case "/final":
+			_, _ = w.Write(body)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	destination := filepath.Join(t.TempDir(), "registry")
+	if err := Sync(context.Background(), destination, server.URL+"/start"); err != nil {
+		t.Fatalf("validated loopback redirect chain rejected: %v", err)
+	}
+	if count, err := VerifySynced(destination); err != nil || count != 1 {
+		t.Fatalf("redirected archive validation: count=%d err=%v", count, err)
+	}
+}
+
+func TestSyncRejectsNoncanonicalGzipAndTarTrailingData(t *testing.T) {
+	archives := make([][]byte, 0, 4)
+	corrupt := syncValidArchive(t)
+	corrupt[len(corrupt)-1] ^= 1
+	archives = append(archives, corrupt)
+	rawTrailing := append(syncValidArchive(t), []byte("raw trailing")...)
+	archives = append(archives, rawTrailing)
+	archives = append(archives, append(syncValidArchive(t), syncValidArchive(t)...))
+	reader, err := gzip.NewReader(bytes.NewReader(syncValidArchive(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tarBytes, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withPayload bytes.Buffer
+	gz := gzip.NewWriter(&withPayload)
+	_, _ = gz.Write(tarBytes)
+	_, _ = gz.Write([]byte("decompressed trailing"))
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	archives = append(archives, withPayload.Bytes())
+
+	for _, body := range archives {
+		dst := t.TempDir()
+		sentinel := filepath.Join(dst, "sentinel")
+		if err := os.WriteFile(sentinel, []byte("old"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write(body)
+		}))
+		err := Sync(context.Background(), dst, server.URL)
+		server.Close()
+		if err == nil {
+			t.Fatal("noncanonical archive was accepted")
+		}
+		got, readErr := os.ReadFile(sentinel)
+		if readErr != nil || string(got) != "old" {
+			t.Fatalf("old state changed: %q err=%v read=%v", got, err, readErr)
+		}
 	}
 }

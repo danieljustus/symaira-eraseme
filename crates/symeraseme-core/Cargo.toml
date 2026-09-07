@@ -27,6 +27,10 @@ toml.workspace = true
 ureq.workspace = true
 yaml-rust2.workspace = true
 
+[build-dependencies]
+cap-fs-ext.workspace = true
+cap-std.workspace = true
+
 [dev-dependencies]
 proptest = "1.11.0"
 tempfile.workspace = true

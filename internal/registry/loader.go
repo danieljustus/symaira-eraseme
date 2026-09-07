@@ -224,6 +224,29 @@ func collectDocs(root fs.FS) (map[string]*doc, error) {
 		if entries > maxDirectoryEntries {
 			return verr("directory entry limit %d exceeded", maxDirectoryEntries)
 		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return verr("symlink is not allowed: %s", p)
+		}
+		rel := strings.TrimPrefix(strings.TrimPrefix(p, "./"), "registry/")
+		if rel == "brokers" {
+			if !d.IsDir() {
+				return verr("registry: brokers must be a directory")
+			}
+		} else if strings.HasPrefix(rel, "brokers/") {
+			parts := strings.Split(rel, "/")
+			switch {
+			case len(parts) == 2:
+				if !d.IsDir() || !allowedJurisdiction(parts[1]) {
+					return verr("registry: invalid broker layout path %q; expected brokers/{eu,uk,us}/<filename>.yaml|yml", p)
+				}
+			case len(parts) == 3:
+				if d.IsDir() || (!strings.HasSuffix(parts[2], ".yaml") && !strings.HasSuffix(parts[2], ".yml")) {
+					return verr("registry: invalid broker layout path %q; expected brokers/{eu,uk,us}/<filename>.yaml|yml", p)
+				}
+			case len(parts) > 3:
+				return verr("registry: invalid broker layout path %q; expected brokers/{eu,uk,us}/<filename>.yaml|yml", p)
+			}
+		}
 		if strings.Count(strings.TrimPrefix(p, "./"), "/") > maxDirectoryDepth+1 {
 			return verr("directory nesting exceeds %d levels", maxDirectoryDepth)
 		}
@@ -243,10 +266,9 @@ func collectDocs(root fs.FS) (map[string]*doc, error) {
 		if !info.Mode().IsRegular() {
 			return verr("YAML entry is not a regular file: %s", p)
 		}
-		rel := strings.TrimPrefix(p, "registry/")
 		parts := strings.Split(rel, "/")
-		if len(parts) < 3 || parts[0] != "brokers" {
-			return nil
+		if len(parts) != 3 || parts[0] != "brokers" || !allowedJurisdiction(parts[1]) {
+			return verr("registry: invalid broker layout path %q; expected brokers/{eu,uk,us}/<filename>.yaml|yml", p)
 		}
 		if strings.HasPrefix(d.Name(), "_") {
 			return nil // documentation-only (contract §2)
@@ -266,6 +288,15 @@ func collectDocs(root fs.FS) (map[string]*doc, error) {
 		return nil, fmt.Errorf("registry: walk: %w", err)
 	}
 	return docs, nil
+}
+
+func allowedJurisdiction(value string) bool {
+	switch value {
+	case "eu", "uk", "us":
+		return true
+	default:
+		return false
+	}
 }
 
 func readBounded(root fs.FS, path string, inputBytes int) ([]byte, int, error) {

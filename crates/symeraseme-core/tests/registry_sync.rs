@@ -1,6 +1,6 @@
-use std::io::Cursor;
+use std::io::{Cursor, Read, Write};
 
-use flate2::{Compression, write::GzEncoder};
+use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use symeraseme_core::registry::{SyncResponse, SyncTransport, sync_with_transport};
 use tar::{Builder, Header};
 
@@ -109,4 +109,39 @@ fn sync_rejects_non_loopback_http_before_transport() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn sync_rejects_noncanonical_gzip_and_tar_trailing_data() {
+    let mut corrupt_trailer = valid_archive();
+    *corrupt_trailer.last_mut().unwrap() ^= 1;
+    let mut raw_trailing = valid_archive();
+    raw_trailing.extend_from_slice(b"raw trailing");
+    let mut concatenated = valid_archive();
+    concatenated.extend_from_slice(&valid_archive());
+
+    let mut tar_bytes = Vec::new();
+    GzDecoder::new(Cursor::new(valid_archive()))
+        .read_to_end(&mut tar_bytes)
+        .unwrap();
+    let mut payload = GzEncoder::new(Vec::new(), Compression::default());
+    payload.write_all(&tar_bytes).unwrap();
+    payload.write_all(b"decompressed trailing").unwrap();
+    let decompressed_trailing = payload.finish().unwrap();
+
+    for body in [
+        corrupt_trailer,
+        raw_trailing,
+        concatenated,
+        decompressed_trailing,
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("registry");
+        std::fs::create_dir_all(&destination).unwrap();
+        let sentinel = destination.join("sentinel");
+        std::fs::write(&sentinel, b"old").unwrap();
+        let transport = StaticTransport { status: 200, body };
+        assert!(sync_with_transport("http://127.0.0.1/test", &destination, &transport).is_err());
+        assert_eq!(std::fs::read(sentinel).unwrap(), b"old");
+    }
 }

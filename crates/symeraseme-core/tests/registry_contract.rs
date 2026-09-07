@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use symeraseme_core::registry::{Broker, Channel, RegistryError, load_from_dir};
+use symeraseme_core::registry::{
+    Broker, Channel, RegistryError, load_from_dir, load_reporting_from_dir,
+};
 
 const FIXTURE_ROOT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -581,4 +583,51 @@ fn loader_requires_matching_manifest_and_schema_metadata() {
     let valid = tempfile_root();
     fs::create_dir_all(valid.path().join("brokers/us")).unwrap();
     assert!(load_from_dir(valid.path()).unwrap().is_empty());
+}
+
+#[test]
+fn reporting_loader_collects_all_validation_errors_in_path_order() {
+    let root = tempfile_root();
+    fs::create_dir_all(root.path().join("brokers/us")).unwrap();
+    let first = base_broker()
+        .replace("id: test", "id: bad-a")
+        .replace("category: other", "category: invalid");
+    let second = base_broker()
+        .replace("id: test", "id: bad-b")
+        .replace("priority: low", "priority: invalid");
+    fs::write(root.path().join("brokers/us/bad-a.yaml"), first).unwrap();
+    fs::write(root.path().join("brokers/us/bad-b.yaml"), second).unwrap();
+
+    let report = load_reporting_from_dir(root.path()).unwrap();
+    assert!(report.brokers.is_empty());
+    assert_eq!(report.errors.len(), 2);
+    assert!(report.errors[0].to_string().contains("bad-a.yaml"));
+    assert!(report.errors[1].to_string().contains("bad-b.yaml"));
+    let first_error = load_from_dir(root.path()).unwrap_err();
+    assert!(first_error.to_string().contains("bad-a.yaml"));
+}
+
+#[test]
+fn filesystem_loader_enforces_canonical_broker_layout() {
+    for (name, relative) in [
+        ("direct", "brokers/direct.yaml"),
+        ("arbitrary jurisdiction", "brokers/ca/test.yaml"),
+        ("deeper nesting", "brokers/us/nested/test.yaml"),
+        ("non-yaml entry", "brokers/us/test.txt"),
+    ] {
+        let root = tempfile_root();
+        let path = root.path().join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, base_broker()).unwrap();
+        let error = load_from_dir(root.path()).unwrap_err();
+        assert!(
+            error.to_string().contains("registry layout"),
+            "{name}: {error}"
+        );
+    }
+
+    let docs = tempfile_root();
+    fs::create_dir_all(docs.path().join("brokers/us")).unwrap();
+    fs::write(docs.path().join("brokers/us/_example.yaml"), base_broker()).unwrap();
+    assert!(load_from_dir(docs.path()).unwrap().is_empty());
 }

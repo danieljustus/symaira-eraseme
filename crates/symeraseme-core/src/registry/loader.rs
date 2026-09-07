@@ -1,4 +1,5 @@
 use super::model::Broker;
+pub use super::validate::LoadReport;
 use super::validate::{RegistryError, decode};
 use std::collections::HashSet;
 
@@ -75,6 +76,13 @@ pub fn load() -> Result<Vec<Broker>, RegistryError> {
 /// Filesystem loading remains available for development and sync validation.
 pub fn load_from_dir(root: impl AsRef<std::path::Path>) -> Result<Vec<Broker>, RegistryError> {
     super::validate::load_from_dir(root)
+}
+
+/// Filesystem loading variant that reports every per-file validation error.
+pub fn load_reporting_from_dir(
+    root: impl AsRef<std::path::Path>,
+) -> Result<LoadReport, RegistryError> {
+    super::validate::load_reporting_from_dir(root)
 }
 
 fn embedded(path: &str) -> Result<&'static [u8], RegistryError> {
