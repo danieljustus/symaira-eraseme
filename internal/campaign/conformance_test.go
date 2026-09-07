@@ -47,9 +47,9 @@ func buildMiniRegistry(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for sub, file := range map[string]string{
-		"DE": "golden-email-eu.yaml",
-		"UK": "golden-multi-uk.yaml",
-		"US": "golden-webform-us.yaml",
+		"eu": "golden-email-eu.yaml",
+		"uk": "golden-multi-uk.yaml",
+		"us": "golden-webform-us.yaml",
 	} {
 		dir := filepath.Join(dst, "brokers", sub)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
