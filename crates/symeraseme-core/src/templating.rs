@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io::{self, Write};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -16,6 +17,20 @@ use serde_json::{Map, Value as JsonValue};
 
 const MAX_NAME_BYTES: usize = 256;
 const MAX_ERROR_BYTES: usize = 256;
+// These limits keep caller-controlled profile data in the MiB range while
+// allowing normal reports and dashboards to contain thousands of records.
+const MAX_STRING_BYTES: usize = 64 * 1024;
+const MAX_TOTAL_STRING_BYTES: usize = 2 * 1024 * 1024;
+const MAX_CONTEXT_BYTES: usize = 4 * 1024 * 1024;
+const MAX_COLLECTION_ENTRIES: usize = 4096;
+const MAX_TOTAL_COLLECTION_ENTRIES: usize = 65_536;
+const MAX_JSON_NODES: usize = 65_536;
+const MAX_JSON_DEPTH: usize = 32;
+const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
+// 100,000 instructions leaves substantial margin over all eleven goldens,
+// while bounding template work independently from input and output sizes.
+const MAX_RENDER_FUEL: u64 = 100_000;
+const MAX_RECURSION_LIMIT: usize = 64;
 const TEMPLATE_COUNT: usize = 11;
 
 struct TemplateSpec {
@@ -126,19 +141,17 @@ pub struct TemplateError {
 
 impl TemplateError {
     fn new(message: &'static str) -> Self {
+        debug_assert!(message.len() <= MAX_ERROR_BYTES);
         Self {
             message: message.to_owned(),
         }
     }
 
-    fn named(message: &'static str, name: &str) -> Self {
-        let mut rendered = String::with_capacity(message.len() + name.len() + 4);
-        rendered.push_str(message);
-        rendered.push_str(" '");
-        rendered.push_str(name);
-        rendered.push('\'');
-        rendered.truncate(MAX_ERROR_BYTES);
-        Self { message: rendered }
+    fn named(message: &'static str, _name: &str) -> Self {
+        // Never include a template-engine error, source excerpt, or caller
+        // value.  The name is deliberately omitted as well: static messages
+        // cannot panic while truncating at a non-UTF-8 boundary.
+        Self::new(message)
     }
 }
 
@@ -299,15 +312,15 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
         .iter()
         .find(|template| template.name == name)
         .ok_or_else(|| TemplateError::new("unknown template"))?;
-    if !context.data.is_null() && !context.data.is_object() {
-        return Err(TemplateError::new("invalid render context"));
-    }
+    validate_context(context)?;
 
     let mut environment = Environment::new();
     environment.set_keep_trailing_newline(false);
     environment.set_trim_blocks(true);
     environment.set_lstrip_blocks(true);
     environment.set_undefined_behavior(UndefinedBehavior::Lenient);
+    environment.set_fuel(Some(MAX_RENDER_FUEL));
+    environment.set_recursion_limit(MAX_RECURSION_LIMIT);
     environment.set_unknown_method_callback(|_state, value, method, args| {
         if method == "get" && value.kind() == minijinja::value::ValueKind::Map {
             let key = args
@@ -343,9 +356,11 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
     let template = environment
         .template_from_named_str(name, template.source)
         .map_err(|_| TemplateError::named("template could not be parsed", name))?;
+    let mut output = BoundedWriter::new(MAX_OUTPUT_BYTES);
     template
-        .render(Value::from_serialize(variables))
-        .map_err(|_| TemplateError::named("template could not be rendered", name))
+        .render_captured_to(variables, &mut output)
+        .map_err(|_| TemplateError::named("template could not be rendered", name))?;
+    output.finish()
 }
 
 /// Explicitly named variant of [`render`].
@@ -384,6 +399,198 @@ fn canonical_name(input: &str) -> Result<&str, TemplateError> {
     } else {
         Err(TemplateError::new("unknown template"))
     }
+}
+
+struct BoundedWriter {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedWriter {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn finish(self) -> Result<String, TemplateError> {
+        String::from_utf8(self.bytes)
+            .map_err(|_| TemplateError::new("template produced invalid output"))
+    }
+}
+
+impl Write for BoundedWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let remaining = self
+            .limit
+            .checked_sub(self.bytes.len())
+            .ok_or_else(|| io::Error::other("template output limit exceeded"))?;
+        if bytes.len() > remaining {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "template output limit exceeded",
+            ));
+        }
+        self.bytes
+            .try_reserve(bytes.len())
+            .map_err(|_| io::Error::other("template output unavailable"))?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct ValidationBudget {
+    total_string_bytes: usize,
+    context_bytes: usize,
+    collection_entries: usize,
+    json_nodes: usize,
+}
+
+impl ValidationBudget {
+    fn add_context_bytes(&mut self, amount: usize) -> Result<(), TemplateError> {
+        self.context_bytes = self
+            .context_bytes
+            .checked_add(amount)
+            .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+        if self.context_bytes > MAX_CONTEXT_BYTES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        Ok(())
+    }
+
+    fn add_string(&mut self, value: &str) -> Result<(), TemplateError> {
+        if value.len() > MAX_STRING_BYTES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        self.total_string_bytes = self
+            .total_string_bytes
+            .checked_add(value.len())
+            .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+        if self.total_string_bytes > MAX_TOTAL_STRING_BYTES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        self.add_context_bytes(value.len())
+    }
+
+    fn add_collection(&mut self, length: usize) -> Result<(), TemplateError> {
+        if length > MAX_COLLECTION_ENTRIES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        self.collection_entries = self
+            .collection_entries
+            .checked_add(length)
+            .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+        if self.collection_entries > MAX_TOTAL_COLLECTION_ENTRIES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        let overhead = length
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+        self.add_context_bytes(overhead)
+    }
+
+    fn add_json(&mut self, value: &JsonValue, depth: usize) -> Result<(), TemplateError> {
+        if depth > MAX_JSON_DEPTH {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        self.json_nodes = self
+            .json_nodes
+            .checked_add(1)
+            .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+        if self.json_nodes > MAX_JSON_NODES {
+            return Err(TemplateError::new("render context exceeds limit"));
+        }
+        match value {
+            JsonValue::Null | JsonValue::Bool(_) => self.add_context_bytes(1),
+            JsonValue::Number(_) => self.add_context_bytes(32),
+            JsonValue::String(value) => self.add_string(value),
+            JsonValue::Array(values) => {
+                self.add_collection(values.len())?;
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+                for value in values {
+                    self.add_json(value, child_depth)?;
+                }
+                Ok(())
+            }
+            JsonValue::Object(values) => {
+                self.add_collection(values.len())?;
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| TemplateError::new("render context exceeds limit"))?;
+                for (key, value) in values {
+                    self.add_string(key)?;
+                    self.add_json(value, child_depth)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+fn validate_context(context: &RenderContext) -> Result<(), TemplateError> {
+    let mut budget = ValidationBudget::default();
+    budget.add_string(&context.full_name)?;
+
+    budget.add_collection(context.name_variants.len())?;
+    for value in &context.name_variants {
+        budget.add_string(value)?;
+    }
+    if let Some(value) = &context.date_of_birth {
+        budget.add_string(value)?;
+    }
+
+    budget.add_collection(context.addresses.len())?;
+    for address in &context.addresses {
+        budget.add_string(&address.street)?;
+        budget.add_string(&address.city)?;
+        budget.add_string(&address.postal_code)?;
+        budget.add_string(&address.country)?;
+    }
+
+    budget.add_collection(context.email_addresses.len())?;
+    for value in &context.email_addresses {
+        budget.add_string(value)?;
+    }
+    budget.add_collection(context.phone_numbers.len())?;
+    for value in &context.phone_numbers {
+        budget.add_string(value)?;
+    }
+    budget.add_collection(context.jurisdictions.len())?;
+    for value in &context.jurisdictions {
+        budget.add_string(value)?;
+    }
+
+    budget.add_string(&context.broker_name)?;
+    budget.add_string(&context.broker_website)?;
+
+    budget.add_collection(context.brokers.len())?;
+    for value in &context.brokers {
+        budget.add_json(value, 0)?;
+    }
+
+    if !context.data.is_null() && !context.data.is_object() {
+        return Err(TemplateError::new("invalid render context"));
+    }
+    budget.add_json(&context.data, 0)?;
+
+    budget.add_string(context.now.as_str())?;
+    DateTime::parse_from_rfc3339(context.now.as_str())
+        .map_err(|_| TemplateError::new("invalid frozen timestamp"))?;
+
+    budget.add_collection(context.extra.len())?;
+    for (key, value) in &context.extra {
+        budget.add_string(key)?;
+        budget.add_json(value, 0)?;
+    }
+    Ok(())
 }
 
 fn context_values(context: &RenderContext) -> Result<BTreeMap<String, Value>, TemplateError> {

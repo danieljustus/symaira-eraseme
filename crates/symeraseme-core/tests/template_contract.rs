@@ -229,6 +229,116 @@ fn malformed_or_missing_values_fail_without_echoing_context() {
 }
 
 #[test]
+fn bounded_rendering_rejects_adversarial_contexts_without_echoing_values() {
+    let sentinel = "template security sentinel";
+
+    let mut direct = fixture_context();
+    direct.full_name = format!("{sentinel}{}", "x".repeat(64 * 1024 + 1));
+    let error = render("gdpr-art17.en.md.j2", &direct)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+
+    let mut nested = fixture_context();
+    nested.data = json!({"nested": {"value": format!("{sentinel}{}", "x".repeat(64 * 1024 + 1))}});
+    let error = render("templates/report.html.j2", &nested)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+}
+
+#[test]
+fn bounded_rendering_rejects_json_depth_collections_and_nodes() {
+    let sentinel = "structure security sentinel";
+
+    let mut too_deep = fixture_context();
+    let mut nested = json!({"value": sentinel});
+    for _ in 0..40 {
+        nested = json!({"nested": nested});
+    }
+    too_deep.data = nested;
+    let error = render("templates/report.html.j2", &too_deep)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+
+    let mut too_many_items = fixture_context();
+    too_many_items.name_variants = vec![sentinel.to_owned(); 4097];
+    let error = render("gdpr-art17.en.md.j2", &too_many_items)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+
+    let mut too_many_map_entries = fixture_context();
+    for index in 0..4097 {
+        too_many_map_entries
+            .extra
+            .insert(format!("extra-{index}"), json!(sentinel));
+    }
+    let error = render("gdpr-art17.en.md.j2", &too_many_map_entries)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+
+    let mut object = serde_json::Map::new();
+    for index in 0..4096 {
+        object.insert(
+            format!("entry-{index}"),
+            Value::Array(vec![Value::Null; 15]),
+        );
+    }
+    let mut too_many_nodes = fixture_context();
+    too_many_nodes.data = Value::Object(object);
+    let error = render("templates/report.html.j2", &too_many_nodes)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+}
+
+#[test]
+fn bounded_rendering_rejects_string_aggregate_and_output_amplification() {
+    let sentinel = "aggregate and output security sentinel";
+
+    let mut too_many_string_bytes = fixture_context();
+    let aggregate = format!("{sentinel}{}", "x".repeat(64_000));
+    too_many_string_bytes.name_variants = vec![aggregate; 33];
+    let error = render("gdpr-art17.en.md.j2", &too_many_string_bytes)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+
+    let mut amplified = fixture_context();
+    let requests = amplified.data["campaigns"][0]["requests"]
+        .as_array_mut()
+        .expect("fixture requests array");
+    requests.clear();
+    let broker_id = format!("{sentinel}{}", "x".repeat(12_000));
+    for id in 0..100 {
+        requests.push(json!({
+            "id": id,
+            "broker_id": broker_id.clone(),
+            "jurisdiction": "US",
+            "current_status": "CONFIRMED",
+            "sent_at": "2026-07-02T08:00:00+00:00",
+            "resolved_at": "2026-07-20T10:30:00+00:00",
+            "reminders_sent": 0
+        }));
+    }
+    let error = render("templates/report.html.j2", &amplified)
+        .unwrap_err()
+        .to_string();
+    assert!(error.len() <= 256);
+    assert!(!error.contains(sentinel));
+}
+
+#[test]
 fn empty_lists_are_supported_deterministically() {
     let mut context = fixture_context();
     context.email_addresses.clear();
