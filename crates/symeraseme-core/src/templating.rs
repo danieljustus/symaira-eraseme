@@ -191,7 +191,7 @@ impl Object for FrozenDateTimeObject {
 
     fn call_method(
         self: &Arc<Self>,
-        _state: &mut State<'_, '_>,
+        _state: &State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
@@ -344,7 +344,7 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
         .template_from_named_str(name, template.source)
         .map_err(|_| TemplateError::named("template could not be parsed", name))?;
     template
-        .render(Value::from_pairs(variables))
+        .render(Value::from_serialize(variables))
         .map_err(|_| TemplateError::named("template could not be rendered", name))
 }
 
@@ -405,14 +405,14 @@ fn context_values(context: &RenderContext) -> Result<BTreeMap<String, Value>, Te
 
     let mut values = BTreeMap::new();
     for (key, value) in object {
-        values.insert(key, Value::from(minijinja::value::Serde(value)));
+        values.insert(key, Value::from_serialize(value));
     }
     values.insert(
         "now".to_owned(),
         Value::from_object(FrozenDateTimeObject { value: now }),
     );
     for (key, value) in extra {
-        values.insert(key, Value::from(minijinja::value::Serde(value)));
+        values.insert(key, Value::from_serialize(value));
     }
     Ok(values)
 }

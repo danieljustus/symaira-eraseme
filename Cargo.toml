@@ -30,7 +30,7 @@ tempfile = "3.27.0"
 toml = "0.5.11"
 ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.10.2"
-minijinja = { version = "3.0.0-alpha.0", default-features = false, features = ["builtins", "serde", "std_collections"] }
+minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "serde", "std_collections"] }
 
 [profile.release]
 opt-level = 3
