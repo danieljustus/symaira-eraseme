@@ -184,8 +184,8 @@ func TestReleaseWorkflowContract(t *testing.T) {
 				t.Errorf("Xcode verification missing %q", expected)
 			}
 		}
-		if !strings.Contains(rawYAML, "runs-on: macos-26") || !strings.Contains(rawYAML, "xcode-version: '26.6'") {
-			t.Error("release workflow must pin the GUI lane to macOS 26 and Xcode 26.6")
+		if !strings.Contains(rawYAML, "runs-on: macos-26") || !strings.Contains(rawYAML, "xcode-version: '26.4.1'") {
+			t.Error("release workflow must pin the GUI lane to macOS 26 and Xcode 26.4.1")
 		}
 	})
 
