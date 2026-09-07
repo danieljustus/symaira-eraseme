@@ -3,6 +3,9 @@ set -euo pipefail
 
 # Make sure we are at the repository root
 cd "$(dirname "$0")/.."
+REPO_ROOT="$(pwd)"
+ICON_SOURCE="$REPO_ROOT/assets/branding/AppIcon.icon"
+ICNS_SOURCE="$REPO_ROOT/assets/branding/AppIcon.icns"
 
 # Product name with a space (display convention); technical SPM package and
 # target names stay unchanged.
@@ -69,9 +72,9 @@ if [ -z "${DEVELOPER_DIR:-}" ]; then
     fi
 fi
 
-STAGE_DIR="app/SymairaEraseMe/.build/dmg-stage"
+STAGE_DIR="$REPO_ROOT/app/SymairaEraseMe/.build/dmg-stage"
 APP_BUNDLE="$STAGE_DIR/$APP_NAME.app"
-DMG_PATH="dist/Symaira-EraseMe-${VERSION}-macos.dmg"
+DMG_PATH="$REPO_ROOT/dist/Symaira-EraseMe-${VERSION}-macos.dmg"
 
 CODESIGN_KEYCHAIN_ARGS=()
 if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
@@ -81,8 +84,8 @@ fi
 if [ "$DMG_ONLY" != "true" ]; then
     echo "Building SymairaEraseMe in Release mode..."
     cd app/SymairaEraseMe
-    swift build -c release
-    SWIFT_BIN_PATH="$(swift build -c release --show-bin-path)"
+    swift build -c release --jobs "${SWIFT_BUILD_JOBS:-2}"
+    SWIFT_BIN_PATH="$(swift build -c release --jobs "${SWIFT_BUILD_JOBS:-2}" --show-bin-path)"
     cd ../..
 
     BUILD_DIR="$SWIFT_BIN_PATH"
@@ -97,6 +100,23 @@ if [ "$DMG_ONLY" != "true" ]; then
     rm -rf "$STAGE_DIR"
     mkdir -p "$APP_BUNDLE/Contents/MacOS"
     mkdir -p "$APP_BUNDLE/Contents/Resources"
+    cp -R "$ICON_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+    cp "$ICNS_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    if ACTOOL="$(xcrun --find actool 2>/dev/null)"; then
+        ICON_BUILD_DIR="$APP_BUNDLE/Contents/Resources/.AppIcon-compiled"
+        mkdir -p "$ICON_BUILD_DIR"
+        "$ACTOOL" \
+            --compile "$ICON_BUILD_DIR" \
+            --platform macosx \
+            --minimum-deployment-target 14.0 \
+            --app-icon AppIcon \
+            --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
+            "$ICON_SOURCE"
+        cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
+        rm -rf "$ICON_BUILD_DIR"
+    else
+        echo "Warning: actool unavailable; keeping the approved ICNS fallback only." >&2
+    fi
 
     echo "Copying Swift and Go binaries..."
     cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
@@ -113,6 +133,8 @@ if [ "$DMG_ONLY" != "true" ]; then
     <key>CFBundleExecutable</key>
     <string>$APP_NAME</string>
     <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
+    <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.symaira.eraseme</string>
@@ -134,13 +156,9 @@ if [ "$DMG_ONLY" != "true" ]; then
 </plist>
 EOF
 
-    SRC_ICON="assets/branding/AppIcon.icns"
-    if [ -f "$SRC_ICON" ]; then
-        echo "Installing AppIcon.icns..."
-        cp "$SRC_ICON" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-    else
-        echo "Warning: $SRC_ICON not found. App will build without icon."
-    fi
+    # The approved icon is copied and guarded before signing; do not silently
+    # fall back to a stale legacy asset.
+    "$REPO_ROOT/scripts/verify-app-icon.sh" "$APP_BUNDLE"
 
     # --- Code Signing ---
     # Sign nested binary with hardened runtime, then sign app bundle with hardened runtime.
@@ -180,6 +198,8 @@ if [ ! -d "$APP_BUNDLE" ]; then
     echo "Error: staged app bundle not found at $APP_BUNDLE" >&2
     exit 1
 fi
+
+scripts/verify-app-icon.sh "$APP_BUNDLE"
 
 echo "Creating DMG..."
 mkdir -p dist

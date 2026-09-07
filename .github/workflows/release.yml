@@ -125,6 +125,7 @@ jobs:
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
+          ./scripts/verify-app-icon.sh "$APP_PATH"
 
       - name: Notarize and staple macOS app
         env:
