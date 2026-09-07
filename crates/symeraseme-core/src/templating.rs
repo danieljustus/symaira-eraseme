@@ -633,7 +633,16 @@ fn json_value(value: JsonValue) -> Result<Value, TemplateError> {
                 Ok(Value::from(value))
             } else if let Some(value) = value.as_u64() {
                 Ok(Value::from(value))
-            } else if let Some(value) = value.as_f64() {
+            } else if let Some(value) = value.as_i128() {
+                Ok(Value::from(value))
+            } else if let Some(value) = value.as_u128() {
+                Ok(Value::from(value))
+            } else if matches!(value.to_string().as_bytes(), bytes if bytes.contains(&b'.') || bytes.contains(&b'e') || bytes.contains(&b'E'))
+                && value.as_f64().is_some_and(f64::is_finite)
+            {
+                let value = value
+                    .as_f64()
+                    .ok_or_else(|| TemplateError::new("invalid render context"))?;
                 Ok(Value::from(value))
             } else {
                 Err(TemplateError::new("invalid render context"))

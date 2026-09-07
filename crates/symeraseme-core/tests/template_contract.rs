@@ -138,6 +138,41 @@ fn every_canonical_template_matches_the_external_golden_byte_for_byte() {
 }
 
 #[test]
+fn arbitrary_precision_numbers_are_exact_or_rejected() {
+    for (input, expected) in [
+        (
+            "-170141183460469231731687303715884105728",
+            "-170141183460469231731687303715884105728",
+        ),
+        ("18446744073709551615", "18446744073709551615"),
+        (
+            "170141183460469231731687303715884105727",
+            "170141183460469231731687303715884105727",
+        ),
+        (
+            "340282366920938463463374607431768211455",
+            "340282366920938463463374607431768211455",
+        ),
+        ("1.25", "1.25"),
+        ("1e3", "1000.0"),
+    ] {
+        let mut context = context_for("templates/dashboard.html.j2");
+        context.data["total_requests"] = serde_json::from_str(input).unwrap();
+        let rendered = render("dashboard.html.j2", &context).unwrap();
+        assert!(
+            rendered.contains(&format!("<div class=\"count\">{expected}</div>")),
+            "number was not rendered as expected: {input}"
+        );
+    }
+
+    let mut context = context_for("templates/dashboard.html.j2");
+    context.data["total_requests"] =
+        serde_json::from_str("340282366920938463463374607431768211456").unwrap();
+    let error = render("dashboard.html.j2", &context).unwrap_err();
+    assert_eq!(error.to_string(), "invalid render context");
+}
+
+#[test]
 fn canonical_sources_are_embedded_without_drift() {
     let names: Vec<_> = embedded_template_sources().collect();
     assert_eq!(names.len(), 11);

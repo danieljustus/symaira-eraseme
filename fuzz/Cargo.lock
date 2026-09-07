@@ -679,6 +679,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "symaira-core-version"
+version = "0.0.0"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=27177f25f551cecefa7bd6c4524abf175b3a75c7#27177f25f551cecefa7bd6c4524abf175b3a75c7"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symeraseme-core"
 version = "0.13.0"
 dependencies = [
@@ -691,6 +700,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "symaira-core-version",
  "tar",
  "tempfile",
  "toml",

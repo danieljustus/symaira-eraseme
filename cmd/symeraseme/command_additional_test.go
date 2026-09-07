@@ -98,6 +98,7 @@ func TestCLIProfileTemplateAndAdapterPaths(t *testing.T) {
 }
 
 func TestCLIEmbeddedRegistrySurfaces(t *testing.T) {
+	t.Setenv("SYMERASEME_RESOURCES", "")
 	for _, args := range [][]string{
 		{"--output", "json", "registry", "list"},
 		{"--output", "json", "registry", "validate"},
