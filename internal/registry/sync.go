@@ -6,38 +6,78 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-// DefaultSyncURL is the release-artefact base URL for registry sync
-// (issue #700: fetch over HTTPS, never git pull).
+// DefaultSyncURL is the release artefact URL for registry sync. Production
+// callers must use HTTPS; loopback HTTP is accepted only for injected test
+// servers.
 const DefaultSyncURL = "https://github.com/danieljustus/symaira-eraseme/releases/latest/download/registry.tar.gz"
 
-// httpClient is the shared sync HTTP client.
-var httpClient = &http.Client{Timeout: 60 * time.Second}
+const (
+	syncTimeout           = 60 * time.Second
+	syncMaxCompressed     = 64 << 20
+	syncMaxExpanded       = 64 << 20
+	syncMaxFile           = 1 << 20
+	syncMaxFiles          = 4096
+	syncMaxArchiveEntries = 8192
+	syncMaxPathBytes      = 4096
+)
 
-// Sync downloads the registry archive from url (default DefaultSyncURL) and
-// unpacks it into dst (which is created if missing). NO git commands — the
-// Python git-pull design (bug #700) is deliberately not reproduced.
-func Sync(ctx context.Context, dst string, url string) error {
-	if url == "" {
-		url = DefaultSyncURL
+var (
+	httpClient    = &http.Client{Timeout: syncTimeout}
+	renamePath    = os.Rename
+	removeAllPath = os.RemoveAll
+)
+
+// Sync downloads, validates, and atomically installs a registry archive.
+// Until validation succeeds, dst is not modified. A failed replacement restores
+// the previous destination from its same-filesystem backup.
+func Sync(ctx context.Context, dst string, rawURL string) error {
+	if rawURL == "" {
+		rawURL = DefaultSyncURL
 	}
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return fmt.Errorf("registry sync: create dst: %w", err)
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("registry sync: invalid URL")
 	}
-	root, err := filepath.Abs(dst)
+	if parsed.Scheme != "https" && !loopbackHTTP(parsed) {
+		return fmt.Errorf("registry sync: HTTPS is required")
+	}
+
+	rootPath, err := filepath.Abs(dst)
 	if err != nil {
-		return fmt.Errorf("registry sync: resolve dst: %w", err)
+		return fmt.Errorf("registry sync: resolve destination: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	parent := filepath.Dir(rootPath)
+	if err := os.MkdirAll(parent, 0o700); err != nil {
+		return fmt.Errorf("registry sync: create destination parent: %w", err)
+	}
+	stage, err := os.MkdirTemp(parent, ".registry-sync-")
 	if err != nil {
-		return fmt.Errorf("registry sync: %w", err)
+		return fmt.Errorf("registry sync: create staging directory: %w", err)
+	}
+	stageReady := true
+	defer func() {
+		if stageReady {
+			_ = removeAllPath(stage)
+		}
+	}()
+	if err := os.Chmod(stage, 0o700); err != nil {
+		return fmt.Errorf("registry sync: secure staging directory: %w", err)
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, syncTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("registry sync: request: %w", err)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -48,56 +88,187 @@ func Sync(ctx context.Context, dst string, url string) error {
 		return fmt.Errorf("registry sync: download: HTTP %d", resp.StatusCode)
 	}
 
-	gz, err := gzip.NewReader(resp.Body)
+	counted := &countingReader{reader: resp.Body}
+	limited := io.LimitReader(counted, syncMaxCompressed+1)
+	gz, err := gzip.NewReader(limited)
 	if err != nil {
-		return fmt.Errorf("registry sync: gzip: %w", err)
+		return fmt.Errorf("registry sync: gzip: malformed archive")
 	}
-	defer gz.Close()
+	if err := extractArchive(gz, stage); err != nil {
+		_ = gz.Close()
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return fmt.Errorf("registry sync: gzip: malformed archive")
+	}
+	if _, err := io.Copy(io.Discard, limited); err != nil {
+		return fmt.Errorf("registry sync: download body read failed")
+	}
+	// Drain trailing response bytes so the compressed-body bound also covers
+	// bytes after a valid gzip member.
+	if counted.n > syncMaxCompressed {
+		return fmt.Errorf("registry sync: compressed archive limit %d bytes exceeded", syncMaxCompressed)
+	}
 
-	tr := tar.NewReader(gz)
+	if _, err := VerifySynced(stage); err != nil {
+		return fmt.Errorf("registry sync: staged registry validation failed: %w", err)
+	}
+	if err := replaceDirectory(rootPath, stage); err != nil {
+		return err
+	}
+	stageReady = false
+	return nil
+}
+
+func loopbackHTTP(parsed *url.URL) bool {
+	if parsed.Scheme != "http" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	addr, err := netip.ParseAddr(host)
+	return err == nil && addr.IsLoopback()
+}
+
+type countingReader struct {
+	reader io.Reader
+	n      int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.n += int64(n)
+	return n, err
+}
+
+type archiveBudget struct {
+	entries int
+	files   int
+	bytes   int64
+}
+
+func extractArchive(reader io.Reader, stage string) error {
+	root, err := os.OpenRoot(stage)
+	if err != nil {
+		return fmt.Errorf("registry sync: open staging root: %w", err)
+	}
+	defer root.Close()
+	budget := archiveBudget{}
+	tr := tar.NewReader(reader)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("registry sync: tar: %w", err)
+			return fmt.Errorf("registry sync: tar: malformed archive")
 		}
-		// Guard against absolute paths and traversal outside the destination.
-		name := filepath.Clean(filepath.FromSlash(hdr.Name))
-		if filepath.IsAbs(name) || strings.Contains(name, "..") {
-			continue
+		budget.entries++
+		if budget.entries > syncMaxArchiveEntries {
+			return fmt.Errorf("registry sync: archive entry limit %d exceeded", syncMaxArchiveEntries)
 		}
-		target := filepath.Join(root, name)
-		relative, err := filepath.Rel(root, target)
-		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			continue
+		name, err := safeArchiveName(hdr.Name)
+		if err != nil {
+			return fmt.Errorf("registry sync: archive entry rejected: %w", err)
 		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return fmt.Errorf("registry sync: mkdir %s: %w", target, err)
+			if hdr.Size != 0 {
+				return fmt.Errorf("registry sync: directory entry has data")
+			}
+			if err := root.MkdirAll(name, 0o700); err != nil {
+				return fmt.Errorf("registry sync: create directory: %w", err)
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return fmt.Errorf("registry sync: mkdir: %w", err)
+			if hdr.Size < 0 || hdr.Size > syncMaxFile {
+				return fmt.Errorf("registry sync: file size limit %d bytes exceeded", syncMaxFile)
 			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(hdr.Mode)&0o755)
+			budget.files++
+			if budget.files > syncMaxFiles {
+				return fmt.Errorf("registry sync: file limit %d exceeded", syncMaxFiles)
+			}
+			if budget.bytes > syncMaxExpanded-hdr.Size {
+				return fmt.Errorf("registry sync: expanded archive limit %d bytes exceeded", syncMaxExpanded)
+			}
+			if err := root.MkdirAll(filepath.Dir(name), 0o700); err != nil {
+				return fmt.Errorf("registry sync: create parent directory: %w", err)
+			}
+			file, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 			if err != nil {
-				return fmt.Errorf("registry sync: write %s: %w", target, err)
+				return fmt.Errorf("registry sync: create archive file: %w", err)
 			}
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
-				return fmt.Errorf("registry sync: copy %s: %w", target, err)
+			_, copyErr := io.CopyN(file, tr, hdr.Size)
+			closeErr := file.Close()
+			if copyErr != nil {
+				return fmt.Errorf("registry sync: read archive file: %w", copyErr)
 			}
-			f.Close()
+			if closeErr != nil {
+				return fmt.Errorf("registry sync: close archive file: %w", closeErr)
+			}
+			budget.bytes += hdr.Size
+		default:
+			return fmt.Errorf("registry sync: unsupported archive entry type")
 		}
 	}
 	return nil
 }
 
-// VerifySynced loads a synced directory through the same loader/validator —
-// a sync is only done when its result loads.
+func safeArchiveName(raw string) (string, error) {
+	if raw == "" || len(raw) > syncMaxPathBytes || strings.IndexByte(raw, 0) >= 0 {
+		return "", fmt.Errorf("invalid archive path")
+	}
+	normalized := filepath.FromSlash(strings.ReplaceAll(raw, "\\", "/"))
+	if filepath.IsAbs(normalized) || filepath.VolumeName(normalized) != "" {
+		return "", fmt.Errorf("absolute archive path")
+	}
+	parts := strings.Split(filepath.ToSlash(normalized), "/")
+	clean := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		if part == "." || part == ".." {
+			return "", fmt.Errorf("traversal archive path")
+		}
+		clean = append(clean, part)
+	}
+	if len(clean) == 0 {
+		return "", fmt.Errorf("empty archive path")
+	}
+	return filepath.Join(clean...), nil
+}
+
+func replaceDirectory(dst, stage string) error {
+	backup := dst + ".registry-backup"
+	_ = removeAllPath(backup)
+	hadOld := false
+	if _, err := os.Lstat(dst); err == nil {
+		if err := renamePath(dst, backup); err != nil {
+			return fmt.Errorf("registry sync: preserve old destination: %w", err)
+		}
+		hadOld = true
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("registry sync: inspect destination: %w", err)
+	}
+	if err := renamePath(stage, dst); err != nil {
+		if hadOld {
+			_ = renamePath(backup, dst)
+		}
+		return fmt.Errorf("registry sync: install staged registry: %w", err)
+	}
+	if hadOld {
+		if err := removeAllPath(backup); err != nil {
+			// Installation succeeded; retaining the backup is safer than claiming
+			// cleanup succeeded and does not affect the installed registry.
+			return fmt.Errorf("registry sync: remove replacement backup: %w", err)
+		}
+	}
+	return nil
+}
+
+// VerifySynced loads a synced directory through the same loader/validator.
 func VerifySynced(dst string) (int, error) {
 	brokers, err := LoadFromDir(dst)
 	if err != nil {
@@ -105,6 +276,3 @@ func VerifySynced(dst string) (int, error) {
 	}
 	return len(brokers), nil
 }
-
-// silence unused import when fs is not otherwise used
-var _ fs.FS

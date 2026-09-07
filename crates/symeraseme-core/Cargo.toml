@@ -8,6 +8,7 @@ description.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+build = "build.rs"
 
 [lib]
 path = "src/lib.rs"
@@ -16,9 +17,12 @@ path = "src/lib.rs"
 cap-fs-ext.workspace = true
 cap-std.workspace = true
 chrono.workspace = true
+flate2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+tar.workspace = true
+tempfile.workspace = true
 toml.workspace = true
 yaml-rust2.workspace = true
 

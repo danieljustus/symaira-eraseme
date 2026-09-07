@@ -285,11 +285,6 @@ fn read_metadata(root: &Dir, path: &Path) -> Result<Vec<u8>, RegistryError> {
     Ok(bytes)
 }
 
-/// Alias matching the loader terminology used by the Go implementation.
-pub fn load(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryError> {
-    load_from_dir(root)
-}
-
 pub(crate) fn decode(file_stem: &str, source: &str) -> Result<Broker, RegistryError> {
     decode_with_metrics(file_stem, source).map(|(broker, _)| broker)
 }
@@ -1047,7 +1042,7 @@ fn prefix(error: RegistryError, field: String) -> RegistryError {
     }
 }
 
-fn with_path(error: RegistryError, path: &Path) -> RegistryError {
+pub(crate) fn with_path(error: RegistryError, path: &Path) -> RegistryError {
     match error {
         RegistryError::Validation { field, message } => {
             validation(path.display().to_string() + ": " + &field, message)

@@ -20,10 +20,12 @@ repository = "https://github.com/danieljustus/symaira-eraseme"
 cap-fs-ext = "4.0.3"
 cap-std = "4.0.3"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+flate2 = "1.1.10"
 rusqlite = { version = "0.37", features = ["backup", "bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9.34"
+tar = "0.4.44"
 tempfile = "3.27.0"
 toml = "0.5.11"
 yaml-rust2 = "0.10.2"
