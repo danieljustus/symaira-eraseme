@@ -27,13 +27,34 @@ done
   printf 'Missing ICNS fallback in bundle: %s\n' "$RESOURCES/AppIcon.icns" >&2
   exit 1
 }
-if ACTOOL="$(xcrun --find actool 2>/dev/null)"; then
-  [[ -f "$RESOURCES/Assets.car" ]] || {
-    printf 'Missing compiled icon catalog in bundle: %s\n' "$RESOURCES/Assets.car" >&2
+REQUIRE_COMPILED_ICON="${REQUIRE_COMPILED_ICON:-false}"
+COMPILED_ICON=false
+if [[ -f "$RESOURCES/Assets.car" ]]; then
+  ASSETUTIL="$(xcrun --find assetutil 2>/dev/null || true)"
+  [[ -n "$ASSETUTIL" ]] || {
+    printf 'Cannot inspect compiled icon catalog: assetutil unavailable.\n' >&2
     exit 1
   }
+  ASSET_INFO="$(mktemp)"
+  trap 'rm -f "$ASSET_INFO"' EXIT
+  "$ASSETUTIL" --info "$RESOURCES/Assets.car" > "$ASSET_INFO"
+  python3 - "$ASSET_INFO" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+entries = json.loads(Path(sys.argv[1]).read_text())
+if not isinstance(entries, list):
+    entries = [entries]
+if not any(item.get("AssetType") == "Icon Image" and item.get("Name") == "AppIcon" for item in entries):
+    raise SystemExit("compiled Assets.car contains no AppIcon icon entry")
+PY
+  COMPILED_ICON=true
+elif [[ "$REQUIRE_COMPILED_ICON" == "true" ]]; then
+  printf 'Missing compiled AppIcon catalog in release-required mode: %s\n' "$RESOURCES/Assets.car" >&2
+  exit 1
 else
-  printf 'App icon guard: actool unavailable; using ICNS fallback only.\n' >&2
+  printf 'App icon guard: compiled AppIcon unavailable; using approved ICNS fallback only.\n' >&2
 fi
 
 python3 -m json.tool "$ICON_SOURCE/icon.json" >/dev/null
@@ -57,4 +78,8 @@ diff -qr "$ICON_SOURCE" "$RESOURCES/AppIcon.icon" >/dev/null || {
 
 python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$INFO_PLIST"
 
-printf 'App icon guard passed: %s (compiled Assets.car + native AppIcon.icon + AppIcon.icns fallback)\n' "$APP_PATH"
+if [[ "$COMPILED_ICON" == "true" ]]; then
+  printf 'App icon guard passed: %s (compiled AppIcon entry + native AppIcon.icon + AppIcon.icns fallback)\n' "$APP_PATH"
+else
+  printf 'App icon guard passed: %s (ICNS fallback only; native AppIcon.icon retained)\n' "$APP_PATH"
+fi

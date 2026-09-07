@@ -15,6 +15,7 @@ APP_NAME="Symaira EraseMe"
 APP_ONLY="${APP_ONLY:-false}"
 DMG_ONLY="${DMG_ONLY:-false}"
 REQUIRE_SIGNING="${REQUIRE_SIGNING:-false}"
+REQUIRE_COMPILED_ICON="${REQUIRE_COMPILED_ICON:-false}"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -102,7 +103,7 @@ if [ "$DMG_ONLY" != "true" ]; then
     mkdir -p "$APP_BUNDLE/Contents/Resources"
     cp -R "$ICON_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     cp "$ICNS_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-    if ACTOOL="$(xcrun --find actool 2>/dev/null)"; then
+    if ACTOOL="$(xcrun --find actool 2>/dev/null || true)" && [ -n "$ACTOOL" ]; then
         ICON_BUILD_DIR="$APP_BUNDLE/Contents/Resources/.AppIcon-compiled"
         mkdir -p "$ICON_BUILD_DIR"
         "$ACTOOL" \
@@ -114,6 +115,9 @@ if [ "$DMG_ONLY" != "true" ]; then
             "$ICON_SOURCE"
         cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
         rm -rf "$ICON_BUILD_DIR"
+    elif [ "$REQUIRE_COMPILED_ICON" = "true" ]; then
+        echo "Release requires an Xcode 26+ actool that supports .icon; actool is unavailable." >&2
+        exit 1
     else
         echo "Warning: actool unavailable; keeping the approved ICNS fallback only." >&2
     fi

@@ -115,6 +115,8 @@ func TestReleaseWorkflowContract(t *testing.T) {
 
 		expectedOrder := []string{
 			"Checkout workflow source",
+			"Select Xcode 26",
+			"Verify Xcode toolchain",
 			"Set up Go",
 			"Import Developer ID certificate",
 			"Validate notarization credentials",
@@ -171,10 +173,24 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		}
 	})
 
+	t.Run("XcodeIconToolchain", func(t *testing.T) {
+		selectStep := getWorkflowStep(t, guiJob.Steps, "Select Xcode 26")
+		if selectStep.Uses != "maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90" {
+			t.Errorf("unexpected Xcode setup action: %q", selectStep.Uses)
+		}
+		verifyStep := getWorkflowStep(t, guiJob.Steps, "Verify Xcode toolchain")
+		for _, expected := range []string{"xcodebuild -version", "Expected Xcode 26 or newer", "XCODE_MAJOR", "XCODE_MAJOR < 26"} {
+			if !strings.Contains(verifyStep.Run, expected) {
+				t.Errorf("Xcode verification missing %q", expected)
+			}
+		}
+	})
+
 	t.Run("BuildAndSignAppBundle", func(t *testing.T) {
 		step := getWorkflowStep(t, guiJob.Steps, "Build and sign macOS app bundle")
 		for _, expected := range []string{
 			"REQUIRE_SIGNING=true",
+			"REQUIRE_COMPILED_ICON=true",
 			"./scripts/package-dmg.sh --app-only",
 			`APP_PATH="app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"`,
 			`test -d "$APP_PATH"`,
