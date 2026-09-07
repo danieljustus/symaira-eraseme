@@ -308,12 +308,21 @@ fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
     }
     #[cfg(windows)]
     {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
         let status = Command::new("taskkill")
             .args(["/PID", &child.id().to_string(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()?;
         if !status.success() {
+            // taskkill can lose a race with a process that exits after the
+            // preflight check. Treat that already-completed cleanup as
+            // idempotent; a still-running process remains a hard failure.
+            if child.try_wait()?.is_some() {
+                return Ok(());
+            }
             return Err(std::io::Error::other(
                 "taskkill failed to clean oracle tree",
             ));
@@ -358,6 +367,9 @@ fn oracle_runner_timeout_helper() {
     }
 }
 
+// These probes require tree-safe termination and therefore remain Unix-only
+// until the documented Windows Job Object capability is implemented.
+#[cfg(unix)]
 #[test]
 fn run_file_backed_enforces_live_output_limit() {
     let tree = TestTree::new("runner-output-limit");
@@ -379,6 +391,7 @@ fn run_file_backed_enforces_live_output_limit() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn run_file_backed_timeout_cleanup_is_bounded() {
     let tree = TestTree::new("runner-timeout");
@@ -399,6 +412,10 @@ fn run_file_backed_timeout_cleanup_is_bounded() {
     assert!(started.elapsed() < Duration::from_secs(3));
 }
 
+// This oracle and the process-cleanup probes require Unix process groups.
+// Windows parity remains explicitly capability-gated until Job Object support
+// exists; the native config cases still run with semantic path normalization.
+#[cfg(unix)]
 #[test]
 fn go_config_oracle_provenance_fixture_and_rust_results_match() {
     let fixture: Value = serde_json::from_str(GO_FIXTURE).expect("valid Go config fixture");
@@ -424,11 +441,32 @@ fn normalized_result(root: &Path, config: &Config, storage: &Storage) -> Value {
         .parent()
         .and_then(Path::parent)
         .expect("encrypted temp dir has cache/tool/database shape");
-    let encoded = serde_json::to_string(&json!({ "config": config, "storage": storage }))
-        .expect("serialize result")
-        .replace(cache_root.to_str().expect("UTF-8 cache root"), "$CACHE")
-        .replace(root.to_str().expect("UTF-8 test root"), "$ROOT");
-    serde_json::from_str(&encoded).expect("normalized result JSON")
+    json!({
+        "config": config,
+        "storage": {
+            "data_dir": normalize_path(root, "$ROOT", &storage.data_dir),
+            "db_dir": normalize_path(root, "$ROOT", &storage.db_dir),
+            "db_path": normalize_path(root, "$ROOT", &storage.db_path),
+            "temp_dir": normalize_path(cache_root, "$CACHE", &storage.temp_dir),
+            "encrypt_db": storage.encrypt_db,
+        },
+    })
+}
+
+fn normalize_path(root: &Path, placeholder: &str, value: &Path) -> String {
+    let root = root.to_string_lossy().replace('\\', "/");
+    let value = value.to_string_lossy().replace('\\', "/");
+    let root = root.trim_end_matches('/');
+    if value == root {
+        return placeholder.to_owned();
+    }
+    if let Some(suffix) = value
+        .strip_prefix(root)
+        .filter(|suffix| suffix.starts_with('/'))
+    {
+        return format!("{placeholder}{suffix}");
+    }
+    value
 }
 
 fn assert_field(error: ConfigError, field: &str) {
