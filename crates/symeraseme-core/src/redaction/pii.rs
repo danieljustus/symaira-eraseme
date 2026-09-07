@@ -107,6 +107,15 @@ fn regex(pattern: &str) -> ByteRegex {
         .expect("built-in redaction regex")
 }
 
+fn passport_regex() -> &'static ByteRegex {
+    static REGEX: OnceLock<ByteRegex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        regex(
+            r"(?i)(passport|travel\s*document|reisedokument)\s*(#|no|num|number)?\s*[:.]?\s*([A-Z0-9]{6,9})\b",
+        )
+    })
+}
+
 fn default_rules() -> Vec<Rule> {
     vec![
         Rule {
@@ -131,9 +140,7 @@ fn default_rules() -> Vec<Rule> {
         },
         Rule {
             name: "Passport",
-            regex: regex(
-                r"(?i)(passport|travel\s*document|reisedokument)\s*(#|no|num|number)?\s*[:.]?\s*([A-Z0-9]{6,9})\b",
-            ),
+            regex: passport_regex().clone(),
             replacement: Replacement::Passport,
         },
         Rule {
@@ -520,16 +527,17 @@ fn scrub_phone(value: &[u8]) -> Vec<u8> {
     out
 }
 fn scrub_passport(value: &[u8]) -> Vec<u8> {
-    let mut start = value.len();
-    while start > 0 && value[start - 1].is_ascii_alphanumeric() {
-        start -= 1;
-    }
-    if value.len().saturating_sub(start) < 6 {
+    let Some(identifier) = passport_regex()
+        .captures(value)
+        .and_then(|captures| captures.get(3))
+    else {
+        return value.to_vec();
+    };
+    if identifier.len() < 2 {
         return value.to_vec();
     }
-    let keep = 2;
     let mut out = value.to_vec();
-    for byte in &mut out[start..value.len() - keep] {
+    for byte in &mut out[identifier.start()..identifier.end() - 2] {
         *byte = b'*';
     }
     out

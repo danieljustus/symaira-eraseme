@@ -135,6 +135,14 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_passport_keyword_preserves_non_pii_bytes() {
+        assert_eq!(
+            redact_text("passportABC123", None).unwrap(),
+            "passport****23"
+        );
+    }
+
+    #[test]
     fn review_rejects_invalid_matches() {
         let value = b"abc";
         let invalid = Match::new("test", 0, 2, b"ac".to_vec(), b"x".to_vec());
