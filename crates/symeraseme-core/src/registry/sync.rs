@@ -16,6 +16,7 @@ const MAX_FILE_BYTES: u64 = 1 << 20;
 const MAX_FILES: usize = 4_096;
 const MAX_ARCHIVE_ENTRIES: usize = 8_192;
 const MAX_PATH_BYTES: usize = 4_096;
+const MAX_TAR_PADDING_BYTES: usize = 20 * 512;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The release artifact URL used when `sync` receives an empty URL.
@@ -244,12 +245,26 @@ fn extract_archive(
 
     // Force checksum/trailer validation and reject bytes after the tar end.
     let mut decoder = archive.into_inner();
-    let mut trailing_decompressed = Vec::new();
-    decoder
-        .read_to_end(&mut trailing_decompressed)
-        .map_err(|source| io_error(Path::new("archive"), source))?;
-    if trailing_decompressed.iter().any(|byte| *byte != 0) {
-        return Err(validation("sync", "decompressed bytes after tar end"));
+    let mut trailing_decompressed = 0_usize;
+    let mut padding = [0_u8; 512];
+    loop {
+        let count = decoder
+            .read(&mut padding)
+            .map_err(|source| io_error(Path::new("archive"), source))?;
+        if count == 0 {
+            break;
+        }
+        trailing_decompressed = trailing_decompressed
+            .checked_add(count)
+            .ok_or_else(|| validation("sync", "tar padding counter overflowed"))?;
+        if trailing_decompressed > MAX_TAR_PADDING_BYTES
+            || padding[..count].iter().any(|byte| *byte != 0)
+        {
+            return Err(validation("sync", "decompressed bytes after tar end"));
+        }
+    }
+    if !trailing_decompressed.is_multiple_of(512) {
+        return Err(validation("sync", "non-canonical tar padding"));
     }
     let mut compressed = decoder.into_inner();
     let mut trailing_compressed = Vec::new();

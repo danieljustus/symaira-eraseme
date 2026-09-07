@@ -160,15 +160,9 @@ fn collect(
         }
 
         let relative = relative_utf8(root, &entry)?;
-        let path = Path::new(&relative);
-        let is_yaml = matches!(
-            path.extension().and_then(|value| value.to_str()),
-            Some("yaml" | "yml")
-        );
         if relative.starts_with("brokers/")
-            && is_yaml
-            && !is_doc_file(&relative)
             && !is_broker_file(&relative)
+            && !is_doc_yaml_file(&relative)
         {
             return Err(format!("invalid broker file layout: {relative}"));
         }
@@ -254,11 +248,18 @@ fn is_selected(relative: &str) -> bool {
         || is_broker_file(relative)
 }
 
-fn is_doc_file(relative: &str) -> bool {
-    relative
-        .split('/')
-        .next_back()
-        .is_some_and(|name| name.starts_with('_'))
+fn is_doc_yaml_file(relative: &str) -> bool {
+    let components = relative.split('/').collect::<Vec<_>>();
+    components.len() == 3
+        && components[0] == "brokers"
+        && matches!(components[1], "eu" | "uk" | "us")
+        && components[2].starts_with('_')
+        && matches!(
+            Path::new(components[2])
+                .extension()
+                .and_then(|value| value.to_str()),
+            Some("yaml" | "yml")
+        )
 }
 
 fn is_broker_file(relative: &str) -> bool {

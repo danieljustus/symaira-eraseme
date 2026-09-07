@@ -28,7 +28,13 @@ fn archive(entries: &[(&str, &[u8], u32)]) -> Vec<u8> {
         let mut tar = Builder::new(&mut compressed);
         for (name, body, kind) in entries {
             let mut header = Header::new_gnu();
-            header.set_path(name).unwrap();
+            if name.contains("../") {
+                let raw = header.as_mut_bytes();
+                raw[..100].fill(0);
+                raw[..name.len()].copy_from_slice(name.as_bytes());
+            } else {
+                header.set_path(name).unwrap();
+            }
             header.set_mode(*kind);
             if *kind == 0o700 {
                 header.set_entry_type(tar::EntryType::Directory);
@@ -58,6 +64,7 @@ fn valid_archive() -> Vec<u8> {
             br#"{"schema_version":1}"#,
             0o600,
         ),
+        ("schemas/safe..name.txt", b"allowed", 0o600),
         ("brokers/us/test.yaml", broker, 0o600),
     ])
 }
@@ -76,6 +83,10 @@ fn sync_validates_then_replaces_existing_registry() {
     sync_with_transport("http://127.0.0.1/test", &destination, &transport).unwrap();
     let installed = std::fs::read(destination.join("brokers/us/test.yaml")).unwrap();
     assert_eq!(&installed[..3], b"id:");
+    assert_eq!(
+        std::fs::read(destination.join("schemas/safe..name.txt")).unwrap(),
+        b"allowed"
+    );
     assert!(!destination.join("old/state").exists());
 }
 
@@ -86,7 +97,7 @@ fn sync_rejects_traversal_and_preserves_old_bytes() {
     std::fs::create_dir_all(&destination).unwrap();
     let old = destination.join("sentinel");
     std::fs::write(&old, b"old-bytes").unwrap();
-    let body = archive(&[("safe..name", b"allowed", 0o600)]);
+    let body = archive(&[("../escape", b"escaped", 0o600)]);
     let transport = StaticTransport { status: 200, body };
 
     assert!(sync_with_transport("http://127.0.0.1/test", &destination, &transport).is_err());
@@ -128,12 +139,17 @@ fn sync_rejects_noncanonical_gzip_and_tar_trailing_data() {
     payload.write_all(&tar_bytes).unwrap();
     payload.write_all(b"decompressed trailing").unwrap();
     let decompressed_trailing = payload.finish().unwrap();
+    let mut zero_payload = GzEncoder::new(Vec::new(), Compression::default());
+    zero_payload.write_all(&tar_bytes).unwrap();
+    zero_payload.write_all(&[0]).unwrap();
+    let zero_decompressed_trailing = zero_payload.finish().unwrap();
 
     for body in [
         corrupt_trailer,
         raw_trailing,
         concatenated,
         decompressed_trailing,
+        zero_decompressed_trailing,
     ] {
         let root = tempfile::tempdir().unwrap();
         let destination = root.path().join("registry");
