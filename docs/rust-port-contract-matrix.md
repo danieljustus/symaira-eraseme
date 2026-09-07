@@ -51,8 +51,11 @@ Tasks `3.1` and `3.2` are implemented and independently reviewed at
 `4a64892d5eaa0c5f435d4ceb2ce42e28a8ec449c`. The schema-v1 models, strict
 validation, embedded 1,277-broker corpus, filters and validated atomic sync
 pass locally in Go and Rust. Both specification reviews are `PASS`; both
-quality/security reviews are `APPROVED`. Native Linux/Windows exact-head CI
-remains mandatory before merge. Tasks `3.3`–`3.4` remain active or pending.
+quality/security reviews are `APPROVED`. Task `3.3` is independently approved
+at `9fb768805de213972db6f5437f1dd218e09e88d9`; all 11 canonical templates
+match the external golden fixture byte-for-byte with bounded rendering.
+Native Linux/Windows exact-head CI remains mandatory before merge. Task `3.4`
+remains active.
 
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
@@ -101,8 +104,8 @@ SQLite, network transcript or process behavior.
 | REG-006 | registry | skip `_` docs, filename=id, deterministic ID sort | temp registry | loader tests | semantic | all | PASS (local; native CI pending) |
 | REG-007 | registry | filters/status/include-disabled/inactive | full corpus | filter snapshots | byte | all | PASS (local; native CI pending) |
 | REG-008 | registry | HTTPS sync, validation and atomic replacement | mock server/temp dir | transcript+manifest | side-effect | all | PASS (local; native CI pending) |
-| TMP-001 | templates | all 11 legal templates | `golden-templates.json` | shared golden test | byte | all | TODO |
-| TMP-002 | templates | missing/invalid variables and template names | negative corpus | error snapshots | byte | all | TODO |
+| TMP-001 | templates | all 11 legal templates | `golden-templates.json` | shared golden test | byte | all | PASS (local; native CI pending) |
+| TMP-002 | templates | missing/invalid variables and template names | negative corpus | error snapshots | byte | all | PASS (local; native CI pending) |
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | TODO |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | TODO |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |

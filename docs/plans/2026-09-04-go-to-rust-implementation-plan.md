@@ -452,12 +452,13 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-core/tests/template_contract.rs`
 
 **Steps:**
-- [ ] First test MiniJinja against the existing canonical `.j2` sources.
-- [ ] Accept it only if all 11 outputs equal `golden-templates.json` byte for
+- [x] First test MiniJinja against the existing canonical `.j2` sources.
+- [x] Accept it only if all 11 outputs equal `golden-templates.json` byte for
       byte.
-- [ ] If not, port frozen templates into the Rust crate and document why.
-- [ ] Do not change legal wording, whitespace or escaping to suit the engine.
-- [ ] Pass `TMP-001..002`.
+- [x] Keep the canonical sources directly embedded; no frozen copies were needed.
+- [x] Do not change legal wording, whitespace or escaping to suit the engine.
+- [x] Pass `TMP-001..002` locally; native exact-head CI remains required before
+      merge.
 
 ### Task 3.4: Port redaction
 
