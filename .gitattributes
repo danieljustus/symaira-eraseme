@@ -6,4 +6,5 @@ tests/fixtures/event-store/crypto/*.db binary
 crates/symeraseme-cli/src/commands/completion/*.txt text eol=lf
 
 # Canonical templates are rendered against byte-exact cross-platform goldens.
+registry/laws/** text eol=lf
 registry/templates/** text eol=lf
