@@ -434,3 +434,17 @@ fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
 fn tempfile_root() -> tempfile::TempDir {
     tempfile::tempdir().unwrap()
 }
+
+#[test]
+fn preflight_rejects_every_second_document_form() {
+    let base = base_broker();
+    for suffix in [
+        "---\nid: other\n",
+        "...\nid: other\n",
+        "---\nopt_out: [null, null]\n",
+    ] {
+        let source = format!("{base}\n{suffix}");
+        let error = Broker::from_yaml("test", &source).unwrap_err();
+        assert!(error.to_string().contains("document"), "{error}");
+    }
+}

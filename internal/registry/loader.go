@@ -7,11 +7,24 @@ package registry
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+)
+
+const (
+	maxDocumentBytes       = 1 << 20
+	maxYAMLNodes           = 16_384
+	maxYAMLDepth           = 64
+	maxDirectoryDepth      = 8
+	maxDirectoryEntries    = 16_384
+	maxBrokerFiles         = 4_096
+	maxOutputBrokers       = 4_096
+	maxAggregateInputBytes = 16 << 20
+	maxAggregateYAMLNodes  = 1 << 20
 )
 
 // embeddedRegistry is populated from the repo-root registry directory via
@@ -38,7 +51,12 @@ func LoadEmbedded() ([]Broker, error) {
 // LoadFromDir loads all broker documents from a directory on disk
 // (filesystem override for development and locally maintained registries).
 func LoadFromDir(root string) ([]Broker, error) {
-	return Load(os.DirFS(root))
+	handle, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, fmt.Errorf("registry: open root: %w", err)
+	}
+	defer handle.Close()
+	return Load(openedRootFS{FS: handle.FS(), root: handle})
 }
 
 // Load walks root for broker YAML files under brokers/<jurisdiction>/*.yaml,
@@ -65,11 +83,28 @@ func LoadReporting(root fs.FS) (brokers []Broker, errs []error) {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
+	var inputBytes, yamlNodes int
 	for _, id := range ids {
-		b, err := decodeAndValidate(docs[id])
-		if err != nil {
-			errs = append(errs, fmt.Errorf("registry: broker %q: %w", id, err))
+		d := docs[id]
+		if d.content == nil {
+			content, n, readErr := readBounded(root, d.path, inputBytes)
+			if readErr != nil {
+				return nil, []error{readErr}
+			}
+			d.content = content
+			inputBytes += n
+		}
+		b, nodes, decodeErr := decodeAndValidateMetrics(d)
+		if decodeErr != nil {
+			errs = append(errs, fmt.Errorf("registry: broker %q: %w", id, decodeErr))
 			continue
+		}
+		yamlNodes += nodes
+		if yamlNodes > maxAggregateYAMLNodes {
+			return nil, []error{verr("aggregate YAML node limit %d exceeded", maxAggregateYAMLNodes)}
+		}
+		if len(brokers) >= maxOutputBrokers {
+			return nil, []error{verr("output broker limit %d exceeded", maxOutputBrokers)}
 		}
 		brokers = append(brokers, b)
 	}
@@ -86,15 +121,34 @@ type doc struct {
 // collectDocs walks the registry filesystem for broker documents.
 func collectDocs(root fs.FS) (map[string]*doc, error) {
 	docs := map[string]*doc{}
+	entries := 0
+	files := 0
 	walk := func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		entries++
+		if entries > maxDirectoryEntries {
+			return verr("directory entry limit %d exceeded", maxDirectoryEntries)
+		}
+		if strings.Count(strings.TrimPrefix(p, "./"), "/") > maxDirectoryDepth+1 {
+			return verr("directory nesting exceeds %d levels", maxDirectoryDepth)
 		}
 		if d.IsDir() {
 			return nil
 		}
 		if !strings.HasSuffix(p, ".yaml") && !strings.HasSuffix(p, ".yml") {
 			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return verr("symlink is not allowed: %s", p)
+		}
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return fmt.Errorf("registry: inspect %s: %w", p, infoErr)
+		}
+		if !info.Mode().IsRegular() {
+			return verr("YAML entry is not a regular file: %s", p)
 		}
 		rel := strings.TrimPrefix(p, "registry/")
 		parts := strings.Split(rel, "/")
@@ -104,16 +158,94 @@ func collectDocs(root fs.FS) (map[string]*doc, error) {
 		if strings.HasPrefix(d.Name(), "_") {
 			return nil // documentation-only (contract §2)
 		}
-		content, err := fs.ReadFile(root, p)
-		if err != nil {
-			return fmt.Errorf("registry: read %s: %w", p, err)
+		files++
+		if files > maxBrokerFiles {
+			return verr("broker YAML file limit %d exceeded", maxBrokerFiles)
 		}
 		stem := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-		docs[stem] = &doc{id: stem, path: p, content: content}
+		if prior, exists := docs[stem]; exists {
+			return verr("duplicate broker id %q in %s and %s", stem, prior.path, p)
+		}
+		docs[stem] = &doc{id: stem, path: p}
 		return nil
 	}
 	if err := fs.WalkDir(root, ".", walk); err != nil {
 		return nil, fmt.Errorf("registry: walk: %w", err)
 	}
 	return docs, nil
+}
+
+func readBounded(root fs.FS, path string, inputBytes int) ([]byte, int, error) {
+	if inputBytes >= maxAggregateInputBytes {
+		return nil, 0, verr("aggregate input byte limit %d exceeded", maxAggregateInputBytes)
+	}
+	if lstat, ok := root.(interface {
+		Lstat(string) (os.FileInfo, error)
+	}); ok {
+		info, err := lstat.Lstat(path)
+		if err != nil {
+			return nil, 0, fmt.Errorf("registry: inspect %s: %w", path, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, 0, verr("symlink is not allowed: %s", path)
+		}
+		if !info.Mode().IsRegular() {
+			return nil, 0, verr("YAML entry is not a regular file: %s", path)
+		}
+	}
+	var (
+		file fs.File
+		err  error
+	)
+	if opener, ok := root.(interface {
+		OpenFile(string, int, os.FileMode) (*os.File, error)
+	}); ok {
+		file, err = opener.OpenFile(path, os.O_RDONLY|registryOpenNonblock, 0)
+	} else {
+		file, err = root.Open(path)
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("registry: read %s: %w", path, err)
+	}
+	defer file.Close()
+	if lstat, ok := root.(interface {
+		Lstat(string) (os.FileInfo, error)
+	}); ok {
+		info, err := lstat.Lstat(path)
+		if err != nil {
+			return nil, 0, fmt.Errorf("registry: inspect %s: %w", path, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, 0, verr("symlink is not allowed: %s", path)
+		}
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return nil, 0, fmt.Errorf("registry: inspect %s: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, 0, verr("YAML entry is not a stable regular file: %s", path)
+	}
+	remaining := maxAggregateInputBytes - inputBytes
+	limit := maxDocumentBytes
+	if remaining < limit {
+		limit = remaining
+	}
+	if info.Size() > int64(limit) {
+		if remaining < maxDocumentBytes {
+			return nil, 0, verr("aggregate input byte limit %d exceeded", maxAggregateInputBytes)
+		}
+		return nil, 0, verr("document %s exceeds %d bytes", path, maxDocumentBytes)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, int64(limit)+1))
+	if err != nil {
+		return nil, 0, fmt.Errorf("registry: read %s: %w", path, err)
+	}
+	if len(data) > limit {
+		if remaining < maxDocumentBytes {
+			return nil, 0, verr("aggregate input byte limit %d exceeded", maxAggregateInputBytes)
+		}
+		return nil, 0, verr("document %s exceeds %d bytes", path, maxDocumentBytes)
+	}
+	return data, len(data), nil
 }

@@ -193,3 +193,25 @@ func TestVerifySyncedSmoke(t *testing.T) {
 		t.Fatal("expected error for missing dir")
 	}
 }
+
+func TestLoaderRejectsMultipleDocumentsBeforeSchemaDecode(t *testing.T) {
+	base := []byte("id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: email\n    endpoint: a@example.test\n")
+	for _, suffix := range []string{"---\nid: other\n", "...\nid: other\n", "---\nopt_out: [null, null]\n"} {
+		source := append(append([]byte{}, base...), []byte(suffix)...)
+		if _, err := decodeAndValidate(&doc{id: "test", content: source}); err == nil {
+			t.Fatalf("expected multiple-document rejection for %q", suffix)
+		}
+	}
+}
+
+func TestLoaderRejectsNonfiniteFormTiming(t *testing.T) {
+	base := "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - goto: https://example.test\n"
+	for _, field := range []string{"timeout_seconds", "rate_limit_delay"} {
+		for _, value := range []string{".nan", ".inf", "-.inf"} {
+			source := []byte(base + "      " + field + ": " + value + "\n")
+			if _, err := decodeAndValidate(&doc{id: "test", content: source}); err == nil {
+				t.Fatalf("expected nonfinite %s rejection for %s", field, value)
+			}
+		}
+	}
+}
