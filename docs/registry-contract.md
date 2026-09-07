@@ -109,8 +109,10 @@ All three are optional inside the block. Unknown keys are rejected.
 
 `form_spec` = `{ "steps": [FormStep...], "timeout_seconds": number, "rate_limit_delay": number, "headless": bool }` — only `steps` is required.
 
-A `FormStep` is a step DSL executed by a browser driver. All keys optional,
-at least one must be present (`minProperties: 1`), unknown keys rejected:
+A `FormStep` is a step DSL executed by a browser driver. All keys are optional,
+but at least one effective action must be present; string actions must be
+non-empty, collection actions must contain entries, and unknown keys are
+rejected:
 
 | Field | Type | Rules |
 |---|---|---|

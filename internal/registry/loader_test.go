@@ -3,6 +3,7 @@ package registry
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
+	"gopkg.in/yaml.v3"
 )
 
 // fixturesFS gives tests access to tests/fixtures/registry-contract via the
@@ -297,6 +299,14 @@ func TestSchemaChannelVariantsWithStandardsValidator(t *testing.T) {
 		{"email with url", withChannel(map[string]any{"type": "email", "endpoint": "a@example.test", "url": "https://example.test"}), false},
 		{"email with form spec", withChannel(map[string]any{"type": "email", "endpoint": "a@example.test", "form_spec": form}), false},
 		{"web form with endpoint", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": form, "endpoint": "a@example.test"}), false},
+		{"valid universal selector", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"fill": map[string]any{"*": "x"}}}}}), true},
+		{"valid tag selector", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"fill": map[string]any{"input": "x"}}}}}), true},
+		{"invalid selector", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"fill": map[string]any{"@#": "x"}}}}}), false},
+		{"empty goto", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"goto": ""}}}}), false},
+		{"empty click", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"click": ""}}}}), false},
+		{"empty wait for", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"wait_for": ""}}}}), false},
+		{"empty screenshot", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"screenshot": ""}}}}), false},
+		{"empty assert text", withChannel(map[string]any{"type": "web_form", "url": "https://example.test", "form_spec": map[string]any{"steps": []any{map[string]any{"assert_text": ""}}}}), false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -311,6 +321,42 @@ func TestSchemaChannelVariantsWithStandardsValidator(t *testing.T) {
 	}
 	if _, err := json.Marshal(base); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLiveRegistryMatchesJSONSchema(t *testing.T) {
+	root := repoRoot(t)
+	schema, err := jsonschema.NewCompiler().Compile(filepath.Join(root, "registry", "schemas", "broker.schema.json"))
+	if err != nil {
+		t.Fatalf("compile schema: %v", err)
+	}
+	count := 0
+	err = filepath.WalkDir(filepath.Join(root, "registry", "brokers"), func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), "_") || (!strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml")) {
+			return nil
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		var document any
+		if decodeErr := yaml.Unmarshal(content, &document); decodeErr != nil {
+			return decodeErr
+		}
+		if validateErr := schema.Validate(document); validateErr != nil {
+			return fmt.Errorf("%s: %w", path, validateErr)
+		}
+		count++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("validate live registry schema: %v", err)
+	}
+	if count != 1277 {
+		t.Fatalf("validated %d broker documents, want 1277", count)
 	}
 }
 

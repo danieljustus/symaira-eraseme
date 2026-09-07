@@ -32,9 +32,13 @@ func TestPreflightYAMLBoundsIndentedMappingsAndFlowNesting(t *testing.T) {
 }
 
 func TestPreflightYAMLHandlesQuotesPlainAndBlockScalars(t *testing.T) {
-	source := "quoted: 'O''Reilly'\nplain: value with an apostrophe's mark\nnotes: |\n  block text contains &anchor *alias # comment-looking text\n"
+	source := "quoted: 'O''Reilly'\nplain: value with an apostrophe's mark\npunctuation: hello [world ]world {world }world, still plain\nnotes: |\n  block text contains &anchor *alias # comment-looking text\n"
 	if _, err := preflightYAML([]byte(source)); err != nil {
 		t.Fatalf("valid scalar forms rejected: %v", err)
+	}
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(source), &document); err != nil {
+		t.Fatalf("test input must be valid YAML: %v", err)
 	}
 }
 

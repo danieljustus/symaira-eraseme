@@ -132,21 +132,24 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 		}
 		switch character {
 		case '\'', '"':
-			quote = character
+			if isYAMLNodeStart(line, index) {
+				quote = character
+			}
 		case '#':
 			if index == 0 || isYAMLCommentBoundary(line[index-1]) {
 				return lineNodes, compactDepth, nil
 			}
 		case '[', '{':
-			*flowDepth++
-			lineNodes++
-			if blockLevels+compactDepth+*flowDepth > maxYAMLDepth {
-				return 0, 0, verr("yaml: lexical depth budget exceeded")
+			if *flowDepth > 0 || isYAMLNodeStart(line, index) {
+				*flowDepth++
+				lineNodes++
+				if blockLevels+compactDepth+*flowDepth > maxYAMLDepth {
+					return 0, 0, verr("yaml: lexical depth budget exceeded")
+				}
 			}
 		case ']', '}':
-			*flowDepth--
-			if *flowDepth < 0 {
-				return 0, 0, verr("yaml: unbalanced flow nesting")
+			if *flowDepth > 0 {
+				*flowDepth--
 			}
 		case ',':
 			if *flowDepth > 0 {
@@ -156,6 +159,32 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 		index++
 	}
 	return lineNodes, compactDepth, nil
+}
+
+// isYAMLNodeStart reports whether index follows syntax that can introduce a
+// new YAML node. Punctuation in an already-started plain scalar is data, not
+// flow syntax (for example, "notes: hello [world").
+func isYAMLNodeStart(line []byte, index int) bool {
+	previous := index - 1
+	for previous >= 0 && (line[previous] == ' ' || line[previous] == '	') {
+		previous--
+	}
+	if previous < 0 {
+		return true
+	}
+	switch line[previous] {
+	case ':', ',', '[', '{':
+		return true
+	case '-':
+		for before := 0; before < previous; before++ {
+			if line[before] != ' ' && line[before] != '	' && line[before] != '-' {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func compactBlockSequenceMarkers(line []byte) int {
