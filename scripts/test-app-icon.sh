@@ -31,7 +31,7 @@ cp "$ICNS_SOURCE" "$APP_PATH/Contents/Resources/AppIcon.icns"
   --enable-on-demand-resources NO \
   --development-region en \
   --output-partial-info-plist "$TMP_DIR/partial.plist" \
-  "$ICON_SOURCE"
+  "$ICON_SOURCE" < /dev/null
 cp "$COMPILED_DIR/Assets.car" "$APP_PATH/Contents/Resources/Assets.car"
 cat > "$APP_PATH/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
