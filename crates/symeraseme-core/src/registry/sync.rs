@@ -114,6 +114,9 @@ pub fn sync_with_transport(
     let staging_dir = Dir::open_ambient_dir(staging.path(), ambient_authority())
         .map_err(|source| io_error(staging.path(), source))?;
     extract_archive(decoder, &staging_dir)?;
+    // Windows refuses to rename a directory while this capability handle is
+    // open. Extraction is complete; close it before validation and replace.
+    drop(staging_dir);
     load_from_dir(staging.path())?;
 
     replace_directory(destination, staging.path())
