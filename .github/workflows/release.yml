@@ -49,7 +49,7 @@ jobs:
     name: Release / macOS GUI DMG
     needs: release-cli
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success')) }}
-    runs-on: macos-15
+    runs-on: macos-26
     environment: release
     env:
       RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
@@ -63,7 +63,7 @@ jobs:
       - name: Select Xcode 26
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
-          xcode-version: '26.0'
+          xcode-version: '26.6'
 
       - name: Verify Xcode toolchain
         run: |
