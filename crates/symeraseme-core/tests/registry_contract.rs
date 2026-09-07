@@ -453,7 +453,19 @@ fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
 }
 
 fn tempfile_root() -> tempfile::TempDir {
-    tempfile::tempdir().unwrap()
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir_all(root.path().join("schemas")).unwrap();
+    fs::write(
+        root.path().join("manifest.json"),
+        r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("schemas/broker.schema.json"),
+        r#"{"schema_version":1}"#,
+    )
+    .unwrap();
+    root
 }
 
 #[test]
@@ -468,4 +480,93 @@ fn preflight_rejects_every_second_document_form() {
         let error = Broker::from_yaml("test", &source).unwrap_err();
         assert!(error.to_string().contains("document"), "{error}");
     }
+}
+
+#[test]
+fn loader_requires_matching_manifest_and_schema_metadata() {
+    let cases = [
+        (
+            "missing manifest",
+            None,
+            Some(r#"{"schema_version":1}"#),
+            "manifest",
+        ),
+        (
+            "malformed manifest",
+            Some("{"),
+            Some(r#"{"schema_version":1}"#),
+            "manifest",
+        ),
+        (
+            "missing manifest version",
+            Some(r#"{"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{"schema_version":1}"#),
+            "manifest",
+        ),
+        (
+            "noninteger manifest version",
+            Some(r#"{"schema_version":1.0,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{"schema_version":1}"#),
+            "manifest",
+        ),
+        (
+            "malformed schema",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some("{"),
+            "broker.schema.json",
+        ),
+        (
+            "missing schema version",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{}"#),
+            "broker.schema.json",
+        ),
+        (
+            "noninteger schema version",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{"schema_version":1.0}"#),
+            "broker.schema.json",
+        ),
+        (
+            "unknown manifest version",
+            Some(r#"{"schema_version":2,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{"schema_version":1}"#),
+            "schema_version",
+        ),
+        (
+            "mismatched schema",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            Some(r#"{"schema_version":2}"#),
+            "schema_version",
+        ),
+        (
+            "unsafe schema pointer",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"../broker.schema.json"}}"#),
+            None,
+            "schemas.broker",
+        ),
+        (
+            "missing schema",
+            Some(r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#),
+            None,
+            "broker.schema.json",
+        ),
+    ];
+    for (name, manifest, schema, expected) in cases {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("brokers/us")).unwrap();
+        if let Some(manifest) = manifest {
+            fs::write(root.path().join("manifest.json"), manifest).unwrap();
+        }
+        if let Some(schema) = schema {
+            fs::create_dir_all(root.path().join("schemas")).unwrap();
+            fs::write(root.path().join("schemas/broker.schema.json"), schema).unwrap();
+        }
+        let error = load_from_dir(root.path()).unwrap_err();
+        assert!(error.to_string().contains(expected), "{name}: {error}");
+    }
+
+    let valid = tempfile_root();
+    fs::create_dir_all(valid.path().join("brokers/us")).unwrap();
+    assert!(load_from_dir(valid.path()).unwrap().is_empty());
 }

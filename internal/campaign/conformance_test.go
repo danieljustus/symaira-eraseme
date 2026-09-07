@@ -37,6 +37,15 @@ func buildMiniRegistry(t *testing.T) string {
 	root := repoRoot(t)
 	src := filepath.Join(root, "tests", "fixtures", "registry-contract")
 	dst := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dst, "schemas"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "manifest.json"), []byte(`{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "schemas", "broker.schema.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for sub, file := range map[string]string{
 		"DE": "golden-email-eu.yaml",
 		"UK": "golden-multi-uk.yaml",

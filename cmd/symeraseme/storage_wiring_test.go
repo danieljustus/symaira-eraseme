@@ -85,6 +85,15 @@ broker_count = 0
 	if err := os.WriteFile(filepath.Join(resDir, "manifest.toml"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(resDir, "schemas"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(resDir, "manifest.json"), []byte(`{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(resDir, "schemas", "broker.schema.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	brokers, err := loadRegistry()
 	if err != nil {
 		t.Fatalf("loadRegistry with custom empty dir error: %v", err)

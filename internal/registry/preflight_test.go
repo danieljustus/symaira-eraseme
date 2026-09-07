@@ -38,15 +38,26 @@ func TestPreflightYAMLHandlesQuotesPlainAndBlockScalars(t *testing.T) {
 	}
 }
 
-func TestPreflightYAMLRejectsAnchorsAliasesAndTrailingDocuments(t *testing.T) {
+func TestPreflightYAMLRejectsTrailingDocuments(t *testing.T) {
 	for name, source := range map[string]string{
-		"anchor":                "value: &real anchored\n",
-		"alias":                 "value: *real\n",
 		"second document alias": "value: first\n---\nvalue: *real\n",
 		"second document deep":  "value: first\n---\n" + strings.Repeat("[", maxYAMLDepth+1) + "x" + strings.Repeat("]", maxYAMLDepth+1) + "\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := preflightYAML([]byte(source)); err == nil {
+				t.Fatal("adversarial YAML accepted")
+			}
+		})
+	}
+}
+
+func TestNodeContractRejectsAnchorsAndAliases(t *testing.T) {
+	for name, source := range map[string]string{
+		"anchor": "value: &real anchored\n",
+		"alias":  "value: *real\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := decodeAndValidate(&doc{id: "test", content: []byte(source)}); err == nil {
 				t.Fatal("adversarial YAML accepted")
 			}
 		})

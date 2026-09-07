@@ -3,9 +3,9 @@ package registry
 import "bytes"
 
 // preflightYAML is a bounded lexical pass. It deliberately does not replace
-// yaml.v3's parser: it bounds bytes, conservative nesting, node-like tokens,
-// anchors, aliases, and document streams before yaml.v3 parses the input.
-// Exact node counts and depth are checked on yaml.Node after parsing.
+// yaml.v3's parser: it bounds bytes, conservative nesting, and document
+// markers before yaml.v3 parses the input. Exact node counts, depth, anchors,
+// aliases, and nulls are checked on yaml.Node after parsing.
 func preflightYAML(source []byte) (int, error) {
 	if len(source) > maxDocumentBytes {
 		return 0, verr("document exceeds %d bytes", maxDocumentBytes)
@@ -26,13 +26,14 @@ func preflightYAML(source []byte) (int, error) {
 			continue
 		}
 		indent := leadingSpaces(line)
+		markerLine := bytes.TrimSuffix(line, []byte{'\r'})
 		if blockScalar {
 			if indent > blockIndent {
 				continue
 			}
 			blockScalar = false
 		}
-		if yamlMarker(trimmed, "---") {
+		if yamlMarker(markerLine, "---") {
 			if documents > 0 || hasContent {
 				return 0, verr("yaml: multiple documents are not allowed")
 			}
@@ -41,7 +42,7 @@ func preflightYAML(source []byte) (int, error) {
 			afterDocEnd = false
 			continue
 		}
-		if yamlMarker(trimmed, "...") {
+		if yamlMarker(markerLine, "...") {
 			if documents == 0 {
 				documents = 1
 			}
@@ -151,10 +152,6 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 			if *flowDepth > 0 {
 				lineNodes++
 			}
-		case '&', '*':
-			if isYAMLReferenceMarker(line, index) {
-				return 0, 0, verr("yaml: anchors and aliases are not allowed")
-			}
 		}
 		index++
 	}
@@ -187,17 +184,6 @@ func leadingSpaces(line []byte) int {
 
 func isYAMLCommentBoundary(character byte) bool {
 	return character == ' ' || character == '\t' || character == '[' || character == '{' || character == ','
-}
-
-func isYAMLReferenceMarker(line []byte, index int) bool {
-	if index+1 >= len(line) {
-		return false
-	}
-	next := line[index+1]
-	if next != '_' && next != '-' && (next < 'A' || next > 'Z') && (next < 'a' || next > 'z') && (next < '0' || next > '9') {
-		return false
-	}
-	return index == 0 || isYAMLCommentBoundary(line[index-1]) || line[index-1] == ':'
 }
 
 func yamlMarker(value []byte, marker string) bool {

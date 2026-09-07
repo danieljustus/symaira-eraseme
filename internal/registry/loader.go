@@ -6,6 +6,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -16,15 +17,17 @@ import (
 )
 
 const (
-	maxDocumentBytes       = 1 << 20
-	maxYAMLNodes           = 16_384
-	maxYAMLDepth           = 64
-	maxDirectoryDepth      = 8
-	maxDirectoryEntries    = 16_384
-	maxBrokerFiles         = 4_096
-	maxOutputBrokers       = 4_096
-	maxAggregateInputBytes = 16 << 20
-	maxAggregateYAMLNodes  = 1 << 20
+	maxDocumentBytes               = 1 << 20
+	maxYAMLNodes                   = 16_384
+	maxYAMLDepth                   = 64
+	maxDirectoryDepth              = 8
+	maxDirectoryEntries            = 16_384
+	maxBrokerFiles                 = 4_096
+	maxOutputBrokers               = 4_096
+	maxAggregateInputBytes         = 16 << 20
+	maxAggregateYAMLNodes          = 1 << 20
+	maxMetadataBytes               = 64 << 10
+	supportedRegistrySchemaVersion = 1
 )
 
 // embeddedRegistry is populated from the repo-root registry directory via
@@ -74,6 +77,9 @@ func Load(root fs.FS) ([]Broker, error) {
 // LoadReporting behaves like Load but collects all validation errors
 // instead of failing on the first document.
 func LoadReporting(root fs.FS) (brokers []Broker, errs []error) {
+	if err := validateRegistryMetadata(root); err != nil {
+		return nil, []error{err}
+	}
 	docs, err := collectDocs(root)
 	if err != nil {
 		return nil, []error{err}
@@ -109,6 +115,93 @@ func LoadReporting(root fs.FS) (brokers []Broker, errs []error) {
 		brokers = append(brokers, b)
 	}
 	return brokers, errs
+}
+
+type registryManifest struct {
+	SchemaVersion *int `json:"schema_version"`
+	Schemas       *struct {
+		Broker *string `json:"broker"`
+	} `json:"schemas"`
+}
+
+type registrySchemaMetadata struct {
+	SchemaVersion *int `json:"schema_version"`
+}
+
+const brokerSchemaPath = "schemas/broker.schema.json"
+
+func validateRegistryMetadata(root fs.FS) error {
+	manifestBytes, err := readMetadata(root, "manifest.json")
+	if err != nil {
+		return fmt.Errorf("registry: manifest.json: %w", err)
+	}
+	var manifest registryManifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		return verr("manifest.json is malformed: %v", err)
+	}
+	if manifest.SchemaVersion == nil || *manifest.SchemaVersion != supportedRegistrySchemaVersion {
+		return verr("manifest.json schema_version must be supported version %d", supportedRegistrySchemaVersion)
+	}
+	if manifest.Schemas == nil || manifest.Schemas.Broker == nil {
+		return verr("manifest.json schemas.broker is required")
+	}
+	if *manifest.Schemas.Broker != brokerSchemaPath {
+		return verr("manifest.json schemas.broker must be %q", brokerSchemaPath)
+	}
+	schemaBytes, err := readMetadata(root, *manifest.Schemas.Broker)
+	if err != nil {
+		return fmt.Errorf("registry: broker schema: %w", err)
+	}
+	var schema registrySchemaMetadata
+	if err := json.Unmarshal(schemaBytes, &schema); err != nil {
+		return verr("broker schema is malformed: %v", err)
+	}
+	if schema.SchemaVersion == nil || *schema.SchemaVersion != supportedRegistrySchemaVersion {
+		return verr("broker schema schema_version must be supported version %d", supportedRegistrySchemaVersion)
+	}
+	if *schema.SchemaVersion != *manifest.SchemaVersion {
+		return verr("manifest and broker schema schema_version mismatch")
+	}
+	return nil
+}
+
+func readMetadata(root fs.FS, path string) ([]byte, error) {
+	if !fs.ValidPath(path) {
+		return nil, verr("unsafe metadata path %q", path)
+	}
+	var (
+		file fs.File
+		err  error
+	)
+	if opener, ok := root.(interface {
+		OpenFile(string, int, os.FileMode) (*os.File, error)
+	}); ok {
+		file, err = opener.OpenFile(path, os.O_RDONLY|registryOpenNonblock, 0)
+	} else {
+		file, err = root.Open(path)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, verr("metadata file is not regular: %s", path)
+	}
+	if info.Size() > maxMetadataBytes {
+		return nil, verr("metadata file %s exceeds %d bytes", path, maxMetadataBytes)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxMetadataBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxMetadataBytes {
+		return nil, verr("metadata file %s exceeds %d bytes", path, maxMetadataBytes)
+	}
+	return data, nil
 }
 
 // doc captures a raw YAML document before decoding.

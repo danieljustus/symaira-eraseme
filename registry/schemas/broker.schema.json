@@ -196,7 +196,13 @@
               "description": "Email address the opt-out request is sent to."
             }
           },
-          "required": ["endpoint"]
+          "required": ["endpoint"],
+          "not": {
+            "anyOf": [
+              { "required": ["url"] },
+              { "required": ["form_spec"] }
+            ]
+          }
         },
         {
           "properties": {
@@ -210,7 +216,10 @@
               "$ref": "#/$defs/formSpec"
             }
           },
-          "required": ["url", "form_spec"]
+          "required": ["url", "form_spec"],
+          "not": {
+            "required": ["endpoint"]
+          }
         }
       ]
     },

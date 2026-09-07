@@ -18,6 +18,10 @@ by the Go loader. The pre-cutover loader and tests are preserved only at the
   schema are updated together in one commit.
 - A consumer must refuse to process a registry whose manifest version it
   does not understand (`RegistryError` in Python).
+- The Go and Rust loaders bounded-read `manifest.json` and the manifest-declared
+  schema before traversing brokers. The `schemas.broker` pointer must be exactly
+  `schemas/broker.schema.json`; missing, malformed, non-integer, unsupported, or
+  mismatched manifest/schema versions are rejected.
 
 ## 2. Layout
 

@@ -9,6 +9,9 @@ use std::path::{Path, PathBuf};
 use yaml_rust2::scanner::{Scanner, Token, TokenType};
 
 const MAX_DOCUMENT_BYTES: usize = 1 << 20;
+const MAX_METADATA_BYTES: usize = 64 << 10;
+const SUPPORTED_REGISTRY_SCHEMA_VERSION: u64 = 1;
+const BROKER_SCHEMA_PATH: &str = "schemas/broker.schema.json";
 const MAX_YAML_NODES: usize = 16_384;
 const MAX_YAML_DEPTH: usize = 64;
 const MAX_DIRECTORY_DEPTH: usize = 8;
@@ -128,6 +131,7 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
                 source,
             }
         })?;
+    validate_registry_metadata(&root_dir)?;
     let brokers_dir = root_dir
         .open_dir("brokers")
         .map_err(|source| RegistryError::Io {
@@ -182,6 +186,103 @@ pub fn load_from_dir(root: impl AsRef<Path>) -> Result<Vec<Broker>, RegistryErro
     }
     brokers.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(brokers)
+}
+
+#[derive(serde::Deserialize)]
+struct RegistryManifest {
+    schema_version: u64,
+    schemas: ManifestSchemas,
+}
+
+#[derive(serde::Deserialize)]
+struct ManifestSchemas {
+    broker: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RegistrySchemaMetadata {
+    schema_version: u64,
+}
+
+fn validate_registry_metadata(root: &Dir) -> Result<(), RegistryError> {
+    let manifest_bytes = read_metadata(root, Path::new("manifest.json"))?;
+    let manifest: RegistryManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|error| validation("manifest.json", format!("is malformed: {error}")))?;
+    if manifest.schema_version != SUPPORTED_REGISTRY_SCHEMA_VERSION {
+        return Err(validation(
+            "manifest.schema_version",
+            format!(
+                "unsupported version {}; expected {SUPPORTED_REGISTRY_SCHEMA_VERSION}",
+                manifest.schema_version
+            ),
+        ));
+    }
+    if manifest.schemas.broker != BROKER_SCHEMA_PATH {
+        return Err(validation(
+            "manifest.schemas.broker",
+            format!("must equal {BROKER_SCHEMA_PATH:?}"),
+        ));
+    }
+    let schema_bytes = read_metadata(root, Path::new(BROKER_SCHEMA_PATH))?;
+    let schema: RegistrySchemaMetadata = serde_json::from_slice(&schema_bytes)
+        .map_err(|error| validation(BROKER_SCHEMA_PATH, format!("is malformed: {error}")))?;
+    if schema.schema_version != SUPPORTED_REGISTRY_SCHEMA_VERSION {
+        return Err(validation(
+            "broker schema.schema_version",
+            format!(
+                "unsupported version {}; expected {SUPPORTED_REGISTRY_SCHEMA_VERSION}",
+                schema.schema_version
+            ),
+        ));
+    }
+    if schema.schema_version != manifest.schema_version {
+        return Err(validation(
+            "schema_version",
+            "manifest and broker schema versions do not match",
+        ));
+    }
+    Ok(())
+}
+
+fn read_metadata(root: &Dir, path: &Path) -> Result<Vec<u8>, RegistryError> {
+    let mut options = cap_fs_ext::OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No).nonblock(true);
+    let file = root
+        .open_with(path, &options)
+        .map_err(|source| RegistryError::Io {
+            path: path.to_owned(),
+            source,
+        })?;
+    let metadata = file.metadata().map_err(|source| RegistryError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
+    if !metadata.is_file() {
+        return Err(validation(
+            path.display().to_string(),
+            "metadata entry is not a regular file",
+        ));
+    }
+    if metadata.len() > MAX_METADATA_BYTES as u64 {
+        return Err(validation(
+            path.display().to_string(),
+            format!("metadata exceeds {MAX_METADATA_BYTES} bytes"),
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take((MAX_METADATA_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|source| RegistryError::Io {
+            path: path.to_owned(),
+            source,
+        })?;
+    if bytes.len() > MAX_METADATA_BYTES {
+        return Err(validation(
+            path.display().to_string(),
+            format!("metadata exceeds {MAX_METADATA_BYTES} bytes"),
+        ));
+    }
+    Ok(bytes)
 }
 
 /// Alias matching the loader terminology used by the Go implementation.
@@ -365,67 +466,35 @@ fn check_value_budget(root: &Value) -> Result<usize, RegistryError> {
 }
 
 fn reject_explicit_nulls(root: &Value) -> Result<(), RegistryError> {
-    let mut stack = vec![root];
-    while let Some(value) = stack.pop() {
+    let mut stack = vec![(root, String::from("$"))];
+    while let Some((value, path)) = stack.pop() {
         match value {
+            Value::Null => {
+                return Err(validation(
+                    path,
+                    "explicit YAML null is not allowed; omit the field instead",
+                ));
+            }
             Value::Mapping(mapping) => {
                 for (key, value) in mapping {
-                    if key.as_str().is_some_and(is_optional_field) && matches!(value, Value::Null) {
-                        return Err(validation(
-                            key.as_str().unwrap_or("field"),
-                            "explicit YAML null is not allowed; omit the field instead",
-                        ));
-                    }
-                    stack.push(key);
-                    stack.push(value);
+                    let key_path = key
+                        .as_str()
+                        .map(|key| format!("$.{key}"))
+                        .unwrap_or_else(|| String::from("$[key]"));
+                    stack.push((key, format!("{key_path}[name]")));
+                    stack.push((value, key_path));
                 }
             }
-            Value::Sequence(sequence) => stack.extend(sequence),
-            Value::Tagged(tagged) => stack.push(&tagged.value),
-            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+            Value::Sequence(sequence) => {
+                for (index, value) in sequence.iter().enumerate() {
+                    stack.push((value, format!("{path}[{index}]")));
+                }
+            }
+            Value::Tagged(tagged) => stack.push((&tagged.value, path)),
+            Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
         }
     }
     Ok(())
-}
-
-fn is_optional_field(field: &str) -> bool {
-    matches!(
-        field,
-        "verification"
-            | "disabled"
-            | "added_date"
-            | "source"
-            | "status"
-            | "notes"
-            | "endpoint"
-            | "url"
-            | "form_spec"
-            | "template"
-            | "locale"
-            | "required_fields"
-            | "supports_suppression"
-            | "expected_response_days"
-            | "ack_keywords"
-            | "rejection_keywords"
-            | "human_required_keywords"
-            | "timeout_seconds"
-            | "rate_limit_delay"
-            | "headless"
-            | "goto"
-            | "fill"
-            | "select"
-            | "click"
-            | "wait_for"
-            | "wait_seconds"
-            | "screenshot"
-            | "assert_text"
-            | "solve_captcha"
-            | "provider"
-            | "action"
-            | "min_score"
-            | "is_invisible"
-            | "data_sensitivity"
-    )
 }
 
 struct PendingDocument {

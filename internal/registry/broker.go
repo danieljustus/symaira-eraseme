@@ -159,6 +159,9 @@ func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
 	if err != nil {
 		return Broker{}, 0, err
 	}
+	if err := rejectYAMLNodeContracts(&document); err != nil {
+		return Broker{}, 0, err
+	}
 	var raw map[string]yaml.Node
 	if err := document.Decode(&raw); err != nil {
 		return Broker{}, 0, verr("yaml decode: %v", err)
@@ -251,6 +254,51 @@ func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
 		b.Status = "active"
 	}
 	return b, nodes, nil
+}
+
+func rejectYAMLNodeContracts(root *yaml.Node) error {
+	var walk func(*yaml.Node, string) error
+	walk = func(node *yaml.Node, path string) error {
+		if node.Kind == yaml.AliasNode {
+			return verr("yaml: aliases are not allowed at %s", path)
+		}
+		if node.Anchor != "" {
+			return verr("yaml: anchors are not allowed at %s", path)
+		}
+		if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+			return verr("yaml: explicit null at %s is not allowed; omit the field instead", path)
+		}
+		switch node.Kind {
+		case yaml.DocumentNode:
+			for _, child := range node.Content {
+				if err := walk(child, path); err != nil {
+					return err
+				}
+			}
+		case yaml.MappingNode:
+			for index := 0; index+1 < len(node.Content); index += 2 {
+				key, value := node.Content[index], node.Content[index+1]
+				fieldPath := path + "[key]"
+				if key.Kind == yaml.ScalarNode && key.Value != "" {
+					fieldPath = path + "." + key.Value
+				}
+				if err := walk(key, fieldPath+"[name]"); err != nil {
+					return err
+				}
+				if err := walk(value, fieldPath); err != nil {
+					return err
+				}
+			}
+		case yaml.SequenceNode:
+			for index, child := range node.Content {
+				if err := walk(child, fmt.Sprintf("%s[%d]", path, index)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(root, "$")
 }
 
 func exactYAMLNodeBudget(root *yaml.Node) (int, error) {
