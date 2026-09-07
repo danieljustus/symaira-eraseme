@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -158,4 +160,130 @@ func fileMode(t *testing.T, path string) os.FileMode {
 		t.Fatal(err)
 	}
 	return info.Mode()
+}
+
+func TestReplaceDirectoryUsesOwnedUniqueBackupAndCleansIt(t *testing.T) {
+	parent := t.TempDir()
+	dst := filepath.Join(parent, "registry")
+	stage := filepath.Join(parent, "stage")
+	sibling := dst + ".registry-backup"
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "state"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stage, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stage, "state"), []byte("new"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(sibling, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sibling, "sentinel"), []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaceDirectory(dst, stage); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(filepath.Join(dst, "state")); err != nil || string(got) != "new" {
+		t.Fatalf("installed state = %q, err=%v", got, err)
+	}
+	if got, err := os.ReadFile(filepath.Join(sibling, "sentinel")); err != nil || string(got) != "keep" {
+		t.Fatalf("pre-existing sibling changed: %q, err=%v", got, err)
+	}
+	matches, err := filepath.Glob(filepath.Join(parent, ".registry-backup-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("owned backup containers remain: %v", matches)
+	}
+}
+
+func TestReplaceDirectoryInstallFailureRollsBackAndCleansOwnedBackup(t *testing.T) {
+	parent := t.TempDir()
+	dst := filepath.Join(parent, "registry")
+	stage := filepath.Join(parent, "stage")
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "state"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stage, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	originalRename := renamePath
+	t.Cleanup(func() { renamePath = originalRename })
+	calls := 0
+	renamePath = func(source, destination string) error {
+		calls++
+		if calls == 2 {
+			return errors.New("forced install failure")
+		}
+		return originalRename(source, destination)
+	}
+
+	if err := replaceDirectory(dst, stage); err == nil {
+		t.Fatal("forced install failure unexpectedly succeeded")
+	}
+	if got, err := os.ReadFile(filepath.Join(dst, "state")); err != nil || string(got) != "old" {
+		t.Fatalf("rollback state = %q, err=%v", got, err)
+	}
+	matches, err := filepath.Glob(filepath.Join(parent, ".registry-backup-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("owned backup containers remain after successful rollback: %v", matches)
+	}
+}
+
+func TestReplaceDirectoryRollbackFailureRetainsRecoverableBackup(t *testing.T) {
+	parent := t.TempDir()
+	dst := filepath.Join(parent, "registry")
+	stage := filepath.Join(parent, "stage")
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "state"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stage, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	originalRename := renamePath
+	t.Cleanup(func() { renamePath = originalRename })
+	calls := 0
+	renamePath = func(source, destination string) error {
+		calls++
+		if calls >= 2 {
+			return errors.New("forced replacement failure")
+		}
+		return originalRename(source, destination)
+	}
+
+	err := replaceDirectory(dst, stage)
+	if err == nil || !strings.Contains(err.Error(), "backup retained") || !strings.Contains(err.Error(), "rollback failed") {
+		t.Fatalf("rollback failure error = %v", err)
+	}
+	matches, err := filepath.Glob(filepath.Join(parent, ".registry-backup-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("recoverable backup containers = %v", matches)
+	}
+	if got, err := os.ReadFile(filepath.Join(matches[0], "old", "state")); err != nil || string(got) != "old" {
+		t.Fatalf("retained backup = %q, err=%v", got, err)
+	}
+	if err := os.RemoveAll(matches[0]); err != nil {
+		t.Fatal(err)
+	}
 }

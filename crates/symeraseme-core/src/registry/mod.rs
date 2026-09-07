@@ -12,5 +12,5 @@ pub use model::{
     Broker, CaptchaProvider, CaptchaType, Category, Channel, ChannelType, FormSpec, FormStep,
     Jurisdiction, Law, Priority, RequiredField, SolveCaptcha, Status, Template, Verification,
 };
-pub use sync::{SyncResponse, SyncTransport, sync, sync_with_transport};
+pub use sync::{DEFAULT_SYNC_URL, SyncResponse, SyncTransport, sync, sync_with_transport};
 pub use validate::RegistryError;

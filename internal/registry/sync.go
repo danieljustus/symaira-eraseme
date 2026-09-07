@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -241,29 +242,48 @@ func safeArchiveName(raw string) (string, error) {
 }
 
 func replaceDirectory(dst, stage string) error {
-	backup := dst + ".registry-backup"
-	_ = removeAllPath(backup)
+	parent := filepath.Dir(dst)
+	backupRoot, err := os.MkdirTemp(parent, ".registry-backup-")
+	if err != nil {
+		return fmt.Errorf("registry sync: create replacement backup: %w", err)
+	}
+	if err := os.Chmod(backupRoot, 0o700); err != nil {
+		_ = removeAllPath(backupRoot)
+		return fmt.Errorf("registry sync: secure replacement backup: %w", err)
+	}
+	backup := filepath.Join(backupRoot, "old")
+	cleanupBackup := func() error { return removeAllPath(backupRoot) }
 	hadOld := false
 	if _, err := os.Lstat(dst); err == nil {
 		if err := renamePath(dst, backup); err != nil {
+			cleanupErr := cleanupBackup()
+			if cleanupErr != nil {
+				return fmt.Errorf("registry sync: preserve old destination failed; backup cleanup failed: %w", errors.Join(err, cleanupErr))
+			}
 			return fmt.Errorf("registry sync: preserve old destination: %w", err)
 		}
 		hadOld = true
 	} else if !os.IsNotExist(err) {
+		_ = cleanupBackup()
 		return fmt.Errorf("registry sync: inspect destination: %w", err)
 	}
 	if err := renamePath(stage, dst); err != nil {
-		if hadOld {
-			_ = renamePath(backup, dst)
+		if !hadOld {
+			_ = cleanupBackup()
+			return fmt.Errorf("registry sync: install staged registry: %w", err)
+		}
+		if rollbackErr := renamePath(backup, dst); rollbackErr != nil {
+			return fmt.Errorf("registry sync: install staged registry failed; rollback failed; backup retained at %s: %w", backupRoot, errors.Join(err, rollbackErr))
+		}
+		if cleanupErr := cleanupBackup(); cleanupErr != nil {
+			return fmt.Errorf("registry sync: install staged registry failed; rollback succeeded; backup cleanup failed at %s: %w", backupRoot, errors.Join(err, cleanupErr))
 		}
 		return fmt.Errorf("registry sync: install staged registry: %w", err)
 	}
-	if hadOld {
-		if err := removeAllPath(backup); err != nil {
-			// Installation succeeded; retaining the backup is safer than claiming
-			// cleanup succeeded and does not affect the installed registry.
-			return fmt.Errorf("registry sync: remove replacement backup: %w", err)
-		}
+	if err := cleanupBackup(); err != nil {
+		// Installation succeeded; retaining the owned backup is safer than
+		// claiming cleanup succeeded and does not affect the installed registry.
+		return fmt.Errorf("registry sync: remove replacement backup: %w", err)
 	}
 	return nil
 }

@@ -10,6 +10,10 @@ skip-tree = [
     # duplicate-version denial intact.
     { name = "cap-std", version = "=4.0.3" },
     { name = "cap-fs-ext", version = "=4.0.3" },
+    # ureq's maintained rustls stack uses ring's legacy getrandom edge;
+    # isolate only this pinned TLS subtree rather than allowing duplicates
+    # workspace-wide.
+    { name = "ring", version = "=0.17.14" },
 ]
 
 [licenses]
@@ -19,6 +23,7 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "Unicode-3.0",

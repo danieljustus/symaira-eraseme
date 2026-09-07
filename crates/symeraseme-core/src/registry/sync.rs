@@ -4,7 +4,6 @@ use flate2::read::GzDecoder;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 use tar::Archive;
 
@@ -15,6 +14,10 @@ const MAX_FILES: usize = 4_096;
 const MAX_ARCHIVE_ENTRIES: usize = 8_192;
 const MAX_PATH_BYTES: usize = 4_096;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// The release artifact URL used when `sync` receives an empty URL.
+pub const DEFAULT_SYNC_URL: &str =
+    "https://github.com/danieljustus/symaira-eraseme/releases/latest/download/registry.tar.gz";
 
 /// A transport response used by `sync_with_transport`, allowing deterministic
 /// loopback test servers without weakening production URL validation.
@@ -27,41 +30,42 @@ pub trait SyncTransport {
     fn get(&self, url: &str, timeout: Duration) -> Result<SyncResponse, RegistryError>;
 }
 
-struct CurlTransport;
+struct UreqTransport {
+    agent: ureq::Agent,
+}
 
-impl SyncTransport for CurlTransport {
-    fn get(&self, url: &str, timeout: Duration) -> Result<SyncResponse, RegistryError> {
-        let temporary =
-            tempfile::NamedTempFile::new().map_err(|source| io_error(Path::new("sync"), source))?;
-        let path = temporary.path().to_owned();
-        let seconds = timeout.as_secs().max(1).to_string();
-        let output = Command::new("curl")
-            .args([
-                "--fail",
-                "--silent",
-                "--show-error",
-                "--location",
-                "--proto",
-                "=https",
-                "--proto-redir",
-                "=https",
-                "--max-filesize",
-                "67108864",
-                "--max-time",
-                &seconds,
-                "--output",
-            ])
-            .arg(&path)
-            .arg(url)
-            .output()
-            .map_err(|_| transport_error())?;
-        if !output.status.success() {
-            return Err(transport_error());
+impl UreqTransport {
+    fn new() -> Self {
+        let config = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .https_only(true)
+            .timeout_global(Some(REQUEST_TIMEOUT))
+            .timeout_connect(Some(REQUEST_TIMEOUT))
+            .timeout_recv_response(Some(REQUEST_TIMEOUT))
+            .timeout_recv_body(Some(REQUEST_TIMEOUT))
+            .max_redirects(10)
+            .max_redirects_will_error(true)
+            .build();
+        Self {
+            agent: ureq::Agent::new_with_config(config),
         }
-        let mut file = File::open(&path).map_err(|source| io_error(Path::new("sync"), source))?;
-        let body = read_bounded(&mut file, MAX_COMPRESSED_BYTES)?;
+    }
+}
+
+impl SyncTransport for UreqTransport {
+    fn get(&self, url: &str, timeout: Duration) -> Result<SyncResponse, RegistryError> {
+        let mut response = self
+            .agent
+            .get(url)
+            .config()
+            .timeout_global(Some(timeout))
+            .build()
+            .call()
+            .map_err(|_| transport_error())?;
+        let status = response.status().as_u16();
+        let body = read_bounded(&mut response.body_mut().as_reader(), MAX_COMPRESSED_BYTES)?;
         Ok(SyncResponse {
-            status: 200,
+            status,
             body: Box::new(Cursor::new(body)),
         })
     }
@@ -69,7 +73,12 @@ impl SyncTransport for CurlTransport {
 
 /// Downloads and atomically installs a validated registry archive.
 pub fn sync(url: &str, destination: impl AsRef<Path>) -> Result<(), RegistryError> {
-    sync_with_transport(url, destination, &CurlTransport)
+    let url = if url.is_empty() {
+        DEFAULT_SYNC_URL
+    } else {
+        url
+    };
+    sync_with_transport(url, destination, &UreqTransport::new())
 }
 
 /// Testable sync entry point. Non-HTTPS URLs are accepted only for loopback
@@ -286,22 +295,70 @@ fn safe_archive_path(raw: &[u8]) -> Result<PathBuf, RegistryError> {
 }
 
 fn replace_directory(destination: &Path, staging: &Path) -> Result<(), RegistryError> {
-    let backup = destination.with_extension("registry-backup");
-    if backup.exists() {
-        fs::remove_dir_all(&backup).map_err(|source| io_error(&backup, source))?;
-    }
-    let had_old = destination.exists();
+    replace_directory_with_ops(destination, staging, &rename_path, &remove_all_path)
+}
+
+fn rename_path(source: &Path, destination: &Path) -> io::Result<()> {
+    fs::rename(source, destination)
+}
+
+fn remove_all_path(path: &Path) -> io::Result<()> {
+    fs::remove_dir_all(path)
+}
+
+fn replace_directory_with_ops(
+    destination: &Path,
+    staging: &Path,
+    rename: &dyn Fn(&Path, &Path) -> io::Result<()>,
+    remove_all: &dyn Fn(&Path) -> io::Result<()>,
+) -> Result<(), RegistryError> {
+    let parent = destination.parent().unwrap_or_else(|| Path::new("."));
+    let backup_container = tempfile::Builder::new()
+        .prefix(".registry-backup-")
+        .tempdir_in(parent)
+        .map_err(|source| io_error(parent, source))?;
+    set_mode(backup_container.path(), 0o700)?;
+    let backup_destination = backup_container.path().join("old");
+
+    let had_old = match fs::symlink_metadata(destination) {
+        Ok(_) => true,
+        Err(source) if source.kind() == io::ErrorKind::NotFound => false,
+        Err(source) => return Err(io_error(destination, source)),
+    };
     if had_old {
-        fs::rename(destination, &backup).map_err(|source| io_error(destination, source))?;
+        rename(destination, &backup_destination).map_err(|source| io_error(destination, source))?;
     }
-    if let Err(source) = fs::rename(staging, destination) {
-        if had_old {
-            let _ = fs::rename(&backup, destination);
+
+    if let Err(install_source) = rename(staging, destination) {
+        if !had_old {
+            return Err(io_error(destination, install_source));
         }
-        return Err(io_error(destination, source));
+        if let Err(rollback_source) = rename(&backup_destination, destination) {
+            let retained = backup_container.keep();
+            return Err(validation(
+                "sync",
+                format!(
+                    "install staged registry failed: {install_source}; rollback failed: {rollback_source}; backup retained at {}",
+                    retained.display()
+                ),
+            ));
+        }
+        let retained = backup_container.keep();
+        if let Err(cleanup_source) = remove_all(&retained) {
+            return Err(validation(
+                "sync",
+                format!(
+                    "install staged registry failed: {install_source}; rollback succeeded; backup cleanup failed at {}: {cleanup_source}",
+                    retained.display()
+                ),
+            ));
+        }
+        return Err(io_error(destination, install_source));
     }
-    if had_old {
-        fs::remove_dir_all(&backup).map_err(|source| io_error(&backup, source))?;
+
+    let retained = backup_container.keep();
+    if let Err(source) = remove_all(&retained) {
+        return Err(io_error(&retained, source));
     }
     Ok(())
 }
@@ -332,4 +389,75 @@ fn io_error(path: &Path, source: io::Error) -> RegistryError {
 
 fn transport_error() -> RegistryError {
     validation("sync", "transport request failed")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::sync::{Arc, Mutex};
+
+    fn make_tree(root: &Path, name: &str, content: &[u8]) -> PathBuf {
+        let path = root.join(name);
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join("state"), content).unwrap();
+        path
+    }
+
+    #[test]
+    fn replacement_does_not_touch_predictable_sibling_and_cleans_owned_backup() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = make_tree(root.path(), "registry", b"old");
+        let staging = make_tree(root.path(), "staging", b"new");
+        let sibling = destination.with_extension("registry-backup");
+        fs::create_dir_all(&sibling).unwrap();
+        fs::write(sibling.join("sentinel"), b"keep").unwrap();
+
+        replace_directory(&destination, &staging).unwrap();
+
+        assert_eq!(fs::read(destination.join("state")).unwrap(), b"new");
+        assert_eq!(fs::read(sibling.join("sentinel")).unwrap(), b"keep");
+        let owned = fs::read_dir(root.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".registry-backup-")
+            })
+            .collect::<Vec<_>>();
+        assert!(owned.is_empty(), "owned backups remain: {owned:?}");
+    }
+
+    #[test]
+    fn failed_install_rolls_back_and_failed_rollback_retains_backup() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = make_tree(root.path(), "registry", b"old");
+        let staging = make_tree(root.path(), "staging", b"new");
+        let calls = Cell::new(0);
+        let retained_backup = Arc::new(Mutex::new(None));
+        let retained_for_rename = Arc::clone(&retained_backup);
+        let rename = |source: &Path, target: &Path| {
+            let call = calls.get() + 1;
+            calls.set(call);
+            if call == 1 {
+                *retained_for_rename.lock().unwrap() = Some(target.to_owned());
+                fs::rename(source, target)
+            } else {
+                Err(io::Error::other("forced replacement failure"))
+            }
+        };
+        let remove = |path: &Path| fs::remove_dir_all(path);
+
+        let error = replace_directory_with_ops(&destination, &staging, &rename, &remove)
+            .expect_err("forced replacement failure unexpectedly succeeded");
+        assert!(error.to_string().contains("rollback failed"));
+        assert!(error.to_string().contains("backup retained"));
+        assert!(!destination.exists());
+        let backup = retained_backup.lock().unwrap().clone().unwrap();
+        assert_eq!(fs::read(backup.join("state")).unwrap(), b"old");
+        let container = backup.parent().unwrap();
+        fs::remove_dir_all(container).unwrap();
+    }
 }
