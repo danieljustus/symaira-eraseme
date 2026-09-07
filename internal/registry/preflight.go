@@ -158,11 +158,6 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 		}
 		index++
 	}
-	if quote != 0 {
-		// A quote can legally continue across a YAML line only for a block
-		// scalar; yaml.v3 will report all other unterminated quoted scalars.
-		// Do not invent a stronger lexical guarantee here.
-	}
 	return lineNodes, compactDepth, nil
 }
 
@@ -198,7 +193,8 @@ func isYAMLReferenceMarker(line []byte, index int) bool {
 	if index+1 >= len(line) {
 		return false
 	}
-	if !(line[index+1] == '_' || line[index+1] == '-' || (line[index+1] >= 'A' && line[index+1] <= 'Z') || (line[index+1] >= 'a' && line[index+1] <= 'z') || (line[index+1] >= '0' && line[index+1] <= '9')) {
+	next := line[index+1]
+	if next != '_' && next != '-' && (next < 'A' || next > 'Z') && (next < 'a' || next > 'z') && (next < '0' || next > '9') {
 		return false
 	}
 	return index == 0 || isYAMLCommentBoundary(line[index-1]) || line[index-1] == ':'

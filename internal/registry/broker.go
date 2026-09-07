@@ -147,8 +147,7 @@ func decodeAndValidate(d *doc) (Broker, error) {
 }
 
 func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
-	nodes, err := preflightYAML(d.content)
-	if err != nil {
+	if _, err := preflightYAML(d.content); err != nil {
 		return Broker{}, 0, err
 	}
 	var document yaml.Node
@@ -156,7 +155,7 @@ func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
 	if err := dec.Decode(&document); err != nil {
 		return Broker{}, 0, verr("yaml decode: %v", err)
 	}
-	nodes, err = exactYAMLNodeBudget(&document)
+	nodes, err := exactYAMLNodeBudget(&document)
 	if err != nil {
 		return Broker{}, 0, err
 	}
