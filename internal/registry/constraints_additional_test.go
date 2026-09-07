@@ -37,3 +37,25 @@ func TestDecodeAndValidateRejectsFieldConstraints(t *testing.T) {
 		})
 	}
 }
+
+func TestAddedDateUsesCalendarValidation(t *testing.T) {
+	base := "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: email\n    endpoint: a@example.test\n"
+	for _, tc := range []struct {
+		date  string
+		valid bool
+	}{
+		{"2024-02-29", true},
+		{"2000-02-29", true},
+		{"2023-02-29", false},
+		{"1900-02-29", false},
+		{"2024-00-10", false},
+		{"2024-13-01", false},
+		{"2024-04-31", false},
+	} {
+		doc := &doc{id: "test", path: "test.yaml", content: []byte(base + "added_date: " + tc.date + "\n")}
+		_, err := decodeAndValidate(doc)
+		if (err == nil) != tc.valid {
+			t.Errorf("added_date %s valid=%v, err=%v", tc.date, tc.valid, err)
+		}
+	}
+}

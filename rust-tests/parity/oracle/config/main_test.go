@@ -6,10 +6,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
+
+func requireUnixProcessTree(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("process-tree cleanup is unsupported on Windows until Job Object support exists")
+	}
+}
 
 func TestVerifySourceHashRejectsWrongExpectedHash(t *testing.T) {
 	_, source, _, ok := runtimeCaller()
@@ -74,6 +82,7 @@ func TestReadCappedFileRejectsOutputOverLimit(t *testing.T) {
 }
 
 func TestBoundedCommandRejectsLargeOutput(t *testing.T) {
+	requireUnixProcessTree(t)
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("Unix shell unavailable")
 	}
@@ -94,6 +103,7 @@ func TestBoundedCommandRejectsLargeOutput(t *testing.T) {
 }
 
 func TestBoundedCommandKillsDescendantsOnTimeout(t *testing.T) {
+	requireUnixProcessTree(t)
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("Unix shell unavailable")
 	}
@@ -118,6 +128,7 @@ func TestBoundedCommandKillsDescendantsOnTimeout(t *testing.T) {
 }
 
 func TestCleanupCommandBoundedFallsBackToDirectChildKill(t *testing.T) {
+	requireUnixProcessTree(t)
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("Unix shell unavailable")
 	}

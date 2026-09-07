@@ -4,13 +4,25 @@ version = 2
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+skip-tree = [
+    # cap-std 4.0.3 deliberately supports several Windows API generations;
+    # isolate only its pinned platform graph while keeping the workspace-wide
+    # duplicate-version denial intact.
+    { name = "cap-std", version = "=4.0.3" },
+    { name = "cap-fs-ext", version = "=4.0.3" },
+    # ureq's maintained rustls stack uses ring's legacy getrandom edge;
+    # isolate only this pinned TLS subtree rather than allowing duplicates
+    # workspace-wide.
+    { name = "ring", version = "=0.17.14" },
+]
 
 [licenses]
 version = 2
 allow = [
     "Apache-2.0",
-    "BSD-2-Clause",
+    "Apache-2.0 WITH LLVM-exception",
     "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "Unicode-3.0",

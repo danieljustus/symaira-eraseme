@@ -5,11 +5,29 @@
 package redaction
 
 import (
+	"errors"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/danieljustus/symaira-eraseme/internal/identity"
+)
+
+var (
+	ErrInputTooLarge   = errors.New("redaction input exceeds the maximum size")
+	ErrMatchLimit      = errors.New("redaction match limit exceeded")
+	ErrOutputTooLarge  = errors.New("redaction output exceeds the maximum size")
+	ErrProfileTooLarge = errors.New("redaction profile exceeds the maximum size")
+	ErrInvalidMatch    = errors.New("redaction match is invalid")
+)
+
+const (
+	maxRedactionInputBytes  = 16 << 20
+	maxRedactionMatches     = 100_000
+	maxRedactionOutputBytes = 32 << 20
+	maxProfileLiteralBytes  = 16 << 10
+	maxProfileLiteralCount  = 4_096
+	maxProfileTotalBytes    = 1 << 20
 )
 
 // Rule describes one PII detector and its replacement policy.
@@ -70,50 +88,73 @@ func Rules() []Rule {
 // configuration-oriented name.
 func DefaultRules() []Rule { return Rules() }
 
-// CollectMatches finds profile-aware and general PII matches, then sorts and
-// filters them exactly like interactive.py: earliest start first, longest
-// match first at a shared start, and earlier rules win ties.
-//
-// A variadic profile keeps the no-profile call concise while allowing callers
-// to pass the already-loaded identity profile without filesystem side effects.
+// CollectMatches is the compatibility wrapper for CollectMatchesChecked. A
+// rejected input produces no matches; security-sensitive callers should use
+// the checked form so the error is propagated.
 func CollectMatches(content string, profiles ...*identity.Profile) []Match {
+	matches, _ := CollectMatchesChecked(content, profiles...)
+	return matches
+}
+
+// CollectMatchesChecked finds bounded, non-overlapping matches.
+func CollectMatchesChecked(content string, profiles ...*identity.Profile) ([]Match, error) {
+	if len(content) > maxRedactionInputBytes {
+		return nil, ErrInputTooLarge
+	}
 	var profile *identity.Profile
 	if len(profiles) > 0 {
 		profile = profiles[0]
+	}
+	if err := validateProfile(profile); err != nil {
+		return nil, err
 	}
 	matches := make([]Match, 0)
 
 	if profile != nil {
 		for _, value := range profile.EmailAddresses {
-			appendLiteralMatches(&matches, content, value, "Profile Email", "[REDACTED-EMAIL]")
+			if err := appendLiteralMatches(&matches, content, value, "Profile Email", "[REDACTED-EMAIL]"); err != nil {
+				return nil, err
+			}
 		}
 		for _, value := range profile.PhoneNumbers {
-			appendLiteralMatches(&matches, content, value, "Profile Phone", "[REDACTED-PHONE]")
+			if err := appendLiteralMatches(&matches, content, value, "Profile Phone", "[REDACTED-PHONE]"); err != nil {
+				return nil, err
+			}
 		}
-		appendLiteralMatches(&matches, content, profile.FullName, "Profile Name", "[REDACTED-NAME]")
+		if err := appendLiteralMatches(&matches, content, profile.FullName, "Profile Name", "[REDACTED-NAME]"); err != nil {
+			return nil, err
+		}
 		for _, value := range profile.NameVariants {
-			appendLiteralMatches(&matches, content, value, "Profile Name", "[REDACTED-NAME]")
+			if err := appendLiteralMatches(&matches, content, value, "Profile Name", "[REDACTED-NAME]"); err != nil {
+				return nil, err
+			}
 		}
 		for _, address := range profile.Addresses {
-			appendLiteralMatches(&matches, content, address.Street, "Profile Street", "[REDACTED-STREET]")
-			appendLiteralMatches(&matches, content, address.City, "Profile City", "[REDACTED-CITY]")
-			appendLiteralMatches(&matches, content, address.PostalCode, "Profile Postal Code", "[REDACTED-POSTAL]")
+			for _, item := range []struct {
+				value, name, replacement string
+			}{{address.Street, "Profile Street", "[REDACTED-STREET]"}, {address.City, "Profile City", "[REDACTED-CITY]"}, {address.PostalCode, "Profile Postal Code", "[REDACTED-POSTAL]"}} {
+				if err := appendLiteralMatches(&matches, content, item.value, item.name, item.replacement); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 
 	for _, rule := range defaultRules {
-		for _, indexes := range rule.Pattern.FindAllStringIndex(content, -1) {
-			value := content[indexes[0]:indexes[1]]
+		remaining := maxRedactionMatches - len(matches)
+		indexes := rule.Pattern.FindAllStringIndex(content, remaining+1)
+		if len(indexes) > remaining {
+			return nil, ErrMatchLimit
+		}
+		for _, index := range indexes {
+			value := content[index[0]:index[1]]
 			if rule.Name == "SSN" && invalidSSN(value) {
 				continue
 			}
 			if rule.Name == "Email" && !validEmail(value) {
 				continue
 			}
-			matches = append(matches, Match{
-				Rule: rule, Name: rule.Name, Start: indexes[0], End: indexes[1],
-				Value: value,
-			})
+			matches = append(matches, Match{Rule: rule, Name: rule.Name, Start: index[0], End: index[1], Value: value})
 		}
 	}
 
@@ -131,15 +172,64 @@ func CollectMatches(content string, profiles ...*identity.Profile) []Match {
 			lastEnd = match.End
 		}
 	}
-	return filtered
+	return filtered, nil
 }
 
-func appendLiteralMatches(matches *[]Match, content, value, name, replacement string) {
+func validateProfile(profile *identity.Profile) error {
+	if profile == nil {
+		return nil
+	}
+	count, total := 0, 0
+	check := func(value string) error {
+		if value == "" {
+			return nil
+		}
+		if len(value) > maxProfileLiteralBytes || count >= maxProfileLiteralCount || total > maxProfileTotalBytes-len(value) {
+			return ErrProfileTooLarge
+		}
+		count++
+		total += len(value)
+		return nil
+	}
+	for _, value := range profile.EmailAddresses {
+		if err := check(value); err != nil {
+			return err
+		}
+	}
+	for _, value := range profile.PhoneNumbers {
+		if err := check(value); err != nil {
+			return err
+		}
+	}
+	if err := check(profile.FullName); err != nil {
+		return err
+	}
+	for _, value := range profile.NameVariants {
+		if err := check(value); err != nil {
+			return err
+		}
+	}
+	for _, address := range profile.Addresses {
+		for _, value := range []string{address.Street, address.City, address.PostalCode} {
+			if err := check(value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func appendLiteralMatches(matches *[]Match, content, value, name, replacement string) error {
 	if value == "" {
-		return
+		return nil
 	}
 	pattern := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(value))
-	for _, indexes := range pattern.FindAllStringIndex(content, -1) {
+	remaining := maxRedactionMatches - len(*matches)
+	indexes := pattern.FindAllStringIndex(content, remaining+1)
+	if len(indexes) > remaining {
+		return ErrMatchLimit
+	}
+	for _, indexes := range indexes {
 		*matches = append(*matches, Match{
 			Rule: Rule{
 				Name: name, Pattern: pattern,
@@ -149,6 +239,7 @@ func appendLiteralMatches(matches *[]Match, content, value, name, replacement st
 			Value: content[indexes[0]:indexes[1]],
 		})
 	}
+	return nil
 }
 
 func invalidSSN(value string) bool {
@@ -182,12 +273,18 @@ func validEmail(value string) bool {
 
 func scrubEmail(value string) string {
 	parts := strings.SplitN(value, "@", 2)
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return value
+	}
 	local, domain := parts[0], parts[1]
 	visible := local[:1]
 	if len(local) > 2 {
 		visible += strings.Repeat("*", len(local)-2) + local[len(local)-1:]
 	}
 	domainParts := strings.Split(domain, ".")
+	if len(domainParts) == 0 || len(domainParts[0]) == 0 {
+		return value
+	}
 	domainDisplay := domainParts[0][:1] + ".*"
 	if len(domainParts) >= 2 {
 		domainDisplay = domainParts[0][:1] + "*." + strings.Join(domainParts[1:], ".")
@@ -202,6 +299,9 @@ func scrubPhone(value string) string {
 			digits = append(digits, value[i])
 		}
 	}
+	if len(digits) < 4 {
+		return value
+	}
 	if len(digits) == 11 {
 		return "+1-***-***-" + string(digits[len(digits)-4:])
 	}
@@ -210,11 +310,29 @@ func scrubPhone(value string) string {
 
 func scrubSSN(string) string { return "***-**-****" }
 func scrubIBAN(value string) string {
+	if len(value) < 6 {
+		return value
+	}
 	return value[:2] + "**" + strings.Repeat("*", len(value)-4) + value[len(value)-4:]
 }
-func scrubGermanID(value string) string  { return "*******" + value[len(value)-2:] }
-func scrubFrenchID(value string) string  { return "***" + value[len(value)-3:] }
-func scrubSpanishID(value string) string { return "****-****-" + value[len(value)-1:] }
+func scrubGermanID(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+	return "*******" + value[len(value)-2:]
+}
+func scrubFrenchID(value string) string {
+	if len(value) < 3 {
+		return value
+	}
+	return "***" + value[len(value)-3:]
+}
+func scrubSpanishID(value string) string {
+	if len(value) < 1 {
+		return value
+	}
+	return "****-****-" + value[len(value)-1:]
+}
 
 func scrubPassport(value string) string {
 	match := passportPattern.FindStringSubmatch(value)
@@ -222,6 +340,9 @@ func scrubPassport(value string) string {
 		return value
 	}
 	passport := match[3]
+	if len(passport) < 2 {
+		return value
+	}
 	mask := strings.Repeat("*", max(3, len(passport)-2)) + passport[len(passport)-2:]
 	return strings.Replace(value, passport, mask, 1)
 }
@@ -233,25 +354,66 @@ func max(a, b int) int {
 	return b
 }
 
-// Redact applies every accepted match while preserving all unmatched bytes.
+// Redact applies the compatibility API. Checked callers should use
+// RedactChecked and handle its error explicitly; a rejected request returns an
+// empty result rather than pretending the input was redacted.
 func Redact(content string, profiles ...*identity.Profile) string {
-	matches := CollectMatches(content, profiles...)
-	if len(matches) == 0 {
-		return content
-	}
-	var out strings.Builder
-	out.Grow(len(content))
-	position := 0
-	for _, match := range matches {
-		out.WriteString(content[position:match.Start])
-		out.WriteString(match.Replacement())
-		position = match.End
-	}
-	out.WriteString(content[position:])
-	return out.String()
+	redacted, _ := RedactChecked(content, profiles...)
+	return redacted
 }
 
-// RedactText is a descriptive alias for Redact.
+// RedactChecked redacts content while enforcing input, match, and output
+// bounds before allocating the output buffer.
+func RedactChecked(content string, profiles ...*identity.Profile) (string, error) {
+	redacted, err := RedactBytesChecked([]byte(content), profiles...)
+	return string(redacted), err
+}
+
+// RedactBytes is the compatibility API. Security-sensitive callers should use
+// RedactBytesChecked so limit failures are propagated.
+func RedactBytes(content []byte, profiles ...*identity.Profile) []byte {
+	redacted, _ := RedactBytesChecked(content, profiles...)
+	return redacted
+}
+
+func RedactBytesChecked(content []byte, profiles ...*identity.Profile) ([]byte, error) {
+	matches, err := CollectMatchesChecked(string(content), profiles...)
+	if err != nil {
+		return nil, err
+	}
+	outputLen := len(content)
+	for _, match := range matches {
+		if match.Start < 0 || match.End < match.Start || match.End > len(content) || match.Start == match.End {
+			return nil, ErrInvalidMatch
+		}
+		replacement := match.Replacement()
+		if len(replacement) > maxRedactionOutputBytes {
+			return nil, ErrOutputTooLarge
+		}
+		if match.End-match.Start > outputLen {
+			return nil, ErrInvalidMatch
+		}
+		outputLen -= match.End - match.Start
+		if len(replacement) > maxRedactionOutputBytes-outputLen {
+			return nil, ErrOutputTooLarge
+		}
+		outputLen += len(replacement)
+	}
+	if outputLen > maxRedactionOutputBytes {
+		return nil, ErrOutputTooLarge
+	}
+	out := make([]byte, 0, outputLen)
+	position := 0
+	for _, match := range matches {
+		out = append(out, content[position:match.Start]...)
+		out = append(out, match.Replacement()...)
+		position = match.End
+	}
+	out = append(out, content[position:]...)
+	return out, nil
+}
+
+// RedactText is a descriptive compatibility alias for Redact.
 func RedactText(content string, profiles ...*identity.Profile) string {
 	return Redact(content, profiles...)
 }

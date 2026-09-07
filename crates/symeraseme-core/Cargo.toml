@@ -8,16 +8,32 @@ description.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+build = "build.rs"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
+cap-fs-ext.workspace = true
+cap-std.workspace = true
 chrono.workspace = true
+flate2.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
 symaira-core-version.workspace = true
+tar.workspace = true
+tempfile.workspace = true
 toml.workspace = true
+ureq.workspace = true
+yaml-rust2.workspace = true
+minijinja.workspace = true
+regex.workspace = true
+
+[build-dependencies]
+cap-fs-ext.workspace = true
+cap-std.workspace = true
 
 [dev-dependencies]
 proptest = "1.11.0"
-serde_json.workspace = true
+tempfile.workspace = true

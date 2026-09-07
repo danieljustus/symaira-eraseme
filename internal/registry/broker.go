@@ -3,6 +3,8 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"math"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -39,6 +41,7 @@ var (
 	// selectorPrefix: contract §6 says keys must "look like CSS selectors".
 	// Real data uses attribute selectors like input[name=x], so accept any
 	// selector-ish token: must contain a tag/attr/id/class marker.
+	datePattern    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	selectorPrefix = regexp.MustCompile(`^[a-zA-Z\[#.*][a-zA-Z0-9\[\]=.'"_:#.\- *>,~+]*$`)
 )
 
@@ -139,10 +142,36 @@ var brokerKeys = set(
 // the contract. Returns ValidationError for contract violations. Unknown
 // top-level, channel, verification, and form-spec fields are rejected.
 func decodeAndValidate(d *doc) (Broker, error) {
-	var raw map[string]yaml.Node
+	broker, _, err := decodeAndValidateMetrics(d)
+	return broker, err
+}
+
+func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
+	if _, err := preflightYAML(d.content); err != nil {
+		return Broker{}, 0, err
+	}
+	var document yaml.Node
 	dec := yaml.NewDecoder(strings.NewReader(string(d.content)))
-	if err := dec.Decode(&raw); err != nil {
-		return Broker{}, verr("yaml decode: %v", err)
+	if err := dec.Decode(&document); err != nil {
+		return Broker{}, 0, verr("yaml decode: %v", err)
+	}
+	nodes, err := exactYAMLNodeBudget(&document)
+	if err != nil {
+		return Broker{}, 0, err
+	}
+	if err := rejectYAMLNodeContracts(&document); err != nil {
+		return Broker{}, 0, err
+	}
+	var raw map[string]yaml.Node
+	if err := document.Decode(&raw); err != nil {
+		return Broker{}, 0, verr("yaml decode: %v", err)
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return Broker{}, 0, verr("yaml: exactly one document is required")
+		}
+		return Broker{}, 0, verr("yaml trailing document: %v", err)
 	}
 	var unknown []string
 	for k := range raw {
@@ -152,7 +181,7 @@ func decodeAndValidate(d *doc) (Broker, error) {
 	}
 	if len(unknown) > 0 {
 		sortStrings(unknown)
-		return Broker{}, verr("unknown top-level field(s): %s", strings.Join(unknown, ", "))
+		return Broker{}, 0, verr("unknown top-level field(s): %s", strings.Join(unknown, ", "))
 	}
 	// Strict re-decode: KnownFields(true) rejects unknown fields at every
 	// nesting level (channels, verification, form_spec, solve_captcha).
@@ -160,60 +189,60 @@ func decodeAndValidate(d *doc) (Broker, error) {
 	strict.KnownFields(true)
 	var b Broker
 	if err := strict.Decode(&b); err != nil {
-		return Broker{}, verr("schema: %v", err)
+		return Broker{}, 0, verr("schema: %v", err)
 	}
 
 	// id: pattern + must equal file stem (§3).
 	if b.ID != d.id {
-		return Broker{}, verr("id %q does not equal file stem %q", b.ID, d.id)
+		return Broker{}, 0, verr("id %q does not equal file stem %q", b.ID, d.id)
 	}
 	if !idPattern.MatchString(b.ID) {
-		return Broker{}, verr("id %q does not match ^[a-z0-9-]+$", b.ID)
+		return Broker{}, 0, verr("id %q does not match ^[a-z0-9-]+$", b.ID)
 	}
 	if strings.TrimSpace(b.Name) == "" {
-		return Broker{}, verr("name is required")
+		return Broker{}, 0, verr("name is required")
 	}
 	if err := validURI(b.Website); err != nil {
-		return Broker{}, verr("website: %v", err)
+		return Broker{}, 0, verr("website: %v", err)
 	}
 	if !categories[b.Category] {
-		return Broker{}, verr("category %q is not in the closed enum", b.Category)
+		return Broker{}, 0, verr("category %q is not in the closed enum", b.Category)
 	}
 	if len(b.Jurisdictions) == 0 {
-		return Broker{}, verr("jurisdictions must have at least 1 entry")
+		return Broker{}, 0, verr("jurisdictions must have at least 1 entry")
 	}
 	for _, j := range b.Jurisdictions {
 		if !jurisdictions[j] {
-			return Broker{}, verr("jurisdiction %q is not in the closed enum", j)
+			return Broker{}, 0, verr("jurisdiction %q is not in the closed enum", j)
 		}
 	}
 	if len(b.Laws) == 0 {
-		return Broker{}, verr("laws must have at least 1 entry")
+		return Broker{}, 0, verr("laws must have at least 1 entry")
 	}
 	for _, l := range b.Laws {
 		if !lawsEnum[l] {
-			return Broker{}, verr("law %q is not in the closed enum", l)
+			return Broker{}, 0, verr("law %q is not in the closed enum", l)
 		}
 	}
 	if b.DataSensitivity != nil && (*b.DataSensitivity < 1 || *b.DataSensitivity > 5) {
-		return Broker{}, verr("data_sensitivity %d out of range 1..5", *b.DataSensitivity)
+		return Broker{}, 0, verr("data_sensitivity %d out of range 1..5", *b.DataSensitivity)
 	}
 	if !priorities[b.Priority] {
-		return Broker{}, verr("priority %q is not in the closed enum", b.Priority)
+		return Broker{}, 0, verr("priority %q is not in the closed enum", b.Priority)
 	}
 	if len(b.OptOut) == 0 {
-		return Broker{}, verr("opt_out must have at least 1 channel")
+		return Broker{}, 0, verr("opt_out must have at least 1 channel")
 	}
 	for i := range b.OptOut {
 		if err := validateChannel(&b.OptOut[i]); err != nil {
-			return Broker{}, verr("opt_out[%d]: %v", i, err)
+			return Broker{}, 0, verr("opt_out[%d]: %v", i, err)
 		}
 	}
 	if b.Status != "" && !statuses[b.Status] {
-		return Broker{}, verr("status %q is not in the closed enum", b.Status)
+		return Broker{}, 0, verr("status %q is not in the closed enum", b.Status)
 	}
-	if b.AddedDate != "" && !datePattern.MatchString(b.AddedDate) {
-		return Broker{}, verr("added_date %q is not ISO 8601 date", b.AddedDate)
+	if b.AddedDate != "" && !isISODate(b.AddedDate) {
+		return Broker{}, 0, verr("added_date %q is not ISO 8601 date", b.AddedDate)
 	}
 
 	// Defaults (§9): authoritative default values.
@@ -224,10 +253,122 @@ func decodeAndValidate(d *doc) (Broker, error) {
 	if b.Status == "" {
 		b.Status = "active"
 	}
-	return b, nil
+	return b, nodes, nil
 }
 
-var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+func rejectYAMLNodeContracts(root *yaml.Node) error {
+	var walk func(*yaml.Node, string) error
+	walk = func(node *yaml.Node, path string) error {
+		if node.Kind == yaml.AliasNode {
+			return verr("yaml: aliases are not allowed at %s", path)
+		}
+		if node.Anchor != "" {
+			return verr("yaml: anchors are not allowed at %s", path)
+		}
+		if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+			return verr("yaml: explicit null at %s is not allowed; omit the field instead", path)
+		}
+		switch node.Kind {
+		case yaml.DocumentNode:
+			for _, child := range node.Content {
+				if err := walk(child, path); err != nil {
+					return err
+				}
+			}
+		case yaml.MappingNode:
+			for index := 0; index+1 < len(node.Content); index += 2 {
+				key, value := node.Content[index], node.Content[index+1]
+				fieldPath := path + "[key]"
+				if key.Kind == yaml.ScalarNode && key.Value != "" {
+					fieldPath = path + "." + key.Value
+				}
+				if isFormStepPath(path) && key.Kind == yaml.ScalarNode && isStringAction(key.Value) && value.Kind == yaml.ScalarNode && value.Value == "" {
+					return verr("yaml: %s must not be empty when present", fieldPath)
+				}
+				if err := walk(key, fieldPath+"[name]"); err != nil {
+					return err
+				}
+				if err := walk(value, fieldPath); err != nil {
+					return err
+				}
+			}
+		case yaml.SequenceNode:
+			for index, child := range node.Content {
+				if err := walk(child, fmt.Sprintf("%s[%d]", path, index)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(root, "$")
+}
+
+func isFormStepPath(path string) bool {
+	return strings.Contains(path, ".form_spec.steps[") && strings.HasSuffix(path, "]")
+}
+
+func isStringAction(field string) bool {
+	switch field {
+	case "goto", "click", "wait_for", "screenshot", "assert_text":
+		return true
+	default:
+		return false
+	}
+}
+
+func exactYAMLNodeBudget(root *yaml.Node) (int, error) {
+	var walk func(*yaml.Node, int) (int, int)
+	walk = func(node *yaml.Node, depth int) (int, int) {
+		if node.Kind == yaml.DocumentNode {
+			count, maxDepth := 0, 0
+			for _, child := range node.Content {
+				childCount, childDepth := walk(child, depth)
+				count += childCount
+				if childDepth > maxDepth {
+					maxDepth = childDepth
+				}
+			}
+			return count, maxDepth
+		}
+		count, maxDepth := 1, depth
+		for _, child := range node.Content {
+			childCount, childDepth := walk(child, depth+1)
+			count += childCount
+			if childDepth > maxDepth {
+				maxDepth = childDepth
+			}
+		}
+		return count, maxDepth
+	}
+
+	nodes, depth := walk(root, 1)
+	if nodes > maxYAMLNodes {
+		return 0, verr("yaml: node budget exceeded (%d > %d)", nodes, maxYAMLNodes)
+	}
+	if depth > maxYAMLDepth {
+		return 0, verr("yaml: depth budget exceeded (%d > %d)", depth, maxYAMLDepth)
+	}
+	return nodes, nil
+}
+
+func isISODate(value string) bool {
+	if !datePattern.MatchString(value) {
+		return false
+	}
+	year := (int(value[0]-'0') * 1000) + (int(value[1]-'0') * 100) + (int(value[2]-'0') * 10) + int(value[3]-'0')
+	month := (int(value[5]-'0') * 10) + int(value[6]-'0')
+	day := (int(value[8]-'0') * 10) + int(value[9]-'0')
+	if month < 1 || month > 12 {
+		return false
+	}
+	leap := year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	days := [...]int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if leap {
+		days[2] = 29
+	}
+	return day >= 1 && day <= days[month]
+}
 
 // validateChannel enforces contract §4: exactly one variant, closed enums,
 // unknown channel fields rejected.
@@ -285,6 +426,12 @@ func validateFormSpec(f *FormSpec) error {
 	if len(f.Steps) == 0 {
 		return verr("form_spec requires at least 1 step")
 	}
+	if f.TimeoutSeconds != nil && (math.IsNaN(*f.TimeoutSeconds) || math.IsInf(*f.TimeoutSeconds, 0) || *f.TimeoutSeconds < 1) {
+		return verr("timeout_seconds must be finite and >= 1")
+	}
+	if f.RateLimitDelay != nil && (math.IsNaN(*f.RateLimitDelay) || math.IsInf(*f.RateLimitDelay, 0) || *f.RateLimitDelay < 0) {
+		return verr("rate_limit_delay must be finite and >= 0")
+	}
 	for i := range f.Steps {
 		if err := validateFormStep(&f.Steps[i]); err != nil {
 			return verr("steps[%d]: %v", i, err)
@@ -314,8 +461,8 @@ func validateFormStep(s *FormStep) error {
 	}
 	if s.WaitSeconds != nil {
 		present++
-		if *s.WaitSeconds < 0 {
-			return verr("wait_seconds must be >= 0")
+		if math.IsNaN(*s.WaitSeconds) || math.IsInf(*s.WaitSeconds, 0) || *s.WaitSeconds < 0 {
+			return verr("wait_seconds must be finite and >= 0")
 		}
 	}
 	if s.Screenshot != "" {
@@ -335,8 +482,8 @@ func validateFormStep(s *FormStep) error {
 		if s.SolveCaptcha.Provider != "" && !captchaProv[s.SolveCaptcha.Provider] {
 			return verr("solve_captcha.provider %q is not in the closed enum", s.SolveCaptcha.Provider)
 		}
-		if s.SolveCaptcha.MinScore != nil && (*s.SolveCaptcha.MinScore < 0 || *s.SolveCaptcha.MinScore > 1) {
-			return verr("solve_captcha.min_score out of range 0..1")
+		if s.SolveCaptcha.MinScore != nil && (math.IsNaN(*s.SolveCaptcha.MinScore) || math.IsInf(*s.SolveCaptcha.MinScore, 0) || *s.SolveCaptcha.MinScore < 0 || *s.SolveCaptcha.MinScore > 1) {
+			return verr("solve_captcha.min_score must be finite and in range 0..1")
 		}
 	}
 	if present == 0 {

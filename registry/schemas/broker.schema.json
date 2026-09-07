@@ -196,7 +196,13 @@
               "description": "Email address the opt-out request is sent to."
             }
           },
-          "required": ["endpoint"]
+          "required": ["endpoint"],
+          "not": {
+            "anyOf": [
+              { "required": ["url"] },
+              { "required": ["form_spec"] }
+            ]
+          }
         },
         {
           "properties": {
@@ -210,7 +216,10 @@
               "$ref": "#/$defs/formSpec"
             }
           },
-          "required": ["url", "form_spec"]
+          "required": ["url", "form_spec"],
+          "not": {
+            "required": ["endpoint"]
+          }
         }
       ]
     },
@@ -233,28 +242,28 @@
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
-      "description": "One declarative web-form step. Standard DSL: goto/fill/select/click/wait keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
+      "description": "One declarative web-form step with at least one effective action. String actions must be non-empty; goto/fill/select/click/wait keys map CSS selector -> value (use ${field_name} template syntax to interpolate identity fields).",
       "properties": {
-        "goto": { "type": "string", "description": "URL to navigate to. Use '.' for the form's own URL." },
+        "goto": { "type": "string", "minLength": 1, "description": "URL to navigate to. Use '.' for the form's own URL." },
         "fill": {
           "type": "object",
           "description": "CSS selector -> value mapping. Use ${full_name}, ${email} etc. for identity interpolation. Keys must look like CSS selectors (start with #, ., [, *, or a tag name) — the legacy {selector, from} shape is rejected.",
           "additionalProperties": { "type": "string" },
-          "propertyNames": { "pattern": "[#.\\[]" },
+          "propertyNames": { "pattern": "^[a-zA-Z\\[#.*][a-zA-Z0-9\\[\\]=.'\"_:#.\\- *>,~+]*$" },
           "minProperties": 1
         },
         "select": {
           "type": "object",
           "description": "CSS selector -> option value mapping (for <select> elements). Same key constraints as `fill`.",
           "additionalProperties": { "type": "string" },
-          "propertyNames": { "pattern": "[#.\\[]" },
+          "propertyNames": { "pattern": "^[a-zA-Z\\[#.*][a-zA-Z0-9\\[\\]=.'\"_:#.\\- *>,~+]*$" },
           "minProperties": 1
         },
-        "click": { "type": "string", "description": "CSS selector to click." },
-        "wait_for": { "type": "string", "description": "CSS selector to wait for." },
+        "click": { "type": "string", "minLength": 1, "description": "CSS selector to click." },
+        "wait_for": { "type": "string", "minLength": 1, "description": "CSS selector to wait for." },
         "wait_seconds": { "type": "number", "minimum": 0 },
-        "screenshot": { "type": "string", "description": "Screenshot file label (no extension)." },
-        "assert_text": { "type": "string", "description": "Text that must appear on the page." },
+        "screenshot": { "type": "string", "minLength": 1, "description": "Screenshot file label (no extension)." },
+        "assert_text": { "type": "string", "minLength": 1, "description": "Text that must appear on the page." },
         "solve_captcha": {
           "type": "object",
           "additionalProperties": false,

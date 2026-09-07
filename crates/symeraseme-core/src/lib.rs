@@ -4,5 +4,8 @@
 
 pub mod config;
 pub mod confirmation;
+pub mod redaction;
+pub mod registry;
+pub mod templating;
 pub mod timeutil;
 pub mod version;

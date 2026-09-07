@@ -1,10 +1,14 @@
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::{Child, Command, Stdio};
+#[cfg(unix)]
 use std::thread;
+#[cfg(unix)]
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symeraseme_core::config::{
     Config, ConfigContext, ConfigError, Storage, default_encrypted_temp_dir, defaults, load,
@@ -60,6 +64,7 @@ fn fixture(case: &str) -> Value {
     document.get(case).cloned().expect("fixture case")
 }
 
+#[cfg(unix)]
 #[derive(Debug)]
 struct OracleCommandOutput {
     status: std::process::ExitStatus,
@@ -67,10 +72,14 @@ struct OracleCommandOutput {
     _stderr: Vec<u8>,
 }
 
+#[cfg(unix)]
 const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(unix)]
 const ORACLE_MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
+#[cfg(unix)]
 const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
+#[cfg(unix)]
 fn run_go_config_oracle() -> Value {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
     let temp_root = std::env::temp_dir().join(format!(
@@ -124,14 +133,17 @@ fn run_go_config_oracle() -> Value {
     serde_json::from_slice(&output.stdout).expect("Go config oracle must emit valid JSON")
 }
 
+#[cfg(unix)]
 struct TempRootGuard(PathBuf);
 
+#[cfg(unix)]
 impl Drop for TempRootGuard {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
 
+#[cfg(unix)]
 fn run_file_backed(
     command: &mut Command,
     stdout_path: &Path,
@@ -147,6 +159,7 @@ fn run_file_backed(
     )
 }
 
+#[cfg(unix)]
 fn run_file_backed_with_limit(
     command: &mut Command,
     stdout_path: &Path,
@@ -193,6 +206,7 @@ fn run_file_backed_with_limit(
     })
 }
 
+#[cfg(unix)]
 fn output_exceeded(stdout_path: &Path, stderr_path: &Path, limit: u64) -> std::io::Result<bool> {
     for path in [stdout_path, stderr_path] {
         match fs::metadata(path) {
@@ -205,6 +219,7 @@ fn output_exceeded(stdout_path: &Path, stderr_path: &Path, limit: u64) -> std::i
     Ok(false)
 }
 
+#[cfg(unix)]
 fn terminate_child_bounded(child: &mut Child, timeout: Duration) -> std::io::Result<()> {
     let tree_cleanup = kill_process_tree(child);
     let direct_cleanup = child.kill();
@@ -240,6 +255,7 @@ fn terminate_child_bounded(child: &mut Child, timeout: Duration) -> std::io::Res
     Ok(())
 }
 
+#[cfg(unix)]
 fn read_capped_file(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
     let mut file = fs::File::open(path)?;
     let mut output = Vec::new();
@@ -272,22 +288,7 @@ fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
-fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command.creation_flags(CREATE_NEW_PROCESS_GROUP);
-    Ok(())
-}
-
-#[cfg(not(any(unix, windows)))]
-fn configure_process_group(_command: &mut Command) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "oracle process-tree cleanup is unsupported on this platform",
-    ))
-}
-
+#[cfg(unix)]
 fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -308,12 +309,21 @@ fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
     }
     #[cfg(windows)]
     {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
         let status = Command::new("taskkill")
             .args(["/PID", &child.id().to_string(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()?;
         if !status.success() {
+            // taskkill can lose a race with a process that exits after the
+            // preflight check. Treat that already-completed cleanup as
+            // idempotent; a still-running process remains a hard failure.
+            if child.try_wait()?.is_some() {
+                return Ok(());
+            }
             return Err(std::io::Error::other(
                 "taskkill failed to clean oracle tree",
             ));
@@ -330,6 +340,7 @@ fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
     }
 }
 
+#[cfg(unix)]
 fn helper_command(test_name: &str, marker: &str) -> Command {
     let mut command = Command::new(std::env::current_exe().expect("current test executable"));
     command
@@ -338,6 +349,7 @@ fn helper_command(test_name: &str, marker: &str) -> Command {
     command
 }
 
+#[cfg(unix)]
 #[test]
 fn oracle_runner_output_helper() {
     if std::env::var_os("SYMERASEME_CONFIG_ORACLE_OUTPUT_HELPER").is_none() {
@@ -351,6 +363,7 @@ fn oracle_runner_output_helper() {
     stdout.flush().expect("flush helper output");
 }
 
+#[cfg(unix)]
 #[test]
 fn oracle_runner_timeout_helper() {
     if std::env::var_os("SYMERASEME_CONFIG_ORACLE_TIMEOUT_HELPER").is_some() {
@@ -358,6 +371,9 @@ fn oracle_runner_timeout_helper() {
     }
 }
 
+// These probes require tree-safe termination and therefore remain Unix-only
+// until the documented Windows Job Object capability is implemented.
+#[cfg(unix)]
 #[test]
 fn run_file_backed_enforces_live_output_limit() {
     let tree = TestTree::new("runner-output-limit");
@@ -379,6 +395,7 @@ fn run_file_backed_enforces_live_output_limit() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn run_file_backed_timeout_cleanup_is_bounded() {
     let tree = TestTree::new("runner-timeout");
@@ -399,6 +416,10 @@ fn run_file_backed_timeout_cleanup_is_bounded() {
     assert!(started.elapsed() < Duration::from_secs(3));
 }
 
+// This oracle and the process-cleanup probes require Unix process groups.
+// Windows parity remains explicitly capability-gated until Job Object support
+// exists; the native config cases still run with semantic path normalization.
+#[cfg(unix)]
 #[test]
 fn go_config_oracle_provenance_fixture_and_rust_results_match() {
     let fixture: Value = serde_json::from_str(GO_FIXTURE).expect("valid Go config fixture");
@@ -424,11 +445,32 @@ fn normalized_result(root: &Path, config: &Config, storage: &Storage) -> Value {
         .parent()
         .and_then(Path::parent)
         .expect("encrypted temp dir has cache/tool/database shape");
-    let encoded = serde_json::to_string(&json!({ "config": config, "storage": storage }))
-        .expect("serialize result")
-        .replace(cache_root.to_str().expect("UTF-8 cache root"), "$CACHE")
-        .replace(root.to_str().expect("UTF-8 test root"), "$ROOT");
-    serde_json::from_str(&encoded).expect("normalized result JSON")
+    json!({
+        "config": config,
+        "storage": {
+            "data_dir": normalize_path(root, "$ROOT", &storage.data_dir),
+            "db_dir": normalize_path(root, "$ROOT", &storage.db_dir),
+            "db_path": normalize_path(root, "$ROOT", &storage.db_path),
+            "temp_dir": normalize_path(cache_root, "$CACHE", &storage.temp_dir),
+            "encrypt_db": storage.encrypt_db,
+        },
+    })
+}
+
+fn normalize_path(root: &Path, placeholder: &str, value: &Path) -> String {
+    let root = root.to_string_lossy().replace('\\', "/");
+    let value = value.to_string_lossy().replace('\\', "/");
+    let root = root.trim_end_matches('/');
+    if value == root {
+        return placeholder.to_owned();
+    }
+    if let Some(suffix) = value
+        .strip_prefix(root)
+        .filter(|suffix| suffix.starts_with('/'))
+    {
+        return format!("{placeholder}{suffix}");
+    }
+    value
 }
 
 fn assert_field(error: ConfigError, field: &str) {

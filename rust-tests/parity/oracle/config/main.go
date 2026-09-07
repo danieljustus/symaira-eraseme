@@ -520,10 +520,10 @@ func unsafeFixturePath(path string) bool {
 func normalizePaths(root string, storage *config.Storage) *config.Storage {
 	copy := *storage
 	cacheRoot := nativeCacheRoot(copy.TempDir)
-	copy.DataDir = normalizePath(root, cacheRoot, copy.DataDir)
-	copy.DBDir = normalizePath(root, cacheRoot, copy.DBDir)
-	copy.DBPath = normalizePath(root, cacheRoot, copy.DBPath)
-	copy.TempDir = normalizePath(root, cacheRoot, copy.TempDir)
+	copy.DataDir = normalizePath(root, "$ROOT", copy.DataDir)
+	copy.DBDir = normalizePath(root, "$ROOT", copy.DBDir)
+	copy.DBPath = normalizePath(root, "$ROOT", copy.DBPath)
+	copy.TempDir = normalizePath(cacheRoot, "$CACHE", copy.TempDir)
 	return &copy
 }
 
@@ -538,12 +538,17 @@ func nativeCacheRoot(tempDir string) string {
 	return filepath.Dir(toolDir)
 }
 
-func normalizePath(root, cacheRoot, value string) string {
-	if cacheRoot != "" && (value == cacheRoot || strings.HasPrefix(value, cacheRoot+string(filepath.Separator))) {
-		return "$CACHE" + strings.TrimPrefix(value, cacheRoot)
+func normalizePath(root, placeholder, value string) string {
+	value = filepath.ToSlash(value)
+	root = strings.TrimRight(filepath.ToSlash(root), "/")
+	if root == "" {
+		return value
 	}
-	if strings.HasPrefix(value, root) {
-		return "$ROOT" + strings.TrimPrefix(value, root)
+	if value == root {
+		return placeholder
+	}
+	if suffix, ok := strings.CutPrefix(value, root); ok && strings.HasPrefix(suffix, "/") {
+		return placeholder + suffix
 	}
 	return value
 }

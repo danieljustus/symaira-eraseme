@@ -420,11 +420,11 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-core/tests/registry_contract.rs`
 
 **Steps:**
-- [ ] Model every schema-v1 field with exact snake_case names/defaults.
-- [ ] Reject unknown keys at every closed object boundary.
-- [ ] Implement channel variant, enum, selector, URI/date and filename rules.
-- [ ] Run all four golden and negative fixtures.
-- [ ] Run the full real corpus; expected count is 1,277.
+- [x] Model every schema-v1 field with exact snake_case names/defaults.
+- [x] Reject unknown keys at every closed object boundary.
+- [x] Implement channel variant, enum, selector, URI/date and filename rules.
+- [x] Run all four golden and negative fixtures.
+- [x] Run the full real corpus; expected count is 1,277.
 
 ### Task 3.2: Port registry embedding, loading, filtering and sync
 
@@ -434,14 +434,15 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: loader/filter/sync parity tests
 
 **Steps:**
-- [ ] Embed committed registry data without runtime filesystem dependency.
-- [ ] Preserve underscore skipping, deterministic ordering and first/all-error
+- [x] Embed committed registry data without runtime filesystem dependency.
+- [x] Preserve underscore skipping, deterministic ordering and first/all-error
       behavior.
-- [ ] Preserve status/disabled filter semantics.
-- [ ] Mock HTTPS sync and verify safe validated replacement.
-- [ ] Measure lazy/eager loading; do not add a binary cache unless measured and
+- [x] Preserve status/disabled filter semantics.
+- [x] Mock HTTPS sync and verify safe validated replacement.
+- [x] Measure lazy/eager loading; do not add a binary cache unless measured and
       contract-neutral.
-- [ ] Pass `REG-001..008`.
+- [x] Pass `REG-001..008` locally; native Linux/Windows exact-head CI remains
+      required before merge.
 
 ### Task 3.3: Port legal and report templates
 
@@ -451,12 +452,13 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: `crates/symeraseme-core/tests/template_contract.rs`
 
 **Steps:**
-- [ ] First test MiniJinja against the existing canonical `.j2` sources.
-- [ ] Accept it only if all 11 outputs equal `golden-templates.json` byte for
+- [x] First test MiniJinja against the existing canonical `.j2` sources.
+- [x] Accept it only if all 11 outputs equal `golden-templates.json` byte for
       byte.
-- [ ] If not, port frozen templates into the Rust crate and document why.
-- [ ] Do not change legal wording, whitespace or escaping to suit the engine.
-- [ ] Pass `TMP-001..002`.
+- [x] Keep the canonical sources directly embedded; no frozen copies were needed.
+- [x] Do not change legal wording, whitespace or escaping to suit the engine.
+- [x] Pass `TMP-001..002` locally; native exact-head CI remains required before
+      merge.
 
 ### Task 3.4: Port redaction
 
@@ -465,11 +467,12 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - Test: shared redaction corpus and property tests
 
 **Steps:**
-- [ ] Port every PII detector and profile-aware literal replacement.
-- [ ] Preserve replacement ordering, overlap and UTF-8 behavior.
-- [ ] Port safe path and consent-bound file review.
-- [ ] Fuzz text input; assert no panic and no matched sentinel leaks.
-- [ ] Pass `RED-001..002`.
+- [x] Port every PII detector and profile-aware literal replacement.
+- [x] Preserve replacement ordering, overlap and UTF-8 behavior.
+- [x] Port safe path and consent-bound file review.
+- [x] Fuzz text input; assert no panic and no matched sentinel leaks.
+- [x] Pass `RED-001..002` locally; native exact-head CI remains required before
+      merge.
 
 ---
 

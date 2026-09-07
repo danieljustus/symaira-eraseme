@@ -18,6 +18,10 @@ by the Go loader. The pre-cutover loader and tests are preserved only at the
   schema are updated together in one commit.
 - A consumer must refuse to process a registry whose manifest version it
   does not understand (`RegistryError` in Python).
+- The Go and Rust loaders bounded-read `manifest.json` and the manifest-declared
+  schema before traversing brokers. The `schemas.broker` pointer must be exactly
+  `schemas/broker.schema.json`; missing, malformed, non-integer, unsupported, or
+  mismatched manifest/schema versions are rejected.
 
 ## 2. Layout
 
@@ -105,8 +109,10 @@ All three are optional inside the block. Unknown keys are rejected.
 
 `form_spec` = `{ "steps": [FormStep...], "timeout_seconds": number, "rate_limit_delay": number, "headless": bool }` — only `steps` is required.
 
-A `FormStep` is a step DSL executed by a browser driver. All keys optional,
-at least one must be present (`minProperties: 1`), unknown keys rejected:
+A `FormStep` is a step DSL executed by a browser driver. All keys are optional,
+but at least one effective action must be present; string actions must be
+non-empty, collection actions must contain entries, and unknown keys are
+rejected:
 
 | Field | Type | Rules |
 |---|---|---|

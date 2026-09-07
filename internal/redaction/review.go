@@ -52,6 +52,15 @@ type ReviewResult struct {
 // decides whether to persist those partial changes, exactly as interactive.py
 // asks whether to save after q. A nil decision function keeps every match.
 func Review(content []byte, matches []Match, decide DecisionFunc) (ReviewResult, error) {
+	if len(content) > maxRedactionInputBytes {
+		return ReviewResult{}, ErrInputTooLarge
+	}
+	if len(matches) > maxRedactionMatches {
+		return ReviewResult{}, ErrMatchLimit
+	}
+	if err := validateReviewMatches(content, matches); err != nil {
+		return ReviewResult{}, err
+	}
 	result := ReviewResult{Content: append([]byte(nil), content...)}
 	if len(matches) == 0 {
 		return result, nil
@@ -95,6 +104,34 @@ func Review(content []byte, matches []Match, decide DecisionFunc) (ReviewResult,
 	return result, nil
 }
 
+func validateReviewMatches(content []byte, matches []Match) error {
+	lastEnd := 0
+	outputSize := len(content)
+	for index, match := range matches {
+		replacement := match.Replacement()
+		if match.Start < 0 || match.End <= match.Start || match.End > len(content) || match.Start < lastEnd || !bytes.Equal(content[match.Start:match.End], []byte(match.Value)) {
+			return fmt.Errorf("invalid review match %d", index)
+		}
+		if len(replacement) > maxRedactionOutputBytes {
+			return ErrOutputTooLarge
+		}
+		span := match.End - match.Start
+		if span > outputSize {
+			return ErrInvalidMatch
+		}
+		outputSize -= span
+		if len(replacement) > maxRedactionOutputBytes-outputSize {
+			return ErrOutputTooLarge
+		}
+		outputSize += len(replacement)
+		lastEnd = match.End
+	}
+	if outputSize > maxRedactionOutputBytes {
+		return ErrOutputTooLarge
+	}
+	return nil
+}
+
 // ReviewText is the string convenience wrapper for Review. Match offsets must
 // still refer to the UTF-8 byte representation of content.
 func ReviewText(content string, matches []Match, decide DecisionFunc) (string, ReviewResult, error) {
@@ -105,7 +142,11 @@ func ReviewText(content string, matches []Match, decide DecisionFunc) (string, R
 // ReviewMatches collects matches and applies a deterministic decision
 // function. It is the no-TTY entry point used by command adapters and tests.
 func ReviewMatches(content []byte, profile *identity.Profile, decide DecisionFunc) (ReviewResult, error) {
-	return Review(content, CollectMatches(string(content), profile), decide)
+	matches, err := CollectMatchesChecked(string(content), profile)
+	if err != nil {
+		return ReviewResult{}, err
+	}
+	return Review(content, matches, decide)
 }
 
 // ReviewTextWithProfile is the string equivalent of ReviewMatches.
