@@ -151,7 +151,7 @@ func scanYAMLLine(line []byte, flowDepth *int, blockLevels int) (int, int, error
 			if *flowDepth > 0 {
 				*flowDepth--
 			}
-		case ',':
+		case ',', ':':
 			if *flowDepth > 0 {
 				lineNodes++
 			}
@@ -173,7 +173,9 @@ func isYAMLNodeStart(line []byte, index int) bool {
 		return true
 	}
 	switch line[previous] {
-	case ':', ',', '[', '{':
+	case ':':
+		return index-previous > 1
+	case '[', '{':
 		return true
 	case '-':
 		for before := 0; before < previous; before++ {

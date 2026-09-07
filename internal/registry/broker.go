@@ -282,6 +282,9 @@ func rejectYAMLNodeContracts(root *yaml.Node) error {
 				if key.Kind == yaml.ScalarNode && key.Value != "" {
 					fieldPath = path + "." + key.Value
 				}
+				if isFormStepPath(path) && key.Kind == yaml.ScalarNode && isStringAction(key.Value) && value.Kind == yaml.ScalarNode && value.Tag == "!!str" && value.Value == "" {
+					return verr("yaml: %s must not be empty when present", fieldPath)
+				}
 				if err := walk(key, fieldPath+"[name]"); err != nil {
 					return err
 				}
@@ -299,6 +302,19 @@ func rejectYAMLNodeContracts(root *yaml.Node) error {
 		return nil
 	}
 	return walk(root, "$")
+}
+
+func isFormStepPath(path string) bool {
+	return strings.Contains(path, ".form_spec.steps[") && strings.HasSuffix(path, "]")
+}
+
+func isStringAction(field string) bool {
+	switch field {
+	case "goto", "click", "wait_for", "screenshot", "assert_text":
+		return true
+	default:
+		return false
+	}
 }
 
 func exactYAMLNodeBudget(root *yaml.Node) (int, error) {

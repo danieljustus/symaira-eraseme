@@ -790,6 +790,17 @@ fn validate_form_spec(form_spec: &FormSpec) -> Result<(), RegistryError> {
 }
 
 fn validate_form_step(step: &FormStep) -> Result<(), RegistryError> {
+    for (field, value) in [
+        ("goto", step.goto.as_deref()),
+        ("click", step.click.as_deref()),
+        ("wait_for", step.wait_for.as_deref()),
+        ("screenshot", step.screenshot.as_deref()),
+        ("assert_text", step.assert_text.as_deref()),
+    ] {
+        if value.is_some_and(str::is_empty) {
+            return Err(validation(field, "must not be empty when present"));
+        }
+    }
     let present = step.goto.as_deref().is_some_and(|value| !value.is_empty())
         || step.fill.as_ref().is_some_and(|value| !value.is_empty())
         || step.select.as_ref().is_some_and(|value| !value.is_empty())

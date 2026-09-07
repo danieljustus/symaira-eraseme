@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -330,18 +331,69 @@ func TestLiveRegistryMatchesJSONSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile schema: %v", err)
 	}
-	count := 0
-	err = filepath.WalkDir(filepath.Join(root, "registry", "brokers"), func(path string, entry fs.DirEntry, walkErr error) error {
+	brokersRoot := filepath.Join(root, "registry", "brokers")
+	rootHandle, err := os.OpenRoot(brokersRoot)
+	if err != nil {
+		t.Fatalf("open broker root: %v", err)
+	}
+	defer rootHandle.Close()
+	count, entries, aggregateBytes := 0, 0, 0
+	err = filepath.WalkDir(brokersRoot, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
+		}
+		entries++
+		if entries > maxDirectoryEntries {
+			return fmt.Errorf("directory entry limit %d exceeded", maxDirectoryEntries)
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink is not allowed: %s", path)
 		}
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), "_") || (!strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml")) {
 			return nil
 		}
-		content, readErr := os.ReadFile(path)
+		if count >= maxBrokerFiles {
+			return fmt.Errorf("broker file limit %d exceeded", maxBrokerFiles)
+		}
+		relative, relErr := filepath.Rel(brokersRoot, path)
+		if relErr != nil {
+			return relErr
+		}
+		file, openErr := rootHandle.Open(relative)
+		if openErr != nil {
+			return openErr
+		}
+		info, statErr := file.Stat()
+		if statErr != nil {
+			file.Close()
+			return statErr
+		}
+		if !info.Mode().IsRegular() {
+			file.Close()
+			return fmt.Errorf("schema fixture is not a regular file: %s", path)
+		}
+		if info.Size() > maxDocumentBytes {
+			file.Close()
+			return fmt.Errorf("schema fixture exceeds %d bytes: %s", maxDocumentBytes, path)
+		}
+		remaining := maxAggregateInputBytes - aggregateBytes
+		if remaining <= 0 {
+			file.Close()
+			return fmt.Errorf("aggregate input byte limit %d exceeded", maxAggregateInputBytes)
+		}
+		limit := min(maxDocumentBytes, remaining)
+		content, readErr := io.ReadAll(io.LimitReader(file, int64(limit)+1))
+		closeErr := file.Close()
 		if readErr != nil {
 			return readErr
 		}
+		if closeErr != nil {
+			return closeErr
+		}
+		if len(content) > limit {
+			return fmt.Errorf("schema fixture byte limit exceeded: %s", path)
+		}
+		aggregateBytes += len(content)
 		var document any
 		if decodeErr := yaml.Unmarshal(content, &document); decodeErr != nil {
 			return decodeErr
@@ -420,6 +472,16 @@ func TestScalarPunctuationAndNodeContracts(t *testing.T) {
 		source := []byte(strings.Replace(base, "endpoint: a@example.test", "endpoint: "+marker, 1))
 		if _, err := decodeAndValidate(&doc{id: "test", content: source}); err == nil {
 			t.Errorf("%s accepted", marker)
+		}
+	}
+}
+
+func TestExplicitlyEmptyStringActionsAreRejectedWithOtherActions(t *testing.T) {
+	base := "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - wait_seconds: 0\n"
+	for _, field := range []string{"goto", "click", "wait_for", "screenshot", "assert_text"} {
+		source := base + "          " + field + ": ''\n"
+		if _, err := decodeAndValidate(&doc{id: "test", content: []byte(source)}); err == nil {
+			t.Errorf("explicitly empty %s accepted alongside another action", field)
 		}
 	}
 }

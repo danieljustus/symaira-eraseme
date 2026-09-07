@@ -150,6 +150,18 @@ fn validated_entry_point_rejects_strict_variants_and_nulls() {
 }
 
 #[test]
+fn explicitly_empty_string_actions_are_rejected_with_other_actions() {
+    let base = "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: https://example.test\n    form_spec:\n      steps:\n        - wait_seconds: 0\n";
+    for field in ["goto", "click", "wait_for", "screenshot", "assert_text"] {
+        let source = format!("{base}          {field}: ''\n");
+        assert!(
+            Broker::from_yaml("test", &source).is_err(),
+            "explicitly empty {field} accepted alongside another action"
+        );
+    }
+}
+
+#[test]
 fn explicit_nulls_are_rejected_but_omitted_fields_serialize_without_nulls() {
     for field in [
         "data_sensitivity",
