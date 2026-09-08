@@ -34,6 +34,11 @@ ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.10.2"
 minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
 regex = "1.11.3"
+hex = "0.4.3"
+rand = "0.9.5"
+scrypt = "0.12.0"
+zeroize = "1.8.2"
+keyring = "3.6.3"
 
 [profile.release]
 opt-level = 3

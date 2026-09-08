@@ -4,6 +4,7 @@
 
 pub mod config;
 pub mod confirmation;
+pub mod identity;
 pub mod redaction;
 pub mod registry;
 pub mod templating;
