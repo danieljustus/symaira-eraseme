@@ -193,7 +193,7 @@ fn replay_uses_occurred_at_then_global_event_id_order() {
 }
 
 #[test]
-fn invalid_append_is_rejected_without_side_effects_and_unknown_replay_is_skipped() {
+fn invalid_append_is_rejected_without_side_effects_and_replay_boundaries_are_preserved() {
     let tree = tempdir().expect("create database tempdir");
     let store = Store::open(tree.path().join("negative.db")).expect("open store");
     let request_id = new_request(&store, "negative-broker");
@@ -290,8 +290,24 @@ fn invalid_append_is_rejected_without_side_effects_and_unknown_replay_is_skipped
         .rebuild_state(request_id)
         .expect("replay skips bad rows");
     assert_eq!(state.current_status, "AWAITING_ACK");
-    assert_eq!(state.last_event_id, note_id);
-    assert_ne!(state.last_event_id, unknown_id);
+    assert_eq!(state.last_event_id, unknown_id);
+    assert_eq!(
+        state.last_event_at.as_deref(),
+        Some("2026-08-03T08:00:00+00:00")
+    );
+    assert_eq!(state.sent_at.as_deref(), Some("2026-08-01T08:00:00+00:00"));
+    assert_eq!(
+        state.deadline_at.as_deref(),
+        Some("2026-08-31T08:00:00+00:00")
+    );
+    assert_eq!(state.acknowledged_at, None);
+    assert_eq!(state.resolved_at, None);
+    assert_eq!(state.next_action_at, None);
+    assert_eq!(state.reminders_sent, 0);
+    assert_eq!(state.escalation_level, 0);
+    assert_eq!(state.request_id, request_id);
+    assert!(unknown_id > note_id);
+    assert!(malformed_id > unknown_id);
     assert_ne!(state.last_event_id, malformed_id);
     assert_eq!(sent_id + 1, note_id);
 }
