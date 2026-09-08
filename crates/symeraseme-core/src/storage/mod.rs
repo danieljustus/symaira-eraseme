@@ -1,8 +1,14 @@
-//! The production SQLite connection seam used by later storage slices.
-//!
-//! This module deliberately stops at connection setup. Schema, repositories,
-//! encryption, and projections belong to later migration slices and must not
-//! be inferred from this portability proof.
+//! The production SQLite connection and event-store seams.
+
+pub mod repository;
+pub mod store;
+pub mod types;
+
+pub use repository::{ListRemovalRequestsOptions, Repository};
+pub use store::{SCHEMA_VERSION, Store};
+pub use types::{
+    Campaign, EventRecord, EventType, RemovalRequest, RemovalRequestRow, Source, TickCandidate,
+};
 
 use rusqlite::{Connection, Result};
 use std::{fs, path::Path, time::Duration};
