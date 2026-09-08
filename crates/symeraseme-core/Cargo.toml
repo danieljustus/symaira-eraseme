@@ -36,6 +36,7 @@ rand.workspace = true
 scrypt.workspace = true
 zeroize.workspace = true
 keyring.workspace = true
+rusqlite.workspace = true
 
 [build-dependencies]
 cap-fs-ext.workspace = true

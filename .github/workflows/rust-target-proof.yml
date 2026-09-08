@@ -1,0 +1,71 @@
+name: Rust SQLite target proof
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - crates/symeraseme-core/Cargo.toml
+      - crates/symeraseme-core/src/storage/**
+      - crates/symeraseme-core/tests/storage_portability.rs
+      - rust-toolchain.toml
+      - .github/workflows/rust-target-proof.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: '1.98.0'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  sqlite-native:
+    name: SQLite smoke / ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-14
+            target: aarch64-apple-darwin
+          - name: macOS amd64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+          - name: Linux arm64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: Linux amd64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - name: Windows arm64
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - name: Windows amd64
+            os: windows-2025
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+
+      - name: Verify native target
+        shell: bash
+        run: |
+          rustc +"$RUST_TOOLCHAIN" -vV
+          test "$(rustc +"$RUST_TOOLCHAIN" -vV | sed -n 's/^host: //p')" = "${{ matrix.target }}"
+
+      - name: Run production SQLite portability smoke
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-core --test storage_portability --target "${{ matrix.target }}" --locked

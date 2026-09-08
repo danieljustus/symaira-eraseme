@@ -1079,6 +1079,7 @@ dependencies = [
  "proptest",
  "rand",
  "regex",
+ "rusqlite",
  "scrypt",
  "serde",
  "serde_json",
