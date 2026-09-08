@@ -1,5 +1,6 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
+use sha2::{Digest, Sha256};
 use symeraseme_core::storage::encryption::{
     EncryptionError, V1_HEADER, V2_HEADER, V2_SALT_LEN, V3_HEADER, V3_SALT_LEN, decrypt_v1,
     decrypt_v2, decrypt_v3,
@@ -257,4 +258,17 @@ fn v3_rejects_tampered_invalid_base64_and_unsupported_fernet_tokens() {
         decrypt_v3(&unsupported_version, MASTER_KEY),
         Err(EncryptionError::UnsupportedFernetVersion(0x81))
     ));
+}
+
+#[test]
+fn python_final_v3_fixture_matches_oracle_provenance() {
+    let provenance: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/event-store/crypto/provenance.json"
+    ))
+    .expect("the committed crypto provenance must be valid JSON");
+    let expected = provenance["fixtures"]["golden-campaign-v3-python.db"]["sha256"]
+        .as_str()
+        .expect("the V3 oracle fixture must have a SHA-256 provenance record");
+    let actual = Sha256::digest(PYTHON_FINAL_V3);
+    assert_eq!(format!("{actual:x}"), expected);
 }
