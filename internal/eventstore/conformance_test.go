@@ -231,7 +231,7 @@ func TestUnparseableEventsSkipped(t *testing.T) {
 	}
 	// Manually insert an event with a garbage timestamp (bypassing Append).
 	if _, err := store.DB().ExecContext(ctx,
-		"INSERT INTO request_events (request_id, event_type, payload, source, occurred_at) VALUES (1, 'SENT', '{}', 'system', 'not-a-timestamp')"); err != nil {
+		"INSERT INTO request_events (request_id, event_type, payload_json, source, occurred_at) VALUES (1, 'SENT', '{}', 'system', 'not-a-timestamp')"); err != nil {
 		t.Skipf("raw insert failed (schema differs): %v", err)
 	}
 	if err := store.Close(); err != nil {

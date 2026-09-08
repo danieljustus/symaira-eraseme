@@ -4,9 +4,11 @@
 //
 // The fold mirrors the Python _accumulate_state: replays the event
 // log in (occurred_at ASC, id ASC) order, applies the §4 status
-// transition table, and writes the resulting request_state. Unknown
-// event types, unparseable timestamps, and bad payloads are logged
-// and skipped (never abort the rebuild — see docs/event-store.md §7).
+// transition table, and writes the resulting request_state. Unparseable
+// timestamps and bad payloads are logged and skipped (never abort the rebuild
+// — see docs/event-store.md §7). Parseable unknown event types advance
+// last_event_id/last_event_at before the status switch, matching the Go
+// oracle's forward-compatible fold.
 package eventstore
 
 import (
@@ -131,6 +133,9 @@ func applyEvent(state *StateJSON, ev Event) error {
 	if occurred.IsZero() {
 		return fmt.Errorf("empty occurred_at")
 	}
+	// Keep replay bookkeeping ahead of the status switch: unknown event types
+	// have no status transition or event-specific side effects, but their
+	// historical position remains observable in request_state.
 	if newStatus, ok := nextStatus(ev.EventType); ok {
 		state.CurrentStatus = newStatus
 	}

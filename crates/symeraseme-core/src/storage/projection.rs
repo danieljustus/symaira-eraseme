@@ -4,7 +4,8 @@
 //! in `(occurred_at ASC, id ASC)` order, matching the Go event-store oracle.
 //! Append-time validation is strict, while replay is deliberately tolerant of
 //! unknown or malformed historical rows so a newer writer cannot make an
-//! existing database unreadable.
+//! existing database unreadable. Parseable unknown rows retain their replay
+//! bookkeeping position; malformed rows are skipped entirely.
 
 use super::{store::Store, types};
 use crate::timeutil;
@@ -386,12 +387,10 @@ pub fn fold_events(request_id: i64, events: &[types::EventRecord]) -> Projection
 }
 
 fn apply_event(state: &mut ProjectionState, event: &types::EventRecord) {
-    // Unknown event types are a forward-compatibility boundary. They must not
-    // affect even last_event_id/last_event_at; the entire row is skipped.
-    if matches!(event.event_type, types::EventType::Unknown(_)) {
-        return;
-    }
-
+    // Keep replay bookkeeping ahead of the status switch. A parseable unknown
+    // event has no status transition or event-specific side effects, but the
+    // Go oracle still exposes its id and occurred_at as the latest replayed
+    // position.
     if let Some(status) = status_for(&event.event_type) {
         state.current_status = status.to_owned();
     }

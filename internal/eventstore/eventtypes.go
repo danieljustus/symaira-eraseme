@@ -15,8 +15,9 @@ package eventstore
 
 // EventType enumerates the closed catalogue defined in
 // docs/event-store.md §3.  AppendEvent validates on the write path;
-// rebuild_state() tolerates unknown types (logs + skips) for forward
-// compatibility.
+// rebuild_state() tolerates unknown types for forward compatibility: a
+// parseable unknown row advances replay bookkeeping but has no status or
+// event-specific side effects; malformed rows are skipped by the loader.
 type EventType string
 
 const (
