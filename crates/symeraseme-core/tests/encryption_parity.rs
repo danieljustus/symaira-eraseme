@@ -212,6 +212,12 @@ fn v3_rejects_malformed_header_salt_token_and_key() {
         Err(EncryptionError::TruncatedToken)
     ));
 
+    let wrong_master_key = [0_u8; 32];
+    assert!(matches!(
+        decrypt_v3(PYTHON_FINAL_V3, &wrong_master_key),
+        Err(EncryptionError::AuthenticationFailed)
+    ));
+
     let short_master_key = [0_u8; 31];
     assert!(matches!(
         decrypt_v3(PYTHON_FINAL_V3, &short_master_key),
