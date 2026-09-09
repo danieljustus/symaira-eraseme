@@ -14,6 +14,10 @@ skip-tree = [
     # isolate only this pinned TLS subtree rather than allowing duplicates
     # workspace-wide.
     { name = "ring", version = "=0.17.14" },
+    # rand 0.9 (also used by the test-only proptest graph) follows the
+    # getrandom 0.3/r-efi 5 platform path while tempfile follows the newer
+    # getrandom 0.4/r-efi 6 path; keep the exception scoped to rand's subtree.
+    { name = "rand", version = "=0.9.5" },
 ]
 
 [licenses]

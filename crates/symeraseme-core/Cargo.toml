@@ -29,6 +29,11 @@ ureq.workspace = true
 yaml-rust2.workspace = true
 minijinja.workspace = true
 regex.workspace = true
+hex.workspace = true
+rand.workspace = true
+scrypt.workspace = true
+zeroize.workspace = true
+keyring.workspace = true
 
 [build-dependencies]
 cap-fs-ext.workspace = true
