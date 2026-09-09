@@ -1,12 +1,16 @@
 # AI Agent Integration Guide
 
+## Current product contract
+
+[PB-2026-09-09](docs/product-boundaries.md) keeps EraseMe an independent specialized product. Browse and Operate become optional Brain modules; the credential service remains independently usable. None becomes a mandatory Brain gateway/context dependency for EraseMe. Existing command/API, privacy, evidence and approval contracts remain unchanged until explicit tested migrations. Do not couple privacy workflows to the presence of Brain's GUI.
+
 **Symaira EraseMe** supports all major AI coding agents through standardized
 skill formats and adapter files.
 
 ## Ecosystem Guidance
 
 - Before changing cross-tool integrations, shared conventions, or product
-  boundaries, read `../docs/00-MASTERPLAN.md` and `../ECOSYSTEM.md`.
+  boundaries, read [PB-2026-09-09](docs/product-boundaries.md); it is available in standalone checkouts.
 - Keep the standalone-first contract: this repo must install, test, and run
   without any other Symaira tool installed.
 
