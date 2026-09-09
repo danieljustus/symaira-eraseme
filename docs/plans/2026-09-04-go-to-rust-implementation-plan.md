@@ -569,7 +569,7 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
       fallback and keyring fallback.
 - [ ] Use fake keyring/symvault adapters in normal tests.
 - [ ] Run native keyring integration tests separately without printing values.
-- [ ] Scan logs/errors for sentinel secrets.
+- [x] Scan logs/errors for sentinel secrets.
 - [ ] Pass `ID-001..003`.
 
 ### Task 4.7: Port consent tokens and destructive-operation gate
