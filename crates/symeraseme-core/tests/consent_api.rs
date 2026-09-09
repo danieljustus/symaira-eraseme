@@ -8,9 +8,10 @@ use std::process::{Command, Output};
 use std::os::unix::fs::PermissionsExt;
 
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use symeraseme_core::identity::CONSENT_FILE_MODE;
 use symeraseme_core::identity::{
-    CONSENT_FILE_MODE, ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken,
-    read_consent_file,
+    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, read_consent_file,
 };
 use tempfile::{TempDir, tempdir};
 

@@ -82,10 +82,10 @@ pub fn read_consent_file(path: impl AsRef<Path>) -> io::Result<String> {
             "consent file is not a regular file",
         ));
     }
-    let mut permissions = metadata.permissions();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        let mut permissions = metadata.permissions();
         permissions.set_mode(0o600);
         let _ = fs::set_permissions(path, permissions);
     }

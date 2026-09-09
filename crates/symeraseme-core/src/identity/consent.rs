@@ -380,11 +380,11 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
 }
 
 fn tighten_permissions(path: &Path) -> io::Result<()> {
-    let metadata = fs::metadata(path)?;
-    let mut permissions = metadata.permissions();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        let metadata = fs::metadata(path)?;
+        let mut permissions = metadata.permissions();
         let mode = if metadata.is_dir() {
             CONSENT_DIR_MODE
         } else {
@@ -395,7 +395,7 @@ fn tighten_permissions(path: &Path) -> io::Result<()> {
     }
     #[cfg(not(unix))]
     {
-        let _ = permissions;
+        let _ = path;
     }
     Ok(())
 }
@@ -481,23 +481,21 @@ mod tests {
         assert_eq!(listed[0].token, fresh);
     }
 
+    #[cfg(unix)]
     #[test]
     fn file_permissions_are_restricted_on_unix() {
         let directory = tempfile::tempdir().unwrap();
         let store = store(directory.path());
         let token = store.issue_token("delete", 60).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let dir_mode = fs::metadata(directory.path()).unwrap().permissions().mode() & 0o777;
-            let file_mode = fs::metadata(directory.path().join(token_filename(&token)))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777;
-            assert_eq!(dir_mode, CONSENT_DIR_MODE);
-            assert_eq!(file_mode, CONSENT_FILE_MODE);
-        }
+        use std::os::unix::fs::PermissionsExt;
+        let dir_mode = fs::metadata(directory.path()).unwrap().permissions().mode() & 0o777;
+        let file_mode = fs::metadata(directory.path().join(token_filename(&token)))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(dir_mode, CONSENT_DIR_MODE);
+        assert_eq!(file_mode, CONSENT_FILE_MODE);
     }
 
     #[allow(dead_code)]
