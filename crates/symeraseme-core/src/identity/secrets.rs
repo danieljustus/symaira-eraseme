@@ -231,14 +231,14 @@ mod tests {
 
     #[test]
     fn direct_hex_beats_passphrase_and_keyring() {
-        let direct = "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899";
+        let direct = hex::encode([0xaa_u8; KEY_LENGTH]);
         let keyring = FakeKeyring::with_value(
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         );
         let mut resolver = resolver(
             keyring.clone(),
             &[
-                (MASTER_KEY_ENV, direct),
+                (MASTER_KEY_ENV, direct.as_str()),
                 (SYMVAULT_PASSPHRASE_ENV, "ignored-passphrase"),
             ],
         );
