@@ -104,10 +104,10 @@ fn consent_store_debug_omits_injected_implementation_details() {
     let directory = tempdir().unwrap();
     let store = fixed_store(directory.path(), 1_000, 7);
     let debug = format!("{store:?}");
-    let directory_name = directory.path().to_string_lossy().into_owned();
+    let directory_debug = format!("{:?}", directory.path());
 
     assert!(debug.starts_with("ConsentStore {"));
-    assert!(debug.contains(&directory_name));
+    assert!(debug.contains(&directory_debug));
     assert!(!debug.contains("clock"));
     assert!(!debug.contains("random"));
 }
