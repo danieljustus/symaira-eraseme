@@ -575,6 +575,36 @@ fn default_directory_uses_data_dir_and_home_fallback() {
 }
 
 #[test]
+fn consent_errors_preserve_classification_without_exposing_payloads() {
+    let io_error = ConsentError::Io(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "synthetic-secret-token",
+    ));
+    assert_eq!(io_error.to_string(), "identity: consent storage error");
+    assert_eq!(
+        std::error::Error::source(&io_error).unwrap().to_string(),
+        "synthetic-secret-token"
+    );
+
+    let json_error = ConsentError::Json(serde_json::from_str::<ConsentRecord>("{").unwrap_err());
+    assert_eq!(json_error.to_string(), "identity: consent token not found");
+    assert!(std::error::Error::source(&json_error).is_some());
+
+    for (error, expected) in [
+        (ConsentError::NotFound, "identity: consent token not found"),
+        (ConsentError::Expired, "identity: consent token expired"),
+        (
+            ConsentError::CommandMismatch,
+            "identity: consent token command mismatch",
+        ),
+        (ConsentError::Denied, "identity: consent denied"),
+    ] {
+        assert_eq!(error.to_string(), expected);
+        assert!(std::error::Error::source(&error).is_none());
+    }
+}
+
+#[test]
 #[ignore]
 fn environment_child() {
     let mode = std::env::var("ID004_CONSENT_CHILD_MODE").unwrap();
