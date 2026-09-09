@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,6 +7,7 @@ use std::process::{Command, Output};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+use sha2::{Digest, Sha256};
 use symeraseme_core::identity::{
     CONSENT_FILE_MODE, ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken,
     read_consent_file,
@@ -45,6 +47,154 @@ fn consent_files(directory: &Path) -> Vec<PathBuf> {
         .collect::<Vec<_>>();
     paths.sort();
     paths
+}
+
+fn hashed_token_path(directory: &Path, token: &str) -> PathBuf {
+    let digest = Sha256::digest(token.as_bytes());
+    let prefix = digest
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    directory.join(format!("consent_{prefix}.json"))
+}
+
+#[test]
+fn consent_errors_expose_stable_diagnostics_and_sources() {
+    let io_error = ConsentError::from(io::Error::new(io::ErrorKind::PermissionDenied, "hidden"));
+    assert_eq!(io_error.to_string(), "identity: consent storage error");
+    assert!(Error::source(&io_error).is_some());
+
+    let json_error = ConsentError::from(
+        serde_json::from_str::<ConsentRecord>("{")
+            .expect_err("truncated JSON should produce a serde error"),
+    );
+    assert_eq!(json_error.to_string(), "identity: consent token not found");
+    assert!(Error::source(&json_error).is_some());
+
+    let domain_errors = [
+        (ConsentError::NotFound, "identity: consent token not found"),
+        (ConsentError::Expired, "identity: consent token expired"),
+        (
+            ConsentError::CommandMismatch,
+            "identity: consent token command mismatch",
+        ),
+        (ConsentError::Denied, "identity: consent denied"),
+    ];
+    for (error, expected) in domain_errors {
+        assert_eq!(error.to_string(), expected);
+        assert!(Error::source(&error).is_none());
+    }
+
+    let left = ConsentError::Json(
+        serde_json::from_str::<ConsentRecord>("{")
+            .expect_err("truncated JSON should produce a serde error"),
+    );
+    let right = ConsentError::Json(
+        serde_json::from_str::<ConsentRecord>("{")
+            .expect_err("truncated JSON should produce a serde error"),
+    );
+    assert_eq!(left, right);
+    assert_ne!(ConsentError::NotFound, ConsentError::Expired);
+}
+
+#[test]
+fn consent_store_debug_omits_injected_implementation_details() {
+    let directory = tempdir().unwrap();
+    let store = fixed_store(directory.path(), 1_000, 7);
+    let debug = format!("{store:?}");
+    let directory_name = directory.path().to_string_lossy().into_owned();
+
+    assert!(debug.starts_with("ConsentStore {"));
+    assert!(debug.contains(&directory_name));
+    assert!(!debug.contains("clock"));
+    assert!(!debug.contains("random"));
+}
+
+#[test]
+fn default_store_generates_url_safe_token_with_default_lifetime() {
+    let directory = tempdir().unwrap();
+    let store = ConsentStore::new(directory.path());
+    let token = store.issue_token("delete", 0).unwrap();
+
+    assert_eq!(token.len(), 22);
+    assert!(
+        token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    );
+    let files = consent_files(directory.path());
+    assert_eq!(files.len(), 1);
+    let record: ConsentRecord = serde_json::from_slice(&fs::read(&files[0]).unwrap()).unwrap();
+    assert_eq!(record.command, "delete");
+    assert_eq!(record.token.as_deref(), Some(token.as_str()));
+    assert_eq!(record.expires_at - record.issued_at, 86_400);
+}
+
+#[test]
+fn consent_operations_propagate_legacy_migration_errors() {
+    let directory = tempdir().unwrap();
+    let token = "legacy-token";
+    write_record(
+        &directory.path().join(format!("consent_{token}.json")),
+        &record("delete", 900, 2_000, None),
+    );
+    fs::create_dir(hashed_token_path(directory.path(), token)).unwrap();
+    let store = fixed_store(directory.path(), 1_000, 7);
+
+    assert!(matches!(
+        store.consume_token(token),
+        Err(ConsentError::Io(_))
+    ));
+    assert!(matches!(
+        store.revoke_token(token),
+        Err(ConsentError::Io(_))
+    ));
+    assert!(
+        directory
+            .path()
+            .join(format!("consent_{token}.json"))
+            .exists()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn list_tokens_skips_nonmatching_and_unreadable_entries() {
+    let directory = tempdir().unwrap();
+    let valid = directory.path().join("consent_valid.json");
+    write_record(&valid, &record("delete", 100, 2_000, None));
+    fs::write(directory.path().join("ignored.json"), b"not a consent file").unwrap();
+    fs::write(
+        directory.path().join("consent_without_suffix"),
+        b"not a consent file",
+    )
+    .unwrap();
+    let unreadable = directory.path().join("consent_unreadable.json");
+    write_record(&unreadable, &record("delete", 200, 2_000, None));
+    fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let listed = fixed_store(directory.path(), 1_000, 7)
+        .list_tokens()
+        .unwrap();
+    assert_eq!(
+        listed,
+        vec![ConsentToken {
+            token: "valid".to_owned(),
+            command: "delete".to_owned(),
+            issued_at: 100,
+            expires_at: 2_000,
+        }]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn consent_file_reader_rejects_special_files() {
+    assert_eq!(
+        read_consent_file("/dev/null").unwrap_err().kind(),
+        io::ErrorKind::InvalidInput
+    );
 }
 
 #[cfg(unix)]
@@ -387,6 +537,18 @@ fn default_directory_uses_data_dir_and_home_fallback() {
     );
     assert_eq!(consent_files(&data_directory).len(), 1);
 
+    let absolute_home = tempdir().unwrap();
+    let absolute_directory = absolute_home.path().join("absolute-data");
+    run_child(
+        "default-data-dir-absolute",
+        &[
+            ("HOME", directory_string(absolute_home.path())),
+            ("SYMERASEME_DATA_DIR", directory_string(&absolute_directory)),
+            ("ID004_EXPECTED_DIR", directory_string(&absolute_directory)),
+        ],
+    );
+    assert_eq!(consent_files(&absolute_directory).len(), 1);
+
     let alias_home = tempdir().unwrap();
     run_child(
         "default-data-dir-home-alias",
@@ -444,7 +606,10 @@ fn environment_child() {
                 Ok(())
             );
         }
-        "default-data-dir" | "default-data-dir-home-alias" | "default-home-dir" => {
+        "default-data-dir"
+        | "default-data-dir-home-alias"
+        | "default-data-dir-absolute"
+        | "default-home-dir" => {
             let expected = PathBuf::from(std::env::var("ID004_EXPECTED_DIR").unwrap());
             let store = ConsentStore::from_default_directory()
                 .unwrap()
