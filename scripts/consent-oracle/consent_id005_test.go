@@ -1,0 +1,158 @@
+// Injected only into a git-archive export by generate.py. Never replaces Go code.
+package identity
+
+import (
+	"bytes"
+	"crypto/rand"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+)
+
+type id005Entry struct {
+	Path string `json:"path"`
+	Kind string `json:"kind"`
+	Mode uint32 `json:"mode"`
+	Body string `json:"body"`
+}
+
+type id005Observation struct {
+	Name    string       `json:"name"`
+	Failed  bool         `json:"failed"`
+	Error   string       `json:"raw_error"`
+	Entries []id005Entry `json:"entries"`
+	Held    string       `json:"held"`
+}
+
+type id005Random struct{ before func() }
+
+func (r id005Random) Read(p []byte) (int, error) {
+	if r.before != nil {
+		r.before()
+	}
+	return copy(p, bytes.Repeat([]byte{7}, len(p))), nil
+}
+
+func TestConsentID005Capture(t *testing.T) {
+	root := os.Getenv("ID005_ROOT")
+	name := os.Getenv("ID005_CASE")
+	if root == "" || name == "" {
+		t.Fatal("explicit isolated root and case required")
+	}
+	originalRandom, originalNow := rand.Reader, nowUnixSeconds
+	t.Cleanup(func() { rand.Reader = originalRandom; SetNowFunc(originalNow) })
+	rand.Reader = id005Random{}
+	SetNowFunc(func() int64 { return 1000 })
+	dir := filepath.Join(root, "consent")
+	filename := tokenFilename("BwcHBwcHBwcHBwcHBwcHBw")
+	path := filepath.Join(dir, filename)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	mkdir := func() { must(os.MkdirAll(dir, 0700)); must(os.Chmod(dir, 0700)) }
+	issue := func(command string) { _, err := IssueTokenInDir(dir, command, 60); must(err) }
+	var err error
+	var held *os.File
+	switch name {
+	case "fresh", "umask_000", "umask_077", "umask_777":
+		_, err = IssueTokenInDir(dir, "delete", 60)
+	case "nested":
+		dir = filepath.Join(dir, "nested")
+		_, err = IssueTokenInDir(dir, "delete", 60)
+	case "existing_directory":
+		mkdir()
+		must(os.Chmod(dir, 0500))
+		_, err = IssueTokenInDir(dir, "delete", 60)
+	case "replacement", "rename_failure", "temp_failure":
+		mkdir()
+		must(os.WriteFile(filepath.Join(dir, ".consent-sentinel.tmp"), []byte("unrelated sentinel"), 0600))
+		if name == "rename_failure" {
+			must(os.Mkdir(path, 0700))
+			must(os.WriteFile(filepath.Join(path, "sentinel"), []byte("destination sentinel"), 0600))
+		} else {
+			issue("before")
+			must(os.Chmod(path, 0400))
+			held, err = os.Open(path)
+			must(err)
+			defer held.Close()
+		}
+		if name == "temp_failure" {
+			if runtime.GOOS == "windows" {
+				t.Fatal("requires native Unix permissions")
+			}
+			rand.Reader = id005Random{before: func() { must(os.Chmod(dir, 0500)) }}
+		}
+		_, err = IssueTokenInDir(dir, "delete", 60)
+		if name == "temp_failure" {
+			must(os.Chmod(dir, 0700))
+		}
+	case "mkdir_failure":
+		must(os.WriteFile(dir, []byte("parent sentinel"), 0600))
+		_, err = IssueTokenInDir(dir, "delete", 60)
+	case "verify", "list", "wrong_command", "expired":
+		mkdir()
+		issue("delete")
+		must(os.Chmod(path, 0644))
+		must(os.Chmod(dir, 0755))
+		switch name {
+		case "verify":
+			err = VerifyTokenInDir(dir, "delete", "BwcHBwcHBwcHBwcHBwcHBw")
+		case "list":
+			_, err = ListTokensInDir(dir)
+		case "wrong_command":
+			err = VerifyTokenInDir(dir, "other", "BwcHBwcHBwcHBwcHBwcHBw")
+		case "expired":
+			SetNowFunc(func() int64 { return 1061 })
+			err = VerifyTokenInDir(dir, "delete", "BwcHBwcHBwcHBwcHBwcHBw")
+		}
+	default:
+		t.Fatalf("unknown case %q", name)
+	}
+	observation := id005Observation{Name: name, Failed: err != nil, Entries: []id005Entry{}}
+	if err != nil {
+		observation.Error = err.Error()
+	}
+	if held != nil {
+		body, readErr := io.ReadAll(held)
+		must(readErr)
+		observation.Held = string(body)
+	}
+	must(filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		info, statErr := entry.Info()
+		if statErr != nil {
+			return statErr
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		item := id005Entry{Path: filepath.ToSlash(rel), Kind: "file", Mode: uint32(info.Mode().Perm())}
+		if entry.IsDir() {
+			item.Kind = "directory"
+		} else {
+			body, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			item.Body = string(body)
+		}
+		observation.Entries = append(observation.Entries, item)
+		return nil
+	}))
+	body, marshalErr := json.Marshal(observation)
+	must(marshalErr)
+	must(os.WriteFile(os.Getenv("ID005_OUTPUT"), body, 0600))
+	must(os.Chmod(os.Getenv("ID005_OUTPUT"), 0600))
+}

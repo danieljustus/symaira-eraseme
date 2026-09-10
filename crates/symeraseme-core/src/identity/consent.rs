@@ -15,7 +15,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tempfile::NamedTempFile;
+use tempfile::Builder;
 
 /// Default token lifetime, matching the Go/Python implementations.
 pub const DEFAULT_TOKEN_TTL: i64 = 86_400;
@@ -172,6 +172,7 @@ impl ConsentStore {
     /// Issue and atomically persist a token for `command`.
     pub fn issue_token(&self, command: &str, ttl: i64) -> Result<String, ConsentError> {
         let ttl = if ttl <= 0 { DEFAULT_TOKEN_TTL } else { ttl };
+        self.ensure_directory()?;
         let bytes = (self.random)(TOKEN_BYTES)?;
         if bytes.len() != TOKEN_BYTES {
             return Err(ConsentError::Io(io::Error::new(
@@ -188,7 +189,6 @@ impl ConsentStore {
             token: Some(token.clone()),
         };
         let body = serde_json::to_vec(&record)?;
-        self.ensure_directory()?;
         atomic_write(&self.path_for_token(&token), &body)?;
         Ok(token)
     }
@@ -215,7 +215,8 @@ impl ConsentStore {
             let _ = fs::remove_file(path);
             return Err(ConsentError::Expired);
         }
-        tighten_permissions(&path)?;
+        // Go hardens existing validated records on a best-effort basis.
+        let _ = tighten_permissions(&path);
         Ok(())
     }
 
@@ -282,7 +283,7 @@ impl ConsentStore {
                 let _ = fs::remove_file(path);
                 continue;
             }
-            tighten_permissions(&path)?;
+            let _ = tighten_permissions(&path);
             let token = record.token.unwrap_or_else(|| {
                 name.trim_start_matches("consent_")
                     .trim_end_matches(".json")
@@ -300,8 +301,18 @@ impl ConsentStore {
     }
 
     fn ensure_directory(&self) -> io::Result<()> {
-        fs::create_dir_all(&self.directory)?;
-        tighten_permissions(&self.directory)
+        let mut builder = fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(CONSENT_DIR_MODE);
+        }
+        builder.create(&self.directory)?;
+        // MkdirAll uses 0700 for every new ancestor; only the requested
+        // directory is subsequently hardened, ignoring chmod errors in Go.
+        let _ = tighten_permissions(&self.directory);
+        Ok(())
     }
 
     fn path_for_token(&self, token: &str) -> PathBuf {
@@ -368,11 +379,15 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
     let directory = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "consent path has no parent"))?;
-    let temporary = NamedTempFile::new_in(directory)?;
-    temporary.as_file().set_len(0)?;
-    temporary.as_file().write_all(body)?;
-    temporary.as_file().sync_all()?;
-    tighten_permissions(temporary.path())?;
+    let mut temporary = Builder::new()
+        .prefix(".consent-")
+        .suffix(".tmp")
+        .tempfile_in(directory)?;
+    temporary.write_all(body)?;
+    // Go closes before chmod/rename and performs no file or directory fsync.
+    // Keep the path guard alive so every pre-rename failure removes our temp.
+    let temporary = temporary.into_temp_path();
+    tighten_permissions(&temporary)?;
     temporary
         .persist(path)
         .map(|_| ())
@@ -380,10 +395,10 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
 }
 
 fn tighten_permissions(path: &Path) -> io::Result<()> {
+    let metadata = fs::metadata(path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let metadata = fs::metadata(path)?;
         let mut permissions = metadata.permissions();
         let mode = if metadata.is_dir() {
             CONSENT_DIR_MODE
@@ -393,12 +408,24 @@ fn tighten_permissions(path: &Path) -> io::Result<()> {
         permissions.set_mode(mode);
         fs::set_permissions(path, permissions)?;
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        let _ = path;
+        // Go's os.Chmod on Windows maps the owner-write bit to read-only.
+        // POSIX modes/ACL equivalence require separate native evidence.
+        let mut permissions = metadata.permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions)?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = metadata;
     }
     Ok(())
 }
+
+#[cfg(all(test, unix))]
+#[path = "consent_filesystem_tests.rs"]
+mod filesystem_tests;
 
 #[cfg(test)]
 mod tests {

@@ -1,0 +1,200 @@
+//! ID-005 side effects captured from Go; Unix mode/umask assertions run natively.
+use super::*;
+use serde_json::{Value, json};
+use std::io::Read;
+use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
+
+const CHILD: &str = "identity::consent::filesystem_tests::id005_child";
+const FIXTURE: &str = include_str!("../../../../tests/fixtures/consent-contract/id005.json");
+
+fn fixture() -> Value {
+    serde_json::from_str(FIXTURE).unwrap()
+}
+
+fn chmod(path: &Path, mode: u32) {
+    fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+fn fixed_store(path: &Path) -> ConsentStore {
+    ConsentStore::new(path)
+        .with_clock(|| 1000)
+        .with_random_source(|length| Ok(vec![7; length]))
+}
+
+fn manifest(root: &Path, directory: &Path, out: &mut Vec<Value>) {
+    let mut entries = fs::read_dir(directory)
+        .unwrap()
+        .map(Result::unwrap)
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let metadata = entry.metadata().unwrap();
+        let is_dir = metadata.is_dir();
+        out.push(json!({
+            "path": path.strip_prefix(root).unwrap().to_str().unwrap(),
+            "kind": if is_dir { "directory" } else { "file" },
+            "mode": metadata.permissions().mode() & 0o777,
+            "body": if is_dir { String::new() } else { fs::read_to_string(&path).unwrap() },
+        }));
+        if is_dir {
+            manifest(root, &path, out);
+        }
+    }
+}
+
+fn observe(root: &Path, name: &str) -> Value {
+    let mut dir = root.join("consent");
+    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([7; 16]);
+    let path = dir.join(token_filename(&token));
+    let mut held = None;
+    let failed = match name {
+        "fresh" | "umask_000" | "umask_077" | "umask_777" => {
+            fixed_store(&dir).issue_token("delete", 60).is_err()
+        }
+        "nested" => {
+            dir = dir.join("nested");
+            fixed_store(&dir).issue_token("delete", 60).is_err()
+        }
+        "existing_directory" => {
+            fs::create_dir(&dir).unwrap();
+            chmod(&dir, 0o500);
+            fixed_store(&dir).issue_token("delete", 60).is_err()
+        }
+        "replacement" | "rename_failure" | "temp_failure" => {
+            fs::create_dir(&dir).unwrap();
+            chmod(&dir, 0o700);
+            let sentinel = dir.join(".consent-sentinel.tmp");
+            fs::write(&sentinel, "unrelated sentinel").unwrap();
+            chmod(&sentinel, 0o600);
+            if name == "rename_failure" {
+                fs::create_dir(&path).unwrap();
+                chmod(&path, 0o700);
+                fs::write(path.join("sentinel"), "destination sentinel").unwrap();
+                chmod(&path.join("sentinel"), 0o600);
+            } else {
+                fixed_store(&dir).issue_token("before", 60).unwrap();
+                chmod(&path, 0o400);
+                held = Some(fs::File::open(&path).unwrap());
+            }
+            let mut store = fixed_store(&dir);
+            if name == "temp_failure" {
+                let dir = dir.clone();
+                store = store.with_random_source(move |length| {
+                    chmod(&dir, 0o500);
+                    Ok(vec![7; length])
+                });
+            }
+            let result = store.issue_token("delete", 60);
+            if name == "temp_failure" {
+                chmod(&dir, 0o700);
+            }
+            result.is_err()
+        }
+        "mkdir_failure" => {
+            fs::write(&dir, "parent sentinel").unwrap();
+            chmod(&dir, 0o600);
+            fixed_store(&dir).issue_token("delete", 60).is_err()
+        }
+        "verify" | "list" | "wrong_command" | "expired" => {
+            let store = fixed_store(&dir);
+            store.issue_token("delete", 60).unwrap();
+            chmod(&path, 0o644);
+            chmod(&dir, 0o755);
+            match name {
+                "verify" => store.verify_token("delete", &token).is_err(),
+                "list" => store.list_tokens().is_err(),
+                "wrong_command" => store.verify_token("other", &token).is_err(),
+                "expired" => store
+                    .with_clock(|| 1061)
+                    .verify_token("delete", &token)
+                    .is_err(),
+                _ => unreachable!(),
+            }
+        }
+        other => panic!("unknown ID-005 case {other}"),
+    };
+    let mut old_body = String::new();
+    if let Some(mut held) = held {
+        held.read_to_string(&mut old_body).unwrap();
+    }
+    let mut entries = Vec::new();
+    manifest(root, root, &mut entries);
+    json!({"name": name, "failed": failed, "held": old_body, "entries": entries})
+}
+
+fn compare(actual: &Value, expected: &Value) -> Result<(), String> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "Go filesystem mismatch: actual={actual}, expected={expected}"
+        ))
+    }
+}
+
+#[test]
+fn id005_matches_frozen_go_filesystem() {
+    let document = fixture();
+    let cases = document["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 14);
+    for expected in cases {
+        let name = expected["name"].as_str().unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let mask = name.strip_prefix("umask_").unwrap_or("022");
+        let output = Command::new("sh")
+            .args(["-c", "umask \"$1\"; shift; exec \"$@\"", "id005", mask])
+            .arg(std::env::current_exe().unwrap())
+            .args([CHILD, "--exact", "--ignored", "--nocapture"])
+            .env("ID005_CASE", name)
+            .env("ID005_ROOT", root.path())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{name}: {output:?}");
+        assert!(
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .contains("1 passed;")
+        );
+    }
+}
+
+#[test]
+#[ignore = "only launched by the parent with an isolated umask and directory"]
+fn id005_child() {
+    let name = std::env::var("ID005_CASE").unwrap();
+    let root = PathBuf::from(std::env::var_os("ID005_ROOT").unwrap());
+    let document = fixture();
+    let expected = document["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == name)
+        .unwrap();
+    compare(&observe(&root, &name), expected).unwrap();
+}
+
+#[test]
+fn id005_rejects_changed_oracle_modes_and_source() {
+    let document = fixture();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (path, expected) in document["source_sha256"].as_object().unwrap() {
+        let actual = hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap()));
+        assert_eq!(
+            actual,
+            expected.as_str().unwrap(),
+            "Go oracle drift: {path}"
+        );
+    }
+    let root = tempfile::tempdir().unwrap();
+    let actual = observe(root.path(), "fresh");
+    let expected = &document["cases"][0];
+    compare(&actual, expected).unwrap();
+    let mut tampered = expected.clone();
+    tampered["entries"][0]["mode"] = json!(0o755);
+    assert!(compare(&actual, &tampered).is_err());
+    tampered = expected.clone();
+    tampered["failed"] = json!(true);
+    assert!(compare(&actual, &tampered).is_err());
+}

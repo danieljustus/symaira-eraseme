@@ -1,0 +1,293 @@
+{
+  "schema": "consent-id005-v1",
+  "source_sha256": {
+    "internal/identity/consent.go": "491f6b7386ff2c84913437b9dff5c3c6190124aaac34ac8b3dabf08e2629943c",
+    "internal/identity/gate.go": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"
+  },
+  "cases": [
+    {
+      "name": "fresh",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "nested",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/nested",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/nested/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "existing_directory",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "replacement",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    },
+    {
+      "name": "rename_failure",
+      "failed": true,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json/sentinel",
+          "kind": "file",
+          "mode": 384,
+          "body": "destination sentinel"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "temp_failure",
+      "failed": true,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    },
+    {
+      "name": "mkdir_failure",
+      "failed": true,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "file",
+          "mode": 384,
+          "body": "parent sentinel"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "verify",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "list",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "wrong_command",
+      "failed": true,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 420,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "expired",
+      "failed": true,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "umask_000",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "umask_077",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    },
+    {
+      "name": "umask_777",
+      "failed": false,
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": ""
+    }
+  ]
+}
