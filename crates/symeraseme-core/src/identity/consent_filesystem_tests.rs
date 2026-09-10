@@ -384,6 +384,76 @@ fn id005_atomic_chmod_matches_source_bound_go_fault() {
 }
 
 #[test]
+fn id005_atomic_injected_close_error_cleans_owned_temporary() {
+    let (root, path, mut held) = fault_setup();
+    let mut before = Vec::new();
+    manifest(root.path(), root.path(), &mut before);
+    let old_body = fs::read_to_string(&path).unwrap();
+    let sentinel = path.parent().unwrap().join(".consent-sentinel.tmp");
+    let mut owned_temporary = None;
+    let replacement = b"replacement must not be published";
+    let error = atomic_write_with(
+        &path,
+        replacement,
+        fs::File::sync_all,
+        |file| {
+            assert_eq!(file.metadata().unwrap().len(), replacement.len() as u64);
+            let mut temporary_paths = fs::read_dir(path.parent().unwrap())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|entry| entry != &path && entry != &sentinel)
+                .collect::<Vec<_>>();
+            assert_eq!(temporary_paths.len(), 1);
+            let temporary = temporary_paths.pop().unwrap();
+            assert_eq!(fs::read(&temporary).unwrap(), replacement);
+            owned_temporary = Some(temporary);
+            // Fail before a checked close consumes the file. This is a
+            // portable adapter injection, not native delayed-close evidence.
+            Err(io::Error::other(InjectedFailure("close")))
+        },
+        |_| panic!("chmod reached after injected close failure"),
+    )
+    .unwrap_err();
+    assert_injected(&error, "close");
+    let actual = fault_observation(root.path(), "injected_close_failure", &mut held);
+    assert_eq!(actual["entries"], json!(before));
+    assert_eq!(actual["held"], old_body);
+    assert!(!owned_temporary.unwrap().try_exists().unwrap());
+}
+
+#[test]
+fn id005_atomic_injected_chmod_error_cleans_owned_temporary() {
+    let (root, path, mut held) = fault_setup();
+    let mut before = Vec::new();
+    manifest(root.path(), root.path(), &mut before);
+    let old_body = fs::read_to_string(&path).unwrap();
+    let mut owned_temporary = None;
+    let replacement = b"replacement must not be published";
+    let error = atomic_write_with(
+        &path,
+        replacement,
+        fs::File::sync_all,
+        |file| {
+            drop(file);
+            Ok(())
+        },
+        |temporary| {
+            assert_eq!(fs::read(temporary).unwrap(), replacement);
+            owned_temporary = Some(temporary.to_path_buf());
+            // Leave the temporary file present for the path guard to remove.
+            // This adapter injection is not native chmod failure evidence.
+            Err(io::Error::other(InjectedFailure("chmod")))
+        },
+    )
+    .unwrap_err();
+    assert_injected(&error, "chmod");
+    let actual = fault_observation(root.path(), "injected_chmod_failure", &mut held);
+    assert_eq!(actual["entries"], json!(before));
+    assert_eq!(actual["held"], old_body);
+    assert!(!owned_temporary.unwrap().try_exists().unwrap());
+}
+
+#[test]
 fn id005_atomic_sync_error_is_retained_without_go_normalization() {
     let (root, path, mut held) = fault_setup();
     let mut before = Vec::new();
