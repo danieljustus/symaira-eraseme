@@ -51,6 +51,21 @@ Replacement is also read through a handle opened before the update. A stale
 `.consent-sentinel.tmp` and a destination sentinel must remain byte-identical;
 the complete manifest detects temporary-file leaks.
 
+`identity::consent::portable_filesystem_tests::id005_destination_conflict_cleans_owned_temp_and_preserves_go_tree`
+also consumes the unchanged `rename_failure` case without Unix APIs, shell,
+Python, or permission-denial setup. It exercises the production atomic writer,
+observes its owned temporary file after successful write/sync/close/chmod,
+then requires failed publication over the nonempty destination directory and
+removal of that temporary path. It compares failure plus the complete tree's
+relative paths, entry types and exact bytes with Go, including both sentinels.
+False success, a leaked temporary file and changed destination bytes are
+rejected by the same comparator. Path components are joined with `/`, matching
+the Go helper's `filepath.ToSlash`; this additional subset does not compare
+native error classifications or permission bits. The full Unix comparison
+above is unchanged. This is portable test availability with local macOS
+execution, not native Linux/Windows evidence or random temporary-name
+collision coverage.
+
 The `replacement_symlink` case moves the old 0400 token outside `consent/`,
 within the isolated root, and makes its original path a relative symlink to
 that referent. Go's production rename replaces the link with a regular 0600

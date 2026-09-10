@@ -481,6 +481,10 @@ fn tighten_permissions(path: &Path) -> io::Result<()> {
 mod filesystem_tests;
 
 #[cfg(test)]
+#[path = "consent_portable_tests.rs"]
+mod portable_filesystem_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
