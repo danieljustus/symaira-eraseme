@@ -1098,7 +1098,9 @@ dependencies = [
 name = "symeraseme-engine"
 version = "0.13.0"
 dependencies = [
+ "serde_json",
  "symeraseme-core",
+ "tempfile",
 ]
 
 [[package]]

@@ -149,7 +149,7 @@ SQLite, network transcript or process behavior.
 | DOM-006 | domain | IMAP UIDVALIDITY/HWM/search/fetch policy | fake transcript | state-machine tests | side-effect | all | TODO |
 | DOM-007 | domain | OAuth2 state, PKCE, refresh and redaction | mock HTTP server | transcript/files | side-effect | all | TODO |
 | DOM-008 | domain | LLM provider descriptors, retries/errors | mock HTTP corpus | transcript tests | side-effect | all | TODO |
-| DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | TODO |
+| DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | PARTIAL (PASS: `Generate`/`WriteFiles` byte-exact against `rust-tests/parity/oracle/scheduler`, both directions reviewed for a path-traversal regression and fixed, #907; TODO: Install/Uninstall/Status, legacy-Python detection, native macOS/Linux/Windows execution of the Windows-specific traversal test) |
 | DOM-010 | domain | manual-task evidence/cleanup retention | temp files/DB | filesystem+DB | side-effect | all | TODO |
 | MCP-001 | MCP | `initialize` protocol version/capabilities/serverInfo | raw frame | raw frame test | byte | all | TODO |
 | MCP-000 | MCP HTTP | bearer secret uses constant-time comparison and strict header parsing | auth corpus; issue #817 | `TestServeHTTPBearerAuthContract` | side-effect | all | PASS |
