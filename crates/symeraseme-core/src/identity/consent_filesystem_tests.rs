@@ -454,6 +454,47 @@ fn id005_atomic_injected_chmod_error_cleans_owned_temporary() {
 }
 
 #[test]
+fn id005_atomic_rust_only_sync_error_cleans_owned_temporary() {
+    let (root, path, mut held) = fault_setup();
+    let mut before = Vec::new();
+    manifest(root.path(), root.path(), &mut before);
+    let old_body = fs::read(&path).unwrap();
+    let sentinel = path.parent().unwrap().join(".consent-sentinel.tmp");
+    let sentinel_body = fs::read(&sentinel).unwrap();
+    let mut owned_temporary = None;
+    let replacement = b"replacement must not be published";
+    let error = atomic_write_with(
+        &path,
+        replacement,
+        |file| {
+            assert_eq!(file.metadata().unwrap().len(), replacement.len() as u64);
+            let mut temporary_paths = fs::read_dir(path.parent().unwrap())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|entry| entry != &path && entry != &sentinel)
+                .collect::<Vec<_>>();
+            assert_eq!(temporary_paths.len(), 1);
+            let temporary = temporary_paths.pop().unwrap();
+            assert_eq!(fs::read(&temporary).unwrap(), replacement);
+            owned_temporary = Some(temporary);
+            // Rust-only sync behavior: Go has no sync operation. Inject before
+            // close/chmod/publication; this does not establish Go parity.
+            Err(io::Error::other(InjectedFailure("sync")))
+        },
+        |_| panic!("checked close reached after injected sync failure"),
+        |_| panic!("chmod reached after injected sync failure"),
+    )
+    .unwrap_err();
+    assert_injected(&error, "sync");
+    let actual = fault_observation(root.path(), "rust_only_sync_failure", &mut held);
+    assert_eq!(actual["entries"], json!(before));
+    assert_eq!(actual["held"].as_str().unwrap().as_bytes(), old_body);
+    assert_eq!(fs::read(&path).unwrap(), old_body);
+    assert_eq!(fs::read(&sentinel).unwrap(), sentinel_body);
+    assert!(!owned_temporary.unwrap().try_exists().unwrap());
+}
+
+#[test]
 fn id005_atomic_sync_error_is_retained_without_go_normalization() {
     let (root, path, mut held) = fault_setup();
     let mut before = Vec::new();
