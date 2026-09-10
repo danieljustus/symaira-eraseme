@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
 )
 
@@ -22,12 +24,34 @@ type id005Entry struct {
 type id005Observation struct {
 	Name    string       `json:"name"`
 	Failed  bool         `json:"failed"`
+	Class   string       `json:"error_class"`
 	Error   string       `json:"raw_error"`
 	Entries []id005Entry `json:"entries"`
 	Held    string       `json:"held"`
 }
 
 type id005Random struct{ before func() }
+
+func id005ErrorClass(err error) string {
+	switch {
+	case err == nil:
+		return "ok"
+	case errors.Is(err, ErrConsentTokenExpired):
+		return "expired"
+	case errors.Is(err, ErrConsentTokenCommandMismatch):
+		return "command_mismatch"
+	case errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
+		return "permission_denied"
+	case errors.Is(err, syscall.ENOTDIR):
+		return "not_a_directory"
+	case errors.Is(err, syscall.EEXIST), errors.Is(err, syscall.EISDIR), errors.Is(err, syscall.ENOTEMPTY):
+		return "destination_conflict"
+	case errors.Is(err, syscall.EFBIG):
+		return "file_too_large"
+	default:
+		return "unclassified"
+	}
+}
 
 func (r id005Random) Read(p []byte) (int, error) {
 	if r.before != nil {
@@ -69,7 +93,7 @@ func TestConsentID005Capture(t *testing.T) {
 		mkdir()
 		must(os.Chmod(dir, 0500))
 		_, err = IssueTokenInDir(dir, "delete", 60)
-	case "replacement", "rename_failure", "temp_failure":
+	case "replacement", "rename_failure", "temp_failure", "write_failure":
 		mkdir()
 		must(os.WriteFile(filepath.Join(dir, ".consent-sentinel.tmp"), []byte("unrelated sentinel"), 0600))
 		if name == "rename_failure" {
@@ -88,7 +112,12 @@ func TestConsentID005Capture(t *testing.T) {
 			}
 			rand.Reader = id005Random{before: func() { must(os.Chmod(dir, 0500)) }}
 		}
+		restore := func() {}
+		if name == "write_failure" {
+			restore = id005LimitWrites(t)
+		}
 		_, err = IssueTokenInDir(dir, "delete", 60)
+		restore()
 		if name == "temp_failure" {
 			must(os.Chmod(dir, 0700))
 		}
@@ -114,7 +143,7 @@ func TestConsentID005Capture(t *testing.T) {
 	default:
 		t.Fatalf("unknown case %q", name)
 	}
-	observation := id005Observation{Name: name, Failed: err != nil, Entries: []id005Entry{}}
+	observation := id005Observation{Name: name, Failed: err != nil, Class: id005ErrorClass(err), Entries: []id005Entry{}}
 	if err != nil {
 		observation.Error = err.Error()
 	}

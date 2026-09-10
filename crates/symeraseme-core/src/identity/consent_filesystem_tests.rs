@@ -49,18 +49,18 @@ fn observe(root: &Path, name: &str) -> Value {
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([7; 16]);
     let path = dir.join(token_filename(&token));
     let mut held = None;
-    let failed = match name {
+    let result = match name {
         "fresh" | "umask_000" | "umask_077" | "umask_777" => {
-            fixed_store(&dir).issue_token("delete", 60).is_err()
+            fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
         "nested" => {
             dir = dir.join("nested");
-            fixed_store(&dir).issue_token("delete", 60).is_err()
+            fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
         "existing_directory" => {
             fs::create_dir(&dir).unwrap();
             chmod(&dir, 0o500);
-            fixed_store(&dir).issue_token("delete", 60).is_err()
+            fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
         "replacement" | "rename_failure" | "temp_failure" => {
             fs::create_dir(&dir).unwrap();
@@ -90,12 +90,17 @@ fn observe(root: &Path, name: &str) -> Value {
             if name == "temp_failure" {
                 chmod(&dir, 0o700);
             }
-            result.is_err()
+            result.map(|_| ())
+        }
+        "write_failure" => {
+            // The parent prepared the old token before limiting this process.
+            held = Some(fs::File::open(&path).unwrap());
+            fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
         "mkdir_failure" => {
             fs::write(&dir, "parent sentinel").unwrap();
             chmod(&dir, 0o600);
-            fixed_store(&dir).issue_token("delete", 60).is_err()
+            fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
         "verify" | "list" | "wrong_command" | "expired" => {
             let store = fixed_store(&dir);
@@ -103,13 +108,10 @@ fn observe(root: &Path, name: &str) -> Value {
             chmod(&path, 0o644);
             chmod(&dir, 0o755);
             match name {
-                "verify" => store.verify_token("delete", &token).is_err(),
-                "list" => store.list_tokens().is_err(),
-                "wrong_command" => store.verify_token("other", &token).is_err(),
-                "expired" => store
-                    .with_clock(|| 1061)
-                    .verify_token("delete", &token)
-                    .is_err(),
+                "verify" => store.verify_token("delete", &token),
+                "list" => store.list_tokens().map(|_| ()),
+                "wrong_command" => store.verify_token("other", &token),
+                "expired" => store.with_clock(|| 1061).verify_token("delete", &token),
                 _ => unreachable!(),
             }
         }
@@ -121,7 +123,22 @@ fn observe(root: &Path, name: &str) -> Value {
     }
     let mut entries = Vec::new();
     manifest(root, root, &mut entries);
-    json!({"name": name, "failed": failed, "held": old_body, "entries": entries})
+    let class = match &result {
+        Ok(()) => "ok",
+        Err(ConsentError::Expired) => "expired",
+        Err(ConsentError::CommandMismatch) => "command_mismatch",
+        Err(ConsentError::Io(error)) => match error.kind() {
+            io::ErrorKind::PermissionDenied => "permission_denied",
+            io::ErrorKind::NotADirectory => "not_a_directory",
+            io::ErrorKind::AlreadyExists
+            | io::ErrorKind::IsADirectory
+            | io::ErrorKind::DirectoryNotEmpty => "destination_conflict",
+            io::ErrorKind::FileTooLarge => "file_too_large",
+            other => panic!("unclassified filesystem error {other:?}: {error}"),
+        },
+        other => panic!("unclassified consent result {other:?}"),
+    };
+    json!({"name": name, "failed": result.is_err(), "error_class": class, "held": old_body, "entries": entries})
 }
 
 fn compare(actual: &Value, expected: &Value) -> Result<(), String> {
@@ -138,13 +155,30 @@ fn compare(actual: &Value, expected: &Value) -> Result<(), String> {
 fn id005_matches_frozen_go_filesystem() {
     let document = fixture();
     let cases = document["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 14);
+    assert_eq!(cases.len(), 15);
     for expected in cases {
         let name = expected["name"].as_str().unwrap();
         let root = tempfile::tempdir().unwrap();
         let mask = name.strip_prefix("umask_").unwrap_or("022");
-        let output = Command::new("sh")
-            .args(["-c", "umask \"$1\"; shift; exec \"$@\"", "id005", mask])
+        let mut command = if name == "write_failure" {
+            let dir = root.path().join("consent");
+            fixed_store(&dir).issue_token("before", 60).unwrap();
+            let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([7; 16]);
+            chmod(&dir.join(token_filename(&token)), 0o400);
+            let sentinel = dir.join(".consent-sentinel.tmp");
+            fs::write(&sentinel, "unrelated sentinel").unwrap();
+            chmod(&sentinel, 0o600);
+            // Python sets the same one-byte soft RLIMIT_FSIZE as the Go probe.
+            // It execs only this test binary, so Rust needs no unsafe pre_exec.
+            let mut command = Command::new("python3");
+            command.args(["-c", "import os,resource,signal,sys; os.umask(0o022); resource.setrlimit(resource.RLIMIT_FSIZE,(1,resource.getrlimit(resource.RLIMIT_FSIZE)[1])); signal.signal(signal.SIGXFSZ,signal.SIG_IGN); os.execv(sys.argv[1],sys.argv[1:])"]);
+            command
+        } else {
+            let mut command = Command::new("sh");
+            command.args(["-c", "umask \"$1\"; shift; exec \"$@\"", "id005", mask]);
+            command
+        };
+        let output = command
             .arg(std::env::current_exe().unwrap())
             .args([CHILD, "--exact", "--ignored", "--nocapture"])
             .env("ID005_CASE", name)
@@ -196,5 +230,8 @@ fn id005_rejects_changed_oracle_modes_and_source() {
     assert!(compare(&actual, &tampered).is_err());
     tampered = expected.clone();
     tampered["failed"] = json!(true);
+    assert!(compare(&actual, &tampered).is_err());
+    tampered = expected.clone();
+    tampered["error_class"] = json!("expired");
     assert!(compare(&actual, &tampered).is_err());
 }

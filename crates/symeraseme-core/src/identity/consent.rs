@@ -308,7 +308,17 @@ impl ConsentStore {
             use std::os::unix::fs::DirBuilderExt;
             builder.mode(CONSENT_DIR_MODE);
         }
-        builder.create(&self.directory)?;
+        builder.create(&self.directory).map_err(|error| {
+            // Go MkdirAll reports ENOTDIR for an existing file at the leaf;
+            // Rust's recursive builder reports EEXIST on Unix instead.
+            if error.kind() == io::ErrorKind::AlreadyExists
+                && fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
+            {
+                io::Error::from(io::ErrorKind::NotADirectory)
+            } else {
+                error
+            }
+        })?;
         // MkdirAll uses 0700 for every new ancestor; only the requested
         // directory is subsequently hardened, ignoring chmod errors in Go.
         let _ = tighten_permissions(&self.directory);
@@ -384,7 +394,10 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
         .suffix(".tmp")
         .tempfile_in(directory)?;
     temporary.write_all(body)?;
-    // Go closes before chmod/rename and performs no file or directory fsync.
+    // Retain the existing Rust sync check. Go has no sync call; this extra
+    // failure path and checked-close parity remain explicit ID-005 gaps.
+    temporary.as_file().sync_all()?;
+    // Go closes before chmod/rename.
     // Keep the path guard alive so every pre-rename failure removes our temp.
     let temporary = temporary.into_temp_path();
     tighten_permissions(&temporary)?;

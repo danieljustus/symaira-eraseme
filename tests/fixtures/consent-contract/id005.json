@@ -1,13 +1,16 @@
 {
   "schema": "consent-id005-v1",
+  "base": "93721a93ec9e527410c4ec3051779cf516216b72",
   "source_sha256": {
     "internal/identity/consent.go": "491f6b7386ff2c84913437b9dff5c3c6190124aaac34ac8b3dabf08e2629943c",
-    "internal/identity/gate.go": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"
+    "internal/identity/gate.go": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a",
+    "internal/identity/profile.go": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"
   },
   "cases": [
     {
       "name": "fresh",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -27,6 +30,7 @@
     {
       "name": "nested",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -52,6 +56,7 @@
     {
       "name": "existing_directory",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -71,6 +76,7 @@
     {
       "name": "replacement",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -96,6 +102,7 @@
     {
       "name": "rename_failure",
       "failed": true,
+      "error_class": "destination_conflict",
       "entries": [
         {
           "path": "consent",
@@ -127,6 +134,7 @@
     {
       "name": "temp_failure",
       "failed": true,
+      "error_class": "permission_denied",
       "entries": [
         {
           "path": "consent",
@@ -152,6 +160,7 @@
     {
       "name": "mkdir_failure",
       "failed": true,
+      "error_class": "not_a_directory",
       "entries": [
         {
           "path": "consent",
@@ -165,6 +174,7 @@
     {
       "name": "verify",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -184,6 +194,7 @@
     {
       "name": "list",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -203,6 +214,7 @@
     {
       "name": "wrong_command",
       "failed": true,
+      "error_class": "command_mismatch",
       "entries": [
         {
           "path": "consent",
@@ -222,6 +234,7 @@
     {
       "name": "expired",
       "failed": true,
+      "error_class": "expired",
       "entries": [
         {
           "path": "consent",
@@ -235,6 +248,7 @@
     {
       "name": "umask_000",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -254,6 +268,7 @@
     {
       "name": "umask_077",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -273,6 +288,7 @@
     {
       "name": "umask_777",
       "failed": false,
+      "error_class": "ok",
       "entries": [
         {
           "path": "consent",
@@ -288,6 +304,32 @@
         }
       ],
       "held": ""
+    },
+    {
+      "name": "write_failure",
+      "failed": true,
+      "error_class": "file_too_large",
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
     }
   ]
 }
