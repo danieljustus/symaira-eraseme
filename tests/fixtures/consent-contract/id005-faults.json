@@ -1,0 +1,84 @@
+{
+  "schema": "consent-id005-faults-v1",
+  "base": "93721a93ec9e527410c4ec3051779cf516216b72",
+  "source_sha256": {
+    "internal/identity/consent.go": "491f6b7386ff2c84913437b9dff5c3c6190124aaac34ac8b3dabf08e2629943c",
+    "internal/identity/gate.go": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a",
+    "internal/identity/profile.go": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"
+  },
+  "cases": [
+    {
+      "name": "close_failure",
+      "failed": true,
+      "error_class": "closed_file",
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    },
+    {
+      "name": "chmod_failure",
+      "failed": true,
+      "error_class": "not_found",
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    }
+  ],
+  "instrumentation": {
+    "kind": "state-changing hooks before unchanged checked operations",
+    "source_sha256": "9d095c9f55155d0eddd7d3a888244e9f986d9652cfa1c12952543ef16cca54d4",
+    "hooks": {
+      "\tif err := tmp.Close(); err != nil {": "\tid005BeforeClose(tmp)\n",
+      "\tif err := os.Chmod(tmpName, mode); err != nil {": "\tid005BeforeChmod(tmpName)\n"
+    }
+  },
+  "helper_sha256": {
+    "consent_id005_fault_test.go.in": "578e38acca8ca095faf5c1c7f7175ebfa589310be56eeeb4252cac478fc9e6c5",
+    "consent_id005_test.go.in": "24fac15dbe37b30b446233c1be8d8e0d3209982f330eb551e277d4ef4af9d981",
+    "consent_id005_unix_test.go.in": "9ad0f2b8a8f7bba9c53726034f7d559b34170caa6a564858f3442ce4c7e02603",
+    "consent_id005_windows_test.go.in": "988322e8b0d58fac593af7c8614bb6c5c55000196988b7d081d9ec53a3a369c2"
+  },
+  "generator_sha256": "f63df491914370abac04dd39f515fed6ba47a3d938d5b35bdd4b5f73bc1040c2",
+  "blockers": {
+    "delayed_close_io": "Preclosing exercises Go os.ErrClosed, not native delayed EIO/ENOSPC; no controlled faulty filesystem is available.",
+    "chmod_existing_temp": "Unlinking exercises real Chmod ENOENT but cannot prove cleanup after chmod failure with the temporary file still present; no deterministic permission-fault hook is available.",
+    "sync": "Go has no sync operation. Rust retains sync_all and returns its error before publishing; no Go sync-error fixture exists.",
+    "non_unix_close": "Rust non-Unix File drop still discards close errors; a reviewed safe checked-close adapter and native proof remain required."
+  }
+}

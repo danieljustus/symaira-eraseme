@@ -40,6 +40,10 @@ func id005ErrorClass(err error) string {
 		return "expired"
 	case errors.Is(err, ErrConsentTokenCommandMismatch):
 		return "command_mismatch"
+	case errors.Is(err, os.ErrClosed):
+		return "closed_file"
+	case errors.Is(err, os.ErrNotExist):
+		return "not_found"
 	case errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
 		return "permission_denied"
 	case errors.Is(err, syscall.ENOTDIR):
@@ -93,7 +97,7 @@ func TestConsentID005Capture(t *testing.T) {
 		mkdir()
 		must(os.Chmod(dir, 0500))
 		_, err = IssueTokenInDir(dir, "delete", 60)
-	case "replacement", "rename_failure", "temp_failure", "write_failure":
+	case "replacement", "rename_failure", "temp_failure", "write_failure", "close_failure", "chmod_failure":
 		mkdir()
 		must(os.WriteFile(filepath.Join(dir, ".consent-sentinel.tmp"), []byte("unrelated sentinel"), 0600))
 		if name == "rename_failure" {
@@ -116,6 +120,9 @@ func TestConsentID005Capture(t *testing.T) {
 		if name == "write_failure" {
 			restore = id005LimitWrites(t)
 		}
+		// Only the fault-instrumented archive calls these hooks. Arm them
+		// after successfully creating and opening the previous token.
+		id005Fault = name
 		_, err = IssueTokenInDir(dir, "delete", 60)
 		restore()
 		if name == "temp_failure" {

@@ -386,6 +386,17 @@ fn token_filename(token: &str) -> String {
 }
 
 fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
+    atomic_write_with(path, body, fs::File::sync_all, close_file, chmod_temporary)
+}
+
+// Operation-local seams keep failure tests deterministic without global hooks.
+fn atomic_write_with(
+    path: &Path,
+    body: &[u8],
+    sync: impl FnOnce(&fs::File) -> io::Result<()>,
+    close: impl FnOnce(fs::File) -> io::Result<()>,
+    chmod: impl FnOnce(&Path) -> io::Result<()>,
+) -> io::Result<()> {
     let directory = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "consent path has no parent"))?;
@@ -394,17 +405,46 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
         .suffix(".tmp")
         .tempfile_in(directory)?;
     temporary.write_all(body)?;
-    // Retain the existing Rust sync check. Go has no sync call; this extra
-    // failure path and checked-close parity remain explicit ID-005 gaps.
-    temporary.as_file().sync_all()?;
+    // Retain the existing fail-closed Rust guard. Go has no sync call:
+    // this is an explicit ID-005 difference, not normalized oracle parity.
+    sync(temporary.as_file())?;
     // Go closes before chmod/rename.
     // Keep the path guard alive so every pre-rename failure removes our temp.
-    let temporary = temporary.into_temp_path();
-    tighten_permissions(&temporary)?;
+    let (file, temporary) = temporary.into_parts();
+    close(file)?;
+    chmod(&temporary)?;
     temporary
         .persist(path)
         .map(|_| ())
         .map_err(|error| error.error)
+}
+
+fn close_file(file: fs::File) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        // Consume the owner exactly once. Do not retry a possibly closed fd
+        // or turn EINTR into success; both could conceal a close failure.
+        nix::unistd::close(file).map_err(io::Error::from)
+    }
+    #[cfg(not(unix))]
+    {
+        // A reviewed checked-close API for these targets remains an ID-005
+        // blocker. Preserve the existing drop behavior and the sync guard.
+        drop(file);
+        Ok(())
+    }
+}
+
+fn chmod_temporary(path: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // The temporary entry is a file. Apply the required mode directly,
+        // matching Go's checked Chmod without an extra metadata failure path.
+        fs::set_permissions(path, fs::Permissions::from_mode(CONSENT_FILE_MODE))
+    }
+    #[cfg(not(unix))]
+    tighten_permissions(path)
 }
 
 fn tighten_permissions(path: &Path) -> io::Result<()> {

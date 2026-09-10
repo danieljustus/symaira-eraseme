@@ -235,3 +235,159 @@ fn id005_rejects_changed_oracle_modes_and_source() {
     tampered["error_class"] = json!("expired");
     assert!(compare(&actual, &tampered).is_err());
 }
+
+const FAULT_FIXTURE: &str =
+    include_str!("../../../../tests/fixtures/consent-contract/id005-faults.json");
+
+fn fault_case(name: &str) -> Value {
+    let document: Value = serde_json::from_str(FAULT_FIXTURE).unwrap();
+    let cases = document["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 2);
+    cases
+        .iter()
+        .find(|case| case["name"] == name)
+        .unwrap()
+        .clone()
+}
+
+fn fault_setup() -> (tempfile::TempDir, PathBuf, fs::File) {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("consent");
+    let token = fixed_store(&dir).issue_token("before", 60).unwrap();
+    let path = dir.join(token_filename(&token));
+    chmod(&path, 0o400);
+    let held = fs::File::open(&path).unwrap();
+    let sentinel = dir.join(".consent-sentinel.tmp");
+    fs::write(&sentinel, "unrelated sentinel").unwrap();
+    chmod(&sentinel, 0o600);
+    (root, path, held)
+}
+
+fn fault_observation(root: &Path, name: &str, held: &mut fs::File) -> Value {
+    let mut entries = Vec::new();
+    manifest(root, root, &mut entries);
+    let mut body = String::new();
+    held.read_to_string(&mut body).unwrap();
+    json!({"name": name, "failed": true, "entries": entries, "held": body})
+}
+
+#[derive(Debug)]
+struct InjectedFailure(&'static str);
+
+impl fmt::Display for InjectedFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl std::error::Error for InjectedFailure {}
+
+fn assert_injected(error: &io::Error, stage: &str) {
+    assert_eq!(
+        error
+            .get_ref()
+            .unwrap()
+            .downcast_ref::<InjectedFailure>()
+            .unwrap()
+            .0,
+        stage
+    );
+}
+
+#[test]
+fn id005_atomic_close_error_preserves_go_rollback() {
+    let (root, path, mut held) = fault_setup();
+    let error = atomic_write_with(
+        &path,
+        b"replacement must not be published",
+        fs::File::sync_all,
+        |file| {
+            close_file(file)?;
+            // Safe Rust cannot retain a File after consuming its owner. Inject
+            // an adapter failure after real close, not a native close fault.
+            Err(io::Error::other(InjectedFailure("close")))
+        },
+        |_| panic!("chmod reached after close failure"),
+    )
+    .unwrap_err();
+    assert_injected(&error, "close");
+    let mut expected = fault_case("close_failure");
+    assert_eq!(expected["error_class"], "closed_file");
+    // Go genuinely returned os.ErrClosed. Only failure + rollback effects
+    // are compared with our injected adapter failure, not native error parity.
+    expected.as_object_mut().unwrap().remove("error_class");
+    let actual = fault_observation(root.path(), "close_failure", &mut held);
+    compare(&actual, &expected).unwrap();
+    expected["entries"][1]["body"] = json!("tampered sentinel");
+    assert!(compare(&actual, &expected).is_err());
+}
+
+#[test]
+fn id005_atomic_chmod_matches_source_bound_go_fault() {
+    let (root, path, mut held) = fault_setup();
+    let error = atomic_write_with(
+        &path,
+        b"replacement must not be published",
+        fs::File::sync_all,
+        close_file,
+        |temporary| {
+            fs::remove_file(temporary).unwrap();
+            // This calls native chmod, with no preceding metadata lookup.
+            chmod_temporary(temporary)
+        },
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+    let mut actual = fault_observation(root.path(), "chmod_failure", &mut held);
+    actual["error_class"] = json!("not_found");
+    compare(&actual, &fault_case("chmod_failure")).unwrap();
+}
+
+#[test]
+fn id005_atomic_sync_error_is_retained_without_go_normalization() {
+    let (root, path, mut held) = fault_setup();
+    let mut before = Vec::new();
+    manifest(root.path(), root.path(), &mut before);
+    let old_body = fs::read_to_string(&path).unwrap();
+    let error = atomic_write_with(
+        &path,
+        b"replacement must not be published",
+        |_| Err(io::Error::other(InjectedFailure("sync"))),
+        |_| panic!("checked close reached after sync failure"),
+        |_| panic!("chmod reached after sync failure"),
+    )
+    .unwrap_err();
+    assert_injected(&error, "sync");
+    let actual = fault_observation(root.path(), "rust_only_sync_failure", &mut held);
+    assert_eq!(actual["entries"], json!(before));
+    assert_eq!(actual["held"], old_body);
+}
+
+#[test]
+fn id005_fault_fixture_is_bound_to_source_and_probe() {
+    let document: Value = serde_json::from_str(FAULT_FIXTURE).unwrap();
+    assert_eq!(document["schema"], "consent-id005-faults-v1");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (path, expected) in document["source_sha256"].as_object().unwrap() {
+        assert_eq!(
+            hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap())),
+            expected.as_str().unwrap(),
+            "Go oracle drift: {path}"
+        );
+    }
+    for (path, expected) in document["helper_sha256"].as_object().unwrap() {
+        assert_eq!(
+            hex::encode(Sha256::digest(
+                fs::read(root.join("scripts/consent-oracle").join(path)).unwrap()
+            )),
+            expected.as_str().unwrap(),
+            "Go helper drift: {path}"
+        );
+    }
+    assert_eq!(
+        hex::encode(Sha256::digest(
+            fs::read(root.join("scripts/consent-oracle/generate.py")).unwrap()
+        )),
+        document["generator_sha256"].as_str().unwrap()
+    );
+}

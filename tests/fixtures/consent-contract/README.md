@@ -50,14 +50,78 @@ the complete manifest detects temporary-file leaks.
 Go uses `CreateTemp → Write → Close → Chmod → Rename` with deferred temporary
 cleanup. It performs **no fsync**; sync failure and crash durability are not
 guarantees of this consent writer. Existing directory/validated-file chmod
-is best effort; temporary-file chmod is required. Exact random temporary-name
-collision and close/chmod fault injection have no existing Go test hook.
-Rust's safe file drop cannot report close errors. The existing Rust
-`sync_all` check is retained, so its additional sync-error path is also an
-explicit difference from Go. Neither is claimed as passing parity. Recovery
-requires a reviewed safe checked-close API and source-bound failure probes
-before deciding how to remove the extra sync guard. This slice remains
-incomplete at that boundary; no unsafe adapter or weakened check is introduced.
+is best effort; temporary-file chmod is required.
+
+## Source-bound failure probes
+
+`id005-faults.json` is a separate generated capture, preserving the ordinary
+15-case fixture unchanged. Run:
+
+```sh
+python3 scripts/consent-oracle/generate.py --fault-probes --evidence /tmp/id005-new-faults
+cmp /tmp/id005-new-faults/derived.json tests/fixtures/consent-contract/id005-faults.json
+```
+
+This mode inserts two hooks **only in the disposable archived Go source**,
+immediately before the original checked Close and Chmod operations. Both
+anchors must occur exactly once; missing-anchor rejection is exercised before
+compilation. The original error checks remain intact. The fixture records
+original/instrumented source hashes, exact insertions, helper and generator
+hashes. Raw evidence additionally retains the source diff, binary digest,
+native platform, verbatim errors and one executed Go test per case.
+
+- `close_failure`: the hook successfully closes the temporary `os.File`.
+  The original checked Close then returns real `os.ErrClosed`; deferred cleanup
+  removes the temporary file. This proves the Go error branch and rollback,
+  **not** a delayed native EIO/ENOSPC close failure.
+- `chmod_failure`: the hook successfully unlinks the temporary path.
+  The original Chmod returns real ENOENT. Both Go and Rust preserve the old
+  0400 token, its open-handle bytes, and the unrelated 0600 stale sentinel.
+  Because the injector removed the temp, this does not prove cleanup following
+  a chmod error while the temporary file still exists.
+
+The Rust consumers are the three `id005_atomic_*` tests in
+`consent_filesystem_tests.rs`. The chmod case calls the actual required chmod
+operation after unlink, and compares the observed error category and complete
+filesystem manifest with Go. The close test performs real checked close, then
+injects a typed adapter error; it checks exact error propagation and compares
+only failure/rollback effects with Go. It explicitly does **not** compare that
+injected error with Go's `os.ErrClosed` or claim native close-fault parity.
+A corrupted-sentinel negative control exercises the actual comparator.
+`id005_fault_fixture_is_bound_to_source_and_probe` rejects source/helper/generator
+drift.
+
+## Checked close and retained sync contract
+
+On Unix, Rust now splits the temporary file from its `TempPath` guard and
+calls the pinned `nix 0.31.3` safe `close(File)` API before chmod/rename. That API
+consumes ownership, invokes close once, and returns errors without retrying
+or treating EINTR as success. The path guard remains alive across checked
+close and chmod failures. No raw descriptors or unsafe code are introduced
+in this repository. The dependency implementation was inspected in the local
+pinned source (`nix/src/unistd.rs`); see the
+[upstream API and source](https://docs.rs/nix/0.31.3/nix/unistd/fn.close.html).
+The alternative `io-close 0.3.7` was rejected because it normalizes EINTR to
+success. Non-Unix retains the existing drop behavior and remains blocked on
+a reviewed checked-close adapter and native execution evidence.
+
+`sync_all` remains mandatory before checked close. Its error is returned
+unchanged, publication stops, and the owned temporary file is cleaned up.
+The Rust-only sync test injects a typed error and checks the full unchanged
+manifest, old open-handle bytes, and that later stages are unreachable. It
+is an adapter/control-flow test, not a native fsync fault. Go has no equivalent
+operation, so the fixture's `blockers.sync` explicitly records this difference;
+there is no fabricated Go sync-error row. This checkpoint retains the existing
+safety guard pending coordinator contract review. Removing sync or declaring
+its extra failure behavior acceptable parity requires a separate reviewed
+contract decision; checked close alone does not settle durability semantics.
+
+Delayed native close EIO/ENOSPC needs a controlled faulting filesystem or an
+approved native syscall injector, neither available in this probe. Exact
+chmod permission failure with an extant temp needs a deterministic native
+fault mechanism; unlink cannot substitute for that evidence. Exact random
+temporary-name collision is also still unproven. These limitations, native
+platform gaps and coordinator acceptance keep ID-005 incomplete.
 
 The retained capture was executed on macOS arm64. Unix permission tests must
 run as a non-root user; root would invalidate the permission-denial case.
