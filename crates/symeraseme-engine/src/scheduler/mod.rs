@@ -533,6 +533,9 @@ mod tests {
         // A resolvable ".." must still be accepted, matching Go's
         // filepath.Clean("a/../b") == "b".
         assert!(is_safe_relative_filename("a/../b"));
+        // A deeper resolvable case: every ".." here cancels a preceding
+        // real segment, matching Go's filepath.Clean("a/b/../../c") == "c".
+        assert!(is_safe_relative_filename("a/b/../../c"));
         assert!(is_safe_relative_filename("install.sh"));
     }
 
@@ -582,6 +585,26 @@ mod tests {
         ));
         let error = result.unwrap_err();
         assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn write_files_reports_write_failure() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out = temp.path().join("schedules");
+        fs::create_dir_all(&out).expect("create output dir");
+        fs::set_permissions(&out, fs::Permissions::from_mode(0o555)).expect("make read-only");
+        let mut files = BTreeMap::new();
+        files.insert("a.sh".to_string(), "#!/bin/sh\n".to_string());
+        let result = write_files(out.to_str().unwrap(), &files);
+        // Restore write access so the tempdir can clean itself up.
+        fs::set_permissions(&out, fs::Permissions::from_mode(0o755)).expect("restore access");
+        let error = match result {
+            Err(SchedulerError::WriteFile { source, .. }) => source,
+            other => panic!("expected SchedulerError::WriteFile, got {other:?}"),
+        };
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
     }
 
     #[test]
