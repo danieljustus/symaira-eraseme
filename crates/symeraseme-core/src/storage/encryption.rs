@@ -10,8 +10,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
 use cbc::Decryptor;
 use cbc::cipher::block_padding::Pkcs7;
-use cbc::cipher::{BlockDecryptMut, KeyIvInit};
-use hmac::{Hmac, Mac};
+use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
+use hmac::{Hmac, KeyInit, Mac};
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use std::fmt;
@@ -137,7 +137,7 @@ fn decrypt_standard_fernet(
     // This decrypt-only API intentionally does not apply a Fernet TTL.
     let _timestamp = &frame[1..9];
     let mac_offset = frame.len() - FERNET_MAC_LEN;
-    let mut mac = <HmacSha256 as Mac>::new_from_slice(&fernet_key[..FERNET_SIGNING_KEY_LEN])
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(&fernet_key[..FERNET_SIGNING_KEY_LEN])
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     mac.update(&frame[..mac_offset]);
     mac.verify_slice(&frame[mac_offset..])
@@ -153,7 +153,7 @@ fn decrypt_standard_fernet(
         .map_err(|_| EncryptionError::InvalidCiphertextLength)?;
     let mut padded = ciphertext.to_vec();
     let plaintext = decryptor
-        .decrypt_padded_mut::<Pkcs7>(&mut padded)
+        .decrypt_padded::<Pkcs7>(&mut padded)
         .map_err(|_| EncryptionError::InvalidPadding)?;
     Ok(plaintext.to_vec())
 }

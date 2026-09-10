@@ -18,14 +18,14 @@ license = "Apache-2.0"
 repository = "https://github.com/danieljustus/symaira-eraseme"
 
 [workspace.dependencies]
-aes = "0.8.4"
+aes = "0.9.3"
 base64 = "0.23.1"
 cap-fs-ext = "4.0.3"
 cap-std = "4.0.3"
-cbc = "0.1.2"
+cbc = "0.2.1"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 flate2 = "1.1.10"
-hmac = "0.12.1"
+hmac = "0.13.0"
 rusqlite = { version = "0.37", features = ["backup", "bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -37,9 +37,14 @@ toml = "0.5.11"
 ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.10.2"
 minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
-pbkdf2 = { version = "0.12.2", features = ["hmac"] }
+pbkdf2 = { version = "0.13.0", features = ["hmac"] }
 regex = "1.11.3"
-sha2 = "0.10.9"
+sha2 = "0.11.0"
+hex = "0.4.3"
+rand = "0.9.5"
+scrypt = "0.12.0"
+zeroize = "1.8.2"
+keyring = "3.6.3"
 
 [profile.release]
 opt-level = 3
