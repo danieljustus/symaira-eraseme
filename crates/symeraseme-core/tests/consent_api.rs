@@ -8,9 +8,10 @@ use std::process::{Command, Output};
 use std::os::unix::fs::PermissionsExt;
 
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use symeraseme_core::identity::CONSENT_FILE_MODE;
 use symeraseme_core::identity::{
-    CONSENT_FILE_MODE, ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken,
-    read_consent_file,
+    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, read_consent_file,
 };
 use tempfile::{TempDir, tempdir};
 
@@ -103,10 +104,10 @@ fn consent_store_debug_omits_injected_implementation_details() {
     let directory = tempdir().unwrap();
     let store = fixed_store(directory.path(), 1_000, 7);
     let debug = format!("{store:?}");
-    let directory_name = directory.path().to_string_lossy().into_owned();
+    let directory_debug = format!("{:?}", directory.path());
 
     assert!(debug.starts_with("ConsentStore {"));
-    assert!(debug.contains(&directory_name));
+    assert!(debug.contains(&directory_debug));
     assert!(!debug.contains("clock"));
     assert!(!debug.contains("random"));
 }

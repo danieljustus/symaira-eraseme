@@ -1,5 +1,7 @@
 # Symaira EraseMe
 
+> **Accepted product direction — implementation pending:** EraseMe remains an independent privacy product. Browse/Operate becoming optional Brain modules and credential UI moving to Brain must not introduce a mandatory Brain dependency into privacy workflows. Existing capabilities and installation instructions below remain unchanged. See [PB-2026-09-09](docs/product-boundaries.md).
+
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/symaira-eraseme/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/symaira-eraseme/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/danieljustus/symaira-eraseme?label=Release&logo=github)](https://github.com/danieljustus/symaira-eraseme/releases)
 [![License](https://img.shields.io/github/license/danieljustus/symaira-eraseme?label=License)](LICENSE)

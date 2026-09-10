@@ -7,6 +7,7 @@ pub mod confirmation;
 pub mod identity;
 pub mod redaction;
 pub mod registry;
+pub mod storage;
 pub mod templating;
 pub mod timeutil;
 pub mod version;
