@@ -35,6 +35,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
+          cache: true
           go-version: '1.26.6'
 
       - name: Cache Cargo dependencies and target
@@ -181,6 +182,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
+          cache: true
           go-version: '1.26.6'
 
       - name: Cache Cargo dependencies and target
