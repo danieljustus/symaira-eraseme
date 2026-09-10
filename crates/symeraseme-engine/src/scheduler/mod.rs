@@ -17,8 +17,8 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
 use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::io::{self, Write as _};
+use std::path::{Component, Path, PathBuf};
 
 const WRAPPER_DIR_PLACEHOLDER: &str = "__WRAPPER_DIR__";
 
@@ -70,7 +70,23 @@ fn which_systemctl() -> Option<PathBuf> {
     let path_var = env::var_os("PATH")?;
     env::split_paths(&path_var)
         .map(|dir| dir.join("systemctl"))
-        .find(|candidate| candidate.is_file())
+        .find(|candidate| is_executable_file(candidate))
+}
+
+/// Matches Go's `exec.LookPath`, which on Unix skips a `PATH` candidate that
+/// exists but is not executable rather than accepting the first same-named
+/// file it finds.
+#[cfg(unix)]
+fn is_executable_file(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(path)
+        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable_file(path: &Path) -> bool {
+    path.is_file()
 }
 
 /// Describes the schedule to generate. Default values select the Python
@@ -180,20 +196,46 @@ pub fn resolve_binary_path(explicit: &str) -> Result<String, SchedulerError> {
             .map_err(SchedulerError::ResolveBinaryPath)?
             .join(path);
     }
-    Ok(clean_path(&path).to_string_lossy().into_owned())
+    Ok(lexically_clean(&path).to_string_lossy().into_owned())
 }
 
-/// A minimal `filepath.Clean`-equivalent: collapses `.` components without
-/// touching `..`, which never appears in a resolved executable path here.
-fn clean_path(path: &Path) -> PathBuf {
-    let mut cleaned = PathBuf::new();
+/// Lexically cleans a path the way Go's `filepath.Clean` does: `.`
+/// components are dropped; a `..` component is collapsed against an
+/// immediately preceding `Normal` component when one exists; a `..` with no
+/// such preceding component to cancel is kept literally if the path is
+/// relative at that point, or dropped if it would climb above a root/prefix
+/// (matching Go's "eliminate `..` elements that begin a rooted path").
+///
+/// This is used both for absolute paths (`resolve_binary_path`, the
+/// `write_files` output root) and, via [`is_safe_relative_filename`], as the
+/// basis for rejecting relative filenames that would escape `output_dir` —
+/// callers must not skip the `..`-collapsing step before validating, or a
+/// name like `"a/../../b"` slips through uncollapsed and is written one
+/// level above the intended root.
+fn lexically_clean(path: &Path) -> PathBuf {
+    let mut out: Vec<Component<'_>> = Vec::new();
     for component in path.components() {
-        if component.as_os_str() == "." {
-            continue;
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => match out.last() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir) | Some(Component::Prefix(_)) => {}
+                _ => out.push(component),
+            },
+            other => out.push(other),
         }
-        cleaned.push(component);
     }
-    cleaned
+    let mut cleaned = PathBuf::new();
+    for component in &out {
+        cleaned.push(component.as_os_str());
+    }
+    if cleaned.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        cleaned
+    }
 }
 
 /// Creates deterministic scheduler files keyed by their relative filename.
@@ -308,7 +350,7 @@ pub fn write_files(
             .map_err(SchedulerError::ResolveOutputDirectory)?
             .join(output_dir)
     };
-    let root = clean_path(&root);
+    let root = lexically_clean(&root);
     fs::create_dir_all(&root).map_err(SchedulerError::CreateOutputDirectory)?;
 
     for name in files.keys() {
@@ -333,23 +375,47 @@ pub fn write_files(
 }
 
 fn is_safe_relative_filename(name: &str) -> bool {
-    if name.is_empty() || Path::new(name).is_absolute() {
+    if name.is_empty() {
         return false;
     }
-    let clean = clean_relative(name);
+    let path = Path::new(name);
+    // `has_root` alone misses a Windows drive-relative prefix like `C:temp`
+    // (a `Prefix` component with no following root), which `is_absolute`
+    // also misses since it requires *both* a prefix and a root; reject
+    // either shape rather than relying on `is_absolute` alone.
+    if path.has_root() || path.components().any(|c| matches!(c, Component::Prefix(_))) {
+        return false;
+    }
+    let clean = lexically_clean(path);
     clean != Path::new(".") && clean != Path::new("..") && !clean.starts_with("..")
 }
 
 fn clean_relative(name: &str) -> PathBuf {
-    let mut cleaned = PathBuf::new();
-    for component in Path::new(name).components() {
-        cleaned.push(component);
-    }
-    cleaned
+    lexically_clean(Path::new(name))
 }
 
+/// Writes `contents` at a temporary name in `path`'s parent directory, sets
+/// its permission bits, then renames it into place — so `path` never appears
+/// at its final name with a mode other than the intended one, unlike
+/// `fs::write` followed by a separate `fs::set_permissions` call.
 fn write_with_mode(path: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
-    fs::write(path, contents)?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty());
+    let mut temporary = match parent {
+        Some(parent) => tempfile::NamedTempFile::new_in(parent)?,
+        None => tempfile::NamedTempFile::new()?,
+    };
+    temporary.write_all(contents)?;
+    temporary.flush()?;
+    tighten_permissions(temporary.path(), mode)?;
+    temporary
+        .persist(path)
+        .map(|_| ())
+        .map_err(|error| error.error)
+}
+
+fn tighten_permissions(path: &Path, mode: u32) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -357,7 +423,7 @@ fn write_with_mode(path: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
     }
     #[cfg(not(unix))]
     {
-        let _ = mode;
+        let _ = (path, mode);
     }
     Ok(())
 }
@@ -450,5 +516,89 @@ mod tests {
             write_files(out.to_str().unwrap(), &traversal),
             Err(SchedulerError::InvalidGeneratedFilename(_))
         ));
+    }
+
+    #[test]
+    fn is_safe_relative_filename_rejects_every_traversal_shape() {
+        // The uncollapsed multi-component case a prior version of this check
+        // missed: "foo/../../outside.txt" lexically cleans to
+        // "../outside.txt", which must be rejected exactly like the
+        // single-component "../escape" case already was.
+        assert!(!is_safe_relative_filename("foo/../../outside.txt"));
+        assert!(!is_safe_relative_filename("a/../../b"));
+        assert!(!is_safe_relative_filename("../escape"));
+        assert!(!is_safe_relative_filename(".."));
+        assert!(!is_safe_relative_filename(""));
+        assert!(!is_safe_relative_filename("/etc/passwd"));
+        // A resolvable ".." must still be accepted, matching Go's
+        // filepath.Clean("a/../b") == "b".
+        assert!(is_safe_relative_filename("a/../b"));
+        assert!(is_safe_relative_filename("install.sh"));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn is_safe_relative_filename_rejects_windows_rooted_and_drive_relative_forms() {
+        // Rooted with no prefix: `is_absolute()` is false for this shape,
+        // so a check based on `is_absolute()` alone would wrongly accept it.
+        assert!(!is_safe_relative_filename(r"\Windows\System32\evil.sh"));
+        // Drive-relative with no root: also `is_absolute() == false`.
+        assert!(!is_safe_relative_filename(r"C:temp\evil.sh"));
+        assert!(!is_safe_relative_filename(r"C:\Windows\evil.sh"));
+    }
+
+    #[test]
+    fn write_files_rejects_multi_component_traversal_end_to_end() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out = temp.path().join("schedules");
+        let mut files = BTreeMap::new();
+        files.insert("foo/../../escape.txt".to_string(), "no".to_string());
+        assert!(matches!(
+            write_files(out.to_str().unwrap(), &files),
+            Err(SchedulerError::InvalidGeneratedFilename(_))
+        ));
+        assert!(!temp.path().join("escape.txt").exists());
+    }
+
+    #[test]
+    fn write_files_rejects_empty_output_directory() {
+        let files = BTreeMap::new();
+        assert!(matches!(
+            write_files("", &files),
+            Err(SchedulerError::EmptyOutputDirectory)
+        ));
+    }
+
+    #[test]
+    fn write_files_reports_create_directory_failure() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let blocked = temp.path().join("blocked");
+        fs::write(&blocked, b"not a directory").expect("create blocking file");
+        let files = BTreeMap::new();
+        let result = write_files(blocked.to_str().unwrap(), &files);
+        assert!(matches!(
+            result,
+            Err(SchedulerError::CreateOutputDirectory(_))
+        ));
+        let error = result.unwrap_err();
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn write_with_mode_never_leaves_a_wrong_mode_window() {
+        // A regression guard for the TOCTOU pattern this function replaced
+        // (fs::write then a separate fs::set_permissions call): the file
+        // must not exist at its final path until it already carries the
+        // intended mode.
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("script.sh");
+        write_with_mode(&path, b"#!/bin/sh\n", 0o755).expect("write with mode");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o755);
+        }
+        assert_eq!(fs::read(&path).unwrap(), b"#!/bin/sh\n");
     }
 }
