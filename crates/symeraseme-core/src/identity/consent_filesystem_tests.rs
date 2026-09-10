@@ -62,7 +62,7 @@ fn observe(root: &Path, name: &str) -> Value {
             chmod(&dir, 0o500);
             fixed_store(&dir).issue_token("delete", 60).map(|_| ())
         }
-        "replacement" | "rename_failure" | "temp_failure" => {
+        "replacement" | "replacement_symlink" | "rename_failure" | "temp_failure" => {
             fs::create_dir(&dir).unwrap();
             chmod(&dir, 0o700);
             let sentinel = dir.join(".consent-sentinel.tmp");
@@ -78,6 +78,13 @@ fn observe(root: &Path, name: &str) -> Value {
                 chmod(&path, 0o400);
                 held = Some(fs::File::open(&path).unwrap());
             }
+            if name == "replacement_symlink" {
+                // Match Go's destination link to an old inode outside consent/
+                // while keeping every observed entry inside the isolated root.
+                fs::rename(&path, root.join("destination-sentinel")).unwrap();
+                std::os::unix::fs::symlink("../destination-sentinel", &path).unwrap();
+                assert!(fs::symlink_metadata(&path).unwrap().is_symlink());
+            }
             let mut store = fixed_store(&dir);
             if name == "temp_failure" {
                 let dir = dir.clone();
@@ -87,6 +94,9 @@ fn observe(root: &Path, name: &str) -> Value {
                 });
             }
             let result = store.issue_token("delete", 60);
+            if name == "replacement_symlink" && result.is_ok() {
+                assert!(fs::symlink_metadata(&path).unwrap().is_file());
+            }
             if name == "temp_failure" {
                 chmod(&dir, 0o700);
             }
@@ -155,7 +165,7 @@ fn compare(actual: &Value, expected: &Value) -> Result<(), String> {
 fn id005_matches_frozen_go_filesystem() {
     let document = fixture();
     let cases = document["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 15);
+    assert_eq!(cases.len(), 16);
     for expected in cases {
         let name = expected["name"].as_str().unwrap();
         let root = tempfile::tempdir().unwrap();
@@ -207,6 +217,36 @@ fn id005_child() {
         .find(|case| case["name"] == name)
         .unwrap();
     compare(&observe(&root, &name), expected).unwrap();
+}
+
+#[test]
+fn id005_symlink_replacement_matches_go_and_rejects_referent_changes() {
+    let document = fixture();
+    let expected = document["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "replacement_symlink")
+        .unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let actual = observe(root.path(), "replacement_symlink");
+    compare(&actual, expected).unwrap();
+    // A writer that follows the destination link could alter either the
+    // referent's bytes or permissions. Reject both through the real comparator.
+    for (field, value) in [
+        ("body", json!("overwritten referent")),
+        ("mode", json!(0o600)),
+    ] {
+        let mut tampered = actual.clone();
+        let referent = tampered["entries"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry["path"] == "destination-sentinel")
+            .unwrap();
+        referent[field] = value;
+        assert!(compare(&tampered, expected).is_err());
+    }
 }
 
 #[test]

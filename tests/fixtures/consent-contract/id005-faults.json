@@ -70,11 +70,11 @@
   },
   "helper_sha256": {
     "consent_id005_fault_test.go.in": "578e38acca8ca095faf5c1c7f7175ebfa589310be56eeeb4252cac478fc9e6c5",
-    "consent_id005_test.go.in": "24fac15dbe37b30b446233c1be8d8e0d3209982f330eb551e277d4ef4af9d981",
+    "consent_id005_test.go.in": "3312392155a22ade5b5efdd96b9b30ecabfb5245734dbc69dc8fc5b44fc95da4",
     "consent_id005_unix_test.go.in": "9ad0f2b8a8f7bba9c53726034f7d559b34170caa6a564858f3442ce4c7e02603",
     "consent_id005_windows_test.go.in": "988322e8b0d58fac593af7c8614bb6c5c55000196988b7d081d9ec53a3a369c2"
   },
-  "generator_sha256": "f63df491914370abac04dd39f515fed6ba47a3d938d5b35bdd4b5f73bc1040c2",
+  "generator_sha256": "36126afde7d83f3e3130823bfef669652a1308d72058eecfc3f5527dd2c2da5a",
   "blockers": {
     "delayed_close_io": "Preclosing exercises Go os.ErrClosed, not native delayed EIO/ENOSPC; no controlled faulty filesystem is available.",
     "chmod_existing_temp": "Unlinking exercises real Chmod ENOENT but cannot prove cleanup after chmod failure with the temporary file still present; no deterministic permission-fault hook is available.",

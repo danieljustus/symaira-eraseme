@@ -97,7 +97,7 @@ func TestConsentID005Capture(t *testing.T) {
 		mkdir()
 		must(os.Chmod(dir, 0500))
 		_, err = IssueTokenInDir(dir, "delete", 60)
-	case "replacement", "rename_failure", "temp_failure", "write_failure", "close_failure", "chmod_failure":
+	case "replacement", "replacement_symlink", "rename_failure", "temp_failure", "write_failure", "close_failure", "chmod_failure":
 		mkdir()
 		must(os.WriteFile(filepath.Join(dir, ".consent-sentinel.tmp"), []byte("unrelated sentinel"), 0600))
 		if name == "rename_failure" {
@@ -109,6 +109,17 @@ func TestConsentID005Capture(t *testing.T) {
 			held, err = os.Open(path)
 			must(err)
 			defer held.Close()
+		}
+		if name == "replacement_symlink" {
+			// Keep the old inode outside consent/ but inside the isolated root.
+			// Production Rename must replace the link, preserving its referent.
+			must(os.Rename(path, filepath.Join(root, "destination-sentinel")))
+			must(os.Symlink("../destination-sentinel", path))
+			info, statErr := os.Lstat(path)
+			must(statErr)
+			if info.Mode()&os.ModeSymlink == 0 {
+				t.Fatal("replacement destination must start as a symlink")
+			}
 		}
 		if name == "temp_failure" {
 			if runtime.GOOS == "windows" {
@@ -125,6 +136,13 @@ func TestConsentID005Capture(t *testing.T) {
 		id005Fault = name
 		_, err = IssueTokenInDir(dir, "delete", 60)
 		restore()
+		if name == "replacement_symlink" && err == nil {
+			info, statErr := os.Lstat(path)
+			must(statErr)
+			if !info.Mode().IsRegular() {
+				t.Fatal("replacement must publish a regular file over the symlink")
+			}
+		}
 		if name == "temp_failure" {
 			must(os.Chmod(dir, 0700))
 		}

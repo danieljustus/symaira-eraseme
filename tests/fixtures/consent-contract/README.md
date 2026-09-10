@@ -21,6 +21,10 @@ python3 scripts/consent-oracle/generate.py --evidence /tmp/id005-new-capture
 cmp /tmp/id005-new-capture/derived.json tests/fixtures/consent-contract/id005.json
 ```
 
+The generator honors explicit `GOCACHE` and `GOMODCACHE` overrides for isolated
+local caches. Its Go build keeps `GOPROXY=off`; populate those caches before
+capture when the shared caches are unavailable.
+
 The source manifest also binds `profile.go`, which defines the permission
 constants. The retained provenance identifies the native capture platform.
 
@@ -47,6 +51,15 @@ Replacement is also read through a handle opened before the update. A stale
 `.consent-sentinel.tmp` and a destination sentinel must remain byte-identical;
 the complete manifest detects temporary-file leaks.
 
+The `replacement_symlink` case moves the old 0400 token outside `consent/`,
+within the isolated root, and makes its original path a relative symlink to
+that referent. Go's production rename replaces the link with a regular 0600
+token, preserving the referent's bytes/mode, old open-handle bytes and stale
+temporary sentinel. Both helpers assert the actual entry is a symlink before
+issue and a regular file afterward. The focused Rust test also rejects changed
+referent bytes and modes through the comparator. This is native macOS atomic
+replacement evidence, not general symlink confinement or race coverage.
+
 Go uses `CreateTemp → Write → Close → Chmod → Rename` with deferred temporary
 cleanup. It performs **no fsync**; sync failure and crash durability are not
 guarantees of this consent writer. Existing directory/validated-file chmod
@@ -54,8 +67,8 @@ is best effort; temporary-file chmod is required.
 
 ## Source-bound failure probes
 
-`id005-faults.json` is a separate generated capture, preserving the ordinary
-15-case fixture unchanged. Run:
+`id005-faults.json` captures the failure probes separately from the ordinary
+16-case fixture. Run:
 
 ```sh
 python3 scripts/consent-oracle/generate.py --fault-probes --evidence /tmp/id005-new-faults

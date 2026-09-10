@@ -330,6 +330,38 @@
         }
       ],
       "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    },
+    {
+      "name": "replacement_symlink",
+      "failed": false,
+      "error_class": "ok",
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 384,
+          "body": "{\"command\":\"delete\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        },
+        {
+          "path": "destination-sentinel",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
     }
   ]
 }

@@ -13,7 +13,7 @@ BASE = "93721a93ec9e527410c4ec3051779cf516216b72"
 CONTRACT = "bf53346eec234929bedf0314b99e3da85dbb991b"
 CASES = ["fresh", "nested", "existing_directory", "replacement", "rename_failure",
          "temp_failure", "mkdir_failure", "verify", "list", "wrong_command", "expired",
-         "umask_000", "umask_077", "umask_777", "write_failure"]
+         "umask_000", "umask_077", "umask_777", "write_failure", "replacement_symlink"]
 FAULT_CASES = ["close_failure", "chmod_failure"]
 # Insert calls before the original operations; never replace their result checks.
 FAULT_HOOKS = {
@@ -68,7 +68,8 @@ def main():
                   "source_sha256": {p: digest(git("show", BASE + ":" + p)) for p in sources},
                   "helper_sha256": {p.name: digest(p.read_bytes()) for p in helpers},
                   "generator_sha256": digest(Path(__file__).read_bytes()), "cases": cases}
-    env = {k: os.environ[k] for k in ("PATH", "HOME")}
+    env = {k: os.environ[k] for k in ("PATH", "HOME", "GOCACHE", "GOMODCACHE")
+           if k in os.environ}
     env.update(GOTOOLCHAIN="go1.26.6", GOPROXY="off", GOENV="off", GOWORK="off", CGO_ENABLED="0")
     # The cached compiler/modules are resolved before isolating application HOME.
     goenv = json.loads(run(["go", "env", "-json", "GOROOT", "GOMODCACHE", "GOCACHE", "GOOS", "GOARCH"], "go-env", env=env))
