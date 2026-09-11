@@ -1,8 +1,8 @@
-//! Decryption for the shipped Python-final V1 event-store envelope.
+//! Decryption for the shipped Python-final V1/V2 event-store envelopes.
 //!
-//! V1 is a fixed-salt PBKDF2-HMAC-SHA256 derivation followed by a standard
-//! Fernet token. This module intentionally implements only the read contract
-//! needed by CRY-001; V2, V3, writes, and legacy Go payloads are separate
+//! V1 and V2 use PBKDF2-HMAC-SHA256 followed by a standard Fernet token.
+//! This module intentionally implements only the read contracts needed by
+//! CRY-001 and CRY-002; V3, writes, and legacy Go payloads are separate
 //! migration slices.
 
 use aes::Aes128;
@@ -18,6 +18,12 @@ use std::fmt;
 
 /// The V1 event-store envelope header, including its trailing newline.
 pub const V1_HEADER: &[u8] = b"SYMERASEME_ENCv1\n";
+
+/// The V2 event-store envelope header, including its trailing newline.
+pub const V2_HEADER: &[u8] = b"SYMERASEME_ENCv2\n";
+
+/// The per-file V2 salt length.
+pub const V2_SALT_LEN: usize = 16;
 
 /// The fixed salt used by Python-final and the Go V1 compatibility path.
 pub const V1_FIXED_SALT: &[u8] = b"symeraseme-db-encryption-v1";
@@ -48,6 +54,8 @@ pub enum EncryptionError {
     InvalidMasterKeyLength { actual: usize },
     /// The envelope does not begin with the exact V1 header.
     UnsupportedEnvelope,
+    /// The V2 envelope does not contain its complete per-file salt.
+    TruncatedSalt,
     /// The decoded Fernet frame is shorter than the authenticated minimum.
     TruncatedToken,
     /// The token is not padded URL-safe base64.
@@ -69,6 +77,7 @@ impl fmt::Display for EncryptionError {
                 write!(formatter, "master key must be 32 bytes (got {actual})")
             }
             Self::UnsupportedEnvelope => formatter.write_str("unsupported encryption envelope"),
+            Self::TruncatedSalt => formatter.write_str("truncated V2 encryption salt"),
             Self::TruncatedToken => formatter.write_str("truncated Fernet token"),
             Self::InvalidBase64 => formatter.write_str("invalid URL-safe base64 Fernet token"),
             Self::UnsupportedFernetVersion(version) => {
@@ -115,6 +124,37 @@ pub fn decrypt_v1(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
         PBKDF2_ITERATIONS,
         &mut fernet_key,
     );
+
+    decrypt_standard_fernet(token, &fernet_key)
+}
+
+/// Decrypts a Python-final standard-Fernet V2 event-store envelope.
+///
+/// The envelope is `V2_HEADER || salt || token`. The per-file 16-byte salt
+/// is used directly for the same PBKDF2-HMAC-SHA256 derivation as V1.
+/// Authentication is verified before any CBC decryption or PKCS7 unpadding.
+pub fn decrypt_v2(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    if !envelope.starts_with(V2_HEADER) {
+        return Err(EncryptionError::UnsupportedEnvelope);
+    }
+    if master_key.len() != MASTER_KEY_LEN {
+        return Err(EncryptionError::InvalidMasterKeyLength {
+            actual: master_key.len(),
+        });
+    }
+
+    let token_start = V2_HEADER.len() + V2_SALT_LEN;
+    if envelope.len() < token_start {
+        return Err(EncryptionError::TruncatedSalt);
+    }
+    let token = &envelope[token_start..];
+    if token.is_empty() {
+        return Err(EncryptionError::TruncatedToken);
+    }
+
+    let salt = &envelope[V2_HEADER.len()..token_start];
+    let mut fernet_key = [0_u8; FERNET_KEY_LEN];
+    pbkdf2_hmac::<Sha256>(master_key, salt, PBKDF2_ITERATIONS, &mut fernet_key);
 
     decrypt_standard_fernet(token, &fernet_key)
 }
