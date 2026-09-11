@@ -271,7 +271,7 @@ impl OwnedProcess {
                     "oracle Windows suspended-process resume failed: {error}"
                 )));
             }
-            return Ok(Self { child, job });
+            Ok(Self { child, job })
         }
         #[cfg(not(windows))]
         Ok(Self { child })
