@@ -884,7 +884,7 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 
 **Files:**
 - Separate repo after immutable prerelease assets exist:
-  `/Users/daniel/Dev/Symaira Dev/homebrew-tap/Formula/symeraseme.rb`
+  `/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/homebrew-tap/Formula/symeraseme.rb`
 
 **Steps:**
 - [ ] Update only from real published asset checksums.
