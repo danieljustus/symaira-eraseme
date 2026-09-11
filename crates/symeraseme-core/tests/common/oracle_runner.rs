@@ -282,7 +282,17 @@ impl OwnedProcess {
         let tree_result = self.job.terminate_tree();
         #[cfg(unix)]
         let tree_result = kill_process_group(&self.child);
-        let direct_result = self.child.kill();
+        #[cfg(not(any(unix, windows)))]
+        let tree_result = Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "oracle process-tree cleanup unsupported on this platform",
+        ));
+        // Closing the Windows Job Object can reap the leader before the direct
+        // kill below. Do not signal an already-reaped child (or a recycled PID).
+        let direct_result = match self.child.try_wait()? {
+            Some(_) => Ok(()),
+            None => self.child.kill(),
+        };
         let deadline = Instant::now() + timeout;
         loop {
             match self.child.try_wait()? {
@@ -375,6 +385,7 @@ struct WindowsJob(isize);
 #[cfg(windows)]
 impl WindowsJob {
     fn assign(child: &Child) -> std::io::Result<Self> {
+        #[link(name = "kernel32")]
         unsafe extern "system" {
             fn CreateJobObjectW(attrs: *const (), name: *const u16) -> isize;
             fn SetInformationJobObject(job: isize, class: u32, info: *mut (), len: u32) -> i32;
@@ -420,7 +431,7 @@ impl WindowsJob {
             SetInformationJobObject(
                 job,
                 JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
-                (&mut limits as *mut _).cast(),
+                (&mut limits as *mut JobObjectExtendedLimitInformation).cast::<()>(),
                 std::mem::size_of_val(&limits) as u32,
             )
         } != 0
@@ -433,8 +444,12 @@ impl WindowsJob {
         Ok(Self(job))
     }
     fn resume(&self, pid: u32) -> std::io::Result<()> {
+        #[link(name = "kernel32")]
         unsafe extern "system" {
             fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+        }
+        #[link(name = "ntdll")]
+        unsafe extern "system" {
             fn NtResumeProcess(process: isize) -> i32;
         }
         let process = unsafe { OpenProcess(PROCESS_ACCESS, 0, pid) };
@@ -466,6 +481,7 @@ impl Drop for WindowsJob {
 }
 #[cfg(windows)]
 fn child_process_handle(pid: u32) -> std::io::Result<isize> {
+    #[link(name = "kernel32")]
     unsafe extern "system" {
         fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
     }
@@ -478,6 +494,7 @@ fn child_process_handle(pid: u32) -> std::io::Result<isize> {
 }
 #[cfg(windows)]
 fn terminate_unassigned(child: &mut Child) -> std::io::Result<()> {
+    #[link(name = "kernel32")]
     unsafe extern "system" {
         fn TerminateProcess(process: isize, code: u32) -> i32;
     }
@@ -503,6 +520,7 @@ fn terminate_unassigned(child: &mut Child) -> std::io::Result<()> {
 }
 #[cfg(windows)]
 fn close_handle(handle: isize) {
+    #[link(name = "kernel32")]
     unsafe extern "system" {
         fn CloseHandle(handle: isize) -> i32;
     }
@@ -520,6 +538,13 @@ mod tests {
     fn command(script: &str) -> Command {
         let mut command = Command::new("/bin/sh");
         command.args(["-c", script]);
+        command
+    }
+
+    #[cfg(windows)]
+    fn command(script: &str) -> Command {
+        let mut command = Command::new("cmd.exe");
+        command.args(["/C", script]);
         command
     }
 
@@ -551,6 +576,35 @@ mod tests {
         .unwrap();
         assert_eq!(output.status.code(), Some(7));
         assert_eq!(output.stdout, b"bad");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_normal_and_nonzero_exit_are_captured() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ok = command("echo ok");
+        let output = run(
+            &mut ok,
+            &dir.path().join("o"),
+            &dir.path().join("e"),
+            Duration::from_secs(1),
+            32,
+        )
+        .unwrap();
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(output.stdout, b"ok\r\n");
+
+        let mut bad = command("echo bad & exit /B 7");
+        let output = run(
+            &mut bad,
+            &dir.path().join("o2"),
+            &dir.path().join("e2"),
+            Duration::from_secs(1),
+            32,
+        )
+        .unwrap();
+        assert_eq!(output.status.code(), Some(7));
+        assert_eq!(output.stdout, b"bad\r\n");
     }
 
     #[test]
