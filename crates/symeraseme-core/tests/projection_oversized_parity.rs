@@ -32,12 +32,12 @@ fn run_go_oracle() -> OracleOutput {
         "projection-oracle"
     });
     let mut build = Command::new("go");
+    oracle_runner::configure_go_environment(&mut build, temp.path());
     build
         .current_dir(repo_root)
         .args(["build", "-o"])
         .arg(&executable)
-        .arg("./rust-tests/parity/oracle/projection")
-        .env("GOWORK", "off");
+        .arg("./rust-tests/parity/oracle/projection");
     let build_output = oracle_runner::run(
         &mut build,
         &temp.path().join("build.stdout"),
@@ -53,10 +53,8 @@ fn run_go_oracle() -> OracleOutput {
     );
 
     let mut oracle = Command::new(&executable);
-    oracle.current_dir(repo_root).env_clear().env(
-        "PATH",
-        std::env::var_os("PATH").expect("PATH is configured"),
-    );
+    oracle_runner::configure_go_environment(&mut oracle, temp.path());
+    oracle.current_dir(repo_root);
     let output = oracle_runner::run(
         &mut oracle,
         &temp.path().join("oracle.stdout"),

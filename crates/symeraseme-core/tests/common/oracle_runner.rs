@@ -1,5 +1,7 @@
 use std::fs;
 use std::io::Read;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
@@ -21,6 +23,26 @@ pub(crate) fn run(
     output_limit: u64,
 ) -> std::io::Result<Output> {
     run_inner(command, stdout_path, stderr_path, timeout, output_limit)
+}
+
+pub(crate) fn configure_go_environment(command: &mut Command, temp_root: &Path) {
+    command
+        .env_clear()
+        .env(
+            "PATH",
+            std::env::var_os("PATH").expect("PATH is configured"),
+        )
+        .env("HOME", temp_root)
+        .env("TMP", temp_root)
+        .env("TMPDIR", temp_root)
+        .env("TEMP", temp_root)
+        .env("GOCACHE", temp_root.join("go-cache"))
+        .env("GOWORK", "off");
+    for name in ["SystemRoot", "SYSTEMROOT", "WINDIR"] {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
+    }
 }
 
 /// Run a subprocess with stdin backed by a private temporary file.
@@ -54,33 +76,33 @@ fn run_inner(
     command
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
-    let mut child = command.spawn()?;
+    let mut process = OwnedProcess::spawn(command)?;
     let deadline = Instant::now() + timeout;
 
     let status = loop {
         match output_exceeded(stdout_path, stderr_path, output_limit) {
             Ok(true) => {
-                cleanup_process(&mut child, Duration::from_secs(2))?;
+                process.cleanup(Duration::from_secs(2))?;
                 return Err(std::io::Error::other(
                     "oracle subprocess output exceeded its bounded limit",
                 ));
             }
             Ok(false) => {}
             Err(error) => {
-                let cleanup = cleanup_process(&mut child, Duration::from_secs(2));
+                let cleanup = process.cleanup(Duration::from_secs(2));
                 return Err(with_cleanup_error(error, cleanup));
             }
         }
-        match child.try_wait() {
+        match process.child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) => {}
             Err(error) => {
-                let cleanup = cleanup_process(&mut child, Duration::from_secs(2));
+                let cleanup = process.cleanup(Duration::from_secs(2));
                 return Err(with_cleanup_error(error, cleanup));
             }
         }
         if Instant::now() >= deadline {
-            cleanup_process(&mut child, Duration::from_secs(2))?;
+            process.cleanup(Duration::from_secs(2))?;
             return Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "oracle subprocess exceeded its bounded timeout",
@@ -90,8 +112,8 @@ fn run_inner(
     };
 
     // The leader may have exited while a descendant still owns stdout/stderr.
-    // The process group is ours, so clean it before opening either file.
-    cleanup_process(&mut child, Duration::from_secs(2))?;
+    // Our owned lifetime handle kills descendants before opening either file.
+    process.cleanup(Duration::from_secs(2))?;
     let stdout = read_capped(stdout_path, output_limit)?;
     let stderr = read_capped(stderr_path, output_limit)?;
     Ok(Output {
@@ -150,89 +172,288 @@ fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
                 }
             });
         }
-        Ok(())
     }
     #[cfg(windows)]
     {
-        let _ = command;
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "oracle process-tree cleanup requires a Windows Job Object; taskkill is not used as a safety substitute",
-        ))
+        command.creation_flags(CREATE_SUSPENDED);
     }
     #[cfg(not(any(unix, windows)))]
     {
         let _ = command;
-        Err(std::io::Error::new(
+        return Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "oracle process-tree cleanup unsupported on this platform",
-        ))
+        ));
+    }
+    Ok(())
+}
+
+struct OwnedProcess {
+    child: Child,
+    #[cfg(windows)]
+    job: WindowsJob,
+}
+
+impl OwnedProcess {
+    fn spawn(command: &mut Command) -> std::io::Result<Self> {
+        #[cfg(windows)]
+        let mut child = command.spawn()?;
+        #[cfg(not(windows))]
+        let child = command.spawn()?;
+        #[cfg(windows)]
+        {
+            let job = match WindowsJob::assign(&child) {
+                Ok(job) => job,
+                Err(error) => {
+                    terminate_unassigned(&mut child)?;
+                    return Err(std::io::Error::other(format!(
+                        "oracle Windows Job Object assignment failed: {error}"
+                    )));
+                }
+            };
+            if let Err(error) = job.resume(child.id()) {
+                terminate_unassigned(&mut child)?;
+                return Err(std::io::Error::other(format!(
+                    "oracle Windows suspended-process resume failed: {error}"
+                )));
+            }
+            return Ok(Self { child, job });
+        }
+        #[cfg(not(windows))]
+        Ok(Self { child })
+    }
+
+    fn cleanup(&mut self, timeout: Duration) -> std::io::Result<()> {
+        #[cfg(windows)]
+        let tree_result = self.job.terminate_tree();
+        #[cfg(unix)]
+        let tree_result = kill_process_group(&self.child);
+        let direct_result = self.child.kill();
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.child.try_wait()? {
+                Some(_) => break,
+                None if Instant::now() >= deadline => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "oracle subprocess cleanup exceeded its bounded timeout",
+                    ));
+                }
+                None => thread::sleep(Duration::from_millis(10)),
+            }
+        }
+        tree_result?;
+        if let Err(error) = direct_result {
+            let already_gone = matches!(
+                error.kind(),
+                std::io::ErrorKind::InvalidInput | std::io::ErrorKind::NotFound
+            ) || error.raw_os_error() == Some(3);
+            if !already_gone {
+                return Err(std::io::Error::other(format!(
+                    "oracle direct-child cleanup failed: {error}"
+                )));
+            }
+        }
+        Ok(())
     }
 }
 
-fn cleanup_process(child: &mut Child, timeout: Duration) -> std::io::Result<()> {
-    let group_result = kill_process_group(child);
-    let direct_result = child.kill();
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait()? {
-            Some(_) => break,
-            None if Instant::now() >= deadline => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "oracle subprocess cleanup exceeded its bounded timeout",
-                ));
-            }
-            None => thread::sleep(Duration::from_millis(10)),
-        }
+#[cfg(unix)]
+fn kill_process_group(child: &Child) -> std::io::Result<()> {
+    unsafe extern "C" {
+        fn kill(pid: i32, signal: i32) -> i32;
     }
-    group_result?;
-    if let Err(error) = direct_result {
-        let already_gone = matches!(
-            error.kind(),
-            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::NotFound
-        ) || error.raw_os_error() == Some(3);
-        if !already_gone {
-            return Err(std::io::Error::other(format!(
-                "oracle direct-child cleanup failed: {error}"
-            )));
+    let pid = i32::try_from(child.id()).map_err(|_| std::io::Error::other("invalid child pid"))?;
+    if unsafe { kill(-pid, 9) } != 0 {
+        let error = std::io::Error::last_os_error();
+        if error.raw_os_error() != Some(3) {
+            return Err(error);
         }
     }
     Ok(())
 }
 
-fn kill_process_group(child: &Child) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        unsafe extern "C" {
-            fn kill(pid: i32, signal: i32) -> i32;
+#[cfg(windows)]
+const CREATE_SUSPENDED: u32 = 0x0000_0004;
+#[cfg(windows)]
+const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x0000_2000;
+#[cfg(windows)]
+const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
+#[cfg(windows)]
+const PROCESS_ACCESS: u32 = 0x0001 | 0x0100 | 0x0800;
+
+#[cfg(windows)]
+#[repr(C)]
+struct JobObjectBasicLimitInformation {
+    per_process_user_time_limit: i64,
+    per_job_user_time_limit: i64,
+    limit_flags: u32,
+    minimum_working_set_size: usize,
+    maximum_working_set_size: usize,
+    active_process_limit: u32,
+    affinity: usize,
+    priority_class: u32,
+    scheduling_class: u32,
+}
+#[cfg(windows)]
+#[repr(C)]
+struct IoCounters {
+    read_operations: u64,
+    write_operations: u64,
+    other_operations: u64,
+    read_bytes: u64,
+    write_bytes: u64,
+    other_bytes: u64,
+}
+#[cfg(windows)]
+#[repr(C)]
+struct JobObjectExtendedLimitInformation {
+    basic: JobObjectBasicLimitInformation,
+    io: IoCounters,
+    process_memory_limit: usize,
+    job_memory_limit: usize,
+    peak_process_memory_used: usize,
+    peak_job_memory_used: usize,
+}
+
+#[cfg(windows)]
+struct WindowsJob(isize);
+#[cfg(windows)]
+impl WindowsJob {
+    fn assign(child: &Child) -> std::io::Result<Self> {
+        unsafe extern "system" {
+            fn CreateJobObjectW(attrs: *const (), name: *const u16) -> isize;
+            fn SetInformationJobObject(job: isize, class: u32, info: *mut (), len: u32) -> i32;
+            fn AssignProcessToJobObject(job: isize, process: isize) -> i32;
         }
-        let pid =
-            i32::try_from(child.id()).map_err(|_| std::io::Error::other("invalid child pid"))?;
-        const SIGKILL: i32 = 9;
-        if unsafe { kill(-pid, SIGKILL) } != 0 {
-            let error = std::io::Error::last_os_error();
-            if error.raw_os_error() != Some(3) {
+        let job = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+        if job == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mut limits = JobObjectExtendedLimitInformation {
+            basic: JobObjectBasicLimitInformation {
+                per_process_user_time_limit: 0,
+                per_job_user_time_limit: 0,
+                limit_flags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                minimum_working_set_size: 0,
+                maximum_working_set_size: 0,
+                active_process_limit: 0,
+                affinity: 0,
+                priority_class: 0,
+                scheduling_class: 0,
+            },
+            io: IoCounters {
+                read_operations: 0,
+                write_operations: 0,
+                other_operations: 0,
+                read_bytes: 0,
+                write_bytes: 0,
+                other_bytes: 0,
+            },
+            process_memory_limit: 0,
+            job_memory_limit: 0,
+            peak_process_memory_used: 0,
+            peak_job_memory_used: 0,
+        };
+        let process = match child_process_handle(child.id()) {
+            Ok(process) => process,
+            Err(error) => {
+                close_handle(job);
                 return Err(error);
             }
+        };
+        let ok = unsafe {
+            SetInformationJobObject(
+                job,
+                JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                (&mut limits as *mut _).cast(),
+                std::mem::size_of_val(&limits) as u32,
+            )
+        } != 0
+            && unsafe { AssignProcessToJobObject(job, process) } != 0;
+        close_handle(process);
+        if !ok {
+            close_handle(job);
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(Self(job))
+    }
+    fn resume(&self, pid: u32) -> std::io::Result<()> {
+        unsafe extern "system" {
+            fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+            fn NtResumeProcess(process: isize) -> i32;
+        }
+        let process = unsafe { OpenProcess(PROCESS_ACCESS, 0, pid) };
+        if process == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let status = unsafe { NtResumeProcess(process) };
+        close_handle(process);
+        if status != 0 {
+            return Err(std::io::Error::last_os_error());
         }
         Ok(())
     }
-    #[cfg(windows)]
-    {
-        let _ = child;
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "oracle process-tree cleanup requires a Windows Job Object",
-        ))
+    fn terminate_tree(&mut self) -> std::io::Result<()> {
+        let handle = self.0;
+        self.0 = 0;
+        close_handle(handle);
+        Ok(())
     }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = child;
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "oracle process-tree cleanup unsupported on this platform",
-        ))
+}
+#[cfg(windows)]
+impl Drop for WindowsJob {
+    fn drop(&mut self) {
+        if self.0 != 0 {
+            close_handle(self.0);
+            self.0 = 0;
+        }
+    }
+}
+#[cfg(windows)]
+fn child_process_handle(pid: u32) -> std::io::Result<isize> {
+    unsafe extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+    }
+    let handle = unsafe { OpenProcess(PROCESS_ACCESS, 0, pid) };
+    if handle == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(handle)
+    }
+}
+#[cfg(windows)]
+fn terminate_unassigned(child: &mut Child) -> std::io::Result<()> {
+    unsafe extern "system" {
+        fn TerminateProcess(process: isize, code: u32) -> i32;
+    }
+    let handle = child_process_handle(child.id())?;
+    let ok = unsafe { TerminateProcess(handle, 1) } != 0;
+    close_handle(handle);
+    if !ok {
+        return Err(std::io::Error::last_os_error());
+    }
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "oracle unassigned Windows child cleanup exceeded its bounded timeout",
+            ));
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+#[cfg(windows)]
+fn close_handle(handle: isize) {
+    unsafe extern "system" {
+        fn CloseHandle(handle: isize) -> i32;
+    }
+    if handle != 0 {
+        let _ = unsafe { CloseHandle(handle) };
     }
 }
 

@@ -290,18 +290,8 @@ fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
         .expect("Rust V3 writer must succeed");
     request.extend_from_slice(&rust_envelope);
     let mut command = std::process::Command::new("go");
-    command
-        .args(["run", "."])
-        .current_dir(&oracle)
-        .env_clear()
-        .env(
-            "PATH",
-            std::env::var_os("PATH").expect("PATH is configured"),
-        )
-        .env("HOME", temp.path())
-        .env("TMPDIR", temp.path())
-        .env("GOCACHE", temp.path().join("go-cache"))
-        .env("GOWORK", "off");
+    oracle_runner::configure_go_environment(&mut command, temp.path());
+    command.args(["run", "."]).current_dir(&oracle);
     let output = oracle_runner::run_with_stdin(
         &mut command,
         &request,
@@ -323,18 +313,8 @@ fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
     encrypt_request.extend_from_slice(&key);
     encrypt_request.extend_from_slice(plaintext);
     let mut command = std::process::Command::new("go");
-    command
-        .args(["run", "."])
-        .current_dir(&oracle)
-        .env_clear()
-        .env(
-            "PATH",
-            std::env::var_os("PATH").expect("PATH is configured"),
-        )
-        .env("HOME", temp.path())
-        .env("TMPDIR", temp.path())
-        .env("GOCACHE", temp.path().join("go-cache"))
-        .env("GOWORK", "off");
+    oracle_runner::configure_go_environment(&mut command, temp.path());
+    command.args(["run", "."]).current_dir(&oracle);
     let output = oracle_runner::run_with_stdin(
         &mut command,
         &encrypt_request,
