@@ -17,4 +17,5 @@ symeraseme-core = { path = "../symeraseme-core", version = "0.13.0" }
 tempfile.workspace = true
 
 [dev-dependencies]
+serde.workspace = true
 serde_json.workspace = true
