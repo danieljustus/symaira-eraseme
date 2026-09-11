@@ -12,9 +12,11 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 )
 
+const maxRequestBytes = 64 << 20
+
 func main() {
-	input, err := io.ReadAll(os.Stdin)
-	if err != nil || len(input) < 33 {
+	input, err := io.ReadAll(io.LimitReader(os.Stdin, maxRequestBytes+1))
+	if err != nil || len(input) > maxRequestBytes || len(input) < 33 {
 		fail("invalid request")
 	}
 	key := input[1:33]

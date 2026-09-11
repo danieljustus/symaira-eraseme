@@ -53,7 +53,10 @@ fn run_go_oracle() -> OracleOutput {
     );
 
     let mut oracle = Command::new(&executable);
-    oracle.current_dir(repo_root).env_clear();
+    oracle.current_dir(repo_root).env_clear().env(
+        "PATH",
+        std::env::var_os("PATH").expect("PATH is configured"),
+    );
     let output = oracle_runner::run(
         &mut oracle,
         &temp.path().join("oracle.stdout"),
