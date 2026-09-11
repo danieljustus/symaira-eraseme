@@ -33,7 +33,7 @@ serde_yaml = "0.9.34"
 symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "27177f25f551cecefa7bd6c4524abf175b3a75c7" }
 tar = "0.4.44"
 tempfile = "3.27.0"
-toml = "0.5.11"
+toml = "1.1.0"
 ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.10.2"
 minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
