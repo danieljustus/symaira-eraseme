@@ -1,9 +1,10 @@
-//! Decryption for the shipped Python-final V1/V2 event-store envelopes.
+//! Decryption for the shipped Python-final V1/V2/V3 event-store envelopes.
 //!
 //! V1 and V2 use PBKDF2-HMAC-SHA256 followed by a standard Fernet token.
-//! This module intentionally implements only the read contracts needed by
-//! CRY-001 and CRY-002; V3, writes, and legacy Go payloads are separate
-//! migration slices.
+//! V3 uses HKDF-SHA256 followed by the same standard Fernet token. This module
+//! intentionally implements only the read contracts needed by CRY-001,
+//! CRY-002, and CRY-003; writes and legacy Go payloads are separate migration
+//! slices.
 
 use aes::Aes128;
 use base64::Engine as _;
@@ -22,14 +23,23 @@ pub const V1_HEADER: &[u8] = b"SYMERASEME_ENCv1\n";
 /// The V2 event-store envelope header, including its trailing newline.
 pub const V2_HEADER: &[u8] = b"SYMERASEME_ENCv2\n";
 
+/// The V3 event-store envelope header, including its trailing newline.
+pub const V3_HEADER: &[u8] = b"SYMERASEME_ENCv3\n";
+
 /// The per-file V2 salt length.
 pub const V2_SALT_LEN: usize = 16;
+
+/// The per-file V3 salt length.
+pub const V3_SALT_LEN: usize = 16;
 
 /// The fixed salt used by Python-final and the Go V1 compatibility path.
 pub const V1_FIXED_SALT: &[u8] = b"symeraseme-db-encryption-v1";
 
 /// The V1 PBKDF2 work factor.
 pub const PBKDF2_ITERATIONS: u32 = 600_000;
+
+/// The V3 HKDF info label.
+pub const V3_HKDF_INFO: &[u8] = b"symeraseme-db-encryption-v3";
 
 const MASTER_KEY_LEN: usize = 32;
 const FERNET_KEY_LEN: usize = 32;
@@ -44,7 +54,7 @@ const FERNET_SIGNING_KEY_LEN: usize = 16;
 type HmacSha256 = Hmac<Sha256>;
 type Aes128CbcDecryptor = Decryptor<Aes128>;
 
-/// Errors returned while authenticating or decrypting a V1 envelope.
+/// Errors returned while authenticating or decrypting a versioned envelope.
 ///
 /// Messages contain only format metadata. No key or decrypted bytes are
 /// retained in the error value or exposed through `Display`.
@@ -54,7 +64,7 @@ pub enum EncryptionError {
     InvalidMasterKeyLength { actual: usize },
     /// The envelope does not begin with the exact V1 header.
     UnsupportedEnvelope,
-    /// The V2 envelope does not contain its complete per-file salt.
+    /// The V2 or V3 envelope does not contain its complete per-file salt.
     TruncatedSalt,
     /// The decoded Fernet frame is shorter than the authenticated minimum.
     TruncatedToken,
@@ -157,6 +167,56 @@ pub fn decrypt_v2(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     pbkdf2_hmac::<Sha256>(master_key, salt, PBKDF2_ITERATIONS, &mut fernet_key);
 
     decrypt_standard_fernet(token, &fernet_key)
+}
+
+/// Decrypts a Python-final standard-Fernet V3 event-store envelope.
+///
+/// The envelope is `V3_HEADER || salt || token`. The per-file 16-byte salt
+/// is used with HKDF-SHA256 and [`V3_HKDF_INFO`] to derive the standard Fernet
+/// key. Authentication is verified before any CBC decryption or PKCS7
+/// unpadding.
+pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    if !envelope.starts_with(V3_HEADER) {
+        return Err(EncryptionError::UnsupportedEnvelope);
+    }
+    if master_key.len() != MASTER_KEY_LEN {
+        return Err(EncryptionError::InvalidMasterKeyLength {
+            actual: master_key.len(),
+        });
+    }
+
+    let token_start = V3_HEADER.len() + V3_SALT_LEN;
+    if envelope.len() < token_start {
+        return Err(EncryptionError::TruncatedSalt);
+    }
+    let token = &envelope[token_start..];
+    if token.is_empty() {
+        return Err(EncryptionError::TruncatedToken);
+    }
+
+    let salt = &envelope[V3_HEADER.len()..token_start];
+    let fernet_key = derive_v3_key(master_key, salt)?;
+    decrypt_standard_fernet(token, &fernet_key)
+}
+
+fn derive_v3_key(master_key: &[u8], salt: &[u8]) -> Result<[u8; FERNET_KEY_LEN], EncryptionError> {
+    // HKDF-Extract: PRK = HMAC-SHA256(salt, master_key). V3 always supplies
+    // its fixed-width per-file salt, so the RFC 5869 absent-salt default is
+    // not used here.
+    let mut extract = <HmacSha256 as KeyInit>::new_from_slice(salt)
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+    extract.update(master_key);
+    let pseudorandom_key = extract.finalize().into_bytes();
+
+    // HKDF-Expand for one 32-byte block: T(1) = HMAC(PRK, info || 0x01).
+    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(&pseudorandom_key)
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+    expand.update(V3_HKDF_INFO);
+    expand.update(&[1]);
+    let block = expand.finalize().into_bytes();
+    let mut key = [0_u8; FERNET_KEY_LEN];
+    key.copy_from_slice(&block);
+    Ok(key)
 }
 
 fn decrypt_standard_fernet(
