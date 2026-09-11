@@ -2,9 +2,15 @@ use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::process::Command;
+use std::time::Duration;
 use symeraseme_core::storage::{EventRecord, EventType, Source, fold_events};
 
+#[path = "common/oracle_runner.rs"]
+mod oracle_runner;
+
 const CASES: &str = include_str!("../../../rust-tests/parity/oracle/projection/cases.json");
+const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
+const ORACLE_MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 struct Case {
@@ -25,18 +31,37 @@ fn run_go_oracle() -> OracleOutput {
     } else {
         "projection-oracle"
     });
-    let build = Command::new("go")
+    let mut build = Command::new("go");
+    build
         .current_dir(repo_root)
         .args(["build", "-o"])
         .arg(&executable)
         .arg("./rust-tests/parity/oracle/projection")
-        .status()
-        .expect("Go must be available for the projection oracle");
-    assert!(build.success(), "Go projection oracle build failed");
-    let output = Command::new(&executable)
-        .current_dir(repo_root)
-        .output()
-        .expect("run Go projection oracle");
+        .env("GOWORK", "off");
+    let build_output = oracle_runner::run(
+        &mut build,
+        &temp.path().join("build.stdout"),
+        &temp.path().join("build.stderr"),
+        ORACLE_TIMEOUT,
+        ORACLE_MAX_OUTPUT_BYTES,
+    )
+    .expect("Go must be available and finish building the projection oracle");
+    assert!(
+        build_output.status.success(),
+        "Go projection oracle build failed: {}",
+        String::from_utf8_lossy(&build_output.stderr)
+    );
+
+    let mut oracle = Command::new(&executable);
+    oracle.current_dir(repo_root).env_clear();
+    let output = oracle_runner::run(
+        &mut oracle,
+        &temp.path().join("oracle.stdout"),
+        &temp.path().join("oracle.stderr"),
+        ORACLE_TIMEOUT,
+        ORACLE_MAX_OUTPUT_BYTES,
+    )
+    .expect("Go projection oracle must finish within its bounded timeout/output limit");
     assert!(
         output.status.success(),
         "Go projection oracle failed: {}",
