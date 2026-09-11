@@ -203,13 +203,13 @@ fn derive_v3_key(master_key: &[u8], salt: &[u8]) -> Result<[u8; FERNET_KEY_LEN],
     // HKDF-Extract: PRK = HMAC-SHA256(salt, master_key). V3 always supplies
     // its fixed-width per-file salt, so the RFC 5869 absent-salt default is
     // not used here.
-    let mut extract = <HmacSha256 as Mac>::new_from_slice(salt)
+    let mut extract = <HmacSha256 as KeyInit>::new_from_slice(salt)
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     extract.update(master_key);
     let pseudorandom_key = extract.finalize().into_bytes();
 
     // HKDF-Expand for one 32-byte block: T(1) = HMAC(PRK, info || 0x01).
-    let mut expand = <HmacSha256 as Mac>::new_from_slice(&pseudorandom_key)
+    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(&pseudorandom_key)
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     expand.update(V3_HKDF_INFO);
     expand.update(&[1]);

@@ -270,5 +270,5 @@ fn python_final_v3_fixture_matches_oracle_provenance() {
         .as_str()
         .expect("the V3 oracle fixture must have a SHA-256 provenance record");
     let actual = Sha256::digest(PYTHON_FINAL_V3);
-    assert_eq!(format!("{actual:x}"), expected);
+    assert_eq!(hex::encode(actual), expected);
 }
