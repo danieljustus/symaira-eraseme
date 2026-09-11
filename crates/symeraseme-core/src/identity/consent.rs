@@ -462,6 +462,7 @@ fn tighten_permissions(path: &Path) -> io::Result<()> {
         fs::set_permissions(path, permissions)?;
     }
     #[cfg(windows)]
+    #[allow(clippy::permissions_set_readonly_false)]
     {
         // Go's os.Chmod on Windows maps the owner-write bit to read-only.
         // POSIX modes/ACL equivalence require separate native evidence.
@@ -580,6 +581,22 @@ mod tests {
             & 0o777;
         assert_eq!(dir_mode, CONSENT_DIR_MODE);
         assert_eq!(file_mode, CONSENT_FILE_MODE);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn readonly_permission_is_cleared_on_windows() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("consent.tmp");
+        fs::write(&path, b"consent").unwrap();
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&path, permissions).unwrap();
+        assert!(fs::metadata(&path).unwrap().permissions().readonly());
+
+        tighten_permissions(&path).unwrap();
+
+        assert!(!fs::metadata(&path).unwrap().permissions().readonly());
     }
 
     #[allow(dead_code)]
