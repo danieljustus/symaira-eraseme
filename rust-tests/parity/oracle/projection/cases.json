@@ -1,0 +1,9 @@
+[
+  {"name":"default","expected_response_days":null},
+  {"name":"negative_one","expected_response_days":-1},
+  {"name":"fractional","expected_response_days":1.9},
+  {"name":"duration_max_without_overflow","expected_response_days":106751},
+  {"name":"duration_day_overflow","expected_response_days":106752},
+  {"name":"int64_max_payload","expected_response_days":9223372036854775807},
+  {"name":"int64_min_payload","expected_response_days":-9223372036854775808}
+]

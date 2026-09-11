@@ -403,9 +403,13 @@ fn apply_event(state: &mut ProjectionState, event: &types::EventRecord) {
             let days = payload_integer(&event.payload, "expected_response_days")
                 .unwrap_or(30)
                 .max(0);
-            if let Some(delta) = Duration::try_days(days)
-                && let Some(deadline) = event.occurred_at.checked_add_signed(delta)
-            {
+            // Go's legacy expression is signed-64 arithmetic:
+            // time.Duration(days) * 24 * time.Hour. Preserve its wrapping
+            // multiplication instead of rejecting large values or silently
+            // retaining the prior deadline.
+            let nanoseconds_per_day: i64 = 86_400_000_000_000;
+            let delta = Duration::nanoseconds(days.wrapping_mul(nanoseconds_per_day));
+            if let Some(deadline) = event.occurred_at.checked_add_signed(delta) {
                 state.deadline_at = Some(timeutil::format_iso(deadline));
             }
         }
