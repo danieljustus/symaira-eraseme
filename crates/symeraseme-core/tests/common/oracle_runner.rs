@@ -25,7 +25,25 @@ pub(crate) fn run(
     run_inner(command, stdout_path, stderr_path, timeout, output_limit)
 }
 
+fn go_env_path(name: &str) -> Option<std::ffi::OsString> {
+    let output = std::process::Command::new("go")
+        .args(["env", name])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8(output.stdout).ok()?.trim().to_owned();
+    (!value.is_empty()).then(|| std::ffi::OsString::from(value))
+}
+
 pub(crate) fn configure_go_environment(command: &mut Command, temp_root: &Path) {
+    // setup-go provisions the module cache, but env_clear removes the HOME
+    // fallback Go uses to discover it (notably on Windows). Resolve both
+    // paths through the installed toolchain before isolating runtime HOME and
+    // temporary files, so cold oracle builds use the real cached dependencies.
+    let go_mod_cache = go_env_path("GOMODCACHE");
+    let go_path = go_env_path("GOPATH");
     command
         .env_clear()
         .env(
@@ -38,6 +56,12 @@ pub(crate) fn configure_go_environment(command: &mut Command, temp_root: &Path) 
         .env("TEMP", temp_root)
         .env("GOCACHE", temp_root.join("go-cache"))
         .env("GOWORK", "off");
+    if let Some(path) = go_mod_cache {
+        command.env("GOMODCACHE", path);
+    }
+    if let Some(path) = go_path {
+        command.env("GOPATH", path);
+    }
     for name in ["SystemRoot", "SYSTEMROOT", "WINDIR"] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
@@ -594,7 +618,7 @@ mod tests {
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(output.stdout, b"ok\r\n");
 
-        let mut bad = command("echo bad & exit /B 7");
+        let mut bad = command("echo bad& exit /B 7");
         let output = run(
             &mut bad,
             &dir.path().join("o2"),

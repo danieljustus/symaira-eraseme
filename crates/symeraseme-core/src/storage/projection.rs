@@ -479,7 +479,20 @@ fn payload_integer(payload: &Map<String, Value>, key: &str) -> Option<i64> {
     payload
         .get(key)
         .and_then(Value::as_f64)
-        .map(|value| value as i64)
+        .map(go_float_to_int)
+}
+
+fn go_float_to_int(value: f64) -> i64 {
+    // Go specifies out-of-range float-to-int conversion as implementation
+    // dependent. The amd64 conversion instruction returns MinInt64 for
+    // +2^63 and larger values; arm64 returns the saturated maximum instead.
+    // Keep this boundary target-specific rather than weakening ordinary,
+    // fractional, or in-range parity cases.
+    #[cfg(target_arch = "x86_64")]
+    if value >= 9_223_372_036_854_775_808.0 {
+        return i64::MIN;
+    }
+    value as i64
 }
 
 fn utc_now() -> DateTime<Utc> {
