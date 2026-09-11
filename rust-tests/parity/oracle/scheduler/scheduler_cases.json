@@ -99,6 +99,10 @@
       "content": "from symeraseme.core.scheduler import run",
       "is_python": true
     },
+    "turkish_dotted_i_marker": {
+      "content": "ExecStart=/bin/bash VENV/BİN/ACTIVATE\n",
+      "is_python": true
+    },
     "uv_run_marker": {
       "content": "uv run symeraseme tick",
       "is_python": true

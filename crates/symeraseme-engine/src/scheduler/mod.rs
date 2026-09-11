@@ -478,9 +478,39 @@ pub struct LegacyUnit {
     pub reason: String,
 }
 
+/// Lowercases per Go's `strings.ToLower`, which folds each rune through
+/// `unicode.ToLower`'s *simple* (always-one-rune-out) case mapping — unlike
+/// Rust's `str::to_lowercase()`, which applies Unicode's *full* case folding
+/// and can expand a single input character into several output characters
+/// (e.g. U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE full-folds to `"i"` +
+/// a combining dot-above, not plain `"i"`). That expansion can insert an
+/// extra codepoint in the middle of what would otherwise be an ASCII marker
+/// match — content containing "VENV/BİN/ACTIVATE" then fails to match the
+/// `venv/bin/activate` marker in Rust while Go's simple fold (`İ` → plain
+/// `i`) still matches it. Taking only the first character each per-`char`
+/// full-fold yields recovers Go's simple mapping for every case relevant
+/// here, since Unicode's full mappings only ever *append* combining/ligature
+/// components after the base simple-mapped character.
+fn go_to_lower(content: &str) -> String {
+    content
+        .chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
+}
+
 /// Reports whether `content` carries a marker associated with the Python
 /// scheduler integration, or the pre-Go marker comment without the `(Go)`
 /// suffix the Rust/Go wrappers always append.
+///
+/// Callers decode file bytes with [`String::from_utf8_lossy`] before calling
+/// this, unlike Go's `string(data)`, which reinterprets raw bytes without
+/// validation. Both handle invalid UTF-8 without panicking/erroring, but a
+/// marker word that straddles an invalid byte sequence could in principle be
+/// found by one and not the other. Accepted for this slice: every caller
+/// reads a scheduler unit file (a bash wrapper, plist XML, or systemd unit) —
+/// text always produced by this project's own generator, a hand-edited text
+/// editor, or the legacy Python installer, never attacker-controlled binary
+/// input — so genuinely invalid UTF-8 here is not a realistic input shape.
 fn is_python_scheduler_content(content: &str) -> bool {
     const MARKERS: [&str; 5] = [
         "python",
@@ -489,7 +519,7 @@ fn is_python_scheduler_content(content: &str) -> bool {
         "uv run",
         "venv/bin/activate",
     ];
-    let lower = content.to_lowercase();
+    let lower = go_to_lower(content);
     if MARKERS.iter().any(|marker| lower.contains(marker)) {
         return true;
     }
