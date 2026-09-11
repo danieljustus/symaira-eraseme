@@ -15,7 +15,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tempfile::NamedTempFile;
+use tempfile::Builder;
 
 /// Default token lifetime, matching the Go/Python implementations.
 pub const DEFAULT_TOKEN_TTL: i64 = 86_400;
@@ -172,6 +172,7 @@ impl ConsentStore {
     /// Issue and atomically persist a token for `command`.
     pub fn issue_token(&self, command: &str, ttl: i64) -> Result<String, ConsentError> {
         let ttl = if ttl <= 0 { DEFAULT_TOKEN_TTL } else { ttl };
+        self.ensure_directory()?;
         let bytes = (self.random)(TOKEN_BYTES)?;
         if bytes.len() != TOKEN_BYTES {
             return Err(ConsentError::Io(io::Error::new(
@@ -188,7 +189,6 @@ impl ConsentStore {
             token: Some(token.clone()),
         };
         let body = serde_json::to_vec(&record)?;
-        self.ensure_directory()?;
         atomic_write(&self.path_for_token(&token), &body)?;
         Ok(token)
     }
@@ -215,7 +215,8 @@ impl ConsentStore {
             let _ = fs::remove_file(path);
             return Err(ConsentError::Expired);
         }
-        tighten_permissions(&path)?;
+        // Go hardens existing validated records on a best-effort basis.
+        let _ = tighten_permissions(&path);
         Ok(())
     }
 
@@ -282,7 +283,7 @@ impl ConsentStore {
                 let _ = fs::remove_file(path);
                 continue;
             }
-            tighten_permissions(&path)?;
+            let _ = tighten_permissions(&path);
             let token = record.token.unwrap_or_else(|| {
                 name.trim_start_matches("consent_")
                     .trim_end_matches(".json")
@@ -300,8 +301,28 @@ impl ConsentStore {
     }
 
     fn ensure_directory(&self) -> io::Result<()> {
-        fs::create_dir_all(&self.directory)?;
-        tighten_permissions(&self.directory)
+        let mut builder = fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(CONSENT_DIR_MODE);
+        }
+        builder.create(&self.directory).map_err(|error| {
+            // Go MkdirAll reports ENOTDIR for an existing file at the leaf;
+            // Rust's recursive builder reports EEXIST on Unix instead.
+            if error.kind() == io::ErrorKind::AlreadyExists
+                && fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
+            {
+                io::Error::from(io::ErrorKind::NotADirectory)
+            } else {
+                error
+            }
+        })?;
+        // MkdirAll uses 0700 for every new ancestor; only the requested
+        // directory is subsequently hardened, ignoring chmod errors in Go.
+        let _ = tighten_permissions(&self.directory);
+        Ok(())
     }
 
     fn path_for_token(&self, token: &str) -> PathBuf {
@@ -365,25 +386,72 @@ fn token_filename(token: &str) -> String {
 }
 
 fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
+    atomic_write_with(path, body, fs::File::sync_all, close_file, chmod_temporary)
+}
+
+// Operation-local seams keep failure tests deterministic without global hooks.
+fn atomic_write_with(
+    path: &Path,
+    body: &[u8],
+    sync: impl FnOnce(&fs::File) -> io::Result<()>,
+    close: impl FnOnce(fs::File) -> io::Result<()>,
+    chmod: impl FnOnce(&Path) -> io::Result<()>,
+) -> io::Result<()> {
     let directory = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "consent path has no parent"))?;
-    let temporary = NamedTempFile::new_in(directory)?;
-    temporary.as_file().set_len(0)?;
-    temporary.as_file().write_all(body)?;
-    temporary.as_file().sync_all()?;
-    tighten_permissions(temporary.path())?;
+    let mut temporary = Builder::new()
+        .prefix(".consent-")
+        .suffix(".tmp")
+        .tempfile_in(directory)?;
+    temporary.write_all(body)?;
+    // Retain the existing fail-closed Rust guard. Go has no sync call:
+    // this is an explicit ID-005 difference, not normalized oracle parity.
+    sync(temporary.as_file())?;
+    // Go closes before chmod/rename.
+    // Keep the path guard alive so every pre-rename failure removes our temp.
+    let (file, temporary) = temporary.into_parts();
+    close(file)?;
+    chmod(&temporary)?;
     temporary
         .persist(path)
         .map(|_| ())
         .map_err(|error| error.error)
 }
 
-fn tighten_permissions(path: &Path) -> io::Result<()> {
+fn close_file(file: fs::File) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        // Consume the owner exactly once. Do not retry a possibly closed fd
+        // or turn EINTR into success; both could conceal a close failure.
+        nix::unistd::close(file).map_err(io::Error::from)
+    }
+    #[cfg(not(unix))]
+    {
+        // A reviewed checked-close API for these targets remains an ID-005
+        // blocker. Preserve the existing drop behavior and the sync guard.
+        drop(file);
+        Ok(())
+    }
+}
+
+fn chmod_temporary(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let metadata = fs::metadata(path)?;
+        // The temporary entry is a file. Apply the required mode directly,
+        // matching Go's checked Chmod without an extra metadata failure path.
+        fs::set_permissions(path, fs::Permissions::from_mode(CONSENT_FILE_MODE))
+    }
+    #[cfg(not(unix))]
+    tighten_permissions(path)
+}
+
+fn tighten_permissions(path: &Path) -> io::Result<()> {
+    let metadata = fs::metadata(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
         let mut permissions = metadata.permissions();
         let mode = if metadata.is_dir() {
             CONSENT_DIR_MODE
@@ -393,12 +461,29 @@ fn tighten_permissions(path: &Path) -> io::Result<()> {
         permissions.set_mode(mode);
         fs::set_permissions(path, permissions)?;
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    #[allow(clippy::permissions_set_readonly_false)]
     {
-        let _ = path;
+        // Go's os.Chmod on Windows maps the owner-write bit to read-only.
+        // POSIX modes/ACL equivalence require separate native evidence.
+        let mut permissions = metadata.permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions)?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = metadata;
     }
     Ok(())
 }
+
+#[cfg(all(test, unix))]
+#[path = "consent_filesystem_tests.rs"]
+mod filesystem_tests;
+
+#[cfg(test)]
+#[path = "consent_portable_tests.rs"]
+mod portable_filesystem_tests;
 
 #[cfg(test)]
 mod tests {
@@ -496,6 +581,22 @@ mod tests {
             & 0o777;
         assert_eq!(dir_mode, CONSENT_DIR_MODE);
         assert_eq!(file_mode, CONSENT_FILE_MODE);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn readonly_permission_is_cleared_on_windows() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("consent.tmp");
+        fs::write(&path, b"consent").unwrap();
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&path, permissions).unwrap();
+        assert!(fs::metadata(&path).unwrap().permissions().readonly());
+
+        tighten_permissions(&path).unwrap();
+
+        assert!(!fs::metadata(&path).unwrap().permissions().readonly());
     }
 
     #[allow(dead_code)]
