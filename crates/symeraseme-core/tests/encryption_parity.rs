@@ -272,3 +272,43 @@ fn python_final_v3_fixture_matches_oracle_provenance() {
     let actual = Sha256::digest(PYTHON_FINAL_V3);
     assert_eq!(hex::encode(actual), expected);
 }
+
+#[test]
+fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let key = [0x41_u8; 32];
+    let plaintext = b"SQLite format 3\0binary\xff payload at a block boundary";
+    let oracle = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../rust-tests/parity/oracle/crypto");
+    let run = |operation: u8, payload: &[u8]| {
+        let mut child = Command::new("go")
+            .args(["run", "."])
+            .current_dir(&oracle)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Go crypto oracle must start");
+        let mut request = Vec::with_capacity(33 + payload.len());
+        request.push(operation);
+        request.extend_from_slice(&key);
+        request.extend_from_slice(payload);
+        child.stdin.take().unwrap().write_all(&request).unwrap();
+        let output = child.wait_with_output().expect("Go oracle must finish");
+        assert!(
+            output.status.success(),
+            "Go oracle failed: {:?}",
+            output.stderr
+        );
+        output.stdout
+    };
+
+    let rust_envelope = symeraseme_core::storage::encryption::encrypt_v3(plaintext, &key)
+        .expect("Rust V3 writer must succeed");
+    assert_eq!(run(b'd', &rust_envelope), plaintext);
+
+    let go_envelope = run(b'e', plaintext);
+    assert_eq!(decrypt_v3(&go_envelope, &key).unwrap(), plaintext);
+}
