@@ -1,0 +1,8 @@
+package identity
+
+import "testing"
+
+func id005LimitWrites(t *testing.T) func() {
+	t.Fatal("ID-005 write failure needs a native Windows fault mechanism")
+	return func() {}
+}

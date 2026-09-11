@@ -1,0 +1,27 @@
+// Hooks for the explicitly instrumented, source-bound archive only.
+// Each hook changes real filesystem/handle state; it never returns a fake error.
+package identity
+
+import "os"
+
+var id005Fault string
+
+func id005BeforeClose(file *os.File) {
+	if id005Fault == "close_failure" {
+		// The original checked Close will observe os.ErrClosed. This is not
+		// a delayed EIO/ENOSPC failure from the underlying filesystem.
+		if err := file.Close(); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func id005BeforeChmod(path string) {
+	if id005Fault == "chmod_failure" {
+		// The original Chmod will observe ENOENT. The hook itself removed
+		// the temp, so this does not prove cleanup after an EPERM failure.
+		if err := os.Remove(path); err != nil {
+			panic(err)
+		}
+	}
+}

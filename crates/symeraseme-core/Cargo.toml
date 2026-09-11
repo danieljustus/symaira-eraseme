@@ -42,6 +42,9 @@ zeroize.workspace = true
 keyring.workspace = true
 rusqlite.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "=0.31.3", default-features = false }
+
 [build-dependencies]
 cap-fs-ext.workspace = true
 cap-std.workspace = true
