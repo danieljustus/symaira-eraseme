@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -25,15 +26,17 @@ func main() {
 	case 'e':
 		output, err = eventstore.EncryptBytesV3(input[33:], key)
 	case 'd':
-		if len(input) < 33+len(eventstore.EncMagicV3)+eventstore.SaltLen {
+		envelope := input[33:]
+		if len(envelope) < len(eventstore.EncMagicV3)+eventstore.SaltLen ||
+			!bytes.HasPrefix(envelope, eventstore.EncMagicV3) {
 			fail("invalid envelope")
 		}
 		offset := len(eventstore.EncMagicV3) + eventstore.SaltLen
-		keyBytes, deriveErr := eventstore.DeriveKeyHKDF(key, input[33+len(eventstore.EncMagicV3):33+offset], eventstore.HKDFInfoV3)
+		keyBytes, deriveErr := eventstore.DeriveKeyHKDF(key, envelope[len(eventstore.EncMagicV3):offset], eventstore.HKDFInfoV3)
 		if deriveErr != nil {
 			fail("key derivation failed")
 		}
-		output, err = eventstore.DecryptFernetToken(input[33+offset:], keyBytes)
+		output, err = eventstore.DecryptFernetToken(envelope[offset:], keyBytes)
 	default:
 		fail("unknown operation")
 	}

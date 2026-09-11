@@ -331,3 +331,37 @@ fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
     );
     assert_eq!(decrypt_v3(&output.stdout, &key).unwrap(), plaintext);
 }
+
+#[test]
+fn go_oracle_rejects_altered_v3_header_without_plaintext() {
+    let key = [0x41_u8; 32];
+    let plaintext = b"header validation regression";
+    let mut envelope = symeraseme_core::storage::encryption::encrypt_v3(plaintext, &key)
+        .expect("Rust V3 writer must succeed");
+    envelope[0] ^= 0x01;
+
+    let oracle = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../rust-tests/parity/oracle/crypto");
+    let temp = tempfile::tempdir().expect("oracle temp directory");
+    let mut request = Vec::with_capacity(33 + envelope.len());
+    request.push(b'd');
+    request.extend_from_slice(&key);
+    request.extend_from_slice(&envelope);
+    let mut command = std::process::Command::new("go");
+    oracle_runner::configure_go_environment(&mut command, temp.path());
+    command.args(["run", "."]).current_dir(&oracle);
+    let output = oracle_runner::run_with_stdin(
+        &mut command,
+        &request,
+        &temp.path().join("altered.stdout"),
+        &temp.path().join("altered.stderr"),
+        std::time::Duration::from_secs(30),
+        4 * 1024 * 1024,
+    )
+    .expect("Go oracle must finish altered-header request");
+    assert!(!output.status.success());
+    assert!(
+        output.stdout.is_empty(),
+        "rejected request leaked plaintext"
+    );
+}

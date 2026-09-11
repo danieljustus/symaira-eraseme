@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
@@ -55,9 +55,10 @@ pub(crate) fn run_with_stdin(
     timeout: Duration,
     output_limit: u64,
 ) -> std::io::Result<Output> {
+    validate_stdin_len(input.len() as u64)?;
     let mut stdin_file =
         tempfile::NamedTempFile::new_in(stdout_path.parent().unwrap_or_else(|| Path::new(".")))?;
-    std::io::Write::write_all(&mut stdin_file, input)?;
+    stdin_file.write_all(input)?;
     stdin_file.as_file().sync_all()?;
     command.stdin(Stdio::from(stdin_file.reopen()?));
     run_inner(command, stdout_path, stderr_path, timeout, output_limit)
@@ -70,39 +71,46 @@ fn run_inner(
     timeout: Duration,
     output_limit: u64,
 ) -> std::io::Result<Output> {
-    let stdout = fs::File::create(stdout_path)?;
-    let stderr = fs::File::create(stderr_path)?;
     configure_process_group(command)?;
-    command
-        .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr));
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut process = OwnedProcess::spawn(command)?;
+    let stdout = process
+        .child
+        .stdout
+        .take()
+        .ok_or_else(|| std::io::Error::other("oracle subprocess stdout pipe unavailable"))?;
+    let stderr = process
+        .child
+        .stderr
+        .take()
+        .ok_or_else(|| std::io::Error::other("oracle subprocess stderr pipe unavailable"))?;
+    let stdout_reader = CappedReader::spawn(stdout, output_limit);
+    let stderr_reader = CappedReader::spawn(stderr, output_limit);
     let deadline = Instant::now() + timeout;
 
     let status = loop {
-        match output_exceeded(stdout_path, stderr_path, output_limit) {
-            Ok(true) => {
-                process.cleanup(Duration::from_secs(2))?;
-                return Err(std::io::Error::other(
-                    "oracle subprocess output exceeded its bounded limit",
-                ));
-            }
-            Ok(false) => {}
-            Err(error) => {
-                let cleanup = process.cleanup(Duration::from_secs(2));
-                return Err(with_cleanup_error(error, cleanup));
-            }
+        if stdout_reader.exceeded() || stderr_reader.exceeded() {
+            process.cleanup(Duration::from_secs(2))?;
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(std::io::Error::other(
+                "oracle subprocess output exceeded its bounded limit",
+            ));
         }
         match process.child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) => {}
             Err(error) => {
                 let cleanup = process.cleanup(Duration::from_secs(2));
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
                 return Err(with_cleanup_error(error, cleanup));
             }
         }
         if Instant::now() >= deadline {
             process.cleanup(Duration::from_secs(2))?;
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
             return Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "oracle subprocess exceeded its bounded timeout",
@@ -111,16 +119,86 @@ fn run_inner(
         thread::sleep(Duration::from_millis(10));
     };
 
-    // The leader may have exited while a descendant still owns stdout/stderr.
-    // Our owned lifetime handle kills descendants before opening either file.
+    // Always clean the owned tree before joining readers: a trusted descendant
+    // may retain a pipe after the leader exits. This avoids an EOF hang.
     process.cleanup(Duration::from_secs(2))?;
-    let stdout = read_capped(stdout_path, output_limit)?;
-    let stderr = read_capped(stderr_path, output_limit)?;
+    let stdout_bytes = stdout_reader.join()?;
+    let stderr_bytes = stderr_reader.join()?;
+    if stdout_bytes.1 || stderr_bytes.1 {
+        return Err(std::io::Error::other(
+            "oracle subprocess output exceeded its bounded limit",
+        ));
+    }
+    write_bounded_file(stdout_path, &stdout_bytes.0)?;
+    write_bounded_file(stderr_path, &stderr_bytes.0)?;
     Ok(Output {
         status,
-        stdout,
-        stderr,
+        stdout: stdout_bytes.0,
+        stderr: stderr_bytes.0,
     })
+}
+
+fn validate_stdin_len(length: u64) -> std::io::Result<()> {
+    if length > 64 * 1024 * 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "oracle subprocess stdin exceeds its bounded request limit",
+        ));
+    }
+    Ok(())
+}
+
+struct CappedReader {
+    handle: thread::JoinHandle<std::io::Result<(Vec<u8>, bool)>>,
+    exceeded: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl CappedReader {
+    fn spawn(mut pipe: impl Read + Send + 'static, limit: u64) -> Self {
+        let exceeded_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = exceeded_flag.clone();
+        Self {
+            handle: thread::spawn(move || {
+                let mut bytes = Vec::new();
+                let mut exceeded = false;
+                let mut buffer = [0_u8; 8192];
+                loop {
+                    let count = pipe.read(&mut buffer)?;
+                    if count == 0 {
+                        break;
+                    }
+                    if !exceeded {
+                        let remaining = limit.saturating_sub(bytes.len() as u64);
+                        if count as u64 <= remaining {
+                            bytes.extend_from_slice(&buffer[..count]);
+                        } else {
+                            let keep = remaining as usize;
+                            bytes.extend_from_slice(&buffer[..keep]);
+                            exceeded = true;
+                            flag.store(true, std::sync::atomic::Ordering::Release);
+                        }
+                    }
+                }
+                Ok((bytes, exceeded))
+            }),
+            exceeded: exceeded_flag,
+        }
+    }
+
+    fn exceeded(&self) -> bool {
+        self.exceeded.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    fn join(self) -> std::io::Result<(Vec<u8>, bool)> {
+        self.handle
+            .join()
+            .map_err(|_| std::io::Error::other("oracle output reader panicked"))?
+    }
+}
+
+fn write_bounded_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(bytes)
 }
 
 fn with_cleanup_error(original: std::io::Error, cleanup: std::io::Result<()>) -> std::io::Error {
@@ -130,33 +208,9 @@ fn with_cleanup_error(original: std::io::Error, cleanup: std::io::Result<()>) ->
     }
 }
 
-fn output_exceeded(stdout: &Path, stderr: &Path, limit: u64) -> std::io::Result<bool> {
-    for path in [stdout, stderr] {
-        match fs::metadata(path) {
-            Ok(metadata) if metadata.len() > limit => return Ok(true),
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(false)
-}
-
-fn read_capped(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
-    let mut file = fs::File::open(path)?;
-    let mut bytes = Vec::new();
-    file.by_ref()
-        .take(limit.saturating_add(1))
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > limit {
-        return Err(std::io::Error::other(
-            "oracle subprocess output exceeded its bounded limit",
-        ));
-    }
-    Ok(bytes)
-}
-
 fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
+    // Unix cleanup covers trusted descendants that retain this process group.
+    // It is not a sandbox: a deliberate setsid/escape descendant is outside scope.
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -497,6 +551,16 @@ mod tests {
         .unwrap();
         assert_eq!(output.status.code(), Some(7));
         assert_eq!(output.stdout, b"bad");
+    }
+
+    #[test]
+    fn stdin_request_limit_is_checked_before_tempfile_write() {
+        assert!(validate_stdin_len(64 * 1024 * 1024 - 1).is_ok());
+        assert!(validate_stdin_len(64 * 1024 * 1024).is_ok());
+        assert_eq!(
+            validate_stdin_len(64 * 1024 * 1024 + 1).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
     }
 
     #[cfg(unix)]
