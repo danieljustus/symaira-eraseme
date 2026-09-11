@@ -1,10 +1,14 @@
 //! The production SQLite connection and event-store seams.
 
 pub mod encryption;
+pub mod projection;
 pub mod repository;
 pub mod store;
 pub mod types;
 
+pub use projection::{
+    ProjectionError, ProjectionResult, ProjectionState, append_and_project_tx, fold_events,
+};
 pub use repository::{ListRemovalRequestsOptions, Repository};
 pub use store::{SCHEMA_VERSION, Store};
 pub use types::{

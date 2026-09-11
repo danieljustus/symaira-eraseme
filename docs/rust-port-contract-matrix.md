@@ -119,7 +119,7 @@ SQLite, network transcript or process behavior.
 | DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO |
 | DB-005 | SQLite | reports/plans/tick snapshots | four event-store JSON fixtures | shared golden tests | byte | all | TODO |
 | DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | query/projection cases | semantic | all | TODO |
-| DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | TODO |
+| DB-007 | SQLite | append rejects unknown event types/sources without rows; a parseable historical unknown `event_type` advances only `last_event_id`/`last_event_at`; malformed replay rows are skipped entirely | temporary DB generated through the production store path; raw SQL only represents append-rejected historical rows (no committed hand-authored fixture) | Go `TestParseableUnknownReplayAdvancesBookkeepingWithoutStatusSideEffects`; Rust `projection_contract::invalid_append_is_rejected_without_side_effects_and_replay_boundaries_are_preserved` | side-effect | all | PASS (issue #889) |
 | DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO |
 | DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
 | DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
