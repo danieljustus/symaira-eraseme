@@ -46,7 +46,7 @@ The Go production route remains unchanged until the later cutover phase.
 
 ## Phase 3 execution evidence
 
-Tasks `3.1` and `3.2` are implemented and independently reviewed at
+Tasks `3.1` and `3.2` were implemented and independently reviewed at
 `b3b7ce642944c4fd0c123150e25d5d990f043b05` and
 `4a64892d5eaa0c5f435d4ceb2ce42e28a8ec449c`. The schema-v1 models, strict
 validation, embedded 1,277-broker corpus, filters and validated atomic sync
@@ -54,10 +54,12 @@ pass locally in Go and Rust. Both specification reviews are `PASS`; both
 quality/security reviews are `APPROVED`. Task `3.3` is independently approved
 at `9fb768805de213972db6f5437f1dd218e09e88d9`; all 11 canonical templates
 match the external golden fixture byte-for-byte with bounded rendering.
-Native Linux/Windows exact-head CI remains mandatory before merge. Task `3.4`
+Task `3.4`
 is independently approved at `0cfa8c0a5dccd0b189ad2cbbc076f53eab38ded2`;
 the shared redaction corpus, profile-aware byte behavior, bounded review and
-capability-safe file reads pass locally. Phase 3 is locally complete.
+capability-safe file reads pass locally. Phase 3 was integrated by #870 as
+`fa366dca`; its Go reference remains pinned and executable. Phase 3 is
+integrated, but its later cutover rows remain governed by the matrix below.
 
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
@@ -135,7 +137,7 @@ SQLite, network transcript or process behavior.
 | ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | identity interoperability/regression tests | byte/side-effect | all | PASS |
 | ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | adapter tests | semantic | native OS | TODO |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | byte | all | PASS (local; native CI pending) |
-| ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | shared cases | byte | all | TODO |
+| ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | `crates/symeraseme-core/tests/consent_api.rs` | byte | all | PASS (focused Rust contract; task 4.7 remains open) |
 | ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |
 | DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | PASS |
 | DOM-000B | domain | production web form has an honest tested runtime/manual boundary | local executor contract + durable manual-task tests; issue #800 | `TestWebFormNoExecutorPersistsManualFallback`, `TestWebFormExecutorReceivesBoundedContextAndMapsEvidence`, `TestAutoConfirmCreatesManualConfirmationTaskWithoutClick` | side-effect | all | PASS |
@@ -147,7 +149,7 @@ SQLite, network transcript or process behavior.
 | DOM-006 | domain | IMAP UIDVALIDITY/HWM/search/fetch policy | fake transcript | state-machine tests | side-effect | all | TODO |
 | DOM-007 | domain | OAuth2 state, PKCE, refresh and redaction | mock HTTP server | transcript/files | side-effect | all | TODO |
 | DOM-008 | domain | LLM provider descriptors, retries/errors | mock HTTP corpus | transcript tests | side-effect | all | TODO |
-| DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | TODO |
+| DOM-009 | domain | scheduler bytes/paths/install commands | isolated HOME + fake exec | native snapshots | byte+side-effect | macOS/Linux/Windows | PARTIAL (PASS: `Generate`/`WriteFiles` byte-exact against `rust-tests/parity/oracle/scheduler`, both directions reviewed for a path-traversal regression and fixed, #907; legacy-Python unit detection (`DetectLegacyPythonUnit`/`DetectLegacyPythonUnits`/`ScanLegacyPythonUnits`) byte-exact against the same oracle, reviewed and fixed (task 5.4 legacy-detection slice); TODO: Install/Uninstall/Status, native macOS/Linux/Windows execution of the Windows-specific traversal test) |
 | DOM-010 | domain | manual-task evidence/cleanup retention | temp files/DB | filesystem+DB | side-effect | all | TODO |
 | MCP-001 | MCP | `initialize` protocol version/capabilities/serverInfo | raw frame | raw frame test | byte | all | TODO |
 | MCP-000 | MCP HTTP | bearer secret uses constant-time comparison and strict header parsing | auth corpus; issue #817 | `TestServeHTTPBearerAuthContract` | side-effect | all | PASS |

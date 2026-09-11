@@ -8,3 +8,13 @@ crates/symeraseme-cli/src/commands/completion/*.txt text eol=lf
 # Canonical templates are rendered against byte-exact cross-platform goldens.
 registry/laws/** text eol=lf
 registry/templates/** text eol=lf
+
+# Go sources are read by rust-tests/parity/oracle/*/main.go and hashed
+# against a pinned sourceSHA256 provenance constant (verifySourceHash). A
+# Windows checkout with the platform's common core.autocrlf=true default
+# rewrites LF to CRLF, changing the hash and making the oracle exit non-zero
+# with no visible diagnostic in the Rust test's panic message beyond "exited
+# unsuccessfully" (frozen_fixture_matches_live_go_oracle in
+# scheduler_parity.rs). Force LF unconditionally so every checkout — and
+# every future oracle's pinned hash — sees the same bytes as `git blame`.
+*.go text eol=lf
