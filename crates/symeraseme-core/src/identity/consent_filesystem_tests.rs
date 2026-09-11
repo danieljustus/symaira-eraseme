@@ -191,6 +191,9 @@ fn id005_matches_frozen_go_filesystem() {
         let output = command
             .arg(std::env::current_exe().unwrap())
             .args([CHILD, "--exact", "--ignored", "--nocapture"])
+            // Child probes intentionally use restrictive umasks and resource limits.
+            // Do not let those probes create unreadable or truncated coverage files.
+            .env_remove("LLVM_PROFILE_FILE")
             .env("ID005_CASE", name)
             .env("ID005_ROOT", root.path())
             .output()

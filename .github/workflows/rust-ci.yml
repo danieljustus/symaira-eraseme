@@ -148,6 +148,18 @@ jobs:
               raise SystemExit(1)
           PY
 
+      - name: Upload Rust coverage diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: rust-coverage-diagnostics
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/rust-coverage.json
+            target/llvm-cov-target/*.profraw
+            target/llvm-cov-target/*-profraw-list
+            target/llvm-cov-target/*.profdata
+
       - name: Check every feature combination
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" hack check --workspace --each-feature --locked
