@@ -1,4 +1,4 @@
-use rusqlite::{Connection, ErrorCode, OpenFlags};
+use rusqlite::{Connection, ErrorCode};
 use std::fs;
 use std::sync::{Arc, Barrier, Condvar, Mutex, OnceLock};
 use std::thread;
@@ -406,6 +406,7 @@ fn newer_schema_is_rejected_without_running_migrations() {
 #[cfg(unix)]
 #[test]
 fn read_only_database_is_readable_but_writes_fail_without_mutation() {
+    use rusqlite::OpenFlags;
     use std::os::unix::fs::PermissionsExt;
 
     let tree = tempdir().expect("create isolated database directory");
