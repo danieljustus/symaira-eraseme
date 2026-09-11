@@ -125,7 +125,7 @@ SQLite, network transcript or process behavior.
 | DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
 | CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
 | CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go vectors complete; Rust vectors remain Phase 4 gate | byte | all | PASS (Python↔Go); Rust gated |
-| CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
+| CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v1-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v1_fixture_matches_shared_go_plaintext` | byte | all | PASS (local; native CI pending) |
 | CRY-002 | crypto | Python-final standard-Fernet V2 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
 | CRY-003 | crypto | Python-final standard-Fernet V3 decrypt | Python-generated vector | Rust decrypt vector | byte | all | TODO |
 | CRY-004 | crypto | corrected Go write format decryptable by Rust | fixed clock/RNG Go vector | bidirectional harness | byte | all | TODO |

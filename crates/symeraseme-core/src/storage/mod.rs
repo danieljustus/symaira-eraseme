@@ -1,8 +1,11 @@
-//! The production SQLite connection seam used by later storage slices.
+//! Persistent storage compatibility primitives.
 //!
-//! This module deliberately stops at connection setup. Schema, repositories,
-//! encryption, and projections belong to later migration slices and must not
-//! be inferred from this portability proof.
+//! This module deliberately stops at connection setup plus the encryption
+//! primitives added alongside it. Schema, repositories, and projections
+//! belong to later migration slices and must not be inferred from this
+//! portability proof.
+
+pub mod encryption;
 
 use rusqlite::{Connection, Result};
 use std::{fs, path::Path, time::Duration};
