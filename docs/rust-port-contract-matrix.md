@@ -11,6 +11,49 @@
 > required row is `PASS`. `TODO` means the contract is known but its
 > differential case has not yet been implemented.
 
+## Execution ordering and dependency gates
+
+Rows are grouped by seam (`BASE`, `CLI`, `CFG`, `REG`, `TMP`, `RED`, `DB`,
+`CRY`, `ID`, `DOM`, `MCP`, `APP`, `REL`, `CUT`) rather than physically
+reordered by dependency tier, because the seam grouping is what lets a row's
+evidence trail be found next to its neighbors. The required execution
+sequence is instead a dependency rule applied to *status*, not to row
+position on the page:
+
+1. **Oracle/differential harness** — `BASE-001`/`BASE-002` (Go gates) and the
+   Phase 1 harness (`1.1`–`1.4`) must hold before any other row's status is
+   trusted.
+2. **Shared secure base** — `CFG-*` (configuration), `DB-*` (SQLite storage),
+   `CRY-*` (encryption) and `ID-*` (identity/consent/master-key) are the
+   foundation every higher row is built on.
+3. **Independent leaf components** — `REG-*` (registry), `TMP-*`
+   (templates) and `RED-*` (redaction) have no dependency on the secure base
+   and may verify independently of it (this is why they can legitimately be
+   `PASS` while `DB-*`/`CRY-*`/`ID-*` rows are still partial).
+4. **Integrations** — `DOM-*` (domain/business logic), `MCP-*`/`MCP HTTP`/
+   `MCP stdio` and `APP-*` (SwiftUI) depend on the secure base plus the leaf
+   components. `CLI-010`–`CLI-024` are integration rows in this sense too
+   (e.g. `CLI-013` tick/status needs the `DB-*` rows; `CLI-017` grant needs
+   `ID-004`/`ID-005`; `CLI-021` review needs `RED-*`; `CLI-022` inbox/classify
+   needs `DOM-004`/`DOM-006`/`DOM-007`) even though they are numbered with
+   the rest of the CLI block — do not certify one of these as `PASS` ahead of
+   the secure-base/leaf rows it actually exercises.
+5. **Performance/value gate** — `BASE-003` (binary size/startup/RSS/asset
+   manifest) and the `REL-*` release-artifact rows.
+6. **Cutover readiness** — `CUT-*`, last, and only after every required row
+   above is `PASS`.
+
+Verified as of this pass: no row currently marked `PASS`/verified violates
+this order (each depends only on rows that are themselves `PASS`, or on
+nothing lower in this sequence). Two branches on `origin` were also checked
+against this ordering and against `main`: `migration/rust-watch-id005-rebase`
+(head `a04ded15`) is **not** additional unmerged work — its tree is
+byte-identical to the already-merged `77a0ba7d` (#903) aside from a
+handoff-doc timing difference, so it adds nothing beyond the `ID-005` row
+above. `migration/crypto-write-parity` (head `c29eea93`) **is** real,
+currently unmerged work; it is cited on `CRY-004`/`CRY-005` above as
+implemented-unverified rather than folded into a `PASS`.
+
 ## Phase 1 execution evidence
 
 Tasks `1.1`–`1.4` are implemented and reviewed on branch
@@ -113,23 +156,23 @@ SQLite, network transcript or process behavior.
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | PASS (local; native CI pending) |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | PASS (local; native CI pending) |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |
-| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
-| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
-| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | TODO |
-| DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO |
+| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB; `tests/fixtures/event-store/golden-campaign.db` | `crates/symeraseme-core/tests/sqlite_contract.rs::fresh_store_matches_go_schema_and_connection_contract`, `::fresh_schema_sql_matches_the_committed_production_fixture` | byte/semantic | all | PASS (local; native CI pending) — merged via #909 (`9ee0b3e0`) |
+| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | `crates/symeraseme-core/tests/sqlite_contract.rs::fresh_store_matches_go_schema_and_connection_contract` (PRAGMA assertions: `busy_timeout=5000`, `foreign_keys=1`, `journal_mode=wal`) | semantic | all | PASS (local; native CI pending) — merged via #909 (`9ee0b3e0`) |
+| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | `crates/symeraseme-core/tests/sqlite_contract.rs::typed_repository_queries_preserve_go_filters_pagination_and_event_buckets`, `::golden_fixture_is_read_from_a_copy_with_nullable_state_fields` | semantic | all | PASS (local; native CI pending) — merged via #909 (`9ee0b3e0`); read-only (`Repository`) queries only, no writes |
+| DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO — explicitly out of scope for #909 per its PR description ("Append/projection ... not included") |
 | DB-005 | SQLite | reports/plans/tick snapshots | four event-store JSON fixtures | shared golden tests | byte | all | TODO |
-| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | query/projection cases | semantic | all | TODO |
-| DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | TODO |
-| DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO |
-| DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
-| DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
+| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | `crates/symeraseme-core/tests/sqlite_contract.rs::event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls` | semantic | all | PASS (local; native CI pending) — merged via #909 (`9ee0b3e0`) |
+| DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | TODO — no append path exists in Rust yet (`Repository` is read-only) |
+| DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO — explicitly out of scope for #909 per its PR description ("full database migration ... not included") |
+| DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | `crates/symeraseme-core/tests/storage_lifecycle.rs::wal_reader_and_writer_progress_on_the_same_file`, `::busy_writer_waits_for_a_real_lock_release_then_commits`, `::busy_timeout_is_distinct_from_rollback_and_retry_succeeds` | side-effect | native OS | PARTIAL (local macOS only; native Linux/Windows CI pending) — merged via #909 (`9ee0b3e0`); contention is exercised with in-process threads sharing one connection pool, not the separate-process harness the row originally specified — treat as a narrower same-process proof, not full multi-process parity |
+| DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | `crates/symeraseme-core/tests/storage_lifecycle.rs::interrupted_initialization_resumes_from_a_real_go_prefix`, `::interrupted_migration_with_a_created_v2_table_is_retryable`, `::locked_migration_times_out_without_advancing_version_then_retries_after_rollback`, `::corrupt_database_is_rejected_without_rewriting_the_file`, `::newer_schema_is_rejected_without_running_migrations`, `::read_only_database_is_readable_but_writes_fail_without_mutation` | side-effect | native OS | PARTIAL (local macOS only; native CI pending) — merged via #909 (`9ee0b3e0`); the read-only case is `#[cfg(unix)]` only, no Windows-specific read-only/ACL equivalent exists yet |
 | CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
 | CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go vectors complete; Rust vectors remain Phase 4 gate | byte | all | PASS (Python↔Go); Rust gated |
 | CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v1-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v1_fixture_matches_shared_go_plaintext` | byte | all | PASS (local; native CI pending) |
 | CRY-002 | crypto | Python-final standard-Fernet V2 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v2-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v2_fixture_matches_shared_go_plaintext` | byte | all | PASS (local; native CI pending) |
 | CRY-003 | crypto | Python-final standard-Fernet V3 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v3-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v3_fixture_matches_shared_go_plaintext` plus fixture-backed negative cases | byte | all | PASS (local; native CI pending) |
-| CRY-004 | crypto | corrected Go write format decryptable by Rust | fixed clock/RNG Go vector | bidirectional harness | byte | all | TODO |
-| CRY-005 | crypto | Rust write format decryptable by corrected Go | fixed clock/RNG Rust vector | bidirectional harness | byte | all | TODO |
+| CRY-004 | crypto | corrected Go write format decryptable by Rust | fixed clock/RNG Go vector | bidirectional harness | byte | all | TODO — implemented-unverified: a Rust `encrypt_v3` writer and a stdin/stdout Go oracle (`rust-tests/parity/oracle/crypto/main.go`) exist and exercise this direction in `encryption_parity.rs::rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust`, but only on the unmerged, un-PR'd branch `migration/crypto-write-parity` (commit `c29eea93`); not on `main`, not independently reviewed or run by this pass — do not raise status until merged and verified |
+| CRY-005 | crypto | Rust write format decryptable by corrected Go | fixed clock/RNG Rust vector | bidirectional harness | byte | all | TODO — implemented-unverified: same branch/commit/test as CRY-004 covers this direction (Go-side decrypt of a Rust-produced envelope); same caveats apply |
 | CRY-006 | crypto | standard-Fernet and any distinctly-versioned Go compatibility parser reject truncation/tamper/wrong keys | mutation corpus | negative tests/fuzz seeds | semantic | all | TODO |
 | CRY-007 | crypto | decrypted temp dir/file modes and cleanup | isolated TMPDIR | filesystem manifest | side-effect | native OS | TODO |
 | CRY-008 | crypto | WAL checkpoint before re-encryption | write/close/crash corpus | data durability test | side-effect | all | TODO |
@@ -138,7 +181,7 @@ SQLite, network transcript or process behavior.
 | ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | adapter tests | semantic | native OS | TODO |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | byte | all | PASS (local; native CI pending) |
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | `crates/symeraseme-core/tests/consent_api.rs` | byte | all | PASS (focused Rust contract; task 4.7 remains open) |
-| ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |
+| ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME; frozen Go oracle in `tests/fixtures/consent-contract/id005.json` | `crates/symeraseme-core/src/identity/consent_filesystem_tests.rs`, `consent_portable_tests.rs` | side-effect | native OS | PARTIAL (local; native CI pending) — merged via #903 (`77a0ba7d`); covers 0700/0600 modes, atomic temp-file replacement and symlink-destination handling against the frozen Go fixture. Per the 2026-09-11 handoff, non-Unix (Windows) checked-close semantics, native delayed-close/chmod-existing-temp fault injection, and full cross-platform collision behavior remain unverified — do not raise to PASS/verified until those are covered. |
 | DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | PASS |
 | DOM-000B | domain | production web form has an honest tested runtime/manual boundary | local executor contract + durable manual-task tests; issue #800 | `TestWebFormNoExecutorPersistsManualFallback`, `TestWebFormExecutorReceivesBoundedContextAndMapsEvidence`, `TestAutoConfirmCreatesManualConfirmationTaskWithoutClick` | side-effect | all | PASS |
 | DOM-001 | domain | deadlines/tick transitions | `golden-tick.json` | shared golden test | byte | all | TODO |
