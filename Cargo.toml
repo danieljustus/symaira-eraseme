@@ -19,6 +19,7 @@ repository = "https://github.com/danieljustus/symaira-eraseme"
 
 [workspace.dependencies]
 aes = "0.9.3"
+aes-gcm = { version = "0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 base64 = "0.23.1"
 cap-fs-ext = "4.0.3"
 cap-std = "4.0.3"

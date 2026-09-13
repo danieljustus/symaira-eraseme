@@ -2,8 +2,12 @@
 //!
 //! V1 and V2 use PBKDF2-HMAC-SHA256 followed by a standard Fernet token.
 //! V3 uses HKDF-SHA256 followed by the same standard Fernet token.
+//! All three readers additionally accept the shipped raw legacy-Go AES-256-GCM
+//! token format after the standard Fernet parser rejects a legacy candidate.
 
 use aes::Aes128;
+use aes_gcm::Aes256Gcm;
+use aes_gcm::aead::{Aead as _, Nonce};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
 use cbc::Decryptor;
@@ -34,6 +38,12 @@ const FERNET_MAC_LEN: usize = 32;
 const FERNET_BLOCK_LEN: usize = 16;
 const FERNET_MIN_FRAME_LEN: usize = 1 + 8 + FERNET_IV_LEN + FERNET_BLOCK_LEN + FERNET_MAC_LEN;
 const FERNET_SIGNING_KEY_LEN: usize = 16;
+const LEGACY_GO_TIMESTAMP_LEN: usize = 8;
+const LEGACY_GO_NONCE_LEN: usize = 12;
+const LEGACY_GO_GCM_TAG_LEN: usize = 16;
+const LEGACY_GO_TOKEN_PREFIX_LEN: usize = 1 + LEGACY_GO_TIMESTAMP_LEN + LEGACY_GO_NONCE_LEN;
+const LEGACY_GO_MIN_TOKEN_LEN: usize =
+    LEGACY_GO_TOKEN_PREFIX_LEN + LEGACY_GO_GCM_TAG_LEN + FERNET_MAC_LEN;
 
 type HmacSha256 = Hmac<Sha256>;
 type Aes128CbcDecryptor = Decryptor<Aes128>;
@@ -87,7 +97,7 @@ pub fn decrypt_v1(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     }
     let mut key = [0_u8; FERNET_KEY_LEN];
     pbkdf2_hmac::<Sha256>(master_key, V1_FIXED_SALT, PBKDF2_ITERATIONS, &mut key);
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_compatible_fernet(token, &key);
     key.zeroize();
     result
 }
@@ -120,7 +130,7 @@ fn decrypt_pbkdf2_envelope(
         PBKDF2_ITERATIONS,
         &mut key,
     );
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_compatible_fernet(token, &key);
     key.zeroize();
     result
 }
@@ -259,6 +269,69 @@ fn decrypt_standard_fernet(
     Ok(plaintext.to_vec())
 }
 
+/// Decrypts the current standard Fernet token format and, only for the raw
+/// legacy-Go candidate shape, falls back to the accidental AES-256-GCM format.
+///
+/// Keeping the standard-parser error when the legacy fallback also fails makes
+/// pre-existing standard-Fernet rejection behavior stable while still allowing
+/// a valid legacy token to decrypt.
+fn decrypt_compatible_fernet(
+    token: &[u8],
+    key: &[u8; FERNET_KEY_LEN],
+) -> Result<Vec<u8>, EncryptionError> {
+    match decrypt_standard_fernet(token, key) {
+        Ok(plaintext) => Ok(plaintext),
+        Err(standard_error) if is_legacy_go_token_candidate(token) => {
+            decrypt_legacy_go_token(token, key).or(Err(standard_error))
+        }
+        Err(standard_error) => Err(standard_error),
+    }
+}
+
+/// Mirrors Go's legacy-envelope recognizer at the token layer. The raw token
+/// must start with the shared 0x80 version and contain the minimum GCM tag and
+/// outer HMAC before it can be considered for legacy parsing.
+fn is_legacy_go_token_candidate(token: &[u8]) -> bool {
+    token.len() >= LEGACY_GO_MIN_TOKEN_LEN && token.first() == Some(&FERNET_VERSION)
+}
+
+/// Decrypts the accidental Go raw-token format:
+/// `0x80 | timestamp:u64 BE | nonce:12 | AES-256-GCM(ciphertext || tag) |
+/// HMAC-SHA256(full derived key, preceding bytes)`.
+///
+/// The outer HMAC is authenticated before AES-GCM is invoked. All
+/// authentication and ciphertext failures collapse to the established generic
+/// error so no key or plaintext material enters the error surface.
+fn decrypt_legacy_go_token(
+    token: &[u8],
+    key: &[u8; FERNET_KEY_LEN],
+) -> Result<Vec<u8>, EncryptionError> {
+    if token.len() < LEGACY_GO_MIN_TOKEN_LEN {
+        return Err(EncryptionError::TruncatedToken);
+    }
+    if token[0] != FERNET_VERSION {
+        return Err(EncryptionError::UnsupportedFernetVersion(token[0]));
+    }
+
+    let mac_offset = token.len() - FERNET_MAC_LEN;
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(key)
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+    mac.update(&token[..mac_offset]);
+    mac.verify_slice(&token[mac_offset..])
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+
+    let nonce = Nonce::<Aes256Gcm>::try_from(
+        &token[1 + LEGACY_GO_TIMESTAMP_LEN..LEGACY_GO_TOKEN_PREFIX_LEN],
+    )
+    .map_err(|_| EncryptionError::AuthenticationFailed)?;
+    let ciphertext = &token[LEGACY_GO_TOKEN_PREFIX_LEN..mac_offset];
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|_| EncryptionError::AuthenticationFailed)?;
+    cipher
+        .decrypt(&nonce, ciphertext)
+        .map_err(|_| EncryptionError::AuthenticationFailed)
+}
+
 pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     if !envelope.starts_with(V3_HEADER) {
         return Err(EncryptionError::UnsupportedEnvelope);
@@ -273,7 +346,7 @@ pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
         return Err(EncryptionError::TruncatedToken);
     }
     let mut key = derive_v3_key(master_key, &envelope[V3_HEADER.len()..token_start])?;
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_compatible_fernet(token, &key);
     key.zeroize();
     result
 }
