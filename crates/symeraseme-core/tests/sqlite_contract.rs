@@ -1,6 +1,7 @@
 use std::fs;
 
 use rusqlite::Connection;
+use sha2::{Digest, Sha256};
 use symeraseme_core::storage::{
     EventType,
     repository::{ListRemovalRequestsOptions, Repository},
@@ -8,10 +9,49 @@ use symeraseme_core::storage::{
 };
 use tempfile::tempdir;
 
-const GOLDEN_DATABASE: &str = concat!(
+const GOLDEN_DATABASE_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-campaign.db"
 );
+const GOLDEN_DATABASE: &[u8] =
+    include_bytes!("../../../tests/fixtures/event-store/golden-campaign.db");
+const GOLDEN_DATABASE_PROVENANCE: &[u8] =
+    include_bytes!("../../../tests/fixtures/event-store/crypto/provenance.json");
+
+fn golden_database() -> &'static [u8] {
+    let provenance: serde_json::Value = serde_json::from_slice(GOLDEN_DATABASE_PROVENANCE)
+        .expect("the committed golden-database provenance must be valid JSON");
+    validate_golden_database(GOLDEN_DATABASE, &provenance)
+        .expect("the source-bound golden database must match its committed provenance");
+    GOLDEN_DATABASE
+}
+
+fn validate_golden_database(database: &[u8], provenance: &serde_json::Value) -> Result<(), String> {
+    if provenance["generator"].as_str() != Some("scripts/generate-crypto-fixtures.py") {
+        return Err(
+            "the golden database does not use the committed Go fixture provenance path".into(),
+        );
+    }
+    let expected_hash = provenance["golden_campaign_sha256"]
+        .as_str()
+        .ok_or("the golden-database provenance must record a SHA-256")?;
+    let expected_size = provenance["golden_campaign_size"]
+        .as_u64()
+        .ok_or("the golden-database provenance must record a byte size")?;
+    if database.len() as u64 != expected_size {
+        return Err(format!(
+            "golden database size {} does not match provenance size {expected_size}",
+            database.len()
+        ));
+    }
+    let actual_hash = hex::encode(Sha256::digest(database));
+    if actual_hash != expected_hash {
+        return Err(format!(
+            "golden database SHA-256 {actual_hash} does not match provenance {expected_hash}"
+        ));
+    }
+    Ok(())
+}
 
 fn pragma_value<T>(connection: &Connection, name: &str) -> T
 where
@@ -119,7 +159,7 @@ fn fresh_store_matches_go_schema_and_connection_contract() {
 
 #[test]
 fn fresh_schema_sql_matches_the_committed_production_fixture() {
-    let original = fs::read(GOLDEN_DATABASE).expect("read committed golden database");
+    let original = golden_database();
     let tree = tempdir().expect("create isolated database directory");
     let fixture_copy = tree.path().join("golden-campaign.db");
     fs::write(&fixture_copy, original).expect("copy golden database");
@@ -134,7 +174,7 @@ fn fresh_schema_sql_matches_the_committed_production_fixture() {
 
 #[test]
 fn typed_repository_queries_preserve_go_filters_pagination_and_event_buckets() {
-    let original = fs::read(GOLDEN_DATABASE).expect("read committed golden database");
+    let original = golden_database();
     let tree = tempdir().expect("create isolated database directory");
     let database = tree.path().join("golden-campaign.db");
     fs::write(&database, original).expect("copy golden database");
@@ -191,10 +231,10 @@ fn typed_repository_queries_preserve_go_filters_pagination_and_event_buckets() {
 
 #[test]
 fn golden_fixture_is_read_from_a_copy_with_nullable_state_fields() {
-    let original = fs::read(GOLDEN_DATABASE).expect("read committed golden database");
+    let original = golden_database();
     let tree = tempdir().expect("create isolated database directory");
     let database = tree.path().join("golden-campaign.db");
-    fs::write(&database, &original).expect("copy golden database");
+    fs::write(&database, original).expect("copy golden database");
 
     let store = Store::open(&database).expect("open copied golden database");
     let repository = Repository::new(&store);
@@ -231,17 +271,17 @@ fn golden_fixture_is_read_from_a_copy_with_nullable_state_fields() {
 
     drop(store);
     assert_eq!(
-        fs::read(GOLDEN_DATABASE).expect("re-read committed fixture"),
+        fs::read(GOLDEN_DATABASE_PATH).expect("re-read committed fixture"),
         original
     );
 }
 
 #[test]
 fn event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls() {
-    let original = fs::read(GOLDEN_DATABASE).expect("read committed golden database");
+    let original = golden_database();
     let tree = tempdir().expect("create isolated database directory");
     let database = tree.path().join("timestamp-layouts.db");
-    fs::write(&database, &original).expect("copy golden database");
+    fs::write(&database, original).expect("copy golden database");
 
     let store = Store::open(&database).expect("open copied golden database");
     store
@@ -288,4 +328,16 @@ fn event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls() {
             .created_at,
         "2026-08-01T08:00:00"
     );
+}
+
+#[test]
+fn golden_database_provenance_rejects_a_mutated_fixture() {
+    let provenance: serde_json::Value = serde_json::from_slice(GOLDEN_DATABASE_PROVENANCE)
+        .expect("the committed golden-database provenance must be valid JSON");
+    let mut mutated = golden_database().to_vec();
+    mutated[0] ^= 1;
+
+    let error = validate_golden_database(&mutated, &provenance)
+        .expect_err("a mutated golden database must be rejected by provenance validation");
+    assert!(error.contains("SHA-256"), "unexpected rejection: {error}");
 }
