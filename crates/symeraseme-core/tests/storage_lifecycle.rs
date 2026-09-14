@@ -134,6 +134,24 @@ struct OracleHandle {
 
 static ORACLE_HANDLE: OnceLock<OracleHandle> = OnceLock::new();
 
+fn git_archive_command(repo_root: &Path, git_ref: &str, paths: &[&str]) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.args([
+        "-c",
+        "core.autocrlf=false",
+        "-c",
+        "core.eol=lf",
+        "archive",
+        "--format=tar",
+        git_ref,
+    ]);
+    for path in paths {
+        cmd.arg(path);
+    }
+    cmd.current_dir(repo_root);
+    cmd
+}
+
 fn oracle_executable() -> &'static Path {
     &ORACLE_HANDLE
         .get_or_init(|| {
@@ -144,10 +162,7 @@ fn oracle_executable() -> &'static Path {
             let temp_dir = tempdir().expect("create oracle build tempdir");
 
             // 1. Materialize pinned Go production tree via git archive
-            let mut git_cmd = Command::new("git");
-            git_cmd
-                .args(["archive", "--format=tar", EXPECTED_ORACLE_COMMIT])
-                .current_dir(&repo_root);
+            let mut git_cmd = git_archive_command(&repo_root, EXPECTED_ORACLE_COMMIT, &[]);
             let git_out = run_command_bounded(&mut git_cmd, None, ORACLE_TIMEOUT)
                 .expect("git archive on pinned commit must succeed");
             assert!(
@@ -916,6 +931,83 @@ fn go_oracle_provenance_and_schema_pragmas_differential() {
         .map(|v| v.as_str().unwrap().to_owned())
         .collect();
     assert_eq!(rust_indexes, go_indexes);
+}
+
+#[test]
+fn git_archive_provenance_hostile_autocrlf_regression() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("canonical repository root");
+
+    // 1. Fetch immutable raw blob via git show
+    let mut show_cmd = Command::new("git");
+    show_cmd
+        .args([
+            "show",
+            &format!("{EXPECTED_ORACLE_COMMIT}:internal/eventstore/store.go"),
+        ])
+        .current_dir(&repo_root);
+    let show_out = run_command_bounded(&mut show_cmd, None, ORACLE_TIMEOUT)
+        .expect("git show on pinned store.go must succeed");
+    assert!(
+        show_out.status.success(),
+        "git show failed: {:?}",
+        String::from_utf8_lossy(&show_out.stderr)
+    );
+    let blob_bytes = show_out.stdout;
+    let blob_sha = hex::encode(Sha256::digest(&blob_bytes));
+    assert_eq!(
+        blob_sha, EXPECTED_STORE_SOURCE_SHA256,
+        "git show blob sha must match expected source sha"
+    );
+
+    // 2. Exercise the SAME git_archive_command helper with hostile autocrlf environment
+    let mut archive_cmd = git_archive_command(
+        &repo_root,
+        EXPECTED_ORACLE_COMMIT,
+        &["internal/eventstore/store.go"],
+    );
+    archive_cmd
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "core.autocrlf")
+        .env("GIT_CONFIG_VALUE_0", "true");
+
+    let archive_out = run_command_bounded(&mut archive_cmd, None, ORACLE_TIMEOUT)
+        .expect("git archive under hostile config must succeed");
+    assert!(
+        archive_out.status.success(),
+        "git archive failed: {:?}",
+        String::from_utf8_lossy(&archive_out.stderr)
+    );
+
+    // 3. Read tar bytes for store.go and verify exact blob match & sha256
+    let mut archive = tar::Archive::new(&archive_out.stdout[..]);
+    let mut extracted_bytes = Vec::new();
+    for entry in archive.entries().expect("tar entries") {
+        let mut file = entry.expect("valid tar entry");
+        let entry_path = file.path().expect("tar entry path");
+        if entry_path == Path::new("internal/eventstore/store.go")
+            || entry_path.to_string_lossy().replace('\\', "/") == "internal/eventstore/store.go"
+        {
+            file.read_to_end(&mut extracted_bytes)
+                .expect("read store.go from tar");
+            break;
+        }
+    }
+    assert!(
+        !extracted_bytes.is_empty(),
+        "internal/eventstore/store.go must be present in tar archive"
+    );
+    assert_eq!(
+        extracted_bytes, blob_bytes,
+        "archived store.go bytes must match immutable git show blob despite hostile autocrlf"
+    );
+    let extracted_sha = hex::encode(Sha256::digest(&extracted_bytes));
+    assert_eq!(
+        extracted_sha, EXPECTED_STORE_SOURCE_SHA256,
+        "archived store.go sha must match expected sha despite hostile autocrlf"
+    );
 }
 
 #[test]
