@@ -178,7 +178,6 @@ jobs:
 
   rust-native:
     name: Rust / native (${{ matrix.os }})
-    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
