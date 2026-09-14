@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)'
+          critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)|^crates/symeraseme-core/src/storage/encryption\.rs$'
           critical_files=()
           while IFS= read -r file; do
             critical_files+=("$file")
