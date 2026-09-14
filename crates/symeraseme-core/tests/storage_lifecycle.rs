@@ -1175,7 +1175,10 @@ fn go_writer_waits_for_rust_lock_release_differential() {
     drop(rust_holder);
 
     let go_result = go_waiter_thread.join().expect("go waiter thread join");
-    assert_eq!(go_result["status"], "ok");
+    assert_eq!(
+        go_result["status"], "ok",
+        "unexpected go oracle result: {go_result}"
+    );
 
     let check = open(&database).expect("open check connection");
     let count: i64 = check
