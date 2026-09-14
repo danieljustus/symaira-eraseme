@@ -1,3 +1,5 @@
+//go:build projection_fixture
+
 // Command projection_fixture generates or verifies the committed DB-004
 // projection contract fixture by replaying the production Go event store.
 // It is test-only: it neither changes production Go behavior nor the default
@@ -85,7 +87,7 @@ func main() {
 	verify := flag.Bool("verify", false, "verify the committed generated fixture instead of writing it")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fatal("usage: go run ./rust-tests/parity/oracle/projection_fixture [--verify]")
+		fatal("usage: go run -tags projection_fixture ./rust-tests/parity/oracle/projection_fixture [--verify]")
 	}
 
 	root, err := repositoryRoot()
