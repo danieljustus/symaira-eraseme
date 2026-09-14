@@ -232,7 +232,7 @@ fn assert_go_crypto_oracle_success(key: &[u8], envelope: &[u8], expected: &[u8])
     let output = run_go_crypto_oracle(b'd', key, envelope);
     assert!(
         output.status.success(),
-        "Go crypto oracle rejected a valid legacy V3 fixture: {:?}",
+        "Go crypto oracle rejected a valid legacy envelope: {:?}",
         output.stderr
     );
     assert!(output.stderr.is_empty(), "Go crypto oracle emitted stderr");
@@ -243,7 +243,7 @@ fn assert_go_crypto_oracle_rejects(case_id: &str, key: &[u8], envelope: &[u8]) {
     let output = run_go_crypto_oracle(b'd', key, envelope);
     assert!(
         !output.status.success(),
-        "{case_id}: Go crypto oracle accepted an invalid legacy V3 token"
+        "{case_id}: Go crypto oracle accepted an invalid envelope"
     );
     assert!(output.stdout.is_empty(), "{case_id}: Go emitted plaintext");
     assert!(
@@ -517,6 +517,7 @@ fn legacy_go_v1_v2_fixtures_match_shared_go_plaintext() {
             SHARED_PLAINTEXT,
             "{name} ({version:?})"
         );
+        assert_go_crypto_oracle_success(MASTER_KEY, fixture, SHARED_PLAINTEXT);
     }
 }
 
@@ -568,6 +569,7 @@ fn legacy_go_v1_v2_mutation_corpus_fails_closed_without_leaks() {
                 mutation.id,
                 decrypt(&mutation.envelope, mutation.master_key),
             );
+            assert_go_crypto_oracle_rejects(mutation.id, mutation.master_key, &mutation.envelope);
         }
     }
 
@@ -586,17 +588,12 @@ fn legacy_go_v3_mutation_corpus_matches_go_oracle_and_fails_closed_without_leaks
             decrypt_v3(&mutation.envelope, mutation.master_key),
         );
 
-        // The existing V3 oracle calls DecryptFernetToken after slicing a
-        // fixed V3 header/salt offset, so it does not validate the envelope
-        // header. That case remains a fixture-driven assertion above.
-        if mutation.id != "bad_header" {
-            assert_go_crypto_oracle_rejects(mutation.id, mutation.master_key, &mutation.envelope);
-            go_comparison_count += 1;
-        }
+        assert_go_crypto_oracle_rejects(mutation.id, mutation.master_key, &mutation.envelope);
+        go_comparison_count += 1;
     }
 
     assert_eq!(
-        go_comparison_count, 5,
+        go_comparison_count, 6,
         "CRY-006 V3 Go-oracle failure cardinality"
     );
 }
