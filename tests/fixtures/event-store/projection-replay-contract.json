@@ -1,0 +1,214 @@
+{
+  "schema": "symeraseme.event-store.projection-contract.v1",
+  "oracle": {
+    "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+    "generator": "rust-tests/parity/oracle/projection_fixture/main.go",
+    "sources": [
+      {
+        "path": "internal/eventstore/projection.go",
+        "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+      },
+      {
+        "path": "internal/eventstore/store.go",
+        "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+      },
+      {
+        "path": "internal/eventstore/eventtypes.go",
+        "sha256": "89394cfcbdc6221f5622c08fe15a32ada42dbc3ed1c17258784f311306636fda"
+      },
+      {
+        "path": "internal/eventstore/timeutil/timeutil.go",
+        "sha256": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df"
+      }
+    ]
+  },
+  "differential_harness": {
+    "status": "blocked",
+    "blocker": "For DB cases, the current neutral parity CLI provides only post-execution SQLite snapshots; it has no DB-case manifest, fixture seeding, projection execution, or golden JSON comparator. Adding those is a separate harness slice."
+  },
+  "cases": [
+    {
+      "name": "golden_projection",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": "2026-08-03T09:12:00+00:00",
+            "current_status": "CONFIRMED",
+            "deadline_at": "2026-08-31T08:05:00+00:00",
+            "escalation_level": 0,
+            "last_event_at": "2026-08-03T09:14:00+00:00",
+            "last_event_id": 4,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 1,
+            "resolved_at": "2026-08-03T09:14:00+00:00",
+            "sent_at": "2026-08-01T08:05:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":\"2026-08-03T09:12:00+00:00\",\"current_status\":\"CONFIRMED\",\"deadline_at\":\"2026-08-31T08:05:00+00:00\",\"escalation_level\":0,\"last_event_at\":\"2026-08-03T09:14:00+00:00\",\"last_event_id\":4,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":1,\"resolved_at\":\"2026-08-03T09:14:00+00:00\",\"sent_at\":\"2026-08-01T08:05:00+00:00\"}"
+        },
+        {
+          "request_id": 2,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "REJECTED_FINAL",
+            "deadline_at": "2026-09-15T08:06:00+00:00",
+            "escalation_level": 0,
+            "last_event_at": "2026-08-12T14:00:00+00:00",
+            "last_event_id": 7,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 2,
+            "resolved_at": "2026-08-12T14:00:00+00:00",
+            "sent_at": "2026-08-01T08:06:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"REJECTED_FINAL\",\"deadline_at\":\"2026-09-15T08:06:00+00:00\",\"escalation_level\":0,\"last_event_at\":\"2026-08-12T14:00:00+00:00\",\"last_event_id\":7,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":2,\"resolved_at\":\"2026-08-12T14:00:00+00:00\",\"sent_at\":\"2026-08-01T08:06:00+00:00\"}"
+        },
+        {
+          "request_id": 3,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "ESCALATED",
+            "deadline_at": "2026-08-31T08:07:00+00:00",
+            "escalation_level": 2,
+            "last_event_at": "2026-09-10T10:00:00+00:00",
+            "last_event_id": 12,
+            "next_action_at": null,
+            "reminders_sent": 1,
+            "request_id": 3,
+            "resolved_at": null,
+            "sent_at": "2026-08-01T08:07:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"ESCALATED\",\"deadline_at\":\"2026-08-31T08:07:00+00:00\",\"escalation_level\":2,\"last_event_at\":\"2026-09-10T10:00:00+00:00\",\"last_event_id\":12,\"next_action_at\":null,\"reminders_sent\":1,\"request_id\":3,\"resolved_at\":null,\"sent_at\":\"2026-08-01T08:07:00+00:00\"}"
+        }
+      ]
+    },
+    {
+      "name": "empty_request",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "PLANNED",
+            "deadline_at": null,
+            "escalation_level": 0,
+            "last_event_at": null,
+            "last_event_id": 0,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 1,
+            "resolved_at": null,
+            "sent_at": null
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"PLANNED\",\"deadline_at\":null,\"escalation_level\":0,\"last_event_at\":null,\"last_event_id\":0,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":1,\"resolved_at\":null,\"sent_at\":null}"
+        }
+      ]
+    },
+    {
+      "name": "same_occurred_at_tie",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "REJECTED_FINAL",
+            "deadline_at": null,
+            "escalation_level": 0,
+            "last_event_at": "2026-10-10T09:00:00+00:00",
+            "last_event_id": 30,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 1,
+            "resolved_at": "2026-10-10T09:00:00+00:00",
+            "sent_at": null
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"REJECTED_FINAL\",\"deadline_at\":null,\"escalation_level\":0,\"last_event_at\":\"2026-10-10T09:00:00+00:00\",\"last_event_id\":30,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":1,\"resolved_at\":\"2026-10-10T09:00:00+00:00\",\"sent_at\":null}"
+        }
+      ]
+    },
+    {
+      "name": "occurred_at_precedes_id",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "REJECTED_FINAL",
+            "deadline_at": null,
+            "escalation_level": 0,
+            "last_event_at": "2026-10-10T10:00:00+00:00",
+            "last_event_id": 40,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 1,
+            "resolved_at": "2026-10-10T10:00:00+00:00",
+            "sent_at": null
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"REJECTED_FINAL\",\"deadline_at\":null,\"escalation_level\":0,\"last_event_at\":\"2026-10-10T10:00:00+00:00\",\"last_event_id\":40,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":1,\"resolved_at\":\"2026-10-10T10:00:00+00:00\",\"sent_at\":null}"
+        }
+      ]
+    },
+    {
+      "name": "numeric_payload_coercion",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "AWAITING_ACK",
+            "deadline_at": "2026-10-14T09:00:00+00:00",
+            "escalation_level": 0,
+            "last_event_at": "2026-10-12T09:01:00+00:00",
+            "last_event_id": 2,
+            "next_action_at": null,
+            "reminders_sent": -2,
+            "request_id": 1,
+            "resolved_at": null,
+            "sent_at": "2026-10-12T09:00:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"AWAITING_ACK\",\"deadline_at\":\"2026-10-14T09:00:00+00:00\",\"escalation_level\":0,\"last_event_at\":\"2026-10-12T09:01:00+00:00\",\"last_event_id\":2,\"next_action_at\":null,\"reminders_sent\":-2,\"request_id\":1,\"resolved_at\":null,\"sent_at\":\"2026-10-12T09:00:00+00:00\"}"
+        },
+        {
+          "request_id": 2,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "AWAITING_ACK",
+            "deadline_at": "2026-10-12T10:00:00+00:00",
+            "escalation_level": 0,
+            "last_event_at": "2026-10-12T10:01:00+00:00",
+            "last_event_id": 4,
+            "next_action_at": null,
+            "reminders_sent": 1,
+            "request_id": 2,
+            "resolved_at": null,
+            "sent_at": "2026-10-12T10:00:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"AWAITING_ACK\",\"deadline_at\":\"2026-10-12T10:00:00+00:00\",\"escalation_level\":0,\"last_event_at\":\"2026-10-12T10:01:00+00:00\",\"last_event_id\":4,\"next_action_at\":null,\"reminders_sent\":1,\"request_id\":2,\"resolved_at\":null,\"sent_at\":\"2026-10-12T10:00:00+00:00\"}"
+        }
+      ]
+    },
+    {
+      "name": "replay_errors_are_skipped",
+      "states": [
+        {
+          "request_id": 1,
+          "state": {
+            "acknowledged_at": null,
+            "current_status": "AWAITING_ACK",
+            "deadline_at": "2026-10-13T09:00:00+00:00",
+            "escalation_level": 0,
+            "last_event_at": "2026-10-11T09:04:00+00:00",
+            "last_event_id": 14,
+            "next_action_at": null,
+            "reminders_sent": 0,
+            "request_id": 1,
+            "resolved_at": null,
+            "sent_at": "2026-10-11T09:00:00+00:00"
+          },
+          "compact_json": "{\"acknowledged_at\":null,\"current_status\":\"AWAITING_ACK\",\"deadline_at\":\"2026-10-13T09:00:00+00:00\",\"escalation_level\":0,\"last_event_at\":\"2026-10-11T09:04:00+00:00\",\"last_event_id\":14,\"next_action_at\":null,\"reminders_sent\":0,\"request_id\":1,\"resolved_at\":null,\"sent_at\":\"2026-10-11T09:00:00+00:00\"}"
+        }
+      ]
+    }
+  ]
+}
