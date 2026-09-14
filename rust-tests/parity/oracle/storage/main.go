@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 )
@@ -367,6 +368,48 @@ func snapshotStore(path string) (snapshot sqliteSnapshot, resultErr error) {
 	return snapshot, nil
 }
 
+func canonicalSQL(sql string) string {
+	var canonical strings.Builder
+	canonical.Grow(len(sql))
+	pendingSpace := false
+	var quote rune
+	runes := []rune(sql)
+
+	for index := 0; index < len(runes); index++ {
+		character := runes[index]
+		if quote != 0 {
+			canonical.WriteRune(character)
+			if character == quote {
+				if index+1 < len(runes) && runes[index+1] == quote {
+					canonical.WriteRune(runes[index+1])
+					index++
+				} else {
+					quote = 0
+				}
+			}
+			continue
+		}
+
+		if character == '\'' || character == '"' {
+			if pendingSpace && canonical.Len() > 0 {
+				canonical.WriteByte(' ')
+			}
+			pendingSpace = false
+			canonical.WriteRune(character)
+			quote = character
+		} else if unicode.IsSpace(character) {
+			pendingSpace = true
+		} else {
+			if pendingSpace && canonical.Len() > 0 {
+				canonical.WriteByte(' ')
+			}
+			pendingSpace = false
+			canonical.WriteRune(character)
+		}
+	}
+	return canonical.String()
+}
+
 func snapshotSchema(store *eventstore.Store) ([]schemaEntry, error) {
 	rows, err := store.DB().Query(`SELECT type, name, sql
 		FROM sqlite_master
@@ -383,7 +426,7 @@ func snapshotSchema(store *eventstore.Store) ([]schemaEntry, error) {
 		if err := rows.Scan(&entry.Type, &entry.Name, &entry.SQL); err != nil {
 			return nil, fmt.Errorf("read SQLite schema row: %w", err)
 		}
-		entry.SQL = strings.Join(strings.Fields(entry.SQL), " ")
+		entry.SQL = canonicalSQL(entry.SQL)
 		entries = append(entries, entry)
 	}
 	if err := rows.Err(); err != nil {

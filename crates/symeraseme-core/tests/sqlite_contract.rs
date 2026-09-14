@@ -160,7 +160,43 @@ fn repository_root() -> PathBuf {
 }
 
 fn canonical_sql(sql: &str) -> String {
-    sql.split_whitespace().collect::<Vec<_>>().join(" ")
+    let mut canonical = String::with_capacity(sql.len());
+    let mut pending_space = false;
+    let mut quote = None;
+    let mut chars = sql.chars().peekable();
+
+    while let Some(character) = chars.next() {
+        if let Some(quote_character) = quote {
+            canonical.push(character);
+            if character == quote_character {
+                if chars.peek() == Some(&quote_character) {
+                    canonical.push(chars.next().expect("peeked escaped SQL quote"));
+                } else {
+                    quote = None;
+                }
+            }
+            continue;
+        }
+
+        if character == '\'' || character == '"' {
+            if pending_space && !canonical.is_empty() {
+                canonical.push(' ');
+            }
+            pending_space = false;
+            canonical.push(character);
+            quote = Some(character);
+        } else if character.is_whitespace() {
+            pending_space = true;
+        } else {
+            if pending_space && !canonical.is_empty() {
+                canonical.push(' ');
+            }
+            pending_space = false;
+            canonical.push(character);
+        }
+    }
+
+    canonical
 }
 
 fn run_go_storage_oracle() -> serde_json::Value {
@@ -631,4 +667,46 @@ fn schema_contract_rejects_case_changed_string_literals() {
         schema_contract(&lower),
         "case changes inside SQL string literals are semantic differences"
     );
+}
+
+fn schema_contract_for(sql: &str) -> Vec<(String, String, String)> {
+    let connection = Connection::open_in_memory().expect("open schema database");
+    connection
+        .execute_batch(sql)
+        .expect("create schema for canonicalization regression");
+    schema_contract(&connection)
+}
+
+#[test]
+fn schema_contract_preserves_whitespace_and_escaped_quotes_inside_literals() {
+    let whitespace_cases = [
+        (
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two  spaces')",
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two spaces')",
+            "repeated spaces inside a literal",
+        ),
+        (
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two\tspaces')",
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two spaces')",
+            "tabs inside a literal",
+        ),
+        (
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two\nspaces')",
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two spaces')",
+            "newlines inside a literal",
+        ),
+        (
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two ''spaces''')",
+            "CREATE TABLE request_state (current_status TEXT NOT NULL DEFAULT 'two spaces')",
+            "escaped quotes inside a literal",
+        ),
+    ];
+
+    for (left, right, description) in whitespace_cases {
+        assert_ne!(
+            schema_contract_for(left),
+            schema_contract_for(right),
+            "{description} must remain a semantic schema difference"
+        );
+    }
 }
