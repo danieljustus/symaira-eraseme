@@ -20,6 +20,7 @@ cap-fs-ext.workspace = true
 cap-std.workspace = true
 cbc.workspace = true
 chrono.workspace = true
+crypto-common.workspace = true
 flate2.workspace = true
 hmac.workspace = true
 serde.workspace = true

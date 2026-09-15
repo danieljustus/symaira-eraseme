@@ -9,13 +9,14 @@ use base64::engine::general_purpose::URL_SAFE;
 use cbc::Decryptor;
 use cbc::cipher::block_padding::Pkcs7;
 use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
+use crypto_common::Output as CryptoOutput;
 use hmac::{Hmac, KeyInit, Mac};
 use pbkdf2::pbkdf2_hmac;
 use rand::TryRngCore;
 use sha2::Sha256;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 pub const V1_HEADER: &[u8] = b"SYMERASEME_ENCv1\n";
 pub const V2_HEADER: &[u8] = b"SYMERASEME_ENCv2\n";
@@ -190,14 +191,16 @@ fn derive_v3_key(master_key: &[u8], salt: &[u8]) -> Result<[u8; FERNET_KEY_LEN],
     let mut extract = <HmacSha256 as KeyInit>::new_from_slice(salt)
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     extract.update(master_key);
-    let pseudorandom_key = extract.finalize().into_bytes();
-    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(&pseudorandom_key)
+    // `CtOutput::into_bytes` clones the digest output, so own that clone directly.
+    let pseudorandom_key: Zeroizing<CryptoOutput<HmacSha256>> =
+        Zeroizing::new(extract.finalize().into_bytes());
+    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(pseudorandom_key.as_slice())
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     expand.update(V3_HKDF_INFO);
     expand.update(&[1]);
-    let block = expand.finalize().into_bytes();
+    let block: Zeroizing<CryptoOutput<HmacSha256>> = Zeroizing::new(expand.finalize().into_bytes());
     let mut key = [0_u8; FERNET_KEY_LEN];
-    key.copy_from_slice(&block);
+    key.copy_from_slice(block.as_slice());
     Ok(key)
 }
 
@@ -408,5 +411,47 @@ mod tests {
             decrypt_v3(&misaligned_envelope, &KEY),
             Err(EncryptionError::InvalidCiphertextLength)
         );
+    }
+
+    #[test]
+    fn hkdf_finalization_owners_are_zeroizing_and_derive_correctly() {
+        let source = include_str!("encryption.rs").replace("\r\n", "\n");
+        let derivation = source
+            .split_once("fn derive_v3_key")
+            .and_then(|(_, body)| body.split_once("\nfn encrypt_standard_fernet"))
+            .map(|(body, _)| body)
+            .expect("V3 derivation source");
+
+        for stage in ["extract", "expand"] {
+            let finalization = format!("Zeroizing::new({stage}.finalize().into_bytes())");
+            assert!(
+                derivation.contains(&finalization),
+                "{stage} finalization output must be directly owned by Zeroizing"
+            );
+        }
+        assert!(
+            derivation.contains("let pseudorandom_key: Zeroizing<CryptoOutput<HmacSha256>>"),
+            "the HKDF extract output must have an explicit zeroizing owner"
+        );
+        assert!(
+            derivation.contains("let block: Zeroizing<CryptoOutput<HmacSha256>>"),
+            "the HKDF expand output must have an explicit zeroizing owner"
+        );
+        assert!(
+            !derivation.contains("copy_from_slice(&extract.finalize().into_bytes())"),
+            "destination-only wrapping must not reintroduce a plain extract output"
+        );
+        assert!(
+            !derivation.contains("copy_from_slice(&expand.finalize().into_bytes())"),
+            "destination-only wrapping must not reintroduce a plain expand output"
+        );
+
+        let derived_key = derive_v3_key(&KEY, &SALT).unwrap();
+        let plaintext = b"HKDF finalization ownership regression";
+        let token = encrypt_standard_fernet(plaintext, &derived_key, &IV, 1_700_000_000).unwrap();
+        let mut envelope = Vec::from(V3_HEADER);
+        envelope.extend_from_slice(&SALT);
+        envelope.extend_from_slice(&token);
+        assert_eq!(decrypt_v3(&envelope, &KEY).unwrap(), plaintext);
     }
 }
