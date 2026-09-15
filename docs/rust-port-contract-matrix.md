@@ -61,6 +61,38 @@ capability-safe file reads pass locally. Phase 3 was integrated by #870 as
 `fa366dca`; its Go reference remains pinned and executable. Phase 3 is
 integrated, but its later cutover rows remain governed by the matrix below.
 
+## Phase 4 SQLite connection and lifecycle evidence
+
+Source `3e7b37f1528c94e685e5ef6b1caae55cc69f0f11` passed the native
+macOS, Linux and Windows jobs in
+[run 34918676554](https://github.com/danieljustus/symaira-eraseme/actions/runs/34918676554).
+The job logs contain successful execution of the shared-opening adapter tests,
+the real Go production-connection check, and the synchronized Go-writer/Rust-lock
+comparison. This is native runtime evidence, not cross-compilation evidence.
+
+The opening adapter pins `symaira-core-sqlite` to immutable CoreKit revision
+`62edd9903983d9369373565cc1e50da3fef43176`; no crates.io release is implied.
+EraseMe still owns parent creation, its schema and its migrations. The shared
+constructor sets each connection's WAL, foreign keys and 5,000 ms busy timeout
+without introducing a shared schema or taking over filesystem policy.
+The lifecycle oracle archives the real Go source at
+`bf53346eec234929bedf0314b99e3da85dbb991b` with host EOL conversion disabled
+and opens operational connections through the production store factory.
+
+Independent local verification passed formatting, workspace Clippy, the focused
+SQLite/lifecycle/encryption tests, full workspace tests, Cargo audit and Cargo
+deny. A zero-busy-timeout mutation failed the actual contention test; restored
+code passed. Duplicate-version policy retains its global denial and permits
+only the exact incompatible leaf versions required by the pinned SQLite,
+YAML and CoreKit FS graph. Removing the `foldhash =0.1.5` exception made the
+real Cargo-deny check fail; restoration passed. No advisory, license or source
+waiver was added.
+
+The statuses below identify the verified source, not completion of all Phase 4
+work. Integration must retain this source history and pass native checks at its
+own HEAD. CLI delivery, remaining crypto/identity rows, final VALUE evidence and
+production cutover remain separately gated.
+
 Comparison modes: **byte** = raw byte equality; **semantic** = parsed equality
 with only documented normalization; **side-effect** = status plus filesystem,
 SQLite, network transcript or process behavior.
@@ -113,16 +145,16 @@ SQLite, network transcript or process behavior.
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | PASS (local; native CI pending) |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | PASS (local; native CI pending) |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |
-| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
-| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
-| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | TODO |
+| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | `sqlite_contract.rs` schema checks; `storage_lifecycle.rs::go_oracle_provenance_and_schema_pragmas_differential` | byte/semantic | all | PASS (source `3e7b37f`; native run 34918676554) |
+| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | `sqlite_contract.rs::corekit_sqlite_adapter_pragmas_and_empty_schema`; production-Go pragma differential | semantic | all | PASS (source `3e7b37f`; native run 34918676554) |
+| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | `sqlite_contract.rs::golden_fixture_is_read_from_a_copy_with_nullable_state_fields` | semantic | all | PASS (source `3e7b37f`; native run 34918676554) |
 | DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO |
 | DB-005 | SQLite | reports/plans/tick snapshots | four event-store JSON fixtures | shared golden tests | byte | all | TODO |
-| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | query/projection cases | semantic | all | TODO |
+| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | `sqlite_contract.rs::event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls` | semantic | all | PASS (source `3e7b37f`; native run 34918676554) |
 | DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | TODO |
 | DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO |
-| DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
-| DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
+| DB-009 | SQLite | lock/busy/concurrent readers+writes | pinned production-Go process harness | `storage_lifecycle.rs` bidirectional WAL isolation, synchronized wait and timeout/retry differentials | side-effect | native OS | PASS (source `3e7b37f`; native run 34918676554) |
+| DB-010 | SQLite | interrupted initialization/migration/read-only DB | real Go prefix, locked migration and fault fixtures | `storage_lifecycle.rs` initialization/migration recovery and read-only/corruption/future-schema differentials | side-effect | native OS | PASS (source `3e7b37f`; native run 34918676554) |
 | CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
 | CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go vectors complete; Rust vectors remain Phase 4 gate | byte | all | PASS (Python↔Go); Rust gated |
 | CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v1-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v1_fixture_matches_shared_go_plaintext` | byte | all | PASS (local; native CI pending) |
