@@ -100,10 +100,11 @@ Deliberate fixture refresh only:
 Mutation mode changes the captured full-name expectation, requires the actual
 Rust comparator to fail specifically on that value, restores the exact original
 bytes in a finally block, and requires a successful rerun. Normal verification
-never updates expected output. Native CI runs this same command on Linux,
-macOS, and Windows. Dispatch `rust-ci.yml` with `profile_read_only=true` for the
-focused runtime lane; formatting and workspace all-target strict Clippy still
-run. Execution at the exact candidate SHA is required; the existence of this
+never updates expected output. Native CI runs this same command on Linux and
+macOS. Dispatch `rust-ci.yml` with `profile_read_only=true` for the focused
+lane; its Unix jobs are runtime checks, while its Windows job is explicitly
+compile-only. Formatting and workspace all-target strict Clippy still run.
+Execution at the exact candidate SHA is required; the existence of this
 workflow is not native PASS evidence.
 
 ### Focused Windows dispatch: compile-only
