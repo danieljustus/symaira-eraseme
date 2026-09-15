@@ -27,16 +27,67 @@ pub fn execute(output_format: &str) -> Result<Vec<u8>, String> {
 
     match output_format {
         "text" => Ok(render_text(&context)),
-        "json" => {
-            let mut output = serde_json::to_vec(&profile)
-                .map_err(|_| "identity: profile output failed".to_owned())?;
-            output.push(b'\n');
-            Ok(output)
-        }
+        "json" => render_json(&profile),
         _ => Err(format!(
             "invalid output format \"{output_format}\": use text or json"
         )),
     }
+}
+
+fn render_json(profile: &Profile) -> Result<Vec<u8>, String> {
+    let encoded =
+        serde_json::to_vec(profile).map_err(|_| "identity: profile output failed".to_owned())?;
+    let mut output = escape_go_html(&encoded);
+    output.push(b'\n');
+    Ok(output)
+}
+
+fn escape_go_html(encoded: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(encoded.len());
+    let mut in_string = false;
+    let mut position = 0;
+    while let Some(&byte) = encoded.get(position) {
+        if byte == b'"' {
+            in_string = !in_string;
+            output.push(byte);
+            position += 1;
+            continue;
+        }
+        if !in_string {
+            output.push(byte);
+            position += 1;
+            continue;
+        }
+        if byte == b'\\' {
+            output.push(byte);
+            position += 1;
+            if let Some(&escaped) = encoded.get(position) {
+                output.push(escaped);
+                position += 1;
+            }
+            continue;
+        }
+        let replacement = match byte {
+            b'<' => Some(br#"\u003c"#),
+            b'>' => Some(br#"\u003e"#),
+            b'&' => Some(br#"\u0026"#),
+            0xe2 if encoded.get(position..position + 3) == Some(&[0xe2, 0x80, 0xa8][..]) => {
+                Some(br#"\u2028"#)
+            }
+            0xe2 if encoded.get(position..position + 3) == Some(&[0xe2, 0x80, 0xa9][..]) => {
+                Some(br#"\u2029"#)
+            }
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            output.extend_from_slice(replacement);
+            position += if byte == 0xe2 { 3 } else { 1 };
+        } else {
+            output.push(byte);
+            position += 1;
+        }
+    }
+    output
 }
 
 fn render_context(profile: &Profile) -> RenderContext {

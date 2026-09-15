@@ -24,6 +24,9 @@ const PROFILE_JSON: &[u8] = br#"{
 const EXPECTED_JSON: &[u8] = br#"{"full_name":"Test Person","name_variants":["Alias"],"date_of_birth":"1980-01-02","addresses":[{"street":"Main Street","city":"Berlin","postal_code":"10115","country":"DE","state":"BE","valid_from":null,"valid_to":null}],"email_addresses":["test@example.test","second@example.test"],"phone_numbers":["+1-555-0100"],"jurisdictions":["DE","EU"]}
 "#;
 const EXPECTED_TEXT: &[u8] = b"Name: Test Person\nEmail: test@example.test\nEmail: second@example.test\nJurisdiction: DE\nJurisdiction: EU\n";
+const HTML_PROFILE_JSON: &[u8] = br#"{"full_name":"<>&\u2028\u2029"}"#;
+const EXPECTED_HTML_JSON: &[u8] = br#"{"full_name":"\u003c\u003e\u0026\u2028\u2029","name_variants":null,"date_of_birth":null,"addresses":[],"email_addresses":null,"phone_numbers":null,"jurisdictions":null}
+"#;
 
 struct Isolation {
     root: PathBuf,
@@ -48,13 +51,17 @@ impl Isolation {
     }
 
     fn write_encrypted_profile(&self, key: &[u8; 32]) {
+        self.write_encrypted_profile_with_plaintext(key, PROFILE_JSON);
+    }
+
+    fn write_encrypted_profile_with_plaintext(&self, key: &[u8; 32], plaintext: &[u8]) {
         let cipher = Aes256Gcm::new_from_slice(key).unwrap();
         let nonce = [0_u8; 12];
         let ciphertext = cipher
             .encrypt(
                 &Nonce::try_from(nonce.as_slice()).unwrap(),
                 Payload {
-                    msg: PROFILE_JSON,
+                    msg: plaintext,
                     aad: HEADER,
                 },
             )
@@ -161,6 +168,14 @@ fn show_profile_json_matches_go() {
             .windows(hex::encode(KEY).len())
             .any(|window| { window == hex::encode(KEY).as_bytes() })
     );
+}
+
+#[test]
+fn show_profile_json_matches_go_html_escaping() {
+    let isolation = Isolation::new();
+    isolation.write_encrypted_profile_with_plaintext(&KEY, HTML_PROFILE_JSON);
+    let output = isolation.run(&["show-profile", "--output", "json"], Some(&KEY), false);
+    assert_success(&output, EXPECTED_HTML_JSON);
 }
 
 #[test]
