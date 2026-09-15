@@ -1,0 +1,25 @@
+# Paths excluded from the TruffleHog full-history scan.
+#
+# One Go-style regex per line, matched against the repository-relative path.
+# Keep this list minimal and justify every entry: a path listed here stops
+# being scanned across the whole of history, for every detector.
+#
+# Do not quote an excluded credential literally in this file. The scanner
+# reads this file too, so a documented example becomes a new finding.
+#
+# internal/registry/sync_test.go
+#   TestSyncURLPolicyRejectsCredentialsMalformedAuthoritiesAndDowngrades
+#   asserts that credential-bearing URLs are REJECTED, so the corpus
+#   necessarily contains one: an https URL carrying the literal words "user"
+#   and "password" as userinfo, pointing at example.test -- a domain reserved
+#   and unroutable per RFC 6761. There is no secret and nothing to rotate.
+#
+#   The current source splits that string so the literal never appears
+#   contiguously; commit fa366dcabb830af4 still holds the un-split form. That
+#   is why diff-scoped pull_request scans pass while full-history scans
+#   (schedule, workflow_dispatch) flag it.
+#
+#   Verified with TruffleHog 3.97.4: verified_secrets 0, unverified_secrets 1,
+#   detector URI. With this exclusion the same scan reports 0 while still
+#   covering ~8.6k chunks, and a planted URI in another file is still caught.
+^internal/registry/sync_test\.go$

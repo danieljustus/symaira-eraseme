@@ -1,0 +1,205 @@
+{
+  "oracle_commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "oracle_source_sha256": "1892a69846a06d7ca41dfffe0b1da81947bd2aacbb32e475092eadfaab689bba",
+  "generator": "rust-tests/parity/oracle/cry006/main.go",
+  "generator_sha256": "f7992d318209f6ac47b6fad4a5f2b8637a91cdb45cdfbb3b2dd0a7a0d050b07f",
+  "cases": [
+    {
+      "id": "v1_valid",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v1_malformed_header",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: unrecognized encryption header"
+    },
+    {
+      "id": "v1_short",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v1_short_token",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v1_wrong_key",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v1_hmac_tamper",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v1_gcm_failure",
+      "version": 1,
+      "fixture": "golden-campaign-v1-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v1_raw_standard_valid",
+      "version": 1,
+      "fixture": "golden-campaign-v1-python.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v1_raw_standard_tamper",
+      "version": 1,
+      "fixture": "golden-campaign-v1-python.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v2_valid",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v2_malformed_header",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: unrecognized encryption header"
+    },
+    {
+      "id": "v2_short",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: encrypted V2 envelope is truncated"
+    },
+    {
+      "id": "v2_short_token",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v2_wrong_key",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v2_hmac_tamper",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v2_gcm_failure",
+      "version": 2,
+      "fixture": "golden-campaign-v2-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v2_raw_standard_valid",
+      "version": 2,
+      "fixture": "golden-campaign-v2-python.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v2_raw_standard_tamper",
+      "version": 2,
+      "fixture": "golden-campaign-v2-python.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v3_valid",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v3_malformed_header",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: unrecognized encryption header"
+    },
+    {
+      "id": "v3_short",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: encrypted V3 envelope is truncated"
+    },
+    {
+      "id": "v3_short_token",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v3_wrong_key",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v3_hmac_tamper",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v3_gcm_failure",
+      "version": 3,
+      "fixture": "golden-campaign-v3-legacy-go.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    },
+    {
+      "id": "v3_raw_standard_valid",
+      "version": 3,
+      "fixture": "golden-campaign-v3-python.db",
+      "outcome": "success",
+      "plaintext_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    {
+      "id": "v3_raw_standard_tamper",
+      "version": 3,
+      "fixture": "golden-campaign-v3-python.db",
+      "outcome": "error",
+      "error": "eventstore: fernet token invalid, tampered, or unsupported format"
+    }
+  ],
+  "fixture_sha256": {
+    "golden-campaign-v1-legacy-go.db": "0fa7797003791808e1ff8935b155c995bdcf45a4f36373831491633d0c6b7334",
+    "golden-campaign-v1-python.db": "cb719251738ff21f09b4f7849028100f2fa377206061a88d937076d893ed16be",
+    "golden-campaign-v2-legacy-go.db": "e6635c673bc608b7fb4bf9618ee8412e6390b5adf4f13d0078bf0a10c2075865",
+    "golden-campaign-v2-python.db": "c1ed3ac0214b7e6b392a24827b8f7aa5a03df2b525f9a0b0c47a83c5a83d955f",
+    "golden-campaign-v3-legacy-go.db": "1881ad5dcc1c3076b859c5581003c9e91cbd938a0e836bd3c504fe2cbf0cde1c",
+    "golden-campaign-v3-python.db": "24bea1fcc07c71e24d08bb7627d141cfc1d375ca0e69e4ad80899cf645fb001c"
+  }
+}

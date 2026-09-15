@@ -112,4 +112,4 @@ jobs:
         uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
         with:
           path: ./
-          extra_args: --exclude-detectors Lob
+          extra_args: --exclude-detectors Lob --exclude-paths .trufflehog-exclude-paths

@@ -7,7 +7,12 @@ on:
     branches: [main]
   schedule:
     - cron: '43 5 * * 1'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      profile_read_only:
+        description: Run the focused profile-read native gate; on Windows this is compile-only (not runtime acceptance)
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,6 +36,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Pinned Go oracle revision (bf53346eec234929bedf0314b99e3da85dbb991b) must exist in git history for SQLite lifecycle tests.
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -177,7 +184,8 @@ jobs:
         run: make parity
 
   rust-native:
-    name: Rust / native (${{ matrix.os }})
+    name: >-
+      Rust / native (${{ matrix.os }})${{ inputs.profile_read_only == true && ' / focused profile-read (Windows compile-only)' || '' }}
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -189,6 +197,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Pinned Go oracle revision (bf53346eec234929bedf0314b99e3da85dbb991b) must exist in git history for SQLite lifecycle tests.
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -213,13 +223,26 @@ jobs:
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" fmt --all --check
 
+      - name: Focused Windows profile-read gate (compile-only, not runtime acceptance)
+        if: runner.os == 'Windows' && inputs.profile_read_only == true
+        shell: bash
+        run: |
+          echo 'FOCUSED WINDOWS PROFILE-READ GATE IS COMPILE-ONLY.'
+          echo 'This green check does not establish Windows runtime, parity, keychain, path, or filesystem acceptance.'
+
       - name: Check and lint
         shell: bash
         run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" && "${{ inputs.profile_read_only }}" == "true" ]]; then
+            cargo +"$RUST_TOOLCHAIN" check -p symeraseme-core --all-targets --all-features --locked
+            exit 0
+          fi
           cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
           cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test and doctest
+        if: inputs.profile_read_only != true
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -231,12 +254,12 @@ jobs:
           fi
 
       - name: Run neutral parity subset on Unix
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && inputs.profile_read_only != true
         shell: bash
         run: make parity
 
       - name: Record Windows parity process-tree limitation
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && inputs.profile_read_only != true
         shell: pwsh
         run: |
           $source = Get-Content rust-tests/parity/src/process.rs -Raw
@@ -244,3 +267,18 @@ jobs:
             throw 'The parity harness capability guard is missing or changed.'
           }
           Write-Host 'Neutral parity is intentionally excluded on Windows: process-tree cleanup requires Unix process groups; the harness fails explicitly rather than claiming tree-safe coverage.'
+
+      - name: Native profile-read Go replay and Rust comparison
+        if: runner.os != 'Windows' || inputs.profile_read_only != true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 rust-tests/parity/profile_read.py --rust --mutation-check 2>&1 | tee profile-read-proof.log
+
+      - name: Upload profile-read native evidence
+        if: always() && (runner.os != 'Windows' || inputs.profile_read_only != true)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: profile-read-${{ runner.os }}-${{ runner.arch }}
+          path: profile-read-proof.log
+          if-no-files-found: warn

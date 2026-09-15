@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 aes.workspace = true
+aes-gcm.workspace = true
 base64.workspace = true
 cap-fs-ext.workspace = true
 cap-std.workspace = true
@@ -25,6 +26,7 @@ hmac.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+symaira-core-sqlite.workspace = true
 symaira-core-version.workspace = true
 tar.workspace = true
 tempfile.workspace = true

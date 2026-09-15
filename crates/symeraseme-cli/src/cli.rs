@@ -348,6 +348,17 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             }
         }
         "config show" => config_show(parsed),
+        "show-profile" => {
+            let output_format = parsed
+                .flags
+                .get("output")
+                .map(String::as_str)
+                .unwrap_or("text");
+            match crate::commands::show_profile::execute(output_format) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            }
+        }
         "completion" => completion(parsed.positional.first().map(String::as_str).unwrap_or("")),
         "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
             Outcome::Notice(

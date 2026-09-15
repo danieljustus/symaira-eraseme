@@ -96,6 +96,7 @@ pub struct MasterKeyResolver<K = OsKeyring> {
     keyring: K,
     environment: BTreeMap<String, String>,
     cached: Option<MasterKey>,
+    allow_keyring: bool,
 }
 
 impl MasterKeyResolver<OsKeyring> {
@@ -118,6 +119,7 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
             keyring,
             environment: BTreeMap::new(),
             cached: None,
+            allow_keyring: true,
         }
     }
 
@@ -127,6 +129,7 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
             keyring,
             environment,
             cached: None,
+            allow_keyring: true,
         }
     }
 
@@ -143,6 +146,14 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
     /// Clear the in-process cache.
     pub fn clear_cache(&mut self) {
         self.cached = None;
+    }
+
+    /// Disable the OS keyring for an explicitly isolated process.
+    ///
+    /// This is used by subprocess tests that must prove missing-key behavior
+    /// without touching the user's keychain.
+    pub fn disable_keyring(&mut self) {
+        self.allow_keyring = false;
     }
 
     /// Resolve an existing key without creating one.
@@ -167,7 +178,8 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
             return Ok(key);
         }
 
-        if let Ok(Some(value)) = self.keyring.get(SERVICE_NAME, USERNAME)
+        if self.allow_keyring
+            && let Ok(Some(value)) = self.keyring.get(SERVICE_NAME, USERNAME)
             && !value.is_empty()
         {
             let key = decode_key("stored keychain master key", &value)?;

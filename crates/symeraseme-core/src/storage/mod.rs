@@ -12,9 +12,7 @@ pub use types::{
 };
 
 use rusqlite::{Connection, Result};
-use std::{fs, path::Path, time::Duration};
-
-const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+use std::{fs, path::Path};
 
 /// Opens a file-backed SQLite database with the Go store's connection pragmas.
 ///
@@ -30,9 +28,8 @@ pub fn open(path: impl AsRef<Path>) -> Result<Connection> {
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
     }
 
-    let connection = Connection::open(path)?;
-    connection.busy_timeout(BUSY_TIMEOUT)?;
-    connection.pragma_update(None, "foreign_keys", true)?;
-    connection.pragma_update(None, "journal_mode", "WAL")?;
-    Ok(connection)
+    symaira_core_sqlite::open_with_existing_parent(path).map_err(|error| match error {
+        symaira_core_sqlite::Error::Open(source) => source,
+        other => rusqlite::Error::ToSqlConversionFailure(Box::new(other)),
+    })
 }
