@@ -49,7 +49,7 @@ def verify_capture(capture, manifest):
     assert capture["helper_sha256"] == digest(HELPER.read_bytes()), "helper drift"
     assert capture["validator_sha256"] == digest(Path(__file__).read_bytes()), "validator drift"
     names = [case["name"] for case in capture["cases"]]
-    assert len(names) == len(set(names)) == 46, "case inventory mismatch"
+    assert len(names) == len(set(names)) == 56, "case inventory mismatch"
 
 
 def main():
@@ -78,9 +78,10 @@ def main():
         shutil.copyfile(HELPER, adapter)
         executable = temp / ("oracle.exe" if os.name == "nt" else "oracle-bin")
         build_env = {k: v for k, v in os.environ.items() if not k.startswith(("SYMERASEME_", "SYMVAULT_"))}
-        build_env["GOTOOLCHAIN"] = "go1.26.6"
+        build_env["GOTOOLCHAIN"] = "local"
         build_env["GOWORK"] = "off"
-        run(["go", "build", "-o", str(executable), "./oracle"], cwd=temp, env=build_env)
+        go_binary = os.environ.get("GO", "go")
+        run([go_binary, "build", "-o", str(executable), "./oracle"], cwd=temp, env=build_env)
         runtime_env = {k: v for k, v in build_env.items() if k in ("PATH", "SystemRoot", "SYSTEMROOT", "WINDIR")}
         runtime_env.update({"HOME": str(temp), "USERPROFILE": str(temp), "TMPDIR": str(temp),
                             "TMP": str(temp), "TEMP": str(temp), "LANG": "C", "TZ": "UTC"})

@@ -11,6 +11,7 @@ use symeraseme_core::identity::{
 };
 
 const ORACLE: &str = "bf53346eec234929bedf0314b99e3da85dbb991b";
+const PROFILE_CASES: usize = 56;
 
 #[derive(Deserialize)]
 struct Capture {
@@ -103,7 +104,7 @@ fn profile_corpus_matches_go() {
         // Tracked helper text is LF on every native checkout (see attributes).
         assert_eq!(hex::encode(Sha256::digest(&bytes)), expected, "{path}");
     }
-    assert_eq!(capture.cases.len(), 46);
+    assert_eq!(capture.cases.len(), PROFILE_CASES);
     let mut executed = BTreeSet::new();
     for case in capture.cases {
         assert!(executed.insert(case.name.clone()));
@@ -189,7 +190,7 @@ fn profile_corpus_matches_go() {
         assert_eq!(snapshot(home), before, "{} wrote filesystem", case.name);
         println!("profile case PASS: {}", case.name);
     }
-    assert_eq!(executed.len(), 46);
+    assert_eq!(executed.len(), PROFILE_CASES);
 }
 
 #[test]

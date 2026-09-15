@@ -159,10 +159,13 @@ func execute(c testCase) (result observation) {
 }
 func cases() []testCase {
 	key := bytes.Repeat([]byte{0x42}, 32)
-	encrypt := func(plain string) []byte {
-		out, err := identity.EncryptProfileWithKey([]byte(plain), key)
+	encryptBytes := func(plain []byte) []byte {
+		out, err := identity.EncryptProfileWithKey(plain, key)
 		must(err)
 		return out
+	}
+	encrypt := func(plain string) []byte {
+		return encryptBytes([]byte(plain))
 	}
 	full := encrypt(`{"full_name":"TEST Alice Ä","name_variants":["TEST A"],"date_of_birth":"2000-02-03","addresses":[{"street":"TEST Street","city":"TEST City","postal_code":"00000","country":"DE","state":"TEST State","valid_from":"2020-01-01","valid_to":null}],"email_addresses":["test@example.invalid"],"phone_numbers":["TEST Phone"],"jurisdictions":["GDPR"]}`)
 	result := []testCase{}
@@ -198,6 +201,28 @@ func cases() []testCase {
 	add("invalid-array-element", encrypt(`{"addresses":[42]}`))
 	add("invalid-root", encrypt(`[]`))
 	add("trailing-json", encrypt(`{} {}`))
+	add("invalid-utf8-full-name", encryptBytes([]byte("{\"full_name\":\"TEST \xff\"}")))
+	add("invalid-utf8-sequence", encryptBytes([]byte("{\"email_addresses\":[\"TEST \xc0\xaf\"]}")))
+	add("lone-high-surrogate", encrypt(`{"full_name":"\ud800"}`))
+	add("lone-low-surrogate", encrypt(`{"full_name":"\udc00"}`))
+	add("valid-surrogate-pair", encrypt(`{"full_name":"\ud83d\ude00"}`))
+	deepJSON := func(depth int) []byte {
+		var builder strings.Builder
+		builder.Grow(depth + 16)
+		builder.WriteString(`{"deep":`)
+		for index := 1; index < depth; index++ {
+			builder.WriteByte('[')
+		}
+		builder.WriteString("null")
+		for index := 1; index < depth; index++ {
+			builder.WriteByte(']')
+		}
+		builder.WriteByte('}')
+		return []byte(builder.String())
+	}
+	for _, depth := range []int{127, 128, 9999, 10000, 10001} {
+		add(fmt.Sprintf("unknown-depth-%d", depth), encryptBytes(deepJSON(depth)))
+	}
 	add("empty-plaintext", encrypt(``))
 	corrupt := append([]byte(nil), full...)
 	corrupt[len(corrupt)-1] ^= 1

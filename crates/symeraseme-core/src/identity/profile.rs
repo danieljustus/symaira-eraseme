@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Read;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
@@ -151,7 +152,650 @@ go_record!(Envelope {
     algorithm: scalar
 });
 
-/// Opaque errors: never retain filenames, JSON excerpts, keys or plaintext.
+const GO_MAX_JSON_NESTING_DEPTH: usize = 10_000;
+
+#[derive(Clone, Copy)]
+enum ProfileFieldKind {
+    Scalar,
+    Optional,
+    Strings,
+    Addresses,
+}
+
+fn profile_field_kind(name: &str, address: bool) -> Option<ProfileFieldKind> {
+    let name = name.to_lowercase().replace('ſ', "s");
+    if address {
+        return match name.as_str() {
+            "street" | "city" | "postal_code" | "country" => Some(ProfileFieldKind::Scalar),
+            "state" | "valid_from" | "valid_to" => Some(ProfileFieldKind::Optional),
+            _ => None,
+        };
+    }
+    match name.as_str() {
+        "full_name" => Some(ProfileFieldKind::Scalar),
+        "name_variants" | "email_addresses" | "phone_numbers" | "jurisdictions" => {
+            Some(ProfileFieldKind::Strings)
+        }
+        "date_of_birth" => Some(ProfileFieldKind::Optional),
+        "addresses" => Some(ProfileFieldKind::Addresses),
+        _ => None,
+    }
+}
+
+/// Normalize the two JSON input behaviors where Go's encoding/json is more
+/// permissive than serde_json: invalid UTF-8 in strings and lone surrogates.
+/// The structural walk also enforces Go's 10,000-container nesting limit.
+fn normalize_go_json(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut normalized = Vec::with_capacity(input.len());
+    let mut position = 0;
+    let mut depth: usize = 0;
+    while position < input.len() {
+        match input[position] {
+            b'"' => {
+                position = normalize_json_string(input, position, &mut normalized)?;
+            }
+            b'{' | b'[' => {
+                depth = depth.checked_add(1).ok_or(())?;
+                if depth > GO_MAX_JSON_NESTING_DEPTH {
+                    return Err(());
+                }
+                normalized.push(input[position]);
+                position += 1;
+            }
+            b'}' | b']' => {
+                depth = depth.saturating_sub(1);
+                normalized.push(input[position]);
+                position += 1;
+            }
+            byte => {
+                normalized.push(byte);
+                position += 1;
+            }
+        }
+    }
+    Ok(normalized)
+}
+
+fn normalize_json_string(input: &[u8], start: usize, output: &mut Vec<u8>) -> Result<usize, ()> {
+    if input.get(start) != Some(&b'"') {
+        return Err(());
+    }
+    output.push(b'"');
+    let mut position = start + 1;
+    while let Some(&byte) = input.get(position) {
+        match byte {
+            b'"' => {
+                output.push(byte);
+                return Ok(position + 1);
+            }
+            b'\\' => {
+                let escape = *input.get(position + 1).ok_or(())?;
+                if escape == b'u' {
+                    let code = parse_hex_quad(input, position + 2).ok_or(())?;
+                    if (0xd800..=0xdbff).contains(&code) {
+                        let pair = if input.get(position + 6) == Some(&b'\\')
+                            && input.get(position + 7) == Some(&b'u')
+                        {
+                            parse_hex_quad(input, position + 8)
+                        } else {
+                            None
+                        };
+                        if pair.is_some_and(|value| (0xdc00..=0xdfff).contains(&value)) {
+                            output.extend_from_slice(&input[position..position + 12]);
+                            position += 12;
+                            continue;
+                        }
+                        output.extend_from_slice(b"\\ufffd");
+                    } else if (0xdc00..=0xdfff).contains(&code) {
+                        output.extend_from_slice(b"\\ufffd");
+                    } else {
+                        output.extend_from_slice(&input[position..position + 6]);
+                    }
+                    position += 6;
+                    continue;
+                }
+                if !matches!(
+                    escape,
+                    b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't'
+                ) {
+                    return Err(());
+                }
+                output.extend_from_slice(&input[position..position + 2]);
+                position += 2;
+            }
+            byte if byte < 0x20 => return Err(()),
+            byte if byte < 0x80 => {
+                output.push(byte);
+                position += 1;
+            }
+            _ => {
+                if let Some(width) = valid_utf8_width(input, position) {
+                    output.extend_from_slice(&input[position..position + width]);
+                    position += width;
+                } else {
+                    output.extend_from_slice(b"\xef\xbf\xbd");
+                    position += 1;
+                }
+            }
+        }
+    }
+    Err(())
+}
+
+fn parse_hex_quad(input: &[u8], start: usize) -> Option<u16> {
+    let mut value = 0_u16;
+    for offset in 0..4 {
+        value = value.checked_mul(16)?;
+        value = value.checked_add(hex_value(input.get(start + offset).copied()?)? as u16)?;
+    }
+    Some(value)
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn valid_utf8_width(input: &[u8], position: usize) -> Option<usize> {
+    let first = *input.get(position)?;
+    let next = |offset| input.get(position + offset).copied();
+    let continuation = |byte: Option<u8>| byte.is_some_and(|value| (0x80..=0xbf).contains(&value));
+    match first {
+        0xc2..=0xdf if continuation(next(1)) => Some(2),
+        0xe0 if matches!(next(1), Some(0xa0..=0xbf)) && continuation(next(2)) => Some(3),
+        0xed if matches!(next(1), Some(0x80..=0x9f)) && continuation(next(2)) => Some(3),
+        value
+            if matches!(value, 0xe1..=0xec | 0xee..=0xef)
+                && continuation(next(1))
+                && continuation(next(2)) =>
+        {
+            Some(3)
+        }
+        0xf0 if matches!(next(1), Some(0x90..=0xbf))
+            && continuation(next(2))
+            && continuation(next(3)) =>
+        {
+            Some(4)
+        }
+        0xf4 if matches!(next(1), Some(0x80..=0x8f))
+            && continuation(next(2))
+            && continuation(next(3)) =>
+        {
+            Some(4)
+        }
+        value
+            if matches!(value, 0xf1..=0xf3)
+                && continuation(next(1))
+                && continuation(next(2))
+                && continuation(next(3)) =>
+        {
+            Some(4)
+        }
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ArrayState {
+    ValueOrEnd,
+    CommaOrEnd,
+}
+
+#[derive(Clone, Copy)]
+enum ObjectState {
+    KeyOrEnd,
+    Value,
+    CommaOrEnd,
+}
+
+#[derive(Clone, Copy)]
+enum JsonFrame {
+    Array(ArrayState),
+    Object(ObjectState),
+}
+
+struct JsonCursor<'a> {
+    input: &'a [u8],
+    position: usize,
+}
+
+impl<'a> JsonCursor<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, position: 0 }
+    }
+
+    fn current(&self) -> Option<u8> {
+        self.input.get(self.position).copied()
+    }
+
+    fn skip_ws(&mut self) {
+        while self
+            .current()
+            .is_some_and(|byte| matches!(byte, b' ' | b'\n' | b'\r' | b'\t'))
+        {
+            self.position += 1;
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<Range<usize>, ()> {
+        let start = self.position;
+        if self.current() != Some(b'"') {
+            return Err(());
+        }
+        self.position += 1;
+        while let Some(&byte) = self.input.get(self.position) {
+            match byte {
+                b'"' => {
+                    self.position += 1;
+                    return Ok(start..self.position);
+                }
+                b'\\' => {
+                    let escape = *self.input.get(self.position + 1).ok_or(())?;
+                    if escape == b'u' {
+                        parse_hex_quad(self.input, self.position + 2).ok_or(())?;
+                        self.position += 6;
+                    } else if matches!(
+                        escape,
+                        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't'
+                    ) {
+                        self.position += 2;
+                    } else {
+                        return Err(());
+                    }
+                }
+                value if value < 0x20 => return Err(()),
+                value if value < 0x80 => self.position += 1,
+                _ => {
+                    let width = valid_utf8_width(self.input, self.position).ok_or(())?;
+                    self.position += width;
+                }
+            }
+        }
+        Err(())
+    }
+
+    fn parse_literal(&mut self, literal: &[u8]) -> Result<(), ()> {
+        let end = self.position.checked_add(literal.len()).ok_or(())?;
+        if self.input.get(self.position..end) != Some(literal) {
+            return Err(());
+        }
+        self.position = end;
+        Ok(())
+    }
+
+    fn parse_number(&mut self) -> Result<(), ()> {
+        let start = self.position;
+        if self.current() == Some(b'-') {
+            self.position += 1;
+        }
+        match self.current() {
+            Some(b'0') => self.position += 1,
+            Some(b'1'..=b'9') => {
+                self.position += 1;
+                while self.current().is_some_and(|byte| byte.is_ascii_digit()) {
+                    self.position += 1;
+                }
+            }
+            _ => return Err(()),
+        }
+        if self.current() == Some(b'.') {
+            self.position += 1;
+            let digits = self.position;
+            while self.current().is_some_and(|byte| byte.is_ascii_digit()) {
+                self.position += 1;
+            }
+            if self.position == digits {
+                return Err(());
+            }
+        }
+        if self
+            .current()
+            .is_some_and(|byte| matches!(byte, b'e' | b'E'))
+        {
+            self.position += 1;
+            if self
+                .current()
+                .is_some_and(|byte| matches!(byte, b'+' | b'-'))
+            {
+                self.position += 1;
+            }
+            let digits = self.position;
+            while self.current().is_some_and(|byte| byte.is_ascii_digit()) {
+                self.position += 1;
+            }
+            if self.position == digits {
+                return Err(());
+            }
+        }
+        if self.position == start || !is_value_delimiter(self.current()) {
+            return Err(());
+        }
+        Ok(())
+    }
+
+    fn start_value(&mut self, frames: &mut Vec<JsonFrame>) -> Result<(), ()> {
+        self.skip_ws();
+        match self.current() {
+            Some(b'"') => {
+                self.parse_string()?;
+            }
+            Some(b'[') => {
+                if frames.len() >= GO_MAX_JSON_NESTING_DEPTH {
+                    return Err(());
+                }
+                self.position += 1;
+                frames.push(JsonFrame::Array(ArrayState::ValueOrEnd));
+            }
+            Some(b'{') => {
+                if frames.len() >= GO_MAX_JSON_NESTING_DEPTH {
+                    return Err(());
+                }
+                self.position += 1;
+                frames.push(JsonFrame::Object(ObjectState::KeyOrEnd));
+            }
+            Some(b't') => self.parse_literal(b"true")?,
+            Some(b'f') => self.parse_literal(b"false")?,
+            Some(b'n') => self.parse_literal(b"null")?,
+            Some(b'-' | b'0'..=b'9') => self.parse_number()?,
+            _ => return Err(()),
+        }
+        Ok(())
+    }
+
+    /// Skip one JSON value without recursive calls, so Go-accepted depths do
+    /// not consume the Rust call stack. The returned range excludes trailing
+    /// whitespace and leaves the cursor at the next delimiter.
+    fn skip_value(&mut self) -> Result<Range<usize>, ()> {
+        self.skip_ws();
+        let start = self.position;
+        let mut frames = Vec::new();
+        self.start_value(&mut frames)?;
+        loop {
+            let Some(frame) = frames.last().copied() else {
+                return Ok(start..self.position);
+            };
+            let index = frames.len() - 1;
+            match frame {
+                JsonFrame::Array(ArrayState::ValueOrEnd) => {
+                    self.skip_ws();
+                    if self.current() == Some(b']') {
+                        self.position += 1;
+                        frames.pop();
+                    } else {
+                        frames[index] = JsonFrame::Array(ArrayState::CommaOrEnd);
+                        self.start_value(&mut frames)?;
+                    }
+                }
+                JsonFrame::Array(ArrayState::CommaOrEnd) => {
+                    self.skip_ws();
+                    match self.current() {
+                        Some(b',') => {
+                            self.position += 1;
+                            frames[index] = JsonFrame::Array(ArrayState::ValueOrEnd);
+                        }
+                        Some(b']') => {
+                            self.position += 1;
+                            frames.pop();
+                        }
+                        _ => return Err(()),
+                    }
+                }
+                JsonFrame::Object(ObjectState::KeyOrEnd) => {
+                    self.skip_ws();
+                    if self.current() == Some(b'}') {
+                        self.position += 1;
+                        frames.pop();
+                    } else {
+                        self.parse_string()?;
+                        self.skip_ws();
+                        if self.current() != Some(b':') {
+                            return Err(());
+                        }
+                        self.position += 1;
+                        frames[index] = JsonFrame::Object(ObjectState::Value);
+                    }
+                }
+                JsonFrame::Object(ObjectState::Value) => {
+                    frames[index] = JsonFrame::Object(ObjectState::CommaOrEnd);
+                    self.start_value(&mut frames)?;
+                }
+                JsonFrame::Object(ObjectState::CommaOrEnd) => {
+                    self.skip_ws();
+                    match self.current() {
+                        Some(b',') => {
+                            self.position += 1;
+                            frames[index] = JsonFrame::Object(ObjectState::KeyOrEnd);
+                        }
+                        Some(b'}') => {
+                            self.position += 1;
+                            frames.pop();
+                        }
+                        _ => return Err(()),
+                    }
+                }
+            }
+        }
+    }
+
+    fn at_end(&mut self) -> bool {
+        self.skip_ws();
+        self.position == self.input.len()
+    }
+}
+
+fn is_value_delimiter(byte: Option<u8>) -> bool {
+    byte.is_none_or(|value| matches!(value, b' ' | b'\n' | b'\r' | b'\t' | b',' | b']' | b'}'))
+}
+
+fn decode_go_profile_json(input: &[u8]) -> Result<Profile, ()> {
+    let normalized = normalize_go_json(input)?;
+    let reduced = reduce_profile_json(&normalized)?;
+    serde_json::from_slice(&reduced).map_err(|_| ())
+}
+
+/// Remove unknown values before serde sees them. Go ignores unknown object
+/// fields, so this preserves profile semantics while allowing arbitrary valid
+/// unknown JSON nesting up to Go's bound without recursive Rust deserialization.
+fn reduce_profile_json(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut cursor = JsonCursor::new(input);
+    cursor.skip_ws();
+    let value = if cursor.current() == Some(b'n') {
+        let range = cursor.skip_value()?;
+        if input.get(range.clone()) != Some(b"null") {
+            return Err(());
+        }
+        input[range].to_vec()
+    } else if cursor.current() == Some(b'{') {
+        reduce_object(&mut cursor, false)?
+    } else {
+        return Err(());
+    };
+    if !cursor.at_end() {
+        return Err(());
+    }
+    Ok(value)
+}
+
+fn reduce_object(cursor: &mut JsonCursor<'_>, address: bool) -> Result<Vec<u8>, ()> {
+    if cursor.current() != Some(b'{') {
+        return Err(());
+    }
+    cursor.position += 1;
+    let mut output = vec![b'{'];
+    let mut has_field = false;
+    loop {
+        cursor.skip_ws();
+        if cursor.current() == Some(b'}') {
+            cursor.position += 1;
+            output.push(b'}');
+            return Ok(output);
+        }
+        let key_range = cursor.parse_string()?;
+        let key: String =
+            serde_json::from_slice(&cursor.input[key_range.clone()]).map_err(|_| ())?;
+        cursor.skip_ws();
+        if cursor.current() != Some(b':') {
+            return Err(());
+        }
+        cursor.position += 1;
+        if let Some(kind) = profile_field_kind(&key, address) {
+            let value = if matches!(kind, ProfileFieldKind::Addresses) {
+                reduce_address_array(cursor)?
+            } else {
+                let range = cursor.skip_value()?;
+                let raw = &cursor.input[range];
+                if !validate_simple_value(raw, kind) {
+                    return Err(());
+                }
+                raw.to_vec()
+            };
+            if has_field {
+                output.push(b',');
+            }
+            output.extend_from_slice(&cursor.input[key_range]);
+            output.push(b':');
+            output.extend_from_slice(&value);
+            has_field = true;
+        } else {
+            cursor.skip_value()?;
+        }
+        cursor.skip_ws();
+        match cursor.current() {
+            Some(b',') => cursor.position += 1,
+            Some(b'}') => {
+                cursor.position += 1;
+                output.push(b'}');
+                return Ok(output);
+            }
+            _ => return Err(()),
+        }
+    }
+}
+
+fn reduce_address_array(cursor: &mut JsonCursor<'_>) -> Result<Vec<u8>, ()> {
+    cursor.skip_ws();
+    if cursor.current() == Some(b'n') {
+        let range = cursor.skip_value()?;
+        if cursor.input.get(range) == Some(b"null") {
+            return Ok(b"null".to_vec());
+        }
+        return Err(());
+    }
+    if cursor.current() != Some(b'[') {
+        return Err(());
+    }
+    cursor.position += 1;
+    let mut output = vec![b'['];
+    let mut first = true;
+    loop {
+        cursor.skip_ws();
+        if cursor.current() == Some(b']') {
+            cursor.position += 1;
+            output.push(b']');
+            return Ok(output);
+        }
+        if !first {
+            output.push(b',');
+        }
+        match cursor.current() {
+            Some(b'{') => output.extend_from_slice(&reduce_object(cursor, true)?),
+            Some(b'n') => {
+                let range = cursor.skip_value()?;
+                if cursor.input.get(range) != Some(b"null") {
+                    return Err(());
+                }
+                output.extend_from_slice(b"null");
+            }
+            _ => return Err(()),
+        }
+        first = false;
+        cursor.skip_ws();
+        match cursor.current() {
+            Some(b',') => cursor.position += 1,
+            Some(b']') => {
+                cursor.position += 1;
+                output.push(b']');
+                return Ok(output);
+            }
+            _ => return Err(()),
+        }
+    }
+}
+
+fn validate_simple_value(input: &[u8], kind: ProfileFieldKind) -> bool {
+    let mut cursor = JsonCursor::new(input);
+    cursor.skip_ws();
+    let valid = match kind {
+        ProfileFieldKind::Scalar | ProfileFieldKind::Optional => {
+            if cursor.current() == Some(b'"') {
+                cursor.parse_string().is_ok()
+            } else if cursor.current() == Some(b'n') {
+                cursor
+                    .skip_value()
+                    .is_ok_and(|range| input.get(range) == Some(b"null"))
+            } else {
+                false
+            }
+        }
+        ProfileFieldKind::Strings => {
+            if cursor.current() == Some(b'n') {
+                cursor
+                    .skip_value()
+                    .is_ok_and(|range| input.get(range) == Some(b"null"))
+            } else if cursor.current() != Some(b'[') {
+                false
+            } else {
+                cursor.position += 1;
+                let mut valid = true;
+                loop {
+                    cursor.skip_ws();
+                    if cursor.current() == Some(b']') {
+                        cursor.position += 1;
+                        break;
+                    }
+                    if cursor.current() == Some(b'"') {
+                        if cursor.parse_string().is_err() {
+                            valid = false;
+                            break;
+                        }
+                    } else if cursor.current() == Some(b'n') {
+                        let Ok(range) = cursor.skip_value() else {
+                            valid = false;
+                            break;
+                        };
+                        if input.get(range) != Some(b"null") {
+                            valid = false;
+                            break;
+                        }
+                    } else {
+                        valid = false;
+                        break;
+                    }
+                    cursor.skip_ws();
+                    match cursor.current() {
+                        Some(b',') => cursor.position += 1,
+                        Some(b']') => {
+                            cursor.position += 1;
+                            break;
+                        }
+                        _ => {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+                valid
+            }
+        }
+        ProfileFieldKind::Addresses => false,
+    };
+    valid && cursor.at_end()
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum ProfileError {
     NotFound,
@@ -340,5 +984,5 @@ pub fn load_profile<K: KeyringBackend>(
             )
             .map_err(|_| ProfileError::Authentication)?,
     );
-    serde_json::from_slice(&plain).map_err(|_| ProfileError::Json)
+    decode_go_profile_json(&plain).map_err(|_| ProfileError::Json)
 }
