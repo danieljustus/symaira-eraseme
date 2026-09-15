@@ -6,10 +6,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -18,7 +20,7 @@ import (
 	"runtime"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	sqlite "modernc.org/sqlite"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 )
@@ -103,6 +105,22 @@ func queryPragmas(db *sql.DB) (map[string]any, error) {
 	pragmas["journal_mode"] = strings.ToLower(journalMode)
 
 	return pragmas, nil
+}
+
+func requireProductionPragmas(db *sql.DB) error {
+	pragmas, err := queryPragmas(db)
+	if err != nil {
+		return err
+	}
+	if pragmas["busy_timeout"] != int64(5000) ||
+		pragmas["foreign_keys"] != int64(1) ||
+		pragmas["journal_mode"] != "wal" {
+		return fmt.Errorf(
+			"unexpected production pragmas: busy_timeout=%v foreign_keys=%v journal_mode=%v",
+			pragmas["busy_timeout"], pragmas["foreign_keys"], pragmas["journal_mode"],
+		)
+	}
+	return nil
 }
 
 func queryTablesAndIndexes(db *sql.DB) (tables []string, indexes []string, err error) {
@@ -223,12 +241,15 @@ func handleRequest(req Request) Response {
 		return Response{Status: "ok", Notes: notes}
 
 	case "write_row":
-		db, err := sql.Open("sqlite", req.Path)
+		store, err := eventstore.Open(req.Path)
 		if err != nil {
 			return Response{Status: "error", Error: err.Error()}
 		}
-		defer db.Close()
-		_, err = db.Exec("INSERT INTO values_table (id, value) VALUES (?, ?)", req.ID, req.Value)
+		defer store.Close()
+		if err := requireProductionPragmas(store.DB()); err != nil {
+			return Response{Status: "error", Error: err.Error()}
+		}
+		_, err = store.DB().Exec("INSERT INTO values_table (id, value) VALUES (?, ?)", req.ID, req.Value)
 		if err != nil {
 			return Response{Status: "error", Error: err.Error()}
 		}
@@ -243,6 +264,7 @@ func main() {
 	pathFlag := flag.String("path", "", "Database path")
 	interactiveSnapshot := flag.Bool("interactive-snapshot", false, "Interactive WAL snapshot mode")
 	interactiveLock := flag.Bool("interactive-lock", false, "Interactive lock contention mode")
+	interactiveWriter := flag.Bool("interactive-writer", false, "Interactive lock-waiting writer mode")
 	idFlag := flag.Int64("id", 0, "Row ID")
 	valFlag := flag.String("value", "", "String value")
 	flag.Parse()
@@ -253,6 +275,10 @@ func main() {
 	}
 	if *interactiveLock {
 		runInteractiveLock(*pathFlag, *idFlag, *valFlag)
+		return
+	}
+	if *interactiveWriter {
+		runInteractiveWriter(*pathFlag, *idFlag, *valFlag)
 		return
 	}
 
@@ -279,13 +305,13 @@ func main() {
 }
 
 func runInteractiveSnapshot(path string) {
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", path)
-	db, err := sql.Open("sqlite", dsn)
+	store, err := eventstore.Open(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer store.Close()
+	db := store.DB()
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -333,25 +359,26 @@ func runInteractiveSnapshot(path string) {
 }
 
 func runInteractiveLock(path string, id int64, value string) {
-	db, err := sql.Open("sqlite", path)
+	store, err := eventstore.Open(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer store.Close()
 
-	tx, err := db.Begin()
+	conn, err := store.DB().Conn(context.Background())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "begin: %v\n", err)
+		fmt.Fprintf(os.Stderr, "pin connection: %v\n", err)
 		os.Exit(1)
 	}
-	defer tx.Rollback()
+	defer conn.Close()
 
-	if _, err := tx.Exec("BEGIN IMMEDIATE"); err != nil && !strings.Contains(err.Error(), "cannot start a transaction within a transaction") {
-		// modernc.org/sqlite: db.Begin() starts deferred, so BEGIN IMMEDIATE upgrades
+	if _, err := conn.ExecContext(context.Background(), "BEGIN IMMEDIATE"); err != nil {
+		fmt.Fprintf(os.Stderr, "begin immediate: %v\n", err)
+		os.Exit(1)
 	}
 	if id != 0 || value != "" {
-		if _, err := tx.Exec("INSERT INTO values_table (id, value) VALUES (?, ?)", id, value); err != nil {
+		if _, err := conn.ExecContext(context.Background(), "INSERT INTO values_table (id, value) VALUES (?, ?)", id, value); err != nil {
 			fmt.Fprintf(os.Stderr, "insert: %v\n", err)
 			os.Exit(1)
 		}
@@ -375,13 +402,106 @@ func runInteractiveLock(path string, id int64, value string) {
 	}
 
 	if action == "commit" {
-		if err := tx.Commit(); err != nil {
+		if _, err := conn.ExecContext(context.Background(), "COMMIT"); err != nil {
 			fmt.Fprintf(os.Stderr, "commit: %v\n", err)
 			os.Exit(1)
 		}
 	} else {
-		_ = tx.Rollback()
+		if _, err := conn.ExecContext(context.Background(), "ROLLBACK"); err != nil {
+			fmt.Fprintf(os.Stderr, "rollback: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Println("RELEASED")
+}
+
+func runInteractiveWriter(path string, id int64, value string) {
+	store, err := eventstore.Open(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open: %v\n", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	conn, err := store.DB().Conn(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "pin connection: %v\n", err)
+		os.Exit(1)
+	}
+	defer conn.Close()
+
+	var observedBusyTimeout int64
+	if err := conn.QueryRowContext(context.Background(), "PRAGMA busy_timeout").Scan(&observedBusyTimeout); err != nil {
+		fmt.Fprintf(os.Stderr, "query busy_timeout: %v\n", err)
+		os.Exit(1)
+	}
+	if observedBusyTimeout != 5000 {
+		fmt.Fprintf(os.Stderr, "unexpected production busy_timeout: got %d, want 5000\n", observedBusyTimeout)
+		os.Exit(1)
+	}
+
+	// READY is emitted only after the production store is open and its
+	// physical connection has been verified. The parent can now acquire its
+	// Rust write lock before asking this connection to write.
+	fmt.Println("READY")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		fmt.Fprintf(os.Stderr, "stdin closed\n")
+		os.Exit(1)
+	}
+	if strings.TrimSpace(scanner.Text()) != "WRITE" {
+		fmt.Fprintf(os.Stderr, "unexpected command %q\n", scanner.Text())
+		os.Exit(1)
+	}
+
+	if _, err := conn.ExecContext(context.Background(), "PRAGMA busy_timeout = 0"); err != nil {
+		fmt.Fprintf(os.Stderr, "set probe busy_timeout: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := conn.ExecContext(context.Background(), "BEGIN IMMEDIATE"); err == nil {
+		_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+		fmt.Fprintln(os.Stderr, "lock probe unexpectedly succeeded")
+		os.Exit(1)
+	} else if !isSQLiteBusy(err) {
+		fmt.Fprintf(os.Stderr, "lock probe failed without SQLITE_BUSY: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := conn.ExecContext(context.Background(), "PRAGMA busy_timeout = 5000"); err != nil {
+		fmt.Fprintf(os.Stderr, "restore busy_timeout: %v\n", err)
+		os.Exit(1)
+	}
+	var restoredBusyTimeout int64
+	if err := conn.QueryRowContext(context.Background(), "PRAGMA busy_timeout").Scan(&restoredBusyTimeout); err != nil {
+		fmt.Fprintf(os.Stderr, "verify restored busy_timeout: %v\n", err)
+		os.Exit(1)
+	}
+	if restoredBusyTimeout != observedBusyTimeout {
+		fmt.Fprintf(os.Stderr, "busy_timeout changed during probe: got %d, want %d\n", restoredBusyTimeout, observedBusyTimeout)
+		os.Exit(1)
+	}
+
+	// The parent uses WAITING as proof that the same pinned connection saw a
+	// real SQLITE_BUSY with timeout zero. This INSERT is deliberately issued
+	// exactly once under the restored production timeout.
+	fmt.Println("WAITING")
+	if _, err := conn.ExecContext(context.Background(), "INSERT INTO values_table (id, value) VALUES (?, ?)", id, value); err != nil {
+		fmt.Fprintf(os.Stderr, "insert: %v\n", err)
+		os.Exit(1)
+	}
+
+	_ = json.NewEncoder(os.Stdout).Encode(Response{
+		Status: "ok",
+		Notes:  "contention observed",
+		Pragmas: map[string]any{
+			"busy_timeout": restoredBusyTimeout,
+		},
+	})
+}
+
+func isSQLiteBusy(err error) bool {
+	var sqliteErr *sqlite.Error
+	return errors.As(err, &sqliteErr) && sqliteErr.Code()&0xff == 5
 }

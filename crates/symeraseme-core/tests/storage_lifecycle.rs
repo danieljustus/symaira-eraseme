@@ -290,6 +290,17 @@ impl InteractiveChild {
         }
     }
 
+    fn assert_no_line(&self, timeout: Duration) {
+        match self.lines.recv_timeout(timeout) {
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Ok(Ok(line)) => panic!("unexpected oracle output before release: {line}"),
+            Ok(Err(err)) => panic!("error reading oracle stdout: {err}"),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                panic!("oracle stdout closed before release")
+            }
+        }
+    }
+
     fn write_line(&mut self, line: &str) {
         writeln!(self.stdin, "{line}").expect("write line to oracle stdin");
         self.stdin.flush().expect("flush oracle stdin");
@@ -375,6 +386,56 @@ impl InteractiveLockSession {
             status.success(),
             "lock oracle exited with failure: {status:?}"
         );
+    }
+}
+
+struct InteractiveWriterSession(InteractiveChild);
+
+impl InteractiveWriterSession {
+    fn start(db_path: &Path, id: i64, value: &str) -> Self {
+        let id_str = id.to_string();
+        Self(InteractiveChild::spawn(&[
+            "--interactive-writer",
+            "--path",
+            db_path.to_str().expect("valid utf8 path"),
+            "--id",
+            &id_str,
+            "--value",
+            value,
+        ]))
+    }
+
+    fn wait_ready(&self, timeout: Duration) {
+        let line = self.0.read_line(timeout);
+        assert_eq!(line.trim(), "READY", "expected READY from oracle writer");
+    }
+
+    fn write(mut self) -> Self {
+        self.0.write_line("WRITE");
+        self
+    }
+
+    fn wait_waiting(&self, timeout: Duration) {
+        let line = self.0.read_line(timeout);
+        assert_eq!(
+            line.trim(),
+            "WAITING",
+            "expected WAITING from oracle writer"
+        );
+    }
+
+    fn assert_no_result(&self, timeout: Duration) {
+        self.0.assert_no_line(timeout);
+    }
+
+    fn finish(self, timeout: Duration) -> Value {
+        let json_line = self.0.read_line(timeout);
+        let status = self.0.wait_for_exit(timeout);
+        assert!(
+            status.success(),
+            "interactive oracle writer exited with failure: {status:?}"
+        );
+        serde_json::from_str(&json_line).expect("parse response JSON from oracle writer")
     }
 }
 
@@ -1135,6 +1196,44 @@ fn rust_writer_waits_for_go_lock_release_differential() {
 }
 
 #[test]
+fn go_write_row_uses_production_store_configuration() {
+    let tree = tempdir().expect("create isolated database directory");
+    let database = tree.path().join("go_write_production_config.db");
+
+    let setup = open(&database).expect("open connection to setup table");
+    setup
+        .execute(
+            "CREATE TABLE values_table (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
+            [],
+        )
+        .expect("create values_table");
+    drop(setup);
+
+    let open_resp = run_oracle(&json!({
+        "op": "open",
+        "path": database.to_str().expect("valid path")
+    }));
+    assert_eq!(open_resp["status"], "ok");
+    assert_eq!(open_resp["pragmas"]["busy_timeout"], 5000);
+    assert_eq!(open_resp["pragmas"]["foreign_keys"], 1);
+    assert_eq!(open_resp["pragmas"]["journal_mode"], "wal");
+
+    let write_resp = run_oracle(&json!({
+        "op": "write_row",
+        "path": database.to_str().expect("valid path"),
+        "id": 1,
+        "value": "written by production Go store"
+    }));
+    assert_eq!(write_resp["status"], "ok");
+
+    let check = open(&database).expect("open check connection");
+    let count: i64 = check
+        .query_row("SELECT count(*) FROM values_table", [], |row| row.get(0))
+        .expect("count production Go row");
+    assert_eq!(count, 1);
+}
+
+#[test]
 fn go_writer_waits_for_rust_lock_release_differential() {
     let tree = tempdir().expect("create isolated database directory");
     let database = tree.path().join("lock_rust_holder_go_waiter.db");
@@ -1148,6 +1247,11 @@ fn go_writer_waits_for_rust_lock_release_differential() {
         .expect("create values_table");
     drop(setup);
 
+    // Start the Go writer first: READY proves eventstore.Open completed
+    // before the Rust holder acquires its write lock.
+    let session = InteractiveWriterSession::start(&database, 2, "written by go waiter");
+    session.wait_ready(ORACLE_TIMEOUT);
+
     let rust_holder = open(&database).expect("open rust holder connection");
     rust_holder
         .execute_batch("BEGIN IMMEDIATE")
@@ -1159,23 +1263,22 @@ fn go_writer_waits_for_rust_lock_release_differential() {
         )
         .expect("rust holder inserts row");
 
-    let db_path_clone = database.clone();
-    let go_waiter_thread = thread::spawn(move || -> Value {
-        run_oracle(&json!({
-            "op": "write_row",
-            "path": db_path_clone.to_str().expect("valid path"),
-            "id": 2,
-            "value": "written by go waiter"
-        }))
-    });
+    let session = session.write();
+    session.wait_waiting(ORACLE_TIMEOUT);
+    session.assert_no_result(Duration::from_millis(100));
 
     rust_holder
         .execute_batch("COMMIT")
         .expect("rust holder commits write lock");
     drop(rust_holder);
 
-    let go_result = go_waiter_thread.join().expect("go waiter thread join");
-    assert_eq!(go_result["status"], "ok");
+    let go_result = session.finish(ORACLE_TIMEOUT);
+    assert_eq!(
+        go_result["status"], "ok",
+        "unexpected go oracle result: {go_result}"
+    );
+    assert_eq!(go_result["notes"], "contention observed");
+    assert_eq!(go_result["pragmas"]["busy_timeout"], 5000);
 
     let check = open(&database).expect("open check connection");
     let count: i64 = check
