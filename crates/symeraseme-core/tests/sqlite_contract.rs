@@ -2,7 +2,7 @@ use std::fs;
 
 use rusqlite::Connection;
 use symeraseme_core::storage::{
-    EventType,
+    EventType, open,
     repository::{ListRemovalRequestsOptions, Repository},
     store::{SCHEMA_VERSION, Store},
 };
@@ -287,5 +287,90 @@ fn event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls() {
             .expect("request exists")
             .created_at,
         "2026-08-01T08:00:00"
+    );
+}
+
+#[test]
+fn corekit_sqlite_adapter_pragmas_and_empty_schema() {
+    let tree = tempdir().expect("create isolated database directory");
+    let database = tree.path().join("empty.db");
+
+    let connection = open(&database).expect("open database via corekit adapter");
+    assert_eq!(pragma_value::<i64>(&connection, "busy_timeout"), 5_000);
+    assert_eq!(pragma_value::<i64>(&connection, "foreign_keys"), 1);
+    assert_eq!(
+        pragma_value::<String>(&connection, "journal_mode").to_ascii_lowercase(),
+        "wal"
+    );
+
+    let table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count tables");
+    assert_eq!(
+        table_count, 0,
+        "open must not create any tables or shared schema"
+    );
+}
+
+#[test]
+fn corekit_sqlite_adapter_retained_nested_parent_and_existing_dir() {
+    let tree = tempdir().expect("create isolated database directory");
+
+    let nested_db = tree.path().join("level1").join("level2").join("nested.db");
+    assert!(!nested_db.parent().unwrap().exists());
+    let conn1 = open(&nested_db).expect("open database with nested parent");
+    assert!(nested_db.is_file());
+    assert!(nested_db.parent().unwrap().is_dir());
+    drop(conn1);
+
+    let existing_dir_db = tree
+        .path()
+        .join("level1")
+        .join("level2")
+        .join("existing.db");
+    assert!(existing_dir_db.parent().unwrap().is_dir());
+    let conn2 = open(&existing_dir_db).expect("open database in existing directory");
+    assert!(existing_dir_db.is_file());
+    drop(conn2);
+}
+
+#[test]
+fn corekit_sqlite_adapter_missing_and_failing_parent_error_behavior() {
+    let tree = tempdir().expect("create isolated database directory");
+
+    let missing_parent_db = tree.path().join("nonexistent_parent").join("direct.db");
+    let direct_err = symaira_core_sqlite::open_with_existing_parent(&missing_parent_db)
+        .expect_err("open_with_existing_parent must fail on missing parent");
+    assert!(
+        matches!(direct_err, symaira_core_sqlite::Error::Open(_)),
+        "direct call must fail with Error::Open"
+    );
+    assert!(
+        !tree.path().join("nonexistent_parent").exists(),
+        "open_with_existing_parent must not create parent directory"
+    );
+
+    let blocker_file = tree.path().join("blocker_file");
+    fs::write(&blocker_file, b"blocking").expect("write blocker file");
+    let invalid_parent_db = blocker_file.join("sub").join("blocked.db");
+    let err = open(&invalid_parent_db).expect_err("open must fail when parent cannot be created");
+    assert!(
+        matches!(err, rusqlite::Error::ToSqlConversionFailure(_)),
+        "failing parent creation must return rusqlite::Error::ToSqlConversionFailure"
+    );
+
+    let dir_as_db = tree.path().join("dir_target");
+    fs::create_dir_all(&dir_as_db).expect("create dir target");
+    let dir_err = open(&dir_as_db).expect_err("opening directory as DB must fail");
+    let direct_rusqlite_err = rusqlite::Connection::open(&dir_as_db)
+        .expect_err("direct rusqlite open on directory must fail");
+    assert_eq!(
+        dir_err.sqlite_error_code(),
+        direct_rusqlite_err.sqlite_error_code(),
+        "error code must match direct rusqlite error code"
     );
 }

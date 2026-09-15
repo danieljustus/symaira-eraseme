@@ -19,6 +19,21 @@ skip-tree = [
     # getrandom 0.4/r-efi 6 path; keep the exception scoped to rand's subtree.
     { name = "rand", version = "=0.9.5" },
 ]
+# These exact leaf skips cover only the incompatible transitive edges in the
+# verified SQLite adoption graph. rusqlite 0.40.2 uses hashlink 0.12.2 and
+# hashbrown 0.17.1, while sqlite-wasm-rs 0.5.5 retains hashbrown 0.16.1.
+# Existing yaml-rust2 and serde_yaml still require the older hashlink,
+# hashbrown, and foldhash chain. CoreKit FS pins nix 0.30.1 while the consumer
+# pins nix 0.31.3; these semver-incompatible upstream edges cannot be unified.
+# Keep these allowances exact and leaf-scoped; remove them when the graph
+# converges so multiple-versions denial remains the default everywhere else.
+skip = [
+    { name = "foldhash", version = "=0.1.5" },
+    { name = "hashbrown", version = "=0.15.5" },
+    { name = "hashbrown", version = "=0.16.1" },
+    { name = "hashlink", version = "=0.10.0" },
+    { name = "nix", version = "=0.30.1" },
+]
 
 [licenses]
 version = 2
