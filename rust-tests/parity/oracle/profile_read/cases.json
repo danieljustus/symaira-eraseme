@@ -1,0 +1,1271 @@
+{
+  "oracle": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "sources": {
+    "go.mod": "c7960fa0742061ad1423af7ed0ba383424dca84a86fb2e6d8c13f44c173f2529",
+    "go.sum": "c960159bdc74de0cbf56c1beedfaa0797ad8e0ede6b847011db5669b58b7674a",
+    "internal/eventstore/atomic_replace_unix.go": "adcf1def3e9898718213886e11164051e2c7430535a9facded42a20004c64884",
+    "internal/eventstore/atomic_replace_windows.go": "abb17e1984ddabff15baa338e22fb03b2454432f041303f2521372e75f37e9a8",
+    "internal/eventstore/cleanup.go": "b679a525b8356e8da5fc57dd66bf113aba7feb517eea6196a77d78ba0db8c8b5",
+    "internal/eventstore/cleanup_additional_test.go": "6b652817b7c8ad87782cf917c6c0062f754e5bd497881e00d494bebd574b295a",
+    "internal/eventstore/cleanup_safety_test.go": "dc235cd50d196be4610ce56eccda4f08705b1b38c5b7965d5cd8b2f31479b79f",
+    "internal/eventstore/configured_test.go": "cc1d5e3d894501f8623940442b7d6a02ebd3a68b9351f5aaccb16bd954789845",
+    "internal/eventstore/conformance_test.go": "341968a66dc249bed57a709cbc28e19297079f02d5d4c4df222dce8e52f62bb4",
+    "internal/eventstore/encrypt.go": "1892a69846a06d7ca41dfffe0b1da81947bd2aacbb32e475092eadfaab689bba",
+    "internal/eventstore/encrypt_test.go": "53be04f07d4e6878ee78cde9f99369cd0e195331975b73e50b0ba00455b5d683",
+    "internal/eventstore/encryption_additional_test.go": "983d2f9ec8de4d0316df5157367805c57800029782e12cc24b8dfbedd63e7371",
+    "internal/eventstore/eventtypes.go": "89394cfcbdc6221f5622c08fe15a32ada42dbc3ed1c17258784f311306636fda",
+    "internal/eventstore/flock_unix.go": "c918d3f9d2532d644f924cadf5192e13c8e16526bd70d4bfa01afd5e76d16696",
+    "internal/eventstore/flock_windows.go": "237970385d9d37969d77a6a3e5a6ce08519911353b0be6ff939f31ee1c7a3574",
+    "internal/eventstore/imap_hwm_test.go": "7d1b3f4e4373d0fabd57b89fd82274de03ce0a8df8e13f69157ca4547cf5350c",
+    "internal/eventstore/private_dir_unix.go": "19687de0acb3191a96f13f3b407ddf5c9815e3bdf93933276cea034e8bd3dd5c",
+    "internal/eventstore/private_dir_windows.go": "2863bc2f5e42148a8b4dbd210e68efd3ded4e7bcc2a5fbd22855b2dd37d65c46",
+    "internal/eventstore/projection.go": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a",
+    "internal/eventstore/projection_additional_test.go": "2fc37461eb8498295458c633d6309825aec6a405e2422067e9bb80fe6472d27e",
+    "internal/eventstore/python_fernet_compat_test.go": "5558fefcf7e0b324d09d2bd1c843e900809bf6149004778927f4b670667d5927",
+    "internal/eventstore/repo.go": "339cf7d383d03de0fbb1f3cba994f8282b45c060a9a5294891e36893374a4625",
+    "internal/eventstore/repo_test.go": "8ff4fc07c08288376c37c07ff78d6b411a41059a40b763232a455875f973adaa",
+    "internal/eventstore/store.go": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3",
+    "internal/eventstore/sync_directory_unix.go": "9cdfe967c394e4012b1dbf4096454887754a136b4e3d1c8aef781efd66f06af0",
+    "internal/eventstore/sync_directory_windows.go": "33dc2d3d00bbbb2d1feea24b9d94f5f0a6cd4ccae8cac8bbdb7be9ebb5bf8cee",
+    "internal/eventstore/timeutil/timeutil.go": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df",
+    "internal/eventstore/timeutil/timeutil_test.go": "497cfab3cce7ed1475287e510af672b2cda00b11b3d12a5876412faf3f7131ff",
+    "internal/identity/additional_test.go": "5824e1bb6e3aeb0b21c6a9fedc86380b64bdf433aaa78cacf56c32367b6b91ca",
+    "internal/identity/bootstrap.go": "03cbfc3a8fbd661bcfae87a456a576d1c28fc5a3ee34f4c8a999335a3be240bf",
+    "internal/identity/consent.go": "491f6b7386ff2c84913437b9dff5c3c6190124aaac34ac8b3dabf08e2629943c",
+    "internal/identity/consent_test.go": "f1040c6db2516147d071f887258af535e6289141b748f375d3f601c2e349a911",
+    "internal/identity/gate.go": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a",
+    "internal/identity/path_additional_test.go": "f8df6667b9dd95d21a664e8324f0b9289c907882ae68b7f57872f316d5097617",
+    "internal/identity/profile.go": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf",
+    "internal/identity/profile_interop_test.go": "f06b35eb8d239fbb2a183771951abb2aa9ba89bd5730f6fb398e8229e1e5b5f4",
+    "internal/identity/profile_regression_test.go": "c173772e8ae6b5e3600dc387b0d54896afbbd16204cb88d8898211feb3497670",
+    "internal/identity/profile_test.go": "d34991902fc0b47e52ae439cfc2b8d4b356b7a63d52a765a66bf6facf91440b7",
+    "internal/identity/resolve.go": "36020241ba651fe52c602941a2f67d50a224977965ef553d26e3bf4cc1e78e59",
+    "internal/identity/resolve_test.go": "b4d170cf2f448b007d8b89c71fc8a5186d85d13cbd3108d1d279164c77246a58",
+    "internal/identity/secrets.go": "b649b0f8e4353bc515c4a4db61a66f102f2ddce6711a4cd57d2b5fa59fb69893",
+    "internal/identity/secrets_test.go": "920fb34685b4ecb0228c825998d320d76054a8b4e1f27688dd95e8274d799de8"
+  },
+  "helper_sha256": "5cbb0748c289c10b29e9a4a13b69f5a64871735bbcafd5e54b7920816f7df5d7",
+  "validator_sha256": "742f7457818ac34c5d548f766d0710f00963ad7a5fcf2569a688bbfd30b956c9",
+  "cases": [
+    {
+      "name": "full",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "authenticated-version-1",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoxLCJub25jZSI6IjA3MDcwNzA3MDcwNzA3MDcwNzA3MDcwNyIsImFsZ29yaXRobSI6IlRFU1QgaWdub3JlZCIsImV4dHJhIjp0cnVlfQoDwDvZ2Z0tlUI5iRLneXI5pg4vS5ynISQOAB0upgWFxD9vDRIu1t8yNsgEmw=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST variant",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "authenticated-version--7",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjotNywibm9uY2UiOiIwNzA3MDcwNzA3MDcwNzA3MDcwNzA3MDciLCJhbGdvcml0aG0iOiJURVNUIGlnbm9yZWQiLCJleHRyYSI6dHJ1ZX0KA8A72dmdLZVCOYkS53lyOaYOL0ucpyEkDgAdLrhGUtd9FXjnCNwhQPhseu4="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST variant",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "authenticated-version-3",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjozLCJub25jZSI6IjA3MDcwNzA3MDcwNzA3MDcwNzA3MDcwNyIsImFsZ29yaXRobSI6IlRFU1QgaWdub3JlZCIsImV4dHJhIjp0cnVlfQoDwDvZ2Z0tlUI5iRLneXI5pg4vS5ynISQOAB0u2+CrDsRuvRYrZ3Z9SmM7hA=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST variant",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "authenticated-version-2",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjA3MDcwNzA3MDcwNzA3MDcwNzA3MDcwNyIsImFsZ29yaXRobSI6IlRFU1QgaWdub3JlZCIsImV4dHJhIjp0cnVlfQoDwDvZ2Z0tlUI5iRLneXI5pg4vS5ynISQOAB0uBBI8a7nuZRQpv6La9DakCw=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST variant",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "unicode-field-fold",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6ImIzNzNlMzE2MGU3NGI2NzdkZTRiMWRlYyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0Kl7lxxb4S6sJt7ni590jzXiBdw9+K+aFnsnQCUiEIEWzhGCqib3BefO8Ig6n62dyChQQ9Jz35Pw=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [
+            {
+              "street": "",
+              "city": "",
+              "postal_code": "",
+              "country": "",
+              "state": "TEST State",
+              "valid_from": null,
+              "valid_to": null
+            }
+          ],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "short-nonce",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjAwIn0KVEVTVA=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "nonce_panic",
+        "error": "crypto/cipher: incorrect nonce length given to GCM",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "empty-object",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjU4ZGRiZTgyNTJlYzJlZDUwNTQ1MTBhYSIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KKF4a2ZfEO8WU/rHm9zGGby6E"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "null-profile",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjhmNTViNmY4YjAwMGI4NTMyNWVlZGEzMyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KnOY6Z8UIdmj66A0EKKi4GCRkpl0="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "normalization",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6ImMyM2E5YmUzZmI3ZjJkMjY5Y2VhZjczYSIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KKcaLAvJDdJcNH3YDNRp5vAAvpYDg2sAcB+KPF1QdLM8ImNFRQB/ctvqQGil5P5dfM1eaP5FFXs4TmctgzbDMCs/X0dzW9FH4TXeps/eLkpNgc5cQ+Gx8ZMysUUHa/pULurEWhzPewDun5SSgYTprGOIsqmiqHdq7u7GomPujfMSFy2HTsLNNoThvM6x26RO0AT11+zQqsOUUOdKUZMtcfPdQEjJeuB8="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [
+            {
+              "street": "",
+              "city": "",
+              "postal_code": "",
+              "country": "",
+              "state": null,
+              "valid_from": null,
+              "valid_to": null
+            },
+            {
+              "street": "",
+              "city": "",
+              "postal_code": "",
+              "country": "",
+              "state": null,
+              "valid_from": null,
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "",
+            "test@example.invalid"
+          ],
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "case-and-duplicates",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6ImRlMjJmYzhjNjRjNTY5NGJhNzg3NzE4MiIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KAulJPnCUIFH0oTWHnsxVbJ83CHQ+SCZ1e8SREt059gea9AVVxim4GXbf/BWYbSmIIagfoUR6tsBTaJCV7bzPqke3FJzsOKretvyd9JCwt1bgymOsh9tfazaSg6i0oOJa7e1LK6H8c2Zm7ayyAugLlsWKLW270Ibj0qJjVYQku5CmXhbul9IrrOf39EMrSrHPyCPtMTa47t3PaxIwHECoFrmQV4oDWlOw18Lot0Wu+2zs+w=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Last",
+          "name_variants": null,
+          "date_of_birth": null,
+          "addresses": [
+            {
+              "street": "",
+              "city": "TEST Last",
+              "postal_code": "",
+              "country": "",
+              "state": null,
+              "valid_from": null,
+              "valid_to": null
+            }
+          ],
+          "email_addresses": null,
+          "phone_numbers": null,
+          "jurisdictions": null
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "empty-file",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": ""
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "separator",
+        "error": "identity: profile corrupt: no header separator",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "missing-separator",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "VEVTVCBtYWxmb3JtZWQ="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "separator",
+        "error": "identity: profile corrupt: no header separator",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "bad-header",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "ewpURVNU"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "header",
+        "error": "identity: profile corrupt: header: unexpected end of JSON input",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "null-header",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "bnVsbApURVNU"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "legacy_v0",
+        "error": "identity: legacy v0 profile (no AAD) is no longer supported",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "v0",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjowfQpURVNU"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "legacy_v0",
+        "error": "identity: legacy v0 profile (no AAD) is no longer supported",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "header-type",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoiVEVTVCJ9ClRFU1Q="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "header",
+        "error": "identity: profile corrupt: header: json: cannot unmarshal string into Go struct field ProfileEnvelope.version of type int",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "invalid-json",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6Ijk5NWNmZGFmNDM5NzY4Y2RkM2U2NmM3NCIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KBJmrD5jy+xKxZoDmJIiPiLrTzg2/LmPpck3SnbM="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: unexpected end of JSON input",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "invalid-field",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjAxMjk5OTg0YzZjMGQxZDM0M2NiZGUzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0K6IEUfSBoEfqhvX+xK9wwUqCvWJew9VKMirHDFXijf/0="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: json: cannot unmarshal number into Go struct field Profile.full_name of type string",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "invalid-array-element",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjYwZWNkZTBmNzg3NGNjNWNhNTU1ODA4MSIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KYT44BVPxdWtjwswJiBWKydL6XFjrnNlp5N0F57Wp8F9BIA=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: json: cannot unmarshal number into Go struct field Profile.addresses of type identity.Address",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "invalid-root",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6Ijc0OGRiZWFjNTVmOWRhNWE3NzM3NzllNiIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KWqGi5Id+Leu4VyibuIOnspv/"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: json: cannot unmarshal array into Go value of type identity.Profile",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "trailing-json",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjFhMTRiOTY3MTczOTRkYmFiY2ZjMmYxOSIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0K2GKaHv31qLRCOSmBMi4PgXvfFcTj"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: invalid character '{' after top-level value",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "empty-plaintext",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6Ijg1ZDNhNTNkYmQ3Njg3OTMyZjUxYTAzYiIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KGxDOX7Hh+wd8koXvioH79w=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "json",
+        "error": "identity: profile corrupt: unexpected end of JSON input",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "tampered-ciphertext",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1w=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "authentication",
+        "error": "identity: profile corrupt: cipher: message authentication failed",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "truncated-ciphertext",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0K"
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "authentication",
+        "error": "identity: profile corrupt: cipher: message authentication failed",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "tampered-aad",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjozLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "authentication",
+        "error": "identity: profile corrupt: cipher: message authentication failed",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "bad-nonce-hex",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6Inp6In0KVEVTVA=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "nonce",
+        "error": "identity: profile corrupt: nonce: encoding/hex: invalid byte: U+007A 'z'",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "wrong-key",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "wrong",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "authentication",
+        "error": "identity: profile corrupt: cipher: message authentication failed",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "missing-key",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "missing",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "key_missing",
+        "error": "identity: master key missing",
+        "key_reads": 1
+      }
+    },
+    {
+      "name": "malformed-before-key",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.encrypted": ""
+      },
+      "directories": [],
+      "key": "missing",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "separator",
+        "error": "identity: profile corrupt: no header separator",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "absent",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {},
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": false,
+        "profile": null,
+        "class": "not_found",
+        "error": "identity: profile not found",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "legacy-fallback",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.enc": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "canonical-priority",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.enc": "aW52YWxpZA==",
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "corrupt-canonical-no-fallback",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {
+        "identity.enc": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g==",
+        "identity.encrypted": ""
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "separator",
+        "error": "identity: profile corrupt: no header separator",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "explicit-legacy-alternate",
+      "path": "$ROOT/identity.enc",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "custom-no-fallback",
+      "path": "$ROOT/custom",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": false,
+        "profile": null,
+        "class": "not_found",
+        "error": "identity: profile not found",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "directory",
+      "path": "$ROOT/identity.encrypted",
+      "environment": {},
+      "files": {},
+      "directories": [
+        "identity.encrypted"
+      ],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": null,
+        "class": "read",
+        "error": "identity: read profile: read $ROOT/identity.encrypted: is a directory",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "parent-is-file",
+      "path": "$ROOT/identity.encrypted/child",
+      "environment": {},
+      "files": {
+        "identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": false,
+        "profile": null,
+        "class": "stat",
+        "error": "identity: stat profile: stat $ROOT/identity.encrypted/child: not a directory",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "default-config",
+      "path": "",
+      "environment": {},
+      "files": {
+        ".config/symeraseme/identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "default-legacy",
+      "path": "",
+      "environment": {},
+      "files": {
+        ".config/symeraseme/identity.enc": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "data-over-config",
+      "path": "",
+      "environment": {
+        "SYMERASEME_CONFIG_DIR": "$ROOT/config",
+        "SYMERASEME_DATA_DIR": "$ROOT/data"
+      },
+      "files": {
+        "data/identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "identity-over-data",
+      "path": "",
+      "environment": {
+        "SYMERASEME_DATA_DIR": "$ROOT/data",
+        "SYMERASEME_IDENTITY_PATH": "$ROOT/custom"
+      },
+      "files": {
+        "custom": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "config-override",
+      "path": "",
+      "environment": {
+        "SYMERASEME_CONFIG_DIR": "$ROOT/config"
+      },
+      "files": {
+        "config/identity.encrypted": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "tilde-override",
+      "path": "",
+      "environment": {
+        "SYMERASEME_IDENTITY_PATH": "~/custom"
+      },
+      "files": {
+        "custom": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "tilde-explicit",
+      "path": "~/custom",
+      "environment": {},
+      "files": {
+        "custom": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    },
+    {
+      "name": "explicit-over-env",
+      "path": "$ROOT/custom",
+      "environment": {
+        "SYMERASEME_IDENTITY_PATH": "$ROOT/missing"
+      },
+      "files": {
+        "custom": "eyJ2ZXJzaW9uIjoyLCJub25jZSI6IjMyZGFjOWY1YzEyZDZlZDE5MDU4M2MzNyIsImFsZ29yaXRobSI6IkFFUy0yNTYtR0NNIn0KUvMQYUiMfeqMjtQ3eg6XN8JnPGbgZ6Yz7Vn0CKl7UiVobvDBsqp7rnPgI7XGWOiSGTgnY+JAOQMMXCAr9BuVoHAJ7LU3PafkjwzggvjEML/XBSHQm/pp73yswQ4S63mdvf+CBs5Dayv0SQHRQIXSFinsbD6noKdD7zM2NuBaH4tXWc1hemLHGRhMbzQB7jbUXgOqjpZt8rt/HxJB9GBFqmWGTNqV/b4tki33QJpXtP/MdGJrtkw3kk3rH6InaPxAunGz2fsLhC8X9oFViQbjQ7dC6+P2K2uPSSlBXkMkZNxwhvxiSG4oqKBhL3Yfv2JdxezsAsbkuyCYT5pL6FHOVhHguWwKTim1zxIwaF3bZ8GhedL+TwivS9ye5XIjrd/0Xj7zW9utPC71ZJlwqIQflUovuZM3/qpyAZpnPgu0ftmA+iMoOuxAsHeWAzeVKxTiq1kmMRsJJ3Jgb2TyIBPmE62bYYJq1g=="
+      },
+      "directories": [],
+      "key": "normal",
+      "expected": {
+        "exists": true,
+        "profile": {
+          "full_name": "TEST Alice \u00c4",
+          "name_variants": [
+            "TEST A"
+          ],
+          "date_of_birth": "2000-02-03",
+          "addresses": [
+            {
+              "street": "TEST Street",
+              "city": "TEST City",
+              "postal_code": "00000",
+              "country": "DE",
+              "state": "TEST State",
+              "valid_from": "2020-01-01",
+              "valid_to": null
+            }
+          ],
+          "email_addresses": [
+            "test@example.invalid"
+          ],
+          "phone_numbers": [
+            "TEST Phone"
+          ],
+          "jurisdictions": [
+            "GDPR"
+          ]
+        },
+        "class": "ok",
+        "error": "",
+        "key_reads": 0
+      }
+    }
+  ]
+}
