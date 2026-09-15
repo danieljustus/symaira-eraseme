@@ -1,8 +1,8 @@
 # Read-only identity profile prerequisite
 
-Scope: the shared core read API needed by CLI-016. This is not completion of
-CLI-016, profile management, or bidirectional ID-001. Go remains the production
-route and rollback implementation.
+Scope: the shared core read API and the bounded CLI `show-profile` adapter needed
+by CLI-016. Profile initialization/write semantics remain out of scope for this
+slice. Go remains the production route and rollback implementation.
 
 ## API
 
@@ -20,11 +20,11 @@ Use an empty path for discovery and the existing
 profiles/directories. The caller owns the returned profile's lifetime; this new
 read primitive does not introduce Go's process-global plaintext cache.
 
-The CLI adapter should populate the existing `RenderContext` from the public
-profile fields, without implementing another loader. Address state/date fields
-remain available in `ProfileAddress`; the existing render address has only
-street/city/postal_code/country. No CLI dispatch or template behavior changes
-are included in this prerequisite.
+The CLI `show-profile` adapter now uses the API above with
+`ProfilePaths::from_process()` and `MasterKeyResolver::from_process()`. It maps
+all public profile fields that the existing `RenderContext` accepts, then emits
+the Go-compatible text or JSON surface. It never initializes a key or writes a
+profile. `init-profile` remains a separate write/initialization slice.
 
 ## Frozen read behavior
 
@@ -35,11 +35,13 @@ sources and module files, verifies every archived byte, builds with Go 1.26.6,
 and injects a fake keyring before invoking the real `ProfileExists` and
 `LoadProfile`. Synthetic TEST profiles and keys are the only runtime inputs.
 
-The committed capture contains 46 cases. Most ciphertext is emitted by the real
-`EncryptProfileWithKey`; four authenticated variant-header inputs are sealed
-with Go's standard AES-GCM primitive and evaluated by real `LoadProfile`.
-Randomized ciphertext is retained, not regenerated in check mode. Go replay
-re-evaluates the retained inputs before Rust consumes their expected results.
+The committed capture contains 56 cases: the original 46 plus authenticated
+invalid-UTF-8, lone-surrogate, valid-surrogate-pair, and nesting-boundary
+fixtures. Most ciphertext is emitted by the real `EncryptProfileWithKey`; four
+authenticated variant-header inputs are sealed with Go's standard AES-GCM
+primitive and evaluated by real `LoadProfile`. Randomized ciphertext is
+retained, not regenerated in check mode. Go replay re-evaluates the retained
+inputs before Rust consumes their expected results.
 Generator and validator digests are separate from immutable production hashes.
 
 Covered: full/minimal/null profiles, nil normalization, case-insensitive and
@@ -74,9 +76,13 @@ their serialization preserves that measured distinction.
   Parser/nonce/OS errors compare typed outcomes; raw Go excerpts are deliberately
   redacted. Native stat/read OS prose is excluded from cross-platform equality.
   This is not a claim of byte-identical CLI diagnostics for every malformed input.
-- The parser uses bounded-depth serde JSON decoding. Invalid UTF-8/lone Unicode
-  surrogates are rejected rather than claiming Go's replacement-character
-  permissiveness; full arbitrary-JSON decoder equivalence is not claimed.
+- The profile decoder follows Go's `encoding/json` behavior for the measured
+  edge cases: invalid UTF-8 bytes in strings and lone UTF-16 surrogates become
+  U+FFFD, while valid surrogate pairs remain their Unicode scalar. An
+  iterative structural scanner enforces Go's 10,000-container nesting limit
+  without using serde's 128-level default or risking recursive stack growth.
+  The corpus proves acceptance at depths 127, 128, 9999, and 10000 and rejects
+  10001 with the typed corrupt-profile outcome.
 
 ## Reproduction
 
@@ -100,10 +106,14 @@ focused runtime lane; formatting and workspace all-target strict Clippy still
 run. Execution at the exact candidate SHA is required; the existence of this
 workflow is not native PASS evidence.
 
-For this implementation milestone, operator-approved Windows acceptance is
-deferred to the final consumer phase before overall completion/release/cutover.
-The focused dispatch runs Go/Rust runtime and mutation gates on macOS/Linux and
-an all-target core compile check on Windows, not Windows Clippy/runtime tests.
-The default full workflow retains Windows runtime coverage. Record
+### Focused Windows dispatch: compile-only
+
+For this implementation milestone, operator-approved Windows **runtime** acceptance
+is deferred to the final consumer phase before overall completion/release/cutover.
+The focused Windows dispatch is **compile-only, not Windows runtime acceptance**:
+it runs an all-target core compile check and skips Go/Rust runtime, parity,
+mutation, keychain, path, and filesystem tests. A green focused Windows check
+must not be interpreted as profile-read behavior acceptance. The default full
+workflow retains Windows runtime coverage. Record
 `windows_acceptance=deferred`; no all-platform matrix row is promoted by this
 milestone, and envelope/key/path/integrity defects are not eligible for deferral.

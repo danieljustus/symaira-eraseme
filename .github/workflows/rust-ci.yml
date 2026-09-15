@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       profile_read_only:
-        description: Run the focused profile-read native gate instead of full runtime suites
+        description: Run the focused profile-read native gate; on Windows this is compile-only (not runtime acceptance)
         type: boolean
         default: false
 
@@ -184,7 +184,8 @@ jobs:
         run: make parity
 
   rust-native:
-    name: Rust / native (${{ matrix.os }})
+    name: >-
+      Rust / native (${{ matrix.os }})${{ inputs.profile_read_only == true && ' / focused profile-read (Windows compile-only)' || '' }}
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -221,6 +222,13 @@ jobs:
       - name: Format
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" fmt --all --check
+
+      - name: Focused Windows profile-read gate (compile-only, not runtime acceptance)
+        if: runner.os == 'Windows' && inputs.profile_read_only == true
+        shell: bash
+        run: |
+          echo 'FOCUSED WINDOWS PROFILE-READ GATE IS COMPILE-ONLY.'
+          echo 'This green check does not establish Windows runtime, parity, keychain, path, or filesystem acceptance.'
 
       - name: Check and lint
         shell: bash
