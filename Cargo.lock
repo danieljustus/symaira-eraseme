@@ -1306,7 +1306,9 @@ dependencies = [
 name = "symeraseme-cli"
 version = "0.13.0"
 dependencies = [
+ "aes-gcm",
  "clap",
+ "hex",
  "serde",
  "serde_json",
  "symeraseme-core",
