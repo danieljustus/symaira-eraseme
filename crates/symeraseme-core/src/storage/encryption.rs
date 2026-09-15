@@ -17,7 +17,7 @@ use rand::TryRngCore;
 use sha2::Sha256;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 pub const V1_HEADER: &[u8] = b"SYMERASEME_ENCv1\n";
 pub const V2_HEADER: &[u8] = b"SYMERASEME_ENCv2\n";
@@ -204,14 +204,22 @@ fn derive_v3_key(master_key: &[u8], salt: &[u8]) -> Result<[u8; FERNET_KEY_LEN],
     let mut extract = <HmacSha256 as KeyInit>::new_from_slice(salt)
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     extract.update(master_key);
-    let pseudorandom_key = extract.finalize().into_bytes();
-    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(&pseudorandom_key)
+    let pseudorandom_key = {
+        let mut value = Zeroizing::new([0_u8; FERNET_KEY_LEN]);
+        value.copy_from_slice(&extract.finalize().into_bytes());
+        value
+    };
+    let mut expand = <HmacSha256 as KeyInit>::new_from_slice(&pseudorandom_key[..])
         .map_err(|_| EncryptionError::AuthenticationFailed)?;
     expand.update(V3_HKDF_INFO);
     expand.update(&[1]);
-    let block = expand.finalize().into_bytes();
+    let block = {
+        let mut value = Zeroizing::new([0_u8; FERNET_KEY_LEN]);
+        value.copy_from_slice(&expand.finalize().into_bytes());
+        value
+    };
     let mut key = [0_u8; FERNET_KEY_LEN];
-    key.copy_from_slice(&block);
+    key.copy_from_slice(&block[..]);
     Ok(key)
 }
 
@@ -504,6 +512,22 @@ mod tests {
         assert_eq!(
             decrypt_v3(&misaligned_envelope, &KEY),
             Err(EncryptionError::InvalidCiphertextLength)
+        );
+    }
+
+    #[test]
+    fn hkdf_intermediates_are_zeroizing_values() {
+        let source = include_str!("encryption.rs");
+        let derivation = source
+            .split_once("fn derive_v3_key")
+            .and_then(|(_, body)| body.split_once("\nfn encrypt_standard_fernet"))
+            .map(|(body, _)| body)
+            .expect("V3 derivation source");
+        assert_eq!(
+            derivation
+                .matches("let mut value = Zeroizing::new([0_u8; FERNET_KEY_LEN])")
+                .count(),
+            2
         );
     }
 }
