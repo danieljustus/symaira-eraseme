@@ -41,7 +41,7 @@ pbkdf2 = { version = "0.13.0", features = ["hmac"] }
 regex = "1.11.3"
 sha2 = "0.11.0"
 hex = "0.4.3"
-rand = "0.9.5"
+rand = "0.10.2"
 scrypt = "0.12.0"
 zeroize = "1.8.2"
 keyring = "3.6.3"
