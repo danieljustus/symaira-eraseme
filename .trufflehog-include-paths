@@ -1,0 +1,3 @@
+# Companion history scan for the path with the historical fixture exception.
+# Keep this anchored to the same single path as .trufflehog-exclude-paths.
+^internal/registry/sync_test\.go$

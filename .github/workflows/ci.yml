@@ -108,8 +108,27 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: TruffleHog secrets scan
         uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
         with:
           path: ./
-          extra_args: --exclude-detectors Lob
+          # action.yml constructs IMAGE:VERSION; tag@digest keeps the
+          # 3.97.4 label while pinning the manifest immutably.
+          image: ghcr.io/trufflesecurity/trufflehog
+          version: '3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4'
+          extra_args: --exclude-detectors Lob --exclude-paths .trufflehog-exclude-paths --fail-on-scan-errors
+      - name: TruffleHog protected-history scan
+        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        with:
+          path: ./
+          image: ghcr.io/trufflesecurity/trufflehog
+          version: '3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4'
+          # --since-commit excludes its base commit. Starting at the known
+          # fixture commit therefore scans the scanner-safe remediation and
+          # every later revision of the one path omitted above.
+          base: fa366dcabb830af478c44c372c2ca40395654644
+          head: HEAD
+          extra_args: --exclude-detectors Lob --include-paths .trufflehog-include-paths --fail-on-scan-errors
+      - name: Verify protected-scope TruffleHog coverage
+        run: ./scripts/test-trufflehog-scope.sh
