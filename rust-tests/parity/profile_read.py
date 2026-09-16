@@ -49,7 +49,7 @@ def verify_capture(capture, manifest):
     assert capture["helper_sha256"] == digest(HELPER.read_bytes()), "helper drift"
     assert capture["validator_sha256"] == digest(Path(__file__).read_bytes()), "validator drift"
     names = [case["name"] for case in capture["cases"]]
-    assert len(names) == len(set(names)) == 56, "case inventory mismatch"
+    assert len(names) == len(set(names)) == 62, "case inventory mismatch"
 
 
 def main():

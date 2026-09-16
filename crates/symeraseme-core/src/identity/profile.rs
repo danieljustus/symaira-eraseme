@@ -342,12 +342,14 @@ fn valid_utf8_width(input: &[u8], position: usize) -> Option<usize> {
 #[derive(Clone, Copy)]
 enum ArrayState {
     ValueOrEnd,
+    Value,
     CommaOrEnd,
 }
 
 #[derive(Clone, Copy)]
 enum ObjectState {
     KeyOrEnd,
+    Key,
     Value,
     CommaOrEnd,
 }
@@ -530,12 +532,20 @@ impl<'a> JsonCursor<'a> {
                         self.start_value(&mut frames)?;
                     }
                 }
+                JsonFrame::Array(ArrayState::Value) => {
+                    self.skip_ws();
+                    if self.current() == Some(b']') {
+                        return Err(());
+                    }
+                    frames[index] = JsonFrame::Array(ArrayState::CommaOrEnd);
+                    self.start_value(&mut frames)?;
+                }
                 JsonFrame::Array(ArrayState::CommaOrEnd) => {
                     self.skip_ws();
                     match self.current() {
                         Some(b',') => {
                             self.position += 1;
-                            frames[index] = JsonFrame::Array(ArrayState::ValueOrEnd);
+                            frames[index] = JsonFrame::Array(ArrayState::Value);
                         }
                         Some(b']') => {
                             self.position += 1;
@@ -559,6 +569,19 @@ impl<'a> JsonCursor<'a> {
                         frames[index] = JsonFrame::Object(ObjectState::Value);
                     }
                 }
+                JsonFrame::Object(ObjectState::Key) => {
+                    self.skip_ws();
+                    if self.current() == Some(b'}') {
+                        return Err(());
+                    }
+                    self.parse_string()?;
+                    self.skip_ws();
+                    if self.current() != Some(b':') {
+                        return Err(());
+                    }
+                    self.position += 1;
+                    frames[index] = JsonFrame::Object(ObjectState::Value);
+                }
                 JsonFrame::Object(ObjectState::Value) => {
                     frames[index] = JsonFrame::Object(ObjectState::CommaOrEnd);
                     self.start_value(&mut frames)?;
@@ -568,7 +591,7 @@ impl<'a> JsonCursor<'a> {
                     match self.current() {
                         Some(b',') => {
                             self.position += 1;
-                            frames[index] = JsonFrame::Object(ObjectState::KeyOrEnd);
+                            frames[index] = JsonFrame::Object(ObjectState::Key);
                         }
                         Some(b'}') => {
                             self.position += 1;
@@ -625,15 +648,15 @@ fn reduce_object(cursor: &mut JsonCursor<'_>, address: bool) -> Result<Vec<u8>, 
         return Err(());
     }
     cursor.position += 1;
+    cursor.skip_ws();
+    if cursor.current() == Some(b'}') {
+        cursor.position += 1;
+        return Ok(b"{}".to_vec());
+    }
     let mut output = vec![b'{'];
     let mut has_field = false;
     loop {
         cursor.skip_ws();
-        if cursor.current() == Some(b'}') {
-            cursor.position += 1;
-            output.push(b'}');
-            return Ok(output);
-        }
         let key_range = cursor.parse_string()?;
         let key: String =
             serde_json::from_slice(&cursor.input[key_range.clone()]).map_err(|_| ())?;
@@ -665,7 +688,13 @@ fn reduce_object(cursor: &mut JsonCursor<'_>, address: bool) -> Result<Vec<u8>, 
         }
         cursor.skip_ws();
         match cursor.current() {
-            Some(b',') => cursor.position += 1,
+            Some(b',') => {
+                cursor.position += 1;
+                cursor.skip_ws();
+                if cursor.current() == Some(b'}') {
+                    return Err(());
+                }
+            }
             Some(b'}') => {
                 cursor.position += 1;
                 output.push(b'}');
@@ -689,15 +718,15 @@ fn reduce_address_array(cursor: &mut JsonCursor<'_>) -> Result<Vec<u8>, ()> {
         return Err(());
     }
     cursor.position += 1;
+    cursor.skip_ws();
+    if cursor.current() == Some(b']') {
+        cursor.position += 1;
+        return Ok(b"[]".to_vec());
+    }
     let mut output = vec![b'['];
     let mut first = true;
     loop {
         cursor.skip_ws();
-        if cursor.current() == Some(b']') {
-            cursor.position += 1;
-            output.push(b']');
-            return Ok(output);
-        }
         if !first {
             output.push(b',');
         }
@@ -715,7 +744,13 @@ fn reduce_address_array(cursor: &mut JsonCursor<'_>) -> Result<Vec<u8>, ()> {
         first = false;
         cursor.skip_ws();
         match cursor.current() {
-            Some(b',') => cursor.position += 1,
+            Some(b',') => {
+                cursor.position += 1;
+                cursor.skip_ws();
+                if cursor.current() == Some(b']') {
+                    return Err(());
+                }
+            }
             Some(b']') => {
                 cursor.position += 1;
                 output.push(b']');
@@ -750,13 +785,15 @@ fn validate_simple_value(input: &[u8], kind: ProfileFieldKind) -> bool {
                 false
             } else {
                 cursor.position += 1;
+                cursor.skip_ws();
+                if cursor.current() == Some(b']') {
+                    cursor.position += 1;
+                    cursor.skip_ws();
+                    return cursor.at_end();
+                }
                 let mut valid = true;
                 loop {
                     cursor.skip_ws();
-                    if cursor.current() == Some(b']') {
-                        cursor.position += 1;
-                        break;
-                    }
                     if cursor.current() == Some(b'"') {
                         if cursor.parse_string().is_err() {
                             valid = false;
@@ -777,7 +814,14 @@ fn validate_simple_value(input: &[u8], kind: ProfileFieldKind) -> bool {
                     }
                     cursor.skip_ws();
                     match cursor.current() {
-                        Some(b',') => cursor.position += 1,
+                        Some(b',') => {
+                            cursor.position += 1;
+                            cursor.skip_ws();
+                            if cursor.current() == Some(b']') {
+                                valid = false;
+                                break;
+                            }
+                        }
                         Some(b']') => {
                             cursor.position += 1;
                             break;
@@ -788,7 +832,7 @@ fn validate_simple_value(input: &[u8], kind: ProfileFieldKind) -> bool {
                         }
                     }
                 }
-                valid
+                valid && cursor.at_end()
             }
         }
         ProfileFieldKind::Addresses => false,

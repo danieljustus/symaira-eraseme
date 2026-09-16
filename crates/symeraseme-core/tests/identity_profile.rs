@@ -11,7 +11,7 @@ use symeraseme_core::identity::{
 };
 
 const ORACLE: &str = "0108b37a8b1c9a69871aa7b7c73040dc28d8f4fd";
-const PROFILE_CASES: usize = 56;
+const PROFILE_CASES: usize = 62;
 
 #[derive(Deserialize)]
 struct Capture {
