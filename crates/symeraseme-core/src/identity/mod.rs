@@ -3,6 +3,7 @@
 mod consent;
 mod gate;
 mod keyring;
+mod profile;
 mod resolve;
 mod secrets;
 
@@ -12,6 +13,9 @@ pub use consent::{
 };
 pub use gate::{ConsentOptions, read_consent_file};
 pub use keyring::{FakeKeyring, KeyringBackend, KeyringError, OsKeyring, SERVICE_NAME, USERNAME};
+pub use profile::{
+    Profile, ProfileAddress, ProfileError, ProfilePaths, load_profile, profile_exists,
+};
 pub use resolve::{
     ENV_PREFIX, KEYCHAIN_PREFIX, OsSecretBackend, SYMVAULT_PREFIX, SecretBackend,
     SecretBackendError, SecretResolutionError, SecretResolver, VAULT_PREFIX,

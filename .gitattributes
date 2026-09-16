@@ -18,3 +18,7 @@ registry/templates/** text eol=lf
 # scheduler_parity.rs). Force LF unconditionally so every checkout — and
 # every future oracle's pinned hash — sees the same bytes as `git blame`.
 *.go text eol=lf
+
+# Profile oracle helper provenance is byte-hashed on native Windows too.
+rust-tests/parity/profile_read.py text eol=lf
+rust-tests/parity/oracle/profile_read/cases.json text eol=lf

@@ -7,6 +7,7 @@ GO ?= go
 CARGO ?= cargo
 GORELEASER ?= goreleaser
 SWIFT ?= swift
+PYTHON ?= python3
 CGO_ENABLED ?= 0
 GOFLAGS ?=
 COVERAGE_FILE ?= coverage.out
@@ -90,7 +91,12 @@ test:
 
 coverage:
 	@rm -f -- $(call shell_quote,$(COVERAGE_FILE))
-	CGO_ENABLED=$(call shell_quote,$(CGO_ENABLED)) GOFLAGS=$(call shell_quote,$(GOFLAGS)) $(call shell_quote,$(GO)) test -count=1 -covermode=atomic -coverprofile=$(call shell_quote,$(COVERAGE_FILE)) ./...
+	@packages="$$(CGO_ENABLED=$(call shell_quote,$(CGO_ENABLED)) GOFLAGS=$(call shell_quote,$(GOFLAGS)) $(call shell_quote,$(GO)) list ./... | $(call shell_quote,$(PYTHON)) -c 'import sys; print(" ".join(line.strip() for line in sys.stdin if line.strip() and "/rust-tests/" not in line))')"; \
+	if [ -z "$$packages" ]; then \
+		printf '%s\n' 'coverage: no production packages found' >&2; \
+		exit 1; \
+	fi; \
+	CGO_ENABLED=$(call shell_quote,$(CGO_ENABLED)) GOFLAGS=$(call shell_quote,$(GOFLAGS)) $(call shell_quote,$(GO)) test -count=1 -covermode=atomic -coverprofile=$(call shell_quote,$(COVERAGE_FILE)) $$packages
 	@awk -v threshold=$(call shell_quote,$(COVERAGE_THRESHOLD)) 'NR > 1 { total += $$2; if ($$3 > 0) covered += $$2 } END { if (total == 0) { print "coverage: no statements found"; exit 1 } printf "Go coverage: %.2f%% (%d/%d statements), gate: %s%%\n", covered * 100 / total, covered, total, threshold; if (covered * 100 < total * threshold) exit 1 }' $(call shell_quote,$(COVERAGE_FILE))
 
 test-race:
