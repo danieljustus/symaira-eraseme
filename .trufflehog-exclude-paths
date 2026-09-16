@@ -1,0 +1,16 @@
+# Narrow history exception for the original synthetic URL fixture.
+#
+# TruffleHog's path filter applies to every commit. Before the remediation
+# commit below, this test contained a contiguous, non-routable fixture value
+# that the URI detector reported even though it was never a real credential.
+# The current test assembles its placeholder at runtime instead.
+#
+# The primary scan excludes only this exact path. CI runs a companion
+# include-only scan from the historical fixture commit, excluding that commit
+# itself, so the scanner-safe remediation and every later revision remain
+# covered. Do not broaden this expression or remove the companion scan without
+# a security review.
+#
+# Historical fixture commit: fa366dcabb830af478c44c372c2ca40395654644
+# Scanner-safe remediation commit: 76b2f6b7d55c88d0c48689099bc7e8598b7568af
+^internal/registry/sync_test\.go$
