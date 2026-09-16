@@ -62,7 +62,7 @@ the exact JSON from the exact SQLite file.
 | `request_id` | INTEGER NOT NULL | FK to removal_requests.id |
 | `occurred_at` | TIMESTAMP NOT NULL | business time of the event (may be backdated) |
 | `recorded_at` | TIMESTAMP NOT NULL | ingestion time |
-| `event_type` | TEXT NOT NULL | closed catalogue, §3 |
+| `event_type` | TEXT NOT NULL | closed append catalogue, §3; historical rows may contain future values |
 | `payload_json` | TEXT NOT NULL | `'{}'` default; JSON object of event-specific fields |
 | `source` | TEXT NOT NULL | `system` / `inbox` / `user` / `scheduler` |
 
@@ -115,9 +115,12 @@ Payload fields observed/used by the projection (all optional JSON):
 - **ACK**: `message_id` (informational)
 - others: informational `via`, `reason`, `authority`, `broker_id`, `campaign_id`
 
-Unknown event types or sources must be rejected on append
-(`ValueError`); **unknown event types encountered during replay are logged
-and skipped** (forward compatibility, see §7).
+Unknown event types or sources must be rejected on append (`ValueError`). A
+parseable historical row with an unknown `event_type` is retained during
+replay: it advances `last_event_id` and `last_event_at`, but makes no status
+transition or event-specific state change. This preserves the Go oracle's
+forward-compatible fold. Rows that cannot be parsed (for example, malformed
+timestamps or payloads) are logged and skipped entirely (see §7).
 
 ## 4. Status transition function
 
@@ -144,6 +147,8 @@ and skipped** (forward compatibility, see §7).
 | NOTE_ADDED | (no change) |
 
 Side effects per event during replay:
+- Every parseable row, including an unknown event type, first sets
+  `last_event_id` and `last_event_at`.
 - SENT → `sent_at = occurred_at`, `deadline_at = occurred_at + expected_response_days` (days)
 - ACK → `acknowledged_at = occurred_at`
 - CONFIRMED / REJECTED_FINAL → `resolved_at = occurred_at`
@@ -254,6 +259,11 @@ Conformance: `internal/eventstore/conformance_test.go`
 The Go conformance test replays the same file and must produce the same
 JSON bytes.
 
+The DB-007 unknown-replay regression uses a temporary database created through
+the production Go store path. It inserts the historical unknown row directly
+only because append-time validation must reject that value; no hand-authored
+committed golden fixture is needed.
+
 ## 7. Implicit behaviours (traps for the port)
 
 - `datetime('now')` defaults are UTC but space-separated; the Go parser accepts
@@ -262,6 +272,9 @@ JSON bytes.
   treated as `{}`.
 - Unparseable timestamps or payloads during replay are logged and skipped by
   the Go projection (never aborting the rebuild).
+- A parseable unknown `event_type` is not skipped wholesale: it advances
+  `last_event_id` and `last_event_at`, while leaving `current_status` and all
+  event-specific fields unchanged. Append-time validation remains strict.
 - `next_action_at` is never written by events; it is tick-engine bookkeeping
   and may be any value.
 - `request_state.reminders_sent` default is `0`; first REMINDER_SENT with no

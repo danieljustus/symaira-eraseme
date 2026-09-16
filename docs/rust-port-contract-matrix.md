@@ -113,16 +113,16 @@ SQLite, network transcript or process behavior.
 | RED-001 | redaction | PII regex and literal-profile replacement | package fixtures | shared text corpus | byte | all | PASS (local; native CI pending) |
 | RED-002 | redaction | file review/interactive consent and safe paths | temp files | side-effect cases | byte+filesystem | all | PASS (local; native CI pending) |
 | DB-000 | SQLite | production honors persistent default, DB_DIR and ENCRYPT_DB | isolated reproduction; issue #796 | fixed Go oracle test | side-effect | all | PASS |
-| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | TODO |
-| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | TODO |
-| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | TODO |
-| DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | TODO |
+| DB-001 | SQLite | schema v2/table/index SQL and `user_version = 2` | fresh Go DB | schema dump comparator | byte/semantic | all | PASS (local; native CI pending) |
+| DB-002 | SQLite | WAL, busy_timeout, foreign_keys | fresh connection | PRAGMA snapshot | semantic | all | PASS (local; native CI pending) |
+| DB-003 | SQLite | read existing `golden-campaign.db` | committed fixture | Rust open/query test | semantic | all | PASS (local; native CI pending) |
+| DB-004 | SQLite | projection fold and `(occurred_at,id)` order | `golden-projection.json` | shared golden test | byte | all | PASS (local; native CI pending) |
 | DB-005 | SQLite | reports/plans/tick snapshots | four event-store JSON fixtures | shared golden tests | byte | all | TODO |
-| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | query/projection cases | semantic | all | TODO |
-| DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | TODO |
-| DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | TODO |
-| DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | TODO |
-| DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | TODO |
+| DB-006 | SQLite | NULL and three timestamp layouts | edge-case DB corpus | query/projection cases | semantic | all | PASS (local; native CI pending) |
+| DB-007 | SQLite | invalid event append vs unknown replay skip | corrupt/forward fixtures | negative cases | side-effect | all | PASS (issue #889) |
+| DB-008 | SQLite | append+projection atomicity and rollback | forced failures | transaction tests | side-effect | all | PASS (local; native CI pending) |
+| DB-009 | SQLite | lock/busy/concurrent readers+writes | process harness | contention tests | side-effect | native OS | PASS (local; native CI pending) |
+| DB-010 | SQLite | interrupted initialization/migration/read-only DB | fault fixtures | recovery tests | side-effect | native OS | PASS (local; native CI pending) |
 | CRY-000 | crypto | exact V1/V2/V3 raw headers are each 17 bytes | `internal/eventstore/encrypt.go`; issue #795 | `TestEncryptionHeaderContract` | byte | all | PASS |
 | CRY-000B | crypto | Python standard-Fernet and Go format collision is resolved with interoperable, distinct versioning | `python-final` + Go; issue #798 | Python/Go vectors complete; Rust vectors remain Phase 4 gate | byte | all | PASS (Python↔Go); Rust gated |
 | CRY-001 | crypto | Python-final standard-Fernet V1 decrypt | `tests/fixtures/event-store/crypto/golden-campaign-v1-python.db`, generated through `python-final` by `scripts/generate-crypto-fixtures.py` | `crates/symeraseme-core/tests/encryption_parity.rs::python_final_v1_fixture_matches_shared_go_plaintext` | byte | all | PASS (local; native CI pending) |
