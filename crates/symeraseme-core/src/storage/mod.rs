@@ -6,7 +6,9 @@ pub mod repository;
 pub mod store;
 pub mod types;
 
-pub use projection::{ProjectionState, fold_events};
+pub use projection::{
+    ProjectionError, ProjectionResult, ProjectionState, append_and_project_tx, fold_events,
+};
 pub use repository::{ListRemovalRequestsOptions, Repository};
 pub use store::{SCHEMA_VERSION, Store};
 pub use types::{
