@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 aes.workspace = true
+aes-gcm.workspace = true
 base64.workspace = true
 cap-fs-ext.workspace = true
 cap-std.workspace = true
