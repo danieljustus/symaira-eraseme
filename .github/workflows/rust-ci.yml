@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)'
+          critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)|^crates/symeraseme-core/src/storage/encryption\.rs$'
           critical_files=()
           while IFS= read -r file; do
             critical_files+=("$file")
@@ -178,7 +178,6 @@ jobs:
 
   rust-native:
     name: Rust / native (${{ matrix.os }})
-    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -194,6 +193,11 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.6'
+          cache: true
+
+      - name: Prime Go module cache for native oracle tests
+        shell: bash
+        run: go mod download
 
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
