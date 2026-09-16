@@ -288,6 +288,9 @@ func decryptProfileWithKey(raw, key []byte) ([]byte, *ProfileEnvelope, error) {
 	if err != nil {
 		return nil, &header, fmt.Errorf("identity: gcm: %w", err)
 	}
+	if len(nonce) != gcm.NonceSize() {
+		return nil, &header, fmt.Errorf("%w: invalid nonce length", ErrProfileCorrupt)
+	}
 	plain, err := gcm.Open(nil, nonce, ciphertext, headerJSON)
 	if err != nil {
 		return nil, &header, fmt.Errorf("%w: %v", ErrProfileCorrupt, err)
