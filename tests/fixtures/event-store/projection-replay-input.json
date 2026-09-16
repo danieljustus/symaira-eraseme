@@ -1,0 +1,186 @@
+{
+  "schema": "symeraseme.event-store.projection-input.v1",
+  "oracle": {
+    "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+    "generator": "rust-tests/parity/oracle/projection_fixture/main.go",
+    "sources": [
+      {
+        "path": "internal/eventstore/projection.go",
+        "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+      },
+      {
+        "path": "internal/eventstore/store.go",
+        "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+      },
+      {
+        "path": "internal/eventstore/eventtypes.go",
+        "sha256": "89394cfcbdc6221f5622c08fe15a32ada42dbc3ed1c17258784f311306636fda"
+      },
+      {
+        "path": "internal/eventstore/timeutil/timeutil.go",
+        "sha256": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "golden_projection",
+      "database": "golden-campaign.db",
+      "request_ids": [1, 2, 3]
+    },
+    {
+      "name": "empty_request",
+      "request_ids": [1]
+    },
+    {
+      "name": "same_occurred_at_tie",
+      "request_ids": [1],
+      "events": [
+        {
+          "id": 30,
+          "request_id": 1,
+          "occurred_at": "2026-10-10T09:00:00+00:00",
+          "recorded_at": "2026-10-10T09:00:00+00:00",
+          "event_type": "REJECTED_FINAL",
+          "payload_json": "{}",
+          "source": "inbox"
+        },
+        {
+          "id": 20,
+          "request_id": 1,
+          "occurred_at": "2026-10-10T09:00:00+00:00",
+          "recorded_at": "2026-10-10T09:00:00+00:00",
+          "event_type": "CONFIRMED",
+          "payload_json": "{}",
+          "source": "inbox"
+        }
+      ]
+    },
+    {
+      "name": "occurred_at_precedes_id",
+      "request_ids": [1],
+      "events": [
+        {
+          "id": 40,
+          "request_id": 1,
+          "occurred_at": "2026-10-10T10:00:00+00:00",
+          "recorded_at": "2026-10-10T10:00:00+00:00",
+          "event_type": "REJECTED_FINAL",
+          "payload_json": "{}",
+          "source": "inbox"
+        },
+        {
+          "id": 50,
+          "request_id": 1,
+          "occurred_at": "2026-10-10T09:00:00+00:00",
+          "recorded_at": "2026-10-10T09:00:00+00:00",
+          "event_type": "CONFIRMED",
+          "payload_json": "{}",
+          "source": "inbox"
+        }
+      ]
+    },
+    {
+      "name": "numeric_payload_coercion",
+      "request_ids": [1, 2],
+      "events": [
+        {
+          "id": 1,
+          "request_id": 1,
+          "occurred_at": "2026-10-12T09:00:00+00:00",
+          "recorded_at": "2026-10-12T09:00:00+00:00",
+          "event_type": "SENT",
+          "payload_json": "{\"expected_response_days\":2.9}",
+          "source": "system"
+        },
+        {
+          "id": 2,
+          "request_id": 1,
+          "occurred_at": "2026-10-12T09:01:00+00:00",
+          "recorded_at": "2026-10-12T09:01:00+00:00",
+          "event_type": "REMINDER_SENT",
+          "payload_json": "{\"count\":-2.9}",
+          "source": "system"
+        },
+        {
+          "id": 3,
+          "request_id": 2,
+          "occurred_at": "2026-10-12T10:00:00+00:00",
+          "recorded_at": "2026-10-12T10:00:00+00:00",
+          "event_type": "SENT",
+          "payload_json": "{\"expected_response_days\":-1.2}",
+          "source": "system"
+        },
+        {
+          "id": 4,
+          "request_id": 2,
+          "occurred_at": "2026-10-12T10:01:00+00:00",
+          "recorded_at": "2026-10-12T10:01:00+00:00",
+          "event_type": "REMINDER_SENT",
+          "payload_json": "{\"count\":0}",
+          "source": "system"
+        }
+      ]
+    },
+    {
+      "name": "replay_errors_are_skipped",
+      "request_ids": [1],
+      "events": [
+        {
+          "id": 15,
+          "request_id": 1,
+          "occurred_at": "0001-01-01T00:00:00+00:00",
+          "recorded_at": "0001-01-01T00:00:00+00:00",
+          "event_type": "ACK",
+          "payload_json": "{}",
+          "source": "system"
+        },
+        {
+          "id": 10,
+          "request_id": 1,
+          "occurred_at": "2026-10-11T09:00:00+00:00",
+          "recorded_at": "2026-10-11T09:00:00+00:00",
+          "event_type": "SENT",
+          "payload_json": "{\"expected_response_days\":2}",
+          "source": "system"
+        },
+        {
+          "id": 11,
+          "request_id": 1,
+          "occurred_at": "not-a-timestamp",
+          "recorded_at": "2026-10-11T09:01:00+00:00",
+          "event_type": "ACK",
+          "payload_json": "{}",
+          "source": "system"
+        },
+        {
+          "id": 12,
+          "request_id": 1,
+          "occurred_at": "2026-10-11T09:02:00+00:00",
+          "recorded_at": "2026-10-11T09:02:00+00:00",
+          "event_type": "REMINDER_SENT",
+          "payload_json": "[]",
+          "source": "system"
+        },
+        {
+          "id": 13,
+          "request_id": 1,
+          "occurred_at": "2026-10-11T09:03:00+00:00",
+          "recorded_at": "2026-10-11T09:03:00+00:00",
+          "event_type": "",
+          "payload_json": "{}",
+          "source": "system"
+        },
+        {
+          "id": 14,
+          "request_id": 1,
+          "occurred_at": "2026-10-11T09:04:00+00:00",
+          "recorded_at": "2026-10-11T09:04:00+00:00",
+          "event_type": "FUTURE_EVENT",
+          "payload_json": "{}",
+          "source": "future-writer"
+        }
+      ]
+    }
+  ]
+}
