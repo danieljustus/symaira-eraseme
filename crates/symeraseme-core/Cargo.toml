@@ -23,6 +23,7 @@ cbc.workspace = true
 chrono.workspace = true
 crypto-common.workspace = true
 flate2.workspace = true
+fs2.workspace = true
 hmac.workspace = true
 serde.workspace = true
 serde_json.workspace = true

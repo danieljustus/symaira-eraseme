@@ -378,6 +378,52 @@ pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     result
 }
 
+/// Identifies the envelope format version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnvelopeVersion {
+    V1,
+    V2,
+    V3,
+}
+
+impl EnvelopeVersion {
+    pub const fn as_u8(self) -> u8 {
+        match self {
+            Self::V1 => 1,
+            Self::V2 => 2,
+            Self::V3 => 3,
+        }
+    }
+}
+
+/// Detects the envelope version from raw bytes, or None if unencrypted.
+pub fn detect_version(raw: &[u8]) -> Option<EnvelopeVersion> {
+    if raw.starts_with(V3_HEADER) {
+        Some(EnvelopeVersion::V3)
+    } else if raw.starts_with(V2_HEADER) {
+        Some(EnvelopeVersion::V2)
+    } else if raw.starts_with(V1_HEADER) {
+        Some(EnvelopeVersion::V1)
+    } else {
+        None
+    }
+}
+
+/// Reports whether raw bytes start with any recognized encryption header.
+pub fn is_encrypted(raw: &[u8]) -> bool {
+    detect_version(raw).is_some()
+}
+
+/// Decrypts any supported envelope version (V1, V2, or V3, including legacy Go payloads).
+pub fn decrypt_any(raw: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    match detect_version(raw) {
+        Some(EnvelopeVersion::V3) => decrypt_v3(raw, master_key),
+        Some(EnvelopeVersion::V2) => decrypt_v2(raw, master_key),
+        Some(EnvelopeVersion::V1) => decrypt_v1(raw, master_key),
+        None => Err(EncryptionError::UnsupportedEnvelope),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

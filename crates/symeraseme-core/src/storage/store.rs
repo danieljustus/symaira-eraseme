@@ -1,5 +1,7 @@
-//! SQLite database lifecycle and schema migration.
-
+use super::encrypted_store::{
+    CheckpointError, EncryptedStoreError, checkpoint_wal_conn, close_store,
+};
+use super::locking::DbLock;
 use super::open;
 use rusqlite::{Connection, Result};
 use std::path::{Path, PathBuf};
@@ -9,8 +11,19 @@ pub const SCHEMA_VERSION: i64 = 2;
 
 /// A schema-owning SQLite store.
 pub struct Store {
-    connection: Connection,
-    path: PathBuf,
+    pub(crate) connection: Connection,
+    pub(crate) path: PathBuf,
+    pub(crate) encrypted_path: Option<PathBuf>,
+    pub(crate) db_lock: Option<DbLock>,
+}
+
+impl std::fmt::Debug for Store {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Store")
+            .field("path", &self.path)
+            .field("encrypted_path", &self.encrypted_path)
+            .finish()
+    }
 }
 
 impl Store {
@@ -19,7 +32,12 @@ impl Store {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let connection = open(&path)?;
-        let store = Self { connection, path };
+        let store = Self {
+            connection,
+            path,
+            encrypted_path: None,
+            db_lock: None,
+        };
         store.init_schema()?;
         Ok(store)
     }
@@ -38,6 +56,26 @@ impl Store {
     /// Returns the path supplied to [`Store::open`].
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Returns the canonical path if opened as an encrypted store.
+    pub fn encrypted_path(&self) -> Option<&Path> {
+        self.encrypted_path.as_deref()
+    }
+
+    /// Returns the held database lock if any.
+    pub fn lock(&self) -> Option<&DbLock> {
+        self.db_lock.as_ref()
+    }
+
+    /// Checkpoints the WAL with `PRAGMA wal_checkpoint(TRUNCATE)`.
+    pub fn checkpoint_wal(&self) -> Result<(), CheckpointError> {
+        checkpoint_wal_conn(&self.connection)
+    }
+
+    /// Closes the store, checkpoints WAL, and re-encrypts to canonical path if encrypted.
+    pub fn close(self) -> Result<(), EncryptedStoreError> {
+        close_store(self)
     }
 
     /// Reads SQLite's user_version pragma.
