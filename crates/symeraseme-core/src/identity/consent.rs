@@ -110,6 +110,75 @@ pub struct ConsentToken {
     pub expires_at: i64,
 }
 
+/// Options for the Go-compatible `grant` operation.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GrantOptions {
+    #[serde(default = "default_grant_command")]
+    pub command: String,
+    #[serde(default = "default_grant_ttl")]
+    pub ttl: i64,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(default)]
+    pub list_tokens: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoke: Option<String>,
+    #[serde(default)]
+    pub revoke_all: bool,
+}
+
+fn default_grant_command() -> String {
+    "execute".to_owned()
+}
+
+const fn default_grant_ttl() -> i64 {
+    DEFAULT_TOKEN_TTL
+}
+
+impl Default for GrantOptions {
+    fn default() -> Self {
+        Self {
+            command: default_grant_command(),
+            ttl: default_grant_ttl(),
+            dry_run: false,
+            list_tokens: false,
+            revoke: None,
+            revoke_all: false,
+        }
+    }
+}
+
+/// JSON result shapes returned by the Go `grant` contract.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum GrantOutcome {
+    List {
+        count: usize,
+        success: bool,
+        tokens: Vec<ConsentToken>,
+    },
+    DryRun {
+        command: String,
+        dry_run: bool,
+        revoke: String,
+        revoke_all: bool,
+        success: bool,
+    },
+    RevokeAll {
+        revoke_all: bool,
+        revoked: usize,
+        success: bool,
+    },
+    RevokeOne {
+        revoked: usize,
+        success: bool,
+    },
+    Issue {
+        success: bool,
+        token: String,
+    },
+}
+
 type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
 type RandomSource = Arc<dyn Fn(usize) -> Result<Vec<u8>, ConsentError> + Send + Sync>;
 
@@ -298,6 +367,57 @@ impl ConsentStore {
         }
         tokens.sort_by_key(|token| token.issued_at);
         Ok(tokens)
+    }
+
+    /// Execute the Go-compatible `grant` decision order without CLI wiring.
+    pub fn grant(&self, options: &GrantOptions) -> Result<GrantOutcome, ConsentError> {
+        if options.list_tokens {
+            let tokens = self.list_tokens()?;
+            let count = tokens.len();
+            return Ok(GrantOutcome::List {
+                success: true,
+                tokens,
+                count,
+            });
+        }
+        let revoke = options.revoke.as_deref().unwrap_or_default();
+        if options.dry_run {
+            return Ok(GrantOutcome::DryRun {
+                success: true,
+                dry_run: true,
+                command: options.command.clone(),
+                revoke: revoke.to_owned(),
+                revoke_all: options.revoke_all,
+            });
+        }
+        if options.revoke_all {
+            let tokens = self.list_tokens()?;
+            let mut revoked = 0;
+            for token in tokens {
+                if self.revoke_token(&token.token)? {
+                    revoked += 1;
+                }
+            }
+            return Ok(GrantOutcome::RevokeAll {
+                success: true,
+                revoked,
+                revoke_all: true,
+            });
+        }
+        if !revoke.is_empty() {
+            if !self.revoke_token(revoke)? {
+                return Err(ConsentError::NotFound);
+            }
+            return Ok(GrantOutcome::RevokeOne {
+                success: true,
+                revoked: 1,
+            });
+        }
+        let token = self.issue_token(&options.command, options.ttl)?;
+        Ok(GrantOutcome::Issue {
+            success: true,
+            token,
+        })
     }
 
     fn ensure_directory(&self) -> io::Result<()> {

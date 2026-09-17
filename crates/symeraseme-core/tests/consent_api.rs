@@ -3,6 +3,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -11,7 +13,8 @@ use sha2::{Digest, Sha256};
 #[cfg(unix)]
 use symeraseme_core::identity::CONSENT_FILE_MODE;
 use symeraseme_core::identity::{
-    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, read_consent_file,
+    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, GrantOptions,
+    GrantOutcome, read_consent_file,
 };
 use tempfile::{TempDir, tempdir};
 
@@ -352,6 +355,159 @@ fn consent_store_handles_idempotent_removals_random_sources_and_io_errors() {
     fs::create_dir(destination.path().join(filename)).unwrap();
     let atomic_error = fixed_store(destination.path(), 1_000, 5).issue_token("delete", 60);
     assert!(matches!(atomic_error, Err(ConsentError::Io(_))));
+}
+
+#[test]
+fn grant_contract_preserves_go_decision_order_and_mutations() {
+    let directory = tempdir().unwrap();
+    let next_fill = Arc::new(AtomicU8::new(10));
+    let random = {
+        let next_fill = Arc::clone(&next_fill);
+        move |length| {
+            let fill = next_fill.fetch_add(1, Ordering::SeqCst);
+            Ok(vec![fill; length])
+        }
+    };
+    let store = ConsentStore::new(directory.path())
+        .with_clock(|| 1_000)
+        .with_random_source(random);
+
+    let dry_run = store
+        .grant(&GrantOptions {
+            command: "send-removal".to_owned(),
+            dry_run: true,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        dry_run,
+        GrantOutcome::DryRun {
+            success: true,
+            dry_run: true,
+            command: "send-removal".to_owned(),
+            revoke: String::new(),
+            revoke_all: false,
+        }
+    );
+    assert_eq!(
+        serde_json::to_string(&dry_run).unwrap(),
+        r#"{"command":"send-removal","dry_run":true,"revoke":"","revoke_all":false,"success":true}"#
+    );
+    assert!(
+        fs::read_dir(directory.path()).unwrap().next().is_none(),
+        "dry-run must not create storage entries"
+    );
+
+    let default_issue = store.grant(&GrantOptions::default()).unwrap();
+    let default_issue_json = serde_json::to_string(&default_issue).unwrap();
+    let default_token = match default_issue {
+        GrantOutcome::Issue { success, token } => {
+            assert!(success);
+            token
+        }
+        other => panic!("default issue = {other:?}"),
+    };
+    assert_eq!(
+        default_issue_json,
+        format!(r#"{{"success":true,"token":"{default_token}"}}"#)
+    );
+
+    let custom_issue = store
+        .clone()
+        .with_clock(|| 1_001)
+        .grant(&GrantOptions {
+            command: "delete".to_owned(),
+            ttl: 120,
+            ..Default::default()
+        })
+        .unwrap();
+    let custom_issue_json = serde_json::to_string(&custom_issue).unwrap();
+    let custom_token = match custom_issue {
+        GrantOutcome::Issue { success, token } => {
+            assert!(success);
+            token
+        }
+        other => panic!("custom issue = {other:?}"),
+    };
+    assert_eq!(
+        custom_issue_json,
+        format!(r#"{{"success":true,"token":"{custom_token}"}}"#)
+    );
+    assert_eq!(store.verify_token("execute", &default_token), Ok(()));
+    assert_eq!(store.verify_token("delete", &custom_token), Ok(()));
+
+    let listed = store
+        .grant(&GrantOptions {
+            list_tokens: true,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::to_string(&listed).unwrap(),
+        format!(
+            r#"{{"count":2,"success":true,"tokens":[{{"token":"{default_token}","command":"execute","issued_at":1000,"expires_at":87400}},{{"token":"{custom_token}","command":"delete","issued_at":1001,"expires_at":1121}}]}}"#
+        )
+    );
+    match listed {
+        GrantOutcome::List { tokens, count, .. } => {
+            assert_eq!(count, 2);
+            assert_eq!(tokens.len(), 2);
+            let custom = tokens
+                .iter()
+                .find(|token| token.command == "delete")
+                .unwrap();
+            assert_eq!(custom.expires_at - custom.issued_at, 120);
+        }
+        other => panic!("list = {other:?}"),
+    }
+
+    assert_eq!(
+        store.grant(&GrantOptions {
+            revoke: Some("missing-token".to_owned()),
+            ..Default::default()
+        }),
+        Err(ConsentError::NotFound)
+    );
+    let revoke_one = store
+        .grant(&GrantOptions {
+            revoke: Some(custom_token),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::to_string(&revoke_one).unwrap(),
+        r#"{"revoked":1,"success":true}"#
+    );
+    assert_eq!(
+        revoke_one,
+        GrantOutcome::RevokeOne {
+            success: true,
+            revoked: 1,
+        }
+    );
+
+    fixed_store(directory.path(), 900, 99)
+        .issue_token("expired", 10)
+        .unwrap();
+    let revoke_all = store
+        .grant(&GrantOptions {
+            revoke_all: true,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::to_string(&revoke_all).unwrap(),
+        r#"{"revoke_all":true,"revoked":1,"success":true}"#
+    );
+    assert_eq!(
+        revoke_all,
+        GrantOutcome::RevokeAll {
+            success: true,
+            revoked: 1,
+            revoke_all: true,
+        }
+    );
+    assert!(store.list_tokens().unwrap().is_empty());
 }
 
 #[test]

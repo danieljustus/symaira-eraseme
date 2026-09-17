@@ -9,7 +9,7 @@ mod secrets;
 
 pub use consent::{
     CONSENT_DIR_MODE, CONSENT_FILE_MODE, ConsentError, ConsentRecord, ConsentStore, ConsentToken,
-    DEFAULT_TOKEN_TTL, default_consent_directory,
+    DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome, default_consent_directory,
 };
 pub use gate::{ConsentOptions, read_consent_file};
 pub use keyring::{FakeKeyring, KeyringBackend, KeyringError, OsKeyring, SERVICE_NAME, USERNAME};
