@@ -52,7 +52,17 @@ jobs:
         shell: bash
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
 
-      - name: Install Rust verification tools
+      - name: Cache Rust verification tools
+        id: rust_tools_cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/erase-me-cargo-install-root
+          key: rust-tools-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_TOOLCHAIN }}-nextest-0.9.143-audit-0.22.2-deny-0.20.2-hack-0.6.45-llvm-cov-0.9.0
+
+      - name: Install Rust verification tools on cache miss
+        if: steps.rust_tools_cache.outputs.cache-hit != 'true'
+        env:
+          CARGO_INSTALL_ROOT: ${{ runner.temp }}/erase-me-cargo-install-root
         shell: bash
         run: |
           cargo +"$RUST_TOOLCHAIN" install cargo-nextest --version 0.9.143 --locked
@@ -60,6 +70,12 @@ jobs:
           cargo +"$RUST_TOOLCHAIN" install cargo-deny --version 0.20.2 --locked
           cargo +"$RUST_TOOLCHAIN" install cargo-hack --version 0.6.45 --locked
           cargo +"$RUST_TOOLCHAIN" install cargo-llvm-cov --version 0.9.0 --locked
+
+      - name: Add Rust verification tools to PATH
+        env:
+          CARGO_INSTALL_ROOT: ${{ runner.temp }}/erase-me-cargo-install-root
+        shell: bash
+        run: echo "$CARGO_INSTALL_ROOT/bin" >> "$GITHUB_PATH"
 
       - name: Format
         shell: bash
