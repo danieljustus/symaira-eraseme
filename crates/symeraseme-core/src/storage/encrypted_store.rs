@@ -91,9 +91,12 @@ fn default_unix_cache_root(xdg: Option<PathBuf>, home: Option<PathBuf>) -> PathB
 #[cfg(test)]
 mod tests {
     use super::default_encrypted_temp_dir;
-    use super::{EncryptedStoreError, cleanup_recovery_paths, remember_recovery_path};
-    use std::fs::File;
+    use super::{
+        EncryptedStoreError, cleanup_recovery_paths, remember_recovery_path, scavenge_stale_temps,
+    };
+    use std::fs::{File, FileTimes};
     use std::path::PathBuf;
+    use std::time::{Duration, SystemTime};
     use tempfile::tempdir;
 
     #[test]
@@ -208,6 +211,34 @@ mod tests {
         assert!(!first.exists());
         assert!(!second.exists());
         super::ENCRYPTED_TEMPS.lock().unwrap().remove(&encrypted);
+    }
+
+    #[test]
+    fn scavenge_preserves_registered_stale_temp() {
+        let dir = tempdir().unwrap();
+        let encrypted = dir.path().join("encrypted.db");
+        let temp = dir.path().join("symeraseme_decrypted_registered.db");
+        File::create(&temp)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(301)))
+            .unwrap();
+
+        super::ENCRYPTED_TEMPS.lock().unwrap().insert(
+            encrypted.clone(),
+            super::RegisteredTemp {
+                tmp_path: temp.clone(),
+                active: true,
+                lock: None,
+                temp_lock: None,
+                recovery_paths: Vec::new(),
+            },
+        );
+
+        scavenge_stale_temps(dir.path()).unwrap();
+
+        assert!(temp.exists());
+        super::unregister_temp(&encrypted);
+        std::fs::remove_file(temp).unwrap();
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

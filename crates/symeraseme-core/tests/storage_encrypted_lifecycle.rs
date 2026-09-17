@@ -233,11 +233,18 @@ fn scavenge_preserves_registered_active_temp_even_when_old() {
                 && path.extension().and_then(|ext| ext.to_str()) == Some("db")
         })
         .unwrap();
-    let old = SystemTime::now() - Duration::from_secs(301);
-    File::open(&temp)
-        .unwrap()
-        .set_times(FileTimes::new().set_modified(old))
-        .unwrap();
+    // Windows refuses to change the mtime of a SQLite file while SQLite has
+    // it open. The active registration is the liveness guard being tested;
+    // Unix additionally exercises it after the temp crosses the stale-age
+    // threshold.
+    #[cfg(not(windows))]
+    {
+        let old = SystemTime::now() - Duration::from_secs(301);
+        File::open(&temp)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(old))
+            .unwrap();
+    }
     scavenge_stale_temps(&tmp_dir).unwrap();
     assert!(temp.exists());
     store.close().unwrap();
