@@ -9,6 +9,7 @@ use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use serde::de::{IgnoredAny, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Read;
@@ -140,11 +141,11 @@ go_record!(ProfileAddress {
     valid_to: optional,
 });
 
-#[derive(Default)]
-struct Envelope {
-    version: i64,
-    nonce: String,
-    algorithm: String,
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct Envelope {
+    pub version: i64,
+    pub nonce: String,
+    pub algorithm: String,
 }
 go_record!(Envelope {
     version: integer,
@@ -961,6 +962,193 @@ impl ProfilePaths {
 /// Go-compatible existence probe (directories also exist); does not resolve keys.
 pub fn profile_exists(path: &Path, paths: &ProfilePaths) -> bool {
     std::fs::metadata(paths.resolve(path)).is_ok()
+}
+
+/// Authenticate and decrypt a raw profile envelope with an explicit key.
+pub fn decrypt_profile_with_key(
+    raw: &[u8],
+    key: &[u8],
+) -> Result<(Vec<u8>, Envelope), ProfileError> {
+    if key.len() != 32 {
+        return Err(ProfileError::Key(MasterKeyError::InvalidLength {
+            source: "master key",
+            actual: key.len(),
+        }));
+    }
+    let separator = raw
+        .iter()
+        .position(|&byte| byte == b'\n')
+        .ok_or(ProfileError::NoSeparator)?;
+    let header_bytes = &raw[..separator];
+    let header: Envelope =
+        serde_json::from_slice(header_bytes).map_err(|_| ProfileError::Header)?;
+    if header.version == 0 {
+        return Err(ProfileError::LegacyV0);
+    }
+    let nonce = hex::decode(&header.nonce).map_err(|_| ProfileError::Nonce)?;
+    let nonce: [u8; 12] = nonce.try_into().map_err(|_| ProfileError::Nonce)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| ProfileError::Authentication)?;
+    let plaintext = cipher
+        .decrypt(
+            &Nonce::from(nonce),
+            Payload {
+                msg: &raw[separator + 1..],
+                aad: header_bytes,
+            },
+        )
+        .map_err(|_| ProfileError::Authentication)?;
+    Ok((plaintext, header))
+}
+
+/// Encrypt plaintext into a version-2 AES-256-GCM envelope with an explicit nonce.
+pub fn encrypt_profile_with_nonce(
+    plaintext: &[u8],
+    key: &[u8],
+    nonce: &[u8; 12],
+) -> Result<Vec<u8>, ProfileError> {
+    if key.len() != 32 {
+        return Err(ProfileError::Key(MasterKeyError::InvalidLength {
+            source: "master key",
+            actual: key.len(),
+        }));
+    }
+    let header = Envelope {
+        version: 2,
+        nonce: hex::encode(nonce),
+        algorithm: "AES-256-GCM".to_owned(),
+    };
+    let header_bytes = serde_json::to_vec(&header).map_err(|_| ProfileError::Header)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| ProfileError::Authentication)?;
+    let ciphertext = cipher
+        .encrypt(
+            &Nonce::from(*nonce),
+            Payload {
+                msg: plaintext,
+                aad: &header_bytes,
+            },
+        )
+        .map_err(|_| ProfileError::Authentication)?;
+    let mut output = Vec::with_capacity(header_bytes.len() + 1 + ciphertext.len());
+    output.extend_from_slice(&header_bytes);
+    output.push(b'\n');
+    output.extend_from_slice(&ciphertext);
+    Ok(output)
+}
+
+/// Encrypt plaintext into a version-2 AES-256-GCM envelope using the OS CSPRNG.
+pub fn encrypt_profile(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, ProfileError> {
+    use rand::RngCore;
+
+    let mut nonce = [0_u8; 12];
+    rand::rng().fill_bytes(&mut nonce);
+    encrypt_profile_with_nonce(plaintext, key, &nonce)
+}
+
+fn write_canonical_string(output: &mut String, value: &str) {
+    output.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => output.push_str("\\\""),
+            '\\' => output.push_str("\\\\"),
+            '\x08' => output.push_str("\\b"),
+            '\x0c' => output.push_str("\\f"),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            character if character < ' ' || character == '\u{7f}' => {
+                use std::fmt::Write;
+                write!(output, "\\u{:04x}", character as u32).unwrap();
+            }
+            character if character.is_ascii() => output.push(character),
+            character if (character as u32) <= 0xffff => {
+                use std::fmt::Write;
+                write!(output, "\\u{:04x}", character as u32).unwrap();
+            }
+            character => {
+                use std::fmt::Write;
+                let value = character as u32 - 0x1_0000;
+                write!(
+                    output,
+                    "\\u{:04x}\\u{:04x}",
+                    0xd800 + (value >> 10),
+                    0xdc00 + (value & 0x3ff)
+                )
+                .unwrap();
+            }
+        }
+    }
+    output.push('"');
+}
+
+fn write_canonical_json(output: &mut String, value: &serde_json::Value) {
+    match value {
+        serde_json::Value::Null => output.push_str("null"),
+        serde_json::Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
+        serde_json::Value::Number(value) => output.push_str(&value.to_string()),
+        serde_json::Value::String(value) => write_canonical_string(output, value),
+        serde_json::Value::Array(values) => {
+            output.push('[');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push_str(", ");
+                }
+                write_canonical_json(output, value);
+            }
+            output.push(']');
+        }
+        serde_json::Value::Object(values) => {
+            output.push('{');
+            let mut keys: Vec<&String> = values.keys().collect();
+            keys.sort();
+            for (index, key) in keys.into_iter().enumerate() {
+                if index > 0 {
+                    output.push_str(", ");
+                }
+                write_canonical_string(output, key);
+                output.push_str(": ");
+                write_canonical_json(output, &values[key]);
+            }
+            output.push('}');
+        }
+    }
+}
+
+/// Serialize arbitrary JSON using Go/Python-compatible sorted-key JSON.
+pub fn canonical_generic_json(value: &serde_json::Value) -> String {
+    let mut output = String::new();
+    write_canonical_json(&mut output, value);
+    output
+}
+
+#[derive(Serialize)]
+struct ProfilePayload<'a> {
+    full_name: &'a str,
+    name_variants: &'a [String],
+    date_of_birth: &'a Option<String>,
+    addresses: &'a [ProfileAddress],
+    email_addresses: &'a [String],
+    phone_numbers: &'a [String],
+    jurisdictions: &'a [String],
+}
+
+/// Serialize a profile in the canonical form used for Go audit hashes.
+pub fn canonical_json(profile: &Profile) -> String {
+    let payload = ProfilePayload {
+        full_name: &profile.full_name,
+        name_variants: &profile.name_variants,
+        date_of_birth: &profile.date_of_birth,
+        addresses: &profile.addresses,
+        email_addresses: &profile.email_addresses,
+        phone_numbers: &profile.phone_numbers,
+        jurisdictions: &profile.jurisdictions,
+    };
+    let value = serde_json::to_value(payload).unwrap_or(serde_json::Value::Null);
+    canonical_generic_json(&value)
+}
+
+/// Return the lowercase SHA-256 digest of a profile's canonical JSON.
+pub fn hash_profile(profile: &Profile) -> String {
+    hex::encode(Sha256::digest(canonical_json(profile).as_bytes()))
 }
 
 /// Read and authenticate a profile with existing key sources only.
