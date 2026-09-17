@@ -1238,6 +1238,7 @@ dependencies = [
  "chrono",
  "crypto-common",
  "flate2",
+ "fs2",
  "hex",
  "hmac",
  "keyring",
