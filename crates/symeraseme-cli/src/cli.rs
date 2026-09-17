@@ -10,6 +10,9 @@ use symeraseme_core::config::{Config, ConfigContext};
 use symeraseme_core::identity::{
     MasterKeyResolver, Profile, ProfilePaths, load_profile, profile_exists,
 };
+use symeraseme_core::registry::{
+    Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
+};
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
 
@@ -80,6 +83,16 @@ fn build_command(specs: &[CommandSpec], path: &[&str]) -> clap::Command {
                 .index(index + 1)
                 .value_name(*positional)
                 .required(false),
+        );
+    }
+    if spec.path == "brokers list" {
+        command = command.arg(
+            clap::Arg::new("trailing")
+                .index(1)
+                .num_args(0..)
+                .value_name("ARG")
+                .hide(true)
+                .trailing_var_arg(true),
         );
     }
     for child in command_surface::children(specs, path) {
@@ -245,8 +258,13 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
         } else {
             let current = command_surface::find(specs, &parts)
                 .ok_or_else(|| format!("unknown command \"{raw}\" for \"{ROOT_NAME}\"\n"))?;
-            if current.positionals.len() > positional.len() {
+            if current.path == "brokers list" || current.positionals.len() > positional.len() {
                 positional.push(raw.clone());
+            } else if current.path == "brokers show" {
+                return Err(format!(
+                    "accepts 1 arg(s), received {}\n",
+                    positional.len() + 1
+                ));
             } else {
                 let parent = if path.is_empty() {
                     ROOT_NAME.to_owned()
@@ -353,6 +371,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             }
         }
         "config show" => config_show(parsed),
+        "brokers list" => brokers_list(parsed),
+        "brokers show" => brokers_show(parsed),
         "completion" => completion(parsed.positional.first().map(String::as_str).unwrap_or("")),
         "render-template" => render_template(parsed),
         "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
@@ -367,6 +387,202 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
 
 fn deferred(path: &str) -> Outcome {
     Outcome::Stderr(format!("deferred command: {path} is not implemented in Rust\n").into_bytes())
+}
+
+#[derive(Serialize)]
+struct BrokersListFilters {
+    include_disabled: bool,
+    status: String,
+}
+
+#[derive(Serialize)]
+struct BrokersListEnvelope<'a> {
+    brokers: Vec<&'a Broker>,
+    count: usize,
+    filters: BrokersListFilters,
+    schema_version: u8,
+}
+
+#[derive(Serialize)]
+struct BrokerShowEnvelope<'a> {
+    broker: &'a Broker,
+    schema_version: u8,
+}
+
+fn output_format(parsed: &Parsed) -> Result<&str, Outcome> {
+    let format = parsed
+        .flags
+        .get("output")
+        .map(String::as_str)
+        .unwrap_or("text");
+    match format {
+        "text" | "json" => Ok(format),
+        value => Err(Outcome::Stderr(
+            format!("invalid output format {value:?}: use text or json\n").into_bytes(),
+        )),
+    }
+}
+
+fn json_line<T: Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
+    let mut bytes = serde_json::to_vec(value)?;
+    normalize_go_json(&mut bytes);
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+fn normalize_go_json(bytes: &mut Vec<u8>) {
+    let mut normalized = Vec::with_capacity(bytes.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_string {
+            let html_escape = match byte {
+                b'&' => Some(b"\\u0026".as_slice()),
+                b'<' => Some(b"\\u003c".as_slice()),
+                b'>' => Some(b"\\u003e".as_slice()),
+                _ => None,
+            };
+            if let Some(escape) = html_escape {
+                normalized.extend_from_slice(escape);
+                index += 1;
+                continue;
+            }
+            if bytes[index..].starts_with(b"\xE2\x80\xA8") {
+                normalized.extend_from_slice(b"\\u2028");
+                index += 3;
+                continue;
+            }
+            if bytes[index..].starts_with(b"\xE2\x80\xA9") {
+                normalized.extend_from_slice(b"\\u2029");
+                index += 3;
+                continue;
+            }
+            normalized.push(byte);
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+        if byte == b'"' {
+            in_string = true;
+            normalized.push(byte);
+            index += 1;
+            continue;
+        }
+        if byte == b'-' || byte.is_ascii_digit() {
+            let start = index;
+            index += 1;
+            while index < bytes.len()
+                && (bytes[index].is_ascii_digit()
+                    || matches!(bytes[index], b'.' | b'e' | b'E' | b'+' | b'-'))
+            {
+                index += 1;
+            }
+            let token = &bytes[start..index];
+            if token.ends_with(b".0") && !token.iter().any(|byte| matches!(byte, b'e' | b'E')) {
+                normalized.extend_from_slice(&token[..token.len() - 2]);
+            } else {
+                normalized.extend_from_slice(token);
+            }
+            continue;
+        }
+        normalized.push(byte);
+        index += 1;
+    }
+    *bytes = normalized;
+}
+
+fn load_brokers() -> Result<Vec<Broker>, symeraseme_core::registry::RegistryError> {
+    match env::var_os("SYMERASEME_RESOURCES") {
+        Some(resources) if !resources.is_empty() => load_from_dir(Path::new(&resources)),
+        _ => load_embedded(),
+    }
+}
+
+fn brokers_list(parsed: &Parsed) -> Outcome {
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let include_disabled = parsed
+        .flags
+        .get("include-disabled")
+        .is_some_and(|value| value == "true");
+    let include_inactive = parsed
+        .flags
+        .get("include-inactive")
+        .is_some_and(|value| value == "true");
+    let status = parsed
+        .flags
+        .get("status")
+        .cloned()
+        .unwrap_or_else(|| "active".to_owned());
+    let filtered = filter_brokers(
+        &brokers,
+        &BrokerFilter {
+            jurisdiction: parsed.flags.get("jurisdiction").cloned(),
+            law: parsed.flags.get("law").cloned(),
+            priority: parsed.flags.get("priority").cloned(),
+            category: None,
+            include_disabled,
+            status: Some(status.clone()),
+            include_inactive,
+        },
+    );
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let envelope = BrokersListEnvelope {
+            count: filtered.len(),
+            brokers: filtered,
+            filters: BrokersListFilters {
+                include_disabled,
+                status,
+            },
+            schema_version: 1,
+        };
+        return match json_line(&envelope) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("{} broker(s)\n", filtered.len()).into_bytes())
+}
+
+fn brokers_show(parsed: &Parsed) -> Outcome {
+    let Some(broker_id) = parsed.positional.first() else {
+        return Outcome::Stderr(b"accepts 1 arg(s), received 0\n".to_vec());
+    };
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let Some(broker) = brokers.iter().find(|broker| broker.id == *broker_id) else {
+        return Outcome::Stderr(format!("broker {broker_id:?} not found\n").into_bytes());
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&BrokerShowEnvelope {
+            broker,
+            schema_version: 1,
+        }) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("{} ({})\n", broker.name, broker.id).into_bytes())
 }
 
 fn render_template(parsed: &Parsed) -> Outcome {
