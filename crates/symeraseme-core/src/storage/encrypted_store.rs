@@ -50,16 +50,18 @@ static DIRECT_MASTER_KEY: RwLock<Option<[u8; 32]>> = RwLock::new(None);
 fn default_encrypted_temp_dir() -> Result<PathBuf, EncryptedStoreError> {
     #[cfg(target_os = "macos")]
     let root = absolute_path(std::env::var_os("HOME").map(PathBuf::from))
-        .map(|home| home.join("Library/Caches"));
+        .map(|home| home.join("Library/Caches"))
+        .unwrap_or_else(std::env::temp_dir);
     #[cfg(target_os = "windows")]
     let root = absolute_path(std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
-        .or_else(|| absolute_path(std::env::var_os("USERPROFILE").map(PathBuf::from)));
+        .or_else(|| absolute_path(std::env::var_os("USERPROFILE").map(PathBuf::from)))
+        .unwrap_or_else(std::env::temp_dir);
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let root = Some(default_unix_cache_root(
+    let root = default_unix_cache_root(
         std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
         std::env::var_os("HOME").map(PathBuf::from),
-    ));
-    checked_temp_root(root.unwrap_or_else(std::env::temp_dir))
+    );
+    checked_temp_root(root)
 }
 
 fn checked_temp_root(root: PathBuf) -> Result<PathBuf, EncryptedStoreError> {
@@ -71,6 +73,7 @@ fn checked_temp_root(root: PathBuf) -> Result<PathBuf, EncryptedStoreError> {
     Ok(root.join("symeraseme").join("database"))
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn absolute_path(path: Option<PathBuf>) -> Option<PathBuf> {
     path.filter(|path| !path.as_os_str().is_empty() && path.is_absolute())
 }
@@ -113,6 +116,7 @@ mod tests {
         assert_eq!(default_encrypted_temp_dir().unwrap(), expected);
     }
 
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn cache_environment_candidates_require_nonempty_absolute_paths() {
         assert_eq!(super::absolute_path(None), None);
