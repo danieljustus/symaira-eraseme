@@ -1,7 +1,7 @@
 use std::fs::{self, File, FileTimes};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use symeraseme_core::storage::encrypted_store::{
@@ -242,6 +242,47 @@ fn scavenge_preserves_registered_active_temp_even_when_old() {
     assert!(temp.exists());
     store.close().unwrap();
     clear_master_key();
+}
+
+#[test]
+fn scavenge_preserves_stale_sidecars_when_main_temp_is_locked() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let tmp_dir = dir.path().join("tmp");
+    fs::create_dir_all(&tmp_dir).unwrap();
+    let temp = tmp_dir.join("symeraseme_decrypted_locked.db");
+    let wal = PathBuf::from(format!("{}-wal", temp.display()));
+    let shm = PathBuf::from(format!("{}-shm", temp.display()));
+    for path in [&temp, &wal, &shm] {
+        File::create(path).unwrap();
+    }
+    let old = SystemTime::now() - Duration::from_secs(301);
+    File::open(&temp)
+        .unwrap()
+        .set_times(FileTimes::new().set_modified(old))
+        .unwrap();
+    let _owner = DbLock::lock(&temp, 1).unwrap();
+
+    scavenge_stale_temps(&tmp_dir).unwrap();
+
+    assert!(temp.exists());
+    assert!(wal.exists());
+    assert!(shm.exists());
+}
+
+#[test]
+fn scavenge_does_not_create_lock_for_recent_unregistered_temp() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let tmp_dir = dir.path().join("tmp");
+    fs::create_dir_all(&tmp_dir).unwrap();
+    let temp = tmp_dir.join("symeraseme_decrypted_recent.db");
+    File::create(&temp).unwrap();
+
+    scavenge_stale_temps(&tmp_dir).unwrap();
+
+    assert!(temp.exists());
+    assert!(!lock_path_for(&temp).exists());
 }
 
 #[test]

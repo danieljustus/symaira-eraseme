@@ -537,19 +537,12 @@ pub fn scavenge_stale_temps(tmp_dir: impl AsRef<Path>) -> io::Result<()> {
         if !is_stale_temp_name(&name_str) {
             continue;
         }
-        // A decrypted temp has no canonical-path information in its name, so
-        // use a lock next to the temp itself for cross-process ownership.
-        let temp_lock = if name_str.starts_with("symeraseme_decrypted_") {
-            if name_str.ends_with(".lock") {
-                continue;
-            }
-            match DbLock::lock_with_delay(entry.path(), 1, Duration::ZERO) {
-                Ok(lock) => Some(lock),
-                Err(_) => continue,
-            }
-        } else {
-            None
-        };
+        // SQLite sidecars and advisory locks are cleaned by their main DB
+        // candidate. Treating them as independent stale files could bypass
+        // the main temp lock and delete live WAL frames.
+        if name_str.ends_with(".lock") || name_str.ends_with("-wal") || name_str.ends_with("-shm") {
+            continue;
+        }
 
         let metadata = match entry.metadata() {
             Ok(m) => m,
@@ -560,22 +553,35 @@ pub fn scavenge_stale_temps(tmp_dir: impl AsRef<Path>) -> io::Result<()> {
         }
 
         let path = entry.path();
-        let temp_lock_path = temp_lock.as_ref().map(|_| lock_path_for(&path));
         if is_registered_temp_or_sidecar(&path, &registered) {
             continue;
         }
 
         let mtime = metadata.modified().unwrap_or(now);
-        if let Ok(age) = now.duration_since(mtime)
-            && age > STALE_SCAVENGE_AGE
-        {
-            let removed = remove_if_exists(&path);
-            let _ = remove_wal_siblings(&path);
-            if removed.is_ok()
-                && let Some(lock_path) = temp_lock_path
-            {
-                let _ = remove_if_exists(&lock_path);
+        let Ok(age) = now.duration_since(mtime) else {
+            continue;
+        };
+        if age <= STALE_SCAVENGE_AGE {
+            continue;
+        }
+
+        // A decrypted temp has no canonical-path information in its name, so
+        // use a lock next to the temp itself for cross-process ownership.
+        let temp_lock = if name_str.starts_with("symeraseme_decrypted_") {
+            match DbLock::lock_with_delay(entry.path(), 1, Duration::ZERO) {
+                Ok(lock) => Some(lock),
+                Err(_) => continue,
             }
+        } else {
+            None
+        };
+        let temp_lock_path = temp_lock.as_ref().map(|_| lock_path_for(&path));
+        let removed = remove_if_exists(&path);
+        let _ = remove_wal_siblings(&path);
+        if removed.is_ok()
+            && let Some(lock_path) = temp_lock_path
+        {
+            let _ = remove_if_exists(&lock_path);
         }
         drop(temp_lock);
     }
