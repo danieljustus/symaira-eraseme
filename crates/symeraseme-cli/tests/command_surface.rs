@@ -241,10 +241,11 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 5] = [
+    const SURFACE_OPERATIONS: [&str; 6] = [
         "operate-completion",
         "operate-config-show",
         "operate-help",
+        "operate-render-template",
         "operate-serve",
         "operate-version",
     ];
@@ -278,8 +279,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 120);
-    assert_eq!(deferred.len(), 45);
+    assert_eq!(selected.len(), 121);
+    assert_eq!(deferred.len(), 44);
 
     let root = unique_root();
     let home = root.join("home");
@@ -358,4 +359,101 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .next()
             .is_none()
     );
+}
+
+#[test]
+fn render_template_unknown_name_matches_go_error() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root);
+
+    let output = run(
+        &["render-template", "laws/not-there"],
+        &home,
+        &cwd,
+        &capture,
+        0,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        output.stderr,
+        b"templating: unknown template \"not-there\"\n"
+    );
+}
+
+#[test]
+fn render_template_does_not_double_strip_final_go_names() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root);
+
+    let valid_prefix = run(
+        &["render-template", "laws/laws/gdpr-art17.en.md.j2"],
+        &home,
+        &cwd,
+        &capture,
+        0,
+    );
+    assert_eq!(valid_prefix.status.code(), Some(1));
+    assert!(valid_prefix.stdout.is_empty());
+    assert_eq!(
+        valid_prefix.stderr,
+        b"templating: unknown template \"laws/gdpr-art17.en.md.j2\"\n"
+    );
+
+    let unknown_prefix = run(
+        &["render-template", "laws/laws/not-there"],
+        &home,
+        &cwd,
+        &capture,
+        1,
+    );
+    assert_eq!(unknown_prefix.status.code(), Some(1));
+    assert!(unknown_prefix.stdout.is_empty());
+    assert_eq!(
+        unknown_prefix.stderr,
+        b"templating: unknown template \"laws/not-there\"\n"
+    );
+}
+
+#[test]
+fn render_template_accepts_go_double_prefix_normalization() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root);
+
+    let canonical = run(
+        &["render-template", "laws/gdpr-art17.en.md.j2"],
+        &home,
+        &cwd,
+        &capture,
+        0,
+    );
+    let double_prefix = run(
+        &["render-template", "laws/templates/gdpr-art17.en.md.j2"],
+        &home,
+        &cwd,
+        &capture,
+        1,
+    );
+    assert_eq!(canonical.status.code(), Some(0));
+    assert_eq!(double_prefix.status.code(), Some(0));
+    assert_eq!(double_prefix.stdout, canonical.stdout);
+    assert_eq!(double_prefix.stderr, canonical.stderr);
 }
