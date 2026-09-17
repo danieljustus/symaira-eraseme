@@ -41,7 +41,7 @@ func ScavengeStaleTemps(tmpDir string) error {
 			continue
 		}
 		// Lock sidecars are protocol state, never transition files.
-		if strings.HasSuffix(e.Name(), ".lock") {
+		if strings.HasSuffix(e.Name(), ".lock") || strings.HasSuffix(e.Name(), "-wal") || strings.HasSuffix(e.Name(), "-shm") {
 			continue
 		}
 		if !isStaleTempName(e.Name()) {
@@ -52,6 +52,10 @@ func ScavengeStaleTemps(tmpDir string) error {
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 	for _, e := range files {
 		full := filepath.Join(tmpDir, e.Name())
+		info, err := e.Info()
+		if err != nil || now.Sub(info.ModTime()) <= StaleScavengeAge {
+			continue
+		}
 		var tempLock *DBLock
 		if strings.HasPrefix(e.Name(), "symeraseme_decrypted_") {
 			// A decrypted temp is removable only when no active opener owns
@@ -62,20 +66,7 @@ func ScavengeStaleTemps(tmpDir string) error {
 				continue
 			}
 		}
-		info, err := e.Info()
-		if err != nil {
-			if tempLock != nil {
-				_ = tempLock.Close()
-			}
-			continue
-		}
 		removeLockSidecar := false
-		if now.Sub(info.ModTime()) <= StaleScavengeAge {
-			if tempLock != nil {
-				_ = tempLock.Close()
-			}
-			continue
-		}
 		if err := os.Remove(full); err == nil || errors.Is(err, os.ErrNotExist) {
 			removeLockSidecar = tempLock != nil
 		}

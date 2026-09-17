@@ -39,6 +39,9 @@ func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 			t.Errorf("non-stale artifact %s was removed: %v", path, err)
 		}
 	}
+	if _, err := os.Stat(recent + ".lock"); !os.IsNotExist(err) {
+		t.Errorf("fresh temp acquired an orphan lock sidecar: %v", err)
+	}
 	if err := ScavengeStaleTemps(filepath.Join(dir, "missing")); err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +50,10 @@ func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 func TestScavengeStaleTempsSkipsLockedDecryptedTemp(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "symeraseme_decrypted_active.db")
-	if err := os.WriteFile(path, []byte("active"), 0o600); err != nil {
-		t.Fatal(err)
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.WriteFile(candidate, []byte("active"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	old := time.Now().Add(-StaleScavengeAge - time.Second)
 	if err := os.Chtimes(path, old, old); err != nil {
@@ -61,8 +66,10 @@ func TestScavengeStaleTempsSkipsLockedDecryptedTemp(t *testing.T) {
 	if err := ScavengeStaleTemps(dir); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("locked stale temp was scavenged: %v", err)
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if _, err := os.Stat(candidate); err != nil {
+			t.Fatalf("locked stale artifact %s was scavenged: %v", candidate, err)
+		}
 	}
 	if err := lock.Close(); err != nil {
 		t.Fatal(err)
