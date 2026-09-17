@@ -15,15 +15,15 @@ pub const RESCAN_DAYS: i64 = 90;
 /// One scheduler decision, matching the Go `deadlines.Action` JSON shape.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TickAction {
-    pub action_type: String,
+    pub request_id: i64,
     pub broker_id: String,
     pub campaign_id: String,
     pub current_status: String,
-    pub description: String,
-    pub dry_run: bool,
+    pub action_type: String,
     pub event_type: String,
+    pub description: String,
     pub payload: Map<String, Value>,
-    pub request_id: i64,
+    pub dry_run: bool,
 }
 
 /// Evaluate one projected request without reading or writing SQLite.
@@ -60,12 +60,17 @@ fn reminder(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Optio
     if days < REMINDER_DAYS {
         return None;
     }
-    let shift = u32::try_from(request.reminders_sent).ok()?;
-    let threshold = REMINDER_DAYS.checked_mul(1_i64.checked_shl(shift)?)?;
+    let shift = request.reminders_sent as u64;
+    let shifted = if shift >= i64::BITS as u64 {
+        0
+    } else {
+        1_i64.wrapping_shl(shift as u32)
+    };
+    let threshold = REMINDER_DAYS.wrapping_mul(shifted);
     if days < threshold {
         return None;
     }
-    let count = request.reminders_sent.saturating_add(1);
+    let count = request.reminders_sent.wrapping_add(1);
     Some(TickAction {
         action_type: "send_reminder".into(),
         broker_id: request.broker_id.clone(),
