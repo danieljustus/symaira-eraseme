@@ -154,11 +154,43 @@ fn action_json_uses_the_go_field_order() {
 fn reminder_counter_matches_go_i64_wrapping() {
     let now = at("2026-08-27T10:00:00+00:00");
     let cases = [
-        (9, -1, "2026-08-20T10:00:00+00:00", 0),
-        (10, 61, "2026-08-20T10:00:00+00:00", 62),
-        (11, 1, "2026-08-13T10:00:00+00:00", 2),
+        (
+            9,
+            -1,
+            "2026-08-20T10:00:00+00:00",
+            0,
+            "Send reminder #0 (7d since sent)",
+        ),
+        (
+            10,
+            61,
+            "2026-08-20T10:00:00+00:00",
+            62,
+            "Send reminder #62 (7d since sent)",
+        ),
+        (
+            11,
+            1,
+            "2026-08-13T10:00:00+00:00",
+            2,
+            "Send reminder #2 (14d since sent)",
+        ),
+        (
+            12,
+            64,
+            "2026-08-20T10:00:00+00:00",
+            65,
+            "Send reminder #65 (7d since sent)",
+        ),
+        (
+            13,
+            i64::MAX,
+            "2026-08-20T10:00:00+00:00",
+            i64::MIN,
+            "Send reminder #-9223372036854775808 (7d since sent)",
+        ),
     ];
-    for (id, reminders_sent, sent_at, expected_count) in cases {
+    for (id, reminders_sent, sent_at, expected_count, expected_description) in cases {
         let request = candidate(
             id,
             "broker-counter",
@@ -174,6 +206,7 @@ fn reminder_counter_matches_go_i64_wrapping() {
             .pop()
             .expect("Go wrapping makes this reminder due");
         assert_eq!(action.payload["count"].as_i64(), Some(expected_count));
+        assert_eq!(action.description, expected_description);
     }
 }
 
