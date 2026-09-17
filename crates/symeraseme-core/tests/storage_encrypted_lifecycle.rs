@@ -1,4 +1,4 @@
-use std::fs::{self, File, FileTimes};
+use std::fs::{self, File, FileTimes, OpenOptions};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -264,7 +264,9 @@ fn scavenge_preserves_stale_sidecars_when_main_temp_is_locked() {
         File::create(path).unwrap();
     }
     let old = SystemTime::now() - Duration::from_secs(301);
-    File::open(&temp)
+    OpenOptions::new()
+        .write(true)
+        .open(&temp)
         .unwrap()
         .set_times(FileTimes::new().set_modified(old))
         .unwrap();
@@ -290,7 +292,9 @@ fn scavenge_retries_main_after_sidecar_cleanup_failure() {
     fs::create_dir(&wal).unwrap();
     File::create(&shm).unwrap();
     let old = SystemTime::now() - Duration::from_secs(301);
-    File::open(&temp)
+    OpenOptions::new()
+        .write(true)
+        .open(&temp)
         .unwrap()
         .set_times(FileTimes::new().set_modified(old))
         .unwrap();
@@ -334,7 +338,9 @@ fn scavenge_preserves_unregistered_decrypted_temp_for_other_process() {
     let temp = tmp_dir.join("symeraseme_decrypted_other_process.db");
     File::create(&temp).unwrap();
     let old = SystemTime::now() - Duration::from_secs(301);
-    File::open(&temp)
+    OpenOptions::new()
+        .write(true)
+        .open(&temp)
         .unwrap()
         .set_times(FileTimes::new().set_modified(old))
         .unwrap();
