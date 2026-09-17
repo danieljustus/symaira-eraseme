@@ -4,8 +4,13 @@ use crate::command_surface::{self, CommandSpec, FlagSpec};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::env;
+use std::path::Path;
 
 use symeraseme_core::config::{Config, ConfigContext};
+use symeraseme_core::identity::{
+    MasterKeyResolver, Profile, ProfilePaths, load_profile, profile_exists,
+};
+use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
 
 const ROOT_NAME: &str = "symeraseme";
@@ -349,6 +354,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         }
         "config show" => config_show(parsed),
         "completion" => completion(parsed.positional.first().map(String::as_str).unwrap_or("")),
+        "render-template" => render_template(parsed),
         "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
             Outcome::Notice(
                 b"symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.\n"
@@ -361,6 +367,88 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
 
 fn deferred(path: &str) -> Outcome {
     Outcome::Stderr(format!("deferred command: {path} is not implemented in Rust\n").into_bytes())
+}
+
+fn render_template(parsed: &Parsed) -> Outcome {
+    let Some(template_name) = parsed.positional.first() else {
+        return Outcome::Stderr(b"accepts 1 arg(s), received 0\n".to_vec());
+    };
+    let broker_name = parsed.flags.get("broker-name").cloned().unwrap_or_default();
+    let broker_website = parsed
+        .flags
+        .get("broker-website")
+        .cloned()
+        .unwrap_or_default();
+
+    let paths = ProfilePaths::from_process();
+    let profile = if profile_exists(Path::new(""), &paths) {
+        let mut keys = MasterKeyResolver::from_process();
+        match load_profile(Path::new(""), &paths, &mut keys) {
+            Ok(profile) => Some(profile),
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        }
+    } else {
+        None
+    };
+    let context = render_context(profile.as_ref(), broker_name, broker_website);
+
+    let lookup_name = normalize_template_name(template_name);
+    if !list_template_names().contains(&lookup_name) {
+        return Outcome::Stderr(
+            format!("templating: unknown template {lookup_name:?}\n").into_bytes(),
+        );
+    }
+    match render(lookup_name, &context) {
+        Ok(content) => Outcome::Stdout(content.into_bytes()),
+        Err(error) => {
+            let message = match error.to_string().as_str() {
+                "unknown template" | "invalid template name" => {
+                    format!("templating: unknown template {lookup_name:?}")
+                }
+                message => format!("templating: {message}"),
+            };
+            Outcome::Stderr(format!("{message}\n").into_bytes())
+        }
+    }
+}
+
+fn normalize_template_name(input: &str) -> &str {
+    let name = input.strip_prefix("laws/").unwrap_or(input);
+    name.strip_prefix("templates/").unwrap_or(name)
+}
+
+fn render_context(
+    profile: Option<&Profile>,
+    broker_name: String,
+    broker_website: String,
+) -> RenderContext {
+    let mut context = RenderContext {
+        broker_name,
+        broker_website,
+        ..RenderContext::default()
+    };
+    match profile {
+        Some(profile) => {
+            context.full_name = profile.full_name.clone();
+            context.name_variants = profile.name_variants.clone();
+            context.date_of_birth = Some(profile.date_of_birth.clone().unwrap_or_default());
+            context.addresses = profile
+                .addresses
+                .iter()
+                .map(|address| Address {
+                    street: address.street.clone(),
+                    city: address.city.clone(),
+                    postal_code: address.postal_code.clone(),
+                    country: address.country.clone(),
+                })
+                .collect();
+            context.email_addresses = profile.email_addresses.clone();
+            context.phone_numbers = profile.phone_numbers.clone();
+            context.jurisdictions = profile.jurisdictions.clone();
+        }
+        None => context.full_name = "<no value>".to_owned(),
+    }
+    context
 }
 
 #[derive(Serialize)]
