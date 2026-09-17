@@ -1001,7 +1001,7 @@ pub fn decrypt_profile_with_key(
 }
 
 /// Encrypt plaintext into a version-2 AES-256-GCM envelope with an explicit nonce.
-pub fn encrypt_profile_with_nonce(
+fn encrypt_profile_with_nonce(
     plaintext: &[u8],
     key: &[u8],
     nonce: &[u8; 12],
@@ -1080,11 +1080,42 @@ fn write_canonical_string(output: &mut String, value: &str) {
     output.push('"');
 }
 
+fn write_canonical_number(output: &mut String, value: &serde_json::Number) {
+    let Some(value) = value.as_f64() else {
+        output.push_str(&value.to_string());
+        return;
+    };
+    if value.is_finite() {
+        if value.fract() == 0.0 {
+            output.push_str(&(value as i64).to_string());
+        } else if value.abs() >= 1_000_000.0 || value.abs() < 0.0001 {
+            let scientific = format!("{value:e}");
+            let (mantissa, exponent) = scientific
+                .split_once('e')
+                .expect("scientific formatting includes an exponent");
+            output.push_str(mantissa);
+            output.push('e');
+            let exponent: i32 = exponent.parse().expect("Rust exponent is an integer");
+            if exponent >= 0 {
+                output.push('+');
+            } else {
+                output.push('-');
+            }
+            use std::fmt::Write;
+            write!(output, "{:02}", exponent.unsigned_abs()).unwrap();
+        } else {
+            output.push_str(&value.to_string());
+        }
+    } else {
+        output.push_str(&value.to_string());
+    }
+}
+
 fn write_canonical_json(output: &mut String, value: &serde_json::Value) {
     match value {
         serde_json::Value::Null => output.push_str("null"),
         serde_json::Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
-        serde_json::Value::Number(value) => output.push_str(&value.to_string()),
+        serde_json::Value::Number(value) => write_canonical_number(output, value),
         serde_json::Value::String(value) => write_canonical_string(output, value),
         serde_json::Value::Array(values) => {
             output.push('[');

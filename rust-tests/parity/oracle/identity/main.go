@@ -1,5 +1,5 @@
 // Command identity is a focused Go oracle for the ID-001 profile wire format.
-// Requests are binary on stdin: e|d + 32-byte key + payload, or c|h + JSON.
+// Requests are binary on stdin: e|d + 32-byte key + payload, or c|g|h + JSON.
 package main
 
 import (
@@ -29,7 +29,14 @@ func main() {
 			fail("short decryption request")
 		}
 		output, err = identity.DecryptProfileWithKey(input[33:], input[1:33])
-	case 'c', 'h':
+	case 'c', 'g', 'h':
+		if input[0] == 'g' {
+			var value any
+			if err = json.Unmarshal(input[1:], &value); err == nil {
+				output, err = identity.CanonicalGenericJSON(value)
+			}
+			break
+		}
 		var profile identity.Profile
 		if err = json.Unmarshal(input[1:], &profile); err == nil {
 			if input[0] == 'c' {

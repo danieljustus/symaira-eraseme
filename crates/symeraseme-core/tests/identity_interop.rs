@@ -3,8 +3,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use symeraseme_core::identity::{
-    Profile, ProfileAddress, ProfileError, canonical_json, decrypt_profile_with_key,
-    encrypt_profile_with_nonce, hash_profile,
+    Profile, ProfileAddress, ProfileError, canonical_generic_json, canonical_json,
+    decrypt_profile_with_key, encrypt_profile, hash_profile,
 };
 
 fn go_oracle(request: &[u8]) -> Vec<u8> {
@@ -56,10 +56,9 @@ fn profile() -> Profile {
 #[test]
 fn rust_writer_is_readable_by_go_and_hashes_match() {
     let key = [0x5a; 32];
-    let nonce = [0x07; 12];
     let value = profile();
     let plaintext = serde_json::to_vec(&value).expect("serialize profile");
-    let envelope = encrypt_profile_with_nonce(&plaintext, &key, &nonce).expect("encrypt");
+    let envelope = encrypt_profile(&plaintext, &key).expect("encrypt");
 
     let mut request = vec![b'd'];
     request.extend_from_slice(&key);
@@ -108,9 +107,7 @@ fn go_writer_is_readable_by_rust_and_hashes_match() {
 #[test]
 fn envelope_rejects_tampering_malformed_inputs_and_bad_keys() {
     let key = [0x42; 32];
-    let nonce = [0x09; 12];
-    let envelope =
-        encrypt_profile_with_nonce(br#"{"full_name":"test"}"#, &key, &nonce).expect("encrypt");
+    let envelope = encrypt_profile(br#"{"full_name":"test"}"#, &key).expect("encrypt");
 
     let mut ciphertext_tampered = envelope.clone();
     *ciphertext_tampered.last_mut().unwrap() ^= 1;
@@ -120,8 +117,15 @@ fn envelope_rejects_tampering_malformed_inputs_and_bad_keys() {
     );
 
     let mut header_tampered = envelope.clone();
-    header_tampered[10] ^= 1;
-    assert!(decrypt_profile_with_key(&header_tampered, &key).is_err());
+    let algorithm_offset = header_tampered
+        .windows(b"AES-256-GCM".len())
+        .position(|window| window == b"AES-256-GCM")
+        .expect("algorithm header");
+    header_tampered[algorithm_offset] = b"B"[0];
+    assert_eq!(
+        decrypt_profile_with_key(&header_tampered, &key),
+        Err(ProfileError::Authentication)
+    );
 
     assert_eq!(
         decrypt_profile_with_key(b"{\"version\":2,\"nonce\":\"00\"}\n", &key),
@@ -135,4 +139,20 @@ fn envelope_rejects_tampering_malformed_inputs_and_bad_keys() {
         decrypt_profile_with_key(&envelope, &[0; 31]),
         Err(ProfileError::Key(_))
     ));
+}
+
+#[test]
+fn canonical_generic_numbers_match_go_float64_rules() {
+    let raw = br#"{"fraction":1.25,"integer":1.0,"large_fraction":1000000.5,"scientific":1e-7}"#;
+    let value: serde_json::Value = serde_json::from_slice(raw).expect("JSON numbers");
+    let mut request = vec![b'g'];
+    request.extend_from_slice(raw);
+    assert_eq!(
+        canonical_generic_json(&value).as_bytes(),
+        go_oracle(&request)
+    );
+    assert_eq!(
+        canonical_generic_json(&value),
+        r#"{"fraction": 1.25, "integer": 1, "large_fraction": 1.0000005e+06, "scientific": 1e-07}"#
+    );
 }
