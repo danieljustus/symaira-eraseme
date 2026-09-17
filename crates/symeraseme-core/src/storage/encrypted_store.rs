@@ -576,8 +576,14 @@ pub fn scavenge_stale_temps(tmp_dir: impl AsRef<Path>) -> io::Result<()> {
             None
         };
         let temp_lock_path = temp_lock.as_ref().map(|_| lock_path_for(&path));
+        // Keep the main plaintext DB and its lock reachable until every
+        // SQLite sidecar has been removed. A failed sidecar cleanup is
+        // retryable; deleting the main DB first would strand WAL frames.
+        if remove_wal_siblings(&path).is_err() {
+            drop(temp_lock);
+            continue;
+        }
         let removed = remove_if_exists(&path);
-        let _ = remove_wal_siblings(&path);
         if removed.is_ok()
             && let Some(lock_path) = temp_lock_path
         {

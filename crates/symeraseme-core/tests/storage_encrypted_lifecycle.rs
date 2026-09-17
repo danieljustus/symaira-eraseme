@@ -271,6 +271,39 @@ fn scavenge_preserves_stale_sidecars_when_main_temp_is_locked() {
 }
 
 #[test]
+fn scavenge_retries_main_after_sidecar_cleanup_failure() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let tmp_dir = dir.path().join("tmp");
+    fs::create_dir_all(&tmp_dir).unwrap();
+    let temp = tmp_dir.join("symeraseme_decrypted_retry.db");
+    let wal = PathBuf::from(format!("{}-wal", temp.display()));
+    let shm = PathBuf::from(format!("{}-shm", temp.display()));
+    File::create(&temp).unwrap();
+    fs::create_dir(&wal).unwrap();
+    File::create(&shm).unwrap();
+    let old = SystemTime::now() - Duration::from_secs(301);
+    File::open(&temp)
+        .unwrap()
+        .set_times(FileTimes::new().set_modified(old))
+        .unwrap();
+
+    scavenge_stale_temps(&tmp_dir).unwrap();
+
+    assert!(temp.exists());
+    assert!(wal.exists());
+    assert!(shm.exists());
+    assert!(lock_path_for(&temp).exists());
+
+    fs::remove_dir(&wal).unwrap();
+    scavenge_stale_temps(&tmp_dir).unwrap();
+
+    assert!(!temp.exists());
+    assert!(!shm.exists());
+    assert!(!lock_path_for(&temp).exists());
+}
+
+#[test]
 fn scavenge_does_not_create_lock_for_recent_unregistered_temp() {
     let _guard = TEST_LOCK.lock().unwrap();
     let dir = tempdir().unwrap();
