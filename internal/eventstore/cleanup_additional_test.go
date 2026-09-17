@@ -2,6 +2,7 @@ package eventstore
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,8 +40,104 @@ func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 			t.Errorf("non-stale artifact %s was removed: %v", path, err)
 		}
 	}
+	if _, err := os.Stat(recent + ".lock"); !os.IsNotExist(err) {
+		t.Errorf("fresh temp acquired an orphan lock sidecar: %v", err)
+	}
 	if err := ScavengeStaleTemps(filepath.Join(dir, "missing")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestScavengeStaleTempsSkipsLockedDecryptedTemp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_active.db")
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.WriteFile(candidate, []byte("active"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := LockDB(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if _, err := os.Stat(candidate); err != nil {
+			t.Fatalf("locked stale artifact %s was scavenged: %v", candidate, err)
+		}
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("unlocked stale temp remains: %v", err)
+	}
+	if _, err := os.Stat(path + ".lock"); !os.IsNotExist(err) {
+		t.Fatalf("temp lock sidecar remains after scavenging: %v", err)
+	}
+}
+
+func TestScavengeStaleTempsDoesNotScavengeLockSidecars(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_orphan.db.lock")
+	if err := os.WriteFile(path, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("lock sidecar was scavenged: %v", err)
+	}
+}
+
+func TestScavengeStaleTempsRetainsTempWhenSiblingCleanupFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_retry.db")
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.WriteFile(candidate, []byte("stale"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	cleanupErr := errors.New("sibling cleanup failure")
+	oldRemoveWAL := removeWALSiblingsFn
+	removeWALSiblingsFn = func(string) error { return cleanupErr }
+	t.Cleanup(func() { removeWALSiblingsFn = oldRemoveWAL })
+
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm", path + ".lock"} {
+		if _, err := os.Stat(candidate); err != nil {
+			t.Fatalf("artifact %s was not retained after cleanup failure: %v", candidate, err)
+		}
+	}
+
+	removeWALSiblingsFn = RemoveWALSiblings
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm", path + ".lock"} {
+		if _, err := os.Stat(candidate); !os.IsNotExist(err) {
+			t.Fatalf("artifact %s remains after retry: %v", candidate, err)
+		}
 	}
 }
 

@@ -104,13 +104,63 @@ func TestEncryptedFileHelpersAndTempRegistration(t *testing.T) {
 	if got, err := os.ReadFile(tmpPath); err != nil || !bytes.Equal(got, []byte("plain data")) {
 		t.Fatalf("temp plaintext = %q, err=%v", got, err)
 	}
+	if _, err := os.Stat(tmpPath + ".lock"); err != nil {
+		t.Fatalf("decrypted temp lock sidecar missing: %v", err)
+	}
 	if err := WriteEncrypted(plainPath); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
 		t.Fatalf("temp file remains after WriteEncrypted: %v", err)
 	}
+	if _, err := os.Stat(tmpPath + ".lock"); !os.IsNotExist(err) {
+		t.Fatalf("temp lock sidecar remains after WriteEncrypted: %v", err)
+	}
 	if err := WriteEncrypted(filepath.Join(dir, "unregistered")); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestOpenEncryptedFailureRetainsTempRegistrationOnCleanupFailure(t *testing.T) {
+	master := fixedTestMaster()
+	SetMasterKeyProvider(func() ([]byte, error) { return master, nil })
+	t.Cleanup(func() { SetMasterKeyProvider(nil) })
+	dir := t.TempDir()
+	encPath := filepath.Join(dir, "invalid.db")
+	ciphertext, err := EncryptBytesV3([]byte("not sqlite"), master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(encPath, ciphertext, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cleanupErr := errors.New("temp cleanup failure")
+	oldRemoveWAL := removeWALSiblingsFn
+	removeWALSiblingsFn = func(string) error { return cleanupErr }
+	t.Cleanup(func() { removeWALSiblingsFn = oldRemoveWAL })
+
+	if _, err := OpenEncrypted(encPath, filepath.Join(dir, "tmp")); err == nil || !errors.Is(err, cleanupErr) {
+		t.Fatalf("OpenEncrypted error = %v, want cleanup failure", err)
+	}
+	value, ok := encryptedTemps.Load(encPath)
+	if !ok {
+		t.Fatal("failed open discarded retry registration")
+	}
+	reg, ok := tempRegistration(value)
+	if !ok || reg.tempLock == nil {
+		t.Fatalf("retry registration = %+v, want held temp lock", reg)
+	}
+	if _, err := os.Stat(reg.tmpPath); err != nil {
+		t.Fatalf("retry plaintext temp missing: %v", err)
+	}
+	if lock, err := tryLockDB(reg.tmpPath); err == nil {
+		_ = lock.Close()
+		t.Fatal("retry temp lock was released after cleanup failure")
+	}
+
+	removeWALSiblingsFn = RemoveWALSiblings
+	if err := cleanupEncryptedTempWithLock(reg.tmpPath, reg.tempLock); err != nil {
+		t.Fatalf("retry temp cleanup = %v", err)
+	}
+	encryptedTemps.Delete(encPath)
 }

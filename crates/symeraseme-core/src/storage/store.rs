@@ -1,5 +1,9 @@
 //! SQLite database lifecycle and schema migration.
 
+use super::encrypted_store::{
+    CheckpointError, EncryptedStoreError, checkpoint_wal_conn, close_store,
+};
+use super::locking::DbLock;
 use super::open;
 use rusqlite::{Connection, Result};
 use std::path::{Path, PathBuf};
@@ -9,8 +13,21 @@ pub const SCHEMA_VERSION: i64 = 2;
 
 /// A schema-owning SQLite store.
 pub struct Store {
-    connection: Connection,
+    pub(crate) connection: Connection,
     path: PathBuf,
+    pub(crate) sqlite_path: PathBuf,
+    pub(crate) encrypted_path: Option<PathBuf>,
+    pub(crate) db_lock: Option<DbLock>,
+}
+
+impl std::fmt::Debug for Store {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Store")
+            .field("path", &self.path)
+            .field("sqlite_path", &self.sqlite_path)
+            .field("encrypted_path", &self.encrypted_path)
+            .finish()
+    }
 }
 
 impl Store {
@@ -19,7 +36,13 @@ impl Store {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let connection = open(&path)?;
-        let store = Self { connection, path };
+        let store = Self {
+            connection,
+            sqlite_path: path.clone(),
+            path,
+            encrypted_path: None,
+            db_lock: None,
+        };
         store.init_schema()?;
         Ok(store)
     }
@@ -38,6 +61,24 @@ impl Store {
     /// Returns the path supplied to [`Store::open`].
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub(crate) fn set_encrypted_paths(&mut self, canonical: PathBuf, sqlite: PathBuf) {
+        self.path = canonical.clone();
+        self.sqlite_path = sqlite;
+        self.encrypted_path = Some(canonical);
+    }
+
+    pub fn encrypted_path(&self) -> Option<&Path> {
+        self.encrypted_path.as_deref()
+    }
+
+    pub fn checkpoint_wal(&self) -> std::result::Result<(), CheckpointError> {
+        checkpoint_wal_conn(&self.connection)
+    }
+
+    pub fn close(self) -> std::result::Result<(), EncryptedStoreError> {
+        close_store(self)
     }
 
     /// Reads SQLite's user_version pragma.

@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -39,6 +40,10 @@ func ScavengeStaleTemps(tmpDir string) error {
 		if e.IsDir() {
 			continue
 		}
+		// Lock sidecars are protocol state, never transition files.
+		if strings.HasSuffix(e.Name(), ".lock") || strings.HasSuffix(e.Name(), "-wal") || strings.HasSuffix(e.Name(), "-shm") {
+			continue
+		}
 		if !isStaleTempName(e.Name()) {
 			continue
 		}
@@ -48,16 +53,39 @@ func ScavengeStaleTemps(tmpDir string) error {
 	for _, e := range files {
 		full := filepath.Join(tmpDir, e.Name())
 		info, err := e.Info()
-		if err != nil {
+		if err != nil || now.Sub(info.ModTime()) <= StaleScavengeAge {
 			continue
 		}
-		if now.Sub(info.ModTime()) <= StaleScavengeAge {
+		var tempLock *DBLock
+		if strings.HasPrefix(e.Name(), "symeraseme_decrypted_") {
+			// A decrypted temp is removable only when no active opener owns
+			// its sibling lock. The zero-retry helper is intentionally
+			// non-blocking so scavenging never delays normal work.
+			tempLock, err = tryLockDB(full)
+			if err != nil {
+				continue
+			}
+		}
+		// Remove SQLite sidecars first. If either removal fails, retain the
+		// main temp and its lock sidecar so the next scan can retry safely.
+		if err := removeWALSiblingsFn(full); err != nil {
+			if tempLock != nil {
+				_ = tempLock.Close()
+			}
 			continue
 		}
-		_ = os.Remove(full)
-		// WAL siblings use the temp-file's suffix (.db) → .db-wal etc.
-		_ = os.Remove(full + "-wal")
-		_ = os.Remove(full + "-shm")
+		removeLockSidecar := false
+		if err := os.Remove(full); err == nil || errors.Is(err, os.ErrNotExist) {
+			removeLockSidecar = tempLock != nil
+		}
+		if tempLock != nil {
+			_ = tempLock.Close()
+			if removeLockSidecar {
+				// The temp is gone while the lock was held; no scavenger can
+				// discover this path again, so removing its sidecar is safe.
+				_ = os.Remove(full + ".lock")
+			}
+		}
 	}
 	return nil
 }
@@ -150,6 +178,21 @@ func LockDB(dbPath string, retryMax int) (*DBLock, error) {
 		return &DBLock{path: lockPath, file: f}, nil
 	}
 	return nil, fmt.Errorf("eventstore: cannot acquire DB lock %s: %w", lockPath, lastErr)
+}
+
+// tryLockDB acquires the same lock as LockDB without retries or delay.
+// ScavengeStaleTemps uses it to skip active decrypted temps immediately.
+func tryLockDB(dbPath string) (*DBLock, error) {
+	lockPath := dbPath + ".lock"
+	f, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0o600) //nolint:gosec // our own lock file
+	if err != nil {
+		return nil, err
+	}
+	if err := flockExclusive(f); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return &DBLock{path: lockPath, file: f}, nil
 }
 
 // Close releases the lock.  Safe to call on a nil receiver.
