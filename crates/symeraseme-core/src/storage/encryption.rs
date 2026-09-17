@@ -378,6 +378,38 @@ pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     result
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnvelopeVersion {
+    V1,
+    V2,
+    V3,
+}
+
+pub fn detect_version(raw: &[u8]) -> Option<EnvelopeVersion> {
+    if raw.starts_with(V3_HEADER) {
+        Some(EnvelopeVersion::V3)
+    } else if raw.starts_with(V2_HEADER) {
+        Some(EnvelopeVersion::V2)
+    } else if raw.starts_with(V1_HEADER) {
+        Some(EnvelopeVersion::V1)
+    } else {
+        None
+    }
+}
+
+pub fn is_encrypted(raw: &[u8]) -> bool {
+    detect_version(raw).is_some()
+}
+
+pub fn decrypt_any(raw: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    match detect_version(raw) {
+        Some(EnvelopeVersion::V1) => decrypt_v1(raw, master_key),
+        Some(EnvelopeVersion::V2) => decrypt_v2(raw, master_key),
+        Some(EnvelopeVersion::V3) => decrypt_v3(raw, master_key),
+        None => Err(EncryptionError::UnsupportedEnvelope),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
