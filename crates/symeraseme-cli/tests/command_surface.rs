@@ -55,6 +55,17 @@ struct ProcessOutput {
 }
 
 fn run(argv: &[&str], home: &Path, cwd: &Path, capture: &Path, index: usize) -> ProcessOutput {
+    run_with_resources(argv, home, cwd, capture, index, None)
+}
+
+fn run_with_resources(
+    argv: &[&str],
+    home: &Path,
+    cwd: &Path,
+    capture: &Path,
+    index: usize,
+    resources: Option<&Path>,
+) -> ProcessOutput {
     let stdout_path = capture.join(format!("{index}.stdout"));
     let stderr_path = capture.join(format!("{index}.stderr"));
     let stdout = fs::File::create(&stdout_path).expect("create stdout capture");
@@ -71,6 +82,9 @@ fn run(argv: &[&str], home: &Path, cwd: &Path, capture: &Path, index: usize) -> 
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
+    if let Some(resources) = resources {
+        command.env("SYMERASEME_RESOURCES", resources);
+    }
     if let Some(profile_path) = std::env::var_os("LLVM_PROFILE_FILE") {
         command.env("LLVM_PROFILE_FILE", profile_path);
     }
@@ -244,7 +258,9 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 6] = [
+    const SURFACE_OPERATIONS: [&str; 8] = [
+        "operate-brokers-list",
+        "operate-brokers-show",
         "operate-completion",
         "operate-config-show",
         "operate-help",
@@ -282,8 +298,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 121);
-    assert_eq!(deferred.len(), 44);
+    assert_eq!(selected.len(), 123);
+    assert_eq!(deferred.len(), 42);
 
     let root = unique_root();
     let home = root.join("home");
@@ -362,6 +378,166 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .next()
             .is_none()
     );
+}
+
+#[test]
+fn brokers_operations_match_go_text_filters_and_errors() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root);
+
+    let output = run(&["brokers", "list"], &home, &cwd, &capture, 0);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"1273 broker(s)\n");
+    assert!(output.stderr.is_empty());
+
+    let output = run(
+        &["brokers", "list", "--law", "GDPR"],
+        &home,
+        &cwd,
+        &capture,
+        1,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"138 broker(s)\n");
+    assert!(output.stderr.is_empty());
+
+    let output = run(
+        &["brokers", "list", "ignored-extra"],
+        &home,
+        &cwd,
+        &capture,
+        2,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"1273 broker(s)\n");
+    assert!(output.stderr.is_empty());
+
+    let output = run(
+        &["brokers", "show", "0ptimus-analytics-us"],
+        &home,
+        &cwd,
+        &capture,
+        3,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"0ptimus Analytics (0ptimus-analytics-us)\n");
+    assert!(output.stderr.is_empty());
+
+    let output = run(&["brokers", "show", "not-there"], &home, &cwd, &capture, 4);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(output.stderr, b"broker \"not-there\" not found\n");
+
+    let output = run(&["brokers", "show"], &home, &cwd, &capture, 5);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stderr, b"accepts 1 arg(s), received 0\n");
+
+    let output = run(&["brokers", "show", "one", "two"], &home, &cwd, &capture, 6);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stderr, b"accepts 1 arg(s), received 2\n");
+
+    let output = run(
+        &["brokers", "list", "--output", "yaml"],
+        &home,
+        &cwd,
+        &capture,
+        7,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        output.stderr,
+        b"invalid output format \"yaml\": use text or json\n"
+    );
+}
+
+#[test]
+fn brokers_list_honors_resources_override() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let resources = root.join("resources");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    fs::create_dir_all(resources.join("brokers")).expect("broker directory");
+    fs::create_dir_all(resources.join("schemas")).expect("schema directory");
+    fs::write(
+        resources.join("manifest.json"),
+        br#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#,
+    )
+    .expect("registry manifest");
+    fs::write(
+        resources.join("schemas/broker.schema.json"),
+        br#"{"schema_version":1}"#,
+    )
+    .expect("broker schema");
+    let _cleanup = Cleanup(root);
+
+    let output = run_with_resources(
+        &["brokers", "list"],
+        &home,
+        &cwd,
+        &capture,
+        8,
+        Some(&resources),
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"0 broker(s)\n");
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn brokers_json_operations_match_source_bound_goldens() {
+    let behavior: Value = serde_json::from_str(BEHAVIOR).expect("behavior JSON");
+    let cases = behavior["cases"].as_array().expect("behavior cases");
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root);
+
+    for (index, id) in ["operate-brokers-list", "operate-brokers-show"]
+        .iter()
+        .enumerate()
+    {
+        let case = cases
+            .iter()
+            .find(|case| case["id"].as_str() == Some(*id))
+            .unwrap_or_else(|| panic!("missing behavior case {id}"));
+        let argv = case["argv"]
+            .as_array()
+            .expect("behavior argv")
+            .iter()
+            .map(|arg| arg.as_str().expect("string behavior argv"))
+            .collect::<Vec<_>>();
+        let output = run(&argv, &home, &cwd, &capture, 20 + index);
+
+        assert_eq!(
+            output.status.code(),
+            case["exit_code"].as_i64().map(|code| code as i32),
+            "{id} exit status"
+        );
+        assert_eq!(
+            output.stdout,
+            decode_base64(case["stdout_base64"].as_str().expect("stdout golden")),
+            "{id} stdout"
+        );
+        assert_eq!(
+            output.stderr,
+            decode_base64(case["stderr_base64"].as_str().expect("stderr golden")),
+            "{id} stderr"
+        );
+    }
 }
 
 #[test]
