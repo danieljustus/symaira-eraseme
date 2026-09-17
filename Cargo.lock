@@ -1184,7 +1184,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "symaira-core-fs"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=7a1a9d11b38797537cf20761aa7121773447bad2#7a1a9d11b38797537cf20761aa7121773447bad2"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=0f441fb27872da7edd65244e4fcbd0890f0b7174#0f441fb27872da7edd65244e4fcbd0890f0b7174"
 dependencies = [
  "cap-primitives",
  "cap-std",
@@ -1198,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-sqlite"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=7a1a9d11b38797537cf20761aa7121773447bad2#7a1a9d11b38797537cf20761aa7121773447bad2"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=0f441fb27872da7edd65244e4fcbd0890f0b7174#0f441fb27872da7edd65244e4fcbd0890f0b7174"
 dependencies = [
  "rusqlite",
  "symaira-core-fs",
