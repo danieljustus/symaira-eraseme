@@ -11,4 +11,5 @@ pub mod registry;
 pub mod storage;
 pub mod templating;
 pub mod timeutil;
+pub mod triage_contract;
 pub mod version;
