@@ -8,7 +8,9 @@ use symeraseme_core::storage::encrypted_store::{
     EncryptedStoreError, clear_master_key, finalise_all, open_configured, open_encrypted,
     scavenge_stale_temps, set_master_key,
 };
-use symeraseme_core::storage::encryption::{EnvelopeVersion, decrypt_v3, detect_version};
+use symeraseme_core::storage::encryption::{
+    EnvelopeVersion, decrypt_v3, detect_version, encrypt_v3,
+};
 use symeraseme_core::storage::{DbLock, lock_path_for};
 use tempfile::tempdir;
 
@@ -49,6 +51,27 @@ fn encrypted_open_uses_canonical_path_and_private_sqlite_temp() {
     store.close().expect("close encrypted store");
     assert!(!temp.path().exists());
     assert!(!lock_path_for(&temp.path()).exists());
+    clear_master_key();
+}
+
+#[test]
+fn failed_store_open_removes_temp_lock_after_temp_deletion() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    set_master_key(KEY);
+    let dir = tempdir().unwrap();
+    let canonical = dir.path().join("invalid-plaintext.db");
+    let tmp_dir = dir.path().join("tmp");
+    fs::write(&canonical, encrypt_v3(b"not sqlite", &KEY).unwrap()).unwrap();
+
+    assert!(open_encrypted(&canonical, &tmp_dir).is_err());
+    let leftovers: Vec<_> = fs::read_dir(&tmp_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "failed open left temp artifacts: {leftovers:?}"
+    );
     clear_master_key();
 }
 

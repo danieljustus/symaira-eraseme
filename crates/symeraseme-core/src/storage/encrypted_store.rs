@@ -570,9 +570,8 @@ pub fn scavenge_stale_temps(tmp_dir: impl AsRef<Path>) -> io::Result<()> {
             && age > STALE_SCAVENGE_AGE
         {
             let removed = remove_if_exists(&path);
-            let siblings_removed = remove_wal_siblings(&path);
+            let _ = remove_wal_siblings(&path);
             if removed.is_ok()
-                && siblings_removed.is_ok()
                 && let Some(lock_path) = temp_lock_path
             {
                 let _ = remove_if_exists(&lock_path);
@@ -615,10 +614,7 @@ fn unregister_temp(enc_path: &Path) -> Option<RegisteredTemp> {
     drop(map);
 
     if let Some(mut temp_lock) = registration.temp_lock.take() {
-        let lock_path = lock_path_for(&registration.tmp_path);
-        if temp_lock.close().is_ok() {
-            let _ = remove_if_exists(&lock_path);
-        }
+        cleanup_temp_lock_after_main(&registration.tmp_path, Some(&mut temp_lock));
     }
     Some(registration)
 }
@@ -739,9 +735,25 @@ fn cleanup_initializer(path: &Path) -> io::Result<()> {
     first.map_or(Ok(()), Err)
 }
 
+fn cleanup_temp_lock_after_main(path: &Path, temp_lock: Option<&mut DbLock>) {
+    if let Some(temp_lock) = temp_lock
+        && temp_lock.close().is_ok()
+    {
+        let _ = remove_if_exists(&lock_path_for(path));
+    }
+}
+
 fn cleanup_plain_temp(path: &Path) -> io::Result<()> {
-    remove_wal_siblings(path)?;
-    remove_if_exists(path)
+    cleanup_plain_temp_with_lock(path, None)
+}
+
+fn cleanup_plain_temp_with_lock(path: &Path, mut temp_lock: Option<DbLock>) -> io::Result<()> {
+    let siblings_error = remove_wal_siblings(path).err();
+    let main_error = remove_if_exists(path).err();
+    if main_error.is_none() {
+        cleanup_temp_lock_after_main(path, temp_lock.as_mut());
+    }
+    main_error.or(siblings_error).map_or(Ok(()), Err)
 }
 
 /// Atomically transitions `target` with `ciphertext`.
@@ -1129,7 +1141,7 @@ pub fn open_encrypted(
     let mut store = match Store::open(&tmp_path) {
         Ok(store) => store,
         Err(error) => {
-            let cleanup = cleanup_plain_temp(&tmp_path);
+            let cleanup = cleanup_plain_temp_with_lock(&tmp_path, Some(temp_lock));
             return Err(match cleanup {
                 Ok(()) => EncryptedStoreError::Sqlite(error),
                 Err(cleanup) => EncryptedStoreError::Io(io::Error::other(format!(
