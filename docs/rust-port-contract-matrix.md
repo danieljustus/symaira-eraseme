@@ -86,7 +86,7 @@ SQLite, network transcript or process behavior.
 | CLI-014 | CLI | `schedule install/uninstall/status` | isolated HOME | scheduler CLI cases | byte+filesystem | native OS | TODO |
 | CLI-015 | CLI | profile init/show | fixed RNG/key fixture | profile CLI cases | semantic+filesystem | all | TODO |
 | CLI-016 | CLI | `render-template` | golden templates | template CLI cases | byte | all | TODO |
-| CLI-017 | CLI | `grant` issue/list/revoke/revoke-all/dry-run | fixed clock/RNG | consent CLI cases | byte+filesystem | all | TODO |
+| CLI-017 | CLI | `grant` issue/list/revoke/revoke-all/dry-run | fixed clock/RNG | consent CLI cases | byte+filesystem | all | PASS (core contract; CLI wire in 8.4) |
 | CLI-018 | CLI | dashboard/calendar/requests/events JSON shapes | golden DB | read-model CLI cases | byte | all | TODO |
 | CLI-019 | CLI | reports/dashboard files | golden DB | report CLI cases | byte+filesystem | all | TODO |
 | CLI-020 | CLI | manual task list/show/complete/cleanup | golden DB/temp files | manual-task CLI cases | byte+side-effect | all | TODO |
@@ -137,8 +137,8 @@ SQLite, network transcript or process behavior.
 | ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | identity interoperability/regression tests | byte/side-effect | all | PASS |
 | ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | semantic | native OS | PASS (local; native CI pending) |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | byte | all | PASS (local; native CI pending) |
-| ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | `crates/symeraseme-core/tests/consent_api.rs` | byte | all | PASS (focused Rust contract; task 4.7 remains open) |
-| ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |
+| ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | `crates/symeraseme-core/tests/consent_api.rs` | byte | all | PASS (local; native CI pending) |
+| ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | PASS (local macOS; native CI pending) |
 | DOM-000A | domain | production `poll_inbox` uses a real adapter and persistent HWM | fake-server transcript; issue #799 | corrected Go oracle | side-effect | all | PASS |
 | DOM-000B | domain | production web form has an honest tested runtime/manual boundary | local executor contract + durable manual-task tests; issue #800 | `TestWebFormNoExecutorPersistsManualFallback`, `TestWebFormExecutorReceivesBoundedContextAndMapsEvidence`, `TestAutoConfirmCreatesManualConfirmationTaskWithoutClick` | side-effect | all | PASS |
 | DOM-001 | domain | deadlines/tick transitions | `golden-tick.json` | shared golden test | byte | all | TODO |

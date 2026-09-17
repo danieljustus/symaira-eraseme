@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 #[cfg(unix)]
 use symeraseme_core::identity::CONSENT_FILE_MODE;
 use symeraseme_core::identity::{
-    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, read_consent_file,
+    ConsentError, ConsentOptions, ConsentRecord, ConsentStore, ConsentToken, GrantOptions,
+    GrantOutcome, consent_gate, read_consent_file,
 };
 use tempfile::{TempDir, tempdir};
 
@@ -603,6 +604,313 @@ fn consent_errors_preserve_classification_without_exposing_payloads() {
         assert_eq!(error.to_string(), expected);
         assert!(std::error::Error::source(&error).is_none());
     }
+}
+
+#[test]
+fn consent_store_revoke_all_removes_active_tokens_and_cleans_expired() {
+    let directory = tempdir().unwrap();
+    let store = fixed_store(directory.path(), 1_000, 1);
+
+    // Empty store returns 0 revoked
+    assert_eq!(store.revoke_all(), Ok(0));
+
+    // Issue two active tokens and one expired token with distinct fills
+    let token1 = fixed_store(directory.path(), 1_000, 1)
+        .issue_token("cmd1", 60)
+        .unwrap();
+    let token2 = fixed_store(directory.path(), 1_000, 2)
+        .issue_token("cmd2", 60)
+        .unwrap();
+    let token_expired = fixed_store(directory.path(), 900, 3)
+        .issue_token("cmd3", 10)
+        .unwrap();
+
+    // Verify all 3 token files exist on disk before revoke_all
+    assert!(
+        directory
+            .path()
+            .join(hashed_token_path(directory.path(), &token1))
+            .exists()
+    );
+    assert!(
+        directory
+            .path()
+            .join(hashed_token_path(directory.path(), &token2))
+            .exists()
+    );
+    assert!(
+        directory
+            .path()
+            .join(hashed_token_path(directory.path(), &token_expired))
+            .exists()
+    );
+
+    // revoke_all at clock=1000: token_expired (expires at 910) is pruned, token1 and token2 are revoked
+    let revoked = store.revoke_all().unwrap();
+    assert_eq!(revoked, 2);
+
+    // Tokens no longer exist
+    assert_eq!(store.list_tokens().unwrap().len(), 0);
+    assert_eq!(
+        store.verify_token("cmd1", &token1),
+        Err(ConsentError::NotFound)
+    );
+    assert_eq!(
+        store.verify_token("cmd2", &token2),
+        Err(ConsentError::NotFound)
+    );
+    assert_eq!(
+        store.verify_token("cmd3", &token_expired),
+        Err(ConsentError::NotFound)
+    );
+}
+
+#[test]
+fn grant_contract_cli017_and_mcp_schema() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU8, Ordering};
+
+    let directory = tempdir().unwrap();
+    let counter = Arc::new(AtomicU8::new(10));
+    let counter_clone = counter.clone();
+    let store = ConsentStore::new(directory.path())
+        .with_clock(|| 1_000)
+        .with_random_source(move |length| {
+            let val = counter_clone.fetch_add(1, Ordering::SeqCst);
+            Ok(vec![val; length])
+        });
+
+    // 1. Dry run: doesn't issue or mutate disk
+    let dry_run_opts = GrantOptions {
+        command: "send-removal".to_owned(),
+        dry_run: true,
+        ..Default::default()
+    };
+    let dry_run_res = store.grant(&dry_run_opts).unwrap();
+    assert_eq!(
+        dry_run_res,
+        GrantOutcome::DryRun {
+            success: true,
+            dry_run: true,
+            command: "send-removal".to_owned(),
+            revoke: String::new(),
+            revoke_all: false,
+        }
+    );
+    let dry_json: serde_json::Value = serde_json::to_value(&dry_run_res).unwrap();
+    assert_eq!(dry_json["success"], true);
+    assert_eq!(dry_json["dry_run"], true);
+    assert_eq!(dry_json["command"], "send-removal");
+    assert_eq!(dry_json["revoke"], "");
+    assert_eq!(dry_json["revoke_all"], false);
+    assert_eq!(store.list_tokens().unwrap().len(), 0);
+
+    // 2. Issue with default command ("execute")
+    let issue_default = store.grant(&GrantOptions::default()).unwrap();
+    let token_default = match &issue_default {
+        GrantOutcome::Issue { success, token } => {
+            assert!(success);
+            token.clone()
+        }
+        other => panic!("expected issue outcome, got {other:?}"),
+    };
+    let issue_json: serde_json::Value = serde_json::to_value(&issue_default).unwrap();
+    assert_eq!(issue_json["success"], true);
+    assert_eq!(issue_json["token"], token_default);
+
+    // Verify the issued token works for "execute"
+    assert_eq!(store.verify_token("execute", &token_default), Ok(()));
+
+    // 3. Issue with custom command and custom TTL
+    let issue_custom = store
+        .grant(&GrantOptions {
+            command: "delete".to_owned(),
+            ttl: 120,
+            ..Default::default()
+        })
+        .unwrap();
+    let token_custom = match &issue_custom {
+        GrantOutcome::Issue { success, token } => {
+            assert!(success);
+            token.clone()
+        }
+        other => panic!("expected issue outcome, got {other:?}"),
+    };
+    assert_eq!(store.verify_token("delete", &token_custom), Ok(()));
+
+    // 4. List tokens: returns list of tokens with count
+    let list_res = store
+        .grant(&GrantOptions {
+            list_tokens: true,
+            ..Default::default()
+        })
+        .unwrap();
+    match &list_res {
+        GrantOutcome::List {
+            success,
+            tokens,
+            count,
+        } => {
+            assert!(success);
+            assert_eq!(*count, 2);
+            assert_eq!(tokens.len(), 2);
+        }
+        other => panic!("expected list outcome, got {other:?}"),
+    };
+    let list_json: serde_json::Value = serde_json::to_value(&list_res).unwrap();
+    assert_eq!(list_json["success"], true);
+    assert_eq!(list_json["count"], 2);
+    assert!(list_json["tokens"].is_array());
+
+    // 5. Revoke single token: non-existent token fails with NotFound
+    let revoke_missing = store.grant(&GrantOptions {
+        revoke: Some("missing-token".to_owned()),
+        ..Default::default()
+    });
+    assert_eq!(revoke_missing, Err(ConsentError::NotFound));
+
+    // 6. Revoke single token: existing token succeeds
+    let revoke_existing = store
+        .grant(&GrantOptions {
+            revoke: Some(token_custom.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        revoke_existing,
+        GrantOutcome::RevokeOne {
+            success: true,
+            revoked: 1
+        }
+    );
+    let revoke_json: serde_json::Value = serde_json::to_value(&revoke_existing).unwrap();
+    assert_eq!(revoke_json["success"], true);
+    assert_eq!(revoke_json["revoked"], 1);
+    assert_eq!(
+        store.verify_token("delete", &token_custom),
+        Err(ConsentError::NotFound)
+    );
+
+    // 7. Revoke all active tokens
+    let revoke_all_res = store
+        .grant(&GrantOptions {
+            revoke_all: true,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        revoke_all_res,
+        GrantOutcome::RevokeAll {
+            success: true,
+            revoked: 1,
+            revoke_all: true
+        }
+    );
+    let revoke_all_json: serde_json::Value = serde_json::to_value(&revoke_all_res).unwrap();
+    assert_eq!(revoke_all_json["success"], true);
+    assert_eq!(revoke_all_json["revoked"], 1);
+    assert_eq!(revoke_all_json["revoke_all"], true);
+    assert_eq!(store.list_tokens().unwrap().len(), 0);
+}
+
+#[test]
+fn consent_gate_evaluates_options_and_fails_closed_without_consent() {
+    let denied = consent_gate("delete", &ConsentOptions::default());
+    assert!(matches!(
+        denied,
+        Err(ConsentError::Denied) | Err(ConsentError::Io(_))
+    ));
+
+    let yes_result = consent_gate(
+        "delete",
+        &ConsentOptions {
+            yes: true,
+            ..Default::default()
+        },
+    );
+    assert!(matches!(yes_result, Ok(()) | Err(ConsentError::Io(_))));
+}
+
+#[test]
+fn mcp_non_interactive_gate_fails_closed_and_requires_token_or_yes() {
+    let directory = tempdir().unwrap();
+    let store = fixed_store(directory.path(), 1_000, 7);
+
+    // MCP caller invokes with interactive: false and no consent token/yes
+    let denied_opts = ConsentOptions {
+        interactive: false,
+        ..Default::default()
+    };
+    assert_eq!(
+        store.authorize("delete", &denied_opts),
+        Err(ConsentError::Denied)
+    );
+
+    // Even if interactive: true is set, core gate has no TTY prompting and fails closed
+    let prompt_opts = ConsentOptions {
+        interactive: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        store.authorize("delete", &prompt_opts),
+        Err(ConsentError::Denied)
+    );
+
+    // MCP caller with --yes succeeds without disk lookup
+    let yes_opts = ConsentOptions {
+        yes: true,
+        interactive: false,
+        ..Default::default()
+    };
+    assert_eq!(store.authorize("delete", &yes_opts), Ok(()));
+
+    // Issue a token for "send-removal"
+    let token = store.issue_token("send-removal", 60).unwrap();
+
+    // Wrong command: MCP caller fails closed with CommandMismatch
+    let wrong_cmd_opts = ConsentOptions {
+        consent_token: Some(token.clone()),
+        interactive: false,
+        ..Default::default()
+    };
+    assert_eq!(
+        store.authorize("wipe-all", &wrong_cmd_opts),
+        Err(ConsentError::CommandMismatch)
+    );
+    // Token is NOT consumed on command mismatch
+    assert_eq!(store.verify_token("send-removal", &token), Ok(()));
+
+    // Expired token: MCP caller fails closed with Expired
+    let expired_store = store.clone().with_clock(|| 1_061);
+    let expired_opts = ConsentOptions {
+        consent_token: Some(token.clone()),
+        interactive: false,
+        ..Default::default()
+    };
+    assert_eq!(
+        expired_store.authorize("send-removal", &expired_opts),
+        Err(ConsentError::Expired)
+    );
+    // Expired token was pruned
+    assert_eq!(
+        store.verify_token("send-removal", &token),
+        Err(ConsentError::NotFound)
+    );
+
+    // Fresh token for "delete": MCP caller authorizes and token is consumed (single use)
+    let single_use_token = store.issue_token("delete", 60).unwrap();
+    let valid_opts = ConsentOptions {
+        consent_token: Some(single_use_token.clone()),
+        interactive: false,
+        ..Default::default()
+    };
+    assert_eq!(store.authorize("delete", &valid_opts), Ok(()));
+
+    // Second call with same token fails closed with NotFound (cannot be reused)
+    assert_eq!(
+        store.authorize("delete", &valid_opts),
+        Err(ConsentError::NotFound)
+    );
 }
 
 #[test]

@@ -102,12 +102,81 @@ pub struct ConsentRecord {
 }
 
 /// Public summary returned by [`ConsentStore::list_tokens`].
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConsentToken {
     pub token: String,
     pub command: String,
     pub issued_at: i64,
     pub expires_at: i64,
+}
+
+/// Options for the `grant` operation matching CLI-017 and MCP `grant`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GrantOptions {
+    #[serde(default = "default_grant_command")]
+    pub command: String,
+    #[serde(default = "default_grant_ttl")]
+    pub ttl: i64,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(default)]
+    pub list_tokens: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoke: Option<String>,
+    #[serde(default)]
+    pub revoke_all: bool,
+}
+
+fn default_grant_command() -> String {
+    "execute".to_owned()
+}
+
+const fn default_grant_ttl() -> i64 {
+    DEFAULT_TOKEN_TTL
+}
+
+impl Default for GrantOptions {
+    fn default() -> Self {
+        Self {
+            command: default_grant_command(),
+            ttl: default_grant_ttl(),
+            dry_run: false,
+            list_tokens: false,
+            revoke: None,
+            revoke_all: false,
+        }
+    }
+}
+
+/// Result of a `grant` operation matching CLI-017 and MCP `grant` schema.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GrantOutcome {
+    List {
+        success: bool,
+        tokens: Vec<ConsentToken>,
+        count: usize,
+    },
+    DryRun {
+        success: bool,
+        dry_run: bool,
+        command: String,
+        revoke: String,
+        revoke_all: bool,
+    },
+    RevokeAll {
+        success: bool,
+        revoked: usize,
+        revoke_all: bool,
+    },
+    RevokeOne {
+        success: bool,
+        revoked: usize,
+    },
+    Issue {
+        success: bool,
+        token: String,
+    },
 }
 
 type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
@@ -255,6 +324,18 @@ impl ConsentStore {
         }
     }
 
+    /// Revoke all active tokens, returning the number of tokens removed.
+    pub fn revoke_all(&self) -> Result<usize, ConsentError> {
+        let tokens = self.list_tokens()?;
+        let mut revoked = 0;
+        for token in tokens {
+            if self.revoke_token(&token.token)? {
+                revoked += 1;
+            }
+        }
+        Ok(revoked)
+    }
+
     /// List valid tokens in issued-at order and prune expired records.
     pub fn list_tokens(&self) -> Result<Vec<ConsentToken>, ConsentError> {
         self.ensure_directory()?;
@@ -298,6 +379,61 @@ impl ConsentStore {
         }
         tokens.sort_by_key(|token| token.issued_at);
         Ok(tokens)
+    }
+
+    /// Execute the `grant` operation according to the Go CLI-017 / MCP contract.
+    pub fn grant(&self, options: &GrantOptions) -> Result<GrantOutcome, ConsentError> {
+        if options.list_tokens {
+            let tokens = self.list_tokens()?;
+            let count = tokens.len();
+            return Ok(GrantOutcome::List {
+                success: true,
+                tokens,
+                count,
+            });
+        }
+        let revoke_str = options.revoke.as_deref().unwrap_or("");
+        if options.dry_run {
+            return Ok(GrantOutcome::DryRun {
+                success: true,
+                dry_run: true,
+                command: if options.command.is_empty() {
+                    default_grant_command()
+                } else {
+                    options.command.clone()
+                },
+                revoke: revoke_str.to_owned(),
+                revoke_all: options.revoke_all,
+            });
+        }
+        if options.revoke_all {
+            let revoked = self.revoke_all()?;
+            return Ok(GrantOutcome::RevokeAll {
+                success: true,
+                revoked,
+                revoke_all: true,
+            });
+        }
+        if !revoke_str.is_empty() {
+            let ok = self.revoke_token(revoke_str)?;
+            if !ok {
+                return Err(ConsentError::NotFound);
+            }
+            return Ok(GrantOutcome::RevokeOne {
+                success: true,
+                revoked: 1,
+            });
+        }
+        let command = if options.command.is_empty() {
+            default_grant_command()
+        } else {
+            options.command.clone()
+        };
+        let token = self.issue_token(&command, options.ttl)?;
+        Ok(GrantOutcome::Issue {
+            success: true,
+            token,
+        })
     }
 
     fn ensure_directory(&self) -> io::Result<()> {
