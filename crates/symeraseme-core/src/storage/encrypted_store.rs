@@ -467,7 +467,7 @@ pub fn sync_dir(dir: impl AsRef<Path>) -> io::Result<()> {
     #[cfg(windows)]
     {
         let _ = dir;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(windows))]
