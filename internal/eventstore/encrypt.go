@@ -613,6 +613,19 @@ func cleanupEncryptedTemp(tmpPath string, extraCleanupPaths ...string) error {
 	return nil
 }
 
+// cleanupEncryptedTempWithLock removes a decrypted temp before releasing its
+// lock, then best-effort removes the now-unneeded lock sidecar.
+func cleanupEncryptedTempWithLock(tmpPath string, tempLock *DBLock, extraCleanupPaths ...string) error {
+	if err := cleanupEncryptedTemp(tmpPath, extraCleanupPaths...); err != nil {
+		return err
+	}
+	if tempLock != nil {
+		_ = tempLock.Close()
+		_ = os.Remove(tmpPath + ".lock")
+	}
+	return nil
+}
+
 // --------------------------------------------------------------------
 // At-rest helpers: decrypt-to-temp / encrypt-from-temp
 // --------------------------------------------------------------------
@@ -622,6 +635,7 @@ func cleanupEncryptedTemp(tmpPath string, extraCleanupPaths ...string) error {
 // close the database before reading its temp file.
 type encryptedTempRegistration struct {
 	tmpPath      string
+	tempLock     *DBLock
 	store        *Store
 	cleanupPath  string // optional original path whose WAL siblings also need cleanup
 	recoveryPath string // retained transition artifact cleaned on retry
@@ -637,9 +651,13 @@ func RegisterTemp(origPath, tmpPath string) {
 }
 
 func registerTempForStoreWithCleanup(origPath, tmpPath string, store *Store, cleanupPath string) {
-	encryptedTemps.Store(origPath, encryptedTempRegistration{
-		tmpPath: tmpPath, store: store, cleanupPath: cleanupPath,
-	})
+	reg := encryptedTempRegistration{tmpPath: tmpPath, store: store, cleanupPath: cleanupPath}
+	if value, ok := encryptedTemps.Load(origPath); ok {
+		if prior, ok := tempRegistration(value); ok {
+			reg.tempLock = prior.tempLock
+		}
+	}
+	encryptedTemps.Store(origPath, reg)
 }
 
 func removeTransitionArtifact(path string) error {
@@ -723,7 +741,13 @@ func DecryptToTemp(srcPath, tmpDir string) (string, error) {
 	if err := ensurePrivateFile(tmpPath, 0o600); err != nil {
 		return "", err
 	}
-	RegisterTemp(srcPath, tmpPath)
+	tempLock, err := LockDB(tmpPath, 1)
+	if err != nil {
+		_ = cleanupEncryptedTemp(tmpPath)
+		_ = os.Remove(tmpPath + ".lock")
+		return "", err
+	}
+	encryptedTemps.Store(srcPath, encryptedTempRegistration{tmpPath: tmpPath, tempLock: tempLock})
 	return tmpPath, nil
 }
 
@@ -772,7 +796,7 @@ func WriteEncrypted(origPath string) error {
 		encryptedTemps.Store(origPath, reg)
 		return err
 	}
-	if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
+	if err := cleanupEncryptedTempWithLock(tmpPath, reg.tempLock, reg.cleanupPath); err != nil {
 		// The replacement is valid, but retain the registration and report
 		// cleanup failure so a later finalisation can retry safely.
 		return err
@@ -1153,10 +1177,12 @@ func OpenEncrypted(encPath, tmpDir string) (*Store, error) {
 		// DecryptToTemp registered the plaintext before opening it. If the
 		// SQLite open fails, there is no Store that can own a retry, so clean
 		// the plaintext and its sidecars immediately.
-		encryptedTemps.Delete(encPath)
-		if cleanupErr := cleanupEncryptedTemp(tmpPath); cleanupErr != nil {
+		regValue, _ := encryptedTemps.Load(encPath)
+		reg, _ := tempRegistration(regValue)
+		if cleanupErr := cleanupEncryptedTempWithLock(tmpPath, reg.tempLock); cleanupErr != nil {
 			return fail(errors.Join(err, fmt.Errorf("eventstore: cleanup decrypted temp: %w", cleanupErr)))
 		}
+		encryptedTemps.Delete(encPath)
 		return fail(err)
 	}
 	// Callers see the canonical path, but all SQLite I/O is on tmpPath.
@@ -1282,7 +1308,7 @@ func (s *Store) closeAtLocked(encPath string) error {
 		return err
 	}
 	if tmpPath != encPath {
-		if err := cleanupEncryptedTemp(tmpPath, reg.cleanupPath); err != nil {
+		if err := cleanupEncryptedTempWithLock(tmpPath, reg.tempLock, reg.cleanupPath); err != nil {
 			encryptedTemps.Store(encPath, reg)
 			return err
 		}

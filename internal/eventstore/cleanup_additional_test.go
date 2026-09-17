@@ -44,6 +44,58 @@ func TestScavengeStaleTempsRemovesOnlyOldDatabaseArtifacts(t *testing.T) {
 	}
 }
 
+func TestScavengeStaleTempsSkipsLockedDecryptedTemp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_active.db")
+	if err := os.WriteFile(path, []byte("active"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := LockDB(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("locked stale temp was scavenged: %v", err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("unlocked stale temp remains: %v", err)
+	}
+	if _, err := os.Stat(path + ".lock"); !os.IsNotExist(err) {
+		t.Fatalf("temp lock sidecar remains after scavenging: %v", err)
+	}
+}
+
+func TestScavengeStaleTempsDoesNotScavengeLockSidecars(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_orphan.db.lock")
+	if err := os.WriteFile(path, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("lock sidecar was scavenged: %v", err)
+	}
+}
+
 func TestRemoveWALSiblingsAndLockDB(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "db")
