@@ -67,6 +67,12 @@ impl ConsentStore {
     }
 }
 
+/// Evaluate the destructive-operation consent gate against the platform-default consent directory.
+pub fn consent_gate(command: &str, options: &ConsentOptions) -> Result<(), ConsentError> {
+    let store = ConsentStore::from_default_directory()?;
+    store.authorize(command, options)
+}
+
 /// Read one token from a consent file, using the first non-empty line.
 pub fn read_consent_file(path: impl AsRef<Path>) -> io::Result<String> {
     let path = path.as_ref();
