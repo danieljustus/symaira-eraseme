@@ -47,7 +47,7 @@ hex = "0.4.3"
 rand = "0.9.5"
 scrypt = "0.12.0"
 zeroize = "1.8.2"
-keyring = "3.6.3"
+keyring = "4.2.0"
 
 [profile.release]
 opt-level = 3
