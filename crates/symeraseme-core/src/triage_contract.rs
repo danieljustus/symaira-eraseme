@@ -300,7 +300,7 @@ fn sorted_fields(fields: &Map<String, Value>) -> BTreeMap<String, Value> {
 
 /// Match Go's `utf8.DecodeRuneInString` behavior used by `encoding/json`:
 /// preserve valid spans and consume exactly one byte for each decode error.
-fn go_json_lossy(bytes: &[u8]) -> String {
+pub(crate) fn go_json_lossy(bytes: &[u8]) -> String {
     let mut output = String::with_capacity(bytes.len());
     let mut offset = 0;
     while offset < bytes.len() {
