@@ -2,6 +2,7 @@ package eventstore
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -100,6 +101,43 @@ func TestScavengeStaleTempsDoesNotScavengeLockSidecars(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("lock sidecar was scavenged: %v", err)
+	}
+}
+
+func TestScavengeStaleTempsRetainsTempWhenSiblingCleanupFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "symeraseme_decrypted_retry.db")
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.WriteFile(candidate, []byte("stale"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-StaleScavengeAge - time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	cleanupErr := errors.New("sibling cleanup failure")
+	oldRemoveWAL := removeWALSiblingsFn
+	removeWALSiblingsFn = func(string) error { return cleanupErr }
+	t.Cleanup(func() { removeWALSiblingsFn = oldRemoveWAL })
+
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm", path + ".lock"} {
+		if _, err := os.Stat(candidate); err != nil {
+			t.Fatalf("artifact %s was not retained after cleanup failure: %v", candidate, err)
+		}
+	}
+
+	removeWALSiblingsFn = RemoveWALSiblings
+	if err := ScavengeStaleTemps(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm", path + ".lock"} {
+		if _, err := os.Stat(candidate); !os.IsNotExist(err) {
+			t.Fatalf("artifact %s remains after retry: %v", candidate, err)
+		}
 	}
 }
 

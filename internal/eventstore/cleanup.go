@@ -66,13 +66,18 @@ func ScavengeStaleTemps(tmpDir string) error {
 				continue
 			}
 		}
+		// Remove SQLite sidecars first. If either removal fails, retain the
+		// main temp and its lock sidecar so the next scan can retry safely.
+		if err := removeWALSiblingsFn(full); err != nil {
+			if tempLock != nil {
+				_ = tempLock.Close()
+			}
+			continue
+		}
 		removeLockSidecar := false
 		if err := os.Remove(full); err == nil || errors.Is(err, os.ErrNotExist) {
 			removeLockSidecar = tempLock != nil
 		}
-		// WAL siblings use the temp-file's suffix (.db) → .db-wal etc.
-		_ = os.Remove(full + "-wal")
-		_ = os.Remove(full + "-shm")
 		if tempLock != nil {
 			_ = tempLock.Close()
 			if removeLockSidecar {
