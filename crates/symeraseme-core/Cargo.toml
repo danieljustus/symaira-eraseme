@@ -27,6 +27,7 @@ hmac.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+symaira-core-sqlite.workspace = true
 symaira-core-version.workspace = true
 tar.workspace = true
 tempfile.workspace = true
@@ -45,7 +46,7 @@ keyring.workspace = true
 rusqlite.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.31.3", default-features = false }
+nix = { version = "=0.30.1", default-features = false }
 
 [build-dependencies]
 cap-fs-ext.workspace = true

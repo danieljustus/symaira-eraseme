@@ -4,6 +4,8 @@
 //! V3 uses HKDF-SHA256 followed by the same standard Fernet token.
 
 use aes::Aes128;
+use aes_gcm::aead::Aead;
+use aes_gcm::{Aes256Gcm, KeyInit as AesGcmKeyInit, Nonce};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
 use cbc::Decryptor;
@@ -44,12 +46,14 @@ pub enum EncryptionError {
     InvalidMasterKeyLength { actual: usize },
     UnsupportedEnvelope,
     TruncatedSalt,
+    TruncatedEnvelope { version: u8 },
     TruncatedToken,
     InvalidBase64,
     UnsupportedFernetVersion(u8),
     AuthenticationFailed,
     InvalidCiphertextLength,
     InvalidPadding,
+    LegacyTokenInvalid,
     RandomnessUnavailable,
     ClockUnavailable,
 }
@@ -60,9 +64,14 @@ impl fmt::Display for EncryptionError {
             Self::InvalidMasterKeyLength { actual } => {
                 write!(f, "master key must be 32 bytes (got {actual})")
             }
-            Self::UnsupportedEnvelope => f.write_str("unsupported encryption envelope"),
+            Self::UnsupportedEnvelope => f.write_str("eventstore: unrecognized encryption header"),
             Self::TruncatedSalt => f.write_str("truncated V2/V3 encryption salt"),
-            Self::TruncatedToken => f.write_str("truncated Fernet token"),
+            Self::TruncatedEnvelope { version } => {
+                write!(f, "eventstore: encrypted V{version} envelope is truncated")
+            }
+            Self::TruncatedToken => {
+                f.write_str("eventstore: fernet token invalid, tampered, or unsupported format")
+            }
             Self::InvalidBase64 => f.write_str("invalid URL-safe base64 Fernet token"),
             Self::UnsupportedFernetVersion(version) => {
                 write!(f, "unsupported Fernet version 0x{version:02x}")
@@ -70,6 +79,9 @@ impl fmt::Display for EncryptionError {
             Self::AuthenticationFailed => f.write_str("Fernet authentication failed"),
             Self::InvalidCiphertextLength => f.write_str("invalid Fernet ciphertext block length"),
             Self::InvalidPadding => f.write_str("invalid Fernet PKCS7 padding"),
+            Self::LegacyTokenInvalid => {
+                f.write_str("eventstore: fernet token invalid, tampered, or unsupported format")
+            }
             Self::RandomnessUnavailable => f.write_str("OS randomness unavailable"),
             Self::ClockUnavailable => f.write_str("system clock unavailable"),
         }
@@ -88,7 +100,7 @@ pub fn decrypt_v1(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     }
     let mut key = [0_u8; FERNET_KEY_LEN];
     pbkdf2_hmac::<Sha256>(master_key, V1_FIXED_SALT, PBKDF2_ITERATIONS, &mut key);
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_fernet_compatible(token, &key);
     key.zeroize();
     result
 }
@@ -108,7 +120,9 @@ fn decrypt_pbkdf2_envelope(
     validate_master_key(master_key)?;
     let token_start = header.len() + V2_SALT_LEN;
     if envelope.len() < token_start {
-        return Err(EncryptionError::TruncatedSalt);
+        return Err(EncryptionError::TruncatedEnvelope {
+            version: if header == V2_HEADER { 2 } else { 3 },
+        });
     }
     let token = &envelope[token_start..];
     if token.is_empty() {
@@ -121,7 +135,7 @@ fn decrypt_pbkdf2_envelope(
         PBKDF2_ITERATIONS,
         &mut key,
     );
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_fernet_compatible(token, &key);
     key.zeroize();
     result
 }
@@ -234,9 +248,13 @@ fn decrypt_standard_fernet(
     token: &[u8],
     key: &[u8; FERNET_KEY_LEN],
 ) -> Result<Vec<u8>, EncryptionError> {
-    let frame = URL_SAFE
-        .decode(token)
-        .map_err(|_| EncryptionError::InvalidBase64)?;
+    let frame = match URL_SAFE.decode(token) {
+        Ok(frame) => frame,
+        Err(_) if token.len() >= FERNET_MIN_FRAME_LEN && token[0] == FERNET_VERSION => {
+            token.to_vec()
+        }
+        Err(_) => return Err(EncryptionError::InvalidBase64),
+    };
     if frame.len() < FERNET_MIN_FRAME_LEN {
         return Err(EncryptionError::TruncatedToken);
     }
@@ -262,6 +280,85 @@ fn decrypt_standard_fernet(
     Ok(plaintext.to_vec())
 }
 
+const LEGACY_GO_NONCE_LEN: usize = 12;
+const LEGACY_GO_GCM_TAG_LEN: usize = 16;
+const LEGACY_GO_MIN_FRAME_LEN: usize =
+    1 + 8 + LEGACY_GO_NONCE_LEN + LEGACY_GO_GCM_TAG_LEN + FERNET_MAC_LEN;
+
+fn decrypt_fernet_compatible(
+    token: &[u8],
+    key: &[u8; FERNET_KEY_LEN],
+) -> Result<Vec<u8>, EncryptionError> {
+    // Match Go's compatibility order: standard Fernet first, including a raw
+    // binary standard frame, then the accidental raw Go AES-GCM format. This
+    // ordering is required because both raw formats begin with 0x80.
+    match decrypt_standard_fernet(token, key) {
+        Ok(plaintext) => Ok(plaintext),
+        Err(_)
+            if token.len() >= LEGACY_GO_MIN_FRAME_LEN && token.first() == Some(&FERNET_VERSION) =>
+        {
+            match decrypt_legacy_go_token(token, key) {
+                Ok(plaintext) => Ok(plaintext),
+                Err(_) => Err(EncryptionError::LegacyTokenInvalid),
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+
+/// Decrypts the accidental Go AES-256-GCM token format.
+///
+/// The Go implementation emitted a raw binary frame rather than a base64
+/// Fernet token: version (0x80), timestamp, 12-byte nonce, GCM ciphertext
+/// including its 16-byte tag, and an outer HMAC-SHA256 over the preceding
+/// bytes. Authentication is checked before attempting GCM decryption.
+fn decrypt_legacy_go_token(
+    token: &[u8],
+    key: &[u8; FERNET_KEY_LEN],
+) -> Result<Vec<u8>, EncryptionError> {
+    if token.len() < LEGACY_GO_MIN_FRAME_LEN {
+        return Err(EncryptionError::TruncatedToken);
+    }
+    if token[0] != FERNET_VERSION {
+        return Err(EncryptionError::UnsupportedFernetVersion(token[0]));
+    }
+
+    let mac_offset = token.len() - FERNET_MAC_LEN;
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(key)
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+    mac.update(&token[..mac_offset]);
+    mac.verify_slice(&token[mac_offset..])
+        .map_err(|_| EncryptionError::AuthenticationFailed)?;
+
+    let nonce = Nonce::try_from(&token[9..9 + LEGACY_GO_NONCE_LEN])
+        .map_err(|_| EncryptionError::InvalidCiphertextLength)?;
+    let ciphertext = &token[9 + LEGACY_GO_NONCE_LEN..mac_offset];
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|_| EncryptionError::AuthenticationFailed)?;
+    cipher
+        .decrypt(&nonce, ciphertext)
+        .map_err(|_| EncryptionError::AuthenticationFailed)
+}
+
+/// Reports whether raw is a known envelope containing the accidental raw Go
+/// AES-GCM frame. This is structural detection only; decryption still verifies
+/// the outer HMAC and GCM tag.
+pub fn is_legacy_go_envelope(raw: &[u8]) -> bool {
+    let token_offset = if raw.starts_with(V1_HEADER) {
+        V1_HEADER.len()
+    } else if raw.starts_with(V2_HEADER) || raw.starts_with(V3_HEADER) {
+        let header_len = if raw.starts_with(V2_HEADER) {
+            V2_HEADER.len()
+        } else {
+            V3_HEADER.len()
+        };
+        header_len + V2_SALT_LEN
+    } else {
+        return false;
+    };
+    raw.len() >= token_offset + LEGACY_GO_MIN_FRAME_LEN && raw[token_offset] == FERNET_VERSION
+}
+
 pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     if !envelope.starts_with(V3_HEADER) {
         return Err(EncryptionError::UnsupportedEnvelope);
@@ -269,14 +366,14 @@ pub fn decrypt_v3(envelope: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encrypt
     validate_master_key(master_key)?;
     let token_start = V3_HEADER.len() + V3_SALT_LEN;
     if envelope.len() < token_start {
-        return Err(EncryptionError::TruncatedSalt);
+        return Err(EncryptionError::TruncatedEnvelope { version: 3 });
     }
     let token = &envelope[token_start..];
     if token.is_empty() {
         return Err(EncryptionError::TruncatedToken);
     }
     let mut key = derive_v3_key(master_key, &envelope[V3_HEADER.len()..token_start])?;
-    let result = decrypt_standard_fernet(token, &key);
+    let result = decrypt_fernet_compatible(token, &key);
     key.zeroize();
     result
 }
