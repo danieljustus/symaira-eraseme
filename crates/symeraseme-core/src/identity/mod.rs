@@ -14,7 +14,9 @@ pub use consent::{
 pub use gate::{ConsentOptions, read_consent_file};
 pub use keyring::{FakeKeyring, KeyringBackend, KeyringError, OsKeyring, SERVICE_NAME, USERNAME};
 pub use profile::{
-    Profile, ProfileAddress, ProfileError, ProfilePaths, load_profile, profile_exists,
+    Envelope, Profile, ProfileAddress, ProfileError, ProfilePaths, canonical_generic_json,
+    canonical_json, decrypt_profile_with_key, encrypt_profile, hash_profile, load_profile,
+    profile_exists,
 };
 pub use resolve::{
     ENV_PREFIX, KEYCHAIN_PREFIX, OsSecretBackend, SYMVAULT_PREFIX, SecretBackend,
