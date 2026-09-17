@@ -4,7 +4,7 @@
 //! encryption format. The caller supplies paths and an existing-key resolver;
 //! loading never initializes a key, creates directories, or rewrites a profile.
 
-use super::{KeyringBackend, MasterKeyError, MasterKeyResolver};
+use super::{KeyringBackend, MasterKey, MasterKeyError, MasterKeyResolver};
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use serde::de::{IgnoredAny, MapAccess, Visitor};
@@ -140,11 +140,11 @@ go_record!(ProfileAddress {
     valid_to: optional,
 });
 
-#[derive(Default)]
-struct Envelope {
-    version: i64,
-    nonce: String,
-    algorithm: String,
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct Envelope {
+    pub version: i64,
+    pub nonce: String,
+    pub algorithm: String,
 }
 go_record!(Envelope {
     version: integer,
@@ -845,6 +845,8 @@ pub enum ProfileError {
     NotFound,
     Stat,
     Read,
+    Write,
+    Mkdir,
     NoSeparator,
     Header,
     LegacyV0,
@@ -860,6 +862,8 @@ impl fmt::Display for ProfileError {
             Self::NotFound => "identity: profile not found",
             Self::Stat => "identity: stat profile failed",
             Self::Read => "identity: read profile failed",
+            Self::Write => "identity: write profile failed",
+            Self::Mkdir => "identity: mkdir failed",
             Self::NoSeparator => "identity: profile corrupt: no header separator",
             Self::Header => "identity: profile corrupt: header",
             Self::LegacyV0 => "identity: legacy v0 profile (no AAD) is no longer supported",
@@ -956,11 +960,344 @@ impl ProfilePaths {
         }
         target
     }
+
+    /// Resolve path for profile write operations.
+    pub fn resolve_write(&self, path: &Path) -> PathBuf {
+        if !path.as_os_str().is_empty() {
+            self.expand(path)
+        } else if let Some(value) = self.value("SYMERASEME_IDENTITY_PATH") {
+            self.expand(Path::new(value))
+        } else {
+            let directory = self.value("SYMERASEME_DATA_DIR").unwrap_or("~/.symeraseme");
+            self.expand(Path::new(directory)).join("identity.encrypted")
+        }
+    }
 }
 
 /// Go-compatible existence probe (directories also exist); does not resolve keys.
 pub fn profile_exists(path: &Path, paths: &ProfilePaths) -> bool {
     std::fs::metadata(paths.resolve(path)).is_ok()
+}
+
+/// Authenticate and decrypt a raw profile envelope with an existing key.
+pub fn decrypt_profile_with_key(
+    raw: &[u8],
+    key: &[u8],
+) -> Result<(Vec<u8>, Envelope), ProfileError> {
+    if key.len() != 32 {
+        return Err(ProfileError::Key(MasterKeyError::InvalidLength {
+            source: "master key",
+            actual: key.len(),
+        }));
+    }
+    let separator = raw
+        .iter()
+        .position(|&v| v == b'\n')
+        .ok_or(ProfileError::NoSeparator)?;
+    let header_bytes = &raw[..separator];
+    let header: Envelope =
+        serde_json::from_slice(header_bytes).map_err(|_| ProfileError::Header)?;
+    if header.version == 0 {
+        return Err(ProfileError::LegacyV0);
+    }
+    let nonce = hex::decode(&header.nonce).map_err(|_| ProfileError::Nonce)?;
+    let nonce: [u8; 12] = nonce.try_into().map_err(|_| ProfileError::Nonce)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| ProfileError::Authentication)?;
+    let plain = cipher
+        .decrypt(
+            &Nonce::from(nonce),
+            Payload {
+                msg: &raw[separator + 1..],
+                aad: header_bytes,
+            },
+        )
+        .map_err(|_| ProfileError::Authentication)?;
+    Ok((plain, header))
+}
+
+/// Encrypt plaintext into a version 2 AES-256-GCM envelope with an explicit 12-byte nonce.
+pub fn encrypt_profile_with_nonce(
+    plaintext: &[u8],
+    key: &[u8],
+    nonce: &[u8; 12],
+) -> Result<Vec<u8>, ProfileError> {
+    if key.len() != 32 {
+        return Err(ProfileError::Key(MasterKeyError::InvalidLength {
+            source: "master key",
+            actual: key.len(),
+        }));
+    }
+    let header = Envelope {
+        version: 2,
+        nonce: hex::encode(nonce),
+        algorithm: "AES-256-GCM".to_string(),
+    };
+    let header_bytes = serde_json::to_vec(&header).map_err(|_| ProfileError::Header)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| ProfileError::Authentication)?;
+    let ciphertext = cipher
+        .encrypt(
+            &Nonce::from(*nonce),
+            Payload {
+                msg: plaintext,
+                aad: &header_bytes,
+            },
+        )
+        .map_err(|_| ProfileError::Authentication)?;
+    let mut out = Vec::with_capacity(header_bytes.len() + 1 + ciphertext.len());
+    out.extend_from_slice(&header_bytes);
+    out.push(b'\n');
+    out.extend_from_slice(&ciphertext);
+    Ok(out)
+}
+
+/// Encrypt plaintext into a version 2 AES-256-GCM envelope using OS CSPRNG.
+pub fn encrypt_profile(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, ProfileError> {
+    use rand::RngCore;
+    let mut nonce = [0_u8; 12];
+    rand::rng().fill_bytes(&mut nonce);
+    encrypt_profile_with_nonce(plaintext, key, &nonce)
+}
+
+fn write_python_escaped_string(out: &mut String, s: &str) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\x08' => out.push_str("\\b"),
+            '\x0c' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => {
+                let u = c as u32;
+                if u < 0x20 || u == 0x7f {
+                    use std::fmt::Write;
+                    write!(out, "\\u{u:04x}").unwrap();
+                } else if u < 0x80 {
+                    out.push(c);
+                } else if u <= 0xffff {
+                    use std::fmt::Write;
+                    write!(out, "\\u{u:04x}").unwrap();
+                } else {
+                    let u = u - 0x10000;
+                    let hi = 0xd800 + (u >> 10);
+                    let lo = 0xdc00 + (u & 0x3ff);
+                    use std::fmt::Write;
+                    write!(out, "\\u{hi:04x}\\u{lo:04x}").unwrap();
+                }
+            }
+        }
+    }
+    out.push('"');
+}
+
+fn write_python_canonical(out: &mut String, val: &serde_json::Value) {
+    match val {
+        serde_json::Value::Null => out.push_str("null"),
+        serde_json::Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                use std::fmt::Write;
+                write!(out, "{i}").unwrap();
+            } else if let Some(u) = n.as_u64() {
+                use std::fmt::Write;
+                write!(out, "{u}").unwrap();
+            } else if let Some(f) = n.as_f64() {
+                if f.trunc() == f && !f.is_nan() && !f.is_infinite() {
+                    use std::fmt::Write;
+                    write!(out, "{}", f as i64).unwrap();
+                } else {
+                    use std::fmt::Write;
+                    write!(out, "{f}").unwrap();
+                }
+            }
+        }
+        serde_json::Value::String(s) => write_python_escaped_string(out, s),
+        serde_json::Value::Array(arr) => {
+            out.push('[');
+            for (i, elem) in arr.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                write_python_canonical(out, elem);
+            }
+            out.push(']');
+        }
+        serde_json::Value::Object(map) => {
+            out.push('{');
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            for (i, k) in keys.into_iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                write_python_escaped_string(out, k);
+                out.push_str(": ");
+                write_python_canonical(out, &map[k]);
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// Helper struct for serializing a profile with normalized collections.
+#[derive(Serialize)]
+struct ProfilePayload<'a> {
+    full_name: &'a str,
+    name_variants: &'a [String],
+    date_of_birth: &'a Option<String>,
+    addresses: &'a [ProfileAddress],
+    email_addresses: &'a [String],
+    phone_numbers: &'a [String],
+    jurisdictions: &'a [String],
+}
+
+/// Serializes arbitrary JSON data into canonical Python JSON representation.
+pub fn canonical_generic_json(value: &serde_json::Value) -> String {
+    let mut out = String::new();
+    write_python_canonical(&mut out, value);
+    out
+}
+
+/// Renders a Profile as a canonical JSON string with sorted keys matching Python and Go.
+pub fn canonical_json(profile: &Profile) -> String {
+    let payload = ProfilePayload {
+        full_name: &profile.full_name,
+        name_variants: &profile.name_variants,
+        date_of_birth: &profile.date_of_birth,
+        addresses: &profile.addresses,
+        email_addresses: &profile.email_addresses,
+        phone_numbers: &profile.phone_numbers,
+        jurisdictions: &profile.jurisdictions,
+    };
+    let value = serde_json::to_value(&payload).unwrap_or(serde_json::Value::Null);
+    canonical_generic_json(&value)
+}
+
+/// Returns deterministic SHA-256 hex digest of the canonical profile JSON.
+pub fn hash_profile(profile: &Profile) -> String {
+    use sha2::{Digest, Sha256};
+    let canon = canonical_json(profile);
+    let digest = Sha256::digest(canon.as_bytes());
+    hex::encode(digest)
+}
+
+/// Save a profile to disk with atomic temp-file, 0600 mode, and directory fsync.
+pub fn save_profile(
+    profile: &Profile,
+    path: &Path,
+    paths: &ProfilePaths,
+    key: &MasterKey,
+) -> Result<PathBuf, ProfileError> {
+    let target = paths.resolve_write(path);
+    let target = if target.is_relative() {
+        std::env::current_dir()
+            .map_err(|_| ProfileError::Write)?
+            .join(target)
+    } else {
+        target
+    };
+    let dir = target.parent().ok_or(ProfileError::Write)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true);
+        builder.mode(0o700);
+        builder.create(dir).map_err(|_| ProfileError::Mkdir)?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(dir).map_err(|_| ProfileError::Mkdir)?;
+    }
+
+    let payload = ProfilePayload {
+        full_name: &profile.full_name,
+        name_variants: &profile.name_variants,
+        date_of_birth: &profile.date_of_birth,
+        addresses: &profile.addresses,
+        email_addresses: &profile.email_addresses,
+        phone_numbers: &profile.phone_numbers,
+        jurisdictions: &profile.jurisdictions,
+    };
+    let plaintext = serde_json::to_vec_pretty(&payload).map_err(|_| ProfileError::Write)?;
+    let encrypted = encrypt_profile(&plaintext, key.as_bytes())?;
+
+    let file_name = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("identity.encrypted");
+    let random_suffix: u64 = rand::random();
+    let temp_name = format!(".{file_name}.tmp-{random_suffix:x}");
+    let temp_path = dir.join(temp_name);
+
+    struct TempCleanup<'a>(&'a Path, bool);
+    impl<'a> Drop for TempCleanup<'a> {
+        fn drop(&mut self) {
+            if !self.1 {
+                let _ = std::fs::remove_file(self.0);
+            }
+        }
+    }
+    let mut cleanup = TempCleanup(&temp_path, false);
+
+    {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut temp_file = options.open(&temp_path).map_err(|_| ProfileError::Write)?;
+        use std::io::Write;
+        temp_file
+            .write_all(&encrypted)
+            .map_err(|_| ProfileError::Write)?;
+        temp_file.sync_all().map_err(|_| ProfileError::Write)?;
+    }
+
+    std::fs::rename(&temp_path, &target).map_err(|_| ProfileError::Write)?;
+    cleanup.1 = true;
+
+    #[cfg(unix)]
+    {
+        if let Ok(d) = std::fs::File::open(dir) {
+            let _ = d.sync_all();
+        }
+    }
+
+    Ok(target)
+}
+
+/// Delete a profile from disk if it exists.
+pub fn delete_profile(path: &Path, paths: &ProfilePaths) -> Result<(), ProfileError> {
+    let target = paths.resolve(path);
+    match std::fs::remove_file(&target) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(ProfileError::NotFound),
+        Err(_) => Err(ProfileError::Read),
+    }
+}
+
+/// Explicitly initialize master key if needed and save the identity profile.
+pub fn init_profile<K: KeyringBackend>(
+    profile: &Profile,
+    path: &Path,
+    paths: &ProfilePaths,
+    keys: &mut MasterKeyResolver<K>,
+) -> Result<PathBuf, ProfileError> {
+    let key = match keys.resolve_existing() {
+        Ok(k) => k,
+        Err(_) => {
+            let fresh = super::secrets::generate_master_key();
+            keys.set_cached(fresh.clone());
+            fresh
+        }
+    };
+    save_profile(profile, path, paths, &key)
 }
 
 /// Read and authenticate a profile with existing key sources only.
@@ -1010,23 +1347,8 @@ pub fn load_profile<K: KeyringBackend>(
     if header.version == 0 {
         return Err(ProfileError::LegacyV0);
     }
-    // Go intentionally does not dispatch on algorithm or reject nonzero
-    // versions: the original header bytes are authenticated without rewriting.
     let key = keys.resolve_existing().map_err(ProfileError::Key)?;
-    let nonce = hex::decode(header.nonce).map_err(|_| ProfileError::Nonce)?;
-    let nonce: [u8; 12] = nonce.try_into().map_err(|_| ProfileError::Nonce)?;
-    let cipher =
-        Aes256Gcm::new_from_slice(key.as_bytes()).map_err(|_| ProfileError::Authentication)?;
-    let plain = Zeroizing::new(
-        cipher
-            .decrypt(
-                &Nonce::from(nonce),
-                Payload {
-                    msg: &raw[separator + 1..],
-                    aad: header_bytes,
-                },
-            )
-            .map_err(|_| ProfileError::Authentication)?,
-    );
+    let (plain, _header) = decrypt_profile_with_key(&raw, key.as_bytes())?;
+    let plain = Zeroizing::new(plain);
     decode_go_profile_json(&plain).map_err(|_| ProfileError::Json)
 }

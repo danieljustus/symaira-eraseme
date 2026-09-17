@@ -52,6 +52,8 @@ fn classify(error: &ProfileError) -> &'static str {
         ProfileError::Nonce => "nonce",
         ProfileError::Authentication => "authentication",
         ProfileError::Json => "json",
+        ProfileError::Write => "write",
+        ProfileError::Mkdir => "mkdir",
     }
 }
 
