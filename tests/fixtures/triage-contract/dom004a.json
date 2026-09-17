@@ -1,0 +1,102 @@
+{
+  "schema": "dom004a-triage-contract-v1",
+  "oracle_revision": "f88a495044b6bb6eb23cd4610302b0f673068110",
+  "source_sha256": {
+    "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
+    "internal/triage/rebuttal.go": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+  },
+  "classification_cases": [
+    {
+      "name": "confirmed_clamp_and_fields",
+      "response": "```json\n{\"classification\":\" confirmed \",\"confidence\":1.5,\"summary\":\"done\",\"extracted_fields\":{\"case\":\"42\"}}\n```",
+      "classification": "confirmed",
+      "event_type": "CONFIRMED",
+      "confidence": 1.0,
+      "needs_human_review": false,
+      "summary": "done",
+      "extracted_fields": {"case": "42"}
+    },
+    {
+      "name": "malformed_defaults",
+      "response": "not json",
+      "classification": "unclear",
+      "event_type": "HUMAN_ACTION_REQUIRED",
+      "confidence": 0.0,
+      "needs_human_review": true,
+      "summary": "Failed to parse classifier response",
+      "extracted_fields": {}
+    },
+    {
+      "name": "utf8_two_byte_split",
+      "ascii_prefix_repetitions": 199,
+      "suffix": "é",
+      "cut_bytes": 200,
+      "raw_summary_bytes": 200,
+      "wire_summary_bytes": 202,
+      "raw_summary_tail_hex": "61616161616161c3",
+      "wire_summary_tail": "aaa�"
+    },
+    {
+      "name": "utf8_three_byte_split",
+      "ascii_prefix_repetitions": 198,
+      "suffix": "€",
+      "cut_bytes": 200,
+      "raw_summary_bytes": 200,
+      "wire_summary_bytes": 204,
+      "raw_summary_tail_hex": "616161616161e282",
+      "wire_summary_tail": "aa��"
+    }
+  ],
+  "valid_utf8_cases": [
+    {
+      "name": "exact_100_e_2byte",
+      "unit": "é",
+      "repetitions": 100,
+      "suffix": "",
+      "summary_bytes": 200,
+      "summary_tail": "éé"
+    },
+    {
+      "name": "exact_99_e_plus_ascii",
+      "unit": "é",
+      "repetitions": 99,
+      "suffix": "aa",
+      "summary_bytes": 200,
+      "summary_tail": "éaa"
+    }
+  ],
+  "rejection_cases": [
+    {
+      "name": "ccpa_classification_and_string_points",
+      "response": "```json\n{\"classification\":\" CCPA_IDENTITY_CHALLENGED \",\"confidence\":0.91,\"jurisdiction\":\"CCPA\",\"summary\":\"verify\",\"key_points\":[\"ID\",4]}\n```",
+      "classification": "ccpa_identity_challenged",
+      "confidence": 0.91,
+      "jurisdiction": "CCPA",
+      "summary": "verify",
+      "key_points": ["ID"]
+    },
+    {
+      "name": "malformed_rejection_defaults",
+      "response": "invalid",
+      "classification": "other",
+      "confidence": 0.0,
+      "jurisdiction": "unknown",
+      "summary": "Failed to parse classifier response",
+      "key_points": null
+    }
+  ],
+  "key_points_cases": [
+    {"name": "missing", "response": "{\"classification\":\"other\"}", "expected": null},
+    {"name": "null", "response": "{\"classification\":\"other\",\"key_points\":null}", "expected": null},
+    {"name": "empty", "response": "{\"classification\":\"other\",\"key_points\":[]}", "expected": null},
+    {"name": "all_nonstring", "response": "{\"classification\":\"other\",\"key_points\":[1,true,null]}", "expected": null},
+    {"name": "mixed", "response": "{\"classification\":\"other\",\"key_points\":[1,\"one\",true]}", "expected": ["one"]}
+  ],
+  "fallback_cases": [
+    {"message": "The old address is wrong", "expected": "address_mismatch"},
+    {"message": "Please verify your identity", "expected": "identity_challenged"},
+    {"message": "Our CCPA team needs California identity verification", "expected": "identity_challenged"},
+    {"message": "California CCPA request", "expected": "ccpa_identity_challenged"},
+    {"message": "No matching reason", "expected": ""}
+  ]
+}

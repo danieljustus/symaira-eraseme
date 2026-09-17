@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -212,13 +213,15 @@ impl Drop for Cleanup {
 }
 
 fn unique_root() -> PathBuf {
+    static ROOT_COUNTER: AtomicU64 = AtomicU64::new(0);
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock after epoch")
         .as_nanos();
+    let sequence = ROOT_COUNTER.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!(
-        "symeraseme-cli-surface-{}-{nonce}",
-        std::process::id()
+        "symeraseme-cli-surface-{}-{nonce}-{sequence}",
+        std::process::id(),
     ))
 }
 
