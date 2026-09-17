@@ -125,7 +125,8 @@ mod tests {
             None
         );
         assert_eq!(super::absolute_path(Some(PathBuf::new())), None);
-        let absolute = PathBuf::from("/user/cache");
+        let temp = tempdir().unwrap();
+        let absolute = temp.path().join("user").join("cache");
         assert_eq!(super::absolute_path(Some(absolute.clone())), Some(absolute));
     }
 
@@ -133,7 +134,9 @@ mod tests {
     fn default_temp_root_rejects_empty_or_relative_fallbacks() {
         assert!(super::checked_temp_root(PathBuf::new()).is_err());
         assert!(super::checked_temp_root(PathBuf::from("relative-cache")).is_err());
-        assert!(super::checked_temp_root(PathBuf::from("/absolute-cache")).is_ok());
+        let temp = tempdir().unwrap();
+        let absolute = temp.path().join("absolute-cache");
+        assert!(super::checked_temp_root(absolute).is_ok());
     }
 
     #[test]
