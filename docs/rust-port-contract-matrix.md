@@ -133,9 +133,9 @@ SQLite, network transcript or process behavior.
 | CRY-006 | crypto | standard-Fernet and any distinctly-versioned Go compatibility parser reject truncation/tamper/wrong keys | mutation corpus | `crates/symeraseme-core/tests/encryption_parity.rs::cry006_table_consumes_every_pinned_go_oracle_case` plus source-provenance negative control | semantic | all | PASS (local; native CI pending) |
 | CRY-007 | crypto | decrypted temp dir/file modes and cleanup | isolated TMPDIR | `crates/symeraseme-core/tests/storage_encrypted_lifecycle.rs` (0700 dir, 0600 file, stale scavenging, locking) | side-effect | native OS | PASS (local; native CI pending) |
 | CRY-008 | crypto | WAL checkpoint before re-encryption | write/close/crash corpus | `crates/symeraseme-core/tests/storage_encrypted_lifecycle.rs` (wal_checkpoint truncate, atomic recovery) | side-effect | all | PASS (local; native CI pending) |
-| ID-001 | identity | encrypted profile Go→Rust→Go | deterministic vector | bidirectional harness | byte/semantic | all | TODO |
+| ID-001 | identity | encrypted profile Go→Rust→Go | deterministic vector | `crates/symeraseme-core/tests/identity_interop.rs` | byte/semantic | all | PASS (local; native CI pending) |
 | ID-000 | identity | Python/Go profile path, serialized fields, hash bytes, and decrypt-only key lookup are frozen | Python fixture; issue #816 | identity interoperability/regression tests | byte/side-effect | all | PASS |
-| ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | adapter tests | semantic | native OS | TODO |
+| ID-002 | identity | master-key resolution order and aliases | fake env/keyring/symvault | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | semantic | native OS | PASS (local; native CI pending) |
 | ID-003 | identity | no secrets in errors/logs | sentinel secrets | `crates/symeraseme-core/tests/identity_secret_resolution.rs` | byte | all | PASS (local; native CI pending) |
 | ID-004 | consent | token filename/hash/content/expiry/command | fixed clock/RNG | `crates/symeraseme-core/tests/consent_api.rs` | byte | all | PASS (focused Rust contract; task 4.7 remains open) |
 | ID-005 | consent | 0700 dirs, 0600 files, atomic updates | isolated HOME | filesystem manifest | side-effect | native OS | TODO |

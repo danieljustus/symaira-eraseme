@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use symeraseme_core::identity::{
-    FakeKeyring, KEY_LENGTH, KEYCHAIN_PREFIX, MASTER_KEY_ENV, MasterKeyError,
-    SYMVAULT_PASSPHRASE_ENV, SecretBackend, SecretBackendError, SecretResolver,
+    FakeKeyring, KEY_LENGTH, KEYCHAIN_PREFIX, MASTER_KEY_ENV, MasterKey, MasterKeyError,
+    MasterKeyResolver, SYMVAULT_PASSPHRASE_ENV, SecretBackend, SecretBackendError, SecretResolver,
 };
 
 const SENTINEL: &str = "ID003-RESOLUTION-SENTINEL";
@@ -184,4 +184,97 @@ fn master_key_resolution_errors_do_not_include_env_or_keyring_values() {
     assert!(matches!(error, MasterKeyError::InvalidHex { .. }));
     assert_error_is_redacted(&error);
     assert_eq!(KEY_LENGTH, 32);
+}
+
+#[test]
+fn id002_master_key_resolution_order_is_cache_direct_hex_scrypt_keyring() {
+    let cache_key = MasterKey::from_bytes(&[0x11; KEY_LENGTH]).unwrap();
+    let hex_key_bytes = [0x22; KEY_LENGTH];
+    let hex_key_str = hex::encode(hex_key_bytes);
+    let keyring_key_bytes = [0x44; KEY_LENGTH];
+    let keyring_key_str = hex::encode(keyring_key_bytes);
+
+    // 1. Cache beats everything
+    let keyring = FakeKeyring::with_value(&keyring_key_str);
+    let mut env = BTreeMap::new();
+    env.insert(MASTER_KEY_ENV.to_owned(), hex_key_str.clone());
+    env.insert(
+        SYMVAULT_PASSPHRASE_ENV.to_owned(),
+        "some-passphrase".to_owned(),
+    );
+    let mut resolver = MasterKeyResolver::with_environment(keyring.clone(), env);
+    resolver.set_cached(cache_key.clone());
+    assert_eq!(resolver.resolve_existing().unwrap(), cache_key);
+    assert!(keyring.calls().is_empty());
+
+    // 2. Direct hex beats passphrase and keyring
+    resolver.clear_cache();
+    let key = resolver.resolve_existing().unwrap();
+    assert_eq!(key.as_bytes(), &hex_key_bytes);
+    assert!(keyring.calls().is_empty());
+
+    // 3. Passphrase beats keyring
+    let mut env = BTreeMap::new();
+    env.insert(SYMVAULT_PASSPHRASE_ENV.to_owned(), "passphrase".to_owned());
+    let mut resolver = MasterKeyResolver::with_environment(keyring.clone(), env);
+    let key = resolver.resolve_existing().unwrap();
+    assert_eq!(
+        hex::encode(key.as_bytes()),
+        "eb9e67f71d018a2bb6fe968090a09ec3cbeb52fe00b9e9fa159e63851c6384cd"
+    );
+    assert!(keyring.calls().is_empty());
+
+    // 4. Keyring is used when env is empty
+    let mut resolver = MasterKeyResolver::with_environment(keyring.clone(), BTreeMap::new());
+    let key = resolver.resolve_existing().unwrap();
+    assert_eq!(key.as_bytes(), &keyring_key_bytes);
+    assert_eq!(
+        keyring.calls(),
+        vec![("symeraseme".to_string(), "identity-master-key".to_string())]
+    );
+
+    // 5. Missing when keyring has no value
+    let mut resolver = MasterKeyResolver::with_environment(FakeKeyring::new(), BTreeMap::new());
+    assert_eq!(
+        resolver.resolve_existing().unwrap_err(),
+        MasterKeyError::Missing
+    );
+}
+
+#[test]
+fn id002_reference_aliases_and_empty_vault_rejection() {
+    let backend = FixtureBackend::default();
+    let resolver = SecretResolver::new(backend);
+
+    // Canonical symvault
+    assert_eq!(resolver.resolve("symvault://my/secret").unwrap(), SENTINEL);
+
+    // Legacy vault alias
+    assert_eq!(resolver.resolve("vault://my/secret").unwrap(), SENTINEL);
+
+    // Empty references fail closed
+    assert!(resolver.resolve("symvault://").is_err());
+    assert!(resolver.resolve("vault://").is_err());
+    assert!(resolver.resolve("keychain://").is_err());
+    assert!(resolver.resolve("keychain://onlyservice").is_err());
+}
+
+#[test]
+fn id002_native_os_adapter_smoke_test() {
+    use symeraseme_core::identity::{KeyringBackend, OsKeyring, OsSecretBackend};
+
+    let keyring = OsKeyring;
+    let result = keyring.get("symeraseme-test-nonexistent-99999", "test-account");
+    match result {
+        Ok(None) => {}
+        Ok(Some(_)) => {}
+        Err(e) => {
+            let msg = format!("{e:?}");
+            assert!(!msg.contains(SENTINEL));
+        }
+    }
+
+    let backend = OsSecretBackend;
+    let result = backend.resolve_keychain("symeraseme-test-nonexistent-99999", "test-account");
+    assert!(result.is_err());
 }
