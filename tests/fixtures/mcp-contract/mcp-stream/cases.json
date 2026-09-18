@@ -1,0 +1,73 @@
+{
+  "source_revision": "4cdbf9be02f76f4384a0eb0c8fdbe37b3aef19f7",
+  "source_path": "internal/mcp/server.go:377-430",
+  "cases": [
+    {
+      "name": "two_values_separated_by_newline",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQp7Impzb25ycGMiOiIyLjAiLCJpZCI6MiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9Cg==",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":2}\n"
+    },
+    {
+      "name": "two_values_separated_by_crlf",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQ0KeyJqc29ucnBjIjoiMi4wIiwiaWQiOjIsIm1ldGhvZCI6ImluaXRpYWxpemUifQ0K",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":2}\n"
+    },
+    {
+      "name": "three_values_adjacent_without_whitespace",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifXsianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn17Impzb25ycGMiOiIyLjAiLCJpZCI6MiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":2}\n"
+    },
+    {
+      "name": "value_split_across_a_newline",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwKImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0K",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "leading_whitespace_is_skipped",
+      "request_b64": "ICAJCg17Impzb25ycGMiOiIyLjAiLCJpZCI6MSwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9Cg==",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "empty_input_produces_nothing",
+      "response": null
+    },
+    {
+      "name": "whitespace_only_input_produces_nothing",
+      "request_b64": "IAoJDQo=",
+      "response": null
+    },
+    {
+      "name": "notification_then_request",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9CnsianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0K",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "scalar_value_is_an_invalid_request",
+      "request_b64": "MQo=",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "string_value_is_an_invalid_request",
+      "request_b64": "IngiCg==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "truncated_final_value_is_an_error",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQp7Impzb25ycGMiOiIyLjAiLA==",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "junk_after_a_value_is_an_error",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSBAQEAK",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "malformed_first_value_is_an_error",
+      "request_b64": "bm9wZQp7Impzb25ycGMiOiIyLjAiLCJpZCI6MSwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9Cg==",
+      "response": null,
+      "parse_error": true
+    }
+  ]
+}

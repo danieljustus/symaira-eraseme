@@ -441,7 +441,7 @@ fn scan_object_fields(raw: &[u8]) -> Option<Vec<RawField<'_>>> {
     }
 }
 
-fn skip_whitespace(raw: &[u8], index: &mut usize) {
+pub(crate) fn skip_whitespace(raw: &[u8], index: &mut usize) {
     while raw
         .get(*index)
         .is_some_and(|byte| is_json_whitespace(*byte))
@@ -583,7 +583,7 @@ fn flush_pending_surrogate(output: &mut String, pending_high: &mut Option<u16>) 
     }
 }
 
-fn skip_json_value(raw: &[u8], mut index: usize) -> Option<usize> {
+pub(crate) fn skip_json_value(raw: &[u8], mut index: usize) -> Option<usize> {
     if raw.get(index) == Some(&b'"') {
         return skip_json_string(raw, index);
     }
