@@ -22,3 +22,9 @@ registry/templates/** text eol=lf
 # Profile oracle helper provenance is byte-hashed on native Windows too.
 rust-tests/parity/profile_read.py text eol=lf
 rust-tests/parity/oracle/profile_read/cases.json text eol=lf
+
+# MCP contract fixtures are included with include_bytes! and compared
+# byte-for-byte against generated responses. A Windows checkout with the
+# platform default core.autocrlf=true rewrites the trailing LF to CRLF and the
+# comparison then fails on Windows only, while every Unix gate stays green.
+tests/fixtures/mcp-contract/** text eol=lf
