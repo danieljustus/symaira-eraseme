@@ -119,6 +119,17 @@ pub(crate) fn initialize(raw: &[u8]) -> InitializeOutcome {
     let notification = !id_present;
     let method = method.as_deref().unwrap_or_default();
     if method != "initialize" {
+        if matches!(method, "tools/list" | "list_tools") {
+            return match super::tools_list::tools_list(raw) {
+                super::tools_list::ToolsListOutcome::Response(bytes) => {
+                    InitializeOutcome::Response(bytes)
+                }
+                super::tools_list::ToolsListOutcome::Notification => {
+                    InitializeOutcome::Notification
+                }
+                super::tools_list::ToolsListOutcome::ParseError => InitializeOutcome::ParseError,
+            };
+        }
         return if notification {
             InitializeOutcome::Notification
         } else {
@@ -893,6 +904,28 @@ mod tests {
                 r#"{"jsonrpc":"2.0","error":{"code":-32600,"message":"invalid request"},"id":1}"#,
             )
         );
+    }
+
+    #[test]
+    fn shared_entry_dispatches_tools_list_to_the_tools_list_slice() {
+        const REQUEST: &[u8] = include_bytes!(
+            "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.request.jsonl"
+        );
+        const RESPONSE: &[u8] = include_bytes!(
+            "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.response.json"
+        );
+        assert_eq!(
+            initialize(REQUEST),
+            InitializeOutcome::Response(RESPONSE.to_vec())
+        );
+    }
+
+    #[test]
+    fn shared_entry_keeps_tools_list_notifications_silent() {
+        const NOTIFICATION: &[u8] = include_bytes!(
+            "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.notification.request.jsonl"
+        );
+        assert_eq!(initialize(NOTIFICATION), InitializeOutcome::Notification);
     }
 
     #[test]
