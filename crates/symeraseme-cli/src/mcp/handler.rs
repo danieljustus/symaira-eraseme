@@ -19,6 +19,7 @@ use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{load_embedded, load_from_dir};
 use symeraseme_core::storage::Store;
+use symeraseme_engine::scheduler;
 
 use super::tools_call::catalogue_has_tool;
 
@@ -297,6 +298,55 @@ impl ContractHandler {
             "the grant token paths are not implemented in this slice".to_owned(),
         ))
     }
+
+    /// Go's `generate_scheduler`. The dry run returns the generated file
+    /// contents; writing them to disk is not part of this slice.
+    fn generate_scheduler(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let cfg = scheduler::Config {
+            platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
+            output_dir: get_str(arguments, "output_dir", "./schedules"),
+            tick_hour: get_int(arguments, "tick_hour", 10) as i32,
+            tick_minute: get_int(arguments, "tick_minute", 0) as i32,
+            poll_hours: parse_poll_hours(&get_str(arguments, "poll_hours", ""))?,
+            project_dir: get_str(arguments, "project_dir", ""),
+            binary_path: get_str(arguments, "symeraseme_bin", ""),
+            venv_activate: get_str(arguments, "venv_activate", ""),
+        };
+        let files = scheduler::generate(&cfg).map_err(|error| ToolError(error.to_string()))?;
+        if get_bool(arguments, "dry_run", false) {
+            return Ok(json!({
+                "success": true,
+                "files": files,
+                "dry_run": true,
+            }));
+        }
+        Err(ToolError(
+            "writing scheduler files is not implemented in this slice".to_owned(),
+        ))
+    }
+}
+
+/// Go's `parsePollHours`: empty means "no override", and each value must be a
+/// clock hour.
+fn parse_poll_hours(raw: &str) -> Result<Vec<i32>, ToolError> {
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut hours = Vec::new();
+    for part in raw.split(',') {
+        let trimmed = part.trim();
+        let invalid = || {
+            ToolError(format!(
+                "invalid poll hour {trimmed:?}: choose values from 0 to 23"
+            ))
+        };
+        let value: i32 = trimmed.parse().map_err(|_| invalid())?;
+        if !(0..=23).contains(&value) {
+            return Err(invalid());
+        }
+        hours.push(value);
+    }
+    Ok(hours)
 }
 
 impl ToolHandler for ContractHandler {
@@ -309,6 +359,7 @@ impl ToolHandler for ContractHandler {
             "manual_tasks_complete" => self.manual_tasks_complete(arguments),
             "manual_tasks_cleanup" => self.manual_tasks_cleanup(arguments),
             "grant" => self.grant(arguments),
+            "generate_scheduler" => self.generate_scheduler(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -515,7 +566,7 @@ mod tests {
             fixture.source_revision,
             "79bf23e83b31f18d98487101200eaf32749e5a46"
         );
-        assert_eq!(fixture.cases.len(), 7, "fixture case count changed");
+        assert_eq!(fixture.cases.len(), 8, "fixture case count changed");
 
         for case in fixture.cases {
             let actual = match initialize(case.request.as_bytes(), &handler) {

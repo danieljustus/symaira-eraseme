@@ -56,7 +56,14 @@ struct ContentItem {
 pub(crate) fn content_envelope(result: Option<&Value>) -> Value {
     let text = match result {
         Some(Value::String(value)) => value.clone(),
-        Some(value) => serde_json::to_string(value).unwrap_or_else(|_| value.to_string()),
+        Some(value) => {
+            // Go builds this text with `json.Marshal`, which HTML-escapes, and
+            // the outer encoder then escapes the resulting backslashes — so a
+            // payload's `&` reaches the wire as `\\u0026`, not `\u0026`.
+            let serialized = serde_json::to_string(value).unwrap_or_else(|_| value.to_string());
+            String::from_utf8(go_escape_json_strings(serialized.as_bytes()))
+                .expect("escaped JSON is UTF-8")
+        }
         None => "null".to_owned(),
     };
     serde_json::to_value(ContentEnvelope {
@@ -99,6 +106,68 @@ pub(crate) fn error_response(id: &Value, code: i32, message: &str) -> Vec<u8> {
 fn encode<T: Serialize>(value: &T) -> Vec<u8> {
     let mut output = serde_json::to_vec(value).expect("MCP response is serializable");
     output.push(b'\n');
+    go_escape_json_strings(&output)
+}
+
+/// Go's `encoding/json` HTTP-escapes `<`, `>`, `&`, U+2028 and U+2029 inside
+/// string values by default, while serde_json does not. Every response this
+/// crate emits goes through this so the bytes match Go's encoder.
+pub(crate) fn go_escape_json_strings(input: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut index = 0;
+    while index < input.len() {
+        let byte = input[index];
+        if !in_string {
+            output.push(byte);
+            in_string = byte == b'"';
+            index += 1;
+            continue;
+        }
+        if escaped {
+            output.push(byte);
+            escaped = false;
+            index += 1;
+            continue;
+        }
+        match byte {
+            b'\\' => {
+                output.push(byte);
+                escaped = true;
+                index += 1;
+            }
+            b'"' => {
+                output.push(byte);
+                in_string = false;
+                index += 1;
+            }
+            b'<' => {
+                output.extend_from_slice(br#"\u003c"#);
+                index += 1;
+            }
+            b'>' => {
+                output.extend_from_slice(br#"\u003e"#);
+                index += 1;
+            }
+            b'&' => {
+                output.extend_from_slice(br#"\u0026"#);
+                index += 1;
+            }
+            _ if input[index..].starts_with("\u{2028}".as_bytes()) => {
+                output.extend_from_slice(br#"\u2028"#);
+                index += 3;
+            }
+            _ if input[index..].starts_with("\u{2029}".as_bytes()) => {
+                output.extend_from_slice(br#"\u2029"#);
+                index += 3;
+            }
+            _ => {
+                output.push(byte);
+                index += 1;
+            }
+        }
+    }
     output
 }
 

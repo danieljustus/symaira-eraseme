@@ -1,3 +1,7 @@
+// `tools_list` now shares the Go-compatible HTML escaping with the response
+// envelope, so the envelope module has to be compiled in here too.
+#[path = "../src/mcp/envelope.rs"]
+mod envelope;
 #[path = "../src/mcp/tools_list.rs"]
 mod tools_list;
 
