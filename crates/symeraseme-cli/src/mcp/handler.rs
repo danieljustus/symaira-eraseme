@@ -12,8 +12,9 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
+use symeraseme_core::registry::{load_embedded, load_from_dir};
 
 use super::tools_call::catalogue_has_tool;
 
@@ -57,6 +58,7 @@ impl ToolHandler for ContractHandler {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         match name {
             "redact_file" => redact_file(&self.workspace_root, arguments),
+            "validate" => validate(&self.workspace_root, arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -84,6 +86,38 @@ fn get_str(arguments: &Map<String, Value>, key: &str, default: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or(default)
         .to_owned()
+}
+
+/// Go's `validate`: load (and thereby validate) a registry directory, or the
+/// embedded registry when no directory is given. A relative directory resolves
+/// against the workspace root, which stands in for Go's process working
+/// directory.
+///
+/// The response shape mirrors Go; only the success path is pinned against the
+/// oracle so far.
+fn validate(root: &Path, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+    let directory = get_str(arguments, "registry_dir", "");
+    let brokers = if directory.is_empty() {
+        load_embedded()
+    } else {
+        let requested = Path::new(&directory);
+        let resolved = if requested.is_absolute() {
+            requested.to_path_buf()
+        } else {
+            root.join(requested)
+        };
+        load_from_dir(&resolved)
+    }
+    .map_err(|error| ToolError(error.to_string()))?;
+    Ok(json!({
+        "schema_version": 1,
+        "ok": true,
+        "totals": {
+            "valid": brokers.len(),
+            "failed": 0,
+            "duplicate_ids": 0,
+        },
+    }))
 }
 
 #[cfg(test)]
@@ -138,6 +172,36 @@ mod tests {
         )
         .expect("pii fixture");
         fs::write(root.join("clean.txt"), "No personal data here.\n").expect("clean fixture");
+
+        // The `validate` cases point at this relative directory, mirroring the
+        // oracle's workspace.
+        let registry = root.join("registry");
+        for sub in ["schemas", "brokers/eu", "brokers/uk", "brokers/us"] {
+            fs::create_dir_all(registry.join(sub)).expect("registry dir");
+        }
+        fs::write(
+            registry.join("manifest.json"),
+            r#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#,
+        )
+        .expect("manifest");
+        fs::write(
+            registry.join("schemas/broker.schema.json"),
+            r#"{"schema_version":1}"#,
+        )
+        .expect("schema");
+        let fixtures =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/registry-contract");
+        for (sub, file) in [
+            ("eu", "golden-email-eu.yaml"),
+            ("uk", "golden-multi-uk.yaml"),
+            ("us", "golden-webform-us.yaml"),
+        ] {
+            fs::copy(
+                fixtures.join(file),
+                registry.join("brokers").join(sub).join(file),
+            )
+            .expect("copy broker fixture");
+        }
         root
     }
 
@@ -155,7 +219,7 @@ mod tests {
             fixture.source_revision,
             "79bf23e83b31f18d98487101200eaf32749e5a46"
         );
-        assert_eq!(fixture.cases.len(), 4, "fixture case count changed");
+        assert_eq!(fixture.cases.len(), 5, "fixture case count changed");
 
         for case in fixture.cases {
             let actual = match initialize(case.request.as_bytes(), &handler) {

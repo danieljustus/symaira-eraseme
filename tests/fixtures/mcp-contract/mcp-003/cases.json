@@ -21,6 +21,11 @@
       "name": "legacy_status_alias_hits_the_handler_default",
       "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"status\",\"arguments\":{}}}",
       "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"tool not found\"},\"id\":4}\n"
+    },
+    {
+      "name": "validate_reports_a_clean_registry",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"validate\",\"arguments\":{\"registry_dir\":\"registry\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"ok\\\":true,\\\"schema_version\\\":1,\\\"totals\\\":{\\\"duplicate_ids\\\":0,\\\"failed\\\":0,\\\"valid\\\":3}}\",\"type\":\"text\"}]},\"id\":5}\n"
     }
   ]
 }

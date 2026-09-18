@@ -72,6 +72,33 @@ func writeFixture() {
 	if err := os.WriteFile(filepath.Join(workspace, "clean.txt"), []byte("No personal data here.\n"), 0o600); err != nil {
 		fail(err)
 	}
+	// A small registry for the `validate` cases: the three golden brokers with
+	// a manifest and schema stub, referenced by a relative path so the request
+	// stays reproducible.
+	registryDir := filepath.Join(workspace, "registry")
+	for _, sub := range []string{"schemas", "brokers/eu", "brokers/uk", "brokers/us"} {
+		if err := os.MkdirAll(filepath.Join(registryDir, sub), 0o755); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(registryDir, "manifest.json"), []byte(`{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}`), 0o644); err != nil {
+		fail(err)
+	}
+	if err := os.WriteFile(filepath.Join(registryDir, "schemas", "broker.schema.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		fail(err)
+	}
+	for sub, file := range map[string]string{"eu": "golden-email-eu.yaml", "uk": "golden-multi-uk.yaml", "us": "golden-webform-us.yaml"} {
+		source := filepath.Join("tests", "fixtures", "registry-contract", file)
+		content, err := os.ReadFile(source)
+		if err != nil {
+			fail(err)
+		}
+		target := filepath.Join(registryDir, "brokers", sub, file)
+		if err := os.WriteFile(target, content, 0o644); err != nil {
+			fail(err)
+		}
+	}
+
 	origin, err := os.Getwd()
 	if err != nil {
 		fail(err)
@@ -99,6 +126,10 @@ func writeFixture() {
 			// the contract handler, so Go answers with its default.
 			Name:    "legacy_status_alias_hits_the_handler_default",
 			Request: callRequest(4, "status", `{}`),
+		},
+		{
+			Name:    "validate_reports_a_clean_registry",
+			Request: callRequest(5, "validate", `{"registry_dir":"registry"}`),
 		},
 	}
 
