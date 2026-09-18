@@ -146,6 +146,12 @@ func writeFixture() {
 		// came from the developer's real store (12351+) and grew between runs.
 		// Pinning them would bake a moving value into the contract, so the tool is
 		// covered by shape assertions instead.
+		// Not recorded: `list_brokers` answers with the registry itself. With
+		// `include_inactive` the status filter is ignored and the answer is 1274
+		// brokers (985 KB); without it, 1273 active ones. Either way the fixture
+		// would duplicate the embedded registry, whose model and filter semantics
+		// already have byte-exact coverage in the registry goldens, so the tool is
+		// covered by shape assertions instead.
 		{
 			// The dry run returns the generated file *contents*, so pinning the
 			// paths in the request makes it reproducible.
