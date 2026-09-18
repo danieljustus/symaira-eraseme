@@ -8,6 +8,7 @@ pub mod deadlines;
 pub mod identity;
 pub mod redaction;
 pub mod registry;
+pub mod reporting;
 pub mod storage;
 pub mod templating;
 pub mod timeutil;
