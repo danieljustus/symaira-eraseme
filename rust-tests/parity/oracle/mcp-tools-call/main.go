@@ -141,6 +141,12 @@ func writeFixture() {
 			Name:    "grant_dry_run_echoes_explicit_arguments",
 			Request: callRequest(7, "grant", `{"dry_run":true,"command":"execute","revoke":"token-1","revoke_all":true}`),
 		},
+		{
+			// The dry run returns the generated file *contents*, so pinning the
+			// paths in the request makes it reproducible.
+			Name:    "generate_scheduler_dry_run_returns_file_contents",
+			Request: callRequest(8, "generate_scheduler", `{"dry_run":true,"platform":"cron","project_dir":"/srv/project","symeraseme_bin":"/usr/local/bin/symeraseme","output_dir":"./schedules","tick_hour":9,"tick_minute":30,"poll_hours":"8,20"}`),
+		},
 	}
 
 	for index := range cases {

@@ -111,67 +111,7 @@ fn response_error(id: &Value, code: i32, message: &'static str) -> ToolsListOutc
 fn encode_response(response: &Response<'_>) -> Vec<u8> {
     let mut output = serde_json::to_vec(response).expect("MCP response is serializable");
     output.push(b'\n');
-    go_escape_json_strings(&output)
-}
-
-// Go's encoding/json HTML-escapes these bytes even though serde_json does not.
-fn go_escape_json_strings(input: &[u8]) -> Vec<u8> {
-    let mut output = Vec::with_capacity(input.len());
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut index = 0;
-    while index < input.len() {
-        let byte = input[index];
-        if !in_string {
-            output.push(byte);
-            in_string = byte == b'"';
-            index += 1;
-            continue;
-        }
-        if escaped {
-            output.push(byte);
-            escaped = false;
-            index += 1;
-            continue;
-        }
-        match byte {
-            b'\\' => {
-                output.push(byte);
-                escaped = true;
-                index += 1;
-            }
-            b'"' => {
-                output.push(byte);
-                in_string = false;
-                index += 1;
-            }
-            b'<' => {
-                output.extend_from_slice(br#"\u003c"#);
-                index += 1;
-            }
-            b'>' => {
-                output.extend_from_slice(br#"\u003e"#);
-                index += 1;
-            }
-            b'&' => {
-                output.extend_from_slice(br#"\u0026"#);
-                index += 1;
-            }
-            _ if input[index..].starts_with("\u{2028}".as_bytes()) => {
-                output.extend_from_slice(br#"\u2028"#);
-                index += 3;
-            }
-            _ if input[index..].starts_with("\u{2029}".as_bytes()) => {
-                output.extend_from_slice(br#"\u2029"#);
-                index += 3;
-            }
-            _ => {
-                output.push(byte);
-                index += 1;
-            }
-        }
-    }
-    output
+    super::envelope::go_escape_json_strings(&output)
 }
 
 #[cfg(test)]
