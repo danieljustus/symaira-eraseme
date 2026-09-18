@@ -253,6 +253,150 @@
       "name": "initialize_invalid_utf8_string_id_is_replaced",
       "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiLDIiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9",
       "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"�\"}\n"
+    },
+    {
+      "name": "unknown_method_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"other\"}",
+      "response": null
+    },
+    {
+      "name": "initialize_params_scalar_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":1}",
+      "response": null
+    },
+    {
+      "name": "initialize_params_array_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":[]}",
+      "response": null
+    },
+    {
+      "name": "non_object_scalar_is_invalid_request",
+      "request_b64": "MQ==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_string_is_parse_error",
+      "request_b64": "ImhlbGxvIg==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_array_is_parse_error",
+      "request_b64": "WzEsMl0=",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_true_is_parse_error",
+      "request_b64": "dHJ1ZQ==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_null_is_parse_error",
+      "request_b64": "bnVsbA==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "shorter_field_name_prefix_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"json\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "string_id_with_surrogate_pair",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\ud83d\\ude00\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"😀\"}\n"
+    },
+    {
+      "name": "unknown_field_nested_containers_are_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":{\"a\":[1,{\"b\":\"x\"},[2,3]],\"c\":true,\"d\":null,\"e\":\"s\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_deep_array_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":[[[[1]]]]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_escaped_string_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":\"\\u0041\\n\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_empty_containers_are_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":{},\"unknown2\":[]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_fractional_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":100.5,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":100.5}\n"
+    },
+    {
+      "name": "initialize_negative_fractional_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":-0.5,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":-0.5}\n"
+    },
+    {
+      "name": "initialize_small_fraction_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":0.001,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":0.001}\n"
+    },
+    {
+      "name": "initialize_negative_zero_float_id_is_preserved",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":-0.0,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":-0}\n"
+    },
+    {
+      "name": "initialize_params_nested_object_values",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"a\":{\"b\":1},\"c\":[1,2]}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "whitespace_padded_request_is_accepted",
+      "request_b64": "ICAgeyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSAgIA==",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "trailing_content_after_object_is_parse_error",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSB4",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "string_id_with_newline_tab_quote_backslash_escapes",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\n\\t\\\"\\\\\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"\\n\\t\\\"\\\\\"}\n"
+    },
+    {
+      "name": "string_id_with_solidus_escape",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\/\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"/\"}\n"
+    },
+    {
+      "name": "string_id_with_control_character_escapes",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\b\\f\\r\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"\\b\\f\\r\"}\n"
+    },
+    {
+      "name": "string_id_with_unicode_escape",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\u0041\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"A\"}\n"
+    },
+    {
+      "name": "string_id_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\x\",\"method\":\"initialize\"}",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "method_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"a\\x\"}",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "jsonrpc_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.\\x0\",\"id\":1,\"method\":\"initialize\"}",
+      "response": null,
+      "parse_error": true
     }
   ]
 }
