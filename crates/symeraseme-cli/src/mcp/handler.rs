@@ -18,7 +18,7 @@ use symeraseme_core::campaign;
 use symeraseme_core::config::{ConfigContext, resolve_storage};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
-use symeraseme_core::registry::{load_embedded, load_from_dir};
+use symeraseme_core::registry::{self, load_embedded, load_from_dir};
 use symeraseme_core::storage::Store;
 use symeraseme_engine::scheduler;
 
@@ -370,6 +370,36 @@ impl ContractHandler {
         .map_err(|error| ToolError(error.to_string()))?;
         serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
     }
+
+    /// Go's `list_brokers`: the embedded registry through the shared filter.
+    ///
+    /// Not recorded in the oracle — the answer is the registry itself (1274
+    /// brokers, 985 KB with `include_inactive`, 1273 without), and the model and
+    /// filter semantics already have byte-exact coverage in the registry
+    /// goldens. The handler path is asserted by shape instead.
+    fn list_brokers(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+        let status = optional_str(arguments, "status").or_else(|| Some("active".to_owned()));
+        let filter = registry::BrokerFilter {
+            jurisdiction: optional_str(arguments, "jurisdiction"),
+            law: optional_str(arguments, "law"),
+            priority: optional_str(arguments, "priority"),
+            category: optional_str(arguments, "category"),
+            include_disabled: get_bool(arguments, "include_disabled", false),
+            status: status.clone(),
+            include_inactive: get_bool(arguments, "include_inactive", false),
+        };
+        let filtered = registry::filter_brokers(&brokers, &filter);
+        Ok(json!({
+            "schema_version": 1,
+            "count": filtered.len(),
+            "brokers": filtered,
+            "filters": {
+                "include_disabled": filter.include_disabled,
+                "status": status,
+            },
+        }))
+    }
 }
 
 /// Go's `parsePollHours`: empty means "no override", and each value must be a
@@ -407,6 +437,7 @@ impl ToolHandler for ContractHandler {
             "grant" => self.grant(arguments),
             "generate_scheduler" => self.generate_scheduler(arguments),
             "plan_create" => self.plan_create(arguments),
+            "list_brokers" => self.list_brokers(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -434,6 +465,16 @@ fn get_str(arguments: &Map<String, Value>, key: &str, default: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or(default)
         .to_owned()
+}
+
+/// Go's `getStr` with an empty default, kept as an option: an absent or
+/// non-string value means "no filter".
+fn optional_str(arguments: &Map<String, Value>, key: &str) -> Option<String> {
+    arguments
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
 }
 
 /// Go's `getInt`: a missing or non-numeric value falls back to the default.
@@ -833,12 +874,16 @@ mod tests {
 
         // A catalogue tool that is not wired yet says so instead of pretending
         // to be unknown.
-        let unwired = call_envelope("{}", "list_brokers");
+        // `execute` is in the catalogue but not wired in this slice. Its required
+        // argument has to be supplied, otherwise validation answers first — which
+        // is the correct order.
+        let unwired = call_envelope(r#"{"campaign_id":"c1"}"#, "execute");
         assert!(
             unwired["error"]["message"]
                 .as_str()
-                .expect("error")
-                .contains("not implemented in this slice")
+                .unwrap_or("")
+                .contains("not implemented in this slice"),
+            "envelope was {unwired}"
         );
 
         // The writing tool fails explicitly when no instant was injected.
@@ -935,6 +980,50 @@ mod tests {
                 "{rejected}"
             );
         }
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `list_brokers` answers with the registry itself, so the oracle could not
+    /// record it without duplicating ~1 MB of embedded data. The counts and the
+    /// filter echo below are the values Go's real handler produced when the
+    /// oracle measured them.
+    #[test]
+    fn list_brokers_shape_matches_the_measured_handler_answers() {
+        let root = workspace("list-brokers");
+        let handler = ContractHandler::new(&root);
+        let call = |arguments: &str| -> Value {
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+            let request = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "list_brokers", "arguments": arguments},
+            })
+            .to_string();
+            match initialize(request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => {
+                    let envelope: Value = serde_json::from_slice(&bytes).expect("envelope JSON");
+                    let text = envelope["result"]["content"][0]["text"]
+                        .as_str()
+                        .expect("payload text");
+                    serde_json::from_str(text).expect("payload JSON")
+                }
+                other => panic!("expected a response, got {other:?}"),
+            }
+        };
+
+        // include_inactive makes Go ignore the status filter, so both statuses
+        // come back.
+        let all = call(r#"{"status":"out-of-business","include_inactive":true}"#);
+        assert_eq!(all["schema_version"], 1);
+        assert_eq!(all["count"], 1274);
+        assert_eq!(all["filters"]["status"], "out-of-business");
+        assert_eq!(all["filters"]["include_disabled"], false);
+        assert_eq!(all["brokers"][0]["id"], "0ptimus-analytics-us");
+
+        // The default is the active registry.
+        let active = call("{}");
+        assert_eq!(active["count"], 1273);
+        assert_eq!(active["filters"]["status"], "active");
 
         let _ = fs::remove_dir_all(&root);
     }
