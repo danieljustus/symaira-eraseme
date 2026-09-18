@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
+use symeraseme_core::campaign;
 use symeraseme_core::config::{ConfigContext, resolve_storage};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
@@ -324,6 +325,51 @@ impl ContractHandler {
             "writing scheduler files is not implemented in this slice".to_owned(),
         ))
     }
+
+    /// Go's `plan_create`: plan against the embedded registry.
+    ///
+    /// Only the missing-profile branch is implemented — it records an empty
+    /// snapshot hash, which is Python's `FileNotFoundError` path. An empty
+    /// `profile_path` or an existing profile needs the keyring-backed load and
+    /// reports that it is not part of this slice.
+    fn plan_create(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let now = self.recorded_instant()?;
+        let profile_path = get_str(arguments, "profile_path", "");
+        if profile_path.is_empty() {
+            return Err(ToolError(
+                "plan_create without an explicit profile_path is not implemented in this slice"
+                    .to_owned(),
+            ));
+        }
+        let resolved = self.workspace_root.join(&profile_path);
+        if resolved.exists() {
+            return Err(ToolError(
+                "reading an existing identity profile is not implemented in this slice".to_owned(),
+            ));
+        }
+        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+        let result = campaign::plan_campaign(
+            &store,
+            &brokers,
+            "",
+            &campaign::PlanOpts {
+                campaign_id: get_str(arguments, "campaign_id", ""),
+                jurisdiction: get_str(arguments, "jurisdiction", ""),
+                law: get_str(arguments, "law", ""),
+                priority: get_str(arguments, "priority", ""),
+                category: get_str(arguments, "category", ""),
+                status: get_str(arguments, "status", "active"),
+                include_inactive: get_bool(arguments, "include_inactive", false),
+                include_disabled: get_bool(arguments, "include_disabled", false),
+                max_brokers: get_int(arguments, "max_brokers", 30),
+                notes: get_str(arguments, "notes", ""),
+            },
+            now,
+        )
+        .map_err(|error| ToolError(error.to_string()))?;
+        serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
+    }
 }
 
 /// Go's `parsePollHours`: empty means "no override", and each value must be a
@@ -360,6 +406,7 @@ impl ToolHandler for ContractHandler {
             "manual_tasks_cleanup" => self.manual_tasks_cleanup(arguments),
             "grant" => self.grant(arguments),
             "generate_scheduler" => self.generate_scheduler(arguments),
+            "plan_create" => self.plan_create(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -806,6 +853,87 @@ mod tests {
                 assert!(text.contains("configuration"), "{text}");
             }
             other => panic!("expected a response, got {other:?}"),
+        }
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `plan_create` answers with the removal-request ids it just created, so
+    /// the oracle could not record it: its store isolation did not hold and the
+    /// ids came from the developer's real store. The shape is asserted here
+    /// instead, including both branches this slice does not implement.
+    #[test]
+    fn plan_create_shape_and_unimplemented_branches() {
+        use std::collections::BTreeMap;
+        use symeraseme_core::config::ConfigContext;
+
+        let root = workspace("plan-create");
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+        let mut environment = BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let config = ConfigContext::new(root.clone(), root.clone(), environment);
+        let handler = ContractHandler::new(&root).with_store(config, now);
+
+        let call = |arguments: &str, name: &str| -> Value {
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+            let request = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": name, "arguments": arguments},
+            })
+            .to_string();
+            match initialize(request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => {
+                    serde_json::from_slice(&bytes).expect("envelope JSON")
+                }
+                other => panic!("expected a response, got {other:?}"),
+            }
+        };
+
+        let planned = call(
+            r#"{"campaign_id":"mcp-plan","max_brokers":2,"profile_path":"missing-profile.enc"}"#,
+            "plan_create",
+        );
+        let payload = &planned["result"]["content"][0]["text"];
+        let payload: Value =
+            serde_json::from_str(payload.as_str().expect("payload is a JSON string"))
+                .expect("payload JSON");
+        assert_eq!(payload["campaign_id"], "mcp-plan");
+        assert!(payload["total_brokers"].as_i64().expect("total") > 1000);
+        assert_eq!(payload["planned"], 2);
+        let requests = payload["requests"].as_array().expect("requests");
+        assert_eq!(requests.len(), 2);
+        // The embedded registry is ordered, so the first two brokers are fixed.
+        assert_eq!(requests[0]["broker_id"], "0ptimus-analytics-us");
+        assert_eq!(requests[0]["request_id"], 1);
+        assert_eq!(requests[1]["request_id"], 2);
+
+        // An empty profile path and an existing profile both need the
+        // keyring-backed load, which this slice does not implement.
+        for (arguments, expected) in [
+            (
+                r#"{"campaign_id":"x"}"#,
+                "without an explicit profile_path is not implemented",
+            ),
+            (
+                r#"{"campaign_id":"x","profile_path":"registry/manifest.json"}"#,
+                "reading an existing identity profile is not implemented",
+            ),
+        ] {
+            let rejected = call(arguments, "plan_create");
+            assert!(
+                rejected["error"]["message"]
+                    .as_str()
+                    .expect("error")
+                    .contains(expected),
+                "{rejected}"
+            );
         }
 
         let _ = fs::remove_dir_all(&root);
