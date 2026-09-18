@@ -279,6 +279,24 @@ impl ContractHandler {
             ],
         ))
     }
+
+    /// Go's `grant`. The dry-run branch echoes its arguments and touches no
+    /// store; the token branches need the consent store and are not part of
+    /// this slice, so they report that instead of pretending otherwise.
+    fn grant(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        if get_bool(arguments, "dry_run", false) {
+            return Ok(json!({
+                "success": true,
+                "dry_run": true,
+                "command": get_str(arguments, "command", "execute"),
+                "revoke": get_str(arguments, "revoke", ""),
+                "revoke_all": get_bool(arguments, "revoke_all", false),
+            }));
+        }
+        Err(ToolError(
+            "the grant token paths are not implemented in this slice".to_owned(),
+        ))
+    }
 }
 
 impl ToolHandler for ContractHandler {
@@ -290,6 +308,7 @@ impl ToolHandler for ContractHandler {
             "manual_tasks_show" => self.manual_tasks_show(arguments),
             "manual_tasks_complete" => self.manual_tasks_complete(arguments),
             "manual_tasks_cleanup" => self.manual_tasks_cleanup(arguments),
+            "grant" => self.grant(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -496,7 +515,7 @@ mod tests {
             fixture.source_revision,
             "79bf23e83b31f18d98487101200eaf32749e5a46"
         );
-        assert_eq!(fixture.cases.len(), 5, "fixture case count changed");
+        assert_eq!(fixture.cases.len(), 7, "fixture case count changed");
 
         for case in fixture.cases {
             let actual = match initialize(case.request.as_bytes(), &handler) {
