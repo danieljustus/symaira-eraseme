@@ -400,6 +400,27 @@ impl ContractHandler {
             },
         }))
     }
+
+    /// Go's `schedule_install`. Only the dry run is implemented: it delegates to
+    /// the same generator as `generate_scheduler`, leaving the paths to the
+    /// engine's defaults — which is what Go does, since this tool accepts only
+    /// the platform and the tick time. Installing for real writes into the
+    /// platform's scheduler directories and is not part of this slice.
+    fn schedule_install(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        if !get_bool(arguments, "dry_run", false) {
+            return Err(ToolError(
+                "installing the schedule is not implemented in this slice".to_owned(),
+            ));
+        }
+        let config = scheduler::Config {
+            platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
+            tick_hour: get_int(arguments, "tick_hour", 10) as i32,
+            tick_minute: get_int(arguments, "tick_minute", 0) as i32,
+            ..scheduler::Config::default()
+        };
+        let files = scheduler::generate(&config).map_err(|error| ToolError(error.to_string()))?;
+        Ok(json!({"success": true, "files": files, "dry_run": true}))
+    }
 }
 
 /// Go's `parsePollHours`: empty means "no override", and each value must be a
@@ -438,6 +459,7 @@ impl ToolHandler for ContractHandler {
             "generate_scheduler" => self.generate_scheduler(arguments),
             "plan_create" => self.plan_create(arguments),
             "list_brokers" => self.list_brokers(arguments),
+            "schedule_install" => self.schedule_install(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -1024,6 +1046,70 @@ mod tests {
         let active = call("{}");
         assert_eq!(active["count"], 1273);
         assert_eq!(active["filters"]["status"], "active");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `schedule_install` accepts only the platform and the tick time, so its
+    /// templates embed paths from the engine's defaults — under `go run` the
+    /// resolved binary lives in a fresh temp directory each time, which is why
+    /// the oracle could not record the answer. The file *names* are stable and
+    /// are asserted here against the set Go's real handler produced.
+    #[test]
+    fn schedule_install_dry_run_shape_and_refusal() {
+        let root = workspace("schedule-install");
+        let handler = ContractHandler::new(&root);
+        let call = |arguments: &str| -> Value {
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+            let request = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "schedule_install", "arguments": arguments},
+            })
+            .to_string();
+            match initialize(request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => {
+                    serde_json::from_slice(&bytes).expect("envelope JSON")
+                }
+                other => panic!("expected a response, got {other:?}"),
+            }
+        };
+
+        let installed =
+            call(r#"{"dry_run":true,"platform":"cron","tick_hour":9,"tick_minute":30}"#);
+        let text = installed["result"]["content"][0]["text"]
+            .as_str()
+            .expect("payload text");
+        let payload: Value = serde_json::from_str(text).expect("payload JSON");
+        assert_eq!(payload["success"], true);
+        assert_eq!(payload["dry_run"], true);
+        let mut names: Vec<&str> = payload["files"]
+            .as_object()
+            .expect("files")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            vec![
+                "crontab.txt",
+                "install.sh",
+                "symeraseme-poll.sh",
+                "symeraseme-rescan.sh",
+                "symeraseme-tick.sh",
+                "uninstall.sh",
+            ]
+        );
+
+        // Writing into the platform's scheduler directories is not in this slice.
+        let refused = call(r#"{"dry_run":false}"#);
+        assert!(
+            refused["error"]["message"]
+                .as_str()
+                .unwrap_or("")
+                .contains("installing the schedule is not implemented"),
+            "{refused}"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }
