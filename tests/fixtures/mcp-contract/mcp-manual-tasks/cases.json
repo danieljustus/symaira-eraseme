@@ -1,0 +1,21 @@
+{
+  "source_revision": "42614bc27527711baec9b3e9d2805ce1e1dee185",
+  "source_path": "internal/mcp/contract_handler.go:167-320, internal/manualtasks/service.go:37-135",
+  "cases": [
+    {
+      "name": "manual_tasks_show_reports_a_missing_task",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_show\",\"arguments\":{\"task_id\":999}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"error\\\":\\\"Manual task #999 not found. Run 'symeraseme manual-tasks list' to see available tasks.\\\",\\\"success\\\":false}\",\"type\":\"text\"}]},\"id\":3}\n"
+    },
+    {
+      "name": "manual_tasks_complete_marks_the_task_completed",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_complete\",\"arguments\":{\"task_id\":1,\"notes\":\"done by hand\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Manual task #1 marked as completed.\\\",\\\"success\\\":true,\\\"task_id\\\":1}\",\"type\":\"text\"}]},\"id\":4}\n"
+    },
+    {
+      "name": "manual_tasks_cleanup_reports_a_missing_directory",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_cleanup\",\"arguments\":{\"dry_run\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"No manual tasks directory found — nothing to clean up.\\\",\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":5}\n"
+    }
+  ]
+}

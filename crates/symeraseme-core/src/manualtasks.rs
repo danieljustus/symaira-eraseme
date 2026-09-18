@@ -151,6 +151,15 @@ fn redact_fields(
 
 /// The Python-compatible manual-task artifact directory.
 pub fn tasks_dir() -> io::Result<PathBuf> {
+    tasks_dir_in(None)
+}
+
+/// The artifact directory for an explicit data directory. `None` falls back to
+/// `SYMERASEME_DATA_DIR` and then to the platform default, matching Go.
+pub fn tasks_dir_in(data_dir: Option<&Path>) -> io::Result<PathBuf> {
+    if let Some(root) = data_dir {
+        return Ok(root.join("manual_tasks"));
+    }
     if let Ok(value) = env::var("SYMERASEME_DATA_DIR")
         && !value.is_empty()
     {
