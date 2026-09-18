@@ -86,7 +86,10 @@ struct ServerInfo {
 #[derive(Serialize)]
 struct EmptyObject {}
 
-pub(crate) fn initialize(raw: &[u8]) -> InitializeOutcome {
+pub(crate) fn initialize(
+    raw: &[u8],
+    handler: &dyn super::handler::ToolHandler,
+) -> InitializeOutcome {
     let value = match parse_request(raw) {
         RequestParse::State(state) => state,
         RequestParse::ParseError => return InitializeOutcome::ParseError,
@@ -136,7 +139,7 @@ pub(crate) fn initialize(raw: &[u8]) -> InitializeOutcome {
             if notification {
                 return InitializeOutcome::Notification;
             }
-            return match super::tools_call::tools_call(raw) {
+            return match super::tools_call::tools_call(raw, handler) {
                 super::tools_call::ToolsCallOutcome::Response(bytes) => {
                     InitializeOutcome::Response(bytes)
                 }
@@ -823,6 +826,7 @@ fn expand_decimal(mantissa: &str, exponent: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mcp::handler::test_support::no_backend_handler;
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -868,7 +872,7 @@ mod tests {
     }
 
     fn response(raw: &str) -> Vec<u8> {
-        match initialize(raw.as_bytes()) {
+        match initialize(raw.as_bytes(), &no_backend_handler()) {
             InitializeOutcome::Response(value) => value,
             other => panic!("expected response, got {other:?}"),
         }
@@ -899,7 +903,10 @@ mod tests {
     #[test]
     fn params_and_id_validation_match_go() {
         assert!(matches!(
-            initialize(br#"{"jsonrpc":"2.0","method":"initialize"}"#),
+            initialize(
+                br#"{"jsonrpc":"2.0","method":"initialize"}"#,
+                &no_backend_handler()
+            ),
             InitializeOutcome::Notification
         ));
         assert_eq!(
@@ -931,7 +938,7 @@ mod tests {
             "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.response.json"
         );
         assert_eq!(
-            initialize(REQUEST),
+            initialize(REQUEST, &no_backend_handler()),
             InitializeOutcome::Response(RESPONSE.to_vec())
         );
     }
@@ -941,7 +948,10 @@ mod tests {
         const NOTIFICATION: &[u8] = include_bytes!(
             "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.notification.request.jsonl"
         );
-        assert_eq!(initialize(NOTIFICATION), InitializeOutcome::Notification);
+        assert_eq!(
+            initialize(NOTIFICATION, &no_backend_handler()),
+            InitializeOutcome::Notification
+        );
     }
 
     #[test]
@@ -966,7 +976,7 @@ mod tests {
         .expect("envelope fixture");
         for case in fixture.cases {
             let request = case.request.expect("fixture request").into_bytes();
-            let actual = match initialize(&request) {
+            let actual = match initialize(&request, &no_backend_handler()) {
                 InitializeOutcome::Response(bytes) => Some(String::from_utf8(bytes).unwrap()),
                 InitializeOutcome::Notification => None,
                 InitializeOutcome::ParseError => {
@@ -986,7 +996,10 @@ mod tests {
 
     #[test]
     fn malformed_json_is_left_to_the_transport_parser() {
-        assert_eq!(initialize(br#"{"#), InitializeOutcome::ParseError);
+        assert_eq!(
+            initialize(br#"{"#, &no_backend_handler()),
+            InitializeOutcome::ParseError
+        );
     }
 
     #[test]
@@ -1014,7 +1027,7 @@ mod tests {
                         .map(|request| request.as_bytes().to_vec())
                 })
                 .expect("fixture request");
-            let actual = match initialize(&request) {
+            let actual = match initialize(&request, &no_backend_handler()) {
                 InitializeOutcome::Response(bytes) => Some(String::from_utf8(bytes).unwrap()),
                 InitializeOutcome::Notification => None,
                 InitializeOutcome::ParseError => {
