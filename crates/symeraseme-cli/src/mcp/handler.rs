@@ -625,14 +625,22 @@ mod tests {
             .clone();
 
         let call_envelope = |arguments: &str, name: &str| -> Value {
-            let request = format!(
-                r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"{name}","arguments":{arguments}}}}}"#
-            );
+            // Build the request through serde_json so argument values are
+            // escaped correctly — a Windows path contains backslashes, which
+            // manual string formatting turns into invalid JSON.
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments are JSON");
+            let request = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": name, "arguments": arguments},
+            })
+            .to_string();
             match initialize(request.as_bytes(), &handler) {
                 InitializeOutcome::Response(bytes) => {
                     serde_json::from_slice(&bytes).expect("envelope JSON")
                 }
-                other => panic!("expected a response, got {other:?}"),
+                other => panic!("expected a response for {name}, got {other:?}"),
             }
         };
         // The tool payload is a JSON string inside the content envelope.
@@ -699,13 +707,11 @@ mod tests {
         let embedded = call("{}", "validate");
         assert_eq!(embedded["ok"], true);
         assert!(embedded["totals"]["valid"].as_i64().expect("valid") > 0);
-        let absolute = call(
-            &format!(
-                r#"{{"registry_dir":"{}"}}"#,
-                root.join("registry").display()
-            ),
-            "validate",
-        );
+        // The path goes through serde_json so a Windows backslash cannot
+        // produce invalid JSON.
+        let absolute_arguments =
+            json!({"registry_dir": root.join("registry").to_string_lossy()}).to_string();
+        let absolute = call(&absolute_arguments, "validate");
         assert_eq!(absolute["totals"]["valid"], 3);
 
         // A catalogue tool that is not wired yet says so instead of pretending
