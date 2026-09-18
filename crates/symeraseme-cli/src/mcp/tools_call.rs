@@ -6,7 +6,6 @@
 //! passes validation is answered with an explicit fail-closed error rather
 //! than a fabricated result.
 
-use serde::Serialize;
 use serde_json::Value;
 
 const TOOL_CATALOGUE: &[u8] = include_bytes!("../../../../internal/mcp/tools.json");
@@ -14,27 +13,16 @@ const TOOL_CATALOGUE: &[u8] = include_bytes!("../../../../internal/mcp/tools.jso
 /// The legacy name Go accepts in `tools/call` without a catalogue entry.
 const LEGACY_STATUS_ALIAS: &str = "status";
 
+/// Go's `NewServerWithOptions` substitutes a handler that fails with exactly
+/// this message when none is injected, so a validated call answered by a
+/// handler-less server is a defined part of the contract.
+const NO_BACKEND_MESSAGE: &str = "tool backend is not available";
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ToolsCallOutcome {
     Response(Vec<u8>),
     Notification,
     ParseError,
-}
-
-#[derive(Serialize)]
-struct Response<'a> {
-    jsonrpc: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<RpcError<'a>>,
-    id: &'a Value,
-}
-
-#[derive(Serialize)]
-struct RpcError<'a> {
-    code: i32,
-    message: &'a str,
 }
 
 /// Handles one JSON-RPC `tools/call` request without transport concerns.
@@ -173,20 +161,12 @@ fn deferred_execution(id: &Value) -> ToolsCallOutcome {
     response_error(
         id,
         -32603,
-        "tool execution is not implemented in this slice",
+        &super::envelope::sanitize_error(NO_BACKEND_MESSAGE),
     )
 }
 
 fn response_error(id: &Value, code: i32, message: &str) -> ToolsCallOutcome {
-    let response = Response {
-        jsonrpc: "2.0",
-        result: None,
-        error: Some(RpcError { code, message }),
-        id,
-    };
-    let mut output = serde_json::to_vec(&response).expect("MCP response is serializable");
-    output.push(b'\n');
-    ToolsCallOutcome::Response(output)
+    ToolsCallOutcome::Response(super::envelope::error_response(id, code, message))
 }
 
 #[cfg(test)]
@@ -212,17 +192,16 @@ mod tests {
     }
 
     #[test]
-    fn a_valid_call_is_deferred_with_an_explicit_error() {
-        // Deliberate fail-closed gap, asserted on the Rust side only: Go would
-        // execute the tool and return a content envelope here, so pinning a
-        // byte value would fake parity. MCP-003 replaces this with the executor.
-        let text = response_text(
-            r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"redact_file","arguments":{"path":"x"}}}"#,
-        );
-        assert!(text.contains("\"code\":-32603"), "{text}");
-        assert!(
-            text.contains("tool execution is not implemented in this slice"),
-            "{text}"
+    fn a_valid_call_matches_the_go_handler_less_backend_error() {
+        // Go substitutes a failing default handler when none is injected, so
+        // this is the defined answer of a handler-less server. It is pinned by
+        // the mcp-result fixture case default_handler_reports_missing_backend.
+        // MCP-003 replaces the deferral itself with a real executor.
+        assert_eq!(
+            response_text(
+                r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"redact_file","arguments":{"path":"x"}}}"#,
+            ),
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"tool backend is not available\"},\"id\":9}\n"
         );
     }
 
