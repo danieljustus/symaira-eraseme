@@ -165,8 +165,8 @@ SQLite, network transcript or process behavior.
 | MCP-011 | MCP HTTP | Origin/loopback/`--allow-remote` policy | host/origin matrix | native network tests | side-effect | native OS | TODO |
 | MCP-012 | MCP HTTP | token path/mode/rotation | isolated data dir | filesystem manifest | side-effect | native OS | TODO |
 | MCP-013 | MCP HTTP | SIGINT/SIGTERM and 5s graceful shutdown | process harness | signal tests | side-effect | native OS | TODO |
-| MCP-014 | MCP stdio | newline frames and zero stdout pollution | raw stream | raw stream comparator | byte | all | TODO |
-| MCP-015 | MCP stdio | malformed/truncated/multiple frames | fuzz corpus | parser tests/fuzz | byte+exit | all | TODO |
+| MCP-014 | MCP stdio | Consecutive JSON values separated by whitespace — **not** newline frames (measured: a value may span lines, three values may sit on one line); one response per request, notifications silent, nothing else on stdout | Go `ServeStdio`; `tests/fixtures/mcp-contract/mcp-stream/cases.json` (13 measured cases) | `crates/symeraseme-cli/src/mcp/stream.rs`, raw stream comparator | byte | all | PARTIAL (framing and response stream pinned byte-exactly; zero-stdout-pollution check and live-pipe streaming still pending) |
+| MCP-015 | MCP stdio | Malformed, truncated and multiple values in one stream | same oracle fixture (adjacent, truncated, junk, scalar and string cases) | `stream.rs` error cases; fuzz corpus still pending | byte+exit | all | PARTIAL (multiple values answered, malformed/truncated input aborts the stream without a fabricated response, each pinned byte-exactly; fuzz corpus pending) |
 | APP-000 | SwiftUI | `listTools()` parses raw `result.tools`, not call content envelope | exact Go response; issue #797 | `MCPClientToolsListTests` | semantic | macOS | PASS |
 | APP-001 | SwiftUI | binary discovery order and name | Swift unit tests | Rust binary fixture | side-effect | macOS | TODO |
 | APP-002 | SwiftUI | launch `mcp --host --port` | supervisor test | Rust E2E | side-effect | macOS | TODO |
