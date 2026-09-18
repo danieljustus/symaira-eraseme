@@ -26,6 +26,16 @@
       "name": "validate_reports_a_clean_registry",
       "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"validate\",\"arguments\":{\"registry_dir\":\"registry\"}}}",
       "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"ok\\\":true,\\\"schema_version\\\":1,\\\"totals\\\":{\\\"duplicate_ids\\\":0,\\\"failed\\\":0,\\\"valid\\\":3}}\",\"type\":\"text\"}]},\"id\":5}\n"
+    },
+    {
+      "name": "grant_dry_run_echoes_defaults",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"grant\",\"arguments\":{\"dry_run\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"command\\\":\\\"execute\\\",\\\"dry_run\\\":true,\\\"revoke\\\":\\\"\\\",\\\"revoke_all\\\":false,\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":6}\n"
+    },
+    {
+      "name": "grant_dry_run_echoes_explicit_arguments",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"grant\",\"arguments\":{\"dry_run\":true,\"command\":\"execute\",\"revoke\":\"token-1\",\"revoke_all\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"command\\\":\\\"execute\\\",\\\"dry_run\\\":true,\\\"revoke\\\":\\\"token-1\\\",\\\"revoke_all\\\":true,\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":7}\n"
     }
   ]
 }

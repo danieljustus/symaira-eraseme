@@ -131,6 +131,16 @@ func writeFixture() {
 			Name:    "validate_reports_a_clean_registry",
 			Request: callRequest(5, "validate", `{"registry_dir":"registry"}`),
 		},
+		{
+			// `grant` with a dry run echoes its arguments and touches no store,
+			// so it is fully reproducible.
+			Name:    "grant_dry_run_echoes_defaults",
+			Request: callRequest(6, "grant", `{"dry_run":true}`),
+		},
+		{
+			Name:    "grant_dry_run_echoes_explicit_arguments",
+			Request: callRequest(7, "grant", `{"dry_run":true,"command":"execute","revoke":"token-1","revoke_all":true}`),
+		},
 	}
 
 	for index := range cases {
