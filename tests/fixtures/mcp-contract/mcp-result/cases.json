@@ -1,0 +1,78 @@
+{
+  "source_revision": "2f2e6985be9cf231afba7018c4314ac45193e3cc",
+  "source_path": "internal/mcp/server.go:38-44,180-250,344-375",
+  "cases": [
+    {
+      "name": "result_envelope_wraps_string_result",
+      "handler": "string",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"redacted text\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "result_envelope_wraps_object_result",
+      "handler": "object",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"a\\\":1,\\\"b\\\":[2]}\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "result_envelope_wraps_array_result",
+      "handler": "array",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"[1,\\\"two\\\"]\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "result_envelope_wraps_number_result",
+      "handler": "number",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"42\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "handler_returning_nil_result",
+      "handler": "nil-handler",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"null\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "sanitized_sqlite_error_hides_storage_detail",
+      "handler": "error-sqlite",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Database not ready — start the server again\"},\"id\":7}\n"
+    },
+    {
+      "name": "sanitized_no_such_table_error_hides_storage_detail",
+      "handler": "error-no-such-table",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Database not ready — start the server again\"},\"id\":7}\n"
+    },
+    {
+      "name": "sanitized_locked_error_hides_storage_detail",
+      "handler": "error-locked",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Database not ready — start the server again\"},\"id\":7}\n"
+    },
+    {
+      "name": "sanitized_malformed_image_error_hides_storage_detail",
+      "handler": "error-malformed",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Database not ready — start the server again\"},\"id\":7}\n"
+    },
+    {
+      "name": "sanitized_panic_error_becomes_internal_server_error",
+      "handler": "error-panic-marker",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Internal server error\"},\"id\":7}\n"
+    },
+    {
+      "name": "unsanitized_handler_error_is_passed_through",
+      "handler": "error-plain",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"campaign not found\"},\"id\":7}\n"
+    },
+    {
+      "name": "default_handler_reports_missing_backend",
+      "handler": "default-nil",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"x\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"tool backend is not available\"},\"id\":7}\n"
+    }
+  ]
+}
