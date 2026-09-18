@@ -27,7 +27,11 @@ pub(crate) enum StreamError {
 /// ponytail: the whole input is buffered instead of read incrementally; the
 /// streaming reader arrives with the real `serve` command, which is what decides
 /// when a value is complete on a live pipe.
-pub(crate) fn serve_stream(input: &[u8], output: &mut Vec<u8>) -> Result<(), StreamError> {
+pub(crate) fn serve_stream(
+    input: &[u8],
+    output: &mut Vec<u8>,
+    handler: &dyn super::handler::ToolHandler,
+) -> Result<(), StreamError> {
     let mut index = 0;
     loop {
         skip_whitespace(input, &mut index);
@@ -38,7 +42,7 @@ pub(crate) fn serve_stream(input: &[u8], output: &mut Vec<u8>) -> Result<(), Str
         let Some(end) = skip_json_value(input, start) else {
             return Err(StreamError::MalformedValue(start));
         };
-        match initialize(&input[start..end]) {
+        match initialize(&input[start..end], handler) {
             InitializeOutcome::Response(bytes) => output.extend_from_slice(&bytes),
             InitializeOutcome::Notification => {}
             InitializeOutcome::ParseError => return Err(StreamError::UnparsableValue(start)),
@@ -50,6 +54,7 @@ pub(crate) fn serve_stream(input: &[u8], output: &mut Vec<u8>) -> Result<(), Str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mcp::handler::test_support::no_backend_handler;
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -105,7 +110,7 @@ mod tests {
                 .map(decode_base64)
                 .unwrap_or_default();
             let mut output = Vec::new();
-            let result = serve_stream(&input, &mut output);
+            let result = serve_stream(&input, &mut output, &no_backend_handler());
             if case.parse_error {
                 assert!(result.is_err(), "{} should have aborted", case.name);
                 continue;
@@ -127,6 +132,7 @@ mod tests {
             br#"{"jsonrpc":"2.0","method":"initialize"}
 {"jsonrpc":"2.0","id":1,"method":"initialize"}{"jsonrpc":"2.0","id":2,"method":"initialize"}"#,
             &mut output,
+            &no_backend_handler(),
         )
         .expect("stream is well formed");
         let text = String::from_utf8(output).expect("responses are UTF-8");
@@ -137,7 +143,8 @@ mod tests {
     #[test]
     fn a_truncated_stream_reports_the_offset_and_writes_nothing_extra() {
         let mut output = Vec::new();
-        let error = serve_stream(br#"{"jsonrpc":"2.0","#, &mut output).unwrap_err();
+        let error =
+            serve_stream(br#"{"jsonrpc":"2.0","#, &mut output, &no_backend_handler()).unwrap_err();
         assert_eq!(error, StreamError::MalformedValue(0));
         assert!(output.is_empty());
     }

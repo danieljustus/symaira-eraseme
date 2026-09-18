@@ -8,15 +8,12 @@
 
 use serde_json::Value;
 
+use super::handler::ToolHandler;
+
 const TOOL_CATALOGUE: &[u8] = include_bytes!("../../../../internal/mcp/tools.json");
 
 /// The legacy name Go accepts in `tools/call` without a catalogue entry.
 const LEGACY_STATUS_ALIAS: &str = "status";
-
-/// Go's `NewServerWithOptions` substitutes a handler that fails with exactly
-/// this message when none is injected, so a validated call answered by a
-/// handler-less server is a defined part of the contract.
-const NO_BACKEND_MESSAGE: &str = "tool backend is not available";
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ToolsCallOutcome {
@@ -26,7 +23,7 @@ pub(crate) enum ToolsCallOutcome {
 }
 
 /// Handles one JSON-RPC `tools/call` request without transport concerns.
-pub(crate) fn tools_call(raw: &[u8]) -> ToolsCallOutcome {
+pub(crate) fn tools_call(raw: &[u8], handler: &dyn ToolHandler) -> ToolsCallOutcome {
     let Ok(request) = serde_json::from_slice::<Value>(raw) else {
         return ToolsCallOutcome::ParseError;
     };
@@ -89,20 +86,50 @@ pub(crate) fn tools_call(raw: &[u8]) -> ToolsCallOutcome {
         if name != LEGACY_STATUS_ALIAS {
             return response_error(id, -32601, "method not found");
         }
-        // ponytail: the legacy `status` alias validates like Go but has no
-        // executor here; extend with the real handler when MCP-003 lands.
-        return deferred_execution(id);
+        // The legacy `status` alias passes validation but has no case in Go's
+        // contract handler either, so the handler answers with its default.
+        return dispatch(handler, id, name, arguments);
     };
 
     if let Err(message) = validate_arguments(tool, arguments) {
         return response_error(id, -32602, &message);
     }
 
-    // ponytail: validation is complete, execution is not part of this slice.
-    // Go would call the tool handler here and answer with a content envelope;
-    // answering with a fabricated envelope would fake parity, so this slice
-    // fails closed until MCP-003 provides the executor.
-    deferred_execution(id)
+    dispatch(handler, id, name, arguments)
+}
+
+/// Runs the handler and maps its outcome the way Go does: a result becomes the
+/// content envelope, a failure becomes a sanitized `-32603`.
+fn dispatch(
+    handler: &dyn ToolHandler,
+    id: &Value,
+    name: &str,
+    arguments: &serde_json::Map<String, Value>,
+) -> ToolsCallOutcome {
+    match handler.call(name, arguments) {
+        Ok(result) => {
+            ToolsCallOutcome::Response(super::envelope::result_response(id, Some(&result)))
+        }
+        Err(error) => response_error(
+            id,
+            -32603,
+            &super::envelope::sanitize_error(&error.to_string()),
+        ),
+    }
+}
+
+/// Whether the embedded catalogue contains a tool with this name.
+pub(crate) fn catalogue_has_tool(name: &str) -> bool {
+    let catalogue: Value =
+        serde_json::from_slice(TOOL_CATALOGUE).expect("Go MCP catalogue is valid JSON");
+    catalogue
+        .get("tools")
+        .and_then(Value::as_array)
+        .is_some_and(|tools| {
+            tools
+                .iter()
+                .any(|tool| tool.get("name").and_then(Value::as_str) == Some(name))
+        })
 }
 
 /// Mirrors Go's `validateToolArguments`: required keys first, then the type of
@@ -157,14 +184,6 @@ fn invalid_request(id: Option<&Value>) -> ToolsCallOutcome {
     response_error(id.unwrap_or(&Value::Null), -32600, "invalid request")
 }
 
-fn deferred_execution(id: &Value) -> ToolsCallOutcome {
-    response_error(
-        id,
-        -32603,
-        &super::envelope::sanitize_error(NO_BACKEND_MESSAGE),
-    )
-}
-
 fn response_error(id: &Value, code: i32, message: &str) -> ToolsCallOutcome {
     ToolsCallOutcome::Response(super::envelope::error_response(id, code, message))
 }
@@ -172,9 +191,10 @@ fn response_error(id: &Value, code: i32, message: &str) -> ToolsCallOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mcp::handler::test_support::no_backend_handler;
 
     fn response_text(raw: &str) -> String {
-        match tools_call(raw.as_bytes()) {
+        match tools_call(raw.as_bytes(), &no_backend_handler()) {
             ToolsCallOutcome::Response(bytes) => {
                 String::from_utf8(bytes).expect("response is UTF-8")
             }
@@ -184,9 +204,12 @@ mod tests {
 
     #[test]
     fn non_object_payloads_are_parse_errors() {
-        assert_eq!(tools_call(b"not json"), ToolsCallOutcome::ParseError);
         assert_eq!(
-            tools_call(br#"[{"jsonrpc":"2.0"}]"#),
+            tools_call(b"not json", &no_backend_handler()),
+            ToolsCallOutcome::ParseError
+        );
+        assert_eq!(
+            tools_call(br#"[{"jsonrpc":"2.0"}]"#, &no_backend_handler()),
             ToolsCallOutcome::ParseError
         );
     }
@@ -206,11 +229,16 @@ mod tests {
     }
 
     #[test]
-    fn the_legacy_status_alias_validates_and_is_deferred() {
+    fn the_legacy_status_alias_reaches_the_handler() {
+        // `status` passes validation but is not in the catalogue, so it lands on
+        // the handler's default — the same path Go takes.
         let text = response_text(
             r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"status"}}"#,
         );
-        assert!(text.contains("\"code\":-32603"), "{text}");
+        assert_eq!(
+            text,
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"tool backend is not available\"},\"id\":9}\n"
+        );
     }
 
     #[test]

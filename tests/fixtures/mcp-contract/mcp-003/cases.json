@@ -1,0 +1,31 @@
+{
+  "source_revision": "79bf23e83b31f18d98487101200eaf32749e5a46",
+  "source_path": "internal/mcp/contract_handler.go:167-320",
+  "cases": [
+    {
+      "name": "redact_file_returns_the_redacted_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"pii.txt\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"Contact j******e@e*.com or ***-***-4567.\\n\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "redact_file_leaves_clean_text_unchanged",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"clean.txt\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"No personal data here.\\n\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
+      "name": "redact_file_reports_a_missing_file_as_a_tool_error",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":{\"path\":\"missing.txt\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"workspace file read failed\"},\"id\":3}\n"
+    },
+    {
+      "name": "legacy_status_alias_hits_the_handler_default",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"status\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"tool not found\"},\"id\":4}\n"
+    },
+    {
+      "name": "validate_reports_a_clean_registry",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"validate\",\"arguments\":{\"registry_dir\":\"registry\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"ok\\\":true,\\\"schema_version\\\":1,\\\"totals\\\":{\\\"duplicate_ids\\\":0,\\\"failed\\\":0,\\\"valid\\\":3}}\",\"type\":\"text\"}]},\"id\":5}\n"
+    }
+  ]
+}
