@@ -130,6 +130,22 @@ pub(crate) fn initialize(raw: &[u8]) -> InitializeOutcome {
                 super::tools_list::ToolsListOutcome::ParseError => InitializeOutcome::ParseError,
             };
         }
+        if matches!(method, "tools/call") {
+            // Go dispatches a notification and then drops every response,
+            // including errors, so this check comes before any rejection.
+            if notification {
+                return InitializeOutcome::Notification;
+            }
+            return match super::tools_call::tools_call(raw) {
+                super::tools_call::ToolsCallOutcome::Response(bytes) => {
+                    InitializeOutcome::Response(bytes)
+                }
+                super::tools_call::ToolsCallOutcome::Notification => {
+                    InitializeOutcome::Notification
+                }
+                super::tools_call::ToolsCallOutcome::ParseError => InitializeOutcome::ParseError,
+            };
+        }
         return if notification {
             InitializeOutcome::Notification
         } else {
@@ -926,6 +942,46 @@ mod tests {
             "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.notification.request.jsonl"
         );
         assert_eq!(initialize(NOTIFICATION), InitializeOutcome::Notification);
+    }
+
+    #[test]
+    fn source_bound_go_envelope_fixture_matches_through_the_shared_entry() {
+        #[derive(Deserialize)]
+        struct EnvelopeCase {
+            name: String,
+            request: Option<String>,
+            response: Option<String>,
+            #[serde(default)]
+            parse_error: bool,
+        }
+
+        #[derive(Deserialize)]
+        struct EnvelopeFixture {
+            cases: Vec<EnvelopeCase>,
+        }
+
+        let fixture: EnvelopeFixture = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/mcp-contract/mcp-envelope/cases.json"
+        ))
+        .expect("envelope fixture");
+        for case in fixture.cases {
+            let request = case.request.expect("fixture request").into_bytes();
+            let actual = match initialize(&request) {
+                InitializeOutcome::Response(bytes) => Some(String::from_utf8(bytes).unwrap()),
+                InitializeOutcome::Notification => None,
+                InitializeOutcome::ParseError => {
+                    assert!(
+                        case.parse_error,
+                        "{} unexpectedly parsed as error",
+                        case.name
+                    );
+                    None
+                }
+            };
+            if !case.parse_error {
+                assert_eq!(actual, case.response, "{}", case.name);
+            }
+        }
     }
 
     #[test]

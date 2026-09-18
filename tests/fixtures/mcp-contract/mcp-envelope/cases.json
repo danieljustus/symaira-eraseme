@@ -1,0 +1,76 @@
+{
+  "source_revision": "a51c7f3c65218924ce1d505ad8389b2216f08c92",
+  "source_path": "internal/mcp/server.go:180-251,377-389",
+  "cases": [
+    {
+      "name": "notification_unknown_method_is_silent",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"nope\"}",
+      "response": null
+    },
+    {
+      "name": "notification_unknown_method_with_params_is_silent",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"nope\",\"params\":{}}",
+      "response": null
+    },
+    {
+      "name": "request_unknown_method_is_not_found",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"nope\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    },
+    {
+      "name": "empty_object_is_invalid_request",
+      "request": "{}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "empty_batch_is_invalid_request",
+      "request": "[]",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "batch_array_initialize",
+      "request": "[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}]",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "tools_call_missing_name",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing tool name\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_blank_name",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"  \"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing tool name\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_unknown_tool",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"nope\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_missing_required_argument",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing required argument: path\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_non_object_arguments",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"redact_file\",\"arguments\":[]}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_non_object_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":[]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"
+    },
+    {
+      "name": "tools_call_invalid_parameter_type",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{\"campaign_id\":5}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid parameter type: campaign_id\"},\"id\":1}\n"
+    },
+    {
+      "name": "legacy_bare_status_is_not_found",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"status\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    }
+  ]
+}
