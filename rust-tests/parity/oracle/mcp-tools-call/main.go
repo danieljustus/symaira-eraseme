@@ -152,6 +152,11 @@ func writeFixture() {
 		// would duplicate the embedded registry, whose model and filter semantics
 		// already have byte-exact coverage in the registry goldens, so the tool is
 		// covered by shape assertions instead.
+		// Not recorded: `schedule_install` accepts only platform/tick fields, so the
+		// paths its templates embed come from Go's defaults. Those resolve to the
+		// running binary, and under `go run` that is a fresh temp directory every
+		// time — the answer changed between two runs. The file *names* are stable,
+		// so the tool is covered by shape assertions instead.
 		{
 			// The dry run returns the generated file *contents*, so pinning the
 			// paths in the request makes it reproducible.
