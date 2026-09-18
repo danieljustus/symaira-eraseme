@@ -2,6 +2,7 @@
 
 //! Deterministic domain foundations for Symaira EraseMe.
 
+pub mod campaign;
 pub mod config;
 pub mod confirmation;
 pub mod deadlines;
