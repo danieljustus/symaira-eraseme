@@ -1,0 +1,402 @@
+{
+  "source_revision": "a51c7f3c65218924ce1d505ad8389b2216f08c92",
+  "source_path": "internal/mcp/server.go:180-207,377-389",
+  "cases": [
+    {
+      "name": "initialize_missing_params_numeric_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_float_id_normalizes_like_go",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1.0,\"method\":\"initialize\",\"params\":null}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_large_number_id_uses_go_decimal_boundary",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e20,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":100000000000000000000}\n"
+    },
+    {
+      "name": "initialize_small_number_id_uses_go_decimal_boundary",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e-7,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1e-7}\n"
+    },
+    {
+      "name": "initialize_negative_zero_id_is_preserved",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":-0,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":-0}\n"
+    },
+    {
+      "name": "initialize_object_params_string_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"x\",\"method\":\"initialize\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"x\"}\n"
+    },
+    {
+      "name": "initialize_explicit_null_id_is_a_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\"}",
+      "response": null
+    },
+    {
+      "name": "initialize_array_params_rejected",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"x\",\"method\":\"initialize\",\"params\":[]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":\"x\"}\n"
+    },
+    {
+      "name": "initialize_invalid_id_rejected",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":true,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_wrong_protocol_rejected",
+      "request": "{\"jsonrpc\":\"1.0\",\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_empty_method_rejected",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_method_is_not_found",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"other\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_int64_max_id_uses_go_float64",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":9223372036854775807,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":9223372036854776000}\n"
+    },
+    {
+      "name": "initialize_out_of_range_id_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e400,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_unknown_out_of_range_number_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":1e400}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_out_of_range_params_is_invalid_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":1e400}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_out_of_range_jsonrpc_is_invalid_request",
+      "request": "{\"jsonrpc\":1e400,\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_out_of_range_method_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":1e400}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_duplicate_overflow_id_uses_last_valid_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e400,\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_lower_fixed_float_boundary",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e-6,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":0.000001}\n"
+    },
+    {
+      "name": "initialize_lower_exponent_float_boundary",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e-7,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1e-7}\n"
+    },
+    {
+      "name": "initialize_upper_exponent_float_boundary",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1e21,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1e+21}\n"
+    },
+    {
+      "name": "initialize_html_escaped_string_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\u003c\u003e\u0026\\u2028\\u2029\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"\\u003c\\u003e\\u0026\\u2028\\u2029\"}\n"
+    },
+    {
+      "name": "initialize_case_insensitive_field_names",
+      "request": "{\"JSONRPC\":\"2.0\",\"ID\":1,\"METHOD\":\"initialize\",\"PARAMS\":null}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_unicode_folded_params_is_invalid_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"paramſ\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_unicode_nonfolded_dotless_id_is_notification",
+      "request": "{\"jsonrpc\":\"2.0\",\"ıd\":1,\"method\":\"initialize\"}",
+      "response": null
+    },
+    {
+      "name": "initialize_duplicate_jsonrpc_type_error_is_sticky",
+      "request": "{\"jsonrpc\":1,\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_duplicate_jsonrpc_case_insensitive_type_error_is_sticky",
+      "request": "{\"JSONRPC\":\"2.0\",\"jsonrpc\":1,\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_duplicate_method_type_error_is_sticky",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":1,\"method\":\"initialize\",\"id\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_duplicate_method_case_insensitive_type_error_is_sticky",
+      "request": "{\"jsonrpc\":\"2.0\",\"METHOD\":\"initialize\",\"method\":1,\"id\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "initialize_duplicate_id_case_insensitive_last_wins",
+      "request": "{\"jsonrpc\":\"2.0\",\"ID\":1,\"id\":\"two\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"two\"}\n"
+    },
+    {
+      "name": "initialize_duplicate_params_uses_last_object",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":1,\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_duplicate_params_uses_last_scalar",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{},\"params\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_duplicate_params_case_insensitive_last_wins",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"PARAMS\":1,\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_duplicate_jsonrpc_null_preserves_value",
+      "request": "{\"jsonrpc\":\"2.0\",\"JSONRPC\":null,\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_duplicate_method_null_preserves_value",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"METHOD\":null,\"id\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_trailing_comma_is_parse_error",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",}",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "initialize_vertical_tab_is_parse_error",
+      "request_b64": "ewsianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0=",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "initialize_nested_params_overflow_is_invalid_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"nested-overflow\",\"method\":\"initialize\",\"params\":{\"x\":1e400}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":\"nested-overflow\"}\n"
+    },
+    {
+      "name": "initialize_nested_params_array_overflow_is_invalid_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"nested-array-overflow\",\"method\":\"initialize\",\"params\":{\"x\":[{\"y\":1e400}]}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":\"nested-array-overflow\"}\n"
+    },
+    {
+      "name": "initialize_unpaired_jsonrpc_surrogate_is_replaced",
+      "request": "{\"jsonrpc\":\"\\ud800\",\"id\":1,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_unpaired_method_surrogate_is_replaced",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\\ud800\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_unpaired_string_id_surrogate_is_replaced",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\ud800\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"�\"}\n"
+    },
+    {
+      "name": "initialize_invalid_utf8_string_id_sequence_is_replaced_bytewise",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiJ44oIoIiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"x��(\"}\n"
+    },
+    {
+      "name": "initialize_invalid_utf8_params_value_is_replaced",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiJwYXJhbS1ieXRlcyIsIm1ldGhvZCI6ImluaXRpYWxpemUiLCJwYXJhbXMiOnsieCI6Iv8ifX0=",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"param-bytes\"}\n"
+    },
+    {
+      "name": "initialize_unpaired_params_value_is_replaced",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"param-surrogate\",\"method\":\"initialize\",\"params\":{\"x\":\"\\ud800\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"param-surrogate\"}\n"
+    },
+    {
+      "name": "initialize_invalid_utf8_jsonrpc_is_replaced",
+      "request_b64": "eyJqc29ucnBjIjoiMi7DMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0=",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_invalid_utf8_method_is_replaced",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXTDaWFsaXplIn0=",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_invalid_utf8_string_id_is_replaced",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiLDIiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"�\"}\n"
+    },
+    {
+      "name": "unknown_method_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"other\"}",
+      "response": null
+    },
+    {
+      "name": "initialize_params_scalar_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":1}",
+      "response": null
+    },
+    {
+      "name": "initialize_params_array_notification_has_no_response",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":[]}",
+      "response": null
+    },
+    {
+      "name": "non_object_scalar_is_invalid_request",
+      "request_b64": "MQ==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_string_is_parse_error",
+      "request_b64": "ImhlbGxvIg==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_array_is_parse_error",
+      "request_b64": "WzEsMl0=",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_true_is_parse_error",
+      "request_b64": "dHJ1ZQ==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "non_object_null_is_parse_error",
+      "request_b64": "bnVsbA==",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "shorter_field_name_prefix_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"json\":1}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "string_id_with_surrogate_pair",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\ud83d\\ude00\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"😀\"}\n"
+    },
+    {
+      "name": "unknown_field_nested_containers_are_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":{\"a\":[1,{\"b\":\"x\"},[2,3]],\"c\":true,\"d\":null,\"e\":\"s\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_deep_array_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":[[[[1]]]]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_escaped_string_is_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":\"\\u0041\\n\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "unknown_field_empty_containers_are_ignored",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"unknown\":{},\"unknown2\":[]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "initialize_fractional_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":100.5,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":100.5}\n"
+    },
+    {
+      "name": "initialize_negative_fractional_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":-0.5,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":-0.5}\n"
+    },
+    {
+      "name": "initialize_small_fraction_id_uses_go_float_text",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":0.001,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":0.001}\n"
+    },
+    {
+      "name": "initialize_negative_zero_float_id_is_preserved",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":-0.0,\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":-0}\n"
+    },
+    {
+      "name": "initialize_params_nested_object_values",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"a\":{\"b\":1},\"c\":[1,2]}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "whitespace_padded_request_is_accepted",
+      "request_b64": "ICAgeyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSAgIA==",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+    },
+    {
+      "name": "trailing_content_after_object_is_parse_error",
+      "request_b64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSB4",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "string_id_with_newline_tab_quote_backslash_escapes",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\n\\t\\\"\\\\\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"\\n\\t\\\"\\\\\"}\n"
+    },
+    {
+      "name": "string_id_with_solidus_escape",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\/\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"/\"}\n"
+    },
+    {
+      "name": "string_id_with_control_character_escapes",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\b\\f\\r\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"\\b\\f\\r\"}\n"
+    },
+    {
+      "name": "string_id_with_unicode_escape",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\u0041\",\"method\":\"initialize\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":\"A\"}\n"
+    },
+    {
+      "name": "string_id_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"\\x\",\"method\":\"initialize\"}",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "method_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"a\\x\"}",
+      "response": null,
+      "parse_error": true
+    },
+    {
+      "name": "jsonrpc_with_invalid_escape_is_invalid_request",
+      "request": "{\"jsonrpc\":\"2.\\x0\",\"id\":1,\"method\":\"initialize\"}",
+      "response": null,
+      "parse_error": true
+    }
+  ]
+}

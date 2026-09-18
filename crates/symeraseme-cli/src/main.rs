@@ -3,6 +3,8 @@
 mod cli;
 mod command_surface;
 mod commands;
+#[allow(dead_code)]
+mod mcp;
 
 use std::io::Write;
 

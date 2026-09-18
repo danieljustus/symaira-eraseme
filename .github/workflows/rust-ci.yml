@@ -102,13 +102,27 @@ jobs:
         run: |
           set -euo pipefail
           critical_pattern='/(crypto|consent|auth|mcp)(/|\.rs$)'
+          # A module file that only declares children and re-exports emits no code,
+          # so LLVM coverage can never report measurable lines for it. Such
+          # declaration-only facades are excluded from the expectation set and
+          # announced. Any file containing a code-bearing item stays critical, so a
+          # genuinely uninstrumented crypto/consent/auth/MCP module still fails.
+          code_item_pattern='^[[:space:]]*(pub([[:space:]]*\([^)]*\))?[[:space:]]+)?(async[[:space:]]+|unsafe[[:space:]]+|const[[:space:]]+)?(fn|impl|trait|struct|enum|union|const|static|type|macro_rules!|extern)([^[:alnum:]_]|$)'
           critical_files=()
+          declaration_only=()
           while IFS= read -r file; do
-            critical_files+=("$file")
+            if grep -Eq "$code_item_pattern" "$file"; then
+              critical_files+=("$file")
+            else
+              declaration_only+=("$file")
+            fi
           done < <(
             find crates -type f -name '*.rs' -not -path '*/commands/*' -print |
               grep -Ei "$critical_pattern" || true
           )
+          if [[ ${#declaration_only[@]} -gt 0 ]]; then
+            echo "::notice::Declaration-only critical modules carry no executable lines and are excluded from the coverage expectation: ${declaration_only[*]}"
+          fi
           if [[ ${#critical_files[@]} -eq 0 ]]; then
             echo '::notice::Rust coverage thresholds are fail-closed for the foundation scaffold: no first-party crypto, consent/auth, or MCP modules exist yet, so no coverage claim is reported.'
             exit 0
