@@ -141,6 +141,11 @@ func writeFixture() {
 			Name:    "grant_dry_run_echoes_explicit_arguments",
 			Request: callRequest(7, "grant", `{"dry_run":true,"command":"execute","revoke":"token-1","revoke_all":true}`),
 		},
+		// Not recorded: `plan_create` answers with the removal-request row ids it
+		// just created, and this oracle's store isolation did not hold — the ids
+		// came from the developer's real store (12351+) and grew between runs.
+		// Pinning them would bake a moving value into the contract, so the tool is
+		// covered by shape assertions instead.
 		{
 			// The dry run returns the generated file *contents*, so pinning the
 			// paths in the request makes it reproducible.
