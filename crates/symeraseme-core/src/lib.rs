@@ -6,6 +6,7 @@ pub mod campaign;
 pub mod config;
 pub mod confirmation;
 pub mod deadlines;
+pub mod email;
 pub mod identity;
 pub mod manualtasks;
 pub mod redaction;

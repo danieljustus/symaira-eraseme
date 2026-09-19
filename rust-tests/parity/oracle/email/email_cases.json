@@ -1,0 +1,1674 @@
+{
+  "source_revision": "76759b80b5831227693dcccf1cb4a37ef9bbbe49",
+  "source_path": "internal/email",
+  "normalize_subject": [
+    {
+      "name": "normalize_00",
+      "input": "",
+      "output": ""
+    },
+    {
+      "name": "normalize_01",
+      "input": "   ",
+      "output": ""
+    },
+    {
+      "name": "normalize_02",
+      "input": "Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_03",
+      "input": "Re: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_04",
+      "input": "RE:RE: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_05",
+      "input": "re : Data Deletion Request — broker-a",
+      "output": "re : Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_06",
+      "input": "Fwd: Re: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_07",
+      "input": "Aw: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_08",
+      "input": "ANTWORT: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_09",
+      "input": "Réf: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_10",
+      "input": "SV: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_11",
+      "input": "Vs: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_12",
+      "input": "WG: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_13",
+      "input": "Ref: Data Deletion Request — broker-a",
+      "output": "Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_14",
+      "input": "Re[2]: Data Deletion Request — broker-a",
+      "output": "Re[2]: Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_15",
+      "input": "Betreff: Data Deletion Request — broker-a",
+      "output": "Betreff: Data Deletion Request — broker-a"
+    },
+    {
+      "name": "normalize_16",
+      "input": "Re:",
+      "output": ""
+    },
+    {
+      "name": "normalize_17",
+      "input": "Data Deletion Request — broker-a (Re: verweigert)",
+      "output": "Data Deletion Request — broker-a (Re: verweigert)"
+    }
+  ],
+  "parse_email_body": [
+    {
+      "name": "body_00",
+      "body": "  removed  ",
+      "max": 200,
+      "output": "removed"
+    },
+    {
+      "name": "body_01",
+      "body": "",
+      "max": 200,
+      "output": ""
+    },
+    {
+      "name": "body_02",
+      "body": "   ",
+      "max": 200,
+      "output": ""
+    },
+    {
+      "name": "body_03",
+      "body": "abc",
+      "max": 0,
+      "output": "abc"
+    },
+    {
+      "name": "body_04",
+      "body": "abcdefghij",
+      "max": 5,
+      "output": "abcde..."
+    },
+    {
+      "name": "body_05",
+      "body": "üöä-üöä",
+      "max": 4,
+      "output": "üö..."
+    },
+    {
+      "name": "body_06",
+      "body": "line one\r\nline two",
+      "max": 10,
+      "output": "line one\r\n..."
+    },
+    {
+      "name": "body_07",
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "max": 500,
+      "output": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+    }
+  ],
+  "subject_matches": [
+    {
+      "name": "subject_00",
+      "base": "Data Deletion Request — broker-a",
+      "reply": "Re: Data Deletion Request — broker-a",
+      "matches": true
+    },
+    {
+      "name": "subject_01",
+      "base": "data deletion request — BROKER-A",
+      "reply": "AW: Data deletion request — broker-a",
+      "matches": true
+    },
+    {
+      "name": "subject_02",
+      "base": "Data Deletion Request — broker-a",
+      "reply": "Data Deletion Request — broker-b",
+      "matches": false
+    },
+    {
+      "name": "subject_03",
+      "base": "Data Deletion Request — broker-a",
+      "reply": "",
+      "matches": false
+    },
+    {
+      "name": "subject_04",
+      "base": "",
+      "reply": "",
+      "matches": true
+    },
+    {
+      "name": "subject_05",
+      "base": "Re: Data Deletion Request — broker-a",
+      "reply": "Data Deletion Request — broker-a",
+      "matches": true
+    }
+  ],
+  "match_reply_to_request": [
+    {
+      "name": "thread_wins_over_subject",
+      "messages": [
+        {
+          "ID": "1",
+          "Subject": "Re: Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm1@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 1
+        },
+        {
+          "ID": "2",
+          "Subject": "AW: Data Deletion Request — BROKER-B",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm2@example.com\u003e",
+          "ThreadID": "\u003cm2@example.com\u003e",
+          "IMAPUID": 2
+        },
+        {
+          "ID": "3",
+          "Subject": "Unrelated",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm3@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 3
+        },
+        {
+          "ID": "4",
+          "Subject": "Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "",
+          "ThreadID": "",
+          "IMAPUID": 4
+        },
+        {
+          "ID": "5",
+          "Subject": "Re: Data Deletion Request — broker-z",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm5@example.com\u003e",
+          "ThreadID": "\u003cm5@example.com\u003e",
+          "IMAPUID": 5
+        }
+      ],
+      "requests": [
+        {
+          "ID": 1,
+          "BrokerID": "broker-a"
+        },
+        {
+          "ID": 2,
+          "BrokerID": "broker-b"
+        }
+      ],
+      "thread_map": {
+        "\u003csent-1@example.com\u003e": 2
+      },
+      "output": "[{\"Message\":{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":1},\"RequestID\":2,\"MatchMethod\":\"thread\"},{\"Message\":{\"ID\":\"2\",\"Subject\":\"AW: Data Deletion Request — BROKER-B\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},\"RequestID\":2,\"MatchMethod\":\"subject\"},{\"Message\":{\"ID\":\"3\",\"Subject\":\"Unrelated\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm3@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":3},\"RequestID\":2,\"MatchMethod\":\"thread\"},{\"Message\":{\"ID\":\"4\",\"Subject\":\"Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\",\"ThreadID\":\"\",\"IMAPUID\":4},\"RequestID\":1,\"MatchMethod\":\"subject\"},{\"Message\":{\"ID\":\"5\",\"Subject\":\"Re: Data Deletion Request — broker-z\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm5@example.com\\u003e\",\"ThreadID\":\"\\u003cm5@example.com\\u003e\",\"IMAPUID\":5},\"RequestID\":null,\"MatchMethod\":\"unmatched\"}]"
+    },
+    {
+      "name": "an_empty_thread_key_never_matches",
+      "messages": [
+        {
+          "ID": "1",
+          "Subject": "Re: Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm1@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 1
+        },
+        {
+          "ID": "2",
+          "Subject": "AW: Data Deletion Request — BROKER-B",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm2@example.com\u003e",
+          "ThreadID": "\u003cm2@example.com\u003e",
+          "IMAPUID": 2
+        },
+        {
+          "ID": "3",
+          "Subject": "Unrelated",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm3@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 3
+        },
+        {
+          "ID": "4",
+          "Subject": "Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "",
+          "ThreadID": "",
+          "IMAPUID": 4
+        },
+        {
+          "ID": "5",
+          "Subject": "Re: Data Deletion Request — broker-z",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm5@example.com\u003e",
+          "ThreadID": "\u003cm5@example.com\u003e",
+          "IMAPUID": 5
+        }
+      ],
+      "requests": [
+        {
+          "ID": 1,
+          "BrokerID": "broker-a"
+        },
+        {
+          "ID": 2,
+          "BrokerID": "broker-b"
+        }
+      ],
+      "thread_map": {
+        "": 9
+      },
+      "output": "[{\"Message\":{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":1},\"RequestID\":1,\"MatchMethod\":\"subject\"},{\"Message\":{\"ID\":\"2\",\"Subject\":\"AW: Data Deletion Request — BROKER-B\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},\"RequestID\":2,\"MatchMethod\":\"subject\"},{\"Message\":{\"ID\":\"3\",\"Subject\":\"Unrelated\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm3@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":3},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"4\",\"Subject\":\"Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\",\"ThreadID\":\"\",\"IMAPUID\":4},\"RequestID\":1,\"MatchMethod\":\"subject\"},{\"Message\":{\"ID\":\"5\",\"Subject\":\"Re: Data Deletion Request — broker-z\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm5@example.com\\u003e\",\"ThreadID\":\"\\u003cm5@example.com\\u003e\",\"IMAPUID\":5},\"RequestID\":null,\"MatchMethod\":\"unmatched\"}]"
+    },
+    {
+      "name": "no_requests_means_no_match",
+      "messages": [
+        {
+          "ID": "1",
+          "Subject": "Re: Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm1@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 1
+        },
+        {
+          "ID": "2",
+          "Subject": "AW: Data Deletion Request — BROKER-B",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm2@example.com\u003e",
+          "ThreadID": "\u003cm2@example.com\u003e",
+          "IMAPUID": 2
+        },
+        {
+          "ID": "3",
+          "Subject": "Unrelated",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm3@example.com\u003e",
+          "ThreadID": "\u003csent-1@example.com\u003e",
+          "IMAPUID": 3
+        },
+        {
+          "ID": "4",
+          "Subject": "Data Deletion Request — broker-a",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "",
+          "ThreadID": "",
+          "IMAPUID": 4
+        },
+        {
+          "ID": "5",
+          "Subject": "Re: Data Deletion Request — broker-z",
+          "From": "",
+          "To": "",
+          "Date": null,
+          "Body": "",
+          "Flags": null,
+          "MessageID": "\u003cm5@example.com\u003e",
+          "ThreadID": "\u003cm5@example.com\u003e",
+          "IMAPUID": 5
+        }
+      ],
+      "requests": null,
+      "output": "[{\"Message\":{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":1},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"2\",\"Subject\":\"AW: Data Deletion Request — BROKER-B\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"3\",\"Subject\":\"Unrelated\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm3@example.com\\u003e\",\"ThreadID\":\"\\u003csent-1@example.com\\u003e\",\"IMAPUID\":3},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"4\",\"Subject\":\"Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\",\"ThreadID\":\"\",\"IMAPUID\":4},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"5\",\"Subject\":\"Re: Data Deletion Request — broker-z\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cm5@example.com\\u003e\",\"ThreadID\":\"\\u003cm5@example.com\\u003e\",\"IMAPUID\":5},\"RequestID\":null,\"MatchMethod\":\"unmatched\"}]"
+    }
+  ],
+  "parse_fetched_message": [
+    {
+      "name": "plain_headers",
+      "header": "Subject: Data Deletion Request\r\nFrom: Broker \u003cb@example.com\u003e\r\nTo: me@example.com\r\nDate: Mon, 21 Jul 2026 10:00:00 +0200\r\nMessage-ID: \u003creply@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\n\r\n",
+      "body": "removed",
+      "flags": [
+        "\\Seen"
+      ],
+      "output": "{\"ID\":\"1\",\"Subject\":\"Data Deletion Request\",\"From\":\"Broker \\u003cb@example.com\\u003e\",\"To\":\"me@example.com\",\"Date\":\"2026-07-21T10:00:00+02:00\",\"Body\":\"removed\",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1}"
+    },
+    {
+      "name": "folded_subject_and_references",
+      "header": "Subject: Data Deletion\r\n Request — broker-a\r\nReferences: \u003cfirst@example.com\u003e\r\n\t\u003csecond@example.com\u003e\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"2\",\"Subject\":\"Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003cfirst@example.com\\u003e\",\"IMAPUID\":2}"
+    },
+    {
+      "name": "encoded_word_quoted_printable_utf8",
+      "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"3\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":3}"
+    },
+    {
+      "name": "encoded_word_base64_utf8",
+      "header": "Subject: =?UTF-8?B?UmU6IERhdGEgRGVsZXRpb24gUmVxdWVzdCDigJQgYnJva2VyLWE=?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"4\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":4}"
+    },
+    {
+      "name": "encoded_word_unknown_charset_is_kept_raw",
+      "header": "Subject: =?ISO-8859-1?Q?Re=3A_Datenl=F6schung?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"5\",\"Subject\":\"Re: Datenlöschung\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":5}"
+    },
+    {
+      "name": "encoded_word_broken_is_kept_raw",
+      "header": "Subject: =?UTF-8?Q?Re=3A_Data?= and =?UTF-8?X?broken?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"6\",\"Subject\":\"Re: Data and =?UTF-8?X?broken?=\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":6}"
+    },
+    {
+      "name": "encoded_word_windows_1252",
+      "header": "Subject: =?windows-1252?Q?Re=3A_Datenl=F6schung_=93broker=94?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"7\",\"Subject\":\"=?windows-1252?Q?Re=3A_Datenl=F6schung_=93broker=94?=\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":7}"
+    },
+    {
+      "name": "encoded_word_invalid_hex",
+      "header": "Subject: =?UTF-8?Q?Re=3A_=ZZbroken?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"8\",\"Subject\":\"=?UTF-8?Q?Re=3A_=ZZbroken?=\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":8}"
+    },
+    {
+      "name": "encoded_word_missing_terminator",
+      "header": "Subject: =?UTF-8?Q?Re=3A_Data\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"9\",\"Subject\":\"=?UTF-8?Q?Re=3A_Data\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":9}"
+    },
+    {
+      "name": "encoded_word_invalid_base64",
+      "header": "Subject: =?UTF-8?B?not-base64!!?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"10\",\"Subject\":\"=?UTF-8?B?not-base64!!?=\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":10}"
+    },
+    {
+      "name": "adjacent_encoded_words",
+      "header": "Subject: =?UTF-8?Q?Re=3A_Data_?= =?UTF-8?Q?Deletion_Request?=\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"11\",\"Subject\":\"Re: Data Deletion Request\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":11}"
+    },
+    {
+      "name": "encoded_word_with_padding_text",
+      "header": "Subject: [external] =?UTF-8?Q?Re=3A_Data_Deletion_Request?= (bitte lesen)\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"12\",\"Subject\":\"[external] Re: Data Deletion Request (bitte lesen)\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":12}"
+    },
+    {
+      "name": "encoded_body_is_not_decoded",
+      "header": "Subject: =?UTF-8?Q?plain?=\r\nFrom: =?UTF-8?B?QnJva2Vy?= \u003cb@example.com\u003e\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"13\",\"Subject\":\"plain\",\"From\":\"Broker \\u003cb@example.com\\u003e\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003creply@example.com\\u003e\",\"IMAPUID\":13}"
+    },
+    {
+      "name": "no_message_id",
+      "header": "Subject: Second\r\nFrom: Broker \u003cb@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"14\",\"Subject\":\"Second\",\"From\":\"Broker \\u003cb@example.com\\u003e\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\",\"ThreadID\":\"\",\"IMAPUID\":14}"
+    },
+    {
+      "name": "internal_date_fallback",
+      "header": "Subject: Undated\r\nMessage-ID: \u003cundated@example.com\u003e\r\n\r\n",
+      "body": "",
+      "internal_date": "2026-07-22T09:30:00Z",
+      "output": "{\"ID\":\"15\",\"Subject\":\"Undated\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cundated@example.com\\u003e\",\"ThreadID\":\"\\u003cundated@example.com\\u003e\",\"IMAPUID\":15}"
+    },
+    {
+      "name": "unparsable_date_falls_back_to_the_internal_date",
+      "header": "Subject: Bad date\r\nDate: not a date\r\nMessage-ID: \u003cbad@example.com\u003e\r\n\r\n",
+      "body": "",
+      "internal_date": "2026-07-23T08:00:00Z",
+      "output": "{\"ID\":\"16\",\"Subject\":\"Bad date\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-23T08:00:00Z\",\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cbad@example.com\\u003e\",\"ThreadID\":\"\\u003cbad@example.com\\u003e\",\"IMAPUID\":16}"
+    },
+    {
+      "name": "in_reply_to_is_the_thread_fallback",
+      "header": "Subject: Re: Data Deletion Request — broker-a\r\nIn-Reply-To: \u003cthread@example.com\u003e\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"17\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003cthread@example.com\\u003e\",\"IMAPUID\":17}"
+    },
+    {
+      "name": "references_without_message_ids_fall_back",
+      "header": "Subject: Re: Data Deletion Request — broker-a\r\nReferences: no-angle-brackets\r\nIn-Reply-To: \u003cthread@example.com\u003e\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"18\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003cthread@example.com\\u003e\",\"IMAPUID\":18}"
+    },
+    {
+      "name": "first_reference_wins",
+      "header": "Subject: Re: Data Deletion Request — broker-a\r\nReferences: \u003cone@example.com\u003e \u003ctwo@example.com\u003e\r\nMessage-ID: \u003creply@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"19\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003creply@example.com\\u003e\",\"ThreadID\":\"\\u003cone@example.com\\u003e\",\"IMAPUID\":19}"
+    },
+    {
+      "name": "empty_flags_stay_null",
+      "header": "Subject: Flags\r\nMessage-ID: \u003cflags@example.com\u003e\r\n\r\n",
+      "body": "",
+      "output": "{\"ID\":\"20\",\"Subject\":\"Flags\",\"From\":\"\",\"To\":\"\",\"Date\":null,\"Body\":\"\",\"Flags\":null,\"MessageID\":\"\\u003cflags@example.com\\u003e\",\"ThreadID\":\"\\u003cflags@example.com\\u003e\",\"IMAPUID\":20}"
+    },
+    {
+      "name": "malformed_header_is_an_error",
+      "header": "Subject Data Deletion Request\r\n\r\n",
+      "body": "",
+      "error": "malformed header line: Subject Data Deletion Request"
+    },
+    {
+      "name": "folded_continuation_without_a_field_is_an_error",
+      "header": "  dangling continuation\r\n\r\n",
+      "body": "",
+      "error": "malformed initial line:   dangling continuation"
+    }
+  ],
+  "poll_inbox": [
+    {
+      "name": "cold_start_then_continue",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "polls": 2,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              6
+            ]
+          ]
+        },
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "7:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              6
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        }
+      ]
+    },
+    {
+      "name": "stored_hwm_continues",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 5
+        }
+      ],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "6:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              6
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        }
+      ]
+    },
+    {
+      "name": "stale_uidvalidity_cold_starts",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 41,
+          "last_uid": 5
+        }
+      ],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              6
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        }
+      ]
+    },
+    {
+      "name": "oldest_window_first",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 2,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "polls": 3,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "3:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "3:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 2
+        }
+      ]
+    },
+    {
+      "name": "search_failure_keeps_the_hwm",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null,
+          "search_error": "mailbox unavailable"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID search failed: mailbox unavailable",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": []
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "fetch_failure_keeps_the_hwm",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            1
+          ],
+          "fetched": null,
+          "fetch_error": "connection reset"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID fetch failed: connection reset",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1
+            ]
+          ]
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "fetch_omission_is_an_error",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ],
+          "omit": [
+            2
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID fetch omitted requested message: UID 2 missing from FETCH response",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2
+            ]
+          ]
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "select_failure",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null,
+          "select_error": "no such folder"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: folder select failed: no such folder",
+          "searches": [],
+          "fetches": []
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "empty_mailbox_records_the_uidvalidity",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "null",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": []
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 0
+        }
+      ]
+    },
+    {
+      "name": "exhausted_uid_space",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 4294967295
+        }
+      ],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID range exhausted: last UID is UINT32_MAX",
+          "searches": [],
+          "fetches": []
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 4294967295
+        }
+      ]
+    },
+    {
+      "name": "since_window_drops_undated",
+      "mode": "inbox",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 7,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            1,
+            2,
+            3
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: Old\r\nMessage-ID: \u003cold@example.com\u003e\r\nDate: Thu, 01 Jan 1970 00:00:00 +0000\r\n\r\n",
+              "body": "old"
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Future\r\nMessage-ID: \u003cfuture@example.com\u003e\r\nDate: Fri, 01 Jan 2199 00:00:00 +0000\r\n\r\n",
+              "body": "future"
+            },
+            {
+              "uid": 3,
+              "header": "Subject: Undated\r\nMessage-ID: \u003cundated@example.com\u003e\r\n\r\n",
+              "body": "undated"
+            }
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"2\",\"Subject\":\"Future\",\"From\":\"\",\"To\":\"\",\"Date\":\"2199-01-01T00:00:00Z\",\"Body\":\"future\",\"Flags\":null,\"MessageID\":\"\\u003cfuture@example.com\\u003e\",\"ThreadID\":\"\\u003cfuture@example.com\\u003e\",\"IMAPUID\":2}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": true
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              3
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 3
+        }
+      ]
+    },
+    {
+      "name": "folders_deduplicate_by_message_id",
+      "mode": "folders",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX",
+        "Replies"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        },
+        "Replies": {
+          "uid_validity": 9,
+          "uids": [
+            4,
+            5
+          ],
+          "fetched": [
+            {
+              "uid": 4,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "duplicate"
+            },
+            {
+              "uid": 5,
+              "header": "Subject: Re: Data Deletion Request — broker-a\r\nMessage-ID: \u003cm5@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 12:00:00 +0000\r\n\r\n",
+              "body": "reply"
+            }
+          ]
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "[{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6},{\"ID\":\"5\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T12:00:00Z\",\"Body\":\"reply\",\"Flags\":null,\"MessageID\":\"\\u003cm5@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":5}]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            },
+            {
+              "folder": "Replies",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1,
+              2,
+              6
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        },
+        {
+          "host": "imap.example.com",
+          "folder": "Replies",
+          "uid_validity": 9,
+          "last_uid": 5
+        }
+      ]
+    }
+  ],
+  "poll_and_match": [
+    {
+      "name": "service_persists_then_commits",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "folders": [
+        "INBOX"
+      ],
+      "requests": [
+        {
+          "ID": 7,
+          "BrokerID": "broker-a"
+        }
+      ],
+      "thread_map": {
+        "\u003csent@example.com\u003e": 7
+      },
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "output": "[{\"Message\":{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},\"RequestID\":7,\"MatchMethod\":\"thread\"},{\"Message\":{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6},\"RequestID\":null,\"MatchMethod\":\"unmatched\"}]",
+      "inserts": [
+        {
+          "request_id": 7,
+          "message_id": "\u003cm1@example.com\u003e",
+          "thread_id": "\u003csent@example.com\u003e",
+          "from": "",
+          "subject": "Re: Data Deletion Request — broker-a",
+          "snippet": "removed"
+        },
+        {
+          "request_id": null,
+          "message_id": "\u003cm2@example.com\u003e",
+          "thread_id": "\u003cm2@example.com\u003e",
+          "from": "",
+          "subject": "Second",
+          "snippet": "second"
+        },
+        {
+          "request_id": null,
+          "message_id": "\u003cm6@example.com\u003e",
+          "thread_id": "\u003cm6@example.com\u003e",
+          "from": "",
+          "subject": "Third",
+          "snippet": "third"
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        }
+      ]
+    },
+    {
+      "name": "service_keeps_the_hwm_when_the_insert_fails",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "folders": [
+        "INBOX"
+      ],
+      "requests": [
+        {
+          "ID": 7,
+          "BrokerID": "broker-a"
+        }
+      ],
+      "thread_map": {
+        "\u003csent@example.com\u003e": 7
+      },
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        }
+      },
+      "error": "email: persist inbox reply: reply insert failed",
+      "inserts": [],
+      "final_hwm": []
+    },
+    {
+      "name": "service_across_folders",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "folders": [
+        "INBOX",
+        "Replies"
+      ],
+      "requests": [
+        {
+          "ID": 7,
+          "BrokerID": "broker-a"
+        }
+      ],
+      "thread_map": {
+        "\u003csent@example.com\u003e": 7
+      },
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            6,
+            1,
+            2
+          ],
+          "fetched": [
+            {
+              "uid": 1,
+              "header": "Subject: =?UTF-8?Q?Re=3A_Data_Deletion_Request_=E2=80=94_broker-a?=\r\nMessage-ID: \u003cm1@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+              "body": "  removed  ",
+              "flags": [
+                "\\Seen"
+              ]
+            },
+            {
+              "uid": 2,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "second"
+            },
+            {
+              "uid": 6,
+              "header": "Subject: Third\r\nMessage-ID: \u003cm6@example.com\u003e\r\n\r\n",
+              "body": "third",
+              "internal_date": "2026-07-22T09:30:00Z"
+            }
+          ]
+        },
+        "Replies": {
+          "uid_validity": 9,
+          "uids": [
+            4,
+            5
+          ],
+          "fetched": [
+            {
+              "uid": 4,
+              "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+              "body": "duplicate"
+            },
+            {
+              "uid": 5,
+              "header": "Subject: Re: Data Deletion Request — broker-a\r\nMessage-ID: \u003cm5@example.com\u003e\r\nReferences: \u003csent@example.com\u003e\r\nDate: Mon, 21 Jul 2026 12:00:00 +0000\r\n\r\n",
+              "body": "reply"
+            }
+          ]
+        }
+      },
+      "output": "[{\"Message\":{\"ID\":\"1\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T10:00:00Z\",\"Body\":\"  removed  \",\"Flags\":[\"\\\\Seen\"],\"MessageID\":\"\\u003cm1@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":1},\"RequestID\":7,\"MatchMethod\":\"thread\"},{\"Message\":{\"ID\":\"2\",\"Subject\":\"Second\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T11:00:00Z\",\"Body\":\"second\",\"Flags\":null,\"MessageID\":\"\\u003cm2@example.com\\u003e\",\"ThreadID\":\"\\u003cm2@example.com\\u003e\",\"IMAPUID\":2},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"6\",\"Subject\":\"Third\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-22T09:30:00Z\",\"Body\":\"third\",\"Flags\":null,\"MessageID\":\"\\u003cm6@example.com\\u003e\",\"ThreadID\":\"\\u003cm6@example.com\\u003e\",\"IMAPUID\":6},\"RequestID\":null,\"MatchMethod\":\"unmatched\"},{\"Message\":{\"ID\":\"5\",\"Subject\":\"Re: Data Deletion Request — broker-a\",\"From\":\"\",\"To\":\"\",\"Date\":\"2026-07-21T12:00:00Z\",\"Body\":\"reply\",\"Flags\":null,\"MessageID\":\"\\u003cm5@example.com\\u003e\",\"ThreadID\":\"\\u003csent@example.com\\u003e\",\"IMAPUID\":5},\"RequestID\":7,\"MatchMethod\":\"thread\"}]",
+      "inserts": [
+        {
+          "request_id": 7,
+          "message_id": "\u003cm1@example.com\u003e",
+          "thread_id": "\u003csent@example.com\u003e",
+          "from": "",
+          "subject": "Re: Data Deletion Request — broker-a",
+          "snippet": "removed"
+        },
+        {
+          "request_id": null,
+          "message_id": "\u003cm2@example.com\u003e",
+          "thread_id": "\u003cm2@example.com\u003e",
+          "from": "",
+          "subject": "Second",
+          "snippet": "second"
+        },
+        {
+          "request_id": null,
+          "message_id": "\u003cm6@example.com\u003e",
+          "thread_id": "\u003cm6@example.com\u003e",
+          "from": "",
+          "subject": "Third",
+          "snippet": "third"
+        },
+        {
+          "request_id": 7,
+          "message_id": "\u003cm5@example.com\u003e",
+          "thread_id": "\u003csent@example.com\u003e",
+          "from": "",
+          "subject": "Re: Data Deletion Request — broker-a",
+          "snippet": "reply"
+        }
+      ],
+      "final_hwm": [
+        {
+          "host": "imap.example.com",
+          "folder": "INBOX",
+          "uid_validity": 42,
+          "last_uid": 6
+        },
+        {
+          "host": "imap.example.com",
+          "folder": "Replies",
+          "uid_validity": 9,
+          "last_uid": 5
+        }
+      ]
+    }
+  ],
+  "imap_config": [
+    {
+      "name": "defaults",
+      "env": {},
+      "config": "{\"folder\":\"INBOX\",\"host\":\"imap.gmail.com\",\"max_messages\":50,\"oauth2\":null,\"password_set\":false,\"port\":993,\"since_days\":14,\"use_tls\":true,\"username\":\"\"}"
+    },
+    {
+      "name": "explicit_values",
+      "env": {
+        "IMAP_FOLDER": "Replies",
+        "IMAP_HOST": "imap.example.com",
+        "IMAP_MAX_MESSAGES": "9",
+        "IMAP_OAUTH2_ACCESS_TOKEN": "literal-token",
+        "IMAP_OAUTH2_USERNAME": "oauth@example.com",
+        "IMAP_PASSWORD": "literal-secret",
+        "IMAP_PORT": "143",
+        "IMAP_SINCE_DAYS": "3",
+        "IMAP_SSL": "0",
+        "IMAP_USERNAME": "me@example.com"
+      },
+      "config": "{\"folder\":\"Replies\",\"host\":\"imap.example.com\",\"max_messages\":9,\"oauth2\":{\"access_token_set\":true,\"username\":\"oauth@example.com\"},\"password_set\":true,\"port\":143,\"since_days\":3,\"use_tls\":false,\"username\":\"me@example.com\"}"
+    },
+    {
+      "name": "oauth2_arguments_win",
+      "env": {
+        "IMAP_OAUTH2_ACCESS_TOKEN": "environment-token",
+        "IMAP_USERNAME": "me@example.com"
+      },
+      "access_token": "argument-token",
+      "oauth2_username": "override@example.com",
+      "config": "{\"folder\":\"INBOX\",\"host\":\"imap.gmail.com\",\"max_messages\":50,\"oauth2\":{\"access_token_set\":true,\"username\":\"override@example.com\"},\"password_set\":false,\"port\":993,\"since_days\":14,\"use_tls\":true,\"username\":\"me@example.com\"}"
+    },
+    {
+      "name": "invalid_port",
+      "env": {
+        "IMAP_PORT": "99999"
+      },
+      "error": "email: IMAP_PORT must be a valid TCP port"
+    },
+    {
+      "name": "invalid_port_text",
+      "env": {
+        "IMAP_PORT": "imap"
+      },
+      "error": "email: IMAP_PORT must be a valid TCP port"
+    },
+    {
+      "name": "odd_boolean_and_negative_numbers",
+      "env": {
+        "IMAP_FOLDER": "",
+        "IMAP_MAX_MESSAGES": "zero",
+        "IMAP_SINCE_DAYS": "-4",
+        "IMAP_SSL": "maybe"
+      },
+      "config": "{\"folder\":\"INBOX\",\"host\":\"imap.gmail.com\",\"max_messages\":50,\"oauth2\":null,\"password_set\":false,\"port\":993,\"since_days\":14,\"use_tls\":true,\"username\":\"\"}"
+    },
+    {
+      "name": "oauth2_username_falls_back_to_the_account",
+      "env": {
+        "IMAP_OAUTH2_ACCESS_TOKEN": "literal-token",
+        "IMAP_USERNAME": "me@example.com"
+      },
+      "config": "{\"folder\":\"INBOX\",\"host\":\"imap.gmail.com\",\"max_messages\":50,\"oauth2\":{\"access_token_set\":true,\"username\":\"me@example.com\"},\"password_set\":false,\"port\":993,\"since_days\":14,\"use_tls\":true,\"username\":\"me@example.com\"}"
+    }
+  ]
+}
