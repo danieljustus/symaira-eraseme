@@ -457,8 +457,8 @@
           "internal_date_set": false
         }
       ],
-      "replay": "go-only",
-      "replay_reason": "the TLS handshake needs the per-run self-signed certificate; shipping a private key in the repository is not acceptable"
+      "replay": "byte",
+      "replay_reason": "the certificate is minted per run on each side; the fixture carries no certificate material"
     },
     {
       "name": "implicit_tls_login",
@@ -499,7 +499,7 @@
         "\u003ctag\u003e LOGOUT"
       ],
       "selected_uid_validity": 100,
-      "replay": "go-only",
+      "replay": "byte",
       "replay_reason": "same certificate boundary as starttls_login"
     }
   ]

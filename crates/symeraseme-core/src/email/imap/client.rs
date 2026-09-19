@@ -1,4 +1,4 @@
-//! Real network dialer for plain-TCP IMAP (the main parity target).
+//! Real network dialer for plain-TCP and TLS IMAP (the main parity target).
 //! Based on Go's `internal/email/dialer.go` but ported to Rust.
 //!
 //! This matches the exact wire semantics defined in the fixture:
@@ -10,10 +10,17 @@
 //! - XOAUTH2 uses SASL IR: '<tag> AUTHENTICATE XOAUTH2 <base64...>'
 //! - close() sends '<tag> LOGOUT' and expects '* BYE ...' + a tagged OK
 //!
-//! The implementation only handles the plain-TCP path; TLS/STARTTLS cases
-//! are not ported (see go-only replay cases). For use_tls=true or an accepted
-//! STARTTLS connection, return an explicit error saying the TLS transport
-//! is not ported yet.
+//! TLS support:
+//! - Implicit TLS (use_tls=true): TLS handshake on connect, then IMAP over TLS.
+//! - STARTTLS: when the server advertises STARTTLS in CAPABILITY, send
+//!   '<tag> STARTTLS', expect its tagged OK, handshake, then continue.
+//! - TLS configuration precedence: an injected configuration wins over the
+//!   dialer-level default; the default is MinVersion TLS 1.2 with ServerName
+//!   = config host. Roots for the product default come from bundled webpki-roots.
+//!
+//! DOCUMENTED DIVERGENCE: Go uses the *platform* root store; the port uses the
+//! bundled webpki roots, so a private/enterprise CA installed in the OS store is
+//! trusted by Go and not by the port.
 
 use crate::email::policy::ERR_IMAP;
 use crate::email::session::{FetchedMessage, ImapSession};
@@ -21,16 +28,157 @@ use crate::email::types::ImapConfig;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Utc};
+use rustls::pki_types::ServerName;
+use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use webpki_roots;
 
-/// IMAP dialer that creates plain-TCP connections.
-pub struct ImapDialer;
+/// Read+Write abstraction shared between plain TCP and TLS sessions.
+pub trait ReadWrite: Read + Write + Send + Sync {}
+impl<T: Read + Write + Send + Sync> ReadWrite for T {}
+
+/// A single owned stream that can be cloned (shared via Arc<Mutex>) so that
+/// the reader (BufReader) and writer both operate on the same underlying
+/// connection. Plain TCP and TLS both use this wrapper.
+pub struct IoStream {
+    inner: Arc<Mutex<Box<dyn ReadWrite>>>,
+}
+
+impl IoStream {
+    pub fn new(stream: Box<dyn ReadWrite>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(stream)),
+        }
+    }
+
+    /// Replaces the underlying transport while every existing handle keeps
+    /// pointing at it — the STARTTLS upgrade needs exactly that, because the
+    /// reader and the writer were created before the handshake.
+    pub fn replace_with(
+        &self,
+        swap: impl FnOnce(Box<dyn ReadWrite>) -> Box<dyn ReadWrite>,
+    ) -> Result<(), String> {
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| format!("{}: stream lock poisoned", ERR_IMAP))?;
+        let current = std::mem::replace(&mut *guard, Box::new(std::io::empty()));
+        *guard = swap(current);
+        Ok(())
+    }
+
+    /// Shares the same underlying transport; used to keep the reader and the
+    /// writer on one connection.
+    fn share(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl Clone for IoStream {
+    fn clone(&self) -> Self {
+        self.share()
+    }
+}
+
+impl Read for IoStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("IoStream lock poisoned"))?;
+        guard.read(buf)
+    }
+}
+
+impl Write for IoStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("IoStream lock poisoned"))?;
+        guard.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("IoStream lock poisoned"))?;
+        guard.flush()
+    }
+}
+
+/// Build a rustls ClientConfig with the given root store, MinVersion TLS 1.2,
+/// and ServerName set to the host. The injected config wins over the default.
+/// Go's `imapTLSConfig` sets `MinVersion: tls.VersionTLS12` and `ServerName`
+/// to the configured host; an injected configuration wins over the default.
+/// rustls' default protocol versions are exactly "TLS 1.2 or newer", so the
+/// minimum-version semantics match. Go uses the platform root store, this port
+/// the bundled webpki roots — an enterprise CA installed in the OS store is
+/// trusted by Go and not here.
+fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, String> {
+    let root_store =
+        root_store.unwrap_or_else(|| webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect());
+    // The provider is named explicitly: relying on rustls' process-level
+    // auto-detection makes the build's feature unification load-bearing.
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| format!("{}: TLS configuration failed: {}", ERR_IMAP, e))?
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+    Ok(config)
+}
+
+/// Perform a TLS handshake on an already-connected TcpStream, returning a
+/// rustls StreamOwned that can be used for both reading and writing.
+/// Wraps an established transport in a rustls session. rustls performs the
+/// handshake lazily on the first read or write, so the IMAP greeting read that
+/// follows is what completes it — mirroring Go, where the session object is
+/// handed to the client before the first exchange.
+fn tls_handshake<S: Read + Write + Send + Sync + 'static>(
+    stream: S,
+    config: &ClientConfig,
+    host: &str,
+) -> Result<rustls::StreamOwned<ClientConnection, S>, String> {
+    let server_name = ServerName::try_from(host.to_string()).map_err(|e| {
+        format!(
+            "{}: connect/login failed: invalid server name '{}': {}",
+            ERR_IMAP, host, e
+        )
+    })?;
+    let conn = ClientConnection::new(Arc::new(config.clone()), server_name).map_err(|e| {
+        format!(
+            "{}: connect/login failed: TLS handshake failed: {}",
+            ERR_IMAP, e
+        )
+    })?;
+    Ok(rustls::StreamOwned::new(conn, stream))
+}
+
+/// IMAP dialer that creates plain-TCP and TLS connections.
+///
+/// `roots` mirrors Go's injectable `*tls.Config` on the dialer: when set it
+/// replaces the bundled webpki root store. Neither Go's product paths nor this
+/// port set it outside tests, and Go's `InsecureSkipVerify` escape hatch has no
+/// counterpart here because no product path uses it.
+pub struct ImapDialer {
+    roots: Option<RootCertStore>,
+}
 
 impl ImapDialer {
     pub fn new() -> Self {
-        Self
+        Self { roots: None }
+    }
+
+    /// Trusts exactly these roots instead of the bundled store.
+    pub fn with_root_certificates(roots: RootCertStore) -> Self {
+        Self { roots: Some(roots) }
     }
 }
 
@@ -42,9 +190,6 @@ impl Default for ImapDialer {
 
 impl crate::email::session::ImapDialer for ImapDialer {
     fn dial(&self, config: &ImapConfig) -> Result<Box<dyn ImapSession>, String> {
-        if config.use_tls {
-            return Err(format!("{}: the TLS transport is not ported yet", ERR_IMAP));
-        }
         if config.host.is_empty() {
             return Err(format!("{}: host is empty", ERR_IMAP));
         }
@@ -72,13 +217,20 @@ impl crate::email::session::ImapDialer for ImapDialer {
             .set_write_timeout(Some(timeout))
             .map_err(|e| format!("{}: write timeout failed: {}", ERR_IMAP, e))?;
 
+        // Try to convert to TLS stream if needed.
+        let stream: Box<dyn ReadWrite> = if config.use_tls {
+            // Implicit TLS: handshake immediately.
+            let tls_config = make_tls_config(self.roots.clone())?;
+            let tls_stream = tls_handshake(stream, &tls_config, &config.host)?;
+            Box::new(tls_stream)
+        } else {
+            Box::new(stream)
+        };
+
+        let io_stream = IoStream::new(stream);
         let mut session = ImapSessionImpl {
-            reader: BufReader::new(
-                stream
-                    .try_clone()
-                    .map_err(|e| format!("{}: connect/login failed: {}", ERR_IMAP, e))?,
-            ),
-            writer: stream,
+            reader: BufReader::new(io_stream.clone()),
+            writer: io_stream,
             tag_counter: 0,
             selected_folder: None,
         };
@@ -90,16 +242,51 @@ impl crate::email::session::ImapDialer for ImapDialer {
         let caps = session.capability()?;
         let starttls_supported = caps.iter().any(|c| c.as_str() == "STARTTLS");
 
-        // We don't port STARTTLS: if the server advertises it, we cannot proceed.
-        if starttls_supported {
-            return Err(format!("{}: the TLS transport is not ported yet", ERR_IMAP));
-        }
-        // No STARTTLS: check cleartext auth permission.
-        if !config.allow_insecure_cleartext_auth {
-            return Err(format!(
-                "{}: cleartext authentication prohibited: server does not support STARTTLS",
-                ERR_IMAP
-            ));
+        if config.use_tls {
+            // Already connected over TLS. Verify we can proceed.
+            // If server advertised STARTTLS but we connected via implicit TLS,
+            // that's fine - we're already encrypted.
+        } else if starttls_supported {
+            // Perform STARTTLS handshake.
+            let tag = session.next_tag();
+            let cmd = format!("{} STARTTLS\r\n", tag);
+            write_line(&mut session.writer, &cmd)?;
+            // Read the tagged response.
+            let response = read_line(&mut session.reader)?;
+            if !response.starts_with(&format!("{} OK", tag)) {
+                return Err(format!(
+                    "{}: connect/login failed: STARTTLS failed: {}",
+                    ERR_IMAP, response
+                ));
+            }
+            // Upgrade the transport in place: the reader and the writer were
+            // created before the handshake and keep working on the new stream.
+            // The server sends nothing between its tagged OK and our
+            // ClientHello (the client speaks first), so the reader's buffer is
+            // empty at this point.
+            let tls_config = make_tls_config(self.roots.clone())?;
+            let host = config.host.clone();
+            let mut handshake_error: Option<String> = None;
+            session.writer.replace_with(|inner| {
+                match tls_handshake(inner, &tls_config, &host) {
+                    Ok(tls_stream) => Box::new(tls_stream),
+                    Err(error) => {
+                        handshake_error = Some(error);
+                        Box::new(std::io::empty())
+                    }
+                }
+            })?;
+            if let Some(error) = handshake_error {
+                return Err(error);
+            }
+        } else {
+            // No STARTTLS: check cleartext auth permission.
+            if !config.allow_insecure_cleartext_auth {
+                return Err(format!(
+                    "{}: cleartext authentication prohibited: server does not support STARTTLS",
+                    ERR_IMAP
+                ));
+            }
         }
 
         // Authenticate
@@ -121,8 +308,8 @@ impl crate::email::session::ImapDialer for ImapDialer {
 }
 
 pub struct ImapSessionImpl {
-    reader: BufReader<TcpStream>,
-    writer: TcpStream,
+    reader: BufReader<IoStream>,
+    writer: IoStream,
     tag_counter: u32,
     selected_folder: Option<String>,
 }
@@ -143,7 +330,7 @@ fn mailbox_argument(folder: &str) -> String {
     format!("\"{}\"", folder.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn read_line(reader: &mut BufReader<TcpStream>) -> Result<String, String> {
+fn read_line(reader: &mut BufReader<IoStream>) -> Result<String, String> {
     let mut line = String::new();
     reader
         .read_line(&mut line)
@@ -156,7 +343,7 @@ fn read_line(reader: &mut BufReader<TcpStream>) -> Result<String, String> {
 }
 
 /// Writes a command to the stream (appends CRLF).
-fn write_line(writer: &mut TcpStream, line: &str) -> Result<(), String> {
+fn write_line(writer: &mut IoStream, line: &str) -> Result<(), String> {
     writer
         .write_all(line.as_bytes())
         .map_err(|e| format!("IMAP write failed: {}", e))?;
@@ -403,18 +590,19 @@ fn collapse_uids(uids: &[u32]) -> String {
 }
 
 /// Reads lines until a tagged response, extracting UIDVALIDITY from untagged OK lines.
-fn read_examine_response(reader: &mut BufReader<TcpStream>, tag: &str) -> Result<u32, String> {
+fn read_examine_response(reader: &mut BufReader<IoStream>, tag: &str) -> Result<u32, String> {
     let mut uid_validity: Option<u32> = None;
     loop {
         let line = read_line(reader)?;
-        if line.starts_with("* ")
-            && let Some(start) = line.find("[UIDVALIDITY ")
+        if let Some(start) = line
+            .strip_prefix("* ")
+            .and_then(|rest| rest.find("[UIDVALIDITY "))
         {
-            let after = &line[start + "[UIDVALIDITY ".len()..];
+            let after = &line[start + "* ".len() + "[UIDVALIDITY ".len()..];
             if let Some(end) = after.find(']')
-                && let Ok(val) = after[..end].parse::<u32>()
+                && let Ok(value) = after[..end].parse::<u32>()
             {
-                uid_validity = Some(val);
+                uid_validity = Some(value);
             }
         }
         if line.starts_with(tag) {
@@ -429,7 +617,7 @@ fn read_examine_response(reader: &mut BufReader<TcpStream>, tag: &str) -> Result
 }
 
 /// Reads lines until a tagged response, collecting UIDs from * SEARCH lines.
-fn read_search_response(reader: &mut BufReader<TcpStream>, tag: &str) -> Result<Vec<u32>, String> {
+fn read_search_response(reader: &mut BufReader<IoStream>, tag: &str) -> Result<Vec<u32>, String> {
     let mut uids = Vec::new();
     loop {
         let line = read_line(reader)?;
@@ -456,7 +644,7 @@ fn read_search_response(reader: &mut BufReader<TcpStream>, tag: &str) -> Result<
 /// Handles the Go fake server's wire format:
 /// * N FETCH (UID N FLAGS (...) BODY[HEADER] {len}\r\n<header> BODY[TEXT] {len}\r\n<body>)\r\n
 fn read_fetch_response(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<IoStream>,
     tag: &str,
 ) -> Result<Vec<FetchedMessage>, String> {
     let mut fetched = Vec::new();
@@ -505,7 +693,7 @@ fn read_fetch_response(
 /// `{n}` is followed by exactly n bytes of payload, and the rest of the same
 /// response follows after it. Line-based reading alone truncates a section at
 /// the CRLF inside the payload, so the bytes are assembled here.
-fn read_response_bytes(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, String> {
+fn read_response_bytes(reader: &mut BufReader<IoStream>) -> Result<Vec<u8>, String> {
     let mut assembled = Vec::new();
     loop {
         let mut line = Vec::new();
@@ -587,7 +775,7 @@ fn parse_flags_from_fetch_line(line: &str) -> Option<Vec<String>> {
 }
 
 /// Reads a literal (body section) of the given length and checks the 64KB bound.
-fn read_bounded_body(reader: &mut BufReader<TcpStream>, len: usize) -> Result<Vec<u8>, String> {
+fn read_bounded_body(reader: &mut BufReader<IoStream>, len: usize) -> Result<Vec<u8>, String> {
     let max_body_bytes = 64 * 1024;
     if len > max_body_bytes {
         // Need to read and discard the oversized bytes
