@@ -1,0 +1,72 @@
+{
+  "source_revision": "79bf23e83b31f18d98487101200eaf32749e5a46",
+  "source_path": "internal/mcp/contract_handler.go:167-320",
+  "seed": "tests/fixtures/mcp-contract/mcp-003-store/seed.sql",
+  "cases": [
+    {
+      "name": "plan_show_lists_every_request_under_the_all_label",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"all\\\",\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T10:00:00Z\\\",\\\"current_status\\\":\\\"SENT\\\",\\\"deadline_at\\\":\\\"2026-08-20T12:00:05Z\\\",\\\"escalation_level\\\":0,\\\"id\\\":1,\\\"identity_snapshot_hash\\\":\\\"hash-a\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"next_action_at\\\":\\\"2026-08-14T09:00:00Z\\\",\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-06T12:00:05Z\\\",\\\"template_id\\\":\\\"tpl-eu\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-b\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"web_form\\\",\\\"created_at\\\":\\\"2026-08-06T11:00:00Z\\\",\\\"current_status\\\":\\\"HUMAN_ACTION_REQUIRED\\\",\\\"deadline_at\\\":null,\\\"escalation_level\\\":1,\\\"id\\\":2,\\\"identity_snapshot_hash\\\":\\\"hash-b\\\",\\\"jurisdiction\\\":\\\"CCPA\\\",\\\"last_event_at\\\":\\\"2026-08-08T08:00:00Z\\\",\\\"next_action_at\\\":null,\\\"reminders_sent\\\":1,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-07T08:00:00Z\\\",\\\"template_id\\\":\\\"tpl-us\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-2\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"current_status\\\":null,\\\"deadline_at\\\":null,\\\"escalation_level\\\":0,\\\"id\\\":3,\\\"identity_snapshot_hash\\\":\\\"hash-c\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":null,\\\"next_action_at\\\":null,\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":null,\\\"template_id\\\":\\\"tpl-eu\\\"}],\\\"total\\\":3}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "plan_show_filters_by_campaign",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{\"campaign_id\":\"campaign-1\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T10:00:00Z\\\",\\\"current_status\\\":\\\"SENT\\\",\\\"deadline_at\\\":\\\"2026-08-20T12:00:05Z\\\",\\\"escalation_level\\\":0,\\\"id\\\":1,\\\"identity_snapshot_hash\\\":\\\"hash-a\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"next_action_at\\\":\\\"2026-08-14T09:00:00Z\\\",\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-06T12:00:05Z\\\",\\\"template_id\\\":\\\"tpl-eu\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-b\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"web_form\\\",\\\"created_at\\\":\\\"2026-08-06T11:00:00Z\\\",\\\"current_status\\\":\\\"HUMAN_ACTION_REQUIRED\\\",\\\"deadline_at\\\":null,\\\"escalation_level\\\":1,\\\"id\\\":2,\\\"identity_snapshot_hash\\\":\\\"hash-b\\\",\\\"jurisdiction\\\":\\\"CCPA\\\",\\\"last_event_at\\\":\\\"2026-08-08T08:00:00Z\\\",\\\"next_action_at\\\":null,\\\"reminders_sent\\\":1,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-07T08:00:00Z\\\",\\\"template_id\\\":\\\"tpl-us\\\"}],\\\"total\\\":2}\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
+      "name": "plan_show_filters_by_campaign_and_status",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{\"campaign_id\":\"campaign-1\",\"status\":\"HUMAN_ACTION_REQUIRED\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-b\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"web_form\\\",\\\"created_at\\\":\\\"2026-08-06T11:00:00Z\\\",\\\"current_status\\\":\\\"HUMAN_ACTION_REQUIRED\\\",\\\"deadline_at\\\":null,\\\"escalation_level\\\":1,\\\"id\\\":2,\\\"identity_snapshot_hash\\\":\\\"hash-b\\\",\\\"jurisdiction\\\":\\\"CCPA\\\",\\\"last_event_at\\\":\\\"2026-08-08T08:00:00Z\\\",\\\"next_action_at\\\":null,\\\"reminders_sent\\\":1,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-07T08:00:00Z\\\",\\\"template_id\\\":\\\"tpl-us\\\"}],\\\"total\\\":1}\",\"type\":\"text\"}]},\"id\":3}\n"
+    },
+    {
+      "name": "list_requests_returns_the_default_page",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":1,\\\"page_size\\\":100,\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T10:00:00Z\\\",\\\"current_status\\\":\\\"SENT\\\",\\\"deadline_at\\\":\\\"2026-08-20T12:00:05Z\\\",\\\"escalation_level\\\":0,\\\"id\\\":1,\\\"identity_snapshot_hash\\\":\\\"hash-a\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"next_action_at\\\":\\\"2026-08-14T09:00:00Z\\\",\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-06T12:00:05Z\\\",\\\"template_id\\\":\\\"tpl-eu\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-b\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"web_form\\\",\\\"created_at\\\":\\\"2026-08-06T11:00:00Z\\\",\\\"current_status\\\":\\\"HUMAN_ACTION_REQUIRED\\\",\\\"deadline_at\\\":null,\\\"escalation_level\\\":1,\\\"id\\\":2,\\\"identity_snapshot_hash\\\":\\\"hash-b\\\",\\\"jurisdiction\\\":\\\"CCPA\\\",\\\"last_event_at\\\":\\\"2026-08-08T08:00:00Z\\\",\\\"next_action_at\\\":null,\\\"reminders_sent\\\":1,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-07T08:00:00Z\\\",\\\"template_id\\\":\\\"tpl-us\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-2\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"current_status\\\":null,\\\"deadline_at\\\":null,\\\"escalation_level\\\":0,\\\"id\\\":3,\\\"identity_snapshot_hash\\\":\\\"hash-c\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":null,\\\"next_action_at\\\":null,\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":null,\\\"template_id\\\":\\\"tpl-eu\\\"}],\\\"total\\\":3}\",\"type\":\"text\"}]},\"id\":4}\n"
+    },
+    {
+      "name": "list_requests_paginates_with_offset_and_limit",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"page\":2,\"page_size\":2}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":2,\\\"page_size\\\":2,\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-2\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"current_status\\\":null,\\\"deadline_at\\\":null,\\\"escalation_level\\\":0,\\\"id\\\":3,\\\"identity_snapshot_hash\\\":\\\"hash-c\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":null,\\\"next_action_at\\\":null,\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":null,\\\"template_id\\\":\\\"tpl-eu\\\"}],\\\"total\\\":3}\",\"type\":\"text\"}]},\"id\":5}\n"
+    },
+    {
+      "name": "list_requests_filters_by_broker_without_narrowing_the_total",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"broker_id\":\"broker-a\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":1,\\\"page_size\\\":100,\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T10:00:00Z\\\",\\\"current_status\\\":\\\"SENT\\\",\\\"deadline_at\\\":\\\"2026-08-20T12:00:05Z\\\",\\\"escalation_level\\\":0,\\\"id\\\":1,\\\"identity_snapshot_hash\\\":\\\"hash-a\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"next_action_at\\\":\\\"2026-08-14T09:00:00Z\\\",\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-06T12:00:05Z\\\",\\\"template_id\\\":\\\"tpl-eu\\\"},{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-2\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"current_status\\\":null,\\\"deadline_at\\\":null,\\\"escalation_level\\\":0,\\\"id\\\":3,\\\"identity_snapshot_hash\\\":\\\"hash-c\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":null,\\\"next_action_at\\\":null,\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":null,\\\"template_id\\\":\\\"tpl-eu\\\"}],\\\"total\\\":3}\",\"type\":\"text\"}]},\"id\":6}\n"
+    },
+    {
+      "name": "list_requests_filters_by_status",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"status\":\"SENT\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":1,\\\"page_size\\\":100,\\\"requests\\\":[{\\\"acknowledged_at\\\":null,\\\"broker_id\\\":\\\"broker-a\\\",\\\"campaign_id\\\":\\\"campaign-1\\\",\\\"channel\\\":\\\"email\\\",\\\"created_at\\\":\\\"2026-08-06T10:00:00Z\\\",\\\"current_status\\\":\\\"SENT\\\",\\\"deadline_at\\\":\\\"2026-08-20T12:00:05Z\\\",\\\"escalation_level\\\":0,\\\"id\\\":1,\\\"identity_snapshot_hash\\\":\\\"hash-a\\\",\\\"jurisdiction\\\":\\\"GDPR\\\",\\\"last_event_at\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"next_action_at\\\":\\\"2026-08-14T09:00:00Z\\\",\\\"reminders_sent\\\":0,\\\"resolved_at\\\":null,\\\"sent_at\\\":\\\"2026-08-06T12:00:05Z\\\",\\\"template_id\\\":\\\"tpl-eu\\\"}],\\\"total\\\":1}\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "list_requests_answers_an_unmatched_filter_with_null_rows",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"status\":\"CONFIRMED\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":1,\\\"page_size\\\":100,\\\"requests\\\":null,\\\"total\\\":0}\",\"type\":\"text\"}]},\"id\":8}\n"
+    },
+    {
+      "name": "get_events_orders_a_request_by_occurred_at_then_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":1}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"[{\\\"ID\\\":1,\\\"RequestID\\\":1,\\\"OccurredAt\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-06T12:00:01Z\\\",\\\"EventType\\\":\\\"PLANNED\\\",\\\"Payload\\\":{},\\\"Source\\\":\\\"system\\\"},{\\\"ID\\\":2,\\\"RequestID\\\":1,\\\"OccurredAt\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-07T09:00:02Z\\\",\\\"EventType\\\":\\\"SENT\\\",\\\"Payload\\\":{\\\"account\\\":\\\"daniel@example.com\\\"},\\\"Source\\\":\\\"user\\\"},{\\\"ID\\\":3,\\\"RequestID\\\":1,\\\"OccurredAt\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-07T09:00:03Z\\\",\\\"EventType\\\":\\\"ACK\\\",\\\"Payload\\\":{},\\\"Source\\\":\\\"inbox\\\"}]\",\"type\":\"text\"}]},\"id\":9}\n"
+    },
+    {
+      "name": "get_events_resumes_after_an_event_id",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":1,\"after_event_id\":2}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"[{\\\"ID\\\":3,\\\"RequestID\\\":1,\\\"OccurredAt\\\":\\\"2026-08-07T09:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-07T09:00:03Z\\\",\\\"EventType\\\":\\\"ACK\\\",\\\"Payload\\\":{},\\\"Source\\\":\\\"inbox\\\"}]\",\"type\":\"text\"}]},\"id\":10}\n"
+    },
+    {
+      "name": "get_events_returns_a_payload_verbatim",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":2}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"[{\\\"ID\\\":4,\\\"RequestID\\\":2,\\\"OccurredAt\\\":\\\"2026-08-08T08:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-08T08:00:04Z\\\",\\\"EventType\\\":\\\"BOUNCE\\\",\\\"Payload\\\":{\\\"reason\\\":\\\"mailbox_full\\\"},\\\"Source\\\":\\\"inbox\\\"}]\",\"type\":\"text\"}]},\"id\":11}\n"
+    },
+    {
+      "name": "get_events_passes_an_unknown_event_type_through",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":3}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"[{\\\"ID\\\":5,\\\"RequestID\\\":3,\\\"OccurredAt\\\":\\\"2026-08-09T07:00:00Z\\\",\\\"RecordedAt\\\":\\\"2026-08-09T07:00:05Z\\\",\\\"EventType\\\":\\\"NEWER_EVENT_TYPE\\\",\\\"Payload\\\":{\\\"detail\\\":\\\"forward compat\\\"},\\\"Source\\\":\\\"scheduler\\\"}]\",\"type\":\"text\"}]},\"id\":12}\n"
+    },
+    {
+      "name": "get_events_reports_no_events_for_an_unknown_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":99}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"null\",\"type\":\"text\"}]},\"id\":13}\n"
+    }
+  ]
+}
