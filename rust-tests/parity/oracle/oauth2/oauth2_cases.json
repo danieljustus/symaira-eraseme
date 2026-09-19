@@ -1,0 +1,402 @@
+{
+  "source_revision": "464e165ba61bb1c13ef95bd2e610747d9a67475f",
+  "source_path": "internal/email/oauth2.go",
+  "providers": {
+    "gmail": {
+      "AuthURL": "https://accounts.google.com/o/oauth2/v2/auth",
+      "TokenURL": "https://oauth2.googleapis.com/token",
+      "Scopes": "https://mail.google.com/ https://www.googleapis.com/auth/gmail.send"
+    },
+    "outlook": {
+      "AuthURL": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "TokenURL": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "Scopes": "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
+    }
+  },
+  "authorize": [
+    {
+      "name": "gmail",
+      "provider": "gmail",
+      "client_id": "client-123.apps.googleusercontent.com",
+      "redirect_uri": "https://erase.example/callback",
+      "auth_url_prefix": "https://accounts.google.com/o/oauth2/v2/auth?",
+      "params": {
+        "access_type": [
+          "offline"
+        ],
+        "client_id": [
+          "client-123.apps.googleusercontent.com"
+        ],
+        "code_challenge": [
+          "\u003crandom\u003e"
+        ],
+        "code_challenge_method": [
+          "S256"
+        ],
+        "prompt": [
+          "consent"
+        ],
+        "redirect_uri": [
+          "https://erase.example/callback"
+        ],
+        "response_type": [
+          "code"
+        ],
+        "scope": [
+          "https://mail.google.com/ https://www.googleapis.com/auth/gmail.send"
+        ],
+        "state": [
+          "\u003crandom\u003e"
+        ]
+      },
+      "verifier_length": 86,
+      "state_length": 22,
+      "challenge_is_s256_of_verifier": true
+    },
+    {
+      "name": "outlook",
+      "provider": " Outlook ",
+      "client_id": "client-abc",
+      "redirect_uri": "http://localhost:8765/callback",
+      "auth_url_prefix": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?",
+      "params": {
+        "access_type": [
+          "offline"
+        ],
+        "client_id": [
+          "client-abc"
+        ],
+        "code_challenge": [
+          "\u003crandom\u003e"
+        ],
+        "code_challenge_method": [
+          "S256"
+        ],
+        "prompt": [
+          "consent"
+        ],
+        "redirect_uri": [
+          "http://localhost:8765/callback"
+        ],
+        "response_type": [
+          "code"
+        ],
+        "scope": [
+          "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access"
+        ],
+        "state": [
+          "\u003crandom\u003e"
+        ]
+      },
+      "verifier_length": 86,
+      "state_length": 22,
+      "challenge_is_s256_of_verifier": true
+    },
+    {
+      "name": "unknown_provider",
+      "provider": "posteo",
+      "client_id": "client-123",
+      "redirect_uri": "https://erase.example/callback",
+      "auth_url_prefix": "",
+      "params": null,
+      "verifier_length": 0,
+      "state_length": 0,
+      "challenge_is_s256_of_verifier": false,
+      "error": "email: oauth2 error: unknown provider \"posteo\""
+    }
+  ],
+  "pkce": [
+    {
+      "verifier": "",
+      "challenge": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+    },
+    {
+      "verifier": "a",
+      "challenge": "ypeBEsobvcr6wjGzmiPcTaeG7_gUfE5yuYB3ha_uSLs"
+    },
+    {
+      "verifier": "test-verifier",
+      "challenge": "JBbiqONGWPaAmwXk_8bT6UnlPfrn65D32eZlJS-zGG0"
+    },
+    {
+      "verifier": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "challenge": "vLMqNyE5o4YP5y86Uv-YjdXnjM8_uAWzetMFJc44o8w"
+    },
+    {
+      "verifier": "verifier-ä-ö",
+      "challenge": "P3d4a8Rh3bzlMn2QFig6JIGa3JgJg8mSe-t8gg_ZtDw"
+    },
+    {
+      "verifier": "3f9a2b",
+      "challenge": "QvRWCN5NBKVz5rkreQ9wzSG5BDy-NAoX2LsRlPu3Hx8"
+    }
+  ],
+  "state_store": [
+    {
+      "name": "store_validate_and_consume",
+      "path_set": true,
+      "ttl_seconds": 300,
+      "steps": [
+        {
+          "op": "store",
+          "state": "state-1",
+          "provider": "gmail",
+          "at": "2026-09-19T12:00:00Z"
+        },
+        {
+          "op": "store",
+          "state": "state-2",
+          "provider": "outlook",
+          "at": "2026-09-19T12:00:00Z"
+        },
+        {
+          "op": "validate",
+          "state": "state-1",
+          "at": "2026-09-19T12:00:30Z"
+        },
+        {
+          "op": "validate",
+          "state": "state-1",
+          "at": "2026-09-19T12:00:31Z",
+          "error": "email: oauth2 state error: state mismatch (possible CSRF attack)"
+        },
+        {
+          "op": "validate",
+          "state": "state-2",
+          "at": "2026-09-19T12:00:32Z"
+        }
+      ],
+      "file": "{}",
+      "file_mode": 384
+    },
+    {
+      "name": "expired_state_is_rejected_and_consumed",
+      "path_set": true,
+      "ttl_seconds": 60,
+      "steps": [
+        {
+          "op": "store",
+          "state": "state-1",
+          "provider": "gmail",
+          "at": "2026-09-19T12:00:00Z"
+        },
+        {
+          "op": "validate",
+          "state": "state-1",
+          "at": "2026-09-19T12:01:01Z",
+          "error": "email: oauth2 state error: state expired (possible CSRF attack)"
+        },
+        {
+          "op": "validate",
+          "state": "state-1",
+          "at": "2026-09-19T12:01:02Z",
+          "error": "email: oauth2 state error: state expired (possible CSRF attack)"
+        }
+      ],
+      "file": "{\"state-1\":{\"provider\":\"gmail\",\"expires_at\":1789819260}}",
+      "file_mode": 384
+    },
+    {
+      "name": "missing_and_empty_state",
+      "path_set": true,
+      "ttl_seconds": 300,
+      "steps": [
+        {
+          "op": "validate",
+          "state": "",
+          "at": "2026-09-19T12:00:00Z",
+          "error": "email: oauth2 state error: missing state (possible CSRF attack)"
+        },
+        {
+          "op": "validate",
+          "state": "never-stored",
+          "at": "2026-09-19T12:00:00Z",
+          "error": "email: oauth2 state error: state mismatch (possible CSRF attack)"
+        },
+        {
+          "op": "store",
+          "state": "",
+          "provider": "gmail",
+          "at": "2026-09-19T12:00:00Z",
+          "error": "email: oauth2 state error: state and provider are required"
+        },
+        {
+          "op": "store",
+          "state": "state-1",
+          "at": "2026-09-19T12:00:00Z",
+          "error": "email: oauth2 state error: state and provider are required"
+        }
+      ],
+      "file_mode": -1
+    },
+    {
+      "name": "empty_path_is_rejected",
+      "path_set": false,
+      "ttl_seconds": 300,
+      "steps": [
+        {
+          "op": "store",
+          "state": "state-1",
+          "provider": "gmail",
+          "at": "2026-09-19T12:00:00Z",
+          "error": "email: oauth2 state error: state path is empty"
+        }
+      ],
+      "file_mode": -1
+    }
+  ],
+  "tokens": [
+    {
+      "name": "exchange_gmail",
+      "operation": "exchange",
+      "provider": "gmail",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "code": "auth-code-1",
+        "redirect_uri": "https://erase.example/callback",
+        "verifier": "pkce-verifier"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"access_token\":\"at-1\",\"refresh_token\":\"rt-1\",\"expires_in\":3600,\"token_type\":\"Bearer\"}"
+      },
+      "recorded": {
+        "method": "POST",
+        "path": "/token",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "client_id=cid\u0026client_secret=csecret\u0026code=auth-code-1\u0026code_verifier=pkce-verifier\u0026grant_type=authorization_code\u0026redirect_uri=https%3A%2F%2Ferase.example%2Fcallback"
+      },
+      "result": "{\"access_token\":\"at-1\",\"expires_in\":3600,\"refresh_token\":\"rt-1\",\"token_type\":\"Bearer\"}"
+    },
+    {
+      "name": "exchange_without_verifier",
+      "operation": "exchange",
+      "provider": "outlook",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "code": "auth-code-2",
+        "redirect_uri": "http://localhost:8765/callback"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"access_token\":\"at-2\",\"expires_in\":3600}"
+      },
+      "recorded": {
+        "method": "POST",
+        "path": "/common/oauth2/v2.0/token",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "client_id=cid\u0026client_secret=csecret\u0026code=auth-code-2\u0026grant_type=authorization_code\u0026redirect_uri=http%3A%2F%2Flocalhost%3A8765%2Fcallback"
+      },
+      "result": "{\"access_token\":\"at-2\",\"expires_in\":3600}"
+    },
+    {
+      "name": "refresh_gmail",
+      "operation": "refresh",
+      "provider": "gmail",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "refresh_token": "rt-9"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"access_token\":\"at-3\",\"expires_in\":3599,\"scope\":\"https://mail.google.com/\"}"
+      },
+      "recorded": {
+        "method": "POST",
+        "path": "/token",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "client_id=cid\u0026client_secret=csecret\u0026grant_type=refresh_token\u0026refresh_token=rt-9"
+      },
+      "result": "{\"access_token\":\"at-3\",\"expires_in\":3599,\"scope\":\"https://mail.google.com/\"}"
+    },
+    {
+      "name": "error_status_is_not_echoed",
+      "operation": "exchange",
+      "provider": "gmail",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "code": "bad-code",
+        "redirect_uri": "https://erase.example/callback"
+      },
+      "response": {
+        "status": 400,
+        "body": "{\"error\":\"invalid_grant\",\"error_description\":\"code auth-code-1 already used\"}"
+      },
+      "recorded": {
+        "method": "POST",
+        "path": "/token",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "client_id=cid\u0026client_secret=csecret\u0026code=bad-code\u0026grant_type=authorization_code\u0026redirect_uri=https%3A%2F%2Ferase.example%2Fcallback"
+      },
+      "error": "email: oauth2 error: token exchange returned HTTP 400"
+    },
+    {
+      "name": "invalid_json_response",
+      "operation": "refresh",
+      "provider": "outlook",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "refresh_token": "rt-1"
+      },
+      "response": {
+        "status": 200,
+        "body": "\u003chtml\u003enot json\u003c/html\u003e"
+      },
+      "recorded": {
+        "method": "POST",
+        "path": "/common/oauth2/v2.0/token",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "client_id=cid\u0026client_secret=csecret\u0026grant_type=refresh_token\u0026refresh_token=rt-1"
+      },
+      "error": "email: oauth2 error: token refresh returned invalid JSON"
+    },
+    {
+      "name": "unknown_provider_never_sends_a_request",
+      "operation": "exchange",
+      "provider": "posteo",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "s",
+        "code": "auth-code-3"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"access_token\":\"never\"}"
+      },
+      "recorded": {
+        "method": "",
+        "path": "",
+        "content_type": "",
+        "body": ""
+      },
+      "error": "email: oauth2 error: unknown provider \"posteo\""
+    },
+    {
+      "name": "transport_failure",
+      "operation": "refresh",
+      "provider": "gmail",
+      "params": {
+        "client_id": "cid",
+        "client_secret": "s",
+        "refresh_token": "rt-2"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"access_token\":\"never\"}"
+      },
+      "transport_fails": true,
+      "recorded": {
+        "method": "",
+        "path": "",
+        "content_type": "",
+        "body": ""
+      },
+      "error": "email: oauth2 error: token refresh failed"
+    }
+  ]
+}

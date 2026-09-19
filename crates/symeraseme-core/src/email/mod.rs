@@ -13,6 +13,7 @@
 
 pub mod config;
 pub mod hwm;
+pub mod oauth2;
 pub mod parse;
 pub mod policy;
 pub mod service;
