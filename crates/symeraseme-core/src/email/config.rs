@@ -87,6 +87,11 @@ pub fn load_imap_config_with(
         since_days: env_int("IMAP_SINCE_DAYS", 14, environment),
         max_messages: env_int("IMAP_MAX_MESSAGES", 50, environment),
         oauth2,
+        // Go's LoadIMAPConfig leaves both at their zero values: it reads no
+        // environment variable for them, and the transport applies its own
+        // 30-second default when the timeout is unset.
+        timeout_seconds: 0,
+        allow_insecure_cleartext_auth: false,
     })
 }
 

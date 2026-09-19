@@ -66,6 +66,8 @@ pub struct ImapConfig {
     pub since_days: i64,
     pub max_messages: i64,
     pub oauth2: Option<OAuth2Token>,
+    pub timeout_seconds: i64,
+    pub allow_insecure_cleartext_auth: bool,
 }
 
 impl Default for ImapConfig {
@@ -80,6 +82,8 @@ impl Default for ImapConfig {
             since_days: 0,
             max_messages: 0,
             oauth2: None,
+            timeout_seconds: 30,
+            allow_insecure_cleartext_auth: false,
         }
     }
 }
