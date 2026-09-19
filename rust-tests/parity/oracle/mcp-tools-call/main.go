@@ -9,19 +9,26 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
+
+	_ "modernc.org/sqlite"
 )
 
 const (
 	sourceRevision = "79bf23e83b31f18d98487101200eaf32749e5a46"
 	sourcePath     = "internal/mcp/contract_handler.go:167-320"
+	// storeFixtureDir holds the store-backed read cases and the frozen rows
+	// both sides read.
+	storeFixtureDir = "tests/fixtures/mcp-contract/mcp-003-store"
 )
 
 type fixtureCase struct {
@@ -34,6 +41,7 @@ type fixtureCase struct {
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--fixture" {
 		writeFixture()
+		writeStoreFixtures()
 		return
 	}
 	raw, err := io.ReadAll(os.Stdin)
@@ -190,4 +198,237 @@ func writeFixture() {
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
+}
+
+// storeCase is one recorded request against a store-backed tool.
+type storeCase struct {
+	name    string
+	request string
+}
+
+// writeStoreFixtures records `plan_show`, `list_requests` and `get_events`
+// against a store the handler created itself.
+//
+// The rows come from `mcp-003-store/seed.sql` rather than from the product's
+// write path: Go stamps `created_at`/`recorded_at` with `time.Now()` and offers
+// no injection point, so a store the product wrote would carry a wall clock and
+// no response over it could be pinned. The frozen rows are fixture input, like
+// the registry YAML the `validate` cases read; the contract these three tools
+// carry is the read path. Both this oracle and the Rust test execute the same
+// file, so the bytes are comparable.
+//
+// The empty-store fixture stays separate from the seeded one: one store cannot
+// be both, and keeping them apart removes any ordering coupling.
+func writeStoreFixtures() {
+	seed, err := os.ReadFile(filepath.Join(storeFixtureDir, "seed.sql"))
+	if err != nil {
+		fail(err)
+	}
+
+	empty := []storeCase{
+		{
+			name:    "plan_show_labels_an_unfiltered_empty_store_as_all",
+			request: callRequest(1, "plan_show", `{}`),
+		},
+		{
+			name:    "plan_show_keeps_an_explicit_campaign_label_without_rows",
+			request: callRequest(2, "plan_show", `{"campaign_id":"campaign-x","status":"SENT"}`),
+		},
+		{
+			name:    "list_requests_reports_an_empty_first_page",
+			request: callRequest(3, "list_requests", `{}`),
+		},
+		{
+			// Go rejects a non-positive page before it opens a query.
+			name:    "list_requests_rejects_page_zero",
+			request: callRequest(4, "list_requests", `{"page":0}`),
+		},
+		{
+			name:    "list_requests_rejects_page_size_zero",
+			request: callRequest(5, "list_requests", `{"page_size":0}`),
+		},
+		{
+			name:    "get_events_reports_no_events_for_an_unknown_request",
+			request: callRequest(6, "get_events", `{"request_id":7}`),
+		},
+		{
+			name:    "get_events_treats_request_zero_as_unknown",
+			request: callRequest(7, "get_events", `{"request_id":0,"after_event_id":0}`),
+		},
+	}
+
+	seeded := []storeCase{
+		{
+			name:    "plan_show_lists_every_request_under_the_all_label",
+			request: callRequest(1, "plan_show", `{}`),
+		},
+		{
+			name:    "plan_show_filters_by_campaign",
+			request: callRequest(2, "plan_show", `{"campaign_id":"campaign-1"}`),
+		},
+		{
+			name:    "plan_show_filters_by_campaign_and_status",
+			request: callRequest(3, "plan_show", `{"campaign_id":"campaign-1","status":"HUMAN_ACTION_REQUIRED"}`),
+		},
+		{
+			name:    "list_requests_returns_the_default_page",
+			request: callRequest(4, "list_requests", `{}`),
+		},
+		{
+			name:    "list_requests_paginates_with_offset_and_limit",
+			request: callRequest(5, "list_requests", `{"page":2,"page_size":2}`),
+		},
+		{
+			// The broker filter narrows the rows but not the count: Go passes
+			// only campaign and status to CountRemovalRequests.
+			name:    "list_requests_filters_by_broker_without_narrowing_the_total",
+			request: callRequest(6, "list_requests", `{"broker_id":"broker-a"}`),
+		},
+		{
+			name:    "list_requests_filters_by_status",
+			request: callRequest(7, "list_requests", `{"status":"SENT"}`),
+		},
+		{
+			name:    "list_requests_answers_an_unmatched_filter_with_null_rows",
+			request: callRequest(8, "list_requests", `{"status":"CONFIRMED"}`),
+		},
+		{
+			name:    "get_events_orders_a_request_by_occurred_at_then_id",
+			request: callRequest(9, "get_events", `{"request_id":1}`),
+		},
+		{
+			name:    "get_events_resumes_after_an_event_id",
+			request: callRequest(10, "get_events", `{"request_id":1,"after_event_id":2}`),
+		},
+		{
+			name:    "get_events_returns_a_payload_verbatim",
+			request: callRequest(11, "get_events", `{"request_id":2}`),
+		},
+		{
+			name:    "get_events_passes_an_unknown_event_type_through",
+			request: callRequest(12, "get_events", `{"request_id":3}`),
+		},
+		{
+			name:    "get_events_reports_no_events_for_an_unknown_request",
+			request: callRequest(13, "get_events", `{"request_id":99}`),
+		},
+	}
+
+	recordStoreFixture("empty-cases.json", nil, empty)
+	recordStoreFixture("seeded-cases.json", seed, seeded)
+}
+
+// recordStoreFixture runs one fixture family inside its own isolated workspace:
+// a fresh data directory (so the developer's store can never leak in, which is
+// what invalidated the earlier `plan_create` attempt), a private
+// `XDG_CONFIG_HOME`, a schema the handler creates, and then the frozen rows.
+func recordStoreFixture(file string, seed []byte, cases []storeCase) {
+	workspace, err := os.MkdirTemp("", "mcp-store-reads")
+	if err != nil {
+		fail(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	dataDir := filepath.Join(workspace, "data")
+	for _, dir := range []string{dataDir, filepath.Join(workspace, "xdg")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.Setenv("SYMERASEME_DATA_DIR", dataDir); err != nil {
+		fail(err)
+	}
+	if err := os.Setenv("SYMERASEME_DB_DIR", dataDir); err != nil {
+		fail(err)
+	}
+	if err := os.Setenv("XDG_CONFIG_HOME", filepath.Join(workspace, "xdg")); err != nil {
+		fail(err)
+	}
+
+	origin, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	if err := os.Chdir(workspace); err != nil {
+		fail(err)
+	}
+	defer func() { _ = os.Chdir(origin) }()
+
+	// One request through the handler creates the store with its schema; the
+	// answer itself is discarded.
+	warmUp := mcp.NewServer(mcp.ContractHandler())
+	if err := warmUp.ServeStdio(
+		context.Background(),
+		bytes.NewReader([]byte(callRequest(0, "list_requests", `{}`)+"\n")),
+		&bytes.Buffer{},
+	); err != nil {
+		fail(err)
+	}
+	if seed != nil {
+		applySeed(filepath.Join(dataDir, "symeraseme.db"), seed)
+	}
+
+	recorded := make([]fixtureCase, 0, len(cases))
+	for index := range cases {
+		recorded = append(recorded, fixtureCase{
+			Name:    cases[index].name,
+			Request: cases[index].request,
+		})
+	}
+	for index := range recorded {
+		var output bytes.Buffer
+		server := mcp.NewServer(mcp.ContractHandler())
+		err := server.ServeStdio(
+			context.Background(),
+			bytes.NewReader(append([]byte(recorded[index].Request), '\n')),
+			&output,
+		)
+		if err != nil {
+			recorded[index].ParseError = true
+		} else if body := output.String(); body != "" {
+			recorded[index].Response = &body
+		}
+	}
+
+	target, err := os.Create(filepath.Join(origin, storeFixtureDir, file))
+	if err != nil {
+		fail(err)
+	}
+	defer target.Close()
+	encoder := json.NewEncoder(target)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(struct {
+		SourceRevision string        `json:"source_revision"`
+		SourcePath     string        `json:"source_path"`
+		Seed           string        `json:"seed,omitempty"`
+		Cases          []fixtureCase `json:"cases"`
+	}{SourceRevision: sourceRevision, SourcePath: sourcePath, Seed: seedFile(seed), Cases: recorded}); err != nil {
+		fail(err)
+	}
+}
+
+func seedFile(seed []byte) string {
+	if seed == nil {
+		return ""
+	}
+	return filepath.Join(storeFixtureDir, "seed.sql")
+}
+
+// applySeed runs the frozen rows. The file holds one statement per line (no
+// semicolons inside values), which keeps the Go and Rust readers identical.
+func applySeed(dbPath string, seed []byte) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		fail(err)
+	}
+	defer db.Close()
+	for _, line := range strings.Split(string(seed), "\n") {
+		statement := strings.TrimSpace(line)
+		if statement == "" || strings.HasPrefix(statement, "--") {
+			continue
+		}
+		if _, err := db.Exec(statement); err != nil {
+			fail(fmt.Errorf("seed %q: %w", statement, err))
+		}
+	}
 }

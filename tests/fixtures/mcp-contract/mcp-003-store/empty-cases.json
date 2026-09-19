@@ -1,0 +1,41 @@
+{
+  "source_revision": "79bf23e83b31f18d98487101200eaf32749e5a46",
+  "source_path": "internal/mcp/contract_handler.go:167-320",
+  "cases": [
+    {
+      "name": "plan_show_labels_an_unfiltered_empty_store_as_all",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"all\\\",\\\"requests\\\":null,\\\"total\\\":0}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "plan_show_keeps_an_explicit_campaign_label_without_rows",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_show\",\"arguments\":{\"campaign_id\":\"campaign-x\",\"status\":\"SENT\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"campaign-x\\\",\\\"requests\\\":null,\\\"total\\\":0}\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
+      "name": "list_requests_reports_an_empty_first_page",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"page\\\":1,\\\"page_size\\\":100,\\\"requests\\\":null,\\\"total\\\":0}\",\"type\":\"text\"}]},\"id\":3}\n"
+    },
+    {
+      "name": "list_requests_rejects_page_zero",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"page\":0}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"page must be at least 1\"},\"id\":4}\n"
+    },
+    {
+      "name": "list_requests_rejects_page_size_zero",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"list_requests\",\"arguments\":{\"page_size\":0}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"page_size must be at least 1\"},\"id\":5}\n"
+    },
+    {
+      "name": "get_events_reports_no_events_for_an_unknown_request",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":7}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"null\",\"type\":\"text\"}]},\"id\":6}\n"
+    },
+    {
+      "name": "get_events_treats_request_zero_as_unknown",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"get_events\",\"arguments\":{\"request_id\":0,\"after_event_id\":0}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"null\",\"type\":\"text\"}]},\"id\":7}\n"
+    }
+  ]
+}

@@ -12,14 +12,16 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::campaign;
 use symeraseme_core::config::{ConfigContext, resolve_storage};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
-use symeraseme_core::storage::Store;
+use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
+use symeraseme_core::storage::{EventRecord, RemovalRequestRow, Store};
+use symeraseme_core::timeutil;
 use symeraseme_engine::scheduler;
 
 use super::tools_call::catalogue_has_tool;
@@ -421,6 +423,205 @@ impl ContractHandler {
         let files = scheduler::generate(&config).map_err(|error| ToolError(error.to_string()))?;
         Ok(json!({"success": true, "files": files, "dry_run": true}))
     }
+
+    /// Go's `plan_show`: the stored requests, optionally filtered by campaign
+    /// and status, under the campaign's label — or `all` when none was named.
+    ///
+    /// Go builds this through `campaign.GetPlan`, which passes neither a limit
+    /// nor an offset, so the answer is the whole matching set.
+    fn plan_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let campaign_id = get_str(arguments, "campaign_id", "");
+        let requests = Repository::new(&store)
+            .list_removal_requests(ListRemovalRequestsOptions {
+                campaign_id: optional_str(arguments, "campaign_id"),
+                status: optional_str(arguments, "status"),
+                ..ListRemovalRequestsOptions::default()
+            })
+            .map_err(|error| ToolError(error.to_string()))?;
+        let label = if campaign_id.is_empty() {
+            "all".to_owned()
+        } else {
+            campaign_id
+        };
+        Ok(json!({
+            "campaign_id": label,
+            "total": requests.len(),
+            "requests": request_rows(requests),
+        }))
+    }
+
+    /// Go's `list_requests`: a page of stored requests plus the total that
+    /// matches the campaign/status filter.
+    ///
+    /// The offset comes from the page number and the page size, and Go rejects
+    /// a non-positive value for either before it queries. The count keeps Go's
+    /// asymmetry: it filters by campaign and status, never by broker, so a
+    /// broker filter narrows the rows but not `total`.
+    fn list_requests(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let page = get_int(arguments, "page", 1);
+        if page < 1 {
+            return Err(ToolError("page must be at least 1".to_owned()));
+        }
+        let page_size = get_int(arguments, "page_size", 100);
+        if page_size < 1 {
+            return Err(ToolError("page_size must be at least 1".to_owned()));
+        }
+        let campaign_id = optional_str(arguments, "campaign_id");
+        let status = optional_str(arguments, "status");
+        let repository = Repository::new(&store);
+        let requests = repository
+            .list_removal_requests(ListRemovalRequestsOptions {
+                campaign_id: campaign_id.clone(),
+                status: status.clone(),
+                broker_id: optional_str(arguments, "broker_id"),
+                limit: Some(page_size),
+                offset: Some((page - 1) * page_size),
+            })
+            .map_err(|error| ToolError(error.to_string()))?;
+        let total = repository
+            .count_removal_requests(campaign_id.as_deref(), status.as_deref())
+            .map_err(|error| ToolError(error.to_string()))?;
+        Ok(json!({
+            "requests": request_rows(requests),
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }))
+    }
+
+    /// Go's `get_events`: one request's events in replay order, resuming after
+    /// an event id when one was given.
+    fn get_events(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let events = Repository::new(&store)
+            .get_events(
+                get_int(arguments, "request_id", 0),
+                get_int(arguments, "after_event_id", 0),
+            )
+            .map_err(|error| ToolError(error.to_string()))?;
+        event_list(events)
+    }
+}
+
+/// Go answers a nil slice when a query matches nothing, which reaches a client
+/// as `null` — never as `[]`.
+fn request_rows(rows: Vec<RemovalRequestRow>) -> Value {
+    if rows.is_empty() {
+        return Value::Null;
+    }
+    Value::Array(rows.iter().map(request_row).collect())
+}
+
+/// Go answers a nil slice when a query matches nothing; see [`request_rows`].
+///
+/// Go marshals the `[]Event` result itself, and a Go *struct* keeps its field
+/// order — `ID`, `RequestID`, `OccurredAt`, … — where `serde_json::Value`'s map
+/// is alphabetical. The list is therefore rendered as JSON text and handed to
+/// the envelope as a string result, which Go's `contentEnvelope` passes through
+/// verbatim too. The Go escaping is applied here because that pass-through
+/// branch does not apply it.
+fn event_list(events: Vec<EventRecord>) -> Result<Value, ToolError> {
+    if events.is_empty() {
+        return Ok(Value::Null);
+    }
+    let wire: Vec<EventWire<'_>> = events.iter().map(EventWire::from).collect();
+    let serialized = serde_json::to_string(&wire).map_err(|error| ToolError(error.to_string()))?;
+    Ok(Value::String(
+        String::from_utf8(super::envelope::go_escape_json_strings(
+            serialized.as_bytes(),
+        ))
+        .expect("escaped JSON is UTF-8"),
+    ))
+}
+
+fn request_row(row: &RemovalRequestRow) -> Value {
+    json!({
+        "id": row.id,
+        "broker_id": row.broker_id,
+        "channel": row.channel,
+        "campaign_id": row.campaign_id,
+        "created_at": timestamp(&row.created_at),
+        "jurisdiction": row.jurisdiction,
+        "template_id": row.template_id,
+        "identity_snapshot_hash": row.identity_snapshot_hash,
+        "current_status": row.current_status,
+        "last_event_at": nullable_timestamp(&row.last_event_at),
+        "sent_at": nullable_timestamp(&row.sent_at),
+        "acknowledged_at": nullable_timestamp(&row.acknowledged_at),
+        "resolved_at": nullable_timestamp(&row.resolved_at),
+        "deadline_at": nullable_timestamp(&row.deadline_at),
+        "next_action_at": nullable_timestamp(&row.next_action_at),
+        "reminders_sent": row.reminders_sent,
+        "escalation_level": row.escalation_level,
+    })
+}
+
+/// Go marshals an `Event` **struct**, so the wire keeps Go's field order and
+/// field names (`ID`, `RequestID`, …) instead of the storage column names — and
+/// unlike the request maps it is not sorted alphabetically.
+#[derive(serde::Serialize)]
+struct EventWire<'a> {
+    #[serde(rename = "ID")]
+    id: i64,
+    #[serde(rename = "RequestID")]
+    request_id: i64,
+    #[serde(rename = "OccurredAt")]
+    occurred_at: String,
+    #[serde(rename = "RecordedAt")]
+    recorded_at: String,
+    #[serde(rename = "EventType")]
+    event_type: &'a str,
+    #[serde(rename = "Payload")]
+    payload: &'a Map<String, Value>,
+    #[serde(rename = "Source")]
+    source: &'a str,
+}
+
+impl<'a> From<&'a EventRecord> for EventWire<'a> {
+    fn from(event: &'a EventRecord) -> Self {
+        Self {
+            id: event.id,
+            request_id: event.request_id,
+            occurred_at: instant(event.occurred_at),
+            recorded_at: instant(event.recorded_at),
+            event_type: event.event_type.as_str(),
+            payload: &event.payload,
+            source: event.source.as_str(),
+        }
+    }
+}
+
+fn nullable_timestamp(value: &Option<String>) -> Value {
+    match value {
+        Some(value) => timestamp(value),
+        None => Value::Null,
+    }
+}
+
+/// Go reaches the wire through `database/sql`, which hands a `TIMESTAMP` column
+/// back as a `time.Time` and renders it as RFC 3339: the stored
+/// `2026-08-06 10:00:00` becomes `2026-08-06T10:00:00Z`. The wording of that
+/// value is the contract, so the raw column text is parsed and re-rendered
+/// rather than passed through.
+///
+/// ponytail: an unparseable column keeps its raw text instead of failing the
+/// call the way the Go driver does. The product's own writers only emit the two
+/// accepted layouts, so the boundary is unreachable through the product.
+fn timestamp(value: &str) -> Value {
+    match timeutil::parse(value) {
+        Ok(parsed) => Value::String(instant(parsed)),
+        Err(_) => Value::String(value.to_owned()),
+    }
+}
+
+/// Go's `time.Time` marshalling (`RFC3339Nano`). `AutoSi` keeps at most
+/// millisecond/microsecond/nanosecond digits; Go trims a trailing zero to any
+/// length, so a value with exactly one, four, five or seven fractional digits
+/// would differ. The product writes whole seconds.
+fn instant(value: DateTime<Utc>) -> String {
+    value.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 /// Go's `parsePollHours`: empty means "no override", and each value must be a
@@ -458,6 +659,9 @@ impl ToolHandler for ContractHandler {
             "grant" => self.grant(arguments),
             "generate_scheduler" => self.generate_scheduler(arguments),
             "plan_create" => self.plan_create(arguments),
+            "plan_show" => self.plan_show(arguments),
+            "list_requests" => self.list_requests(arguments),
+            "get_events" => self.get_events(arguments),
             "list_brokers" => self.list_brokers(arguments),
             "schedule_install" => self.schedule_install(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
@@ -662,8 +866,198 @@ mod tests {
         root
     }
 
-    /// Every case is a response Go's real `ContractHandler` produced, so these
-    /// bytes are product behaviour rather than a stub's answer.
+    /// The store-backed read tools — `plan_show`, `list_requests`,
+    /// `get_events` — answer from rows frozen in `mcp-003-store/seed.sql`.
+    ///
+    /// The rows are fixture input rather than product output because Go stamps
+    /// `created_at`/`recorded_at` with `time.Now()` and offers no injection
+    /// point; a store the product wrote could not be pinned. The oracle applies
+    /// the same file to a store the handler created, so the bytes below are the
+    /// Go handler's own answer over identical rows.
+    #[test]
+    fn source_bound_go_store_read_fixtures_match() {
+        let seed = include_str!("../../../../tests/fixtures/mcp-contract/mcp-003-store/seed.sql");
+        store_read_fixture_matches(
+            "empty-cases",
+            include_str!("../../../../tests/fixtures/mcp-contract/mcp-003-store/empty-cases.json"),
+            None,
+        );
+        store_read_fixture_matches(
+            "seeded-cases",
+            include_str!("../../../../tests/fixtures/mcp-contract/mcp-003-store/seeded-cases.json"),
+            Some(seed),
+        );
+    }
+
+    /// Runs one store-read fixture family against a handler that resolves its
+    /// store from its own data directory, seeding the same rows the oracle did.
+    fn store_read_fixture_matches(name: &str, fixture_json: &str, seed: Option<&str>) {
+        use std::collections::BTreeMap;
+        use symeraseme_core::config::ConfigContext;
+
+        #[derive(Deserialize)]
+        struct StoreFixture {
+            source_revision: String,
+            cases: Vec<Case>,
+        }
+
+        let root = workspace(&format!("store-reads-{name}"));
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        if let Some(seed) = seed {
+            let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+            store
+                .connection()
+                .execute_batch(seed)
+                .expect("apply frozen rows");
+            drop(store);
+        }
+
+        let mut environment = BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+        let handler = ContractHandler::new(&root).with_store(
+            ConfigContext::new(root.clone(), root.clone(), environment),
+            now,
+        );
+
+        let fixture: StoreFixture = serde_json::from_str(fixture_json).expect("store fixture");
+        assert_eq!(
+            fixture.source_revision, "79bf23e83b31f18d98487101200eaf32749e5a46",
+            "{name}"
+        );
+        assert!(!fixture.cases.is_empty(), "{name} lost its cases");
+
+        for case in fixture.cases {
+            let actual = match initialize(case.request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => Some(String::from_utf8(bytes).unwrap()),
+                InitializeOutcome::Notification => None,
+                InitializeOutcome::ParseError => {
+                    panic!("{} unexpectedly parsed as error", case.name)
+                }
+            };
+            assert_response_matches(&case.name, actual, case.response.as_deref());
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Compares a response the way the contract does, and names the first
+    /// differing byte instead of dumping two walls of escaped JSON.
+    fn assert_response_matches(name: &str, actual: Option<String>, expected: Option<&str>) {
+        let expected = expected.unwrap_or_default();
+        let actual = actual.unwrap_or_default();
+        if actual == expected {
+            return;
+        }
+        let index = actual
+            .bytes()
+            .zip(expected.bytes())
+            .position(|(left, right)| left != right)
+            .unwrap_or_else(|| actual.len().min(expected.len()));
+        let window = |text: &str| {
+            let end = (index + 120).min(text.len());
+            text[index..end].to_owned()
+        };
+        panic!(
+            "{name}: differs at byte {index} of {} (actual) / {} (expected)\n actual: {}\nexpected: {}",
+            actual.len(),
+            expected.len(),
+            window(&actual),
+            window(expected)
+        );
+    }
+
+    /// Wraps one `tools/call` in the envelope and returns the whole response.
+    fn handler_call(handler: &ContractHandler, name: &str, arguments: &str) -> Value {
+        let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+        let request = json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        })
+        .to_string();
+        match initialize(request.as_bytes(), handler) {
+            InitializeOutcome::Response(bytes) => {
+                serde_json::from_slice(&bytes).expect("envelope JSON")
+            }
+            other => panic!("expected a response for {name}, got {other:?}"),
+        }
+    }
+
+    /// The branches the frozen-row fixtures do not reach: a handler without a
+    /// store configuration, and a `TIMESTAMP` column whose text the parse does
+    /// not accept.
+    #[test]
+    fn store_read_tools_need_a_store_and_keep_unparsable_timestamps() {
+        use std::collections::BTreeMap;
+        use symeraseme_core::config::ConfigContext;
+
+        let root = workspace("store-read-boundaries");
+
+        let bare = ContractHandler::new(&root);
+        for (name, arguments) in [
+            ("plan_show", "{}"),
+            ("list_requests", "{}"),
+            ("get_events", r#"{"request_id":1}"#),
+        ] {
+            let rejected = handler_call(&bare, name, arguments);
+            assert!(
+                rejected["error"]["message"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("the store-backed tools need a configuration"),
+                "{name}: {rejected}"
+            );
+        }
+
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+        store
+            .connection()
+            .execute_batch(
+                "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, \
+                 created_at, jurisdiction) VALUES (1, 'broker-t', 'email', 'campaign-t', \
+                 'not a timestamp', 'GDPR');",
+            )
+            .expect("seed unparsable row");
+        drop(store);
+
+        let mut environment = BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+        let handler = ContractHandler::new(&root).with_store(
+            ConfigContext::new(root.clone(), root.clone(), environment),
+            now,
+        );
+
+        let response = handler_call(&handler, "plan_show", "{}");
+        let payload: Value = serde_json::from_str(
+            response["result"]["content"][0]["text"]
+                .as_str()
+                .expect("payload text"),
+        )
+        .expect("payload JSON");
+        assert_eq!(payload["campaign_id"], "all");
+        assert_eq!(payload["total"], 1);
+        // ponytail: Go's driver rejects the value; this port keeps the raw text
+        // rather than inventing a failure the storage contract does not name.
+        assert_eq!(payload["requests"][0]["created_at"], "not a timestamp");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Every file-based case is a response Go's real `ContractHandler` produced,
+    /// so these bytes are product behaviour rather than a stub's answer.
     #[test]
     fn source_bound_go_tools_call_fixture_matches() {
         let root = workspace("tools-call");
