@@ -968,7 +968,7 @@ mod tests {
             actual.len(),
             expected.len(),
             window(&actual),
-            window(&expected)
+            window(expected)
         );
     }
 
