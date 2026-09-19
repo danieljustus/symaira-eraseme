@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -96,6 +97,14 @@ type folderScript struct {
 	FetchError  string        `json:"fetch_error,omitempty"`
 }
 
+// secretWire carries the synthetic credentials a case configures. The values are
+// invented; they only exist so the recorded error text proves redaction.
+type secretWire struct {
+	password string
+	username string
+	token    string
+}
+
 type hwmWire struct {
 	Host        string  `json:"host"`
 	Folder      string  `json:"folder"`
@@ -117,18 +126,21 @@ type callWire struct {
 }
 
 type pollCase struct {
-	Name      string                  `json:"name"`
-	Mode      string                  `json:"mode"`
-	Host      string                  `json:"host"`
-	Folder    string                  `json:"folder"`
-	Max       int                     `json:"max_messages"`
-	SinceDays int                     `json:"since_days"`
-	Folders   []string                `json:"folders"`
-	Initial   []hwmWire               `json:"initial_hwm"`
-	Script    map[string]folderScript `json:"script"`
-	Polls     int                     `json:"polls"`
-	Calls     []callWire              `json:"calls"`
-	Final     []hwmWire               `json:"final_hwm"`
+	Name        string                  `json:"name"`
+	Mode        string                  `json:"mode"`
+	Password    string                  `json:"password,omitempty"`
+	OAuth2User  string                  `json:"oauth2_username,omitempty"`
+	OAuth2Token string                  `json:"oauth2_access_token,omitempty"`
+	Host        string                  `json:"host"`
+	Folder      string                  `json:"folder"`
+	Max         int                     `json:"max_messages"`
+	SinceDays   int                     `json:"since_days"`
+	Folders     []string                `json:"folders"`
+	Initial     []hwmWire               `json:"initial_hwm"`
+	Script      map[string]folderScript `json:"script"`
+	Polls       int                     `json:"polls"`
+	Calls       []callWire              `json:"calls"`
+	Final       []hwmWire               `json:"final_hwm"`
 }
 
 type insertWire struct {
@@ -553,6 +565,41 @@ func seedHWM(store email.HWMStore, entries []hwmWire) {
 }
 
 // simpleHeader builds the raw RFC 5322 header block for one scripted message.
+// spellingProbe builds an error that contains each of the four base64 spellings
+// of a secret exactly once, so dropping any one entry of the redaction list
+// changes the recorded answer. It refuses to build a probe whose spellings are
+// not pairwise distinct — such a probe would silently pin nothing.
+func spellingProbe(secret string) string {
+	encoded := []struct {
+		label string
+		value string
+	}{
+		{"std", base64.StdEncoding.EncodeToString([]byte(secret))},
+		{"rawstd", base64.RawStdEncoding.EncodeToString([]byte(secret))},
+		{"url", base64.URLEncoding.EncodeToString([]byte(secret))},
+		{"rawurl", base64.RawURLEncoding.EncodeToString([]byte(secret))},
+	}
+	for i := range encoded {
+		for j := i + 1; j < len(encoded); j++ {
+			if encoded[i].value == encoded[j].value {
+				fail(fmt.Errorf("probe for %q: %s and %s are identical, nothing would be pinned",
+					secret, encoded[i].label, encoded[j].label))
+			}
+		}
+	}
+	parts := make([]string, 0, len(encoded))
+	for _, entry := range encoded {
+		parts = append(parts, entry.label+" "+entry.value)
+	}
+	return strings.Join(parts, " ")
+}
+
+// xoauth2PayloadForOracle mirrors email's unexported payload builder so a case
+// can embed it in a server error and prove the redaction list contains it.
+func xoauth2PayloadForOracle(username, token string) string {
+	return "user=" + username + "\x01auth=Bearer " + token + "\x01\x01"
+}
+
 func simpleHeader(subject, messageID, references, date string) string {
 	lines := []string{"Subject: " + subject}
 	if messageID != "" {
@@ -606,7 +653,7 @@ func pollCases() []pollCase {
 
 	// run polls the configured folders `polls` times and records each answer
 	// together with the searches the policy performed for it.
-	runScript := func(name string, folders []string, initial []hwmWire, maxMessages, sinceDays, polls int, script map[string]folderScript) pollCase {
+	runSecrets := func(name string, folders []string, initial []hwmWire, maxMessages, sinceDays, polls int, script map[string]folderScript, secrets secretWire) pollCase {
 		if len(folders) == 0 {
 			folders = []string{"INBOX"}
 		}
@@ -615,7 +662,10 @@ func pollCases() []pollCase {
 		calls := make([]callWire, 0, polls)
 		for range polls {
 			dialer := &scriptedDialer{script: script}
-			cfg := email.IMAPConfig{Host: "imap.example.com", Folder: folders[0], MaxMessages: maxMessages, SinceDays: sinceDays}
+			cfg := email.IMAPConfig{Host: "imap.example.com", Folder: folders[0], MaxMessages: maxMessages, SinceDays: sinceDays, Password: secrets.password}
+			if secrets.token != "" {
+				cfg.OAuth2 = &email.OAuth2Token{Username: secrets.username, AccessToken: secrets.token}
+			}
 			var messages []email.Message
 			var err error
 			if len(folders) > 1 {
@@ -639,19 +689,25 @@ func pollCases() []pollCase {
 			calls = append(calls, call)
 		}
 		return pollCase{
-			Name:      name,
-			Mode:      mode(folders),
-			Host:      "imap.example.com",
-			Folder:    folders[0],
-			Max:       maxMessages,
-			SinceDays: sinceDays,
-			Folders:   folders,
-			Initial:   initialOrEmpty(initial),
-			Script:    script,
-			Polls:     polls,
-			Calls:     calls,
-			Final:     hwmSnapshot(state, "imap.example.com", folders),
+			Name:        name,
+			Mode:        mode(folders),
+			Password:    secrets.password,
+			OAuth2User:  secrets.username,
+			OAuth2Token: secrets.token,
+			Host:        "imap.example.com",
+			Folder:      folders[0],
+			Max:         maxMessages,
+			SinceDays:   sinceDays,
+			Folders:     folders,
+			Initial:     initialOrEmpty(initial),
+			Script:      script,
+			Polls:       polls,
+			Calls:       calls,
+			Final:       hwmSnapshot(state, "imap.example.com", folders),
 		}
+	}
+	runScript := func(name string, folders []string, initial []hwmWire, maxMessages, sinceDays, polls int, script map[string]folderScript) pollCase {
+		return runSecrets(name, folders, initial, maxMessages, sinceDays, polls, script, secretWire{})
 	}
 	run := func(name string, folders []string, initial []hwmWire, maxMessages, sinceDays, polls int) pollCase {
 		return runScript(name, folders, initial, maxMessages, sinceDays, polls, scripts(folders))
@@ -696,6 +752,21 @@ func pollCases() []pollCase {
 		})),
 		// Cross-folder polling deduplicates by Message-ID.
 		run("folders_deduplicate_by_message_id", []string{"INBOX", "Replies"}, nil, 0, 0, 1),
+		// Credentials never reach an error message: the raw password, its
+		// standard base64 spelling and the full XOAUTH2 payload are all replaced
+		// before the error is returned (imapSecrets + RedactError end to end).
+		runSecrets("raw_password_is_redacted", one, nil, 0, 0, 1,
+			failing(folderScript{UIDValidity: 42, SearchError: "server rejected oracle-secret-1"}),
+			secretWire{password: "oracle-secret-1"}),
+		runSecrets("base64_password_is_redacted", one, nil, 0, 0, 1,
+			failing(folderScript{UIDValidity: 42, SelectError: "auth blob " + base64.StdEncoding.EncodeToString([]byte("oracle-secret-1"))}),
+			secretWire{password: "oracle-secret-1"}),
+		runSecrets("base64_variants_are_redacted", one, nil, 0, 0, 1,
+			failing(folderScript{UIDValidity: 42, SelectError: spellingProbe("????")}),
+			secretWire{password: "????"}),
+		runSecrets("oauth2_token_and_payload_are_redacted", one, nil, 0, 0, 1,
+			failing(folderScript{UIDValidity: 42, UIDs: []uint32{1}, FetchError: "token " + base64.RawURLEncoding.EncodeToString([]byte("oracle-token-1")) + " payload " + xoauth2PayloadForOracle("oracle-user-1", "oracle-token-1")}),
+			secretWire{username: "oracle-user-1", token: "oracle-token-1"}),
 	}
 }
 

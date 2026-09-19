@@ -15,7 +15,9 @@ use symeraseme_core::email::hwm::{HwmStore, MemoryHwmStore};
 use symeraseme_core::email::policy::{parse_email_body, poll_folders, poll_inbox};
 use symeraseme_core::email::service::{InboxService, ReplyStore};
 use symeraseme_core::email::session::{FetchedMessage, ImapDialer, ImapSession};
-use symeraseme_core::email::types::{ImapConfig, MatchedMessage, Message, RemovalRequest};
+use symeraseme_core::email::types::{
+    ImapConfig, MatchedMessage, Message, OAuth2Token, RemovalRequest,
+};
 use symeraseme_core::email::wire::{matched_messages_json, optional_messages_json};
 use symeraseme_core::email::{
     match_reply_to_request, normalize_subject, parse_fetched_message, subject_matches,
@@ -433,6 +435,16 @@ fn recorded_polls_agree() {
             folder: folders[0].clone(),
             max_messages: case["max_messages"].as_i64().unwrap_or(0),
             since_days: case["since_days"].as_i64().unwrap_or(0),
+            password: case["password"].as_str().unwrap_or_default().to_string(),
+            oauth2: case["oauth2_access_token"]
+                .as_str()
+                .map(|token| OAuth2Token {
+                    username: case["oauth2_username"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                    access_token: token.to_string(),
+                }),
             ..ImapConfig::default()
         };
         let state = MemoryHwmStore::new();

@@ -1348,6 +1348,149 @@
           "last_uid": 5
         }
       ]
+    },
+    {
+      "name": "raw_password_is_redacted",
+      "mode": "inbox",
+      "password": "oracle-secret-1",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null,
+          "search_error": "server rejected oracle-secret-1"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID search failed: server rejected [REDACTED]",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": []
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "base64_password_is_redacted",
+      "mode": "inbox",
+      "password": "oracle-secret-1",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null,
+          "select_error": "auth blob b3JhY2xlLXNlY3JldC0x"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: folder select failed: auth blob [REDACTED]",
+          "searches": [],
+          "fetches": []
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "base64_variants_are_redacted",
+      "mode": "inbox",
+      "password": "????",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": null,
+          "fetched": null,
+          "select_error": "std Pz8/Pw== rawstd Pz8/Pw url Pz8_Pw== rawurl Pz8_Pw"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: folder select failed: std [REDACTED] rawstd [REDACTED] url [REDACTED] rawurl [REDACTED]",
+          "searches": [],
+          "fetches": []
+        }
+      ],
+      "final_hwm": []
+    },
+    {
+      "name": "oauth2_token_and_payload_are_redacted",
+      "mode": "inbox",
+      "oauth2_username": "oracle-user-1",
+      "oauth2_access_token": "oracle-token-1",
+      "host": "imap.example.com",
+      "folder": "INBOX",
+      "max_messages": 0,
+      "since_days": 0,
+      "folders": [
+        "INBOX"
+      ],
+      "initial_hwm": [],
+      "script": {
+        "INBOX": {
+          "uid_validity": 42,
+          "uids": [
+            1
+          ],
+          "fetched": null,
+          "fetch_error": "token b3JhY2xlLXRva2VuLTE payload user=oracle-user-1\u0001auth=Bearer oracle-token-1\u0001\u0001"
+        }
+      },
+      "polls": 1,
+      "calls": [
+        {
+          "messages": "",
+          "error": "email: imap error: UID fetch failed: token [REDACTED] payload user=oracle-user-1\u0001auth=Bearer [REDACTED]\u0001\u0001",
+          "searches": [
+            {
+              "folder": "INBOX",
+              "uid_range": "1:*",
+              "since_set": false
+            }
+          ],
+          "fetches": [
+            [
+              1
+            ]
+          ]
+        }
+      ],
+      "final_hwm": []
     }
   ],
   "poll_and_match": [
