@@ -1,6 +1,6 @@
 # Übergabe-Prompt (für den nächsten Agenten, kopierfertig)
 
-Stand 2026-09-19, zweiter Cut des Tages.
+Stand 2026-09-19, dritter Cut des Tages.
 
 Du setzt die Symaira-Go→Rust-Migration für **EraseMe** fort. Arbeite
 evidenzbasiert: jede Behauptung muss durch echte Ausführung belegt sein.
@@ -8,15 +8,17 @@ evidenzbasiert: jede Behauptung muss durch echte Ausführung belegt sein.
 ## Pfade
 
 - Repo: `/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme`
-- Übergabe-Doku (zuerst lesen): `docs/rust-port/handoffs/2026-09-19-email-policy.md`
-- Davor, als Historie: `docs/rust-port/handoffs/2026-09-19-mcp-store-reads.md`,
+- Übergabe-Doku (zuerst lesen): `docs/rust-port/handoffs/2026-09-19-oauth2.md`
+- Davor, als Historie: `2026-09-19-email-policy.md`,
+  `docs/rust-port/handoffs/2026-09-19-mcp-store-reads.md`,
   `2026-09-18-mcp-handler-cut.md`
 - Vertragsregister (SSOT): `docs/rust-port-contract-matrix.md`
 - Docs-Repo-Status: `/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/docs/intern/rust-cut-20260917/eraseme/STATUS.md`
-- Go-Orakel: `rust-tests/parity/oracle/{mcp-tools-call,email}/`
+- Go-Orakel: `rust-tests/parity/oracle/{mcp-tools-call,email,oauth2}/`
 - Fixtures: `tests/fixtures/mcp-contract/mcp-003/cases.json` (dateibasiert),
   `tests/fixtures/mcp-contract/mcp-003-store/{seed.sql,empty-cases.json,seeded-cases.json}` (Store-Leser),
-  `rust-tests/parity/oracle/email/email_cases.json` (Inbox-Policy)
+  `rust-tests/parity/oracle/email/email_cases.json` (Inbox-Policy),
+  `rust-tests/parity/oracle/oauth2/oauth2_cases.json` (OAuth2)
 - Arbeitsdateien/Temporäres: `/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/tmp/`
 
 ## Umgebung (verpflichtend)
