@@ -180,19 +180,19 @@ func dialerCases(t *testing.T) []dialerCase {
 		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",
 	}, []string{"select:INBOX", "search:1:*", "fetch:1"}, "byte")
 
-	// STARTTLS and implicit TLS need a certificate the client trusts. The Go
-	// side generates a self-signed certificate per run, so the Rust replay
-	// cannot reach the same bytes without shipping a private key; these cases
-	// stay recorded Go evidence with the boundary stated.
+	// The TLS cases are replayable: the fixture records the command transcript
+	// and the results, never certificate material, and each side mints and
+	// trusts its own localhost certificate for the run. The Go side uses the
+	// package's test certificate, the Rust side mints one in its own test.
 	cases = append(cases, measureDialer(t, "starttls_login", "starttls", standard, dialerConfigWire{
 		Username: "testuser", Password: "testpass", TimeoutSeconds: 5,
 		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",
-	}, []string{"select:INBOX", "search:1:*", "fetch:1", "close"}, "go-only",
-		"the TLS handshake needs the per-run self-signed certificate; shipping a private key in the repository is not acceptable"))
+	}, []string{"select:INBOX", "search:1:*", "fetch:1", "close"}, "byte",
+		"the certificate is minted per run on each side; the fixture carries no certificate material"))
 	cases = append(cases, measureDialer(t, "implicit_tls_login", "tls", standard, dialerConfigWire{
 		UseTLS: true, Username: "testuser", Password: "testpass", TimeoutSeconds: 5,
 		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",
-	}, []string{"select:INBOX", "close"}, "go-only",
+	}, []string{"select:INBOX", "close"}, "byte",
 		"same certificate boundary as starttls_login"))
 	return cases
 }

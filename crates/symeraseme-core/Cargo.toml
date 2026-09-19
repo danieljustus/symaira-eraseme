@@ -53,5 +53,6 @@ cap-fs-ext.workspace = true
 cap-std.workspace = true
 
 [dev-dependencies]
+rcgen.workspace = true
 proptest = "1.11.0"
 tempfile.workspace = true

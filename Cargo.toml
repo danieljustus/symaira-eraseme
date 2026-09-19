@@ -37,6 +37,7 @@ symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljust
 tar = "0.4.44"
 tempfile = "3.27.0"
 toml = "0.5.11"
+rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
 ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.10.2"
 minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
