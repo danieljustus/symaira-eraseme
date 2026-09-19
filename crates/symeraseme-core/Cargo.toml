@@ -44,6 +44,8 @@ scrypt.workspace = true
 zeroize.workspace = true
 keyring.workspace = true
 rusqlite.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.30.1", default-features = false }

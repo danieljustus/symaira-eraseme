@@ -7,13 +7,23 @@
 //! UID list, the fetched messages (uid, flags, header, body) and the exact
 //! error string. Cases marked `replay: "go-only"` are skipped with an explicit
 //! assertion that they carry a reason, so a skipped case can never be mistaken
-//! for covered behaviour.
+//! for covered behaviour; the fixture currently marks every case byte-replayable,
+//! including the two TLS ones, and the suite asserts that both TLS cases really
+//! ran rather than being skipped somewhere else.
+//!
+//! The TLS cases record no certificate material: each side mints its own
+//! localhost certificate for the run and trusts exactly that one, which is why
+//! the transcript and the results stay comparable.
 
 #[path = "support/imap_server.rs"]
 mod imap_server;
 
-use imap_server::{FolderState, MessageState, ScriptedImapServer};
+use imap_server::{FolderState, MessageState, ScriptedImapServer, TlsMode};
+use rcgen::generate_simple_self_signed;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+use rustls::{RootCertStore, ServerConfig};
 use serde_json::{Value, json};
+use std::sync::Arc;
 use symeraseme_core::email::session::{FetchedMessage, ImapDialer};
 use symeraseme_core::email::types::{ImapConfig, OAuth2Token};
 
@@ -47,8 +57,54 @@ struct Observed {
     error: Option<String>,
 }
 
-fn server_for(case: &Value) -> ScriptedImapServer {
-    let server = ScriptedImapServer::new().expect("scripted server starts");
+/// Mints a localhost certificate for the run and returns the server
+/// configuration plus the root store that trusts exactly this certificate. No
+/// key material ever reaches the repository or the fixture.
+fn tls_material() -> (Arc<ServerConfig>, RootCertStore) {
+    let certified = generate_simple_self_signed(vec!["127.0.0.1".to_string()])
+        .expect("localhost certificate is minted");
+    let certificate: CertificateDer<'static> = certified.cert.der().clone();
+    let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(
+        certified.signing_key.serialize_der(),
+    ));
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = ServerConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .expect("protocol versions")
+        .with_no_client_auth()
+        .with_single_cert(vec![certificate.clone()], key)
+        .expect("server certificate is usable");
+    let mut roots = RootCertStore::empty();
+    roots
+        .add(certificate)
+        .expect("minted certificate is a trust anchor");
+    (Arc::new(config), roots)
+}
+
+/// The server the case was recorded against, plus the roots the client has to
+/// trust for it.
+fn server_for(case: &Value) -> (ScriptedImapServer, Option<RootCertStore>) {
+    let (server, roots) = match case["server_mode"].as_str().unwrap_or("plain") {
+        "tls" => {
+            let (config, roots) = tls_material();
+            (
+                ScriptedImapServer::new_tls(config, TlsMode::Implicit).expect("TLS server starts"),
+                Some(roots),
+            )
+        }
+        "starttls" => {
+            let (config, roots) = tls_material();
+            (
+                ScriptedImapServer::new_tls(config, TlsMode::StartTls)
+                    .expect("STARTTLS server starts"),
+                Some(roots),
+            )
+        }
+        _ => (
+            ScriptedImapServer::new().expect("scripted server starts"),
+            None,
+        ),
+    };
     let uid_validity = case["uid_validity"].as_u64().expect("uid_validity") as u32;
     let messages: Vec<MessageState> = case["messages"]
         .as_array()
@@ -91,7 +147,7 @@ fn server_for(case: &Value) -> ScriptedImapServer {
             },
         );
     }
-    server
+    (server, roots)
 }
 
 fn config_for(case: &Value, server: &ScriptedImapServer) -> ImapConfig {
@@ -133,12 +189,12 @@ fn fetched_to_value(message: &FetchedMessage) -> Value {
     })
 }
 
-fn measure(case: &Value, server: &ScriptedImapServer) -> Observed {
-    measure_with(
-        case,
-        server,
-        &symeraseme_core::email::imap::ImapDialer::new(),
-    )
+fn measure(case: &Value, server: &ScriptedImapServer, roots: Option<RootCertStore>) -> Observed {
+    let dialer = match roots {
+        Some(roots) => symeraseme_core::email::imap::ImapDialer::with_root_certificates(roots),
+        None => symeraseme_core::email::imap::ImapDialer::new(),
+    };
+    measure_with(case, server, &dialer)
 }
 
 fn measure_with(case: &Value, server: &ScriptedImapServer, dialer: &impl ImapDialer) -> Observed {
@@ -189,6 +245,7 @@ fn measure_with(case: &Value, server: &ScriptedImapServer, dialer: &impl ImapDia
 #[test]
 fn imap_transport_transcript_cases_match_the_go_oracle() {
     let mut replayed = 0;
+    let mut tls_replayed = 0;
     for case in cases() {
         let name = case["name"].as_str().expect("case name").to_string();
         if case["replay"].as_str() == Some("go-only") {
@@ -199,8 +256,13 @@ fn imap_transport_transcript_cases_match_the_go_oracle() {
             );
             continue;
         }
-        let server = server_for(&case);
-        let observed = measure(&case, &server);
+        let (server, roots) = server_for(&case);
+        // STARTTLS starts in cleartext, so `use_tls` alone would miss it; the
+        // recorded server mode is what says a case exercises TLS.
+        if case["server_mode"].as_str().unwrap_or("plain") != "plain" {
+            tls_replayed += 1;
+        }
+        let observed = measure(&case, &server, roots);
         replayed += 1;
 
         let expected_transcript: Vec<String> = case["transcript"]
@@ -263,28 +325,57 @@ fn imap_transport_transcript_cases_match_the_go_oracle() {
         }
     }
     assert!(
-        replayed >= 9,
-        "expected at least the nine byte-replayable cases, replayed {replayed}"
+        replayed >= 11,
+        "expected all eleven byte-replayable cases, replayed {replayed}"
+    );
+    assert!(
+        tls_replayed >= 2,
+        "both TLS cases must really run rather than being skipped, replayed {tls_replayed}"
     );
 }
 
 #[test]
-fn tls_transport_is_refused_and_says_so() {
-    let server = ScriptedImapServer::new().expect("scripted server starts");
-    let case = json!({
+fn the_default_root_store_rejects_an_untrusted_certificate() {
+    let (config, _trusted_roots) = tls_material();
+    let server = ScriptedImapServer::new_tls(config, TlsMode::Implicit).expect("TLS server starts");
+    let case = tls_case();
+    let observed = measure(&case, &server, None);
+    let error = observed
+        .error
+        .expect("the bundled webpki roots must not trust a locally minted certificate");
+    assert!(
+        error.contains("UnknownIssuer") || error.contains("certificate"),
+        "the rejection must be a certificate failure, got: {error}"
+    );
+}
+
+#[test]
+fn the_injected_root_store_is_what_makes_that_certificate_trusted() {
+    let (config, roots) = tls_material();
+    let server = ScriptedImapServer::new_tls(config, TlsMode::Implicit).expect("TLS server starts");
+    let case = tls_case();
+    let observed = measure(&case, &server, Some(roots));
+    assert_eq!(
+        observed.error, None,
+        "the injected root store must make the minted certificate trusted"
+    );
+    assert!(
+        !observed.transcript.is_empty(),
+        "a trusted TLS connection must speak IMAP"
+    );
+}
+
+fn tls_case() -> Value {
+    json!({
         "server_mode": "tls",
         "uid_validity": 100,
-        "config": {"use_tls": true, "username": "testuser", "password": "testpass", "timeout_seconds": 5.0}
-    });
-    let observed = measure(&case, &server);
-    let error = observed.error.expect("implicit TLS must be refused");
-    assert!(
-        error.contains("not ported"),
-        "the refusal must name the unported transport, got: {error}"
-    );
-    assert!(
-        observed.transcript.is_empty(),
-        "a refused TLS connection must not speak IMAP, got: {:?}",
-        observed.transcript
-    );
+        "ops": ["close"],
+        "config": {
+            "use_tls": true,
+            "username": "testuser",
+            "password": "testpass",
+            "timeout_seconds": 5.0,
+            "allow_insecure_cleartext_auth": false
+        }
+    })
 }

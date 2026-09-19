@@ -13,12 +13,95 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+/// A transport that can be swapped in place, so the reader (created before the
+/// handshake) and the writer keep working on the upgraded stream. rustls'
+/// session object cannot be cloned, which is the same constraint the product
+/// client solves with its own wrapper.
+pub trait ReadWrite: Read + Write + Send + Sync {}
+impl<T: Read + Write + Send + Sync> ReadWrite for T {}
+
+pub struct SharedStream {
+    inner: Arc<Mutex<Box<dyn ReadWrite>>>,
+}
+
+impl SharedStream {
+    fn new(stream: Box<dyn ReadWrite>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(stream)),
+        }
+    }
+
+    /// Shares the same underlying transport; used to keep the reader and the
+    /// writer on one connection.
+    fn share(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+
+    fn replace_with(
+        &self,
+        swap: impl FnOnce(Box<dyn ReadWrite>) -> Result<Box<dyn ReadWrite>, String>,
+    ) -> Result<(), String> {
+        let mut guard = self.inner.lock().expect("stream lock");
+        let current = std::mem::replace(&mut *guard, Box::new(std::io::empty()));
+        *guard = swap(current)?;
+        Ok(())
+    }
+}
+
+impl Clone for SharedStream {
+    fn clone(&self) -> Self {
+        self.share()
+    }
+}
+
+impl Read for SharedStream {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.inner.lock().expect("stream lock").read(buffer)
+    }
+}
+
+impl Write for SharedStream {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.inner.lock().expect("stream lock").write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.lock().expect("stream lock").flush()
+    }
+}
+
+/// How the scripted server secures the connection: not at all, after the
+/// STARTTLS command, or from the first byte (implicit TLS).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TlsMode {
+    None,
+    StartTls,
+    Implicit,
+}
+
+fn upgrade_tls(stream: &SharedStream, config: &Arc<ServerConfig>) -> Result<(), String> {
+    let connection =
+        ServerConnection::new(config.clone()).map_err(|e| format!("server TLS: {e}"))?;
+    stream.replace_with(|inner| Ok(Box::new(StreamOwned::new(connection, inner))))
+}
+
+/// The TLS material a scripted server was started with; bundled so the
+/// connection handler keeps a manageable argument list.
+#[derive(Clone)]
+pub struct TlsSetup {
+    config: Option<Arc<ServerConfig>>,
+    mode: TlsMode,
+}
 
 pub struct ScriptedImapServer {
     pub port: u16,
@@ -33,6 +116,15 @@ impl ScriptedImapServer {
     /// Creates a new scripted IMAP server for parity testing.
     /// Mirrors Go's startFakeIMAPServerMode(false, false).
     pub fn new() -> Result<Self, String> {
+        Self::start(None, TlsMode::None)
+    }
+
+    /// Serves over TLS, either implicitly or after `STARTTLS`.
+    pub fn new_tls(tls: Arc<ServerConfig>, mode: TlsMode) -> Result<Self, String> {
+        Self::start(Some(tls), mode)
+    }
+
+    fn start(tls: Option<Arc<ServerConfig>>, tls_mode: TlsMode) -> Result<Self, String> {
         let listener = TcpListener::bind("127.0.0.1:0")
             .map_err(|e| format!("failed to bind server: {}", e))?;
         let addr = listener
@@ -46,6 +138,10 @@ impl ScriptedImapServer {
             require_pass: "testpass".to_string(),
             require_token: "testtoken".to_string(),
             transcript: Arc::new(Mutex::new(Vec::new())),
+        };
+        let tls = TlsSetup {
+            config: tls,
+            mode: tls_mode,
         };
 
         // Default INBOX folder
@@ -76,6 +172,7 @@ impl ScriptedImapServer {
                 require_pass,
                 require_token,
                 transcript_clone,
+                tls,
             );
         });
 
@@ -96,6 +193,7 @@ fn serve_loop(
     require_pass: String,
     require_token: String,
     transcript: Arc<Mutex<Vec<String>>>,
+    tls: TlsSetup,
 ) {
     for stream in listener.incoming() {
         match stream {
@@ -105,6 +203,7 @@ fn serve_loop(
                 let require_pass = require_pass.clone();
                 let require_token = require_token.clone();
                 let transcript = transcript.clone();
+                let tls = tls.clone();
                 thread::spawn(move || {
                     handle_connection(
                         stream,
@@ -113,6 +212,7 @@ fn serve_loop(
                         &require_pass,
                         &require_token,
                         transcript,
+                        tls,
                     );
                 });
             }
@@ -122,19 +222,21 @@ fn serve_loop(
 }
 
 fn handle_connection(
-    mut stream: TcpStream,
+    tcp: TcpStream,
     folders: Arc<Mutex<HashMap<String, FolderState>>>,
     require_user: &str,
     require_pass: &str,
     require_token: &str,
     transcript: Arc<Mutex<Vec<String>>>,
+    tls: TlsSetup,
 ) {
-    let reader = BufReader::new(
-        stream
-            .try_clone()
-            .unwrap_or_else(|_| panic!("stream clone failed")),
-    );
+    let shared = SharedStream::new(Box::new(tcp));
+    if let (Some(config), TlsMode::Implicit) = (&tls.config, tls.mode) {
+        upgrade_tls(&shared, config).expect("implicit TLS handshake");
+    }
+    let reader = BufReader::new(shared.clone());
     let mut lines = reader.lines();
+    let mut stream = shared;
     let mut selected_folder: Option<String> = None;
 
     // Send greeting
@@ -160,16 +262,29 @@ fn handle_connection(
 
         match cmd.as_str() {
             "CAPABILITY" => {
+                let starttls_capability = if tls.mode == TlsMode::StartTls {
+                    " STARTTLS"
+                } else {
+                    ""
+                };
                 let response = format!(
-                    "* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=XOAUTH2 SASL-IR\r\n{} OK CAPABILITY completed\r\n",
-                    tag
+                    "* CAPABILITY IMAP4rev1{} AUTH=PLAIN AUTH=XOAUTH2 SASL-IR\r\n{} OK CAPABILITY completed\r\n",
+                    starttls_capability, tag
                 );
                 let _ = stream.write_all(response.as_bytes());
             }
-            "STARTTLS" => {
-                let _ =
-                    stream.write_all(format!("{} BAD STARTTLS unavailable\r\n", tag).as_bytes());
-            }
+            "STARTTLS" => match (&tls.config, tls.mode) {
+                (Some(config), TlsMode::StartTls) => {
+                    let _ = stream
+                        .write_all(format!("{} OK Begin TLS negotiation now\r\n", tag).as_bytes());
+                    let _ = stream.flush();
+                    upgrade_tls(&stream, config).expect("STARTTLS handshake");
+                }
+                _ => {
+                    let _ = stream
+                        .write_all(format!("{} BAD STARTTLS unavailable\r\n", tag).as_bytes());
+                }
+            },
             "LOGIN" => {
                 let (username, password) = parse_login(&rest);
                 if username != require_user || password != require_pass {
@@ -301,8 +416,8 @@ fn handle_connection(
 }
 
 fn handle_xoauth2(
-    stream: &mut TcpStream,
-    _lines: &mut std::io::Lines<BufReader<TcpStream>>,
+    stream: &mut SharedStream,
+    _lines: &mut std::io::Lines<BufReader<SharedStream>>,
     tag: &str,
     rest: &str,
     require_token: &str,
@@ -336,7 +451,7 @@ fn handle_xoauth2(
     }
 }
 
-fn perform_fetch(stream: &mut TcpStream, tag: &str, folder: &FolderState, fetch_args: &str) {
+fn perform_fetch(stream: &mut SharedStream, tag: &str, folder: &FolderState, fetch_args: &str) {
     let uids = parse_fetch_uids(fetch_args);
     if uids.is_empty() {
         let _ = stream.write_all(format!("{} BAD Invalid FETCH syntax\r\n", tag).as_bytes());
@@ -355,7 +470,7 @@ fn perform_fetch(stream: &mut TcpStream, tag: &str, folder: &FolderState, fetch_
     let _ = stream.write_all(format!("{} OK UID FETCH completed\r\n", tag).as_bytes());
 }
 
-fn write_fetch_response(stream: &mut TcpStream, seq: u32, msg: &MessageState) {
+fn write_fetch_response(stream: &mut SharedStream, seq: u32, msg: &MessageState) {
     let header_bytes = msg.header.as_bytes();
     let body_bytes = msg.body.as_bytes();
     let flags_str = if !msg.flags.is_empty() {
