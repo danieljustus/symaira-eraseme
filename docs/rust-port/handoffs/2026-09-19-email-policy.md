@@ -100,3 +100,32 @@ Header/Encoded-Words (aus Go's Quellen abgeleitet und gemessen):
   offen sind MIME-Boundaries, CRLF und Empfänger.
 - **MCP-003**: unverändert bei 14/26 — `poll_inbox` bleibt Go, solange der
   Transport fehlt. Kein Tool wird als „läuft" gezählt, das nicht pollen kann.
+
+## Nachtrag: Credential-Redaktion gepinnt
+
+`imapSecrets` + `RedactError` waren portiert, aber **nicht** durch einen Fall
+belegt. Vier neue Poll-Fälle schließen das end-to-end (Scripted Session lässt
+den Fehlertext das Geheimnis tragen):
+
+| Fall | gepinnt |
+|---|---|
+| `raw_password_is_redacted` | Rohform (Suchfehler) |
+| `base64_password_is_redacted` | `base64.StdEncoding` (Select-Fehler) |
+| `base64_variants_are_redacted` | alle vier Schreibweisen einzeln (Probe mit `????`) |
+| `oauth2_token_and_payload_are_redacted` | Token + Reihenfolge-Effekt (siehe unten) |
+
+Die Probe `spellingProbe` **verweigert** ein Geheimnis, dessen vier
+Schreibweisen nicht paarweise verschieden sind — sonst pinnt der Fall nichts.
+Mein erster Versuch (`oracle-secret-?`, 15 Byte) fiel genau darauf herein: bei
+padding-freier Länge sind `StdEncoding` und `RawStdEncoding` identisch, die
+Negativkontrolle wäre grün geblieben. `????` erzeugt alle vier Formen
+(`Pz8/Pw==`, `Pz8/Pw`, `Pz8_Pw==`, `Pz8_Pw`).
+
+**Negativkontrollen:** jede der vier Base64-Einträge einzeln entfernt → Test rot,
+zurückgebaut → grün. Vorher war nur die Rohform gepinnt.
+
+**Gemessene Nuance:** Go's Liste enthält zusätzlich den ganzen XOAUTH2-Payload.
+Er greift nie, weil der Token vorher ersetzt wird und den Payload dabei
+zerlegt — der vierte Fall zeigt genau diesen Effekt (`payload user=…\x01auth=
+Bearer [REDACTED]\x01\x01`). Der Eintrag ist also redundant, aber harmlos; der
+Port behält ihn, weil er Go's Liste spiegelt.
