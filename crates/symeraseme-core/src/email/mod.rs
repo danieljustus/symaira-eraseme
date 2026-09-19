@@ -13,6 +13,7 @@
 
 pub mod config;
 pub mod hwm;
+pub mod imap;
 pub mod oauth2;
 pub mod parse;
 pub mod policy;
@@ -26,6 +27,7 @@ pub use config::{
     resolve_imap_oauth2,
 };
 pub use hwm::{HwmStore, MemoryHwmStore, StagingHwmStore};
+pub use imap::ImapDialer as ImapTransportDialer;
 pub use parse::{decode_header, parse_fetched_message};
 pub use policy::{
     ERR_IMAP, match_reply_to_request, normalize_subject, parse_email_body, poll_folders,
