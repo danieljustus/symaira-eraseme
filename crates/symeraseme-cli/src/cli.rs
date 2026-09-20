@@ -2,17 +2,22 @@
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
 use serde::Serialize;
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::env;
 use std::path::Path;
 
-use symeraseme_core::config::{Config, ConfigContext};
+use chrono::{DateTime, Utc};
+use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
+use symeraseme_core::deadlines::{self, RunOpts};
 use symeraseme_core::identity::{
     MasterKeyResolver, Profile, ProfilePaths, load_profile, profile_exists,
 };
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
 };
+use symeraseme_core::reporting;
+use symeraseme_core::storage::Store;
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
 
@@ -381,6 +386,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
                     .to_vec(),
             )
         }
+        "plan status" => plan_status(parsed),
+        "plan tick" => plan_tick(parsed),
         _ => deferred(&path),
     }
 }
@@ -407,6 +414,130 @@ struct BrokersListEnvelope<'a> {
 struct BrokerShowEnvelope<'a> {
     broker: &'a Broker,
     schema_version: u8,
+}
+
+/// The wall clock, as Go's `time.Now().UTC()`. `chrono` is built without its
+/// `clock` feature here, so the instant comes from `std`.
+fn now_utc() -> DateTime<Utc> {
+    DateTime::<Utc>::from(std::time::SystemTime::now())
+}
+
+/// The process environment as a [`ConfigContext`], as every command sees it.
+fn process_context() -> ConfigContext {
+    let home = env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
+    let cwd = env::current_dir().unwrap_or_default();
+    let environment = env::vars().collect::<BTreeMap<_, _>>();
+    ConfigContext::new(home, cwd, environment)
+}
+
+/// Go's `dataStore()`: resolve the storage location, create the database
+/// directory with mode `0700`, then open the event store.
+fn open_store() -> Result<Store, String> {
+    let storage = resolve_storage(&process_context()).map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&storage.db_dir)
+        .map_err(|error| format!("eventstore: create database directory: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&storage.db_dir, std::fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("eventstore: secure database directory: {error}"))?;
+    }
+    Store::open(&storage.db_path).map_err(|error| error.to_string())
+}
+
+/// Go's `%v` rendering of a string-keyed map: sorted keys, plain values.
+fn go_value(value: &Value) -> String {
+    let Some(object) = value.as_object() else {
+        return value.to_string();
+    };
+    let entries = object
+        .iter()
+        .map(|(key, value)| format!("{key}:{value}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("map[{entries}]")
+}
+
+/// `plan status` — Go's `planStatusCommand`.
+///
+/// The order is Go's and it is observable: the store is opened first, the status
+/// is computed second, and only then is `--output` validated. A broken store
+/// therefore wins over a bad `--output` value.
+fn plan_status(parsed: &Parsed) -> Outcome {
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match reporting::get_campaign_status(&store, "", now_utc()) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+}
+
+/// `plan tick` — Go's `tickCommandWith`.
+///
+/// `--dry-run` only decides whether the tick mutates: Go never calls the apply
+/// step separately and always leaves the batch limit disabled (`batch_size: 0`).
+fn plan_tick(parsed: &Parsed) -> Outcome {
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let dry_run = parsed
+        .flags
+        .get("dry-run")
+        .is_some_and(|value| value == "true");
+    let actions = match deadlines::run_tick(
+        &store,
+        &RunOpts {
+            dry_run,
+            batch_size: 0,
+        },
+        now_utc(),
+    ) {
+        Ok(actions) => actions,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        // Go marshals a `map[string]any`, so the keys come out sorted, and a nil
+        // action slice stays `null` rather than becoming `[]`.
+        let serialized = match serde_json::to_value(&actions) {
+            Ok(value) => value,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let actions_value = if actions.is_empty() {
+            Value::Null
+        } else {
+            serialized
+        };
+        let payload = json!({
+            "actions": actions_value,
+            "dry_run": dry_run,
+            "success": true,
+        });
+        return match json_line(&payload) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
 }
 
 fn output_format(parsed: &Parsed) -> Result<&str, Outcome> {
@@ -674,12 +805,7 @@ struct ConfigEnvelope<'a> {
 }
 
 fn config_show(parsed: &Parsed) -> Outcome {
-    let home = env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default();
-    let cwd = env::current_dir().unwrap_or_default();
-    let environment = env::vars().collect::<BTreeMap<_, _>>();
-    let context = ConfigContext::new(home, cwd, environment);
+    let context = process_context();
     let config = match Config::load(&context) {
         Ok(config) => config,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
