@@ -53,10 +53,10 @@ rust-gate: build-rust
 		exit 127; \
 	fi
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) fmt --all --check
-	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) check --workspace --all-targets
-	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) clippy --workspace --all-targets -- -D warnings
-	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --all-targets
-	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --doc
+	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) check --workspace --all-targets --all-features --locked
+	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) clippy --workspace --all-targets --all-features --locked -- -D warnings
+	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --all-features --locked
+	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --doc --all-features --locked
 
 parity: build-go build-rust
 	@if ! command -v $(call shell_quote,$(CARGO)) >/dev/null 2>&1; then \

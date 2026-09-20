@@ -86,3 +86,6 @@ ARCHITEKTUR.md
 /symeraseme-rust
 /target/
 /coverage.out
+
+# Local agent/tool run state (not source)
+.omo/
