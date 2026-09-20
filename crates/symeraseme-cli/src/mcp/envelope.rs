@@ -93,6 +93,22 @@ pub(crate) fn result_response(id: &Value, result: Option<&Value>) -> Vec<u8> {
     })
 }
 
+/// A JSON-RPC success response carrying the result **verbatim**.
+///
+/// Go uses this for the bare legacy methods (`redact_file`), which predate
+/// `tools/call` and return their result without the content envelope.
+// The envelope module is also compiled into test targets that include only the
+// escaping helper, so the crate-internal reachability check cannot see this
+// caller there.
+#[allow(dead_code)]
+pub(crate) fn raw_result_response(id: &Value, result: &Value) -> Vec<u8> {
+    encode(&SuccessResponse {
+        jsonrpc: "2.0",
+        result: result.clone(),
+        id,
+    })
+}
+
 /// A JSON-RPC error response. Handler failures must be passed through
 /// [`sanitize_error`] first.
 pub(crate) fn error_response(id: &Value, code: i32, message: &str) -> Vec<u8> {

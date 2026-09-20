@@ -149,6 +149,20 @@ pub(crate) fn initialize(
                 super::tools_call::ToolsCallOutcome::ParseError => InitializeOutcome::ParseError,
             };
         }
+        if method == "redact_file" {
+            // The bare legacy method predates the tool catalogue: it reads its
+            // path from object or positional params, answers a handler failure
+            // with `-32602` and returns the result without the content envelope.
+            return match super::tools_call::legacy_redact_file(raw, handler) {
+                super::tools_call::ToolsCallOutcome::Response(bytes) => {
+                    InitializeOutcome::Response(bytes)
+                }
+                super::tools_call::ToolsCallOutcome::Notification => {
+                    InitializeOutcome::Notification
+                }
+                super::tools_call::ToolsCallOutcome::ParseError => InitializeOutcome::ParseError,
+            };
+        }
         return if notification {
             InitializeOutcome::Notification
         } else {

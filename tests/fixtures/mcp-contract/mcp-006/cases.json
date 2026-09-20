@@ -1,0 +1,66 @@
+{
+  "source_revision": "79bf23e83b31f18d98487101200eaf32749e5a46",
+  "source_path": "internal/mcp/server.go:237-265",
+  "cases": [
+    {
+      "name": "bare_redact_file_reads_object_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"redact_file\",\"params\":{\"path\":\"pii.txt\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":\"Contact j******e@e*.com or ***-***-4567.\\n\",\"id\":1}\n"
+    },
+    {
+      "name": "bare_redact_file_reads_positional_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"redact_file\",\"params\":[\"pii.txt\"]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":\"Contact j******e@e*.com or ***-***-4567.\\n\",\"id\":2}\n"
+    },
+    {
+      "name": "bare_redact_file_leaves_clean_text_unchanged",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"redact_file\",\"params\":{\"path\":\"clean.txt\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":\"No personal data here.\\n\",\"id\":3}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_object_params_without_a_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"redact_file\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":4}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_an_empty_object_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"redact_file\",\"params\":{\"path\":\"\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":5}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_an_empty_positional_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"redact_file\",\"params\":[\"\"]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":6}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_a_non_string_positional_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"redact_file\",\"params\":[42]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":7}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_a_nested_positional_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"redact_file\",\"params\":[[\"pii.txt\"]]}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":8}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_missing_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"redact_file\"}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":9}\n"
+    },
+    {
+      "name": "bare_redact_file_rejects_a_non_string_object_path",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"redact_file\",\"params\":{\"path\":42}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing path parameter\"},\"id\":10}\n"
+    },
+    {
+      "name": "bare_redact_file_reports_a_handler_failure_as_invalid_params",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"redact_file\",\"params\":{\"path\":\"missing.txt\"}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"workspace file read failed\"},\"id\":11}\n"
+    },
+    {
+      "name": "bare_redact_file_notification_stays_silent",
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"redact_file\",\"params\":{\"path\":\"pii.txt\"}}",
+      "response": null
+    }
+  ]
+}

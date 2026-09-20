@@ -188,6 +188,75 @@ fn response_error(id: &Value, code: i32, message: &str) -> ToolsCallOutcome {
     ToolsCallOutcome::Response(super::envelope::error_response(id, code, message))
 }
 
+/// Go's bare legacy `redact_file` method — the sibling of `tools/call` for
+/// clients that predate the tool catalogue.
+///
+/// Three details separate it from `tools/call`, and all three are measured in
+/// `tests/fixtures/mcp-contract/mcp-006/cases.json`:
+///
+/// * the path may arrive as `{"path": …}` **or** as `["…"]`, and anything else
+///   is `-32602 missing path parameter`;
+/// * a handler failure is `-32602` (with the sanitized message), not the
+///   `-32603` that `tools/call` answers;
+/// * the result is returned verbatim — no content envelope.
+pub(crate) fn legacy_redact_file(raw: &[u8], handler: &dyn ToolHandler) -> ToolsCallOutcome {
+    let Ok(request) = serde_json::from_slice::<Value>(raw) else {
+        return ToolsCallOutcome::ParseError;
+    };
+    let Some(request) = request.as_object() else {
+        return ToolsCallOutcome::ParseError;
+    };
+
+    let Some(jsonrpc) = request.get("jsonrpc").and_then(Value::as_str) else {
+        return invalid_request(request.get("id"));
+    };
+    let Some(method) = request.get("method").and_then(Value::as_str) else {
+        return invalid_request(request.get("id"));
+    };
+    if jsonrpc != "2.0" || method.is_empty() {
+        return invalid_request(request.get("id"));
+    }
+    if !request.contains_key("id") {
+        return ToolsCallOutcome::Notification;
+    }
+    let id = request.get("id").expect("contains_key checked");
+    if !matches!(id, Value::Null | Value::String(_) | Value::Number(_)) {
+        return invalid_request(Some(id));
+    }
+
+    let Some(path) = legacy_path(request.get("params")) else {
+        return response_error(id, -32602, "missing path parameter");
+    };
+    let mut arguments = serde_json::Map::new();
+    arguments.insert("path".to_owned(), Value::String(path));
+
+    match handler.call("redact_file", &arguments) {
+        Ok(result) => ToolsCallOutcome::Response(super::envelope::raw_result_response(id, &result)),
+        Err(error) => response_error(
+            id,
+            -32602,
+            &super::envelope::sanitize_error(&error.to_string()),
+        ),
+    }
+}
+
+/// Go's `legacyPath`: a positional request must start with a non-empty string,
+/// an object request must carry a non-empty string `path`, and everything else
+/// is the same missing-parameter error.
+fn legacy_path(params: Option<&Value>) -> Option<String> {
+    match params {
+        Some(Value::Array(values)) => match values.first() {
+            Some(Value::String(path)) if !path.is_empty() => Some(path.clone()),
+            _ => None,
+        },
+        Some(Value::Object(object)) => match object.get("path") {
+            Some(Value::String(path)) if !path.is_empty() => Some(path.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
