@@ -2069,4 +2069,78 @@ mod tests {
         }
         let _ = fs::remove_dir_all(&root);
     }
+
+    /// The bare legacy `redact_file` method answers the Go oracle's own bytes.
+    ///
+    /// It is a separate branch of the Go server switch, not a `tools/call`
+    /// alias: it reads its path from object **or** positional params, answers
+    /// both a bad path argument and a handler failure with `-32602`, and returns
+    /// the result **without** the content envelope. Each of those is a measured
+    /// case, so a regression in any one of them fails here. `workspace()` writes
+    /// the same two files the oracle recorded against.
+    #[test]
+    fn source_bound_legacy_redact_file_fixture_matches() {
+        #[derive(Deserialize)]
+        struct LegacyCase {
+            name: String,
+            request: Option<String>,
+            response: Option<String>,
+            #[serde(default)]
+            parse_error: bool,
+        }
+
+        #[derive(Deserialize)]
+        struct LegacyFixture {
+            source_revision: String,
+            source_path: String,
+            cases: Vec<LegacyCase>,
+        }
+
+        let fixture: LegacyFixture = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/mcp-contract/mcp-006/cases.json"
+        ))
+        .expect("legacy redact_file fixture");
+        assert_eq!(
+            fixture.source_revision, "79bf23e83b31f18d98487101200eaf32749e5a46",
+            "legacy fixture source revision"
+        );
+        assert_eq!(
+            fixture.source_path, "internal/mcp/server.go:237-265",
+            "legacy fixture source path"
+        );
+        assert!(!fixture.cases.is_empty(), "legacy fixture lost its cases");
+
+        let root = workspace("legacy-redact-file");
+        let handler = ContractHandler::new(&root);
+
+        for case in &fixture.cases {
+            let request = case.request.as_deref().expect("case request");
+            match (&case.response, initialize(request.as_bytes(), &handler)) {
+                (Some(expected), InitializeOutcome::Response(bytes)) => {
+                    assert_eq!(
+                        String::from_utf8(bytes).expect("UTF-8 response"),
+                        *expected,
+                        "{}",
+                        case.name
+                    );
+                }
+                (Some(expected), InitializeOutcome::Notification) => {
+                    panic!("{} produced no response, expected {expected}", case.name);
+                }
+                (Some(_), InitializeOutcome::ParseError) => {
+                    panic!("{} did not parse", case.name);
+                }
+                (None, InitializeOutcome::Response(bytes)) => {
+                    assert!(
+                        case.parse_error,
+                        "{} answered unexpectedly: {}",
+                        case.name,
+                        String::from_utf8_lossy(&bytes)
+                    );
+                }
+                (None, _) => {}
+            }
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
 }
