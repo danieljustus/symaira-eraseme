@@ -231,9 +231,7 @@ fn merge_file(config: &mut Config, path: &Path, scope: &'static str) -> Result<(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(_) => return Err(ConfigError::Io { scope }),
     };
-    let document = contents
-        .parse::<Value>()
-        .map_err(|_| ConfigError::Parse { scope })?;
+    let document = toml::from_str::<Value>(&contents).map_err(|_| ConfigError::Parse { scope })?;
     let Some(table) = document.as_table() else {
         return Err(ConfigError::Parse { scope });
     };
