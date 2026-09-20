@@ -14,7 +14,7 @@ skill bundle for automated data broker removal orchestration.
 ### 1. Link the skill bundle
 
 Claude Code discovers skills from `.claude/skills/` in the project root.
-A pre-configured symlink is included:
+Create the symlink with:
 
 ```bash
 ls -la .claude/skills/

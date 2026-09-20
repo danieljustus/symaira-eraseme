@@ -34,7 +34,8 @@ skill formats and adapter files.
 Five agents support the **SKILL.md** standard natively:
 - Hermes, GitHub Copilot CLI, Codex CLI, Cursor, Windsurf
 
-These agents auto-discover from `.agents/skills/` (already configured in this repo).
+These agents auto-discover from `.agents/skills/`. The symlink is not tracked:
+run `./scripts/setup-agents.sh --agent all` to create it.
 
 ## Skill Bundle Contents
 
@@ -62,9 +63,9 @@ The **workflow-removal-cycle.md** template ties all sub-skills together into a r
 
 ```bash
 cd /path/to/symaira-eraseme
-# Already configured:
+./scripts/setup-agents.sh --agent claude
 ls -la .claude/skills/
-# symeraseme -> ../../skills/
+# symaira-eraseme -> ../../skills
 ```
 
 See [examples/claude-code/](examples/claude-code/) for details.
@@ -108,9 +109,9 @@ See [examples/hermes/](examples/hermes/) for details.
 **Status**: ✅ Auto-discovered from `.agents/skills/`
 
 ```bash
-# Already configured in this repo:
+./scripts/setup-agents.sh --agent codex
 ls -la .agents/skills/
-# symaira-eraseme -> ../../skills/
+# symaira-eraseme -> ../../skills
 ```
 
 Verify:
