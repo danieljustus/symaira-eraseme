@@ -197,7 +197,9 @@ jobs:
 
       - name: Audit dependencies
         shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" audit
+        run: |
+          cargo +"$RUST_TOOLCHAIN" audit --file Cargo.lock
+          cargo +"$RUST_TOOLCHAIN" audit --file fuzz/Cargo.lock
 
       - name: Enforce dependency policy
         shell: bash
