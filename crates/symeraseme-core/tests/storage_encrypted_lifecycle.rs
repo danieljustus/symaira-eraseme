@@ -24,6 +24,12 @@ fn encrypted_open_uses_canonical_path_and_private_sqlite_temp() {
     let dir = tempdir().unwrap();
     let canonical = dir.path().join("canonical.db");
     let tmp_dir = dir.path().join("tmp");
+    // Pre-create the temp root with a permissive mode: `open_encrypted` has to
+    // tighten it to 0700 itself, so the assertion below cannot pass merely
+    // because of the process umask.
+    fs::create_dir_all(&tmp_dir).unwrap();
+    #[cfg(unix)]
+    fs::set_permissions(&tmp_dir, fs::Permissions::from_mode(0o755)).unwrap();
 
     let store = open_encrypted(&canonical, &tmp_dir).expect("open encrypted store");
     assert_eq!(store.path(), canonical);
@@ -43,6 +49,15 @@ fn encrypted_open_uses_canonical_path_and_private_sqlite_temp() {
         .expect("private sqlite temp");
     #[cfg(unix)]
     assert_eq!(temp.metadata().unwrap().permissions().mode() & 0o777, 0o600);
+    // CRY-007 covers the directory as well as the file: the decrypted SQLite
+    // temp must live in a private 0700 directory, otherwise a local user could
+    // read the plaintext database through the directory entry.
+    #[cfg(unix)]
+    assert_eq!(
+        fs::metadata(&tmp_dir).unwrap().permissions().mode() & 0o777,
+        0o700,
+        "the decrypted temp directory must be private"
+    );
     assert!(
         decrypt_v3(&fs::read(&canonical).unwrap(), &KEY)
             .unwrap()
