@@ -51,12 +51,35 @@ byte-pinned `mcp-003/cases.json` stays untouched, and replay it through `initial
 
 ### CLI-013 — `tick` / `status` still report `deferred command`
 
-Not started; no measurement taken yet. The Go reference is `cmd/symeraseme/{command_surface,real_commands,extra_commands}.go`,
-and the Rust cores (`symeraseme_core::deadlines::{run_tick, apply_tick_actions}`, campaign/reporting
-read models) already exist. `crates/symeraseme-cli/tests/command_surface.rs` asserts a deferred count
-that must be **lowered to reality, never weakened**. Note the existing CLI golden fixture
-`rust-tests/parity/cases/cli/behavior.json` (`symeraseme.go-oracle.cli.v…`) is the established
-recording format for CLI answers.
+Measured on 2026-09-20 with the real Go binary (`go build ./cmd/symeraseme`) against an isolated
+`SYMERASEME_DATA_DIR`/`SYMERASEME_DB_DIR`/`XDG_CONFIG_HOME` and frozen rows.
+
+**Two traps in the fixture setup, both found the hard way:**
+
+1. `plan status` counts **campaigns first** (`reporting.GetCampaignStatus` → `loadCampaigns`), so rows
+   in `removal_requests` alone yield `requests: 0`. The fixture needs a `campaigns` row
+   (`INSERT INTO campaigns (id, created_at, kind, notes) VALUES ('campaign-1','2026-08-06 09:00:00','initial','…')`).
+2. The campaign filter is applied whenever `campaignID != ""`; the command has no flag for it, so the
+   scope is always `all` and every request of every loaded campaign is counted.
+
+**Measured answers** (store seeded with `mcp-003-poll/seed.sql` plus that campaign row):
+
+| Command | stdout | pinnable |
+|---|---|---|
+| `plan status` | `Total: map[open:2 requests:3 resolved:1]\n` | yes, byte-exact — Go prints the totals map with `%v`, whose keys are sorted |
+| `plan status --output json` | `{"as_of":…,"by_channel":{"email":3},"by_status":{"CONFIRMED":1,"SENT":2},"escalation":{"dpa_pending":0,"none":3,"reminder":0},"schema_version":1,"scope":{"campaign_id":"all"},"totals":{"open":2,"requests":3,"resolved":1},"upcoming":{"deadline_due_within_30d":0,"deadline_due_within_7d":0,"overdue":1,"tick_actions_ready":1}}` | shape only — `as_of` is `time.Now()` and the CLI has no injection point; the rest is stable because the frozen deadlines are in the past |
+| `plan tick --dry-run` | `tick complete: 0 action(s)\n` | yes, byte-exact |
+| `plan tick --dry-run --output json` | `{"actions":null,"dry_run":true,"success":true}` | yes — `actions` is a nil slice, so `null`, not `[]` |
+| `plan tick --output json` | `{"actions":null,"dry_run":false,"success":true}` | the write path; the same rows produced no actions, so nothing was stamped |
+
+Note the deliberate inconsistency worth preserving: `plan status` reports `tick_actions_ready: 1` while
+`plan tick` returns **0 actions** — the two use different criteria. Do not "fix" either side.
+
+Where: `crates/symeraseme-cli/src/cli.rs` (the `deferred command` stub at ~line 389), reusing
+`symeraseme_core::deadlines::{run_tick, apply_tick_actions}` and the `reporting` read model.
+`crates/symeraseme-cli/tests/command_surface.rs` asserts `deferred.len() == 42`; that count must be
+**lowered to reality, never weakened**. `rust-tests/parity/cases/cli/behavior.json`
+(`symeraseme.go-oracle.cli.v…`) is the established recording format for CLI answers.
 
 ### DOM-008 — LLM provider surface without corekit/llmkit
 
