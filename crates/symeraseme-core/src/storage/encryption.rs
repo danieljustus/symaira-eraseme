@@ -14,7 +14,7 @@ use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
 use crypto_common::Output as CryptoOutput;
 use hmac::{Hmac, KeyInit, Mac};
 use pbkdf2::pbkdf2_hmac;
-use rand::TryRngCore;
+use rand::TryRng;
 use sha2::Sha256;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -146,12 +146,12 @@ pub fn encrypt_v3(plaintext: &[u8], master_key: &[u8]) -> Result<Vec<u8>, Encryp
     validate_master_key(master_key)?;
     let mut salt = [0_u8; V3_SALT_LEN];
     let mut iv = [0_u8; FERNET_IV_LEN];
-    if rand::rngs::OsRng.try_fill_bytes(&mut salt).is_err() {
+    if rand::rngs::SysRng.try_fill_bytes(&mut salt).is_err() {
         salt.zeroize();
         iv.zeroize();
         return Err(EncryptionError::RandomnessUnavailable);
     }
-    if rand::rngs::OsRng.try_fill_bytes(&mut iv).is_err() {
+    if rand::rngs::SysRng.try_fill_bytes(&mut iv).is_err() {
         salt.zeroize();
         iv.zeroize();
         return Err(EncryptionError::RandomnessUnavailable);

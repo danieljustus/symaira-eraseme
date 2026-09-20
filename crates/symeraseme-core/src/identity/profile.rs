@@ -1037,7 +1037,7 @@ fn encrypt_profile_with_nonce(
 
 /// Encrypt plaintext into a version-2 AES-256-GCM envelope using the OS CSPRNG.
 pub fn encrypt_profile(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, ProfileError> {
-    use rand::RngCore;
+    use rand::Rng;
 
     let mut nonce = [0_u8; 12];
     rand::rng().fill_bytes(&mut nonce);

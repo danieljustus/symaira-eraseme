@@ -6,7 +6,7 @@
 //! and token source injectable so differential fixtures can be deterministic.
 
 use base64::Engine;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
