@@ -70,12 +70,12 @@ SQLite, network transcript or process behavior.
 | BASE-001 | baseline | Go format/test/lint/vet/build | `make fmt-check test lint vet build` | pre-flight script | side-effect | macOS/Linux | PASS |
 | BASE-002 | baseline | exact coverage gate | `make coverage` | retain Go gate until retirement | semantic | Linux | PASS (76.23%) |
 | BASE-003 | baseline | binary size/startup/RSS and release asset manifest | `v0.12.1`; `scripts/capture-go-baseline.sh` | `rust-tests/parity/baselines/v0.12.1.json` | semantic | macOS arm64 | PASS |
-| CLI-001 | CLI | root help and command ordering | `symeraseme --help` | `cli_root_help.snap` | byte | all | PASS |
-| CLI-002 | CLI | root `--version` | `symeraseme --version` | `cli_root_version.snap` | byte | all | PASS |
-| CLI-003 | CLI | `version` text | `symeraseme version` | `cli_version_text.snap` | byte | all | PASS |
-| CLI-004 | CLI | `version --json` schema v1 | `symeraseme version --json` | `cli_version_json.snap` | byte | all | PASS |
+| CLI-001 | CLI | root help and command ordering | `symeraseme --help` | `rust-tests/parity/cases/cli/behavior.json` `help-root` (plus the 51-case `help` category) | byte | all | PASS |
+| CLI-002 | CLI | root `--version` | `symeraseme --version` | `rust-tests/parity/cases/cli/behavior.json` `root-version` (`root_version` category) | byte | all | PASS |
+| CLI-003 | CLI | `version` text | `symeraseme version` | `rust-tests/parity/cases/cli/behavior.json` `version` (exact group) | byte | all | PASS |
+| CLI-004 | CLI | `version --json` schema v1 | `symeraseme version --json` | `rust-tests/parity/cases/cli/behavior.json` `version-json` (exact group; `schema_version` asserted) | byte | all | PASS |
 | CLI-005 | CLI | global `--output text|json` inheritance | command corpus | `cli_output_modes.json` | byte | all | PASS |
-| CLI-006 | CLI | unknown command/flag, usage and exit code | command corpus | `cli_invalid_args.json` | byte | all | PASS |
+| CLI-006 | CLI | unknown command/flag, usage and exit code | command corpus | `rust-tests/parity/cases/cli/behavior.json` `unknown_flag` (51), `unknown_command`, `missing_argument` (3) categories | byte | all | PASS |
 | CLI-007 | CLI | shell completion: bash/zsh/fish/powershell | `completion` commands | completion snapshots | byte | all | PASS |
 | CLI-008 | CLI | hidden deprecated `serve` alias and stderr notice | `serve --stdio` | alias fixture | byte | all | PASS |
 | CLI-009 | CLI | `config show` text/JSON | isolated config trees | config CLI cases | byte | all | PASS |

@@ -108,6 +108,9 @@ vet:
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run ./...; \
+	elif [ -n "$$CI" ] && [ -f .golangci.yml ]; then \
+		printf '%s\n' 'golangci-lint is missing on a CI runner; the repository configures linters that go vet does not cover' >&2; \
+		exit 1; \
 	else \
 		printf '%s\n' 'golangci-lint not found; falling back to go vet'; \
 		$(call shell_quote,$(MAKE)) vet; \

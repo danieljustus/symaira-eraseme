@@ -785,9 +785,7 @@ func initialOrEmpty(initial []hwmWire) []hwmWire {
 }
 
 // failingStore fails the first insert, so the staged HWM must not be committed.
-type failingStore struct {
-	inner email.ReplyStore
-}
+type failingStore struct{}
 
 func (f *failingStore) Insert(context.Context, email.MatchedMessage, string) error {
 	return fmt.Errorf("reply insert failed")
@@ -795,7 +793,6 @@ func (f *failingStore) Insert(context.Context, email.MatchedMessage, string) err
 
 // recordingStore captures what the service persisted.
 type recordingStore struct {
-	inner   email.ReplyStore
 	inserts []insertWire
 }
 
