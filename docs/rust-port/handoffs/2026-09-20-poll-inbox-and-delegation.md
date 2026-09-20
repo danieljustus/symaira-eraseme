@@ -49,7 +49,10 @@ branch; today `redact_file` falls through to `-32601 method not found`). `Params
 already covers the array form. Add the oracle as a new program with its own fixture directory so the
 byte-pinned `mcp-003/cases.json` stays untouched, and replay it through `initialize()`.
 
-### CLI-013 — `tick` / `status` still report `deferred command`
+### CLI-013 — `tick` / `status`
+
+Status: **implemented** in the same change that carries this note (row CLI-013 → PASS); the measurement
+below is what the implementation was written against and what the fixture pins.
 
 Measured on 2026-09-20 with the real Go binary (`go build ./cmd/symeraseme`) against an isolated
 `SYMERASEME_DATA_DIR`/`SYMERASEME_DB_DIR`/`XDG_CONFIG_HOME` and frozen rows.

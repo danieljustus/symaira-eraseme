@@ -1,0 +1,126 @@
+{
+  "schema": "symeraseme.go-oracle.cli.v1",
+  "source": "cmd/symeraseme/real_commands.go:198-245",
+  "seed": "tests/fixtures/cli-tick-status/seed.sql",
+  "cases": [
+    {
+      "id": "status-text",
+      "argv": [
+        "plan",
+        "status"
+      ],
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout_base64": "VG90YWw6IG1hcFtvcGVuOjIgcmVxdWVzdHM6MyByZXNvbHZlZDoxXQo=",
+      "stderr_base64": "",
+      "stdout_bytes": 41,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "status-json",
+      "argv": [
+        "plan",
+        "status",
+        "--output",
+        "json"
+      ],
+      "compare": "json_without_wall_clock",
+      "normalized_fields": [
+        "as_of"
+      ],
+      "exit_code": 0,
+      "stdout_base64": "eyJhc19vZiI6IjxUSU1FU1RBTVA+IiwiYnlfY2hhbm5lbCI6eyJlbWFpbCI6M30sImJ5X3N0YXR1cyI6eyJDT05GSVJNRUQiOjEsIlNFTlQiOjJ9LCJlc2NhbGF0aW9uIjp7ImRwYV9wZW5kaW5nIjowLCJub25lIjozLCJyZW1pbmRlciI6MH0sInNjaGVtYV92ZXJzaW9uIjoxLCJzY29wZSI6eyJjYW1wYWlnbl9pZCI6ImFsbCJ9LCJ0b3RhbHMiOnsib3BlbiI6MiwicmVxdWVzdHMiOjMsInJlc29sdmVkIjoxfSwidXBjb21pbmciOnsiZGVhZGxpbmVfZHVlX3dpdGhpbl8zMGQiOjAsImRlYWRsaW5lX2R1ZV93aXRoaW5fN2QiOjAsIm92ZXJkdWUiOjEsInRpY2tfYWN0aW9uc19yZWFkeSI6MX19Cg==",
+      "stderr_base64": "",
+      "stdout_bytes": 337,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "tick-dry-run-text",
+      "argv": [
+        "plan",
+        "tick",
+        "--dry-run"
+      ],
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout_base64": "dGljayBjb21wbGV0ZTogMCBhY3Rpb24ocykK",
+      "stderr_base64": "",
+      "stdout_bytes": 27,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "tick-dry-run-json",
+      "argv": [
+        "plan",
+        "tick",
+        "--dry-run",
+        "--output",
+        "json"
+      ],
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout_base64": "eyJhY3Rpb25zIjpudWxsLCJkcnlfcnVuIjp0cnVlLCJzdWNjZXNzIjp0cnVlfQo=",
+      "stderr_base64": "",
+      "stdout_bytes": 47,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "tick-text",
+      "argv": [
+        "plan",
+        "tick"
+      ],
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout_base64": "dGljayBjb21wbGV0ZTogMCBhY3Rpb24ocykK",
+      "stderr_base64": "",
+      "stdout_bytes": 27,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "tick-json",
+      "argv": [
+        "plan",
+        "tick",
+        "--output",
+        "json"
+      ],
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout_base64": "eyJhY3Rpb25zIjpudWxsLCJkcnlfcnVuIjpmYWxzZSwic3VjY2VzcyI6dHJ1ZX0K",
+      "stderr_base64": "",
+      "stdout_bytes": 48,
+      "stderr_bytes": 0
+    },
+    {
+      "id": "status-invalid-output",
+      "argv": [
+        "plan",
+        "status",
+        "--output",
+        "xml"
+      ],
+      "compare": "exact",
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBvdXRwdXQgZm9ybWF0ICJ4bWwiOiB1c2UgdGV4dCBvciBqc29uCg==",
+      "stdout_bytes": 0,
+      "stderr_bytes": 46
+    },
+    {
+      "id": "tick-invalid-output",
+      "argv": [
+        "plan",
+        "tick",
+        "--output",
+        "xml"
+      ],
+      "compare": "exact",
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBvdXRwdXQgZm9ybWF0ICJ4bWwiOiB1c2UgdGV4dCBvciBqc29uCg==",
+      "stdout_bytes": 0,
+      "stderr_bytes": 46
+    }
+  ]
+}
