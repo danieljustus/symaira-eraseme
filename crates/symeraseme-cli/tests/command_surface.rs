@@ -300,6 +300,20 @@ fn run_with_data_dir(
     }
 }
 
+/// Lists a directory's entries so a leak names the file it left behind.
+fn directory_entries(directory: &Path, context: &str) -> Vec<String> {
+    fs::read_dir(directory)
+        .unwrap_or_else(|error| panic!("{context}: {error}"))
+        .map(|entry| {
+            entry
+                .expect("directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect()
+}
+
 /// Applies the frozen rows both implementations read.
 fn seed_store(database: &Path) {
     let store = symeraseme_core::storage::Store::open(database).expect("open the seeded store");
@@ -528,17 +542,15 @@ fn frozen_command_surface_matches_phase_two_contract() {
         );
     }
 
+    let home_entries = directory_entries(&home, "read isolated home");
     assert!(
-        fs::read_dir(&home)
-            .expect("read isolated home")
-            .next()
-            .is_none()
+        home_entries.is_empty(),
+        "isolated home stayed clean: {home_entries:?}"
     );
+    let cwd_entries = directory_entries(&cwd, "read isolated cwd");
     assert!(
-        fs::read_dir(&cwd)
-            .expect("read isolated cwd")
-            .next()
-            .is_none()
+        cwd_entries.is_empty(),
+        "isolated cwd stayed clean: {cwd_entries:?}"
     );
 }
 
