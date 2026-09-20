@@ -234,9 +234,7 @@ func measureDialer(t *testing.T, name, mode string, messages []fakeMessage, cfg 
 		ReplayReason: replayReason,
 	}
 	for _, message := range messages {
-		recorded.Messages = append(recorded.Messages, fakeMessageWire{
-			UID: message.UID, Flags: message.Flags, Header: message.Header, Body: message.Body, Invalid: message.Invalid,
-		})
+		recorded.Messages = append(recorded.Messages, fakeMessageWire(message))
 	}
 
 	session, err := dialer.Dial(context.Background(), config)

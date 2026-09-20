@@ -132,7 +132,7 @@ func (d *scriptedDialer) Dial(_ context.Context, _ email.IMAPConfig) (email.IMAP
 func uidBounds(uidRange string) (uint32, uint32) {
 	parts := strings.SplitN(uidRange, ":", 2)
 	low := uint32(1)
-	high := uint32(^uint32(0))
+	high := ^uint32(0)
 	if len(parts) > 0 && parts[0] != "*" && parts[0] != "" {
 		if value, err := strconv.ParseUint(parts[0], 10, 32); err == nil {
 			low = uint32(value)
