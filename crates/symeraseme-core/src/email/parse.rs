@@ -304,7 +304,10 @@ pub fn parse_fetched_message(fetched: &FetchedMessage) -> Result<Message, String
             .unwrap_or_else(|| header_value(&fields, "To").unwrap_or_default().to_string()),
         date,
         body: to_valid_utf8_lossy_per_byte(&fetched.body),
-        flags: fetched.flags.clone(),
+        // Go builds this with `append([]string(nil), fetched.Flags...)`, so an
+        // empty list — and an absent one — both stay a nil slice and marshal as
+        // `null`, never `[]`.
+        flags: fetched.flags.clone().filter(|flags| !flags.is_empty()),
         message_id,
         thread_id,
         imap_uid: fetched.uid,
