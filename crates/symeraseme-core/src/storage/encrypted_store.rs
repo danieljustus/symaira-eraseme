@@ -5,7 +5,7 @@
 use super::encryption::{EncryptionError, decrypt_any, encrypt_v3, is_encrypted};
 use super::locking::{DbLock, LockError, lock_path_for};
 use super::store::Store;
-use rand::RngCore;
+use rand::Rng;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 #[cfg(not(windows))]

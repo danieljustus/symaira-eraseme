@@ -5,7 +5,7 @@
 //! Read paths never create or replace a key.
 
 use super::keyring::{KeyringBackend, OsKeyring, SERVICE_NAME, USERNAME};
-use rand::RngCore;
+use rand::Rng;
 use scrypt::{Params, scrypt};
 use std::collections::BTreeMap;
 use std::fmt;
