@@ -1,0 +1,507 @@
+{
+  "schema": "symeraseme.go-oracle.llm-surface.v1",
+  "source": "internal/llm/{llm,factory,util,agent}.go",
+  "providers": [
+    "agent",
+    "anthropic",
+    "ollama",
+    "openai",
+    "openai-compatible"
+  ],
+  "usage_records": [
+    {
+      "input": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "record": {
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0,
+        "input_tokens": 0,
+        "model": "",
+        "output_tokens": 0
+      }
+    },
+    {
+      "input": {
+        "model": "claude-sonnet-4-6",
+        "input_tokens": 1200,
+        "output_tokens": 340,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 512,
+        "cost": 0.0123
+      },
+      "record": {
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 512,
+        "cost": 0.0123,
+        "input_tokens": 1200,
+        "model": "claude-sonnet-4-6",
+        "output_tokens": 340
+      }
+    },
+    {
+      "input": {
+        "model": "llama3.1",
+        "input_tokens": 1,
+        "output_tokens": 0,
+        "cache_creation_tokens": 7,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "record": {
+        "cache_creation_tokens": 7,
+        "cache_read_tokens": 0,
+        "cost": 0,
+        "input_tokens": 1,
+        "model": "llama3.1",
+        "output_tokens": 0
+      }
+    }
+  ],
+  "cache_key_jitter": {
+    "": 0,
+    "Grüße-ü": 4,
+    "a": 0,
+    "abc": 1,
+    "seed-1": 2,
+    "triage-2026-09-20": 1,
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": 2
+  },
+  "create_cases": [
+    {
+      "id": "agent-default",
+      "env": {
+        "PATH": ""
+      },
+      "provider": "agent",
+      "model": "",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "auto",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "agent-explicit-model",
+      "env": {
+        "PATH": ""
+      },
+      "provider": "agent",
+      "model": "model-x",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "model-x",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "agent-model-from-environment",
+      "env": {
+        "PATH": "",
+        "SYMERASEME_LLM_MODEL": "env-model"
+      },
+      "provider": "agent",
+      "model": "",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "env-model",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "agent-provider-normalized",
+      "env": {
+        "PATH": "",
+        "SYMERASEME_LLM_PROVIDER": "  AGENT  "
+      },
+      "provider": "",
+      "model": "",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "auto",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "agent-model-keeps-whitespace",
+      "env": {
+        "PATH": "",
+        "SYMERASEME_LLM_MODEL": "  "
+      },
+      "provider": "agent",
+      "model": "",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "  ",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "agent-backend-from-environment",
+      "env": {
+        "PATH": "",
+        "SYMERASEME_AGENT_BACKEND": "codex"
+      },
+      "provider": "agent",
+      "model": "",
+      "agent_backend": "",
+      "client": true,
+      "agent_model": "auto",
+      "agent_max_retries": 3,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "",
+      "error_prefix": ""
+    },
+    {
+      "id": "unknown-provider",
+      "env": {
+        "PATH": ""
+      },
+      "provider": "gemini",
+      "model": "",
+      "agent_backend": "",
+      "client": false,
+      "agent_model": "",
+      "agent_max_retries": 0,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "ProviderError",
+      "error_prefix": "unknown LLM provider \"gemini\". Known providers: ",
+      "error_names": [
+        "agent",
+        "anthropic",
+        "ollama",
+        "openai",
+        "openai-compatible"
+      ]
+    },
+    {
+      "id": "unknown-provider-quotes-escaped",
+      "env": {
+        "PATH": ""
+      },
+      "provider": "gem\tini\n\"x\"",
+      "model": "",
+      "agent_backend": "",
+      "client": false,
+      "agent_model": "",
+      "agent_max_retries": 0,
+      "agent_tracker_len": 0,
+      "agent_available": false,
+      "error_type": "ProviderError",
+      "error_prefix": "unknown LLM provider \"gem\\tini\\n\\\"x\\\"\". Known providers: ",
+      "error_names": [
+        "agent",
+        "anthropic",
+        "ollama",
+        "openai",
+        "openai-compatible"
+      ]
+    }
+  ],
+  "retry_cases": [
+    {
+      "id": "success-first-attempt",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "ok",
+          "text": "triage: remove",
+          "msg": ""
+        }
+      ],
+      "attempts": 1,
+      "attempts_observed": true,
+      "text": "triage: remove",
+      "usage": {
+        "model": "oracle-model",
+        "input_tokens": 10,
+        "output_tokens": 2,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0.001
+      }
+    },
+    {
+      "id": "rate-limit-then-success",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "rate_limit",
+          "text": "",
+          "msg": "429 too many requests"
+        },
+        {
+          "kind": "ok",
+          "text": "second try",
+          "msg": ""
+        }
+      ],
+      "attempts": 2,
+      "attempts_observed": true,
+      "text": "second try",
+      "usage": {
+        "model": "oracle-model",
+        "input_tokens": 10,
+        "output_tokens": 2,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0.001
+      }
+    },
+    {
+      "id": "foreign-error-is-not-retried",
+      "max_retries": 2,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "error",
+          "text": "",
+          "msg": "boom"
+        },
+        {
+          "kind": "ok",
+          "text": "never reached",
+          "msg": ""
+        }
+      ],
+      "attempts": 1,
+      "attempts_observed": true,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "boom",
+      "error_type": "*errors.errorString"
+    },
+    {
+      "id": "rate-limit-exhausted",
+      "max_retries": 2,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "rate_limit",
+          "text": "",
+          "msg": "rate limited"
+        },
+        {
+          "kind": "rate_limit",
+          "text": "",
+          "msg": "rate limited"
+        }
+      ],
+      "attempts": 2,
+      "attempts_observed": true,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "",
+      "error_type": "RateLimitError"
+    },
+    {
+      "id": "cancelled-context-wins-over-retry",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "error",
+          "text": "",
+          "msg": "boom"
+        }
+      ],
+      "attempts": 1,
+      "attempts_observed": true,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "context canceled",
+      "error_type": "*errors.errorString"
+    },
+    {
+      "id": "context-error-from-call-is-not-retried",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "ctx_error",
+          "text": "",
+          "msg": "context canceled"
+        },
+        {
+          "kind": "ok",
+          "text": "never reached",
+          "msg": ""
+        }
+      ],
+      "attempts": 1,
+      "attempts_observed": true,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "context canceled",
+      "error_type": "*errors.errorString"
+    },
+    {
+      "id": "rate-limit-jitter-key",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "seed-1",
+      "max_tokens": 64,
+      "temperature": 0.2,
+      "script": [
+        {
+          "kind": "rate_limit",
+          "text": "",
+          "msg": "429"
+        },
+        {
+          "kind": "ok",
+          "text": "after jitter",
+          "msg": ""
+        }
+      ],
+      "attempts": 2,
+      "attempts_observed": true,
+      "text": "after jitter",
+      "usage": {
+        "model": "oracle-model",
+        "input_tokens": 10,
+        "output_tokens": 2,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0.001
+      }
+    },
+    {
+      "id": "zero-max-retries-never-calls",
+      "max_retries": 0,
+      "zero_value": true,
+      "cache_key": "",
+      "max_tokens": 0,
+      "temperature": 0,
+      "script": null,
+      "attempts": 0,
+      "attempts_observed": true,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "all 0 retries exhausted: %!w(\u003cnil\u003e)",
+      "error_type": "*fmt.wrapError"
+    },
+    {
+      "id": "host-agent-unavailable",
+      "max_retries": 3,
+      "zero_value": false,
+      "cache_key": "",
+      "max_tokens": 0,
+      "temperature": 0,
+      "script": null,
+      "attempts": 0,
+      "attempts_observed": false,
+      "text": "",
+      "usage": {
+        "model": "",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost": 0
+      },
+      "error": "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND",
+      "error_type": "Error"
+    }
+  ],
+  "boundaries": [
+    {
+      "path": "llmkit-backed construction (anthropic, openai, ollama, openai-compatible)",
+      "evidence": "Create(CreateOptions{}) -\u003e llmkit client for \"anthropic\": llmkit: auth_failure: environment variable ANTHROPIC_API_KEY is not set (reference ANTHROPIC_API_KEY): llmkit: auth_failure: environment variable ANTHROPIC_API_KEY is not set (reference ANTHROPIC_API_KEY)",
+      "reason": "corekit/llmkit owns the transports, the credential reference format and this error text; it has no Rust counterpart, so construction stays Go."
+    },
+    {
+      "path": "llmkit provider descriptor defaults (env key, default model, base URL)",
+      "evidence": "not observable: the table is unexported and an llmkit client exposes no model accessor",
+      "reason": "the port pins the provider name set and the agent branch, which are observable; the llmkit defaults cannot be read back through the public API."
+    },
+    {
+      "path": "cache key jitter for the empty key",
+      "evidence": "hashCacheKey(\"\") short-circuits to 0 without hashing; the recorded value for the empty key is that 0, not fnv32a(\"\")%5",
+      "reason": "the empty key is the only input that skips the hash, so the fixture pins the rule rather than the primitive for it."
+    },
+    {
+      "path": "retry backoff durations",
+      "evidence": "time.Duration(1\u003c\u003cattempt)*time.Second plus fnv32a(cacheKey)%5 seconds; only the attempt accounting is recorded",
+      "reason": "wall-clock durations are not reproducible in a byte fixture; the jitter input is pinned separately as cache_key_jitter."
+    }
+  ]
+}
