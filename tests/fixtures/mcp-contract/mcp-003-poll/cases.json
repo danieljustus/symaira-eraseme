@@ -1,0 +1,53 @@
+{
+  "source_revision": "79bf23e83b31f18d98487101200eaf32749e5a46",
+  "source_path": "internal/mcp/poll_inbox.go",
+  "mailbox": "tests/fixtures/mcp-contract/mcp-003-poll/mailbox.json",
+  "seed": "tests/fixtures/mcp-contract/mcp-003-poll/seed.sql",
+  "cases": [
+    {
+      "name": "poll_inbox_reports_an_empty_mailbox",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"Empty\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 0 messages from inbox\\\\nMatched to requests: 0\\\\nNo new messages found.\\\",\\\"messages\\\":[],\\\"total_fetched\\\":0,\\\"total_matched\\\":0}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "poll_inbox_matches_a_thread_reply_and_leaves_a_newsletter_unmatched",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"INBOX\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 2 messages from inbox\\\\nMatched to requests: 1\\\\n  [1] Re: Data Deletion Request — broker-a\\\\n  [unmatched] Weekly newsletter\\\",\\\"messages\\\":[{\\\"Message\\\":{\\\"ID\\\":\\\"1\\\",\\\"Subject\\\":\\\"Re: Data Deletion Request — broker-a\\\",\\\"From\\\":\\\"privacy@broker.example\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T09:00:00Z\\\",\\\"Body\\\":\\\"Your record has been deleted.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\"],\\\"MessageID\\\":\\\"\\\\u003creply-1@broker.example\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003csent-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":1},\\\"RequestID\\\":1,\\\"MatchMethod\\\":\\\"thread\\\"},{\\\"Message\\\":{\\\"ID\\\":\\\"2\\\",\\\"Subject\\\":\\\"Weekly newsletter\\\",\\\"From\\\":\\\"news@example.com\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T10:00:00Z\\\",\\\"Body\\\":\\\"Nothing to do with your request.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\",\\\"\\\\\\\\Answered\\\"],\\\"MessageID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":2},\\\"RequestID\\\":null,\\\"MatchMethod\\\":\\\"unmatched\\\"}],\\\"total_fetched\\\":2,\\\"total_matched\\\":1}\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
+      "name": "poll_inbox_matches_by_subject_when_no_thread_is_recorded",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"Archive\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 1 messages from inbox\\\\nMatched to requests: 1\\\\n  [2] Data Deletion Request — broker-b\\\",\\\"messages\\\":[{\\\"Message\\\":{\\\"ID\\\":\\\"5\\\",\\\"Subject\\\":\\\"Data Deletion Request — broker-b\\\",\\\"From\\\":\\\"dpo@broker.example\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-09T10:00:00Z\\\",\\\"Body\\\":\\\"We need proof of identity.\\\\r\\\\n\\\",\\\"Flags\\\":null,\\\"MessageID\\\":\\\"\\\\u003creply-2@broker.example\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003creply-2@broker.example\\\\u003e\\\",\\\"IMAPUID\\\":5},\\\"RequestID\\\":2,\\\"MatchMethod\\\":\\\"subject\\\"}],\\\"total_fetched\\\":1,\\\"total_matched\\\":1}\",\"type\":\"text\"}]},\"id\":3}\n"
+    },
+    {
+      "name": "poll_inbox_aggregates_several_folders_and_deduplicates",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"Empty\",\"INBOX\",\"Archive\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 3 messages from inbox\\\\nMatched to requests: 2\\\\n  [1] Re: Data Deletion Request — broker-a\\\\n  [unmatched] Weekly newsletter\\\\n  [2] Data Deletion Request — broker-b\\\",\\\"messages\\\":[{\\\"Message\\\":{\\\"ID\\\":\\\"1\\\",\\\"Subject\\\":\\\"Re: Data Deletion Request — broker-a\\\",\\\"From\\\":\\\"privacy@broker.example\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T09:00:00Z\\\",\\\"Body\\\":\\\"Your record has been deleted.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\"],\\\"MessageID\\\":\\\"\\\\u003creply-1@broker.example\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003csent-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":1},\\\"RequestID\\\":1,\\\"MatchMethod\\\":\\\"thread\\\"},{\\\"Message\\\":{\\\"ID\\\":\\\"2\\\",\\\"Subject\\\":\\\"Weekly newsletter\\\",\\\"From\\\":\\\"news@example.com\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T10:00:00Z\\\",\\\"Body\\\":\\\"Nothing to do with your request.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\",\\\"\\\\\\\\Answered\\\"],\\\"MessageID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":2},\\\"RequestID\\\":null,\\\"MatchMethod\\\":\\\"unmatched\\\"},{\\\"Message\\\":{\\\"ID\\\":\\\"5\\\",\\\"Subject\\\":\\\"Data Deletion Request — broker-b\\\",\\\"From\\\":\\\"dpo@broker.example\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-09T10:00:00Z\\\",\\\"Body\\\":\\\"We need proof of identity.\\\\r\\\\n\\\",\\\"Flags\\\":null,\\\"MessageID\\\":\\\"\\\\u003creply-2@broker.example\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003creply-2@broker.example\\\\u003e\\\",\\\"IMAPUID\\\":5},\\\"RequestID\\\":2,\\\"MatchMethod\\\":\\\"subject\\\"}],\\\"total_fetched\\\":3,\\\"total_matched\\\":2}\",\"type\":\"text\"}]},\"id\":4}\n"
+    },
+    {
+      "name": "poll_inbox_defaults_to_inbox_without_a_folder_argument",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 2 messages from inbox\\\\nMatched to requests: 1\\\\n  [1] Re: Data Deletion Request — broker-a\\\\n  [unmatched] Weekly newsletter\\\",\\\"messages\\\":[{\\\"Message\\\":{\\\"ID\\\":\\\"1\\\",\\\"Subject\\\":\\\"Re: Data Deletion Request — broker-a\\\",\\\"From\\\":\\\"privacy@broker.example\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T09:00:00Z\\\",\\\"Body\\\":\\\"Your record has been deleted.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\"],\\\"MessageID\\\":\\\"\\\\u003creply-1@broker.example\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003csent-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":1},\\\"RequestID\\\":1,\\\"MatchMethod\\\":\\\"thread\\\"},{\\\"Message\\\":{\\\"ID\\\":\\\"2\\\",\\\"Subject\\\":\\\"Weekly newsletter\\\",\\\"From\\\":\\\"news@example.com\\\",\\\"To\\\":\\\"daniel@example.com\\\",\\\"Date\\\":\\\"2026-08-08T10:00:00Z\\\",\\\"Body\\\":\\\"Nothing to do with your request.\\\\r\\\\n\\\",\\\"Flags\\\":[\\\"\\\\\\\\Seen\\\",\\\"\\\\\\\\Answered\\\"],\\\"MessageID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"ThreadID\\\":\\\"\\\\u003cnewsletter-1@example.com\\\\u003e\\\",\\\"IMAPUID\\\":2},\\\"RequestID\\\":null,\\\"MatchMethod\\\":\\\"unmatched\\\"}],\\\"total_fetched\\\":2,\\\"total_matched\\\":1}\",\"type\":\"text\"}]},\"id\":5}\n"
+    },
+    {
+      "name": "poll_inbox_reports_a_transport_failure",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"NoSuchFolder\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"email: imap error: folder select failed: scripted mailbox has no folder \\\"NoSuchFolder\\\"\"},\"id\":6}\n"
+    },
+    {
+      "name": "poll_inbox_drops_messages_outside_the_since_window",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":1,\"ssl\":true,\"folders\":[\"INBOX\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Fetched 0 messages from inbox\\\\nMatched to requests: 0\\\\nNo new messages found.\\\",\\\"messages\\\":[],\\\"total_fetched\\\":0,\\\"total_matched\\\":0}\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "poll_inbox_rejects_a_request_without_the_required_port",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":[\"INBOX\"]}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing required argument: port\"},\"id\":8}\n"
+    },
+    {
+      "name": "poll_inbox_rejects_folders_that_are_not_an_array",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"poll_inbox\",\"arguments\":{\"host\":\"imap.example.invalid\",\"port\":993,\"username\":\"oracle@example.invalid\",\"since_days\":3650,\"ssl\":true,\"folders\":\"INBOX\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid parameter type: folders\"},\"id\":9}\n"
+    }
+  ]
+}

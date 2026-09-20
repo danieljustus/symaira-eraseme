@@ -1,0 +1,41 @@
+{
+  "schema": "mcp-poll-inbox-mailbox-v1",
+  "note": "Language-neutral mailbox script for the MCP `poll_inbox` contract. The Go oracle (rust-tests/parity/oracle/mcp-poll-inbox) and the Rust replay test both read this file and script the same mailbox; neither hand-writes a transcript. The scripted SearchUID deliberately ignores the `since` argument: the policy computes that window from the wall clock, so filtering on it would make the answer move. `uid_validity` is fixed, so a fresh high-water-mark store always cold-starts.",
+  "folders": {
+    "INBOX": {
+      "uid_validity": 1,
+      "messages": [
+        {
+          "uid": 1,
+          "flags": ["\\Seen"],
+          "internal_date": "2026-08-08T09:00:00Z",
+          "header": "Message-ID: <reply-1@broker.example>\r\nIn-Reply-To: <sent-1@example.com>\r\nSubject: Re: Data Deletion Request \u2014 broker-a\r\nFrom: privacy@broker.example\r\nTo: daniel@example.com\r\nDate: Sat, 08 Aug 2026 09:00:00 +0000\r\n\r\n",
+          "body": "Your record has been deleted.\r\n"
+        },
+        {
+          "uid": 2,
+          "flags": ["\\Seen", "\\Answered"],
+          "internal_date": "2026-08-08T10:00:00Z",
+          "header": "Message-ID: <newsletter-1@example.com>\r\nSubject: Weekly newsletter\r\nFrom: news@example.com\r\nTo: daniel@example.com\r\nDate: Sat, 08 Aug 2026 10:00:00 +0000\r\n\r\n",
+          "body": "Nothing to do with your request.\r\n"
+        }
+      ]
+    },
+    "Archive": {
+      "uid_validity": 2,
+      "messages": [
+        {
+          "uid": 5,
+          "flags": [],
+          "internal_date": "2026-08-09T10:00:00Z",
+          "header": "Message-ID: <reply-2@broker.example>\r\nSubject: Data Deletion Request \u2014 broker-b\r\nFrom: dpo@broker.example\r\nTo: daniel@example.com\r\nDate: Sun, 09 Aug 2026 10:00:00 +0000\r\n\r\n",
+          "body": "We need proof of identity.\r\n"
+        }
+      ]
+    },
+    "Empty": {
+      "uid_validity": 3,
+      "messages": []
+    }
+  }
+}

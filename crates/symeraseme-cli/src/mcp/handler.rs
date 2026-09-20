@@ -10,12 +10,19 @@
 //! name outside the catalogue (`status`, the legacy alias) reproduces Go's
 //! switch default — the handler has no case for it either.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::campaign;
 use symeraseme_core::config::{ConfigContext, resolve_storage};
+use symeraseme_core::email::config::{ImapConfigOptions, load_imap_config_with_options};
+use symeraseme_core::email::hwm::HwmStore;
+use symeraseme_core::email::service::InboxService;
+use symeraseme_core::email::session::ImapDialer;
+use symeraseme_core::email::types::{MatchedMessage, RemovalRequest};
+use symeraseme_core::identity::{OsSecretBackend, SecretResolver};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
@@ -45,8 +52,60 @@ pub trait ToolHandler {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError>;
 }
 
+/// `json.Marshal` of one Go string: quoted, with the HTML characters Go escapes
+/// by default (`<`, `>`, `&`, U+2028, U+2029) turned into `\uXXXX`.
+fn go_json_string(value: &str) -> String {
+    let serialized = serde_json::to_string(value).expect("a string is serializable");
+    String::from_utf8(super::envelope::go_escape_json_strings(
+        serialized.as_bytes(),
+    ))
+    .expect("escaped JSON is UTF-8")
+}
+
+/// One `email.MatchedMessage` as Go marshals it: the embedded `Message` keeps
+/// its declaration order and its capitalised field names, then `RequestID`
+/// (nullable) and `MatchMethod`. A nil `Flags` slice stays `null` — Go does not
+/// turn it into `[]`, and neither does this.
+fn go_matched_message_json(matched: &MatchedMessage) -> String {
+    let message = &matched.message;
+    let date = match &message.date {
+        Some(date) => go_json_string(&date.to_rfc3339_opts(SecondsFormat::AutoSi, true)),
+        None => "null".to_owned(),
+    };
+    let flags = match &message.flags {
+        Some(flags) => format!(
+            "[{}]",
+            flags
+                .iter()
+                .map(|flag| go_json_string(flag))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        None => "null".to_owned(),
+    };
+    let request_id = matched
+        .request_id
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "null".to_owned());
+    format!(
+        "{{\"Message\":{{\"ID\":{},\"Subject\":{},\"From\":{},\"To\":{},\"Date\":{},\"Body\":{},\"Flags\":{},\"MessageID\":{},\"ThreadID\":{},\"IMAPUID\":{}}},\"RequestID\":{},\"MatchMethod\":{}}}",
+        go_json_string(&message.id),
+        go_json_string(&message.subject),
+        go_json_string(&message.from),
+        go_json_string(&message.to),
+        date,
+        go_json_string(&message.body),
+        flags,
+        go_json_string(&message.message_id),
+        go_json_string(&message.thread_id),
+        message.imap_uid,
+        request_id,
+        go_json_string(matched.match_method.as_str())
+    )
+}
+
 /// The production handler, mirroring Go's `ContractHandler`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ContractHandler {
     /// The workspace the file-reading tools are confined to. Go uses the
     /// process working directory; the caller supplies it here so the guard is
@@ -62,6 +121,13 @@ pub struct ContractHandler {
     /// The data directory the artifact tools use. Go resolves it from
     /// `SYMERASEME_DATA_DIR`; `None` keeps that behaviour.
     pub data_dir: Option<PathBuf>,
+    /// The injected IMAP dialer for `poll_inbox`. Go uses
+    /// `ContractHandlerOptions.IMAPDialer`; `None` means the production
+    /// dialer is created from the resolved config.
+    pub imap_dialer: Option<std::sync::Arc<dyn ImapDialer>>,
+    /// The injected HWM store for `poll_inbox`. Go uses
+    /// `ContractHandlerOptions.HWMStore`; `None` means an in-memory store.
+    pub hwm_store: Option<std::sync::Arc<dyn HwmStore>>,
 }
 
 impl ContractHandler {
@@ -71,6 +137,8 @@ impl ContractHandler {
             config: None,
             now: None,
             data_dir: None,
+            imap_dialer: None,
+            hwm_store: None,
         }
     }
 
@@ -85,6 +153,18 @@ impl ContractHandler {
     pub fn with_store(mut self, config: ConfigContext, now: DateTime<Utc>) -> Self {
         self.config = Some(config);
         self.now = Some(now);
+        self
+    }
+
+    /// Adds the IMAP dialer for the `poll_inbox` tool.
+    pub fn with_imap_dialer(mut self, dialer: std::sync::Arc<dyn ImapDialer>) -> Self {
+        self.imap_dialer = Some(dialer);
+        self
+    }
+
+    /// Adds the HWM store for the `poll_inbox` tool.
+    pub fn with_hwm_store(mut self, store: std::sync::Arc<dyn HwmStore>) -> Self {
+        self.hwm_store = Some(store);
         self
     }
 
@@ -503,6 +583,240 @@ impl ContractHandler {
             .map_err(|error| ToolError(error.to_string()))?;
         event_list(events)
     }
+    /// Go's `poll_inbox`: load IMAP settings from args/env, resolve password,
+    /// read active matchable requests + EvtSent thread map from the store,
+    /// poll with injected dialer (or production default), and return the
+    /// Go-exact payload shape. Byte-parity with `poll_inbox` fixtures
+    /// requires the scripted-server mailbox seed (language-neutral JSON)
+    /// mirrored from the Go oracle; see IMPLEMENTATION_REPORT_POLL_INBOX.md.
+    fn poll_inbox(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        // 1. Load IMAP config with explicit options (matches Go LoadIMAPConfigWithOptions).
+        let username_arg = get_str(arguments, "username", "");
+        let oauth_username_override = get_str(arguments, "oauth2_username", "");
+        let cfg_result = load_imap_config_with_options(ImapConfigOptions {
+            oauth2_access_token: Some(get_str(arguments, "oauth2_access_token", "")),
+            oauth2_username: Some(if oauth_username_override.is_empty() {
+                username_arg.clone()
+            } else {
+                oauth_username_override.clone()
+            }),
+        });
+        let mut cfg =
+            cfg_result.map_err(|e| ToolError(format!("email: cannot load IMAP config: {e}")))?;
+
+        // 2. Apply overrides exactly like Go handlePollInbox.
+        if let Some(host) = arguments.get("host").and_then(|value| value.as_str())
+            && !host.is_empty()
+        {
+            cfg.host = host.to_string();
+        }
+        if let Some(port) = arguments.get("port").and_then(|value| value.as_i64())
+            && port > 0
+        {
+            cfg.port = port;
+        }
+        if !username_arg.is_empty() {
+            cfg.username = username_arg.clone();
+        }
+        // Go rewrites the OAuth2 username in place. The override has to reach the
+        // configuration, so it is applied through a mutable borrow rather than a
+        // clone that goes out of scope.
+        if let Some(oauth) = cfg.oauth2.as_mut() {
+            if !oauth_username_override.is_empty() {
+                oauth.username = oauth_username_override.clone();
+            } else if !username_arg.is_empty() {
+                oauth.username = username_arg.clone();
+            }
+        }
+        // 3. Password resolution (Go resolves it through `identity.ResolveSecret`
+        // with the `IMAP_PASSWORD` env fallback and the `symeraseme-imap` keyring
+        // service, and skips resolution entirely for OAuth2).
+        if let Some(password) = arguments.get("password").and_then(|value| value.as_str())
+            && !password.is_empty()
+        {
+            let resolved = if cfg.oauth2.is_some() {
+                password.to_string()
+            } else {
+                let mut resolver = SecretResolver::with_environment(
+                    OsSecretBackend,
+                    std::env::vars().collect::<std::collections::BTreeMap<_, _>>(),
+                );
+                resolver.set_env_fallback("IMAP_PASSWORD");
+                resolver.set_keyring_service("symeraseme-imap");
+                resolver.set_keyring_username("IMAP_PASSWORD");
+                resolver
+                    .resolve(password)
+                    .map_err(|e| ToolError(format!("email: cannot resolve IMAP password: {e}")))?
+            };
+            cfg.password = resolved;
+        }
+        // 4. SSL / TLS override (Go handles both `ssl` and `use_tls`).
+        if let Some(use_tls) = arguments.get("ssl").and_then(|value| value.as_bool()) {
+            cfg.use_tls = use_tls;
+        } else if let Some(use_tls) = arguments.get("use_tls").and_then(|value| value.as_bool()) {
+            cfg.use_tls = use_tls;
+        }
+        // 5. Since / since_days / max_messages.
+        if let Some(days) = arguments.get("since_days").and_then(|value| value.as_i64())
+            && days > 0
+        {
+            cfg.since_days = days;
+        } else if let Some(days) = arguments.get("since").and_then(|value| value.as_i64())
+            && days > 0
+        {
+            cfg.since_days = days;
+        }
+        if let Some(max) = arguments
+            .get("max_messages")
+            .and_then(|value| value.as_i64())
+            && max > 0
+        {
+            cfg.max_messages = max;
+        }
+
+        // 6. Folder parsing (array / JSON-string / comma-string, default cfg.Folder or INBOX).
+        let mut folders = Vec::new();
+        if let Some(f_val) = arguments.get("folders") {
+            match f_val {
+                Value::Array(arr) => {
+                    for item in arr {
+                        if let Some(s) = item.as_str() {
+                            let trimmed = s.trim();
+                            if !trimmed.is_empty() {
+                                folders.push(trimmed.to_string());
+                            }
+                        }
+                    }
+                }
+                Value::String(s) => {
+                    let trimmed = s.trim();
+                    if !trimmed.is_empty() {
+                        if let Ok(parsed) = serde_json::from_str::<Vec<String>>(trimmed) {
+                            folders.extend(parsed.into_iter().filter(|x| !x.trim().is_empty()));
+                        } else {
+                            for part in trimmed.split(',') {
+                                let s = part.trim();
+                                if !s.is_empty() {
+                                    folders.push(s.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if folders.is_empty() {
+            if !cfg.folder.is_empty() {
+                folders.push(cfg.folder.clone());
+            } else {
+                folders.push("INBOX".to_string());
+            }
+        }
+
+        // 7. Campaign filter.
+        let campaign_id_filter = get_str(arguments, "campaign_id", "");
+
+        // 8. Read active matchable removal requests and build EvtSent thread map.
+        let store_ref = self.open_store()?;
+        let repo = Repository::new(&store_ref);
+        let active_reqs_result =
+            repo.get_active_matchable_requests(if campaign_id_filter.is_empty() {
+                None
+            } else {
+                Some(&campaign_id_filter)
+            });
+        let active_reqs = active_reqs_result
+            .map_err(|e| ToolError(format!("email: cannot read active requests: {e}")))?;
+        let mut removal_reqs = Vec::new();
+        let mut req_ids = Vec::new();
+        for row in &active_reqs {
+            req_ids.push(row.id);
+            removal_reqs.push(RemovalRequest {
+                id: row.id,
+                broker_id: row.broker_id.clone(),
+            });
+        }
+        let mut thread_map = HashMap::<String, i64>::new();
+        if !req_ids.is_empty() {
+            let evt_sent = symeraseme_core::storage::types::EventType::Sent;
+            let events_result = repo.get_events_for_requests(&req_ids, Some(&evt_sent));
+            let events_by_req =
+                events_result.map_err(|e| ToolError(format!("email: cannot read events: {e}")))?;
+            for (rid, evts) in events_by_req {
+                for ev in evts {
+                    // Go keeps only a non-empty string `message_id`; anything else
+                    // is skipped rather than recorded as a thread.
+                    if let Some(msg_id) = ev
+                        .payload
+                        .get("message_id")
+                        .and_then(|value| value.as_str())
+                        && !msg_id.is_empty()
+                    {
+                        thread_map.insert(msg_id.to_string(), rid);
+                    }
+                }
+            }
+        }
+
+        // 9. Create the InboxService with injected (or default) dialer and HWM store.
+        let dialer_ref = self.imap_dialer.as_ref();
+        let hwm_store_ref = self.hwm_store.as_ref();
+
+        // Note: the production default dialer is symeraseme_core::email::imap::ImapDialer (new())
+        // and the default HWM store is MemoryHwmStore. When either is None,
+        // we fall back to the same behavior Go uses: a new default instance.
+        let matched = if let Some(d_ref) = dialer_ref {
+            let service = InboxService::new(d_ref.as_ref(), hwm_store_ref.map(|s| s.as_ref()));
+            service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
+        } else {
+            let default_dialer = symeraseme_core::email::imap::ImapDialer::new();
+            let default_service =
+                InboxService::new(&default_dialer, hwm_store_ref.map(|s| s.as_ref()));
+            default_service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
+        };
+        let matched = matched.map_err(|e| ToolError(e.to_string()))?;
+
+        // 10. Build the result payload. Go returns a `map[string]any`, so the
+        // outer keys come out sorted, while the nested structs keep their
+        // declaration order — and `json.Marshal` HTML-escapes `<`, `>` and `&`.
+        // A `Value` here would re-sort the struct fields alphabetically and lose
+        // the escaping, so the payload is assembled as text and handed to the
+        // envelope verbatim (a string result is used as-is).
+        let total_fetched = matched.len() as i64;
+        let matched_count = matched.iter().filter(|m| m.request_id.is_some()).count() as i64;
+        let mut lines: Vec<String> = Vec::new();
+        lines.push(format!("Fetched {total_fetched} messages from inbox"));
+        lines.push(format!("Matched to requests: {matched_count}"));
+        for m in &matched {
+            let req_id_str = m
+                .request_id
+                .map(|id| format!("{id}"))
+                .unwrap_or_else(|| "unmatched".to_owned());
+            let subj = if m.message.subject.is_empty() {
+                "(no subject)".to_owned()
+            } else {
+                m.message.subject.clone()
+            };
+            lines.push(format!("  [{req_id_str}] {subj}"));
+        }
+        if matched.is_empty() {
+            lines.push("No new messages found.".to_owned());
+        }
+        let messages = matched
+            .iter()
+            .map(go_matched_message_json)
+            .collect::<Vec<_>>()
+            .join(",");
+
+        Ok(Value::String(format!(
+            "{{\"message\":{},\"messages\":[{}],\"total_fetched\":{},\"total_matched\":{}}}",
+            go_json_string(&lines.join("\n")),
+            messages,
+            total_fetched,
+            matched_count
+        )))
+    }
 }
 
 /// Go answers a nil slice when a query matches nothing, which reaches a client
@@ -664,6 +978,7 @@ impl ToolHandler for ContractHandler {
             "get_events" => self.get_events(arguments),
             "list_brokers" => self.list_brokers(arguments),
             "schedule_install" => self.schedule_install(arguments),
+            "poll_inbox" => self.poll_inbox(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -805,6 +1120,9 @@ mod tests {
     use crate::mcp::protocol::{InitializeOutcome, initialize};
     use serde::Deserialize;
     use std::fs;
+    use symeraseme_core::email::hwm::MemoryHwmStore;
+    use symeraseme_core::email::session::{FetchedMessage, ImapSession};
+    use symeraseme_core::email::types::ImapConfig;
 
     #[derive(Deserialize)]
     struct Case {
@@ -1505,6 +1823,250 @@ mod tests {
             "{refused}"
         );
 
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The Go oracle's mailbox script, replayed by the Rust transport.
+    ///
+    /// Both sides read `mcp-003-poll/mailbox.json`, so a difference in the
+    /// answer is a port defect and not a difference in the fake. `search_uid`
+    /// ignores its window on purpose: the policy computes that window from the
+    /// wall clock, so honouring it would make the recorded answer move.
+    struct ScriptedDialer {
+        folders: HashMap<String, ScriptedFolder>,
+    }
+
+    #[derive(Clone)]
+    struct ScriptedFolder {
+        uid_validity: u32,
+        messages: Vec<ScriptedMessage>,
+    }
+
+    #[derive(Clone, Deserialize)]
+    struct ScriptedMessage {
+        uid: u32,
+        flags: Vec<String>,
+        internal_date: String,
+        header: String,
+        body: String,
+    }
+
+    #[derive(Deserialize)]
+    struct ScriptedFolderDocument {
+        uid_validity: u32,
+        messages: Vec<ScriptedMessage>,
+    }
+
+    #[derive(Deserialize)]
+    struct MailboxScript {
+        folders: HashMap<String, ScriptedFolderDocument>,
+    }
+
+    impl ScriptedDialer {
+        fn from_fixture() -> Self {
+            let script: MailboxScript = serde_json::from_str(include_str!(
+                "../../../../tests/fixtures/mcp-contract/mcp-003-poll/mailbox.json"
+            ))
+            .expect("mailbox script");
+            Self {
+                folders: script
+                    .folders
+                    .into_iter()
+                    .map(|(name, folder)| {
+                        (
+                            name,
+                            ScriptedFolder {
+                                uid_validity: folder.uid_validity,
+                                messages: folder.messages,
+                            },
+                        )
+                    })
+                    .collect(),
+            }
+        }
+    }
+
+    struct ScriptedSession {
+        folders: HashMap<String, ScriptedFolder>,
+        messages: Vec<ScriptedMessage>,
+    }
+
+    impl ImapDialer for ScriptedDialer {
+        fn dial(&self, _config: &ImapConfig) -> Result<Box<dyn ImapSession>, String> {
+            Ok(Box::new(ScriptedSession {
+                folders: self.folders.clone(),
+                messages: Vec::new(),
+            }))
+        }
+    }
+
+    impl ImapSession for ScriptedSession {
+        fn select(&mut self, folder: &str) -> Result<u32, String> {
+            let Some(selected) = self.folders.get(folder) else {
+                return Err(format!("scripted mailbox has no folder {folder:?}"));
+            };
+            self.messages = selected.messages.clone();
+            Ok(selected.uid_validity)
+        }
+
+        fn search_uid(
+            &mut self,
+            uid_range: &str,
+            _since: Option<DateTime<Utc>>,
+        ) -> Result<Vec<u32>, String> {
+            let (low, high) = uid_bounds(uid_range);
+            Ok(self
+                .messages
+                .iter()
+                .map(|message| message.uid)
+                .filter(|uid| *uid >= low && *uid <= high)
+                .collect())
+        }
+
+        fn fetch(&mut self, uids: &[u32]) -> Result<Vec<FetchedMessage>, String> {
+            let mut out = Vec::with_capacity(uids.len());
+            for uid in uids {
+                let Some(message) = self.messages.iter().find(|message| message.uid == *uid) else {
+                    return Err(format!("scripted mailbox has no uid {uid}"));
+                };
+                let internal_date = DateTime::parse_from_rfc3339(&message.internal_date)
+                    .map_err(|error| error.to_string())?
+                    .with_timezone(&Utc);
+                out.push(FetchedMessage {
+                    uid: message.uid,
+                    header: message.header.clone().into_bytes(),
+                    body: message.body.clone().into_bytes(),
+                    flags: Some(message.flags.clone()),
+                    internal_date: Some(internal_date),
+                });
+            }
+            Ok(out)
+        }
+
+        fn close(&mut self) {}
+    }
+
+    /// The policy's `<low>:<high>` UID range; `*` is the open end. Mirrors the
+    /// oracle's own reader so both sides search the same window.
+    fn uid_bounds(uid_range: &str) -> (u32, u32) {
+        let mut parts = uid_range.splitn(2, ':');
+        let low = parts
+            .next()
+            .filter(|part| !part.is_empty() && *part != "*")
+            .and_then(|part| part.parse::<u32>().ok())
+            .unwrap_or(1);
+        let high = parts
+            .next()
+            .filter(|part| !part.is_empty() && *part != "*")
+            .and_then(|part| part.parse::<u32>().ok())
+            .unwrap_or(u32::MAX);
+        (low, high)
+    }
+
+    /// `poll_inbox` answers the Go oracle's own recorded bytes.
+    ///
+    /// The oracle drives the real Go handler with an injected dialer and
+    /// high-water-mark store, so the recorded responses are Go's answer over the
+    /// same scripted mailbox and the same frozen rows. Every request is replayed
+    /// through the same dispatch entry the product uses, which keeps the
+    /// catalogue's argument gate in the path — the "missing required argument"
+    /// and "invalid parameter type" cases only pass if that gate still runs
+    /// first.
+    #[test]
+    fn source_bound_poll_inbox_fixture_matches() {
+        use std::collections::BTreeMap;
+        use symeraseme_core::config::ConfigContext;
+
+        #[derive(Deserialize)]
+        struct PollCase {
+            name: String,
+            request: Option<String>,
+            response: Option<String>,
+            #[serde(default)]
+            parse_error: bool,
+        }
+
+        #[derive(Deserialize)]
+        struct PollFixture {
+            source_revision: String,
+            seed: String,
+            cases: Vec<PollCase>,
+        }
+
+        let fixture: PollFixture = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/mcp-contract/mcp-003-poll/cases.json"
+        ))
+        .expect("poll fixture");
+        assert_eq!(
+            fixture.source_revision, "79bf23e83b31f18d98487101200eaf32749e5a46",
+            "poll fixture source revision"
+        );
+        assert!(!fixture.cases.is_empty(), "poll fixture lost its cases");
+        assert_eq!(
+            fixture.seed, "tests/fixtures/mcp-contract/mcp-003-poll/seed.sql",
+            "poll fixture seed"
+        );
+
+        let root = workspace("poll-inbox");
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+        store
+            .connection()
+            .execute_batch(include_str!(
+                "../../../../tests/fixtures/mcp-contract/mcp-003-poll/seed.sql"
+            ))
+            .expect("apply frozen rows");
+        drop(store);
+
+        let mut environment = BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+
+        for case in &fixture.cases {
+            // A fresh high-water-mark store per case, exactly like the oracle:
+            // a shared one would advance past the messages of the next case and
+            // silently turn it into an empty mailbox.
+            let handler = ContractHandler::new(&root)
+                .with_store(
+                    ConfigContext::new(root.clone(), root.clone(), environment.clone()),
+                    now,
+                )
+                .with_imap_dialer(std::sync::Arc::new(ScriptedDialer::from_fixture()))
+                .with_hwm_store(std::sync::Arc::new(MemoryHwmStore::new()));
+            let request = case.request.as_deref().expect("case request");
+            let outcome = initialize(request.as_bytes(), &handler);
+            match (&case.response, outcome) {
+                (Some(expected), InitializeOutcome::Response(bytes)) => {
+                    assert_eq!(
+                        String::from_utf8(bytes).expect("UTF-8 response"),
+                        *expected,
+                        "{}",
+                        case.name
+                    );
+                }
+                (Some(expected), InitializeOutcome::Notification) => {
+                    panic!("{} produced no response, expected {expected}", case.name);
+                }
+                (Some(_), InitializeOutcome::ParseError) => {
+                    panic!("{} did not parse", case.name);
+                }
+                (None, InitializeOutcome::Response(bytes)) => {
+                    assert!(
+                        case.parse_error,
+                        "{} answered unexpectedly: {}",
+                        case.name,
+                        String::from_utf8_lossy(&bytes)
+                    );
+                }
+                (None, _) => {}
+            }
+        }
         let _ = fs::remove_dir_all(&root);
     }
 }
