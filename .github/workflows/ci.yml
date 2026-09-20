@@ -51,6 +51,10 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.6'
+      - name: Install golangci-lint
+        # Without this the lint target would fall back to `go vet` and the
+        # linters configured in .golangci.yml would never run.
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
       - name: Check formatting and lint
         run: |
           make fmt-check
