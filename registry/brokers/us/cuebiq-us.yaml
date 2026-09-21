@@ -10,7 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: web_form
-  url: https://cuebiq.com/privacy-center/ / privacy@cuebiq.com
+  url: https://cuebiq.com/privacy-center/
   template: ccpa-deletion
   locale: en
   required_fields:
@@ -20,7 +20,8 @@ opt_out:
   expected_response_days: 45
   form_spec:
     steps:
-    - goto: https://cuebiq.com/privacy-center/ / privacy@cuebiq.com
+    - goto: https://cuebiq.com/privacy-center/
+notes: privacy@cuebiq.com
 verification:
   ack_keywords:
   - received

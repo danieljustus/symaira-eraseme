@@ -502,14 +502,50 @@ func validateFormStep(s *FormStep) error {
 	return nil
 }
 
-// validURI checks a uri-format field. Per contract §7/§9 the JSON Schema
-// `format` keyword is treated as an annotation (matching the Python
-// checker, which does not assert formats either) — real registry data
-// contains legacy values like `privacy@host` or combined URLs with spaces
-// in url fields. Enforced: non-empty.
+// validURI enforces the schema's `format: uri` for uri-format fields.
+//
+// It used to accept any non-empty string, because 46 registry entries carried
+// an email address in a `web_form` `url`. Those entries were channels of the
+// wrong type, and they are now `email` channels with the address in `endpoint`
+// (#843), so the permissive rule no longer has a subject. Requiring a real
+// scheme is what keeps the class from returning: a value that is not a URI is
+// now rejected at load time instead of reaching the browser runner.
+//
+// The scheme set is deliberately narrow. The registry only ever ships http(s)
+// destinations; accepting an arbitrary RFC 3986 scheme would let `javascript:`
+// or `file:` through to a browser navigation.
 func validURI(s string) error {
 	if s == "" {
 		return verr("is required")
+	}
+	if err := checkURI(s); err != nil {
+		return verr("%v", err)
+	}
+	return nil
+}
+
+// checkURI validates an absolute http(s) URI without pulling in a second URL
+// parser: scheme, authority, and no whitespace or control characters.
+func checkURI(s string) error {
+	if strings.ContainsAny(s, " 	\r\n") {
+		return fmt.Errorf("%q contains whitespace", s)
+	}
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("%q contains a control character", s)
+		}
+	}
+	rest, ok := strings.CutPrefix(s, "https://")
+	if !ok {
+		if rest, ok = strings.CutPrefix(s, "http://"); !ok {
+			return fmt.Errorf("%q is not an absolute http(s) URI", s)
+		}
+	}
+	host, _, _ := strings.Cut(rest, "/")
+	host = strings.SplitN(host, "?", 2)[0]
+	host = strings.SplitN(host, "#", 2)[0]
+	if host == "" {
+		return fmt.Errorf("%q has no host", s)
 	}
 	return nil
 }
