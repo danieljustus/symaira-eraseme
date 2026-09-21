@@ -389,7 +389,10 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 				}
 				return map[string]any{"success": true, "files": files, "dry_run": true}, nil
 			}
-			return scheduler.Install(ctx, scheduler.InstallOptions{Config: cfg})
+			return scheduler.Install(ctx, scheduler.InstallOptions{
+				Config:        cfg,
+				ReplaceLegacy: getBool(args, "replace_legacy", false),
+			})
 		case "schedule_uninstall":
 			err := scheduler.Uninstall(ctx, scheduler.InstallOptions{Config: scheduler.Config{Platform: scheduler.Platform(getStr(args, "platform", ""))}})
 			if err != nil {

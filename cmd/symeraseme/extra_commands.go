@@ -538,11 +538,14 @@ func realScheduleInstallCommand() *cobra.Command {
 	cmd.Flags().IntVar(&tick_minute, "tick-minute", 0, "Minute to run tick engine")
 	var dry_run bool
 	cmd.Flags().BoolVar(&dry_run, "dry-run", false, "Preview without installing")
+	var replace_legacy bool
+	cmd.Flags().BoolVar(&replace_legacy, "replace-legacy", false, "Replace detected legacy scheduler units instead of refusing")
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
 		argsMap["platform"] = platform
 		argsMap["tick_hour"] = tick_hour
 		argsMap["tick_minute"] = tick_minute
 		argsMap["dry_run"] = dry_run
+		argsMap["replace_legacy"] = replace_legacy
 		return nil
 	}
 	return cmd
