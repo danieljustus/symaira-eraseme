@@ -316,7 +316,16 @@ func brokerLeaderboard(rs []requestRow) []any {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.SliceStable(keys, func(i, j int) bool { return m[keys[i]].total > m[keys[j]].total })
+	// Map iteration order is random, so brokers with equal totals would
+	// otherwise come out in a different order on every run. Order by total
+	// descending and then by broker_id ascending, so the result is total and
+	// reproducible (#963).
+	sort.Slice(keys, func(i, j int) bool {
+		if m[keys[i]].total != m[keys[j]].total {
+			return m[keys[i]].total > m[keys[j]].total
+		}
+		return keys[i] < keys[j]
+	})
 	out := []any{}
 	for _, k := range keys {
 		s := m[k]
@@ -352,7 +361,17 @@ func jurisdictionBreakdown(rs []requestRow) []any {
 			s["overdue"] = s["overdue"].(int) + 1
 		}
 	}
-	sort.SliceStable(order, func(i, j int) bool { return m[order[i]]["total"].(int) > m[order[j]]["total"].(int) })
+	// `order` is first-seen order, which for equal totals follows the input
+	// order. The query only orders by `created_at`, so ties there are not
+	// guaranteed to be stable; order by total descending and then by
+	// jurisdiction ascending so the output depends only on the data (#963).
+	sort.Slice(order, func(i, j int) bool {
+		ti, tj := m[order[i]]["total"].(int), m[order[j]]["total"].(int)
+		if ti != tj {
+			return ti > tj
+		}
+		return order[i] < order[j]
+	})
 	out := []any{}
 	for _, k := range order {
 		s := m[k]
