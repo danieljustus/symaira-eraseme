@@ -24,17 +24,17 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 149 · deferred: 17 (as of `04e516b3`).
+Selected: 152 · deferred: 14 (as of `c0573f86`).
 
 ## Remaining deferred cases
 
 | Case id | Subsystem | State |
 |---|---|---|
 
-| `grant-dry-run`, `operate-grant` | grant/tokens | ready |
-| `operate-events-show` | events | ready |
 
-| `operate-plan-create/-show/-execute` | campaign planning | in progress — CLI-017, branch `cli-017-plan` |
+| `operate-events-show`, `grant-dry-run`, `operate-grant` | events / tokens | in progress — CLI-018, branch `cli-018-events-grant` |
+
+
 | `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready |
 | `operate-auto-confirm`, `operate-classify-reply` | triage | ready |
 | `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | ready |
@@ -46,6 +46,15 @@ Selected: 149 · deferred: 17 (as of `04e516b3`).
 `Rust / native (${{ matrix.os }})` reports **skipping** on PRs, so a green PR
 is not native multi-platform evidence. Native target results remain an open
 gate for cutover readiness.
+
+## Pinned as measured, not desired
+
+- **`plan execute --dry-run` on a web-form request appends a `SENT` event.**
+  Go's `executeWebformRequest` gates only the adapter on `dry_run`, not the
+  event append (the early return at `internal/campaign/execution.go:100`
+  applies only when the runner is nil, and the CLI supplies one). It sends
+  nothing, but it is not read-only, and the recorded `SENT` removes that
+  request from the next batch. Changing it is a contract change (CLI-017).
 
 ## Known parity defects found but not fixed
 
@@ -61,6 +70,7 @@ gate for cutover readiness.
 
 - 2026-09-21 — this ledger created; `docs/rust-port/handoffs/` stays the
   per-slice evidence store, not a second tracker.
+- 2026-09-21 — CLI-017 merged as #1019 (`c0573f86`).
 - 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`); CLI-016 as #1017 (`04e516b3`).
 - Port PRs carry code only; ledger updates go to main separately.
 - The `manual-tasks list` key-order defect is being fixed on `fix/manual-tasks-key-order`.
