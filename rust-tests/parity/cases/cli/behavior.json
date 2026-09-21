@@ -2535,6 +2535,28 @@
     {
       "argv": [
         "registry",
+        "list"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "MTI3NyBicm9rZXIocykK",
+      "stderr_base64": "",
+      "stdout_bytes": 15,
+      "stderr_bytes": 0,
+      "id": "registry-list",
+      "category": "success",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "registry",
         "list",
         "--output",
         "json"
