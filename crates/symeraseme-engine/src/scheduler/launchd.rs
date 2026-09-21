@@ -1,4 +1,4 @@
-use super::{Config, WRAPPER_DIR_PLACEHOLDER, wrapper};
+use super::{Config, LEGACY_MARKER, WRAPPER_DIR_PLACEHOLDER, wrapper};
 use std::collections::BTreeMap;
 
 pub(super) fn generate(
@@ -127,10 +127,14 @@ fn plist(label: &str, wrapper_path: &str, intervals: &str, array: bool) -> Strin
     };
     let label = plist_escape(label);
     let wrapper_path = plist_escape(wrapper_path);
-    let lines: [String; 29] = [
+    let lines: [String; 30] = [
         r#"<?xml version="1.0" encoding="UTF-8"?>"#.to_string(),
         r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN""#.to_string(),
         r#"  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#.to_string(),
+        // The generator marker is what separates a unit written by this
+        // implementation from a Python-era one; the two templates are otherwise
+        // byte-identical, so the legacy scan has nothing else to go on.
+        format!("<!-- {LEGACY_MARKER} (Go) -->"),
         r#"<plist version="1.0">"#.to_string(),
         "<dict>".to_string(),
         "    <key>Label</key>".to_string(),

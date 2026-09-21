@@ -272,6 +272,7 @@ func plist(label, wrapperPath, intervals string, array bool) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- %s (Go) -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
@@ -298,7 +299,7 @@ func plist(label, wrapperPath, intervals string, array bool) string {
     <false/>
 </dict>
 </plist>
-`, plistString(label), plistString(wrapperPath), intervals, plistString(label), plistString(label))
+`, legacyMarker, plistString(label), plistString(wrapperPath), intervals, plistString(label), plistString(label))
 }
 
 func generateLaunchd(cfg Config, binaryPath, projectDir string, pollHours []int) map[string]string {
@@ -320,6 +321,7 @@ func generateLaunchd(cfg Config, binaryPath, projectDir string, pollHours []int)
 
 func systemdService(description, wrapperPath string) string {
 	return fmt.Sprintf(`[Unit]
+# %s (Go)
 Description=%s
 After=network-online.target
 
@@ -332,11 +334,12 @@ StandardError=journal
 
 [Install]
 WantedBy=default.target
-`, description, wrapperPath)
+`, legacyMarker, description, wrapperPath)
 }
 
 func systemdTimer(description, serviceName, calendar string) string {
 	return fmt.Sprintf(`[Unit]
+# %s (Go)
 Description=%s
 
 [Timer]
@@ -346,7 +349,7 @@ Persistent=true
 
 [Install]
 WantedBy=timers.target
-`, description, serviceName, calendar)
+`, legacyMarker, description, serviceName, calendar)
 }
 
 func generateSystemd(cfg Config, binaryPath, projectDir string, pollHours []int) map[string]string {
@@ -555,6 +558,15 @@ func DetectLegacyPythonUnit(path string) (bool, error) {
 	return isPythonSchedulerContent(string(data)), nil
 }
 
+// isPythonSchedulerContent reports whether unit content was written by the
+// Python-era generator rather than this one.
+//
+// The two generators emitted byte-identical launchd/systemd templates and the
+// same file names, so content cannot be told apart by structure. The only
+// reliable discriminator is the generator marker: this implementation stamps
+// `<legacyMarker> (Go)` into every unit it writes, so a unit carrying the bare
+// marker without the suffix came from the Python era. A unit with no marker at
+// all is also not ours and is therefore treated as a replacement candidate.
 func isPythonSchedulerContent(content string) bool {
 	lower := strings.ToLower(content)
 	markers := []string{"python", "site-packages", "symeraseme.core.scheduler", "uv run", "venv/bin/activate"}
@@ -564,6 +576,14 @@ func isPythonSchedulerContent(content string) bool {
 		}
 	}
 	return strings.Contains(content, legacyMarker) && !strings.Contains(content, legacyMarker+" (Go)")
+}
+
+// isOwnGeneratedUnit reports whether a unit file was written by this
+// implementation, identified by the Go marker. Re-running `install` must not
+// refuse on its own output; only a genuinely foreign unit requires explicit
+// replacement consent.
+func isOwnGeneratedUnit(content string) bool {
+	return strings.Contains(content, legacyMarker+" (Go)")
 }
 
 // ScanLegacyPythonUnits scans the native per-user unit locations. Existing
@@ -603,6 +623,12 @@ func ScanLegacyPythonUnits(home string, platform Platform) ([]LegacyUnit, error)
 			return nil, fmt.Errorf("read legacy unit %s: %w", path, err)
 		}
 		isPython := isPythonSchedulerContent(string(data))
+		// A unit this implementation wrote is not a replacement candidate. It
+		// uses the same file names as the Python era, so name matching alone
+		// previously made `install` refuse its own output and blocked re-install.
+		if isOwnGeneratedUnit(string(data)) {
+			continue
+		}
 		reason := "existing Symaira scheduler unit; explicit replacement required"
 		if isPython {
 			reason = "existing Python scheduler unit; explicit replacement required"
@@ -872,11 +898,15 @@ func Status(ctx context.Context, opts InstallOptions) (StatusResult, error) {
 	names := []string{"symeraseme-tick", "symeraseme-poll", "symeraseme-rescan"}
 	entries := make([]StatusEntry, 0, len(names))
 	for _, name := range names {
-		ext := ".plist"
+		// Launchd units live under their label (`com.symeraseme.tick.plist`),
+		// the same name WriteFiles/Uninstall and the legacy scan use. Building
+		// the path from the logical name made Status inspect a file that never
+		// exists, so it reported a removed unit as still installed.
+		pathName := nameToLaunchdLabel(name) + ".plist"
 		if platform == PlatformSystemd {
-			ext = ".timer"
+			pathName = name + ".timer"
 		}
-		path := filepath.Join(root, name+ext)
+		path := filepath.Join(root, pathName)
 		entry := StatusEntry{Label: name, Path: path}
 		_, statErr := os.Stat(path)
 		entry.Installed = statErr == nil
