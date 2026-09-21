@@ -409,6 +409,31 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "manual-tasks list" => {
             contract_command("manual_tasks_list", manual_tasks_arguments(parsed), parsed)
         }
+        "manual-tasks show" => match manual_task_id(parsed) {
+            Ok(task_id) => {
+                let mut arguments = Map::new();
+                arguments.insert("task_id".to_owned(), json!(task_id));
+                contract_command("manual_tasks_show", arguments, parsed)
+            }
+            Err(outcome) => outcome,
+        },
+        "manual-tasks complete" => match manual_task_id(parsed) {
+            Ok(task_id) => {
+                let mut arguments = Map::new();
+                arguments.insert("task_id".to_owned(), json!(task_id));
+                arguments.insert("notes".to_owned(), json!(string_flag(parsed, "notes")));
+                contract_command("manual_tasks_complete", arguments, parsed)
+            }
+            Err(outcome) => outcome,
+        },
+        "manual-tasks cleanup" => {
+            let mut arguments = Map::new();
+            arguments.insert(
+                "dry_run".to_owned(),
+                json!(parsed.flags.get("dry-run").is_some_and(|value| value == "true")),
+            );
+            contract_command("manual_tasks_cleanup", arguments, parsed)
+        }
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
         "schedule status" => schedule_status(parsed),
@@ -774,6 +799,16 @@ fn manual_tasks_arguments(parsed: &Parsed) -> Map<String, Value> {
         json!(int_flag(parsed, "request-id", 0)),
     );
     arguments
+}
+
+/// Go's `intArgument`: the positional `TASK_ID` wins over `--task-id`.
+fn manual_task_id(parsed: &Parsed) -> Result<i64, Outcome> {
+    let Some(argument) = parsed.positional.first() else {
+        return Ok(int_flag(parsed, "task-id", 0));
+    };
+    argument
+        .parse()
+        .map_err(|_| Outcome::Stderr(format!("invalid task ID {argument:?}\n").into_bytes()))
 }
 
 /// `plan tick` — Go's `tickCommandWith`.
