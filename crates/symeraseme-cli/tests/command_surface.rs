@@ -478,6 +478,14 @@ fn is_exact_case(case: &Value) -> bool {
     // them: the recorded write lands in the case's own data directory and the
     // recorded read finds no profile at all.
     const PROFILE_OPERATIONS: [&str; 2] = ["operate-init-profile", "operate-show-profile"];
+    // `plan create`/`show`/`execute` are replayed now that cli.rs implements
+    // them. Each runs against its own data directory, which is why `show` and
+    // `execute` report an empty plan although `create` planned one request.
+    const PLAN_OPERATIONS: [&str; 3] = [
+        "operate-plan-create",
+        "operate-plan-show",
+        "operate-plan-execute",
+    ];
     const STATUS_OPERATIONS: [&str; 3] = ["status-json", "operate-status", "operate-tick"];
     const REGISTRY_OPERATIONS: [&str; 5] = [
         "registry-list",
@@ -494,6 +502,7 @@ fn is_exact_case(case: &Value) -> bool {
         || REGISTRY_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || STATUS_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || PROFILE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || PLAN_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || CONTRACT_TOOL_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
 }
 
@@ -520,8 +529,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 149);
-    assert_eq!(deferred.len(), 17);
+    assert_eq!(selected.len(), 152);
+    assert_eq!(deferred.len(), 14);
 
     let root = unique_root();
     let home = root.join("home");
@@ -550,6 +559,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 | "status-json"
                 | "operate-status"
                 | "operate-tick"
+                | "operate-plan-create"
+                | "operate-plan-show"
+                | "operate-plan-execute"
         ) || CONTRACT_TOOL_OPERATIONS.contains(&id);
         // The phase-two capture runs every schedule case in its own
         // `cli/<id>/cwd`, so the generated wrappers record that directory; the
@@ -754,7 +766,7 @@ fn brokers_list_honors_resources_override() {
     fs::create_dir_all(&home).expect("isolated home");
     fs::create_dir_all(&cwd).expect("isolated cwd");
     fs::create_dir_all(&capture).expect("capture directory");
-    fs::create_dir_all(resources.join("brokers")).expect("broker directory");
+    fs::create_dir_all(resources.join("brokers/us")).expect("broker directory");
     fs::create_dir_all(resources.join("schemas")).expect("schema directory");
     fs::write(
         resources.join("manifest.json"),
@@ -1568,4 +1580,269 @@ fn manual_task_timestamps_match_the_go_sql_driver() {
             "stored {stored:?} message"
         );
     }
+}
+
+/// A two-broker registry: one email-first broker and one web-form-first broker.
+fn plan_resources(root: &Path) -> std::path::PathBuf {
+    let resources = root.join("resources");
+    fs::create_dir_all(resources.join("brokers/us")).expect("broker directory");
+    fs::create_dir_all(resources.join("schemas")).expect("schema directory");
+    fs::write(
+        resources.join("manifest.json"),
+        br#"{"schema_version":1,"schemas":{"broker":"schemas/broker.schema.json"}}"#,
+    )
+    .expect("registry manifest");
+    fs::write(
+        resources.join("schemas/broker.schema.json"),
+        br#"{"schema_version":1}"#,
+    )
+    .expect("broker schema");
+    fs::write(
+        resources.join("brokers/us/aa-mail-us.yaml"),
+        b"id: aa-mail-us\nname: AA Mail\nwebsite: https://aa.example\ncategory: other\njurisdictions:\n- US\nlaws:\n- CCPA\ndata_sensitivity: 3\npriority: medium\nopt_out:\n- type: email\n  endpoint: privacy@aa.example\n  template: ccpa-deletion\n  locale: en\n  expected_response_days: 45\nadded_date: '2025-05-21'\nstatus: active\n".as_slice(),
+    )
+    .expect("email broker");
+    fs::write(
+        resources.join("brokers/us/zz-form-us.yaml"),
+        b"id: zz-form-us\nname: ZZ Form\nwebsite: https://zz.example\ncategory: other\njurisdictions:\n- US\nlaws:\n- CCPA\ndata_sensitivity: 3\npriority: medium\nopt_out:\n- type: web_form\n  url: https://zz.example/optout\n  form_spec:\n    steps:\n    - goto: https://zz.example/optout\nadded_date: '2025-05-21'\nstatus: active\n".as_slice(),
+    )
+    .expect("web form broker");
+    resources
+}
+
+/// The populated `plan create`/`show`/`execute` paths, which the oracle records
+/// only in their empty state.
+///
+/// One isolated store carries the whole sequence, because the commands are
+/// written to build on each other: `create` plans, `show` reads the plan back
+/// and `execute` consumes it. The registry is a two-broker override so the email
+/// and web-form branches are both exercised with known values.
+#[test]
+fn plan_populated_paths_match_the_go_bodies() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let data_dir = root.join("data");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    fs::create_dir_all(&data_dir).expect("isolated data directory");
+    let resources = plan_resources(&root);
+    let _cleanup = Cleanup(root.clone());
+
+    let resources = resources.to_string_lossy().to_string();
+    let environment: Vec<(&str, &str)> = vec![
+        ("SYMERASEME_RESOURCES", resources.as_str()),
+        (
+            "SYMERASEME_IDENTITY_MASTER_KEY",
+            "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        ),
+    ];
+    let mut step = 0;
+    let mut plan = |argv: &[&str]| {
+        step += 1;
+        run_with_data_dir(
+            argv,
+            &home,
+            &cwd,
+            &capture,
+            900 + step,
+            &data_dir,
+            &environment,
+        )
+    };
+
+    let output = plan(&[
+        "init-profile",
+        "--full-name",
+        "Jane Doe",
+        "--email",
+        "jane@example.com",
+    ]);
+    assert_eq!(output.status.code(), Some(0), "init-profile");
+
+    // `create` plans both brokers: the email channel resolves a template, the
+    // web-form channel resolves none.
+    let created = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "create",
+        "--campaign",
+        "pop",
+        "--max",
+        "5",
+    ]));
+    assert_eq!(created["total_brokers"], 2);
+    assert_eq!(created["matched"], 2);
+    assert_eq!(created["planned"], 2);
+    let requests = created["requests"].as_array().expect("planned requests");
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0]["broker_id"], "aa-mail-us");
+    assert_eq!(requests[0]["channel"], "email");
+    assert_eq!(requests[0]["template"], "ccpa-deletion.en.md.j2");
+    assert_eq!(requests[1]["broker_id"], "zz-form-us");
+    assert_eq!(requests[1]["channel"], "web_form");
+    assert_eq!(requests[1]["template"], "");
+
+    // `--max` bounds the planned requests, never the match count.
+    let capped = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "create",
+        "--campaign",
+        "capped",
+        "--max",
+        "1",
+    ]));
+    assert_eq!(capped["matched"], 2);
+    assert_eq!(capped["planned"], 1);
+
+    // A filter that matches nothing keeps Go's nil slice: `null`, not `[]`.
+    let empty = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "create",
+        "--campaign",
+        "empty",
+        "--category",
+        "people-search",
+    ]));
+    assert_eq!(empty["planned"], 0);
+    assert_eq!(empty["requests"], Value::Null);
+
+    // `show` reads the plan back, filtered by campaign and by status.
+    let shown = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "show",
+        "--campaign",
+        "pop",
+    ]));
+    assert_eq!(shown["campaign_id"], "pop");
+    assert_eq!(shown["total"], 2);
+    let rows = shown["requests"].as_array().expect("shown requests");
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["broker_id"], "aa-mail-us");
+    assert_eq!(rows[0]["current_status"], "PLANNED");
+    let filtered = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "show",
+        "--campaign",
+        "pop",
+        "--status",
+        "SENT",
+    ]));
+    assert_eq!(filtered["total"], 0);
+    assert_eq!(filtered["requests"], Value::Null);
+    let all = json_stdout(&plan(&["--output", "json", "plan", "show"]));
+    assert_eq!(all["campaign_id"], "all");
+    assert_eq!(all["total"], 3);
+
+    // `execute --dry-run` previews both channels. The email branch renders Go's
+    // placeholder body, because `realPlanCommand` injects no renderer.
+    let executed = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "execute",
+        "--campaign",
+        "pop",
+        "--dry-run",
+    ]));
+    assert_eq!(executed["campaign_id"], "pop");
+    assert_eq!(executed["total_planned"], 2);
+    assert_eq!(executed["batch_size"], 2);
+    let results = executed["results"].as_array().expect("execute results");
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0]["success"], true);
+    assert_eq!(results[0]["dry_run"], true);
+    assert_eq!(results[0]["to"], "privacy@aa.example");
+    // Go reads `req["broker_id"]` into `brokerName`, so the id is what reaches
+    // the subject line and the rendered body.
+    assert_eq!(results[0]["subject"], "Data Deletion Request — aa-mail-us");
+    assert_eq!(
+        results[0]["body"],
+        "[template ccpa-deletion.en.md.j2 — aa-mail-us / Jane Doe]"
+    );
+    assert_eq!(results[1]["success"], true);
+    assert_eq!(results[1]["broker_id"], "zz-form-us");
+    assert_eq!(results[1]["url"], "https://zz.example/optout");
+    // The allowlist drops the adapter's `steps` field on the way out.
+    assert_eq!(results[1]["steps"], Value::Null);
+
+    // The web-form branch records its outcome even in a dry run, which is what
+    // takes that request out of the next batch; the email branch records
+    // nothing, so it stays PLANNED.
+    let after = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "show",
+        "--campaign",
+        "pop",
+    ]));
+    let rows = after["requests"]
+        .as_array()
+        .expect("requests after execute");
+    assert_eq!(rows[0]["current_status"], "PLANNED");
+    // The shared projection turns a SENT event into `AWAITING_ACK`.
+    assert_eq!(rows[1]["current_status"], "AWAITING_ACK");
+
+    // `--batch-size` bounds one batch without changing the planned total.
+    let batched = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "execute",
+        "--campaign",
+        "capped",
+        "--dry-run",
+        "--batch-size",
+        "0",
+    ]));
+    assert_eq!(batched["total_planned"], 1);
+    assert_eq!(batched["batch_size"], 1);
+
+    // An unknown campaign executes an empty batch, and `results` stays `[]`.
+    let unknown = json_stdout(&plan(&[
+        "--output",
+        "json",
+        "plan",
+        "execute",
+        "--campaign",
+        "missing",
+        "--dry-run",
+    ]));
+    assert_eq!(unknown["total_planned"], 0);
+    assert_eq!(unknown["results"], Value::Array(Vec::new()));
+
+    // Without a consent token a live run stops at the gate, before any adapter
+    // is built — which is why no test here can reach a non-dry-run execution.
+    let denied = plan(&["--output", "json", "plan", "execute", "--campaign", "pop"]);
+    assert_eq!(denied.status.code(), Some(1), "consent gate exit code");
+    assert_eq!(denied.stdout, b"", "consent gate stdout");
+    assert_eq!(denied.stderr, b"identity: consent denied\n");
+
+    // `--campaign` is required by both commands that declare it as mandatory.
+    let missing = plan(&["plan", "create"]);
+    assert_eq!(missing.status.code(), Some(1));
+    assert_eq!(missing.stderr, b"--campaign is required\n");
+}
+
+/// The JSON document one successful command wrote to stdout.
+fn json_stdout(output: &ProcessOutput) -> Value {
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("stdout is one JSON document")
 }

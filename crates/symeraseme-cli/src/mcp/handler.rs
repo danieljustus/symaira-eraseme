@@ -842,7 +842,7 @@ impl ContractHandler {
 
 /// Go answers a nil slice when a query matches nothing, which reaches a client
 /// as `null` — never as `[]`.
-fn request_rows(rows: Vec<RemovalRequestRow>) -> Value {
+pub fn request_rows(rows: Vec<RemovalRequestRow>) -> Value {
     if rows.is_empty() {
         return Value::Null;
     }
