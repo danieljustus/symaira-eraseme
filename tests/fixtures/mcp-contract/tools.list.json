@@ -464,6 +464,11 @@
             "type": "boolean",
             "description": "Preview without installing",
             "default": false
+          },
+          "replace_legacy": {
+            "type": "boolean",
+            "description": "Replace detected legacy scheduler units instead of refusing",
+            "default": false
           }
         }
       }
