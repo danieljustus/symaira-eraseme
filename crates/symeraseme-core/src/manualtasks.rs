@@ -9,7 +9,7 @@
 //! - `create`/`save_screenshot` therefore take the instant that Go reads from
 //!   `time.Now()`.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use regex::Regex;
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
@@ -438,10 +438,67 @@ fn scan_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<ManualTask> {
         html_snapshot_path: row.get(8)?,
         form_fields_json: row.get(9)?,
         status: row.get(10)?,
-        created_at: row.get(11)?,
-        completed_at: row.get(12)?,
+        created_at: driver_timestamp(row.get::<_, String>(11)?),
+        completed_at: row.get::<_, Option<String>>(12)?.map(driver_timestamp),
         notes: row.get(13)?,
     })
+}
+
+/// The `TIMESTAMP` columns as Go's SQL driver hands them to a `string`.
+///
+/// `database/sql` converts a declared `TIMESTAMP` into `time.Time` and renders
+/// it with `time.RFC3339Nano`, so a stored `2026-01-02 03:04:05` reads back as
+/// `2026-01-02T03:04:05Z`. The driver's first two layouts carry a numeric zone
+/// offset and differ only in their `T`/space separator, and Go's `time.Parse`
+/// also accepts `Z` wherever a layout writes `-07:00`; a parsed offset survives
+/// into the rendered value, so only the naive layouts report `Z`. A value none
+/// of the layouts accept is passed through unchanged.
+fn driver_timestamp(value: String) -> String {
+    const NAIVE_LAYOUTS: [&str; 5] = [
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d",
+    ];
+    // `parse_from_rfc3339` is the offset-bearing pair: it accepts both the
+    // offset and `Z`, and the space-separated layout reaches it by way of the
+    // separator Go's first layout writes.
+    let offset_bearing =
+        DateTime::parse_from_rfc3339(&value).or_else(|error| match value.split_once(' ') {
+            Some((date, time)) => DateTime::parse_from_rfc3339(&format!("{date}T{time}")),
+            None => Err(error),
+        });
+    let instant = if let Ok(parsed) = offset_bearing {
+        parsed
+    } else if let Some(parsed) = NAIVE_LAYOUTS.iter().find_map(|layout| {
+        NaiveDateTime::parse_from_str(&value, layout)
+            .ok()
+            .or_else(|| {
+                NaiveDate::parse_from_str(&value, layout)
+                    .ok()
+                    .and_then(|date| date.and_hms_opt(0, 0, 0))
+            })
+    }) {
+        parsed.and_utc().fixed_offset()
+    } else {
+        return value;
+    };
+    // Go's RFC3339Nano drops the trailing zeros of the fraction and writes a
+    // zero offset as `Z`.
+    let mut rendered = instant.format("%Y-%m-%dT%H:%M:%S%.9f").to_string();
+    if rendered.contains('.') {
+        rendered = rendered
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_owned();
+    }
+    if instant.offset().local_minus_utc() == 0 {
+        rendered.push('Z');
+    } else {
+        rendered.push_str(&instant.format("%:z").to_string());
+    }
+    rendered
 }
 
 /// Retrieves one task, returning `None` when it does not exist.

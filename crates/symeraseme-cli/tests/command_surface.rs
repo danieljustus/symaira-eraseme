@@ -362,7 +362,7 @@ fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
 /// wrappers over an MCP tool (`mcp.ContractHandler()`), which is why each pair of
 /// ids carries the same recorded bytes. They are listed here because the
 /// selection predicate and the replay body both need them.
-const CONTRACT_TOOL_OPERATIONS: [&str; 8] = [
+const CONTRACT_TOOL_OPERATIONS: [&str; 11] = [
     "dashboard-json",
     "operate-dashboard",
     "calendar-json",
@@ -371,6 +371,9 @@ const CONTRACT_TOOL_OPERATIONS: [&str; 8] = [
     "operate-requests-list",
     "manual-tasks-list-json",
     "operate-manual-tasks-list",
+    "operate-manual-tasks-show",
+    "operate-manual-tasks-complete",
+    "operate-manual-tasks-cleanup",
 ];
 
 /// `plan status` and `plan tick` answer the Go oracle's recorded bytes.
@@ -517,8 +520,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 146);
-    assert_eq!(deferred.len(), 20);
+    assert_eq!(selected.len(), 149);
+    assert_eq!(deferred.len(), 17);
 
     let root = unique_root();
     let home = root.join("home");
@@ -1256,4 +1259,313 @@ fn init_profile_round_trips_through_show_profile() {
     );
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(output.stderr, b"invalid email address\n");
+}
+
+/// Seeds one manual task and one artifact file, then replays the populated
+/// paths of `manual-tasks show`, `complete` and `cleanup`.
+///
+/// The recorded corpus only exercises the absent task and the absent artifact
+/// directory, so the populated branches of Go's `HandleShow`, `HandleComplete`
+/// and `HandleCleanup` are covered here instead.
+#[test]
+fn manual_tasks_populated_paths_match_the_go_bodies() {
+    use chrono::{DateTime, Utc};
+
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let data_dir = root.join("data");
+    let tasks_dir = data_dir.join("manual_tasks");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    fs::create_dir_all(&tasks_dir).expect("isolated artifact directory");
+    let _cleanup = Cleanup(root.clone());
+
+    let now = "2026-01-02T03:04:05Z"
+        .parse::<DateTime<Utc>>()
+        .expect("fixed instant");
+    {
+        let store = symeraseme_core::storage::Store::open(data_dir.join("symeraseme.db"))
+            .expect("open the seeded store");
+        symeraseme_core::manualtasks::create(
+            &store,
+            &symeraseme_core::manualtasks::CreateOpts {
+                broker_id: "acme".to_owned(),
+                broker_name: "Acme Data".to_owned(),
+                form_url: "https://acme.example/optout".to_owned(),
+                reason: "captcha_failed".to_owned(),
+                ..symeraseme_core::manualtasks::CreateOpts::default()
+            },
+            None,
+            now,
+        )
+        .expect("seed a manual task");
+    }
+    fs::write(tasks_dir.join("task-1.png"), b"artifact").expect("seed an artifact");
+
+    let show = run_with_data_dir(
+        &["manual-tasks", "show", "1", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        900,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(show.status.code(), Some(0), "show status");
+    assert!(show.stderr.is_empty(), "show stderr");
+    let payload: Value = serde_json::from_slice(&show.stdout).expect("show payload");
+    assert_eq!(payload["success"], true);
+    assert_eq!(payload["id"], 1);
+    assert_eq!(payload["broker_name"], "Acme Data");
+    assert_eq!(payload["status"], "pending");
+    // Go's SQL driver renders the `TIMESTAMP` columns as RFC3339 in UTC.
+    let created_at = payload["created_at"].as_str().expect("created_at");
+    assert!(
+        created_at.ends_with('Z') && created_at.parse::<chrono::DateTime<chrono::Utc>>().is_ok(),
+        "created_at is an RFC3339 instant: {created_at}"
+    );
+    let message = payload["message"].as_str().expect("show message");
+    assert_eq!(
+        message,
+        format!(
+            "Manual task #1:\n  Broker:     Acme Data (acme)\n  URL:        https://acme.example/optout\n  Reason:     captcha_failed\n  Status:     pending\n  Created:    {created_at}\n\nInstructions:\nThe CAPTCHA solver failed for Acme Data's opt-out form. Please visit the URL below and complete the CAPTCHA manually."
+        ),
+        "show message"
+    );
+
+    // Go's `manual-tasks show` reads `--task-id` when no positional is given.
+    let show_flag = run_with_data_dir(
+        &["manual-tasks", "show", "--task-id", "1", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        901,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(show_flag.stdout, show.stdout, "show --task-id stdout");
+
+    // Go's `intArgument` rejects a non-numeric positional before the handler.
+    let invalid = run_with_data_dir(
+        &["manual-tasks", "show", "abc", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        902,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(invalid.status.code(), Some(1), "invalid task ID status");
+    assert_eq!(invalid.stdout, b"", "invalid task ID stdout");
+    assert_eq!(
+        invalid.stderr, b"invalid task ID \"abc\"\n",
+        "invalid task ID stderr"
+    );
+
+    let complete = run_with_data_dir(
+        &[
+            "manual-tasks",
+            "complete",
+            "1",
+            "--notes",
+            "done by hand",
+            "--output",
+            "json",
+        ],
+        &home,
+        &cwd,
+        &capture,
+        903,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(complete.status.code(), Some(0), "complete status");
+    assert_eq!(
+        complete.stdout,
+        b"{\"message\":\"Manual task #1 marked as completed.\",\"success\":true,\"task_id\":1}\n",
+        "complete stdout"
+    );
+
+    // The completion is persisted: `show` now reports it with the notes.
+    let after: Value = serde_json::from_slice(
+        &run_with_data_dir(
+            &["manual-tasks", "show", "1", "--output", "json"],
+            &home,
+            &cwd,
+            &capture,
+            904,
+            &data_dir,
+            &[],
+        )
+        .stdout,
+    )
+    .expect("show payload after completion");
+    assert_eq!(after["status"], "completed");
+    assert_eq!(after["notes"], "done by hand");
+    let completed_at = after["completed_at"].as_str().expect("completed_at");
+    let after_message = after["message"].as_str().expect("message");
+    assert!(
+        after_message.contains(&format!("\n  Completed:  {completed_at}\n")),
+        "completed show message: {after_message}"
+    );
+    assert!(
+        after_message.ends_with("\n\nNotes: done by hand"),
+        "completed show message: {after_message}"
+    );
+
+    // `--dry-run` counts the artifact without removing it.
+    let dry_run = run_with_data_dir(
+        &["manual-tasks", "cleanup", "--dry-run", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        905,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(dry_run.status.code(), Some(0), "cleanup dry-run status");
+    assert_eq!(
+        dry_run.stdout,
+        format!(
+            "{{\"dry_run\":true,\"message\":\"Would remove 1 artifact(s) from {}. Use --yes to confirm.\",\"removed\":0,\"skipped\":1,\"success\":true}}\n",
+            tasks_dir.display()
+        )
+        .into_bytes(),
+        "cleanup dry-run stdout"
+    );
+    assert!(
+        tasks_dir.join("task-1.png").exists(),
+        "dry run kept the file"
+    );
+
+    let removed = run_with_data_dir(
+        &["manual-tasks", "cleanup", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        906,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(
+        removed.stdout,
+        format!(
+            "{{\"dry_run\":false,\"message\":\"Removed 1 artifact(s) from {}.\",\"removed\":1,\"skipped\":0,\"success\":true}}\n",
+            tasks_dir.display()
+        )
+        .into_bytes(),
+        "cleanup stdout"
+    );
+    assert!(
+        !tasks_dir.join("task-1.png").exists(),
+        "cleanup removed the file"
+    );
+
+    // Go's text mode prints the contract's `success` line for all three.
+    for argv in [
+        vec!["manual-tasks", "show", "1"],
+        vec!["manual-tasks", "complete", "1"],
+        vec!["manual-tasks", "cleanup", "--dry-run"],
+    ] {
+        let text = run_with_data_dir(&argv, &home, &cwd, &capture, 907, &data_dir, &[]);
+        assert_eq!(text.stdout, b"success\n", "{argv:?} text stdout");
+        assert_eq!(text.status.code(), Some(0), "{argv:?} text status");
+    }
+}
+
+/// `manual-tasks show` renders the `TIMESTAMP` columns the way Go's SQL driver
+/// does, for every layout that driver accepts.
+///
+/// Each expectation was taken from the built Go binary reading the same stored
+/// value. Two of the driver's layouts carry a numeric zone offset and differ
+/// only in their `T`/space separator, Go's `time.Parse` also accepts `Z` where
+/// a layout writes `-07:00`, and a parsed offset survives into the rendered
+/// value — only the naive layouts report `Z`.
+#[test]
+fn manual_task_timestamps_match_the_go_sql_driver() {
+    use chrono::{DateTime, Utc};
+
+    const CASES: [(&str, &str); 16] = [
+        ("2026-09-21 18:39:46+02:00", "2026-09-21T18:39:46+02:00"),
+        ("2026-09-21T18:39:46+02:00", "2026-09-21T18:39:46+02:00"),
+        ("2026-09-21T18:39:46Z", "2026-09-21T18:39:46Z"),
+        ("2026-09-21 18:39:46Z", "2026-09-21T18:39:46Z"),
+        ("2026-09-21 18:39:46+00:00", "2026-09-21T18:39:46Z"),
+        ("2026-09-21 18:39:46.5+02:00", "2026-09-21T18:39:46.5+02:00"),
+        (
+            "2026-09-21T18:39:46.500000000+02:00",
+            "2026-09-21T18:39:46.5+02:00",
+        ),
+        ("2026-09-21 18:39:46-05:30", "2026-09-21T18:39:46-05:30"),
+        ("2026-09-21 18:39:46.123", "2026-09-21T18:39:46.123Z"),
+        ("2026-09-21 18:39:46", "2026-09-21T18:39:46Z"),
+        ("2026-09-21T18:39:46", "2026-09-21T18:39:46Z"),
+        ("2026-09-21 18:39", "2026-09-21T18:39:00Z"),
+        ("2026-09-21T18:39", "2026-09-21T18:39:00Z"),
+        ("2026-09-21", "2026-09-21T00:00:00Z"),
+        // Neither the short offset nor a non-instant matches a layout, so Go
+        // hands the stored text back untouched.
+        ("2026-09-21T18:39:46+02", "2026-09-21T18:39:46+02"),
+        ("not a time", "not a time"),
+    ];
+
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let data_dir = root.join("data");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    fs::create_dir_all(&data_dir).expect("isolated data directory");
+    let _cleanup = Cleanup(root.clone());
+
+    let database = data_dir.join("symeraseme.db");
+    let now = "2026-01-02T03:04:05Z"
+        .parse::<DateTime<Utc>>()
+        .expect("fixed instant");
+    let store = symeraseme_core::storage::Store::open(database).expect("open the seeded store");
+    symeraseme_core::manualtasks::create(
+        &store,
+        &symeraseme_core::manualtasks::CreateOpts {
+            broker_id: "acme".to_owned(),
+            broker_name: "Acme Data".to_owned(),
+            reason: "captcha_failed".to_owned(),
+            ..symeraseme_core::manualtasks::CreateOpts::default()
+        },
+        None,
+        now,
+    )
+    .expect("seed a manual task");
+
+    for (index, (stored, expected)) in CASES.iter().enumerate() {
+        store
+            .connection()
+            .execute(
+                "UPDATE manual_tasks SET created_at = ? WHERE id = 1",
+                [stored],
+            )
+            .expect("store the timestamp");
+        let output = run_with_data_dir(
+            &["manual-tasks", "show", "1", "--output", "json"],
+            &home,
+            &cwd,
+            &capture,
+            920 + index,
+            &data_dir,
+            &[],
+        );
+        let payload: Value = serde_json::from_slice(&output.stdout).expect("show payload");
+        assert_eq!(payload["created_at"], *expected, "stored {stored:?}");
+        assert!(
+            payload["message"]
+                .as_str()
+                .expect("message")
+                .contains(&format!("\n  Created:    {expected}\n")),
+            "stored {stored:?} message"
+        );
+    }
 }
