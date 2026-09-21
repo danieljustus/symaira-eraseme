@@ -3,7 +3,7 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Base: `61ef9ecd` (main, clean)
+- Base: `861527cf` (main, clean)
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
@@ -24,7 +24,7 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 152 · deferred: 14 (as of `c0573f86`).
+Selected: 155 · deferred: 11 (as of `861527cf`).
 
 ## Remaining deferred cases
 
@@ -32,10 +32,7 @@ Selected: 152 · deferred: 14 (as of `c0573f86`).
 |---|---|---|
 
 
-| `operate-events-show`, `grant-dry-run`, `operate-grant` | events / tokens | in progress — CLI-018, branch `cli-018-events-grant` |
-
-
-| `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready |
+| `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready — next slice |
 | `operate-auto-confirm`, `operate-classify-reply` | triage | ready |
 | `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | ready |
 | `operate-mcp` | MCP stdio server | ready |
@@ -58,13 +55,21 @@ gate for cutover readiness.
 
 ## Known parity defects found but not fixed
 
-- **`manual-tasks list` nested task key order.** Go emits the nested task
-  objects in struct order (`id, request_id, broker_id, …`); Rust emits them
-  sorted alphabetically. The recorded `operate-manual-tasks-list` case has an
-  empty `tasks` array, so the corpus does not catch it. Found during CLI-016;
-  belongs to the already-merged `list` slice (#1015). Fixing it means enabling
-  `serde_json`'s `preserve_order`. **The green corpus is not proof this row is
-  clean.**
+(none open — the `manual-tasks list` key-order defect below was fixed by #1018.)
+
+## Fixed parity defects (folded into the corpus or a regression test)
+
+- **`manual-tasks list` nested task key order.** Fixed by #1018
+  (`a96d65d5`): `serde_json` now builds with `preserve_order`, ported
+  structs keep declaration order, and every payload Go builds from a
+  `map[string]any` is sorted explicitly via `jsonorder::go_map_order`.
+- **`preserve_order` interaction with `plan execute` / `plan show`.**
+  Found while rebasing #1018 onto the CLI-017 tree: both payloads are Go
+  maps, so insertion order diverged. Fixed in the same merge
+  (`execute_campaign` sorts recursively; `plan show` sorts its document).
+  Lesson: any `preserve_order` consumer must classify each payload as
+  struct-ordered or map-ordered against the Go source — the corpus only
+  catches the cases it records.
 
 ## Decisions
 
@@ -72,8 +77,9 @@ gate for cutover readiness.
   per-slice evidence store, not a second tracker.
 - 2026-09-21 — CLI-017 merged as #1019 (`c0573f86`).
 - 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`); CLI-016 as #1017 (`04e516b3`).
+- 2026-09-21 — key-order fix merged as #1018 (`a96d65d5`); CLI-018
+  (events/grant) merged as #1020 (`861527cf`). Selected 155 / deferred 11.
 - Port PRs carry code only; ledger updates go to main separately.
-- The `manual-tasks list` key-order defect is being fixed on `fix/manual-tasks-key-order`.
 - Work is dispatched into per-slice worktrees off the integrated revision; the
   coordinator alone edits this file, shared manifests and CI.
 
