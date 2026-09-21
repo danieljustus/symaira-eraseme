@@ -255,8 +255,52 @@ fn added_date_is_calendar_valid_and_uri_format_remains_compatibility_only() {
         let source = format!("{}added_date: {date}\n", base_broker());
         assert_eq!(Broker::from_yaml("test", &source).is_ok(), valid, "{date}");
     }
+    // The 46 legacy email-as-url values made `format: uri` a no-op. They are
+    // corrected and the rule is strict now (#843), so this must be rejected.
     let source = base_broker().replace("https://example.test", "privacy@host");
-    assert!(Broker::from_yaml("test", &source).is_ok());
+    assert!(
+        Broker::from_yaml("test", &source).is_err(),
+        "a non-URI website must be rejected"
+    );
+}
+
+/// The same negative cases Go guards, including the schemes a browser must
+/// never be sent to.
+#[test]
+fn non_uri_web_form_values_and_unsafe_schemes_are_rejected() {
+    for invalid in [
+        "privacy@www.comparethemarket.com",
+        "https://cuebiq.com/privacy-center/ / privacy@cuebiq.com",
+        "https://spydialer.com - Remove My Info link in footer",
+        "https://tex warrant roundup",
+        "javascript:alert(1)",
+        "file:///etc/passwd",
+        "ftp://example.test/form",
+        "https://",
+    ] {
+        let source = format!(
+            "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: {invalid}\n    form_spec:\n      steps:\n        - goto: {invalid}\n"
+        );
+        assert!(
+            Broker::from_yaml("test", &source).is_err(),
+            "web_form url {invalid:?} was accepted"
+        );
+    }
+    // Every shape the cleaned corpus relies on must stay loadable.
+    for valid in [
+        "https://example.test",
+        "https://example.test/path/to/form?x=1&y=2#frag",
+        "http://sub.example.test:8443/form",
+        "https://example.test/path%20with%20encoding",
+    ] {
+        let source = format!(
+            "id: test\nname: Test\nwebsite: https://example.test\ncategory: other\njurisdictions: [US]\nlaws: [GDPR]\npriority: low\nopt_out:\n  - type: web_form\n    url: {valid}\n    form_spec:\n      steps:\n        - goto: {valid}\n"
+        );
+        assert!(
+            Broker::from_yaml("test", &source).is_ok(),
+            "web_form url {valid:?} must stay accepted"
+        );
+    }
 }
 
 #[test]

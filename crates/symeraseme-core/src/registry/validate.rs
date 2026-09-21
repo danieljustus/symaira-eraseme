@@ -1024,11 +1024,38 @@ fn validate_object_keys(
     Ok(())
 }
 
+/// Enforce the schema's `format: uri` for uri-format fields.
+///
+/// This used to accept any non-empty string, mirroring Go, because 46 registry
+/// entries carried an email address in a `web_form` `url` and 8 more combined a
+/// URL with free-text annotation. Those entries are corrected (the 46 became
+/// `email` channels, the 8 were split into a clean URL plus `notes`), so the
+/// permissive rule no longer has a subject and is replaced by the same strict
+/// check Go now applies (#843).
+///
+/// The accepted scheme set is deliberately narrow: the registry only ships
+/// http(s) destinations, and a browser navigation must never receive
+/// `javascript:` or `file:`.
 fn valid_uri(field: &str, value: &str) -> Result<(), RegistryError> {
-    // `format: uri` remains a compatibility annotation: match the Go oracle's
-    // non-empty runtime rule until the coordinated #843 corpus cleanup.
     if value.is_empty() {
         return Err(validation(field, "is required"));
+    }
+    if value.contains(char::is_whitespace) {
+        return Err(validation(field, format!("{value:?} contains whitespace")));
+    }
+    if value.chars().any(|c| c.is_control()) {
+        return Err(validation(
+            field,
+            format!("{value:?} contains a control character"),
+        ));
+    }
+    let rest = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"))
+        .ok_or_else(|| validation(field, format!("{value:?} is not an absolute http(s) URI")))?;
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    if authority.is_empty() {
+        return Err(validation(field, format!("{value:?} has no host")));
     }
     Ok(())
 }

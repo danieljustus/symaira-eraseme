@@ -10,8 +10,7 @@ data_sensitivity: 3
 priority: medium
 opt_out:
 - type: web_form
-  url: https://www.hotjar.com/legal/compliance/gdpr/ / dpo@hotjar.com / Visitor lookup
-    tool
+  url: https://www.hotjar.com/legal/compliance/gdpr/
   template: ccpa-deletion
   locale: en
   required_fields:
@@ -21,8 +20,8 @@ opt_out:
   expected_response_days: 45
   form_spec:
     steps:
-    - goto: https://www.hotjar.com/legal/compliance/gdpr/ / dpo@hotjar.com / Visitor
-        lookup tool
+    - goto: https://www.hotjar.com/legal/compliance/gdpr/
+notes: dpo@hotjar.com / Visitor lookup tool
 verification:
   ack_keywords:
   - received
