@@ -54,6 +54,16 @@ rather than trusted:
 Nothing else is masked: no broad JSON sorting, no whitespace trimming, no
 stderr removal.
 
+## Every case pins its platform
+
+No case relies on platform auto-detection. `DetectPlatform` derives launchd on
+macOS, systemd-or-cron on Linux, so a case without `--platform` records the
+machine that produced it rather than a contract — it passed locally and failed on
+the Linux runner. All twelve CLI cases and all seventeen engine cases now name
+their platform, and the capture was re-read to confirm a launchd-pinned case
+carries launchd content (`<key>Label</key>`, `launchctl`) rather than cron
+content.
+
 ## Go defects pinned as measured (not as desired) — #1000
 
 1. **`Status` and `Uninstall` disagree about launchd unit names.** `Status`
