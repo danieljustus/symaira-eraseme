@@ -74,15 +74,15 @@ var cases = []struct {
 	compare string
 	seed    seed
 }{
-	{"install-dry-run-text", []string{"schedule", "install", "--dry-run"}, "exact", seedNone},
-	{"install-dry-run-json", []string{"schedule", "install", "--dry-run", "--output", "json"}, "exact", seedNone},
+	{"install-dry-run-text", []string{"schedule", "install", "--platform", "launchd", "--dry-run"}, "exact", seedNone},
+	{"install-dry-run-json", []string{"schedule", "install", "--platform", "launchd", "--dry-run", "--output", "json"}, "exact", seedNone},
 	{"install-unsupported-platform", []string{"schedule", "install", "--platform", "windows"}, "exact", seedNone},
 	{"install-launchd-without-launchctl", []string{"schedule", "install", "--platform", "launchd"}, "exact", seedNone},
 	{"install-launchd-refuses-python-legacy", []string{"schedule", "install", "--platform", "launchd"}, "exact", seedLabeledUnits},
 	{"status-launchd-without-launchctl", []string{"schedule", "status", "--platform", "launchd"}, "exact", seedStatusNamedUnits},
 	{"status-launchd-json", []string{"schedule", "status", "--platform", "launchd", "--output", "json"}, "exact", seedStatusNamedUnits},
 	{"status-unsupported-platform", []string{"schedule", "status", "--platform", "windows"}, "exact", seedNone},
-	{"status-invalid-output", []string{"schedule", "status", "--output", "xml"}, "exact", seedNone},
+	{"status-invalid-output", []string{"schedule", "status", "--platform", "launchd", "--output", "xml"}, "exact", seedNone},
 	{"uninstall-launchd-without-launchctl", []string{"schedule", "uninstall", "--platform", "launchd"}, "exact", seedLabeledUnits},
 	{"uninstall-launchd-json", []string{"schedule", "uninstall", "--platform", "launchd", "--output", "json"}, "exact", seedLabeledUnits},
 	{"uninstall-unsupported-platform", []string{"schedule", "uninstall", "--platform", "windows"}, "exact", seedNone},

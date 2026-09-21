@@ -7,6 +7,8 @@
       "argv": [
         "schedule",
         "install",
+        "--platform",
+        "launchd",
         "--dry-run"
       ],
       "compare": "exact",
@@ -25,6 +27,8 @@
       "argv": [
         "schedule",
         "install",
+        "--platform",
+        "launchd",
         "--dry-run",
         "--output",
         "json"
@@ -186,6 +190,8 @@
       "argv": [
         "schedule",
         "status",
+        "--platform",
+        "launchd",
         "--output",
         "xml"
       ],
