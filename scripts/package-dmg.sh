@@ -73,9 +73,12 @@ if [ -z "${DEVELOPER_DIR:-}" ]; then
     fi
 fi
 
-STAGE_DIR="$REPO_ROOT/app/SymairaEraseMe/.build/dmg-stage"
+# Overridable so concurrent test processes do not share one staging directory
+# and race each other in asset-catalog/ICNS generation (#873).
+STAGE_DIR="${STAGE_DIR:-$REPO_ROOT/app/SymairaEraseMe/.build/dmg-stage}"
 APP_BUNDLE="$STAGE_DIR/$APP_NAME.app"
-DMG_PATH="$REPO_ROOT/dist/Symaira-EraseMe-${VERSION}-macos.dmg"
+DIST_DIR="${DIST_DIR:-$REPO_ROOT/dist}"
+DMG_PATH="$DIST_DIR/Symaira-EraseMe-${VERSION}-macos.dmg"
 
 CODESIGN_KEYCHAIN_ARGS=()
 if [ -n "${KEYCHAIN_PATH:-}" ] && [ -f "$KEYCHAIN_PATH" ]; then
@@ -210,8 +213,8 @@ fi
 scripts/verify-app-icon.sh "$APP_BUNDLE"
 
 echo "Creating DMG..."
-mkdir -p dist
-rm -f dist/SymairaEraseMe.dmg   # legacy unversioned name from older releases
+mkdir -p "$DIST_DIR"
+rm -f "$DIST_DIR/SymairaEraseMe.dmg"   # legacy unversioned name from older releases
 rm -f "$DMG_PATH"
 scripts/create-symaira-dmg.sh \
     "$APP_BUNDLE" \

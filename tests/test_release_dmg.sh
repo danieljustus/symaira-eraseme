@@ -8,10 +8,16 @@ TEST_DIR="$(mktemp -d)"
 MOCK_BIN="$TEST_DIR/mock_bin"
 MOCK_LOG="$TEST_DIR/invocations.log"
 
+# Everything this script writes stays inside TEST_DIR, so concurrent
+# `go test ./...` processes cannot share `.build/dmg-stage` or `dist/` and race
+# each other in asset-catalog/ICNS generation (#873). package-dmg.sh takes both
+# paths from the environment.
+export STAGE_DIR="$TEST_DIR/dmg-stage"
+export DIST_DIR="$TEST_DIR/dist"
+mkdir -p "$STAGE_DIR" "$DIST_DIR"
+
 cleanup() {
     rm -rf "$TEST_DIR"
-    rm -f "$REPO_ROOT/dist"/Symaira-EraseMe-*-macos.dmg 2>/dev/null || true
-    rm -rf "$REPO_ROOT/app/SymairaEraseMe/.build/dmg-stage" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -145,13 +151,13 @@ export TEST_DIR
 test_local_test_mode_without_credentials() {
     echo "--- Running Test: local packaging test mode without credentials ---"
     rm -f "$MOCK_LOG"
-    rm -f "$REPO_ROOT/dist"/Symaira-EraseMe-*-macos.dmg
+    rm -f "$DIST_DIR"/Symaira-EraseMe-*-macos.dmg
 
     local OUT
     OUT="$(VERSION="0.13.0" "$REPO_ROOT/scripts/package-dmg.sh" 2>&1)"
     echo "$OUT" | grep -q "CODESIGN_IDENTITY not set. Skipping code signing (non-release test mode only)."
     echo "$OUT" | grep -q "DMG successfully created"
-    test -f "$REPO_ROOT/dist/Symaira-EraseMe-0.13.0-macos.dmg"
+    test -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
     echo "PASS: local packaging test mode succeeded without credentials"
 }
 
@@ -172,19 +178,19 @@ test_require_signing_fails_closed() {
 test_package_dmg_modes() {
     echo "--- Running Test: package-dmg.sh --app-only and --dmg-only flags ---"
     rm -f "$MOCK_LOG"
-    rm -f "$REPO_ROOT/dist"/Symaira-EraseMe-*-macos.dmg
+    rm -f "$DIST_DIR"/Symaira-EraseMe-*-macos.dmg
 
     # 1. Test --app-only with signing identity
     CODESIGN_IDENTITY="Developer ID Application: Symaira Inc (TEST1234)" \
     VERSION="0.13.0" \
     "$REPO_ROOT/scripts/package-dmg.sh" --app-only
 
-    local APP_BUNDLE="$REPO_ROOT/app/SymairaEraseMe/.build/dmg-stage/Symaira EraseMe.app"
+    local APP_BUNDLE="$STAGE_DIR/Symaira EraseMe.app"
     test -d "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     test -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     "$REPO_ROOT/scripts/verify-app-icon.sh" "$APP_BUNDLE"
     python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$APP_BUNDLE/Contents/Info.plist"
-    test ! -f "$REPO_ROOT/dist/Symaira-EraseMe-0.13.0-macos.dmg"
+    test ! -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
 
     # Verify nested Go binary signed before outer app bundle
     grep -q "codesign.*symeraseme" "$MOCK_LOG"
@@ -195,7 +201,7 @@ test_package_dmg_modes() {
     VERSION="0.13.0" \
     "$REPO_ROOT/scripts/package-dmg.sh" --dmg-only
 
-    test -f "$REPO_ROOT/dist/Symaira-EraseMe-0.13.0-macos.dmg"
+    test -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
     grep -q "codesign.*Symaira-EraseMe-0.13.0-macos.dmg" "$MOCK_LOG"
 
     echo "PASS: package-dmg.sh --app-only and --dmg-only succeeded"
