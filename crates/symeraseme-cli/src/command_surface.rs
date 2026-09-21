@@ -1188,6 +1188,12 @@ pub fn all() -> Vec<CommandSpec> {
                     usage: "Preview without installing",
                 },
                 FlagSpec {
+                    name: "replace-legacy",
+                    kind: "bool",
+                    default: "false",
+                    usage: "Replace detected legacy scheduler units instead of refusing",
+                },
+                FlagSpec {
                     name: "platform",
                     kind: "string",
                     default: "",

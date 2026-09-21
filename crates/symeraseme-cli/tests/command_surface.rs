@@ -851,6 +851,7 @@ const SCHEDULE_FIXTURE: &str = include_str!(concat!(
 fn seed_schedule_case(home: &Path, id: &str) {
     let dir = home.join("Library").join("LaunchAgents");
     let (names, content): (&[&str], &str) = if id.contains("refuses-python-legacy")
+        || id.contains("replaces-python-legacy")
         || id.contains("uninstall-launchd-without-launchctl")
     {
         (
@@ -993,7 +994,7 @@ fn schedule_commands_match_the_go_oracle() {
         "cmd/symeraseme/extra_commands.go:512-594"
     );
     let cases = fixture["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 12, "the fixture lost cases");
+    assert_eq!(cases.len(), 13, "the fixture lost cases");
 
     let root = unique_root();
     let capture = root.join("capture");
