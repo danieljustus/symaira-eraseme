@@ -853,6 +853,8 @@ pub enum ProfileError {
     Nonce,
     Authentication,
     Json,
+    Mkdir,
+    Write,
 }
 
 impl fmt::Display for ProfileError {
@@ -870,6 +872,8 @@ impl fmt::Display for ProfileError {
                 "identity: profile corrupt: cipher: message authentication failed"
             }
             Self::Json => "identity: profile corrupt",
+            Self::Mkdir => "identity: mkdir failed",
+            Self::Write => "identity: write profile failed",
         })
     }
 }
@@ -925,9 +929,9 @@ impl ProfilePaths {
     }
 
     /// Explicit path, identity override, data override, then config directory.
-    /// Only the two historical identity basenames are eligible for fallback.
-    pub fn resolve(&self, path: &Path) -> PathBuf {
-        let target = if !path.as_os_str().is_empty() {
+    /// The write path never falls back to the historical basename.
+    pub fn resolve_write(&self, path: &Path) -> PathBuf {
+        if !path.as_os_str().is_empty() {
             self.expand(path)
         } else if let Some(value) = self.value("SYMERASEME_IDENTITY_PATH") {
             self.expand(Path::new(value))
@@ -937,7 +941,13 @@ impl ProfilePaths {
                 .or_else(|| self.value("SYMERASEME_CONFIG_DIR"))
                 .unwrap_or("~/.config/symeraseme");
             self.expand(Path::new(directory)).join("identity.encrypted")
-        };
+        }
+    }
+
+    /// Explicit path, identity override, data override, then config directory.
+    /// Only the two historical identity basenames are eligible for fallback.
+    pub fn resolve(&self, path: &Path) -> PathBuf {
+        let target = self.resolve_write(path);
         // Do not fallback from permission or other I/O failures to a different
         // identity. This fail-closed distinction is intentional.
         if let Err(error) = std::fs::metadata(&target)
@@ -1248,4 +1258,102 @@ pub fn load_profile<K: KeyringBackend>(
             .map_err(|_| ProfileError::Authentication)?,
     );
     decode_go_profile_json(&plain).map_err(|_| ProfileError::Json)
+}
+
+/// Serialize the Go profile plaintext: every field present, empty lists as `[]`.
+fn profile_plaintext(profile: &Profile) -> Result<Vec<u8>, ProfileError> {
+    let payload = ProfilePayload {
+        full_name: &profile.full_name,
+        name_variants: &profile.name_variants,
+        date_of_birth: &profile.date_of_birth,
+        addresses: &profile.addresses,
+        email_addresses: &profile.email_addresses,
+        phone_numbers: &profile.phone_numbers,
+        jurisdictions: &profile.jurisdictions,
+    };
+    serde_json::to_vec_pretty(&payload).map_err(|_| ProfileError::Write)
+}
+
+/// Encrypt and durably write a profile with an already-initialized key.
+///
+/// The write is a same-directory temporary file with mode 0600, fsync, atomic
+/// rename and a directory fsync, so a crash never truncates an existing profile.
+pub fn save_profile<K: KeyringBackend>(
+    profile: &Profile,
+    path: &Path,
+    paths: &ProfilePaths,
+    keys: &mut MasterKeyResolver<K>,
+) -> Result<PathBuf, ProfileError> {
+    let target = paths.resolve_write(path);
+    let directory = target.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(directory).map_err(|_| ProfileError::Mkdir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700));
+    }
+    let key = keys.resolve_existing().map_err(ProfileError::Key)?;
+    let plaintext = Zeroizing::new(profile_plaintext(profile)?);
+    let encrypted = encrypt_profile(&plaintext, key.as_bytes())?;
+
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or(ProfileError::Write)?;
+    let temporary = directory.join(format!(
+        ".{name}.tmp-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_nanos())
+            .unwrap_or_default()
+    ));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let write = (|| -> std::io::Result<()> {
+        use std::io::Write;
+        let mut file = options.open(&temporary)?;
+        file.write_all(&encrypted)?;
+        file.sync_all()
+    })();
+    if write.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(ProfileError::Write);
+    }
+    if std::fs::rename(&temporary, &target).is_err() {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(ProfileError::Write);
+    }
+    if let Ok(handle) = std::fs::File::open(directory) {
+        let _ = handle.sync_all();
+    }
+    Ok(target)
+}
+
+/// Initialize the master key, then save the profile.
+///
+/// A key minted by this call is rolled back when the save fails, so a failed
+/// initialization never strands an existing profile behind an unrelated key.
+pub fn init_profile<K: KeyringBackend>(
+    profile: &Profile,
+    path: &Path,
+    paths: &ProfilePaths,
+    keys: &mut MasterKeyResolver<K>,
+) -> Result<PathBuf, ProfileError> {
+    let key_existed = keys.resolve_existing().is_ok();
+    keys.init().map_err(ProfileError::Key)?;
+    match save_profile(profile, path, paths, keys) {
+        Ok(target) => Ok(target),
+        Err(error) => {
+            if !key_existed {
+                let _ = keys.delete();
+            }
+            Err(error)
+        }
+    }
 }

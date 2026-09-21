@@ -257,6 +257,7 @@ fn run_with_data_dir(
     capture: &Path,
     index: usize,
     data_dir: &Path,
+    extra_env: &[(&str, &str)],
 ) -> ProcessOutput {
     let stdout_path = capture.join(format!("tick-status-{index}.stdout"));
     let stderr_path = capture.join(format!("tick-status-{index}.stderr"));
@@ -273,6 +274,7 @@ fn run_with_data_dir(
         .env("TZ", "UTC")
         .env("PWD", cwd)
         .env("SYMERASEME_DATA_DIR", data_dir)
+        .envs(extra_env.iter().copied())
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
@@ -407,7 +409,7 @@ fn source_bound_status_and_tick_match_the_go_oracle() {
         fs::create_dir_all(&data_dir).expect("isolated data directory");
         seed_store(&data_dir.join("symeraseme.db"));
 
-        let output = run_with_data_dir(&argv, &home, &cwd, &capture, index, &data_dir);
+        let output = run_with_data_dir(&argv, &home, &cwd, &capture, index, &data_dir, &[]);
         assert_eq!(
             output.status.code(),
             Some(case["exit_code"].as_i64().expect("exit code") as i32),
@@ -469,6 +471,10 @@ fn is_exact_case(case: &Value) -> bool {
     // `status` and `plan status` share Go's body; the recorded bytes for
     // `status-json`, `operate-status` and `operate-plan-status` are identical,
     // and bare `tick` shares `tickCommandWith` with `plan tick`.
+    // `init-profile`/`show-profile` are replayed now that cli.rs implements
+    // them: the recorded write lands in the case's own data directory and the
+    // recorded read finds no profile at all.
+    const PROFILE_OPERATIONS: [&str; 2] = ["operate-init-profile", "operate-show-profile"];
     const STATUS_OPERATIONS: [&str; 3] = ["status-json", "operate-status", "operate-tick"];
     const REGISTRY_OPERATIONS: [&str; 5] = [
         "registry-list",
@@ -484,6 +490,7 @@ fn is_exact_case(case: &Value) -> bool {
         || SURFACE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || REGISTRY_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || STATUS_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || PROFILE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || CONTRACT_TOOL_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
 }
 
@@ -510,8 +517,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 144);
-    assert_eq!(deferred.len(), 22);
+    assert_eq!(selected.len(), 146);
+    assert_eq!(deferred.len(), 20);
 
     let root = unique_root();
     let home = root.join("home");
@@ -551,10 +558,28 @@ fn frozen_command_surface_matches_phase_two_contract() {
         } else {
             cwd.clone()
         };
-        let output = if store_backed {
+        let output = if id == "operate-init-profile" {
+            // The capture wrote the profile into `cli/<id>/data`, so the
+            // recorded path only reproduces from the same layout. The master
+            // key comes from the environment, ahead of any OS keychain.
+            let data_dir = root.join("cli").join(id).join("data");
+            fs::create_dir_all(&data_dir).expect("isolated profile data directory");
+            run_with_data_dir(
+                &argv,
+                &home,
+                &case_cwd,
+                &capture,
+                index,
+                &data_dir,
+                &[(
+                    "SYMERASEME_IDENTITY_MASTER_KEY",
+                    "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+                )],
+            )
+        } else if store_backed {
             let data_dir = root.join(format!("data-{id}"));
             fs::create_dir_all(&data_dir).expect("isolated data directory");
-            run_with_data_dir(&argv, &home, &case_cwd, &capture, index, &data_dir)
+            run_with_data_dir(&argv, &home, &case_cwd, &capture, index, &data_dir, &[])
         } else {
             run(&argv, &home, &case_cwd, &capture, index)
         };
@@ -587,6 +612,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 )
             {
                 mask_wall_clock(&output.stdout)
+            } else if id == "operate-init-profile" {
+                String::from_utf8_lossy(&output.stdout)
+                    .replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
+                    .into_bytes()
             } else if id.starts_with("operate-schedule") {
                 // The generated wrappers embed the working directory and the CLI's
                 // own resolved executable path; the phase-two capture folds both to
@@ -1140,4 +1169,91 @@ fn schedule_commands_match_the_go_oracle() {
         checked += 1;
     }
     assert_eq!(checked, cases.len(), "every case was replayed");
+}
+
+#[test]
+fn init_profile_round_trips_through_show_profile() {
+    const KEY: [(&str, &str); 1] = [(
+        "SYMERASEME_IDENTITY_MASTER_KEY",
+        "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    )];
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let data_dir = root.join("data");
+    for directory in [&home, &cwd, &capture, &data_dir] {
+        fs::create_dir_all(directory).expect("isolated directory");
+    }
+    let _cleanup = Cleanup(root.clone());
+
+    let output = run_with_data_dir(
+        &[
+            "init-profile",
+            "--full-name",
+            " Oracle User ",
+            "--email",
+            " oracle@example.invalid ",
+        ],
+        &home,
+        &cwd,
+        &capture,
+        0,
+        &data_dir,
+        &KEY,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        output.stdout,
+        format!(
+            "identity profile saved at {}/identity.encrypted\n",
+            data_dir.display()
+        )
+        .into_bytes()
+    );
+
+    let output = run_with_data_dir(
+        &["show-profile", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        1,
+        &data_dir,
+        &KEY,
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        output.stdout,
+        b"{\"full_name\":\"Oracle User\",\"name_variants\":null,\"date_of_birth\":null,\"addresses\":[],\"email_addresses\":[\"oracle@example.invalid\"],\"phone_numbers\":null,\"jurisdictions\":null}\n"
+    );
+
+    let output = run_with_data_dir(
+        &["init-profile", "--full-name", "Oracle User"],
+        &home,
+        &cwd,
+        &capture,
+        2,
+        &data_dir,
+        &KEY,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stderr, b"--full-name and --email are required\n");
+
+    let output = run_with_data_dir(
+        &[
+            "init-profile",
+            "--full-name",
+            "Oracle User",
+            "--email",
+            "Oracle User <oracle@example.invalid>",
+        ],
+        &home,
+        &cwd,
+        &capture,
+        3,
+        &data_dir,
+        &KEY,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stderr, b"invalid email address\n");
 }

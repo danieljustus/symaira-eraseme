@@ -27,6 +27,12 @@ impl std::error::Error for KeyringError {}
 pub trait KeyringBackend: Send + Sync {
     /// Return the stored value, or `None` when the entry is absent.
     fn get(&self, service: &str, username: &str) -> Result<Option<String>, KeyringError>;
+
+    /// Durably store a value. Explicit initialization only.
+    fn set(&self, service: &str, username: &str, value: &str) -> Result<(), KeyringError>;
+
+    /// Remove the entry. An absent entry is not an error.
+    fn delete(&self, service: &str, username: &str) -> Result<(), KeyringError>;
 }
 
 /// Native OS keyring adapter.
@@ -40,6 +46,19 @@ impl KeyringBackend for OsKeyring {
             Ok(value) if !value.is_empty() => Ok(Some(value)),
             Ok(_) => Ok(None),
             Err(_) => Ok(None),
+        }
+    }
+
+    fn set(&self, service: &str, username: &str, value: &str) -> Result<(), KeyringError> {
+        let entry = keyring::Entry::new(service, username).map_err(|_| KeyringError)?;
+        entry.set_password(value).map_err(|_| KeyringError)
+    }
+
+    fn delete(&self, service: &str, username: &str) -> Result<(), KeyringError> {
+        let entry = keyring::Entry::new(service, username).map_err(|_| KeyringError)?;
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err(KeyringError),
         }
     }
 }
@@ -85,5 +104,15 @@ impl KeyringBackend for FakeKeyring {
             .expect("fake keyring mutex")
             .push((service.to_owned(), username.to_owned()));
         Ok(self.value.lock().expect("fake keyring mutex").clone())
+    }
+
+    fn set(&self, _service: &str, _username: &str, value: &str) -> Result<(), KeyringError> {
+        self.set_value(Some(value.to_owned()));
+        Ok(())
+    }
+
+    fn delete(&self, _service: &str, _username: &str) -> Result<(), KeyringError> {
+        self.set_value(None);
+        Ok(())
     }
 }
