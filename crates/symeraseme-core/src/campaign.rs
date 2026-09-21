@@ -18,6 +18,7 @@ use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::identity::Profile;
+use crate::jsonorder::go_map_order;
 use crate::registry::{Broker, BrokerFilter, Channel, RegistryError, Template, filter_brokers};
 use crate::storage::Store;
 use crate::storage::projection::ProjectionError;
@@ -439,7 +440,14 @@ pub fn execute_campaign(
     out.insert("total_planned".to_owned(), json!(total_planned));
     out.insert("batch_size".to_owned(), json!(batch.len()));
     out.insert("results".to_owned(), Value::Array(results));
-    Ok(out)
+    // Go returns `map[string]any` at every level of this payload
+    // (`ExecuteCampaign`, `ExecuteRequest` and the captured failure), so the
+    // keys marshal sorted; without this `preserve_order` would keep the
+    // insertion order above.
+    let Value::Object(ordered) = go_map_order(Value::Object(out)) else {
+        unreachable!("go_map_order keeps objects as objects")
+    };
+    Ok(ordered)
 }
 
 /// Go's `ExecuteRequest`: dispatch on the request's channel.

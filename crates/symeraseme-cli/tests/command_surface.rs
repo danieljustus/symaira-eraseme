@@ -1846,3 +1846,64 @@ fn json_stdout(output: &ProcessOutput) -> Value {
     );
     serde_json::from_slice(&output.stdout).expect("stdout is one JSON document")
 }
+
+/// One manual task, with every column set to a fixed value so the whole payload
+/// is deterministic.
+const MANUAL_TASK_SEED: &str = "INSERT INTO manual_tasks \
+     (id,request_id,broker_id,broker_name,form_url,reason,instructions,screenshot_path,\
+      html_snapshot_path,form_fields_json,status,created_at,completed_at,notes) \
+     VALUES (1,NULL,'acme','Acme Data','https://example.test/form','captcha','do it',\
+      '/s.png','/s.html','{}','pending','2026-01-02T03:04:05Z',NULL,'note');";
+
+/// The bytes the Go binary writes for that row, measured against an isolated
+/// store. The recorded corpus case `operate-manual-tasks-list` runs on an empty
+/// store, so only a populated list pins the key order of the nested task
+/// objects: Go marshals them from the `manualtasks.ManualTask` struct and so
+/// emits its declaration order, while the surrounding `Result` goes through a
+/// Go map and is sorted.
+const MANUAL_TASKS_LIST_GOLDEN: &str = concat!(
+    r#"{"message":"Manual tasks (1):\n  #1 [pending] Acme Data (captcha) @ 2026-01-02T03:04:05Z","#,
+    r#""success":true,"tasks":[{"id":1,"request_id":null,"broker_id":"acme","#,
+    r#""broker_name":"Acme Data","form_url":"https://example.test/form","reason":"captcha","#,
+    r#""instructions":"do it","screenshot_path":"/s.png","html_snapshot_path":"/s.html","#,
+    r#""form_fields_json":"{}","status":"pending","created_at":"2026-01-02T03:04:05Z","#,
+    r#""completed_at":null,"notes":"note"}]}"#,
+    "\n"
+);
+
+#[test]
+fn manual_tasks_list_matches_go_on_a_populated_store() {
+    let root = unique_root();
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let home = root.join("home");
+    let data_dir = root.join("data");
+    for directory in [&cwd, &capture, &home, &data_dir] {
+        fs::create_dir_all(directory).expect("isolated directory");
+    }
+    let _cleanup = Cleanup(root.clone());
+
+    let store = symeraseme_core::storage::Store::open(data_dir.join("symeraseme.db"))
+        .expect("open the seeded store");
+    store
+        .connection()
+        .execute_batch(MANUAL_TASK_SEED)
+        .expect("seed one manual task");
+    drop(store);
+
+    let output = run_with_data_dir(
+        &["manual-tasks", "list", "--output", "json"],
+        &home,
+        &cwd,
+        &capture,
+        0,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stderr, b"");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("UTF-8 stdout"),
+        MANUAL_TASKS_LIST_GOLDEN
+    );
+}

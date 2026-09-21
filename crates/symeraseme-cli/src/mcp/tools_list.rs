@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 use serde_json::Value;
+use symeraseme_core::jsonorder::go_map_order;
 
 const TOOL_CATALOGUE: &[u8] = include_bytes!("../../../../internal/mcp/tools.json");
 
@@ -91,6 +92,9 @@ fn invalid_request(id: Option<&Value>) -> ToolsListOutcome {
 }
 
 fn response_tools(id: &Value, tools: Vec<Value>) -> ToolsListOutcome {
+    // Go decodes the catalogue into `map[string]any` and re-encodes it, so each
+    // tool is emitted with sorted keys rather than in the catalogue's order.
+    let tools = tools.into_iter().map(go_map_order).collect();
     ToolsListOutcome::Response(encode_response(&Response {
         jsonrpc: "2.0",
         result: Some(ToolsResult { tools }),

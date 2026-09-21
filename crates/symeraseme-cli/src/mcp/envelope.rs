@@ -211,7 +211,9 @@ mod tests {
         let id = json!(7);
         match handler {
             "string" => result_response(&id, Some(&json!("redacted text"))),
-            "object" => result_response(&id, Some(&json!({ "b": [2], "a": 1 }))),
+            // The measured case marshalled a Go `map[string]any`, which is
+            // emitted sorted; this crate keeps object keys in insertion order.
+            "object" => result_response(&id, Some(&json!({ "a": 1, "b": [2] }))),
             "array" => result_response(&id, Some(&json!([1, "two"]))),
             "number" => result_response(&id, Some(&json!(42))),
             "nil-handler" => result_response(&id, None),

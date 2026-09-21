@@ -8,6 +8,7 @@ pub mod confirmation;
 pub mod deadlines;
 pub mod email;
 pub mod identity;
+pub mod jsonorder;
 pub mod llm;
 pub mod manualtasks;
 pub mod redaction;
