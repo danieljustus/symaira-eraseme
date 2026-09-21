@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -91,20 +92,29 @@ fn oracle_executable(package: &'static str) -> PathBuf {
 
 /// Runs the named oracle with an optional stdin payload, building it first if
 /// this process has not done so yet. Both phases are bounded.
+///
+/// Tests in a file run concurrently, so each invocation writes to its own
+/// output files. Sharing them let two concurrent oracles overwrite each other's
+/// payload mid-read, which surfaced as a corrupt-header failure rather than as
+/// anything resembling a race.
 pub fn run_oracle(package: &'static str, stdin: Option<&[u8]>) -> OracleRun {
     let executable = oracle_executable(package);
     let scratch = scratch_root(package);
+    let invocation = INVOCATION.fetch_add(1, Ordering::Relaxed);
     let mut command = Command::new(executable);
     command.current_dir(repository_root());
     run_bounded(
         command,
         stdin,
-        &scratch.join("run.stdout"),
-        &scratch.join("run.stderr"),
+        &scratch.join(format!("run-{invocation}.stdout")),
+        &scratch.join(format!("run-{invocation}.stderr")),
         ORACLE_TIMEOUT,
     )
     .expect("Go oracle execution must complete within its bounded timeout")
 }
+
+/// Distinguishes concurrent invocations of the same oracle within one process.
+static INVOCATION: AtomicUsize = AtomicUsize::new(0);
 
 fn run_bounded(
     mut command: Command,
