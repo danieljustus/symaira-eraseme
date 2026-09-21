@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.go-oracle.http.v1",
-  "commit": "5f54b6fed818c014b794cd7e776fd3bcb3bd95d5",
+  "commit": "4e582f28",
   "toolchain": {
     "go_version": "go version go1.26.6 darwin/arm64",
     "go_root": "<GO_ROOT>",
