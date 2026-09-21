@@ -1,6 +1,5 @@
-use std::io::Write;
-use std::path::Path;
-use std::process::{Command, Stdio};
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
 
 use symeraseme_core::identity::{
     Profile, ProfileAddress, ProfileError, canonical_generic_json, canonical_json,
@@ -8,29 +7,13 @@ use symeraseme_core::identity::{
 };
 
 fn go_oracle(request: &[u8]) -> Vec<u8> {
-    let oracle =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rust-tests/parity/oracle/identity");
-    let mut child = Command::new("go")
-        .args(["run", "."])
-        .current_dir(oracle)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Go identity oracle must start");
-    child
-        .stdin
-        .as_mut()
-        .expect("oracle stdin")
-        .write_all(request)
-        .expect("write oracle request");
-    let output = child.wait_with_output().expect("wait for Go oracle");
+    let run = go_oracle::run_oracle("identity", Some(request));
     assert!(
-        output.status.success(),
+        run.status.success(),
         "Go oracle failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&run.stderr)
     );
-    output.stdout
+    run.stdout
 }
 
 fn profile() -> Profile {
