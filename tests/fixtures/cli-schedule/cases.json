@@ -119,6 +119,38 @@
       }
     },
     {
+      "id": "install-launchd-replaces-python-legacy",
+      "argv": [
+        "schedule",
+        "install",
+        "--platform",
+        "launchd",
+        "--replace-legacy"
+      ],
+      "compare": "exact",
+      "normalized_fields": [
+        "root_path"
+      ],
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bG9hZCBsYXVuY2hkIHVuaXQgY29tLnN5bWVyYXNlbWUudGljay5wbGlzdDogZXhlYzogImxhdW5jaGN0bCI6IGV4ZWN1dGFibGUgZmlsZSBub3QgZm91bmQgaW4gJFBBVEgK",
+      "stdout_bytes": 0,
+      "stderr_bytes": 99,
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "80930a746b0100d7af4b99d8d8a9e40272d9ce87f9caebe7daf3357ccf3c7e1d",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "b9672aca093b3f782537df8c2ea85479fa2b31576120bd2c37b07f5d51983429",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "c0998a6b934566c425f229cdc3c5efb40f2e5e7912a237ead787c7818bfdd55b",
+        "schedules/com.symeraseme.poll.plist": "0ef26400093079e8280ae48412c16f76235298dfbca27c78b0b2aafb83b5fdf5",
+        "schedules/com.symeraseme.rescan.plist": "2e65f54c93d30884aaf189590719f3ae8a1257a93e9daf132212ea938984a24f",
+        "schedules/com.symeraseme.tick.plist": "235d8ba1e20fa31252ad7db8f3db49a293493cbfa6f6f9e35c4ce813fe6db352",
+        "schedules/install.sh": "f1f83339f619085e59d3df2d83735dd8b543a4765a24fb2921ebeed038a06d4e",
+        "schedules/symeraseme-poll.sh": "fd6c093ed79930f22c227410ffcc5bd70eab95b39c6b24829612aa851eb87089",
+        "schedules/symeraseme-rescan.sh": "0b2d4d4462abf824fe08039d72b25d6079aedc6a236ea865d7b125000f3a2ff5",
+        "schedules/symeraseme-tick.sh": "0b2d4d4462abf824fe08039d72b25d6079aedc6a236ea865d7b125000f3a2ff5",
+        "schedules/uninstall.sh": "a0ad887617fe3975406843e5ab645843b15462bfb231d15c1c10dda633b5d398"
+      }
+    },
+    {
       "id": "status-launchd-without-launchctl",
       "argv": [
         "schedule",

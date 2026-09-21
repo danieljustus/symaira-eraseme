@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.go-oracle.cli-surface.v1",
-  "commit": "bf53346eec234929bedf0314b99e3da85dbb991b",
+  "commit": "bfe2873937947479347c626512d74730fceaa3ac",
   "root": {
     "order": 0,
     "path": null,
@@ -3358,6 +3358,15 @@
               },
               {
                 "order": 2,
+                "name": "replace-legacy",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Replace detected legacy scheduler units instead of refusing",
+                "hidden": false
+              },
+              {
+                "order": 3,
                 "name": "tick-hour",
                 "type": "int",
                 "default": "10",
@@ -3365,7 +3374,7 @@
                 "hidden": false
               },
               {
-                "order": 3,
+                "order": 4,
                 "name": "tick-minute",
                 "type": "int",
                 "default": "0",
@@ -3411,6 +3420,15 @@
               },
               {
                 "order": 3,
+                "name": "replace-legacy",
+                "type": "bool",
+                "default": "false",
+                "no_opt_value": "true",
+                "usage": "Replace detected legacy scheduler units instead of refusing",
+                "hidden": false
+              },
+              {
+                "order": 4,
                 "name": "tick-hour",
                 "type": "int",
                 "default": "10",
@@ -3418,7 +3436,7 @@
                 "hidden": false
               },
               {
-                "order": 4,
+                "order": 5,
                 "name": "tick-minute",
                 "type": "int",
                 "default": "0",

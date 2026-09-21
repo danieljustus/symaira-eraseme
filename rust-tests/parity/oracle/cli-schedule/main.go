@@ -79,6 +79,10 @@ var cases = []struct {
 	{"install-unsupported-platform", []string{"schedule", "install", "--platform", "windows"}, "exact", seedNone},
 	{"install-launchd-without-launchctl", []string{"schedule", "install", "--platform", "launchd"}, "exact", seedNone},
 	{"install-launchd-refuses-python-legacy", []string{"schedule", "install", "--platform", "launchd"}, "exact", seedLabeledUnits},
+	// The same seed, with the consent flag: the refusal must turn into an
+	// attempt, which is what `--replace-legacy` exists to grant. Without the
+	// flag the run above stops before writing anything.
+	{"install-launchd-replaces-python-legacy", []string{"schedule", "install", "--platform", "launchd", "--replace-legacy"}, "exact", seedLabeledUnits},
 	{"status-launchd-without-launchctl", []string{"schedule", "status", "--platform", "launchd"}, "exact", seedStatusNamedUnits},
 	{"status-launchd-json", []string{"schedule", "status", "--platform", "launchd", "--output", "json"}, "exact", seedStatusNamedUnits},
 	{"status-unsupported-platform", []string{"schedule", "status", "--platform", "windows"}, "exact", seedNone},

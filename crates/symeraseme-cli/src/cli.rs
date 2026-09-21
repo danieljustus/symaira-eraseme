@@ -435,6 +435,12 @@ fn schedule_options(parsed: &Parsed) -> InstallOptions<'static> {
     }
     let mut options = InstallOptions::new(config);
     options.platform_name = Some(platform_name);
+    // Go threads `replace_legacy` straight into InstallOptions; it is what
+    // grants consent to replace a detected legacy or foreign unit.
+    options.replace_legacy = parsed
+        .flags
+        .get("replace-legacy")
+        .is_some_and(|value| value == "true");
     options
 }
 
