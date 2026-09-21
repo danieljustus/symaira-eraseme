@@ -1,7 +1,7 @@
 //! Clap-compatible command surface, Cobra-compatible help, and handlers.
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
-use crate::mcp::handler::{ContractHandler, ToolHandler};
+use crate::mcp::handler::{ContractHandler, ToolHandler, request_rows};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -9,16 +9,19 @@ use std::env;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
+use symeraseme_core::campaign;
 use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
 use symeraseme_core::deadlines::{self, RunOpts};
 use symeraseme_core::identity::{
-    MasterKeyResolver, Profile, ProfilePaths, init_profile, load_profile, profile_exists,
+    ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
+    init_profile, load_profile, profile_exists,
 };
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
 };
 use symeraseme_core::reporting;
 use symeraseme_core::storage::Store;
+use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
 use symeraseme_engine::scheduler::install::{self, InstallOptions};
@@ -397,6 +400,9 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             let campaign = parsed.flags.get("campaign").cloned().unwrap_or_default();
             campaign_status(parsed, &campaign)
         }
+        "plan create" => plan_create(parsed),
+        "plan show" => plan_show(parsed),
+        "plan execute" => plan_execute(parsed),
         "plan status" => plan_status(parsed),
         // Go's bare `tick` and `plan tick` are `tickCommandWith` with the same
         // `--dry-run` pointer; the recorded oracle bytes for `operate-tick` and
@@ -668,6 +674,191 @@ fn go_value(value: &Value) -> String {
     format!("map[{entries}]")
 }
 
+/// Go's `identityHashForPlanning`: the default profile's hash, an empty hash
+/// when no profile exists, and the load failure otherwise.
+///
+/// `--profile` selects the file; `ProfilePaths::resolve` applies the platform
+/// default for an empty path, as Go's `DefaultProfilePath` does.
+fn planning_profile(parsed: &Parsed) -> Result<Option<Profile>, String> {
+    let requested = string_flag(parsed, "profile");
+    let paths = ProfilePaths::from_process();
+    let mut keys = MasterKeyResolver::from_process();
+    match load_profile(Path::new(&requested), &paths, &mut keys) {
+        Ok(profile) => Ok(Some(profile)),
+        Err(ProfileError::NotFound) => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+/// `plan create` — Go's `realPlanCommand`'s `create`.
+fn plan_create(parsed: &Parsed) -> Outcome {
+    let campaign_id = string_flag(parsed, "campaign");
+    if campaign_id.is_empty() {
+        return Outcome::Stderr(b"--campaign is required\n".to_vec());
+    }
+    let identity_hash = match planning_profile(parsed) {
+        Ok(profile) => profile
+            .as_ref()
+            .map(symeraseme_core::identity::hash_profile)
+            .unwrap_or_default(),
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let options = campaign::PlanOpts {
+        campaign_id,
+        jurisdiction: string_flag(parsed, "jurisdiction"),
+        law: string_flag(parsed, "law"),
+        priority: string_flag(parsed, "priority"),
+        category: string_flag(parsed, "category"),
+        status: string_flag_or(parsed, "status", "active"),
+        include_inactive: bool_flag(parsed, "include-inactive"),
+        include_disabled: false,
+        max_brokers: int_flag(parsed, "max", 30),
+        notes: string_flag(parsed, "notes"),
+    };
+    let result =
+        match campaign::plan_campaign(&store, &brokers, &identity_hash, &options, now_utc()) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(
+        format!(
+            "planned {} request(s) for campaign {}\n",
+            result.planned, result.campaign_id
+        )
+        .into_bytes(),
+    )
+}
+
+/// `plan show` — Go's `campaign.GetPlan` behind the `show` subcommand.
+fn plan_show(parsed: &Parsed) -> Outcome {
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let campaign_id = string_flag(parsed, "campaign");
+    let status = string_flag(parsed, "status");
+    let requests = match Repository::new(&store).list_removal_requests(ListRemovalRequestsOptions {
+        campaign_id: (!campaign_id.is_empty()).then(|| campaign_id.clone()),
+        status: (!status.is_empty()).then_some(status),
+        ..ListRemovalRequestsOptions::default()
+    }) {
+        Ok(requests) => requests,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let label = if campaign_id.is_empty() {
+        "all".to_owned()
+    } else {
+        campaign_id
+    };
+    let total = requests.len();
+    // Go marshals a `map[string]any`, so the keys come out sorted.
+    let result = json!({
+        "campaign_id": label.clone(),
+        "total": total,
+        "requests": request_rows(requests),
+    });
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("campaign {label}: {total} request(s)\n").into_bytes())
+}
+
+/// `plan execute` — Go's `realPlanCommand`'s `execute`.
+///
+/// Go gates a non-dry run behind a consent token, then builds a web-form
+/// adapter with no `FormExecutor` and leaves the email sender nil, so no branch
+/// of this command can reach the network. [`campaign::ExecuteOpts`] carries no
+/// adapters at all, which keeps that true by construction.
+fn plan_execute(parsed: &Parsed) -> Outcome {
+    let campaign_id = string_flag(parsed, "campaign");
+    if campaign_id.is_empty() {
+        return Outcome::Stderr(b"--campaign is required\n".to_vec());
+    }
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let dry_run = bool_flag(parsed, "dry-run");
+    if !dry_run && let Err(error) = consent_gate(parsed) {
+        return Outcome::Stderr(format!("{error}\n").into_bytes());
+    }
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let profile = planning_profile(parsed);
+    let result = match campaign::execute_campaign(
+        &store,
+        &campaign_id,
+        &campaign::ExecuteOpts {
+            account: string_flag(parsed, "account"),
+            dry_run,
+            brokers: &brokers,
+        },
+        profile.as_ref().map(Option::as_ref).map_err(String::as_str),
+        int_flag(parsed, "batch-size", 5),
+        now_utc(),
+    ) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(
+        format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
+    )
+}
+
+/// Go's `identity.ConsentGate("execute", ...)` for the flags `execute` declares.
+fn consent_gate(parsed: &Parsed) -> Result<(), String> {
+    let store = ConsentStore::from_default_directory().map_err(|error| error.to_string())?;
+    store
+        .authorize(
+            "execute",
+            &ConsentOptions {
+                consent_token: Some(string_flag(parsed, "consent")),
+                consent_file: Some(string_flag(parsed, "consent-file")),
+                consent_env_var: Some("SYMERASEME_CONSENT".to_owned()),
+                consent_file_env_var: Some("SYMERASEME_CONSENT_FILE".to_owned()),
+                ..ConsentOptions::default()
+            },
+        )
+        .map_err(|error| error.to_string())
+}
+
 /// `plan status` — Go's `planStatusCommand`.
 ///
 /// The order is Go's and it is observable: the store is opened first, the status
@@ -711,6 +902,19 @@ fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
 /// One string flag as the command saw it; `""` when it was not given.
 fn string_flag(parsed: &Parsed, name: &str) -> String {
     parsed.flags.get(name).cloned().unwrap_or_default()
+}
+
+/// One boolean flag as the command saw it.
+fn bool_flag(parsed: &Parsed, name: &str) -> bool {
+    parsed.flags.get(name).is_some_and(|value| value == "true")
+}
+
+/// One string flag, falling back to Go's default when it was not given.
+fn string_flag_or(parsed: &Parsed, name: &str, default: &str) -> String {
+    match parsed.flags.get(name) {
+        Some(value) => value.clone(),
+        None => default.to_owned(),
+    }
 }
 
 /// One integer flag as the command saw it, falling back to Go's default when it
