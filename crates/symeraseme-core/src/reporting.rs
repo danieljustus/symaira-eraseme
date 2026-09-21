@@ -14,6 +14,7 @@ use std::str::FromStr;
 
 use crate::jsonorder::go_map_order;
 use crate::storage::Store;
+use crate::templating::{FrozenDateTime, RenderContext, render};
 use crate::timeutil::format_iso;
 
 /// Selects campaigns. The clock is injected rather than read from the
@@ -949,4 +950,142 @@ pub fn get_dashboard_data(
         "recent_events": events,
         "generated_at": iso(now),
     })))
+}
+
+/// Go's `GenerateDashboard`: render the dashboard template over the dashboard
+/// data. `refresh` seeds `auto_refresh_seconds`, exactly like Go's extra vars.
+pub fn generate_dashboard(
+    data: &Value,
+    refresh: i64,
+    now: DateTime<Utc>,
+) -> Result<String, String> {
+    let context = RenderContext {
+        data: data.clone(),
+        now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
+        extra: BTreeMap::from([("auto_refresh_seconds".to_owned(), json!(refresh))]),
+        ..RenderContext::default()
+    };
+    render("dashboard.html.j2", &context).map_err(|error| error.to_string())
+}
+
+/// Go's `GenerateReport`: JSON, CSV or HTML over the report data. The format
+/// match is ASCII case-insensitive, like Go's `strings.ToLower`.
+pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result<String, String> {
+    match format.to_ascii_lowercase().as_str() {
+        "json" => export_json(data),
+        "csv" => Ok(export_csv(data)),
+        "html" => export_html(data, now),
+        _ => Err(format!(
+            "unsupported format: {format}; choose html, json, or csv"
+        )),
+    }
+}
+
+/// Go's `ExportJSON`: two-space indent, no HTML escaping, no trailing newline.
+///
+/// serde_json never escapes `<`, `>` or `&` (its escape table covers only
+/// control characters, quotes and backslashes), which is exactly Go's
+/// `SetEscapeHTML(false)` behavior. `to_string_pretty` indents with two
+/// spaces and appends no trailing newline, matching Go's trimmed encoder.
+fn export_json(data: &Value) -> Result<String, String> {
+    serde_json::to_string_pretty(data).map_err(|error| error.to_string())
+}
+
+/// Go's `ExportCSV`: CRLF rows, the fixed twelve-column header, one row per
+/// request of every campaign. Quoting follows `encoding/csv`: a field is
+/// quoted when it contains a comma, quote, `\r` or `\n`, and an embedded
+/// quote is doubled.
+fn export_csv(data: &Value) -> String {
+    const HEADER: [&str; 12] = [
+        "campaign_id",
+        "request_id",
+        "broker_id",
+        "jurisdiction",
+        "channel",
+        "status",
+        "sent_at",
+        "acknowledged_at",
+        "resolved_at",
+        "deadline_at",
+        "reminders_sent",
+        "escalation_level",
+    ];
+    /// Go's `text`: nil renders empty, anything else renders as-is.
+    fn cell(value: Option<&Value>) -> String {
+        match value {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(text)) => text.clone(),
+            Some(Value::Number(number)) => number.to_string(),
+            Some(Value::Bool(flag)) => flag.to_string(),
+            Some(Value::Array(_)) | Some(Value::Object(_)) => String::new(),
+        }
+    }
+    fn field(value: &str, row: &mut String) {
+        if value.contains([',', '"', '\r', '\n']) {
+            row.push('"');
+            row.push_str(&value.replace('"', "\"\""));
+            row.push('"');
+        } else {
+            row.push_str(value);
+        }
+    }
+    let mut out = String::new();
+    let mut header = String::new();
+    for (index, column) in HEADER.iter().enumerate() {
+        if index > 0 {
+            header.push(',');
+        }
+        header.push_str(column);
+    }
+    out.push_str(&header);
+    out.push_str("\r\n");
+    for campaign in data
+        .get("campaigns")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+    {
+        let campaign_id = cell(campaign.get("campaign_id"));
+        for request in campaign
+            .get("requests")
+            .and_then(Value::as_array)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+        {
+            let cells = [
+                campaign_id.clone(),
+                cell(request.get("id")),
+                cell(request.get("broker_id")),
+                cell(request.get("jurisdiction")),
+                cell(request.get("channel")),
+                cell(request.get("current_status")),
+                cell(request.get("sent_at")),
+                cell(request.get("acknowledged_at")),
+                cell(request.get("resolved_at")),
+                cell(request.get("deadline_at")),
+                cell(request.get("reminders_sent")),
+                cell(request.get("escalation_level")),
+            ];
+            let mut row = String::new();
+            for (index, value) in cells.iter().enumerate() {
+                if index > 0 {
+                    row.push(',');
+                }
+                field(value, &mut row);
+            }
+            out.push_str(&row);
+            out.push_str("\r\n");
+        }
+    }
+    out
+}
+
+/// Go's `ExportHTML`: the report template over the report data.
+fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
+    let context = RenderContext {
+        data: data.clone(),
+        now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
+        ..RenderContext::default()
+    };
+    render("report.html.j2", &context).map_err(|error| error.to_string())
 }

@@ -437,6 +437,68 @@ impl ContractHandler {
         ))
     }
 
+    /// Go's `generate_dashboard`: dashboard data, rendered template, and the
+    /// file write when `output` is set — which the CLI default (`report.html`)
+    /// always is. Paths resolve against the process working directory, like
+    /// Go's `filepath.Abs`.
+    fn generate_dashboard(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let now = self.recorded_instant()?;
+        let data = reporting::get_dashboard_data(&store, "", now)
+            .map_err(|error| ToolError(error.to_string()))?;
+        let content =
+            reporting::generate_dashboard(&data, get_int(arguments, "auto_refresh", 0), now)
+                .map_err(ToolError)?;
+        if get_str(arguments, "output", "").is_empty() {
+            return Ok(json!({
+                "success": true,
+                "dashboard": content,
+                "campaigns": data["total_campaigns"],
+                "requests": data["total_requests"],
+            }));
+        }
+        let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
+        Ok(json!({
+            "success": true,
+            "output_file": path,
+            "size_bytes": content.len() as i64,
+            "campaigns": data["total_campaigns"],
+            "requests": data["total_requests"],
+        }))
+    }
+
+    /// Go's `generate_report`: report data in the requested format, and the
+    /// file write when `output` is set.
+    fn generate_report(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let now = self.recorded_instant()?;
+        let format = get_str(arguments, "format", "html");
+        let data = reporting::get_report_data(
+            &store,
+            &reporting::ReportOpts {
+                campaign_id: get_str(arguments, "campaign_id", ""),
+                all_campaigns: get_bool(arguments, "all_campaigns", false),
+            },
+            now,
+        )
+        .map_err(|error| ToolError(error.to_string()))?;
+        let content = reporting::generate_report(&data, &format, now).map_err(ToolError)?;
+        if get_str(arguments, "output", "").is_empty() {
+            return Ok(json!({
+                "success": true,
+                "report": content,
+                "format": format,
+            }));
+        }
+        let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
+        Ok(json!({
+            "success": true,
+            "output_file": path,
+            "size_bytes": content.len() as i64,
+            "format": format,
+        }))
+    }
+
     /// Go's `plan_create`: plan against the embedded registry.
     ///
     /// Only the missing-profile branch is implemented — it records an empty
@@ -1034,6 +1096,8 @@ impl ContractHandler {
             "manual_tasks_cleanup" => self.manual_tasks_cleanup(arguments),
             "grant" => self.grant(arguments),
             "generate_scheduler" => self.generate_scheduler(arguments),
+            "generate_dashboard" => self.generate_dashboard(arguments),
+            "generate_report" => self.generate_report(arguments),
             "plan_create" => self.plan_create(arguments),
             "plan_show" => self.plan_show(arguments),
             "list_requests" => self.list_requests(arguments),
@@ -1061,6 +1125,25 @@ fn redact_file(root: &Path, arguments: &Map<String, Value>) -> Result<Value, Too
     Ok(Value::String(
         String::from_utf8_lossy(&redacted).into_owned(),
     ))
+}
+
+/// Go's `writeGeneratedFile`: resolve against the process working directory
+/// (`filepath.Abs`), create a missing parent, write the file with mode `0600`.
+/// Returns the absolute path, like Go.
+fn write_generated_file(path: &str, content: &[u8]) -> Result<String, ToolError> {
+    let current = std::env::current_dir().map_err(|error| ToolError(error.to_string()))?;
+    let absolute = current.join(path);
+    if let Some(parent) = absolute.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| ToolError(error.to_string()))?;
+    }
+    std::fs::write(&absolute, content).map_err(|error| ToolError(error.to_string()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&absolute, std::fs::Permissions::from_mode(0o600))
+            .map_err(|error| ToolError(error.to_string()))?;
+    }
+    Ok(absolute.to_string_lossy().into_owned())
 }
 
 /// Go's `getStr`: a value of another type falls back to the default.
