@@ -330,20 +330,46 @@ fn seed_store(database: &Path) {
         .expect("apply the frozen rows");
 }
 
-/// Replaces the reported instant with the fixture's placeholder.
+/// Replaces the reported instants with the fixture's placeholder.
 ///
-/// The masked value is parsed as an instant first, so masking cannot hide a
-/// difference in the format Go reports.
+/// Only the fields the oracle itself folds are masked, and each one is parsed as
+/// an instant before it is replaced, so masking cannot hide a difference in the
+/// format Go reports. Go's layout is `2006-01-02T15:04:05.999999-07:00`, so a
+/// UTC instant ends in `+00:00` rather than `Z`.
 fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
-    let text = String::from_utf8(payload.to_vec()).expect("UTF-8 payload");
-    let key = "\"as_of\":\"";
-    let start = text.find(key).expect("the payload reports as_of") + key.len();
-    let end = start + text[start..].find('"').expect("a terminated as_of value");
-    let instant = &text[start..end];
-    chrono::DateTime::parse_from_rfc3339(instant).expect("as_of is an RFC 3339 instant");
-    // `text[..start]` already ends with the value's opening quote.
-    format!("{}<TIMESTAMP>\"{}", &text[..start], &text[end + 1..]).into_bytes()
+    let mut text = String::from_utf8(payload.to_vec()).expect("UTF-8 payload");
+    for key in ["as_of", "generated_at", "horizon_until"] {
+        let prefix = format!("\"{key}\":\"");
+        // The search resumes past the folded value: the prefix survives the
+        // replacement, so restarting from the front would find it again.
+        let mut search_from = 0;
+        while let Some(relative) = text[search_from..].find(&prefix) {
+            let start = search_from + relative + prefix.len();
+            let end = start + text[start..].find('"').expect("a terminated instant");
+            let instant = &text[start..end];
+            chrono::DateTime::parse_from_rfc3339(instant)
+                .unwrap_or_else(|_| panic!("{key} is an RFC 3339 instant"));
+            text = format!("{}<TIMESTAMP>\"{}", &text[..start], &text[end + 1..]);
+            search_from = start + "<TIMESTAMP>\"".len();
+        }
+    }
+    text.into_bytes()
 }
+
+/// `dashboard`, `calendar`, `requests list` and `manual-tasks list` are thin
+/// wrappers over an MCP tool (`mcp.ContractHandler()`), which is why each pair of
+/// ids carries the same recorded bytes. They are listed here because the
+/// selection predicate and the replay body both need them.
+const CONTRACT_TOOL_OPERATIONS: [&str; 8] = [
+    "dashboard-json",
+    "operate-dashboard",
+    "calendar-json",
+    "operate-calendar",
+    "requests-list-json",
+    "operate-requests-list",
+    "manual-tasks-list-json",
+    "operate-manual-tasks-list",
+];
 
 /// `plan status` and `plan tick` answer the Go oracle's recorded bytes.
 ///
@@ -441,7 +467,8 @@ fn is_exact_case(case: &Value) -> bool {
     // They carry the registry contract that `brokers list` cannot: no status
     // filter and no `filters` object, so the count is 1,277 rather than 1,273.
     // `status` and `plan status` share Go's body; the recorded bytes for
-    // `status-json`, `operate-status` and `operate-plan-status` are identical.
+    // `status-json`, `operate-status` and `operate-plan-status` are identical,
+    // and bare `tick` shares `tickCommandWith` with `plan tick`.
     const STATUS_OPERATIONS: [&str; 3] = ["status-json", "operate-status", "operate-tick"];
     const REGISTRY_OPERATIONS: [&str; 5] = [
         "registry-list",
@@ -457,6 +484,7 @@ fn is_exact_case(case: &Value) -> bool {
         || SURFACE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || REGISTRY_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || STATUS_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || CONTRACT_TOOL_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
 }
 
 #[test]
@@ -482,8 +510,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 136);
-    assert_eq!(deferred.len(), 30);
+    assert_eq!(selected.len(), 144);
+    assert_eq!(deferred.len(), 22);
 
     let root = unique_root();
     let home = root.join("home");
@@ -512,7 +540,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 | "status-json"
                 | "operate-status"
                 | "operate-tick"
-        );
+        ) || CONTRACT_TOOL_OPERATIONS.contains(&id);
         // The phase-two capture runs every schedule case in its own
         // `cli/<id>/cwd`, so the generated wrappers record that directory; the
         // replay has to run in the same layout or the folded paths differ.
@@ -552,7 +580,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
         // `plan status` reports a wall clock, so its value is masked before the
         // comparison — the format itself is still asserted by the masker.
         let actual_stdout =
-            if matches!(id, "operate-plan-status" | "status-json" | "operate-status") {
+            if matches!(id, "operate-plan-status" | "status-json" | "operate-status")
+                || matches!(
+                    id,
+                    "dashboard-json" | "operate-dashboard" | "calendar-json" | "operate-calendar"
+                )
+            {
                 mask_wall_clock(&output.stdout)
             } else if id.starts_with("operate-schedule") {
                 // The generated wrappers embed the working directory and the CLI's

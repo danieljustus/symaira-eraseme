@@ -26,6 +26,7 @@ use symeraseme_core::identity::{OsSecretBackend, SecretResolver};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
+use symeraseme_core::reporting;
 use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
 use symeraseme_core::storage::{EventRecord, RemovalRequestRow, Store};
 use symeraseme_core::timeutil;
@@ -538,6 +539,26 @@ impl ContractHandler {
     /// a non-positive value for either before it queries. The count keeps Go's
     /// asymmetry: it filters by campaign and status, never by broker, so a
     /// broker filter narrows the rows but not `total`.
+    /// Go's `get_dashboard_data`: the whole dashboard for every campaign.
+    fn dashboard_data(&self) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let now = self.recorded_instant()?;
+        reporting::get_dashboard_data(&store, "", now).map_err(|error| ToolError(error.to_string()))
+    }
+
+    /// Go's `get_calendar`: `weeks` defaults to 4, `campaign_id` to all.
+    fn calendar(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let now = self.recorded_instant()?;
+        reporting::get_calendar(
+            &store,
+            &get_str(arguments, "campaign_id", ""),
+            get_int(arguments, "weeks", 4),
+            now,
+        )
+        .map_err(|error| ToolError(error.to_string()))
+    }
+
     fn list_requests(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let store = self.open_store()?;
         let page = get_int(arguments, "page", 1);
@@ -975,6 +996,8 @@ impl ToolHandler for ContractHandler {
             "plan_create" => self.plan_create(arguments),
             "plan_show" => self.plan_show(arguments),
             "list_requests" => self.list_requests(arguments),
+            "get_dashboard_data" => self.dashboard_data(),
+            "get_calendar" => self.calendar(arguments),
             "get_events" => self.get_events(arguments),
             "list_brokers" => self.list_brokers(arguments),
             "schedule_install" => self.schedule_install(arguments),
