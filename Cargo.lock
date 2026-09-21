@@ -1433,6 +1433,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
+ "sha2",
  "symeraseme-core",
  "symeraseme-engine",
 ]
@@ -1482,8 +1483,10 @@ dependencies = [
 name = "symeraseme-engine"
 version = "0.13.0"
 dependencies = [
+ "hex",
  "serde",
  "serde_json",
+ "sha2",
  "symeraseme-core",
  "tempfile",
 ]

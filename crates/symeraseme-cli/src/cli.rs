@@ -20,6 +20,8 @@ use symeraseme_core::reporting;
 use symeraseme_core::storage::Store;
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
+use symeraseme_engine::scheduler::install::{self, InstallOptions};
+use symeraseme_engine::scheduler::{Config as SchedulerConfig, Platform};
 
 const ROOT_NAME: &str = "symeraseme";
 
@@ -388,6 +390,9 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         }
         "plan status" => plan_status(parsed),
         "plan tick" => plan_tick(parsed),
+        "schedule install" => schedule_install(parsed),
+        "schedule uninstall" => schedule_uninstall(parsed),
+        "schedule status" => schedule_status(parsed),
         _ => deferred(&path),
     }
 }
@@ -414,6 +419,134 @@ struct BrokersListEnvelope<'a> {
 struct BrokerShowEnvelope<'a> {
     broker: &'a Broker,
     schema_version: u8,
+}
+
+/// Builds the scheduler options the way Go's `schedule_*` CLI commands do.
+///
+/// Go passes only `platform` (plus the tick time for `install`) and lets the
+/// engine fill the rest from its defaults, so `output_dir` stays empty here and
+/// the engine substitutes `./schedules`.
+fn schedule_options(parsed: &Parsed) -> InstallOptions<'static> {
+    let platform_name = parsed.flags.get("platform").cloned().unwrap_or_default();
+    let mut config = SchedulerConfig::default();
+    if parsed.path.join(" ") == "schedule install" {
+        config.tick_hour = flag_int(parsed, "tick-hour", 10) as i32;
+        config.tick_minute = flag_int(parsed, "tick-minute", 0) as i32;
+    }
+    let mut options = InstallOptions::new(config);
+    options.platform_name = Some(platform_name);
+    options
+}
+
+/// Reads an integer flag, falling back to the declared default. Go's cobra does
+/// the same for a flag the caller did not set.
+fn flag_int(parsed: &Parsed, name: &str, default: i64) -> i64 {
+    parsed
+        .flags
+        .get(name)
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(default)
+}
+
+/// Go's `schedule install`: the dry run renders the files, a real install also
+/// writes the wrappers and loads the native units.
+fn schedule_install(parsed: &Parsed) -> Outcome {
+    let options = schedule_options(parsed);
+    let dry_run = parsed
+        .flags
+        .get("dry-run")
+        .is_some_and(|value| value == "true");
+    if dry_run {
+        // Go's dry run goes through `Generate` on a config whose platform is
+        // still the raw string, so the rejection message carries Generate's
+        // longer hint. `Config::platform` is empty here, which auto-detects
+        // exactly like Go's empty string does.
+        let mut config = options.config.clone();
+        config.platform = match &options.platform_name {
+            Some(name) if !name.is_empty() => match Platform::parse(name) {
+                Some(platform) => Some(platform),
+                None => {
+                    return Outcome::Stderr(
+                        format!(
+                            "unsupported platform: {} (choose cron, launchd, or systemd)\n",
+                            name.to_ascii_lowercase()
+                        )
+                        .into_bytes(),
+                    );
+                }
+            },
+            _ => Some(symeraseme_engine::scheduler::detect_platform()),
+        };
+        let files = match symeraseme_engine::scheduler::generate(&config) {
+            Ok(files) => files,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&json!({"success": true, "files": files, "dry_run": true})) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        return Outcome::Stdout(b"success\n".to_vec());
+    }
+    if let Err(error) = install::install(&options) {
+        return Outcome::Stderr(format!("{error}\n").into_bytes());
+    }
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&json!({"success": true})) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(b"success\n".to_vec())
+}
+
+/// Go's `schedule uninstall`.
+fn schedule_uninstall(parsed: &Parsed) -> Outcome {
+    let options = schedule_options(parsed);
+    if let Err(error) = install::uninstall(&options) {
+        return Outcome::Stderr(format!("{error}\n").into_bytes());
+    }
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&json!({"success": true})) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(b"success\n".to_vec())
+}
+
+/// Go's `schedule status`. The text form prints `success` — Go discards the
+/// status payload unless JSON was requested, which is pinned as measured.
+fn schedule_status(parsed: &Parsed) -> Outcome {
+    let options = schedule_options(parsed);
+    let result = match install::status(&options) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(b"success\n".to_vec())
 }
 
 /// The wall clock, as Go's `time.Now().UTC()`. `chrono` is built without its

@@ -12,9 +12,11 @@
 //! Task 5.4 in `docs/plans/2026-09-04-go-to-rust-implementation-plan.md`.
 
 mod cron;
+pub mod install;
 mod launchd;
 mod systemd;
 
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
@@ -22,7 +24,7 @@ use std::fs;
 use std::io::{self, Write as _};
 use std::path::{Component, Path, PathBuf};
 
-const WRAPPER_DIR_PLACEHOLDER: &str = "__WRAPPER_DIR__";
+pub(crate) const WRAPPER_DIR_PLACEHOLDER: &str = "__WRAPPER_DIR__";
 
 /// A supported scheduler backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +44,30 @@ impl Platform {
             "systemd" => Some(Self::Systemd),
             _ => None,
         }
+    }
+
+    /// Go's platform validation, which happens on the string form: an empty
+    /// value auto-detects, a known name is used, and anything else is rejected
+    /// with Go's own message. Collapsing an unknown name into the auto-detect
+    /// fallback would silently ignore a caller's mistake, so this stays strict.
+    pub fn from_name(value: &str) -> Result<Self, SchedulerError> {
+        let lowered = value.to_ascii_lowercase();
+        if lowered.is_empty() {
+            return Ok(detect_platform());
+        }
+        Self::parse(&lowered).ok_or(SchedulerError::UnsupportedPlatformOperation(lowered))
+    }
+}
+
+/// Go's `Platform` is a string type, so `encoding/json` emits `"launchd"` and
+/// not a variant name. Serializing manually keeps that shape.
+impl Serialize for Platform {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(match self {
+            Self::Cron => "cron",
+            Self::Launchd => "launchd",
+            Self::Systemd => "systemd",
+        })
     }
 }
 
@@ -127,6 +153,9 @@ impl Default for Config {
 #[derive(Debug)]
 pub enum SchedulerError {
     UnsupportedPlatform(String),
+    /// Go's `Install`/`Status`/`Uninstall` reject an unknown platform with a
+    /// shorter message than `Generate` does, so the two need separate variants.
+    UnsupportedPlatformOperation(String),
     InvalidTickTime,
     InvalidPollHour(i32),
     ResolveBinaryPath(io::Error),
@@ -135,9 +164,45 @@ pub enum SchedulerError {
     ResolveOutputDirectory(io::Error),
     CreateOutputDirectory(io::Error),
     InvalidGeneratedFilename(String),
-    WriteFile { path: PathBuf, source: io::Error },
+    WriteFile {
+        path: PathBuf,
+        source: io::Error,
+    },
     ResolveHomeDirectory(io::Error),
-    ReadLegacyUnit { path: PathBuf, source: io::Error },
+    ReadLegacyUnit {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Go's `ErrLegacyUnits`: installation refused so a Python-era unit is not
+    /// overwritten without an explicit replacement request.
+    LegacyUnitsDetected,
+    RemoveLegacyUnit {
+        path: PathBuf,
+        source: io::Error,
+    },
+    CreateNativeUnitDirectory(io::Error),
+    WriteNativeUnit {
+        path: PathBuf,
+        source: io::Error,
+    },
+    RemoveNativeUnit {
+        path: PathBuf,
+        source: io::Error,
+    },
+    LoadLaunchdUnit {
+        unit: String,
+        source: io::Error,
+    },
+    SystemctlDaemonReload(io::Error),
+    EnableSystemdTimer {
+        unit: String,
+        source: io::Error,
+    },
+    WriteCronStaging {
+        path: PathBuf,
+        source: io::Error,
+    },
+    InstallCrontab(io::Error),
 }
 
 impl fmt::Display for SchedulerError {
@@ -147,6 +212,9 @@ impl fmt::Display for SchedulerError {
                 f,
                 "unsupported platform: {platform} (choose cron, launchd, or systemd)"
             ),
+            Self::UnsupportedPlatformOperation(platform) => {
+                write!(f, "unsupported platform: {platform}")
+            }
             Self::InvalidTickTime => write!(f, "tick time must be a valid 24-hour time"),
             Self::InvalidPollHour(hour) => {
                 write!(f, "poll hour must be between 0 and 23: {hour}")
@@ -173,6 +241,34 @@ impl fmt::Display for SchedulerError {
             Self::ResolveHomeDirectory(source) => {
                 write!(f, "resolve home directory: {source}")
             }
+            Self::LegacyUnitsDetected => {
+                f.write_str("legacy scheduler units detected; replacement was not requested")
+            }
+            Self::RemoveLegacyUnit { path, source } => {
+                write!(f, "remove legacy unit {}: {source}", path.display())
+            }
+            Self::CreateNativeUnitDirectory(source) => {
+                write!(f, "create native unit directory: {source}")
+            }
+            Self::WriteNativeUnit { path, source } => {
+                write!(f, "write native unit {}: {source}", path.display())
+            }
+            Self::RemoveNativeUnit { path, source } => {
+                write!(f, "remove native unit {}: {source}", path.display())
+            }
+            Self::LoadLaunchdUnit { unit, source } => {
+                write!(f, "load launchd unit {unit}: {source}")
+            }
+            Self::SystemctlDaemonReload(source) => {
+                write!(f, "systemd daemon-reload: {source}")
+            }
+            Self::EnableSystemdTimer { unit, source } => {
+                write!(f, "enable systemd timer {unit}: {source}")
+            }
+            Self::WriteCronStaging { path, source } => {
+                write!(f, "write crontab staging file {}: {source}", path.display())
+            }
+            Self::InstallCrontab(source) => write!(f, "install crontab: {source}"),
             Self::ReadLegacyUnit { path, source } => {
                 write!(f, "read legacy unit {}: {source}", path.display())
             }
@@ -204,11 +300,38 @@ pub fn resolve_binary_path(explicit: &str) -> Result<String, SchedulerError> {
     }
     let mut path = env::current_exe().map_err(SchedulerError::ResolveBinaryPath)?;
     if !path.is_absolute() {
-        path = env::current_dir()
+        path = working_directory()
             .map_err(SchedulerError::ResolveBinaryPath)?
             .join(path);
     }
     Ok(lexically_clean(&path).to_string_lossy().into_owned())
+}
+
+/// The working directory the way Go's `os.Getwd` resolves it: `$PWD` is
+/// preferred when it names the same directory as the kernel reports.
+///
+/// `std::env::current_dir` always returns the kernel's view, which on macOS is
+/// the symlink-resolved path (`/private/var/...` for `/var/...`). Go returns the
+/// logical `$PWD` instead, so using `current_dir` alone would bake a different
+/// directory into every generated wrapper — a real behavioural difference, not
+/// a cosmetic one.
+fn working_directory() -> io::Result<PathBuf> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Some(pwd) = env::var_os("PWD") {
+            let logical = PathBuf::from(&pwd);
+            if logical.is_absolute()
+                && let (Ok(from_env), Ok(from_kernel)) =
+                    (fs::metadata(&logical), fs::metadata(env::current_dir()?))
+                && from_env.dev() == from_kernel.dev()
+                && from_env.ino() == from_kernel.ino()
+            {
+                return Ok(logical);
+            }
+        }
+    }
+    env::current_dir()
 }
 
 /// Lexically cleans a path the way Go's `filepath.Clean` does: `.`
@@ -274,7 +397,7 @@ pub fn generate(cfg: &Config) -> Result<BTreeMap<String, String>, SchedulerError
     }
     let binary_path = resolve_binary_path(&cfg.binary_path)?;
     let project_dir = if cfg.project_dir.is_empty() {
-        env::current_dir()
+        working_directory()
             .map_err(SchedulerError::ResolveProjectDirectory)?
             .to_string_lossy()
             .into_owned()

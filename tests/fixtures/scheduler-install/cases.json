@@ -1,0 +1,1044 @@
+{
+  "schema": "symeraseme-scheduler-install-oracle/v1",
+  "source_revision": "working-tree",
+  "source": "internal/scheduler/scheduler.go (Install/Status/Uninstall/installRoot/ScanLegacyPythonUnits)",
+  "runner_script": {
+    "crontab": "",
+    "crontab -l": "17 * * * * /usr/local/bin/other-job\n",
+    "launchctl list com.symeraseme.poll": "ERROR: Could not find service",
+    "launchctl list com.symeraseme.rescan": "ERROR: Could not find service",
+    "launchctl list com.symeraseme.tick": "com.symeraseme.tick\n",
+    "launchctl load": "",
+    "launchctl unload": "",
+    "systemctl --user daemon-reload": "",
+    "systemctl --user disable --now symeraseme-poll.timer": "",
+    "systemctl --user disable --now symeraseme-rescan.timer": "",
+    "systemctl --user disable --now symeraseme-tick.timer": "",
+    "systemctl --user enable --now symeraseme-poll.timer": "",
+    "systemctl --user enable --now symeraseme-rescan.timer": "",
+    "systemctl --user enable --now symeraseme-tick.timer": "",
+    "systemctl --user is-active symeraseme-poll.timer": "inactive\n",
+    "systemctl --user is-active symeraseme-rescan.timer": "ERROR: Unit not found.",
+    "systemctl --user is-active symeraseme-tick.timer": "active\n"
+  },
+  "cases": {
+    "cron_install_replaces_existing_block": {
+      "name": "cron_install_replaces_existing_block",
+      "output": {
+        "files": [
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/crontab.txt",
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/install.sh",
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/symeraseme-poll.sh",
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/symeraseme-rescan.sh",
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/symeraseme-tick.sh",
+          "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/uninstall.sh"
+        ],
+        "legacy": [],
+        "output_dir": "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules",
+        "platform": "cron",
+        "replacement_required": false
+      },
+      "error": "",
+      "files": {
+        "schedules/crontab.txt": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47",
+        "schedules/install.sh": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c",
+        "schedules/symeraseme-poll.sh": "5ea3a264d5f8ddbb23a2398ce3820ac29f30627a7a05b23fdb2824bcbeafa6bd",
+        "schedules/symeraseme-rescan.sh": "7298161d9b51682fa3ebcbc398415748dc539ff7a2bff2b7eb80438e7b428209",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/uninstall.sh": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+      },
+      "mode": {
+        "schedules/crontab.txt": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": [
+        {
+          "name": "crontab",
+          "args": [
+            "-l"
+          ],
+          "line": "crontab -l"
+        },
+        {
+          "name": "crontab",
+          "args": [
+            "\u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/.crontab-\u003cRANDOM\u003e"
+          ],
+          "line": "crontab \u003cTMPROOT\u003e/cron_install_replaces_existing_block/schedules/.crontab-\u003cRANDOM\u003e"
+        }
+      ]
+    },
+    "cron_install_writes_block": {
+      "name": "cron_install_writes_block",
+      "output": {
+        "files": [
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/crontab.txt",
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/install.sh",
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/symeraseme-poll.sh",
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/symeraseme-rescan.sh",
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/symeraseme-tick.sh",
+          "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/uninstall.sh"
+        ],
+        "legacy": [],
+        "output_dir": "\u003cTMPROOT\u003e/cron_install_writes_block/schedules",
+        "platform": "cron",
+        "replacement_required": false
+      },
+      "error": "",
+      "files": {
+        "schedules/crontab.txt": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47",
+        "schedules/install.sh": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c",
+        "schedules/symeraseme-poll.sh": "5ea3a264d5f8ddbb23a2398ce3820ac29f30627a7a05b23fdb2824bcbeafa6bd",
+        "schedules/symeraseme-rescan.sh": "7298161d9b51682fa3ebcbc398415748dc539ff7a2bff2b7eb80438e7b428209",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/uninstall.sh": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+      },
+      "mode": {
+        "schedules/crontab.txt": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": [
+        {
+          "name": "crontab",
+          "args": [
+            "-l"
+          ],
+          "line": "crontab -l"
+        },
+        {
+          "name": "crontab",
+          "args": [
+            "\u003cTMPROOT\u003e/cron_install_writes_block/schedules/.crontab-\u003cRANDOM\u003e"
+          ],
+          "line": "crontab \u003cTMPROOT\u003e/cron_install_writes_block/schedules/.crontab-\u003cRANDOM\u003e"
+        }
+      ]
+    },
+    "cron_status_reports_missing_block": {
+      "name": "cron_status_reports_missing_block",
+      "output": {
+        "entries": [
+          {
+            "active": false,
+            "error": "",
+            "installed": false,
+            "label": "cron",
+            "legacy": false,
+            "path": "crontab"
+          }
+        ],
+        "platform": "cron"
+      },
+      "error": "",
+      "files": {},
+      "mode": {},
+      "calls": [
+        {
+          "name": "crontab",
+          "args": [
+            "-l"
+          ],
+          "line": "crontab -l"
+        }
+      ]
+    },
+    "cron_uninstall_rewrites_crontab": {
+      "name": "cron_uninstall_rewrites_crontab",
+      "output": {
+        "ok": true
+      },
+      "error": "",
+      "files": {},
+      "mode": {},
+      "calls": [
+        {
+          "name": "crontab",
+          "args": [
+            "-l"
+          ],
+          "line": "crontab -l"
+        },
+        {
+          "name": "crontab",
+          "args": [
+            "\u003cTMP\u003e/.symeraseme-crontab-\u003cRANDOM\u003e"
+          ],
+          "line": "crontab \u003cTMP\u003e/.symeraseme-crontab-\u003cRANDOM\u003e"
+        }
+      ]
+    },
+    "launchd_install_no_legacy": {
+      "name": "launchd_install_no_legacy",
+      "output": {
+        "files": [
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/com.symeraseme.poll.plist",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/com.symeraseme.rescan.plist",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/com.symeraseme.tick.plist",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/install.sh",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/symeraseme-poll.sh",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/symeraseme-rescan.sh",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/symeraseme-tick.sh",
+          "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules/uninstall.sh"
+        ],
+        "legacy": [],
+        "output_dir": "\u003cTMPROOT\u003e/launchd_install_no_legacy/schedules",
+        "platform": "launchd",
+        "replacement_required": false
+      },
+      "error": "",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "d4ce9e4a57d54994440d3d496dbc40e3b34590bec31597577c45cf9edaa1e0cf",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "a30d1023cda40df413c01f72d716d03e6780c6c71397901c100e76cd9aaf64cb",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "d4dc7a59256a19bcc28793702cf1bd27b4aa49140a2c692560386b94e0cedc33",
+        "schedules/com.symeraseme.poll.plist": "d74329499b40c4a85ba9875abe76d64fdcfadd0f96beea597f08a35e6682a475",
+        "schedules/com.symeraseme.rescan.plist": "b267a4e4d150d1ca63a795a95fac58cd7b60f13857354c874d67123089ca7b06",
+        "schedules/com.symeraseme.tick.plist": "2d240f4acccff4f634ed624ed1fc70fb386da5a355e3040f5294e069890554fb",
+        "schedules/install.sh": "f1f83339f619085e59d3df2d83735dd8b543a4765a24fb2921ebeed038a06d4e",
+        "schedules/symeraseme-poll.sh": "93c123d93358e872b887b974c8c80f3eea2df497e81a4b972823f33d5f4e73f4",
+        "schedules/symeraseme-rescan.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/uninstall.sh": "a0ad887617fe3975406843e5ab645843b15462bfb231d15c1c10dda633b5d398"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644",
+        "schedules/com.symeraseme.poll.plist": "0644",
+        "schedules/com.symeraseme.rescan.plist": "0644",
+        "schedules/com.symeraseme.tick.plist": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_no_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+        }
+      ]
+    },
+    "launchd_install_refuses_python_legacy": {
+      "name": "launchd_install_refuses_python_legacy",
+      "output": {
+        "files": [],
+        "legacy": [
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.tick.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.tick.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.poll.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.poll.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.rescan.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.rescan.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          }
+        ],
+        "output_dir": "\u003cTMPROOT\u003e/launchd_install_refuses_python_legacy/schedules",
+        "platform": "launchd",
+        "replacement_required": true
+      },
+      "error": "legacy scheduler units detected; replacement was not requested",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "81c1c2f06d952d59c6a2e9338f889027ca4596b13beac9cf2bbc1534662321c8",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "81c1c2f06d952d59c6a2e9338f889027ca4596b13beac9cf2bbc1534662321c8",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "81c1c2f06d952d59c6a2e9338f889027ca4596b13beac9cf2bbc1534662321c8"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644"
+      },
+      "calls": []
+    },
+    "launchd_install_replaces_python_legacy": {
+      "name": "launchd_install_replaces_python_legacy",
+      "output": {
+        "files": [
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/com.symeraseme.poll.plist",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/com.symeraseme.rescan.plist",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/com.symeraseme.tick.plist",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/install.sh",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/symeraseme-poll.sh",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/symeraseme-rescan.sh",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/symeraseme-tick.sh",
+          "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules/uninstall.sh"
+        ],
+        "legacy": [
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.tick.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.tick.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.poll.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.poll.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": true,
+            "kind": "launchd",
+            "name": "com.symeraseme.rescan.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.rescan.plist",
+            "platform": "launchd",
+            "reason": "existing Python scheduler unit; explicit replacement required"
+          }
+        ],
+        "output_dir": "\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/schedules",
+        "platform": "launchd",
+        "replacement_required": true
+      },
+      "error": "",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "af6d1a256282e2880bbbfdb55ef038196f0470f97054d350a5d35b7193d76202",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "147b557747c33c813a43339605323fdafa9c1f0ff4e4503c2dc492a4226b3c2e",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "d566617b9916e00725c9e18e7253f58fc9c79ea59a45e47d7bcbbc01406f7ca5",
+        "schedules/com.symeraseme.poll.plist": "d74329499b40c4a85ba9875abe76d64fdcfadd0f96beea597f08a35e6682a475",
+        "schedules/com.symeraseme.rescan.plist": "b267a4e4d150d1ca63a795a95fac58cd7b60f13857354c874d67123089ca7b06",
+        "schedules/com.symeraseme.tick.plist": "2d240f4acccff4f634ed624ed1fc70fb386da5a355e3040f5294e069890554fb",
+        "schedules/install.sh": "f1f83339f619085e59d3df2d83735dd8b543a4765a24fb2921ebeed038a06d4e",
+        "schedules/symeraseme-poll.sh": "93c123d93358e872b887b974c8c80f3eea2df497e81a4b972823f33d5f4e73f4",
+        "schedules/symeraseme-rescan.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/uninstall.sh": "a0ad887617fe3975406843e5ab645843b15462bfb231d15c1c10dda633b5d398"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644",
+        "schedules/com.symeraseme.poll.plist": "0644",
+        "schedules/com.symeraseme.rescan.plist": "0644",
+        "schedules/com.symeraseme.tick.plist": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "load\u001f\u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+          ],
+          "line": "launchctl load \u003cTMPROOT\u003e/launchd_install_replaces_python_legacy/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+        }
+      ]
+    },
+    "launchd_reinstall_after_a_successful_install": {
+      "name": "launchd_reinstall_after_a_successful_install",
+      "output": {
+        "files": [],
+        "legacy": [
+          {
+            "is_python": false,
+            "kind": "launchd",
+            "name": "com.symeraseme.tick.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.tick.plist",
+            "platform": "launchd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "launchd",
+            "name": "com.symeraseme.poll.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.poll.plist",
+            "platform": "launchd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "launchd",
+            "name": "com.symeraseme.rescan.plist",
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/com.symeraseme.rescan.plist",
+            "platform": "launchd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          }
+        ],
+        "output_dir": "\u003cTMPROOT\u003e/launchd_reinstall_after_a_successful_install/schedules",
+        "platform": "launchd",
+        "replacement_required": true
+      },
+      "error": "legacy scheduler units detected; replacement was not requested",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "d5b208ac68285f18265985b07c10e63e1393c3601516c07a45b1e0bd1480cd62",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0d29ad686a820b453ad94de5877f8fd2ce379f107b5a510566c6ea0e09e65ded",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "d77a01a485a5660ae9a3a95c5b8d93aa15ba98660fab88e50b1866639d4a94b1",
+        "schedules/com.symeraseme.poll.plist": "d74329499b40c4a85ba9875abe76d64fdcfadd0f96beea597f08a35e6682a475",
+        "schedules/com.symeraseme.rescan.plist": "b267a4e4d150d1ca63a795a95fac58cd7b60f13857354c874d67123089ca7b06",
+        "schedules/com.symeraseme.tick.plist": "2d240f4acccff4f634ed624ed1fc70fb386da5a355e3040f5294e069890554fb",
+        "schedules/install.sh": "f1f83339f619085e59d3df2d83735dd8b543a4765a24fb2921ebeed038a06d4e",
+        "schedules/symeraseme-poll.sh": "93c123d93358e872b887b974c8c80f3eea2df497e81a4b972823f33d5f4e73f4",
+        "schedules/symeraseme-rescan.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/uninstall.sh": "a0ad887617fe3975406843e5ab645843b15462bfb231d15c1c10dda633b5d398"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644",
+        "schedules/com.symeraseme.poll.plist": "0644",
+        "schedules/com.symeraseme.rescan.plist": "0644",
+        "schedules/com.symeraseme.tick.plist": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": []
+    },
+    "launchd_status_after_uninstall_names_are_gone": {
+      "name": "launchd_status_after_uninstall_names_are_gone",
+      "output": {
+        "entries": [
+          {
+            "active": true,
+            "error": "",
+            "installed": true,
+            "label": "symeraseme-tick",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-tick.plist"
+          },
+          {
+            "active": false,
+            "error": "launchctl could not confirm active state",
+            "installed": true,
+            "label": "symeraseme-poll",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-poll.plist"
+          },
+          {
+            "active": false,
+            "error": "launchctl could not confirm active state",
+            "installed": true,
+            "label": "symeraseme-rescan",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-rescan.plist"
+          }
+        ],
+        "platform": "launchd"
+      },
+      "error": "",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/symeraseme-poll.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/symeraseme-rescan.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/symeraseme-tick.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644",
+        "home/Library/LaunchAgents/symeraseme-poll.plist": "0644",
+        "home/Library/LaunchAgents/symeraseme-rescan.plist": "0644",
+        "home/Library/LaunchAgents/symeraseme-tick.plist": "0644"
+      },
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.tick"
+          ],
+          "line": "launchctl list com.symeraseme.tick"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.poll"
+          ],
+          "line": "launchctl list com.symeraseme.poll"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.rescan"
+          ],
+          "line": "launchctl list com.symeraseme.rescan"
+        }
+      ]
+    },
+    "launchd_status_names_differ_from_uninstall_names": {
+      "name": "launchd_status_names_differ_from_uninstall_names",
+      "output": {
+        "entries": [
+          {
+            "active": true,
+            "error": "",
+            "installed": true,
+            "label": "symeraseme-tick",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-tick.plist"
+          },
+          {
+            "active": false,
+            "error": "launchctl could not confirm active state",
+            "installed": true,
+            "label": "symeraseme-poll",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-poll.plist"
+          },
+          {
+            "active": false,
+            "error": "launchctl could not confirm active state",
+            "installed": true,
+            "label": "symeraseme-rescan",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-rescan.plist"
+          }
+        ],
+        "platform": "launchd"
+      },
+      "error": "",
+      "files": {
+        "home/Library/LaunchAgents/symeraseme-poll.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/symeraseme-rescan.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/symeraseme-tick.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/symeraseme-poll.plist": "0644",
+        "home/Library/LaunchAgents/symeraseme-rescan.plist": "0644",
+        "home/Library/LaunchAgents/symeraseme-tick.plist": "0644"
+      },
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.tick"
+          ],
+          "line": "launchctl list com.symeraseme.tick"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.poll"
+          ],
+          "line": "launchctl list com.symeraseme.poll"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.rescan"
+          ],
+          "line": "launchctl list com.symeraseme.rescan"
+        }
+      ]
+    },
+    "launchd_status_reports_active_and_errors": {
+      "name": "launchd_status_reports_active_and_errors",
+      "output": {
+        "entries": [
+          {
+            "active": true,
+            "error": "",
+            "installed": false,
+            "label": "symeraseme-tick",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-tick.plist"
+          },
+          {
+            "active": false,
+            "error": "",
+            "installed": false,
+            "label": "symeraseme-poll",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-poll.plist"
+          },
+          {
+            "active": false,
+            "error": "",
+            "installed": false,
+            "label": "symeraseme-rescan",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/Library/LaunchAgents/symeraseme-rescan.plist"
+          }
+        ],
+        "platform": "launchd"
+      },
+      "error": "",
+      "files": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464"
+      },
+      "mode": {
+        "home/Library/LaunchAgents/com.symeraseme.poll.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.rescan.plist": "0644",
+        "home/Library/LaunchAgents/com.symeraseme.tick.plist": "0644"
+      },
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.tick"
+          ],
+          "line": "launchctl list com.symeraseme.tick"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.poll"
+          ],
+          "line": "launchctl list com.symeraseme.poll"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "list\u001fcom.symeraseme.rescan"
+          ],
+          "line": "launchctl list com.symeraseme.rescan"
+        }
+      ]
+    },
+    "launchd_uninstall_removes_units": {
+      "name": "launchd_uninstall_removes_units",
+      "output": {
+        "ok": true
+      },
+      "error": "",
+      "files": {},
+      "mode": {},
+      "calls": [
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.tick.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.poll.plist"
+        },
+        {
+          "name": "launchctl",
+          "args": [
+            "unload\u001f\u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+          ],
+          "line": "launchctl unload \u003cTMPROOT\u003e/launchd_uninstall_removes_units/home/Library/LaunchAgents/com.symeraseme.rescan.plist"
+        }
+      ]
+    },
+    "systemd_install_no_legacy": {
+      "name": "systemd_install_no_legacy",
+      "output": {
+        "files": [
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/install.sh",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-poll.service",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-poll.sh",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-poll.timer",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-rescan.service",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-rescan.sh",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-rescan.timer",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-tick.service",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-tick.sh",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/symeraseme-tick.timer",
+          "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules/uninstall.sh"
+        ],
+        "legacy": [],
+        "output_dir": "\u003cTMPROOT\u003e/systemd_install_no_legacy/schedules",
+        "platform": "systemd",
+        "replacement_required": false
+      },
+      "error": "",
+      "files": {
+        "home/.config/systemd/user/symeraseme-poll.service": "6246622d2e8465d476383344586849ba282a120bec603db379639c4dccd21d76",
+        "home/.config/systemd/user/symeraseme-poll.timer": "145518bc5d9f6f9ccb147d5c9b62aee2b740aee52a77781bdba2350fd4aeb271",
+        "home/.config/systemd/user/symeraseme-rescan.service": "21d46f8c98f8c099c361a223d1fe206025ff1a7f05ac22bd23071013e071c1ff",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "10e510894d91a4c5cc005fefc0ed7cba4b1274848baddd1a1535c27ff0aa19af",
+        "home/.config/systemd/user/symeraseme-tick.service": "2e82f61268e0686f632baf4d664b14fe2efa04585880bdbb312636bdbc01154e",
+        "home/.config/systemd/user/symeraseme-tick.timer": "761411528c165daf2a482c7c048aeb78df7869c86d5025d716111451522e6ed3",
+        "schedules/install.sh": "65d9c6cb1536fd26f4b4997ae4b5a88e6e4f0cb4e323ffb3a4c47e381b891d0f",
+        "schedules/symeraseme-poll.service": "c4360a52a1f6b51dc090a450cd2a51a8bfd10ed05b302a7739279d1078900495",
+        "schedules/symeraseme-poll.sh": "93c123d93358e872b887b974c8c80f3eea2df497e81a4b972823f33d5f4e73f4",
+        "schedules/symeraseme-poll.timer": "145518bc5d9f6f9ccb147d5c9b62aee2b740aee52a77781bdba2350fd4aeb271",
+        "schedules/symeraseme-rescan.service": "f834c6b3c34dfb3ff6ececbf8d070dd2be777dd60d09489b730d89fdc68c4b21",
+        "schedules/symeraseme-rescan.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-rescan.timer": "10e510894d91a4c5cc005fefc0ed7cba4b1274848baddd1a1535c27ff0aa19af",
+        "schedules/symeraseme-tick.service": "0fa3f0769ce68106aa8c9bec0e0731fdc7d9f77573a96bdd399aba699d2191ba",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-tick.timer": "761411528c165daf2a482c7c048aeb78df7869c86d5025d716111451522e6ed3",
+        "schedules/uninstall.sh": "0deb9ec16f15c79bc3b3fce64a9a0827944134390bab0f973665c0aebb269e34"
+      },
+      "mode": {
+        "home/.config/systemd/user/symeraseme-poll.service": "0644",
+        "home/.config/systemd/user/symeraseme-poll.timer": "0644",
+        "home/.config/systemd/user/symeraseme-rescan.service": "0644",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "0644",
+        "home/.config/systemd/user/symeraseme-tick.service": "0644",
+        "home/.config/systemd/user/symeraseme-tick.timer": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.service": "0644",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-poll.timer": "0644",
+        "schedules/symeraseme-rescan.service": "0644",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-rescan.timer": "0644",
+        "schedules/symeraseme-tick.service": "0644",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/symeraseme-tick.timer": "0644",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": [
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fdaemon-reload"
+          ],
+          "line": "systemctl --user daemon-reload"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fenable\u001f--now\u001fsymeraseme-tick.timer"
+          ],
+          "line": "systemctl --user enable --now symeraseme-tick.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fenable\u001f--now\u001fsymeraseme-poll.timer"
+          ],
+          "line": "systemctl --user enable --now symeraseme-poll.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fenable\u001f--now\u001fsymeraseme-rescan.timer"
+          ],
+          "line": "systemctl --user enable --now symeraseme-rescan.timer"
+        }
+      ]
+    },
+    "systemd_reinstall_after_a_successful_install": {
+      "name": "systemd_reinstall_after_a_successful_install",
+      "output": {
+        "files": [],
+        "legacy": [
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-tick.service",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-tick.service",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-tick.timer",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-tick.timer",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-poll.service",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-poll.service",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-poll.timer",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-poll.timer",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-rescan.service",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-rescan.service",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          },
+          {
+            "is_python": false,
+            "kind": "systemd",
+            "name": "symeraseme-rescan.timer",
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-rescan.timer",
+            "platform": "systemd",
+            "reason": "existing Symaira scheduler unit; explicit replacement required"
+          }
+        ],
+        "output_dir": "\u003cTMPROOT\u003e/systemd_reinstall_after_a_successful_install/schedules",
+        "platform": "systemd",
+        "replacement_required": true
+      },
+      "error": "legacy scheduler units detected; replacement was not requested",
+      "files": {
+        "home/.config/systemd/user/symeraseme-poll.service": "8b4f145fafaa66e94c7efd89dba5cb82d7dc6715741ac26f94740917491b8a3b",
+        "home/.config/systemd/user/symeraseme-poll.timer": "145518bc5d9f6f9ccb147d5c9b62aee2b740aee52a77781bdba2350fd4aeb271",
+        "home/.config/systemd/user/symeraseme-rescan.service": "2058c97b06363deec62500f361d34a5e7faff5a3ae06cfaa5bf7a8f52ea3562d",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "10e510894d91a4c5cc005fefc0ed7cba4b1274848baddd1a1535c27ff0aa19af",
+        "home/.config/systemd/user/symeraseme-tick.service": "1183f0a38939e2ad13ea3e37a4356d587923aeb50c93bfd3e753bac821930dc3",
+        "home/.config/systemd/user/symeraseme-tick.timer": "761411528c165daf2a482c7c048aeb78df7869c86d5025d716111451522e6ed3",
+        "schedules/install.sh": "65d9c6cb1536fd26f4b4997ae4b5a88e6e4f0cb4e323ffb3a4c47e381b891d0f",
+        "schedules/symeraseme-poll.service": "c4360a52a1f6b51dc090a450cd2a51a8bfd10ed05b302a7739279d1078900495",
+        "schedules/symeraseme-poll.sh": "93c123d93358e872b887b974c8c80f3eea2df497e81a4b972823f33d5f4e73f4",
+        "schedules/symeraseme-poll.timer": "145518bc5d9f6f9ccb147d5c9b62aee2b740aee52a77781bdba2350fd4aeb271",
+        "schedules/symeraseme-rescan.service": "f834c6b3c34dfb3ff6ececbf8d070dd2be777dd60d09489b730d89fdc68c4b21",
+        "schedules/symeraseme-rescan.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-rescan.timer": "10e510894d91a4c5cc005fefc0ed7cba4b1274848baddd1a1535c27ff0aa19af",
+        "schedules/symeraseme-tick.service": "0fa3f0769ce68106aa8c9bec0e0731fdc7d9f77573a96bdd399aba699d2191ba",
+        "schedules/symeraseme-tick.sh": "3e6b32c3b65fc275400e9ca07a4b35db58b9dfe24a48a52eefa920de7e3f4b5c",
+        "schedules/symeraseme-tick.timer": "761411528c165daf2a482c7c048aeb78df7869c86d5025d716111451522e6ed3",
+        "schedules/uninstall.sh": "0deb9ec16f15c79bc3b3fce64a9a0827944134390bab0f973665c0aebb269e34"
+      },
+      "mode": {
+        "home/.config/systemd/user/symeraseme-poll.service": "0644",
+        "home/.config/systemd/user/symeraseme-poll.timer": "0644",
+        "home/.config/systemd/user/symeraseme-rescan.service": "0644",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "0644",
+        "home/.config/systemd/user/symeraseme-tick.service": "0644",
+        "home/.config/systemd/user/symeraseme-tick.timer": "0644",
+        "schedules/install.sh": "0755",
+        "schedules/symeraseme-poll.service": "0644",
+        "schedules/symeraseme-poll.sh": "0755",
+        "schedules/symeraseme-poll.timer": "0644",
+        "schedules/symeraseme-rescan.service": "0644",
+        "schedules/symeraseme-rescan.sh": "0755",
+        "schedules/symeraseme-rescan.timer": "0644",
+        "schedules/symeraseme-tick.service": "0644",
+        "schedules/symeraseme-tick.sh": "0755",
+        "schedules/symeraseme-tick.timer": "0644",
+        "schedules/uninstall.sh": "0755"
+      },
+      "calls": []
+    },
+    "systemd_status_reports_active_and_errors": {
+      "name": "systemd_status_reports_active_and_errors",
+      "output": {
+        "entries": [
+          {
+            "active": true,
+            "error": "",
+            "installed": true,
+            "label": "symeraseme-tick",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-tick.timer"
+          },
+          {
+            "active": false,
+            "error": "",
+            "installed": true,
+            "label": "symeraseme-poll",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-poll.timer"
+          },
+          {
+            "active": false,
+            "error": "systemctl could not confirm active state",
+            "installed": true,
+            "label": "symeraseme-rescan",
+            "legacy": false,
+            "path": "\u003cHOME\u003e/.config/systemd/user/symeraseme-rescan.timer"
+          }
+        ],
+        "platform": "systemd"
+      },
+      "error": "",
+      "files": {
+        "home/.config/systemd/user/symeraseme-poll.timer": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464",
+        "home/.config/systemd/user/symeraseme-tick.timer": "8bfff8150323bc99ed29ae77df46ea628f612f74b3ab0d3a3f75503883e51464"
+      },
+      "mode": {
+        "home/.config/systemd/user/symeraseme-poll.timer": "0644",
+        "home/.config/systemd/user/symeraseme-rescan.timer": "0644",
+        "home/.config/systemd/user/symeraseme-tick.timer": "0644"
+      },
+      "calls": [
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fis-active\u001fsymeraseme-tick.timer"
+          ],
+          "line": "systemctl --user is-active symeraseme-tick.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fis-active\u001fsymeraseme-poll.timer"
+          ],
+          "line": "systemctl --user is-active symeraseme-poll.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fis-active\u001fsymeraseme-rescan.timer"
+          ],
+          "line": "systemctl --user is-active symeraseme-rescan.timer"
+        }
+      ]
+    },
+    "systemd_uninstall_removes_units": {
+      "name": "systemd_uninstall_removes_units",
+      "output": {
+        "ok": true
+      },
+      "error": "",
+      "files": {},
+      "mode": {},
+      "calls": [
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fdisable\u001f--now\u001fsymeraseme-tick.timer"
+          ],
+          "line": "systemctl --user disable --now symeraseme-tick.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fdisable\u001f--now\u001fsymeraseme-poll.timer"
+          ],
+          "line": "systemctl --user disable --now symeraseme-poll.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fdisable\u001f--now\u001fsymeraseme-rescan.timer"
+          ],
+          "line": "systemctl --user disable --now symeraseme-rescan.timer"
+        },
+        {
+          "name": "systemctl",
+          "args": [
+            "--user\u001fdaemon-reload"
+          ],
+          "line": "systemctl --user daemon-reload"
+        }
+      ]
+    },
+    "unsupported_platform_is_rejected": {
+      "name": "unsupported_platform_is_rejected",
+      "output": {
+        "files": [],
+        "legacy": [],
+        "output_dir": "",
+        "platform": "windows",
+        "replacement_required": false
+      },
+      "error": "unsupported platform: windows",
+      "files": {},
+      "mode": {},
+      "calls": []
+    }
+  },
+  "notes": {
+    "clock": "no case depends on the wall clock",
+    "environment": "each case runs in a private HOME under a per-case temp root; the Runner is a recording fake",
+    "paths": "file hashes are relative to the recorded root that the case names in files_root"
+  }
+}
