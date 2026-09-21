@@ -1,0 +1,82 @@
+{
+  "schema": "symaira-eraseme.triage-corpus.v1",
+  "oracle_revision": "9c97319f8e293b03e39e36ea502b8934cfa6f82e",
+  "source_sha256": {
+    "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
+    "internal/triage/rebuttal.go": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+  },
+  "cases": [
+    {
+      "name": "ack_gdpr",
+      "corpus_file": "tests/fixtures/broker_replies/ack_gdpr.txt",
+      "corpus_sha256": "093c4e4f02c5a93c42b12a9c7875a3ddb3f0b322e0790cf0789f5f092434e73a",
+      "broker_name": "broker.example.com",
+      "broker_website": "",
+      "reply_subject": "Re: Data Deletion Request",
+      "reply_body": "From: compliance@broker.example.com\n\nDear Customer,\n\nWe acknowledge receipt of your data deletion request (reference #DR-2026-05123).\n\nYour request is being processed and we will notify you once the deletion is complete.\nPlease allow up to 30 business days for processing.\n\nBest regards,\nData Privacy Team\nAcme Data Solutions GmbH",
+      "fallback_template": "",
+      "prompt_base64": "QnJva2VyOiBicm9rZXIuZXhhbXBsZS5jb20gKCkKCgpSZXBseSBzdWJqZWN0OiBSZTogRGF0YSBEZWxldGlvbiBSZXF1ZXN0CgpSZXBseSBib2R5OgpGcm9tOiBjKioqKioqKiplQGIqLmV4YW1wbGUuY29tCgpEZWFyIEN1c3RvbWVyLAoKV2UgYWNrbm93bGVkZ2UgcmVjZWlwdCBvZiB5b3VyIGRhdGEgZGVsZXRpb24gcmVxdWVzdCAocmVmZXJlbmNlICNEUi0yMDI2LTA1MTIzKS4KCllvdXIgcmVxdWVzdCBpcyBiZWluZyBwcm9jZXNzZWQgYW5kIHdlIHdpbGwgbm90aWZ5IHlvdSBvbmNlIHRoZSBkZWxldGlvbiBpcyBjb21wbGV0ZS4KUGxlYXNlIGFsbG93IHVwIHRvIDMwIGJ1c2luZXNzIGRheXMgZm9yIHByb2Nlc3NpbmcuCgpCZXN0IHJlZ2FyZHMsCkRhdGEgUHJpdmFjeSBUZWFtCkFjbWUgRGF0YSBTb2x1dGlvbnMgR21iSA==",
+      "prompt_bytes": 412
+    },
+    {
+      "name": "autoresponder_ooto",
+      "corpus_file": "tests/fixtures/broker_replies/autoresponder_ooto.txt",
+      "corpus_sha256": "57212972985029d0128692744be3f7e1b2a8d6a121afb9eb9ca2c7a50da5e4fa",
+      "broker_name": "company.com",
+      "broker_website": "",
+      "reply_subject": "Out of Office: Data Deletion Request",
+      "reply_body": "From: hr@company.com\n\nI am out of the office until May 25, 2026 with limited access to email.\nYour message will be forwarded to our privacy team for handling.\n\nFor urgent privacy matters, please contact privacy@company.com.\n\nBest regards,\nJane Smith\nData Protection Officer",
+      "fallback_template": "",
+      "prompt_base64": "QnJva2VyOiBjb21wYW55LmNvbSAoKQoKClJlcGx5IHN1YmplY3Q6IE91dCBvZiBPZmZpY2U6IERhdGEgRGVsZXRpb24gUmVxdWVzdAoKUmVwbHkgYm9keToKRnJvbTogaEBjKi5jb20KCkkgYW0gb3V0IG9mIHRoZSBvZmZpY2UgdW50aWwgTWF5IDI1LCAyMDI2IHdpdGggbGltaXRlZCBhY2Nlc3MgdG8gZW1haWwuCllvdXIgbWVzc2FnZSB3aWxsIGJlIGZvcndhcmRlZCB0byBvdXIgcHJpdmFjeSB0ZWFtIGZvciBoYW5kbGluZy4KCkZvciB1cmdlbnQgcHJpdmFjeSBtYXR0ZXJzLCBwbGVhc2UgY29udGFjdCBwKioqKip5QGMqLmNvbS4KCkJlc3QgcmVnYXJkcywKSmFuZSBTbWl0aApEYXRhIFByb3RlY3Rpb24gT2ZmaWNlcg==",
+      "prompt_bytes": 352
+    },
+    {
+      "name": "bounce_no_mailbox",
+      "corpus_file": "tests/fixtures/broker_replies/bounce_no_mailbox.txt",
+      "corpus_sha256": "3362d2c47ac42267ad5b294e526e1942d56b83d50856280c0de8516ec816354a",
+      "broker_name": "mx.broker.com",
+      "broker_website": "",
+      "reply_subject": "Delivery Status Notification (Failure)",
+      "reply_body": "From: MAILER-DAEMON@mx.broker.com\n\nThis is an automatically generated Delivery Status Notification.\n\nDelivery to the following recipient failed permanently:\n\nprivacy@old-broker-website.com\n\nReason: 550 5.1.1 The email account that you tried to reach does not exist.",
+      "fallback_template": "",
+      "prompt_base64": "QnJva2VyOiBteC5icm9rZXIuY29tICgpCgoKUmVwbHkgc3ViamVjdDogRGVsaXZlcnkgU3RhdHVzIE5vdGlmaWNhdGlvbiAoRmFpbHVyZSkKClJlcGx5IGJvZHk6CkZyb206IE0qKioqKioqKioqKk5AbSouYnJva2VyLmNvbQoKVGhpcyBpcyBhbiBhdXRvbWF0aWNhbGx5IGdlbmVyYXRlZCBEZWxpdmVyeSBTdGF0dXMgTm90aWZpY2F0aW9uLgoKRGVsaXZlcnkgdG8gdGhlIGZvbGxvd2luZyByZWNpcGllbnQgZmFpbGVkIHBlcm1hbmVudGx5OgoKcCoqKioqeUBvKi5jb20KClJlYXNvbjogNTUwIDUuMS4xIFRoZSBlbWFpbCBhY2NvdW50IHRoYXQgeW91IHRyaWVkIHRvIHJlYWNoIGRvZXMgbm90IGV4aXN0Lg==",
+      "prompt_bytes": 343
+    },
+    {
+      "name": "confirmed_account_deleted",
+      "corpus_file": "tests/fixtures/broker_replies/confirmed_account_deleted.txt",
+      "corpus_sha256": "2d52508b69170ad0ae3d76d72b83672af4661d425cee8b9673ee36618dea969a",
+      "broker_name": "databroker.com",
+      "broker_website": "",
+      "reply_subject": "Your data has been deleted",
+      "reply_body": "From: privacy@databroker.com\n\nDear Customer,\n\nThis is to confirm that all personal data associated with your account\nhas been permanently deleted from our systems in accordance with your\ndeletion request (ticket #DEL-78901).\n\nNo further action is required on your part.\n\nSincerely,\nPrivacy Operations\nDataBroker Inc.",
+      "fallback_template": "",
+      "prompt_base64": "QnJva2VyOiBkYXRhYnJva2VyLmNvbSAoKQoKClJlcGx5IHN1YmplY3Q6IFlvdXIgZGF0YSBoYXMgYmVlbiBkZWxldGVkCgpSZXBseSBib2R5OgpGcm9tOiBwKioqKip5QGQqLmNvbQoKRGVhciBDdXN0b21lciwKClRoaXMgaXMgdG8gY29uZmlybSB0aGF0IGFsbCBwZXJzb25hbCBkYXRhIGFzc29jaWF0ZWQgd2l0aCB5b3VyIGFjY291bnQKaGFzIGJlZW4gcGVybWFuZW50bHkgZGVsZXRlZCBmcm9tIG91ciBzeXN0ZW1zIGluIGFjY29yZGFuY2Ugd2l0aCB5b3VyCmRlbGV0aW9uIHJlcXVlc3QgKHRpY2tldCAjREVMLTc4OTAxKS4KCk5vIGZ1cnRoZXIgYWN0aW9uIGlzIHJlcXVpcmVkIG9uIHlvdXIgcGFydC4KClNpbmNlcmVseSwKUHJpdmFjeSBPcGVyYXRpb25zCkRhdGFCcm9rZXIgSW5jLg==",
+      "prompt_bytes": 391
+    },
+    {
+      "name": "rejected_invalid_id",
+      "corpus_file": "tests/fixtures/broker_replies/rejected_invalid_id.txt",
+      "corpus_sha256": "d76b36be6855507d816f58b4963a75296cdeb16a6b73c5f5e1abc3894cc087c5",
+      "broker_name": "lookupbroker.com",
+      "broker_website": "",
+      "reply_subject": "Your request could not be processed",
+      "reply_body": "From: support@lookupbroker.com\n\nDear Customer,\n\nWe were unable to process your data deletion request because the\ninformation provided does not match our records.\n\nTo proceed, please provide:\n- Full legal name\n- Date of birth\n- Current mailing address\n\nWithout this information we cannot verify your identity and process\nthe deletion request.\n\nRegards,\nSupport Team\nLookUpBroker LLC",
+      "fallback_template": "address_mismatch",
+      "prompt_base64": "QnJva2VyOiBsb29rdXBicm9rZXIuY29tICgpCgoKUmVwbHkgc3ViamVjdDogWW91ciByZXF1ZXN0IGNvdWxkIG5vdCBiZSBwcm9jZXNzZWQKClJlcGx5IGJvZHk6CkZyb206IHMqKioqKnRAbCouY29tCgpEZWFyIEN1c3RvbWVyLAoKV2Ugd2VyZSB1bmFibGUgdG8gcHJvY2VzcyB5b3VyIGRhdGEgZGVsZXRpb24gcmVxdWVzdCBiZWNhdXNlIHRoZQppbmZvcm1hdGlvbiBwcm92aWRlZCBkb2VzIG5vdCBtYXRjaCBvdXIgcmVjb3Jkcy4KClRvIHByb2NlZWQsIHBsZWFzZSBwcm92aWRlOgotIEZ1bGwgbGVnYWwgbmFtZQotIERhdGUgb2YgYmlydGgKLSBDdXJyZW50IG1haWxpbmcgYWRkcmVzcwoKV2l0aG91dCB0aGlzIGluZm9ybWF0aW9uIHdlIGNhbm5vdCB2ZXJpZnkgeW91ciBpZGVudGl0eSBhbmQgcHJvY2Vzcwp0aGUgZGVsZXRpb24gcmVxdWVzdC4KClJlZ2FyZHMsClN1cHBvcnQgVGVhbQpMb29rVXBCcm9rZXIgTExD",
+      "prompt_bytes": 465
+    },
+    {
+      "name": "verification_needed",
+      "corpus_file": "tests/fixtures/broker_replies/verification_needed.txt",
+      "corpus_sha256": "d62f4c5bcc0836f0376924da1dfa1834adf2fac203adb7d22345731d47b28216",
+      "broker_name": "personfinder.com",
+      "broker_website": "",
+      "reply_subject": "Verification required for your request",
+      "reply_body": "From: compliance@personfinder.com\n\nHello,\n\nBefore we can process your data removal request, we need you to\nverify your identity. Please follow the link below and upload\na copy of your government-issued ID:\n\nhttps://personfinder.example.com/verify/ABC123\n\nThis verification step is required to protect against fraudulent\ndeletion requests. Once verified we will process your request\nwithin 14 business days.\n\nThank you,\nPrivacy Team\nPersonFinder",
+      "fallback_template": "identity_challenged",
+      "prompt_base64": "QnJva2VyOiBwZXJzb25maW5kZXIuY29tICgpCgoKUmVwbHkgc3ViamVjdDogVmVyaWZpY2F0aW9uIHJlcXVpcmVkIGZvciB5b3VyIHJlcXVlc3QKClJlcGx5IGJvZHk6CkZyb206IGMqKioqKioqKmVAcCouY29tCgpIZWxsbywKCkJlZm9yZSB3ZSBjYW4gcHJvY2VzcyB5b3VyIGRhdGEgcmVtb3ZhbCByZXF1ZXN0LCB3ZSBuZWVkIHlvdSB0bwp2ZXJpZnkgeW91ciBpZGVudGl0eS4gUGxlYXNlIGZvbGxvdyB0aGUgbGluayBiZWxvdyBhbmQgdXBsb2FkCmEgY29weSBvZiB5b3VyIGdvdmVybm1lbnQtaXNzdWVkIElEOgoKaHR0cHM6Ly9wZXJzb25maW5kZXIuZXhhbXBsZS5jb20vdmVyaWZ5L0FCQzEyMwoKVGhpcyB2ZXJpZmljYXRpb24gc3RlcCBpcyByZXF1aXJlZCB0byBwcm90ZWN0IGFnYWluc3QgZnJhdWR1bGVudApkZWxldGlvbiByZXF1ZXN0cy4gT25jZSB2ZXJpZmllZCB3ZSB3aWxsIHByb2Nlc3MgeW91ciByZXF1ZXN0CndpdGhpbiAxNCBidXNpbmVzcyBkYXlzLgoKVGhhbmsgeW91LApQcml2YWN5IFRlYW0KUGVyc29uRmluZGVy",
+      "prompt_bytes": 531
+    }
+  ]
+}
