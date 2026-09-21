@@ -10,6 +10,10 @@
 //! of the child, so a timeout can actually kill it, and a large oracle payload
 //! cannot deadlock against a full pipe buffer.
 
+// The module is included per test file via `#[path]`, so each file sees every
+// helper while using only some of them.
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -23,6 +27,10 @@ pub const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
 /// Separate, larger budget for the one-off build: compiling costs more than
 /// running, and the cold-cache case must not be mistaken for a hang.
 pub const ORACLE_BUILD_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// The Go toolchain the committed oracles are pinned to. CI pins the same
+/// version in `rust-ci.yml`.
+pub const GO_TOOLCHAIN: &str = "go1.26.6";
 
 /// What an oracle invocation produced.
 pub struct OracleRun {
@@ -116,7 +124,70 @@ pub fn run_oracle(package: &'static str, stdin: Option<&[u8]>) -> OracleRun {
 /// Distinguishes concurrent invocations of the same oracle within one process.
 static INVOCATION: AtomicUsize = AtomicUsize::new(0);
 
-fn run_bounded(
+/// A `go` invocation with the repository as its working directory and the
+/// isolated build cache the storage oracle needs. Exposed so callers that run
+/// `go test` rather than a built binary share the same bounded execution.
+pub fn go_command(repository: &Path, build_cache: &Path) -> Command {
+    let mut command = Command::new("go");
+    command
+        .current_dir(repository)
+        .env("GOCACHE", build_cache)
+        .env("GOTOOLCHAIN", GO_TOOLCHAIN)
+        .env("GOWORK", "off");
+    command
+}
+
+/// Builds the named oracle with extra build tags once per test process and runs
+/// it. Needed by the storage oracle, which is guarded by `storage_oracle`.
+pub fn run_oracle_with_tags(
+    package: &'static str,
+    tags: &[&str],
+    build_cache: &Path,
+    repository: &Path,
+) -> OracleRun {
+    let scratch = scratch_root(package);
+    let name = package.rsplit('/').next().expect("oracle package name");
+    let executable = scratch.join(if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_owned()
+    });
+    let tag_list = tags.join(",");
+    let mut build = go_command(repository, build_cache);
+    build
+        .args(["build", "-tags", &tag_list, "-o"])
+        .arg(&executable)
+        .arg(format!("./rust-tests/parity/oracle/{package}"));
+    let build_run = run_bounded(
+        build,
+        None,
+        &scratch.join("build.stdout"),
+        &scratch.join("build.stderr"),
+        ORACLE_BUILD_TIMEOUT,
+    )
+    .expect("Go must be available for the committed oracle");
+    assert!(
+        build_run.status.success(),
+        "Go oracle build failed: {}",
+        String::from_utf8_lossy(&build_run.stderr)
+    );
+
+    let invocation = INVOCATION.fetch_add(1, Ordering::Relaxed);
+    let mut command = Command::new(executable);
+    command.current_dir(repository);
+    run_bounded(
+        command,
+        None,
+        &scratch.join(format!("run-{invocation}.stdout")),
+        &scratch.join(format!("run-{invocation}.stderr")),
+        ORACLE_TIMEOUT,
+    )
+    .expect("Go oracle execution must complete within its bounded timeout")
+}
+
+/// Runs an already-configured command with a deadline, capturing its output to
+/// files. Public so tests that invoke `go test` share this bounded path.
+pub fn run_bounded(
     mut command: Command,
     stdin: Option<&[u8]>,
     stdout_path: &Path,

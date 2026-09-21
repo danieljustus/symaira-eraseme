@@ -1,3 +1,6 @@
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -202,38 +205,37 @@ fn canonical_sql(sql: &str) -> String {
 fn run_go_storage_oracle() -> serde_json::Value {
     let build_cache = tempdir().expect("create isolated Go build cache");
     let repository = repository_root();
-    let test_output = Command::new("go")
-        .args([
-            "test",
-            "-tags",
-            "storage_oracle",
-            "./rust-tests/parity/oracle/storage",
-        ])
-        .current_dir(&repository)
-        .env("GOCACHE", build_cache.path())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOWORK", "off")
-        .output()
-        .expect("run the committed Go storage oracle negative controls");
+    // Both phases go through the shared bounded runner. `go run` recompiles the
+    // oracle on every call, so the compile cost came out of the runtime budget
+    // here too — the same defect #912 fixed for the other three call sites.
+    let scratch = tempdir().expect("oracle output scratch");
+    let mut go_test = go_oracle::go_command(&repository, build_cache.path());
+    go_test.args([
+        "test",
+        "-tags",
+        "storage_oracle",
+        "./rust-tests/parity/oracle/storage",
+    ]);
+    let test_output = go_oracle::run_bounded(
+        go_test,
+        None,
+        &scratch.path().join("go-test.stdout"),
+        &scratch.path().join("go-test.stderr"),
+        go_oracle::ORACLE_BUILD_TIMEOUT,
+    )
+    .expect("run the committed Go storage oracle negative controls");
     assert!(
         test_output.status.success(),
         "Go storage oracle negative controls failed: {}",
         String::from_utf8_lossy(&test_output.stderr)
     );
 
-    let output = Command::new("go")
-        .args([
-            "run",
-            "-tags",
-            "storage_oracle",
-            "./rust-tests/parity/oracle/storage",
-        ])
-        .current_dir(repository)
-        .env("GOCACHE", build_cache.path())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOWORK", "off")
-        .output()
-        .expect("run the committed Go storage oracle");
+    let output = go_oracle::run_oracle_with_tags(
+        "storage",
+        &["storage_oracle"],
+        build_cache.path(),
+        &repository,
+    );
     assert!(
         output.status.success(),
         "Go storage oracle failed: {}",
