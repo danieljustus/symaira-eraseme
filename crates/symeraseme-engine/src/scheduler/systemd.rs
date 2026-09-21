@@ -1,4 +1,4 @@
-use super::{Config, WRAPPER_DIR_PLACEHOLDER, wrapper};
+use super::{Config, LEGACY_MARKER, WRAPPER_DIR_PLACEHOLDER, wrapper};
 use std::collections::BTreeMap;
 
 pub(super) fn generate(
@@ -87,6 +87,7 @@ pub(super) fn generate(
 fn service(description: &str, wrapper_path: &str) -> String {
     format!(
         "[Unit]\n\
+         # {LEGACY_MARKER} (Go)\n\
          Description={description}\n\
          After=network-online.target\n\
          \n\
@@ -105,6 +106,7 @@ fn service(description: &str, wrapper_path: &str) -> String {
 fn timer(description: &str, service_name: &str, calendar: &str) -> String {
     format!(
         "[Unit]\n\
+         # {LEGACY_MARKER} (Go)\n\
          Description={description}\n\
          \n\
          [Timer]\n\

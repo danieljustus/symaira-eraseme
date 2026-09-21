@@ -28,7 +28,7 @@ import (
 
 const (
 	sourceRevision = "ef1f7bcbaf748b490eeeb0bc4ef879cb2f536de6"
-	sourceSHA256   = "d936e2fea18f2f36e4801b3812d2c5c5d379c33423680e35c74d3d7a4e5f8860"
+	sourceSHA256   = "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"
 	oracleSchema   = "symaira-eraseme.scheduler-parity.v1"
 )
 

@@ -269,14 +269,15 @@ pub fn is_python_scheduler_content(content: &str) -> bool {
     content.contains(LEGACY_MARKER) && !content.contains(&format!("{LEGACY_MARKER} (Go)"))
 }
 
-/// The unit names Go's `Status` resolves, which differ from
-/// [`native_unit_names`] on launchd. See #1000.
+/// Unit file names `status` inspects. Launchd units live under their label
+/// (`com.symeraseme.tick.plist`), the same name `write_files`/`uninstall` and
+/// the legacy scan use; systemd units use the logical name.
 fn status_unit_names(platform: Platform) -> [&'static str; 3] {
     match platform {
         Platform::Launchd => [
-            "symeraseme-tick.plist",
-            "symeraseme-poll.plist",
-            "symeraseme-rescan.plist",
+            "com.symeraseme.tick.plist",
+            "com.symeraseme.poll.plist",
+            "com.symeraseme.rescan.plist",
         ],
         _ => [
             "symeraseme-tick.timer",
