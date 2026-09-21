@@ -169,9 +169,9 @@
         {
           "name": "crontab",
           "args": [
-            "/var/folders/7v/7bpq0fjn44lflpxdylsx8qs40000gn/T/.symeraseme-crontab-\u003cRANDOM\u003e"
+            "\u003cTMP\u003e/.symeraseme-crontab-\u003cRANDOM\u003e"
           ],
-          "line": "crontab /var/folders/7v/7bpq0fjn44lflpxdylsx8qs40000gn/T/.symeraseme-crontab-\u003cRANDOM\u003e"
+          "line": "crontab \u003cTMP\u003e/.symeraseme-crontab-\u003cRANDOM\u003e"
         }
       ]
     },

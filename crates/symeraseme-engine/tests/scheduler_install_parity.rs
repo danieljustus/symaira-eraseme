@@ -147,6 +147,16 @@ fn normalize(value: &str, case_root: &Path, temp_root: &Path) -> String {
     let case = case_root.to_string_lossy().to_string();
     out = out.replace(&temp, "<TMPROOT>");
     out = out.replace(&case, "<CASE>");
+    // The crontab staging file lives in the system temp directory, whose form
+    // differs by platform: macOS keeps a trailing separator ("/var/folders/.../T/"),
+    // Linux does not ("/tmp"). Trim it to match Go's folding.
+    let staging = std::env::temp_dir().to_string_lossy().to_string();
+    let staging = staging.trim_end_matches('/');
+    out = out.replace(
+        &format!("{staging}/.symeraseme-crontab-"),
+        "<TMP>/.symeraseme-crontab-",
+    );
+    out = out.replace(&format!("{staging}/.crontab-"), "<TMP>/.crontab-");
     out = collapse_random(&out, ".crontab-");
     out = collapse_random(&out, ".symeraseme-crontab-");
     out

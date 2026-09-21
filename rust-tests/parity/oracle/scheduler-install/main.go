@@ -147,7 +147,11 @@ func normalize(value, caseRoot string) string {
 		out = strings.ReplaceAll(out, filepath.ToSlash(root), "<TMPROOT>")
 	}
 	out = strings.ReplaceAll(out, filepath.ToSlash(caseRoot), "<CASE>")
-	staging := filepath.ToSlash(os.TempDir())
+	// os.TempDir keeps whatever TMPDIR holds: macOS ends in a separator
+	// ("/var/folders/.../T/"), Linux does not ("/tmp"). Without trimming it the
+	// join below builds a doubled separator that never matches, so the staging
+	// path kept the machine's own temp directory in the capture.
+	staging := strings.TrimRight(filepath.ToSlash(os.TempDir()), "/")
 	out = strings.ReplaceAll(out, staging+"/.crontab-", "<TMP>/.crontab-")
 	out = strings.ReplaceAll(out, staging+"/.symeraseme-crontab-", "<TMP>/.symeraseme-crontab-")
 	// The staging suffix itself is a random number.
