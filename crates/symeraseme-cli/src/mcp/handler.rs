@@ -23,6 +23,7 @@ use symeraseme_core::email::service::InboxService;
 use symeraseme_core::email::session::ImapDialer;
 use symeraseme_core::email::types::{MatchedMessage, RemovalRequest};
 use symeraseme_core::identity::{OsSecretBackend, SecretResolver};
+use symeraseme_core::jsonorder::go_map_order;
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
@@ -186,21 +187,24 @@ impl ContractHandler {
         })
     }
 
-    /// Go's `Result` marshalling: `success`, then `error`, then the flattened
-    /// data keys — a `message` is dropped when an error is present.
+    /// Go's `Result` marshalling: `success`, `error` and the flattened data keys
+    /// go through a Go map, so they are emitted in sorted key order — a
+    /// `message` is dropped when an error is present. The crate builds JSON
+    /// objects in insertion order (`serde_json/preserve_order`, needed for the
+    /// struct-ordered payloads nested inside), so this one sorts explicitly.
     fn result_payload(success: bool, error: Option<String>, data: Vec<(&str, Value)>) -> Value {
-        let mut payload = Map::new();
-        payload.insert("success".to_owned(), json!(success));
+        let mut entries: Vec<(String, Value)> = vec![("success".to_owned(), json!(success))];
         if let Some(error) = &error {
-            payload.insert("error".to_owned(), json!(error));
+            entries.push(("error".to_owned(), json!(error)));
         }
         for (key, value) in data {
             if error.is_some() && key == "message" {
                 continue;
             }
-            payload.insert(key.to_owned(), value);
+            entries.push((key.to_owned(), value));
         }
-        Value::Object(payload)
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        Value::Object(entries.into_iter().collect::<Map<String, Value>>())
     }
 
     /// Go's `HandleList`.
@@ -984,10 +988,23 @@ fn parse_poll_hours(raw: &str) -> Result<Vec<i32>, ToolError> {
 
 impl ToolHandler for ContractHandler {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        // Every tool payload Go builds is a `map[string]any`, so it is emitted
+        // with sorted keys. `manual_tasks_list` is the one exception: its
+        // `tasks` entries are marshalled from the `ManualTask` struct and keep
+        // that struct's declaration order, so it sorts its own top level
+        // instead of being sorted here.
+        if name == "manual_tasks_list" {
+            return self.manual_tasks_list(arguments);
+        }
+        self.call_go_map(name, arguments).map(go_map_order)
+    }
+}
+
+impl ContractHandler {
+    fn call_go_map(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         match name {
             "redact_file" => redact_file(&self.workspace_root, arguments),
             "validate" => validate(&self.workspace_root, arguments),
-            "manual_tasks_list" => self.manual_tasks_list(arguments),
             "manual_tasks_show" => self.manual_tasks_show(arguments),
             "manual_tasks_complete" => self.manual_tasks_complete(arguments),
             "manual_tasks_cleanup" => self.manual_tasks_cleanup(arguments),
@@ -1313,6 +1330,16 @@ mod tests {
         );
     }
 
+    /// The payload's keys in the order it was serialised with.
+    fn keys(payload: &Value) -> Vec<&str> {
+        payload
+            .as_object()
+            .unwrap_or_else(|| panic!("expected an object, got {payload}"))
+            .keys()
+            .map(String::as_str)
+            .collect()
+    }
+
     /// Wraps one `tools/call` in the envelope and returns the whole response.
     fn handler_call(handler: &ContractHandler, name: &str, arguments: &str) -> Value {
         let arguments: Value = serde_json::from_str(arguments).expect("arguments");
@@ -1580,8 +1607,41 @@ mod tests {
                 .starts_with("Manual tasks (1):")
         );
 
+        // Key order, which the empty-`tasks` oracle case cannot pin: Go
+        // marshals the nested task objects of `list` from the `ManualTask`
+        // struct, so they keep its declaration order, while `Result` itself and
+        // `show`'s `taskMap` go through a Go map and come out sorted.
+        assert_eq!(
+            keys(&listed),
+            vec!["message", "success", "tasks"],
+            "list payload: {listed}"
+        );
+        assert_eq!(
+            keys(&listed["tasks"][0]),
+            vec![
+                "id",
+                "request_id",
+                "broker_id",
+                "broker_name",
+                "form_url",
+                "reason",
+                "instructions",
+                "screenshot_path",
+                "html_snapshot_path",
+                "form_fields_json",
+                "status",
+                "created_at",
+                "completed_at",
+                "notes",
+            ],
+            "nested task: {listed}"
+        );
+
         // `show` detail: the message block plus the task map.
         let shown = call(r#"{"task_id":1}"#, "manual_tasks_show");
+        let mut sorted_show_keys = keys(&shown);
+        sorted_show_keys.sort_unstable();
+        assert_eq!(keys(&shown), sorted_show_keys, "show payload: {shown}");
         assert_eq!(shown["success"], true);
         assert_eq!(shown["id"], 1);
         let message = shown["message"].as_str().expect("message");
@@ -1591,6 +1651,14 @@ mod tests {
         );
         assert!(message.contains("URL:        https://broker-a.example/optout"));
         assert!(message.contains("Instructions:"));
+
+        // `complete` on the seeded task: Go's map order again.
+        let completed = call(r#"{"task_id":1,"notes":"done"}"#, "manual_tasks_complete");
+        assert_eq!(
+            keys(&completed),
+            vec!["message", "success", "task_id"],
+            "complete payload: {completed}"
+        );
 
         // `complete` on a missing task: the shared not-found text.
         let missing = call(r#"{"task_id":999}"#, "manual_tasks_complete");

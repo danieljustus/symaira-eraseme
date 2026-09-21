@@ -437,9 +437,14 @@ impl OAuth2Client {
                 reply.status
             )));
         }
-        match serde_json::from_str::<serde_json::Value>(&reply.body) {
-            Ok(serde_json::Value::Object(map)) => Ok(map),
-            Ok(_) | Err(_) => Err(OAuthError::oauth2(format!(
+        // Go decodes the reply into `map[string]any`, so the token fields are
+        // held — and re-marshalled — in sorted key order.
+        match crate::jsonorder::go_map_order(
+            serde_json::from_str::<serde_json::Value>(&reply.body)
+                .unwrap_or(serde_json::Value::Null),
+        ) {
+            serde_json::Value::Object(map) => Ok(map),
+            _ => Err(OAuthError::oauth2(format!(
                 "{operation} returned invalid JSON"
             ))),
         }

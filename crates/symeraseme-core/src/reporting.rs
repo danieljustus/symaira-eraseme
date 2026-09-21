@@ -12,6 +12,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
+use crate::jsonorder::go_map_order;
 use crate::storage::Store;
 use crate::timeutil::format_iso;
 
@@ -274,7 +275,7 @@ pub fn get_campaign_status(
         campaign_id
     };
     let total = requests.len() as i64;
-    Ok(json!({
+    Ok(go_map_order(json!({
         "schema_version": 1,
         "as_of": iso(now),
         "scope": {"campaign_id": scope},
@@ -292,7 +293,7 @@ pub fn get_campaign_status(
             "deadline_due_within_30d": due30,
             "tick_actions_ready": tick,
         },
-    }))
+    })))
 }
 
 /// Mirrors Go's `GetCalendar`: unresolved markers grouped by ISO week.
@@ -361,7 +362,7 @@ pub fn get_calendar(
     } else {
         campaign_id
     };
-    Ok(json!({
+    Ok(go_map_order(json!({
         "schema_version": 1,
         "as_of": iso(now),
         "horizon_weeks": weeks,
@@ -373,7 +374,7 @@ pub fn get_calendar(
             "weeks_with_actions": weeks_with_actions,
         },
         "weeks": grouped,
-    }))
+    })))
 }
 
 #[derive(Debug, Clone)]
@@ -854,7 +855,7 @@ pub fn get_report_data(
         })
         .collect();
     let statuses = count_statuses(&requests);
-    Ok(json!({
+    Ok(go_map_order(json!({
         "generated_at": iso(now),
         "campaigns": aggregates,
         "total_campaigns": aggregates.len() as i64,
@@ -865,7 +866,7 @@ pub fn get_report_data(
         "timeline": build_timeline(&events),
         "historical_comparison": historical_comparison(&aggregates),
         "success_metrics": success_metrics(&requests),
-    }))
+    })))
 }
 
 /// Go's `recentEvents`: the newest events joined with their broker.
@@ -934,7 +935,7 @@ pub fn get_dashboard_data(
         .collect();
     let events = recent_events(store, 50)?;
     let counts = count_statuses(&requests);
-    Ok(json!({
+    Ok(go_map_order(json!({
         "campaigns": campaign_values,
         "total_requests": requests.len() as i64,
         "planned": count_of(&counts, "PLANNED"),
@@ -947,5 +948,5 @@ pub fn get_dashboard_data(
         "broker_status": broker_dashboard(&requests),
         "recent_events": events,
         "generated_at": iso(now),
-    }))
+    })))
 }

@@ -16,6 +16,7 @@ use symeraseme_core::identity::{
     ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
     init_profile, load_profile, profile_exists,
 };
+use symeraseme_core::jsonorder::go_map_order;
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
 };
@@ -567,7 +568,13 @@ fn schedule_install(parsed: &Parsed) -> Outcome {
             Err(outcome) => return outcome,
         };
         if format == "json" {
-            return match json_line(&json!({"success": true, "files": files, "dry_run": true})) {
+            // Go writes a `map[string]any`, so the keys come out sorted.
+            let payload = go_map_order(json!({
+                "success": true,
+                "files": files,
+                "dry_run": true,
+            }));
+            return match json_line(&payload) {
                 Ok(bytes) => Outcome::Stdout(bytes),
                 Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
             };
@@ -770,11 +777,11 @@ fn plan_show(parsed: &Parsed) -> Outcome {
     };
     let total = requests.len();
     // Go marshals a `map[string]any`, so the keys come out sorted.
-    let result = json!({
+    let result = go_map_order(json!({
         "campaign_id": label.clone(),
         "total": total,
         "requests": request_rows(requests),
-    });
+    }));
     let format = match output_format(parsed) {
         Ok(format) => format,
         Err(outcome) => return outcome,
