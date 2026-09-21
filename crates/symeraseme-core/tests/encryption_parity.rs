@@ -1,6 +1,9 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
 use sha2::{Digest, Sha256};
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
+
 use symeraseme_core::storage::encryption::{
     EncryptionError, V1_HEADER, V2_HEADER, V2_SALT_LEN, V3_HEADER, V3_SALT_LEN, decrypt_v1,
     decrypt_v2, decrypt_v3, is_legacy_go_envelope,
@@ -278,34 +281,16 @@ fn python_final_v3_fixture_matches_oracle_provenance() {
 
 #[test]
 fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
     let key = [0x41_u8; 32];
     let plaintext = b"SQLite format 3\0binary\xff payload at a block boundary";
-    let oracle = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust-tests/parity/oracle/crypto");
     let run = |operation: u8, payload: &[u8]| {
-        let mut child = Command::new("go")
-            .args(["run", "."])
-            .current_dir(&oracle)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("Go crypto oracle must start");
         let mut request = Vec::with_capacity(33 + payload.len());
         request.push(operation);
         request.extend_from_slice(&key);
         request.extend_from_slice(payload);
-        child.stdin.take().unwrap().write_all(&request).unwrap();
-        let output = child.wait_with_output().expect("Go oracle must finish");
-        assert!(
-            output.status.success(),
-            "Go oracle failed: {:?}",
-            output.stderr
-        );
-        output.stdout
+        let run = go_oracle::run_oracle("crypto", Some(&request));
+        assert!(run.status.success(), "Go oracle failed: {:?}", run.stderr);
+        run.stdout
     };
 
     let rust_envelope = symeraseme_core::storage::encryption::encrypt_v3(plaintext, &key)

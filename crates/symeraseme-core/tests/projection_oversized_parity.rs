@@ -6,12 +6,13 @@
 //! only covers ordinary fractional and negative values, so this test pins the
 //! boundary behaviour against a live Go executable oracle.
 
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
+
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
-use std::path::Path;
-use std::process::Command;
 use symeraseme_core::storage::{EventRecord, EventType, ProjectionState, Source, fold_events};
 
 const CASES: &str = include_str!("../../../rust-tests/parity/oracle/projection/cases.json");
@@ -28,19 +29,13 @@ struct OracleOutput {
 }
 
 fn run_go_oracle() -> OracleOutput {
-    let oracle =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rust-tests/parity/oracle/projection");
-    let output = Command::new("go")
-        .args(["run", "."])
-        .current_dir(&oracle)
-        .output()
-        .expect("Go must be available for the projection oracle");
+    let run = go_oracle::run_oracle("projection", None);
     assert!(
-        output.status.success(),
+        run.status.success(),
         "Go projection oracle failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&run.stderr)
     );
-    serde_json::from_slice(&output.stdout).expect("Go projection oracle must emit JSON")
+    serde_json::from_slice(&run.stdout).expect("Go projection oracle must emit JSON")
 }
 
 #[test]
