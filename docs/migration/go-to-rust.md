@@ -24,7 +24,7 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 146 · deferred: 20 (as of `cedc0b8a`).
+Selected: 149 · deferred: 17 (as of `04e516b3`).
 
 ## Remaining deferred cases
 
@@ -33,13 +33,19 @@ Selected: 146 · deferred: 20 (as of `cedc0b8a`).
 
 | `grant-dry-run`, `operate-grant` | grant/tokens | ready |
 | `operate-events-show` | events | ready |
-| `operate-manual-tasks-show/-complete/-cleanup` | manual tasks | in progress — CLI-016, branch `cli-016-manual-tasks` |
-| `operate-plan-create/-show/-execute` | campaign planning | ready |
+
+| `operate-plan-create/-show/-execute` | campaign planning | in progress — CLI-017, branch `cli-017-plan` |
 | `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready |
 | `operate-auto-confirm`, `operate-classify-reply` | triage | ready |
 | `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | ready |
 | `operate-mcp` | MCP stdio server | ready |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
+
+## CI caveat
+
+`Rust / native (${{ matrix.os }})` reports **skipping** on PRs, so a green PR
+is not native multi-platform evidence. Native target results remain an open
+gate for cutover readiness.
 
 ## Known parity defects found but not fixed
 
@@ -55,7 +61,9 @@ Selected: 146 · deferred: 20 (as of `cedc0b8a`).
 
 - 2026-09-21 — this ledger created; `docs/rust-port/handoffs/` stays the
   per-slice evidence store, not a second tracker.
-- 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`).
+- 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`); CLI-016 as #1017 (`04e516b3`).
+- Port PRs carry code only; ledger updates go to main separately.
+- The `manual-tasks list` key-order defect is being fixed on `fix/manual-tasks-key-order`.
 - Work is dispatched into per-slice worktrees off the integrated revision; the
   coordinator alone edits this file, shared manifests and CI.
 
