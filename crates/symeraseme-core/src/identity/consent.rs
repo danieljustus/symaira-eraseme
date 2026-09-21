@@ -329,17 +329,22 @@ impl ConsentStore {
         self.ensure_directory()?;
         let now = (self.clock)();
         let mut tokens = Vec::new();
+        // Go's `os.ReadDir` answers filename order; the sort below is stable,
+        // so files issued in the same second keep it.
+        let mut names = Vec::new();
         for entry in fs::read_dir(&self.directory)? {
             let entry = entry?;
-            if !entry.file_type()?.is_file() {
-                continue;
+            if entry.file_type()?.is_file() {
+                names.push(entry.file_name());
             }
-            let name = entry.file_name();
+        }
+        names.sort();
+        for name in &names {
             let name = name.to_string_lossy();
             if !name.starts_with("consent_") || !name.ends_with(".json") {
                 continue;
             }
-            let path = entry.path();
+            let path = self.directory.join(name.as_ref());
             let body = match fs::read(&path) {
                 Ok(body) => body,
                 Err(_) => continue,
@@ -365,6 +370,8 @@ impl ConsentStore {
                 expires_at: record.expires_at,
             });
         }
+        // Go reads the directory in name order and then sorts by issue time,
+        // so files issued in the same second keep their filename order.
         tokens.sort_by_key(|token| token.issued_at);
         Ok(tokens)
     }
