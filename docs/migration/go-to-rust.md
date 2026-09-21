@@ -24,7 +24,7 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 155 · deferred: 11 (as of `861527cf`).
+Selected: 158 · deferred: 8 (as of `93872f48`).
 
 ## Remaining deferred cases
 
@@ -32,8 +32,9 @@ Selected: 155 · deferred: 11 (as of `861527cf`).
 |---|---|---|
 
 
-| `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready — next slice |
-| `operate-auto-confirm`, `operate-classify-reply` | triage | ready |
+| `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
+| `operate-generate-rebuttal` | generators/LLM | deferred — no llmkit transports in Rust; emulating the auth error is forbidden |
+| `operate-auto-confirm`, `operate-classify-reply` | triage | ready — next slice |
 | `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | ready |
 | `operate-mcp` | MCP stdio server | ready |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
@@ -79,6 +80,12 @@ gate for cutover readiness.
 - 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`); CLI-016 as #1017 (`04e516b3`).
 - 2026-09-21 — key-order fix merged as #1018 (`a96d65d5`); CLI-018
   (events/grant) merged as #1020 (`861527cf`). Selected 155 / deferred 11.
+- 2026-09-21 — CLI-019 (generate-dashboard/-report/-scheduler) merged as
+  #1021 (`93872f48`). Selected 158 / deferred 8. `operate-generate-rebuttal`
+  stays deferred: the LLM subsystem is unported and its auth-failure string
+  must not be emulated. Delegated worker for this slice died on Codex 429
+  (fallback did not trigger); the coordinator implemented the slice directly
+  in the slice worktree.
 - Port PRs carry code only; ledger updates go to main separately.
 - Work is dispatched into per-slice worktrees off the integrated revision; the
   coordinator alone edits this file, shared manifests and CI.
