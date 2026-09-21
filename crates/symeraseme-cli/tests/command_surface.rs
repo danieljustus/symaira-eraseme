@@ -440,6 +440,9 @@ fn is_exact_case(case: &Value) -> bool {
     // `registry list`/`validate` are replayed now that cli.rs implements them.
     // They carry the registry contract that `brokers list` cannot: no status
     // filter and no `filters` object, so the count is 1,277 rather than 1,273.
+    // `status` and `plan status` share Go's body; the recorded bytes for
+    // `status-json`, `operate-status` and `operate-plan-status` are identical.
+    const STATUS_OPERATIONS: [&str; 3] = ["status-json", "operate-status", "operate-tick"];
     const REGISTRY_OPERATIONS: [&str; 5] = [
         "registry-list",
         "registry-list-json",
@@ -453,6 +456,7 @@ fn is_exact_case(case: &Value) -> bool {
     ) || case["category"] == "success" && PHASE_SUCCESS.contains(&case["id"].as_str().unwrap_or(""))
         || SURFACE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || REGISTRY_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || STATUS_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
 }
 
 #[test]
@@ -478,8 +482,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 133);
-    assert_eq!(deferred.len(), 33);
+    assert_eq!(selected.len(), 136);
+    assert_eq!(deferred.len(), 30);
 
     let root = unique_root();
     let home = root.join("home");
@@ -501,7 +505,14 @@ fn frozen_command_surface_matches_phase_two_contract() {
         // The store-backed operations read the event store, so they run against
         // their own data directory: the shared isolated HOME has to stay empty
         // for the assertion below.
-        let store_backed = matches!(id, "operate-plan-status" | "operate-plan-tick");
+        let store_backed = matches!(
+            id,
+            "operate-plan-status"
+                | "operate-plan-tick"
+                | "status-json"
+                | "operate-status"
+                | "operate-tick"
+        );
         // The phase-two capture runs every schedule case in its own
         // `cli/<id>/cwd`, so the generated wrappers record that directory; the
         // replay has to run in the same layout or the folded paths differ.
@@ -540,17 +551,18 @@ fn frozen_command_surface_matches_phase_two_contract() {
         };
         // `plan status` reports a wall clock, so its value is masked before the
         // comparison — the format itself is still asserted by the masker.
-        let actual_stdout = if id == "operate-plan-status" {
-            mask_wall_clock(&output.stdout)
-        } else if id.starts_with("operate-schedule") {
-            // The generated wrappers embed the working directory and the CLI's
-            // own resolved executable path; the phase-two capture folds both to
-            // `<ORACLE_ROOT>` (the binary as `<ORACLE_ROOT>/bin/symeraseme`).
-            // Folding the same values here keeps the rest byte exact.
-            fold_schedule_output(&output.stdout, &root, &binary())
-        } else {
-            output.stdout.clone()
-        };
+        let actual_stdout =
+            if matches!(id, "operate-plan-status" | "status-json" | "operate-status") {
+                mask_wall_clock(&output.stdout)
+            } else if id.starts_with("operate-schedule") {
+                // The generated wrappers embed the working directory and the CLI's
+                // own resolved executable path; the phase-two capture folds both to
+                // `<ORACLE_ROOT>` (the binary as `<ORACLE_ROOT>/bin/symeraseme`).
+                // Folding the same values here keeps the rest byte exact.
+                fold_schedule_output(&output.stdout, &root, &binary())
+            } else {
+                output.stdout.clone()
+            };
         assert_eq!(actual_stdout, expected_stdout, "{id} stdout");
         assert_eq!(
             output.stderr,

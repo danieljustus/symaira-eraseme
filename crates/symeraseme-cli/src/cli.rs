@@ -390,7 +390,15 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
                     .to_vec(),
             )
         }
+        "status" => {
+            let campaign = parsed.flags.get("campaign").cloned().unwrap_or_default();
+            campaign_status(parsed, &campaign)
+        }
         "plan status" => plan_status(parsed),
+        // Go's bare `tick` and `plan tick` are `tickCommandWith` with the same
+        // `--dry-run` pointer; the recorded oracle bytes for `operate-tick` and
+        // `operate-plan-tick` are identical, so they share one implementation.
+        "tick" => plan_tick(parsed),
         "plan tick" => plan_tick(parsed),
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
@@ -632,11 +640,24 @@ fn go_value(value: &Value) -> String {
 /// is computed second, and only then is `--output` validated. A broken store
 /// therefore wins over a bad `--output` value.
 fn plan_status(parsed: &Parsed) -> Outcome {
+    // `plan status` declares no `--campaign` flag at all, so it always reports
+    // every campaign.
+    campaign_status(parsed, "")
+}
+
+/// Go's `status` and `plan status` are the same body.
+///
+/// `realStatusCommand` and `planStatusCommand` both call
+/// `reporting.GetCampaignStatus` and print either the marshalled result or
+/// `Total: %v`; only the top-level `status` declares a `--campaign` flag. The
+/// recorded oracle bytes are identical for both commands, which is what makes
+/// this a shared function rather than two implementations.
+fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
     let store = match open_store() {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let result = match reporting::get_campaign_status(&store, "", now_utc()) {
+    let result = match reporting::get_campaign_status(&store, campaign_id, now_utc()) {
         Ok(result) => result,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
