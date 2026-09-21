@@ -571,12 +571,11 @@ struct BrokerStat {
     times: Vec<f64>,
 }
 
-/// Go's `brokerLeaderboard`, ordered by total descending.
+/// Go's `brokerLeaderboard`, ordered by total descending then broker_id.
 ///
-/// Go builds its ordering slice from map iteration, so brokers with **equal**
-/// totals come out in a random order there; this port keeps first-seen order
-/// instead. The shared golden fixture has no tie (2 vs 1), so both orders agree
-/// on it.
+/// Go derived its ordering slice from map iteration, so brokers with equal
+/// totals came out in a random order; both sides now order equal totals by
+/// `broker_id` ascending, so the result is a function of the data alone (#963).
 fn broker_leaderboard(requests: &[RequestRow]) -> Vec<BrokerStat> {
     let mut stats: Vec<BrokerStat> = Vec::new();
     let position = |stats: &Vec<BrokerStat>, broker_id: &str| {
@@ -614,7 +613,16 @@ fn broker_leaderboard(requests: &[RequestRow]) -> Vec<BrokerStat> {
                 .push((resolved - sent).num_seconds() as f64 / 86_400.0);
         }
     }
-    stats.sort_by_key(|stat| std::cmp::Reverse(stat.total));
+    // Total descending, then broker_id ascending. Go derives its ordering
+    // slice from map iteration, so equal totals came out in a random order
+    // there (#963); both sides now share this rule instead of this port
+    // documenting a divergence.
+    stats.sort_by(|left, right| {
+        right
+            .total
+            .cmp(&left.total)
+            .then_with(|| left.broker_id.cmp(&right.broker_id))
+    });
     stats
 }
 
@@ -699,7 +707,15 @@ fn jurisdiction_breakdown(requests: &[RequestRow]) -> Vec<Value> {
             _ => {}
         }
     }
-    stats.sort_by_key(|stat| std::cmp::Reverse(stat.total));
+    // Total descending, then jurisdiction ascending, mirroring Go: its
+    // `order` slice is first-seen, so equal totals followed the input order
+    // and the output was not a function of the data alone (#963).
+    stats.sort_by(|left, right| {
+        right
+            .total
+            .cmp(&left.total)
+            .then_with(|| left.key.cmp(&right.key))
+    });
     stats
         .into_iter()
         .map(|stat| {

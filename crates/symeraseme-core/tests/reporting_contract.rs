@@ -136,3 +136,48 @@ fn unknown_campaign_produces_the_empty_report() {
     assert_eq!(report["historical_comparison"], serde_json::json!({}));
     assert_eq!(report["success_metrics"], serde_json::json!({}));
 }
+
+/// The golden fixture has no tie (its totals are 2 and 1), so any ordering
+/// looks correct against it. This pins the rule both sides now share: equal
+/// totals order by `broker_id` ascending (#963).
+#[test]
+fn tied_totals_order_by_broker_id() {
+    let (_tree, store) = fixture_store();
+    // Three brokers with one request each, seeded in an order that is not
+    // alphabetical, so first-seen order and the pinned rule disagree.
+    for (id, broker) in [(10, "delta"), (11, "alpha"), (12, "charlie")] {
+        store
+            .connection()
+            .execute_batch(&format!(
+                "INSERT INTO removal_requests(id,broker_id,channel,campaign_id,created_at,jurisdiction,template_id,identity_snapshot_hash) \
+                 VALUES ({id},'{broker}','email','new','2026-08-03T08:00:00+00:00','GDPR','gdpr','h');\
+                 INSERT INTO request_state(request_id,current_status,last_event_at) \
+                 VALUES ({id},'CONFIRMED','2026-08-03T08:00:00+00:00')"
+            ))
+            .expect("seed tied broker");
+    }
+    let report = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        pinned_now(),
+    )
+    .expect("report");
+
+    let leaderboard: Vec<String> = report["broker_leaderboard"]
+        .as_array()
+        .expect("leaderboard")
+        .iter()
+        // Only the tied brokers. The fixture's own `broker-b` also has a total
+        // of 1, so it belongs in this run of the ordering.
+        .filter(|entry| entry["total"] == 1)
+        .map(|entry| entry["broker_id"].as_str().expect("broker id").to_owned())
+        .collect();
+    assert_eq!(
+        leaderboard,
+        vec!["alpha", "broker-b", "charlie", "delta"],
+        "equal totals must order by broker_id ascending"
+    );
+}
