@@ -362,7 +362,7 @@ fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
 /// wrappers over an MCP tool (`mcp.ContractHandler()`), which is why each pair of
 /// ids carries the same recorded bytes. They are listed here because the
 /// selection predicate and the replay body both need them.
-const CONTRACT_TOOL_OPERATIONS: [&str; 11] = [
+const CONTRACT_TOOL_OPERATIONS: [&str; 14] = [
     "dashboard-json",
     "operate-dashboard",
     "calendar-json",
@@ -374,6 +374,9 @@ const CONTRACT_TOOL_OPERATIONS: [&str; 11] = [
     "operate-manual-tasks-show",
     "operate-manual-tasks-complete",
     "operate-manual-tasks-cleanup",
+    "operate-events-show",
+    "operate-grant",
+    "grant-dry-run",
 ];
 
 /// `plan status` and `plan tick` answer the Go oracle's recorded bytes.
@@ -529,8 +532,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 152);
-    assert_eq!(deferred.len(), 14);
+    assert_eq!(selected.len(), 155);
+    assert_eq!(deferred.len(), 11);
 
     let root = unique_root();
     let home = root.join("home");
@@ -1905,5 +1908,193 @@ fn manual_tasks_list_matches_go_on_a_populated_store() {
     assert_eq!(
         String::from_utf8(output.stdout).expect("UTF-8 stdout"),
         MANUAL_TASKS_LIST_GOLDEN
+    );
+}
+
+/// `events show` and `grant` on the paths the oracle corpus cannot reach.
+///
+/// The recorded cases are all absent/dry-run states, so the populated event
+/// list and the real issue/revoke/list token paths are asserted here. Both run
+/// against an isolated HOME and `SYMERASEME_DATA_DIR`: the consent tokens are
+/// files under that data directory and never reach a keychain.
+#[test]
+fn events_and_grant_populated_paths_match_the_go_bodies() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    let data_dir = root.join("data");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    fs::create_dir_all(&data_dir).expect("isolated data directory");
+    let _cleanup = Cleanup(root.clone());
+    seed_store(&data_dir.join("symeraseme.db"));
+
+    let go = |argv: &[&str], index: usize| {
+        run_with_data_dir(argv, &home, &cwd, &capture, index, &data_dir, &[])
+    };
+
+    // Go marshals `[]eventstore.Event` itself, so the exported struct field
+    // order survives and `<` is HTML-escaped by `json.Marshal`.
+    let events = go(&["events", "show", "1", "--output", "json"], 920);
+    assert_eq!(events.status.code(), Some(0), "events show status");
+    assert!(events.stderr.is_empty(), "events show stderr");
+    assert_eq!(
+        events.stdout,
+        concat!(
+            r#"[{"ID":1,"RequestID":1,"OccurredAt":"2026-08-07T08:59:00Z","RecordedAt":"2026-08-07T08:59:01Z","EventType":"PLANNED","Payload":{},"Source":"system"},"#,
+            r#"{"ID":2,"RequestID":1,"OccurredAt":"2026-08-07T09:00:00Z","RecordedAt":"2026-08-07T09:00:02Z","EventType":"SENT","Payload":{"message_id":"\u003csent-1@example.com\u003e"},"Source":"user"}]"#,
+            "\n"
+        )
+        .as_bytes(),
+        "events show stdout"
+    );
+
+    // `--after-event-id` drops the earlier event.
+    let after = go(
+        &[
+            "events",
+            "show",
+            "1",
+            "--after-event-id",
+            "1",
+            "--output",
+            "json",
+        ],
+        921,
+    );
+    assert_eq!(
+        after.stdout,
+        concat!(
+            r#"[{"ID":2,"RequestID":1,"OccurredAt":"2026-08-07T09:00:00Z","RecordedAt":"2026-08-07T09:00:02Z","EventType":"SENT","Payload":{"message_id":"\u003csent-1@example.com\u003e"},"Source":"user"}]"#,
+            "\n"
+        )
+        .as_bytes(),
+        "events show --after-event-id stdout"
+    );
+
+    // Go's `events show` reads `--request-id` when no positional is given.
+    assert_eq!(
+        go(
+            &["events", "show", "--request-id", "1", "--output", "json"],
+            922
+        )
+        .stdout,
+        events.stdout,
+        "events show --request-id stdout"
+    );
+    // A request with no events keeps Go's nil slice.
+    assert_eq!(
+        go(&["events", "show", "9", "--output", "json"], 923).stdout,
+        b"null\n",
+        "events show unknown request stdout"
+    );
+    // Text mode never renders the list.
+    assert_eq!(
+        go(&["events", "show", "1"], 924).stdout,
+        b"success\n",
+        "events show text stdout"
+    );
+    // Go's `intArgument` rejects a non-numeric positional before the handler.
+    let invalid = go(&["events", "show", "abc", "--output", "json"], 925);
+    assert_eq!(invalid.status.code(), Some(1), "invalid request ID status");
+    assert_eq!(
+        invalid.stderr, b"invalid request ID \"abc\"\n",
+        "invalid request ID stderr"
+    );
+
+    // `grant` without `--dry-run` issues a token into the data directory.
+    let issued = go(&["grant", "--output", "json"], 926);
+    assert_eq!(issued.status.code(), Some(0), "grant issue status");
+    let issued: Value = serde_json::from_slice(&issued.stdout).expect("grant issue payload");
+    assert_eq!(issued["success"], true);
+    let first = issued["token"].as_str().expect("issued token").to_owned();
+    assert!(!first.is_empty(), "grant issues a token value");
+    let consent = directory_entries(&data_dir, "read isolated data directory")
+        .into_iter()
+        .filter(|name| name.starts_with("consent_"))
+        .count();
+    assert_eq!(consent, 1, "the token is stored in the isolated data dir");
+
+    // The positional overrides `--command`, and `--ttl` reaches the record.
+    let second = go(
+        &["grant", "send-removal", "--ttl", "60", "--output", "json"],
+        927,
+    );
+    let second: Value = serde_json::from_slice(&second.stdout).expect("grant issue payload");
+    let second = second["token"].as_str().expect("issued token").to_owned();
+
+    // `--list` is Go's second name for `--list-tokens`, and Go marshals
+    // `[]ConsentToken` itself, so its struct field order survives.
+    let listed = go(&["grant", "--list", "--output", "json"], 928);
+    let body = String::from_utf8(listed.stdout.clone()).expect("UTF-8 listing");
+    assert!(
+        body.starts_with("{\"count\":2,\"success\":true,\"tokens\":["),
+        "{body}"
+    );
+    let listed: Value = serde_json::from_slice(&listed.stdout).expect("grant list payload");
+    let tokens = listed["tokens"].as_array().expect("tokens");
+    // Both tokens are issued in the same second, and Go sorts on issued-at
+    // alone, so only the membership is contractual here.
+    let mut commands = tokens
+        .iter()
+        .map(|token| token["command"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    commands.sort_unstable();
+    assert_eq!(commands, ["execute", "send-removal"], "listed commands");
+    let short = tokens
+        .iter()
+        .find(|token| token["command"] == "send-removal")
+        .expect("the positional reached the record");
+    assert_eq!(
+        short["expires_at"].as_i64().expect("expires_at")
+            - short["issued_at"].as_i64().expect("issued_at"),
+        60,
+        "--ttl reaches the record"
+    );
+    // Text mode never renders the listing.
+    assert_eq!(
+        go(&["grant", "--list-tokens"], 929).stdout,
+        b"success\n",
+        "grant list text stdout"
+    );
+
+    // A single revoke reports one removal; an unknown token fails closed with
+    // Go's own wording rather than the identity package's.
+    assert_eq!(
+        go(&["grant", "--revoke", &first, "--output", "json"], 930).stdout,
+        b"{\"revoked\":1,\"success\":true}\n",
+        "grant revoke stdout"
+    );
+    let missing = go(&["grant", "--revoke", &first, "--output", "json"], 931);
+    assert_eq!(
+        missing.status.code(),
+        Some(1),
+        "grant revoke missing status"
+    );
+    assert_eq!(missing.stdout, b"", "grant revoke missing stdout");
+    assert_eq!(
+        missing.stderr, b"consent token not found\n",
+        "grant revoke missing stderr"
+    );
+
+    // `--revoke-all` clears the rest, and the empty listing is Go's nil slice.
+    assert_eq!(
+        go(&["grant", "--revoke-all", "--output", "json"], 932).stdout,
+        b"{\"revoke_all\":true,\"revoked\":1,\"success\":true}\n",
+        "grant revoke-all stdout"
+    );
+    assert_eq!(
+        go(&["grant", "--list-tokens", "--output", "json"], 933).stdout,
+        b"{\"count\":0,\"success\":true,\"tokens\":null}\n",
+        "grant empty list stdout"
+    );
+    assert!(!second.is_empty(), "the second token was issued");
+
+    let home_entries = directory_entries(&home, "read isolated home");
+    assert!(
+        home_entries.is_empty(),
+        "isolated home stayed clean: {home_entries:?}"
     );
 }

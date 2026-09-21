@@ -416,7 +416,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "manual-tasks list" => {
             contract_command("manual_tasks_list", manual_tasks_arguments(parsed), parsed)
         }
-        "manual-tasks show" => match manual_task_id(parsed) {
+        "manual-tasks show" => match int_argument(parsed, "task-id", "task ID") {
             Ok(task_id) => {
                 let mut arguments = Map::new();
                 arguments.insert("task_id".to_owned(), json!(task_id));
@@ -424,7 +424,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             }
             Err(outcome) => outcome,
         },
-        "manual-tasks complete" => match manual_task_id(parsed) {
+        "manual-tasks complete" => match int_argument(parsed, "task-id", "task ID") {
             Ok(task_id) => {
                 let mut arguments = Map::new();
                 arguments.insert("task_id".to_owned(), json!(task_id));
@@ -441,6 +441,13 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             );
             contract_command("manual_tasks_cleanup", arguments, parsed)
         }
+        "events show" => match int_argument(parsed, "request-id", "request ID") {
+            Ok(request_id) => {
+                contract_command_rendered("get_events", events_arguments(parsed, request_id), parsed)
+            }
+            Err(outcome) => outcome,
+        },
+        "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
         "schedule status" => schedule_status(parsed),
@@ -944,25 +951,82 @@ fn contract_handler() -> Result<ContractHandler, String> {
 /// The four CLI commands that are thin wrappers over an MCP tool share Go's
 /// body: call the tool, print its result as JSON, or `success` in text mode.
 fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) -> Outcome {
-    let handler = match contract_handler() {
-        Ok(handler) => handler,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let result = match handler.call(tool, &arguments) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
+    match contract_result(tool, &arguments, parsed) {
+        Err(outcome) => outcome,
+        Ok(None) => Outcome::Stdout(b"success\n".to_vec()),
+        Ok(Some(result)) => match json_line(&result) {
             Ok(bytes) => Outcome::Stdout(bytes),
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
-        };
+        },
     }
-    Outcome::Stdout(b"success\n".to_vec())
+}
+
+/// The tool result when the command asked for JSON, `None` for text mode.
+fn contract_result(
+    tool: &str,
+    arguments: &Map<String, Value>,
+    parsed: &Parsed,
+) -> Result<Option<Value>, Outcome> {
+    let handler =
+        contract_handler().map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
+    let result = handler
+        .call(tool, arguments)
+        .map_err(|error| Outcome::Stderr(format!("{}\n", error.0).into_bytes()))?;
+    let format = output_format(parsed)?;
+    Ok((format == "json").then_some(result))
+}
+
+/// `contract_command` for the tools whose JSON result is carried as pre-rendered
+/// text because Go marshals a *struct* there and keeps its field order:
+/// `get_events`' `[]Event` and `grant --list-tokens`' `[]ConsentToken`.
+fn contract_command_rendered(
+    tool: &str,
+    arguments: Map<String, Value>,
+    parsed: &Parsed,
+) -> Outcome {
+    match contract_result(tool, &arguments, parsed) {
+        Err(outcome) => outcome,
+        Ok(None) => Outcome::Stdout(b"success\n".to_vec()),
+        Ok(Some(Value::String(rendered))) => Outcome::Stdout(format!("{rendered}\n").into_bytes()),
+        Ok(Some(result)) => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+    }
+}
+
+/// Go's `events show` `PreRunE`: the positional overrides `--request-id`.
+fn events_arguments(parsed: &Parsed, request_id: i64) -> Map<String, Value> {
+    let mut arguments = Map::new();
+    arguments.insert("request_id".to_owned(), json!(request_id));
+    arguments.insert(
+        "after_event_id".to_owned(),
+        json!(int_flag(parsed, "after-event-id", 0)),
+    );
+    arguments
+}
+
+/// Go's `grant` `PreRunE`: every flag is sent, the positional overrides
+/// `--command`, and `--list` is a second name for `--list-tokens`.
+fn grant_arguments(parsed: &Parsed) -> Map<String, Value> {
+    let command = match parsed.positional.first() {
+        Some(positional) => positional.clone(),
+        None => string_flag_or(parsed, "command", "execute"),
+    };
+    let mut arguments = Map::new();
+    arguments.insert("command".to_owned(), json!(command));
+    arguments.insert("ttl".to_owned(), json!(int_flag(parsed, "ttl", 86_400)));
+    arguments.insert("revoke".to_owned(), json!(string_flag(parsed, "revoke")));
+    arguments.insert(
+        "revoke_all".to_owned(),
+        json!(bool_flag(parsed, "revoke-all")),
+    );
+    arguments.insert(
+        "list_tokens".to_owned(),
+        json!(bool_flag(parsed, "list-tokens") || bool_flag(parsed, "list")),
+    );
+    arguments.insert("dry_run".to_owned(), json!(bool_flag(parsed, "dry-run")));
+    arguments
 }
 
 /// Go's `calendar` `PreRunE`: `--campaign` and `--campaign-id` feed one key.
@@ -1013,13 +1077,13 @@ fn manual_tasks_arguments(parsed: &Parsed) -> Map<String, Value> {
 }
 
 /// Go's `intArgument`: the positional `TASK_ID` wins over `--task-id`.
-fn manual_task_id(parsed: &Parsed) -> Result<i64, Outcome> {
+fn int_argument(parsed: &Parsed, flag: &str, name: &str) -> Result<i64, Outcome> {
     let Some(argument) = parsed.positional.first() else {
-        return Ok(int_flag(parsed, "task-id", 0));
+        return Ok(int_flag(parsed, flag, 0));
     };
     argument
         .parse()
-        .map_err(|_| Outcome::Stderr(format!("invalid task ID {argument:?}\n").into_bytes()))
+        .map_err(|_| Outcome::Stderr(format!("invalid {name} {argument:?}\n").into_bytes()))
 }
 
 /// `plan tick` — Go's `tickCommandWith`.

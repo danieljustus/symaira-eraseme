@@ -22,7 +22,10 @@ use symeraseme_core::email::hwm::HwmStore;
 use symeraseme_core::email::service::InboxService;
 use symeraseme_core::email::session::ImapDialer;
 use symeraseme_core::email::types::{MatchedMessage, RemovalRequest};
-use symeraseme_core::identity::{OsSecretBackend, SecretResolver};
+use symeraseme_core::identity::{
+    ConsentError, ConsentStore, DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome, OsSecretBackend,
+    SecretResolver, default_consent_directory,
+};
 use symeraseme_core::jsonorder::go_map_order;
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
@@ -373,18 +376,39 @@ impl ContractHandler {
     /// store; the token branches need the consent store and are not part of
     /// this slice, so they report that instead of pretending otherwise.
     fn grant(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        if get_bool(arguments, "dry_run", false) {
-            return Ok(json!({
-                "success": true,
-                "dry_run": true,
-                "command": get_str(arguments, "command", "execute"),
-                "revoke": get_str(arguments, "revoke", ""),
-                "revoke_all": get_bool(arguments, "revoke_all", false),
-            }));
+        let options = GrantOptions {
+            command: get_str(arguments, "command", "execute"),
+            ttl: get_int(arguments, "ttl", DEFAULT_TOKEN_TTL),
+            dry_run: get_bool(arguments, "dry_run", false),
+            list_tokens: get_bool(arguments, "list_tokens", false),
+            revoke: Some(get_str(arguments, "revoke", "")),
+            revoke_all: get_bool(arguments, "revoke_all", false),
+        };
+        // Go resolves the consent directory inside the token paths only, so a
+        // dry run answers without one.
+        let store = ConsentStore::new(default_consent_directory().unwrap_or_default());
+        let outcome = store.grant(&options).map_err(|error| match error {
+            // The only `grant` branch that reports a missing token is the
+            // single-token revoke, and Go words it without the package prefix.
+            ConsentError::NotFound => ToolError("consent token not found".to_owned()),
+            error => ToolError(error.to_string()),
+        })?;
+        // Go marshals `[]ConsentToken` itself, so the list keeps the struct's
+        // field order; it is rendered here and carried as text, like
+        // [`event_list`]. An empty store is Go's nil slice.
+        if let GrantOutcome::List { count, tokens, .. } = &outcome {
+            let rendered = if tokens.is_empty() {
+                "null".to_owned()
+            } else {
+                serde_json::to_string(tokens).map_err(|error| ToolError(error.to_string()))?
+            };
+            let body = format!("{{\"count\":{count},\"success\":true,\"tokens\":{rendered}}}");
+            return Ok(Value::String(
+                String::from_utf8(super::envelope::go_escape_json_strings(body.as_bytes()))
+                    .expect("escaped JSON is UTF-8"),
+            ));
         }
-        Err(ToolError(
-            "the grant token paths are not implemented in this slice".to_owned(),
-        ))
+        serde_json::to_value(&outcome).map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `generate_scheduler`. The dry run returns the generated file
