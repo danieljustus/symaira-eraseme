@@ -24,16 +24,16 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 144 · deferred: 22 (as of `61ef9ecd`).
+Selected: 146 · deferred: 20 (as of `cedc0b8a`).
 
 ## Remaining deferred cases
 
 | Case id | Subsystem | State |
 |---|---|---|
-| `operate-init-profile`, `operate-show-profile` | identity/profile | in progress — CLI-015, branch `cli-015-profile` |
+
 | `grant-dry-run`, `operate-grant` | grant/tokens | ready |
 | `operate-events-show` | events | ready |
-| `operate-manual-tasks-show/-complete/-cleanup` | manual tasks | ready |
+| `operate-manual-tasks-show/-complete/-cleanup` | manual tasks | in progress — CLI-016, branch `cli-016-manual-tasks` |
 | `operate-plan-create/-show/-execute` | campaign planning | ready |
 | `operate-generate-dashboard/-report/-rebuttal/-scheduler` | generators | ready |
 | `operate-auto-confirm`, `operate-classify-reply` | triage | ready |
@@ -41,10 +41,21 @@ Selected: 144 · deferred: 22 (as of `61ef9ecd`).
 | `operate-mcp` | MCP stdio server | ready |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
 
+## Known parity defects found but not fixed
+
+- **`manual-tasks list` nested task key order.** Go emits the nested task
+  objects in struct order (`id, request_id, broker_id, …`); Rust emits them
+  sorted alphabetically. The recorded `operate-manual-tasks-list` case has an
+  empty `tasks` array, so the corpus does not catch it. Found during CLI-016;
+  belongs to the already-merged `list` slice (#1015). Fixing it means enabling
+  `serde_json`'s `preserve_order`. **The green corpus is not proof this row is
+  clean.**
+
 ## Decisions
 
 - 2026-09-21 — this ledger created; `docs/rust-port/handoffs/` stays the
   per-slice evidence store, not a second tracker.
+- 2026-09-21 — CLI-015 merged as #1016 (`cedc0b8a`).
 - Work is dispatched into per-slice worktrees off the integrated revision; the
   coordinator alone edits this file, shared manifests and CI.
 
