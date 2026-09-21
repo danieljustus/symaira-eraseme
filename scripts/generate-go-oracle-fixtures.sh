@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PINNED_COMMIT="bfe2873937947479347c626512d74730fceaa3ac"
+PINNED_COMMIT="5f54b6fed818c014b794cd7e776fd3bcb3bd95d5"
 OUT_DIR="${REPO_ROOT}/rust-tests/parity"
 
 usage() {

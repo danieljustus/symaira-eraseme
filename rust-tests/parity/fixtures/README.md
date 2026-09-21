@@ -1,6 +1,6 @@
 # Go oracle fixtures
 
-These fixtures are generated from corrected Go commit `bfe2873937947479347c626512d74730fceaa3ac` by
+These fixtures are generated from corrected Go commit `5f54b6fed818c014b794cd7e776fd3bcb3bd95d5` by
 `scripts/generate-go-oracle-fixtures.sh`. The generator exports that commit with
 `git archive`, injects one untracked `_test.go` beside the real `newRootCommand`,
 and launches the resulting binary as a black box. No tracked Go source is
