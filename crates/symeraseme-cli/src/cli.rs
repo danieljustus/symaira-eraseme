@@ -1,8 +1,9 @@
 //! Clap-compatible command surface, Cobra-compatible help, and handlers.
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
+use crate::mcp::handler::{ContractHandler, ToolHandler};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::env;
 use std::path::Path;
@@ -400,6 +401,12 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         // `operate-plan-tick` are identical, so they share one implementation.
         "tick" => plan_tick(parsed),
         "plan tick" => plan_tick(parsed),
+        "dashboard" => contract_command("get_dashboard_data", Map::new(), parsed),
+        "calendar" => contract_command("get_calendar", calendar_arguments(parsed), parsed),
+        "requests list" => contract_command("list_requests", requests_arguments(parsed), parsed),
+        "manual-tasks list" => {
+            contract_command("manual_tasks_list", manual_tasks_arguments(parsed), parsed)
+        }
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
         "schedule status" => schedule_status(parsed),
@@ -672,6 +679,99 @@ fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
         };
     }
     Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+}
+
+/// One string flag as the command saw it; `""` when it was not given.
+fn string_flag(parsed: &Parsed, name: &str) -> String {
+    parsed.flags.get(name).cloned().unwrap_or_default()
+}
+
+/// One integer flag as the command saw it, falling back to Go's default when it
+/// was not given.
+fn int_flag(parsed: &Parsed, name: &str, default: i64) -> i64 {
+    parsed
+        .flags
+        .get(name)
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
+}
+
+/// Go's `mcp.ContractHandler()`: the process working directory, the resolved
+/// configuration and the current instant.
+fn contract_handler() -> Result<ContractHandler, String> {
+    let root = env::current_dir().map_err(|error| error.to_string())?;
+    Ok(ContractHandler::new(root).with_store(process_context(), now_utc()))
+}
+
+/// The four CLI commands that are thin wrappers over an MCP tool share Go's
+/// body: call the tool, print its result as JSON, or `success` in text mode.
+fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) -> Outcome {
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match handler.call(tool, &arguments) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(b"success\n".to_vec())
+}
+
+/// Go's `calendar` `PreRunE`: `--campaign` and `--campaign-id` feed one key.
+fn calendar_arguments(parsed: &Parsed) -> Map<String, Value> {
+    let campaign = {
+        let named = string_flag(parsed, "campaign-id");
+        if named.is_empty() {
+            string_flag(parsed, "campaign")
+        } else {
+            named
+        }
+    };
+    let mut arguments = Map::new();
+    arguments.insert("weeks".to_owned(), json!(int_flag(parsed, "weeks", 4)));
+    arguments.insert("campaign_id".to_owned(), json!(campaign));
+    arguments
+}
+
+/// Go's `requests list` `PreRunE`: every flag is always sent, defaults included.
+fn requests_arguments(parsed: &Parsed) -> Map<String, Value> {
+    let mut arguments = Map::new();
+    arguments.insert(
+        "campaign_id".to_owned(),
+        json!(string_flag(parsed, "campaign-id")),
+    );
+    arguments.insert("status".to_owned(), json!(string_flag(parsed, "status")));
+    arguments.insert(
+        "broker_id".to_owned(),
+        json!(string_flag(parsed, "broker-id")),
+    );
+    arguments.insert("page".to_owned(), json!(int_flag(parsed, "page", 1)));
+    arguments.insert(
+        "page_size".to_owned(),
+        json!(int_flag(parsed, "page-size", 100)),
+    );
+    arguments
+}
+
+/// Go's `manual-tasks list` `PreRunE`.
+fn manual_tasks_arguments(parsed: &Parsed) -> Map<String, Value> {
+    let mut arguments = Map::new();
+    arguments.insert("status".to_owned(), json!(string_flag(parsed, "status")));
+    arguments.insert(
+        "request_id".to_owned(),
+        json!(int_flag(parsed, "request-id", 0)),
+    );
+    arguments
 }
 
 /// `plan tick` — Go's `tickCommandWith`.
