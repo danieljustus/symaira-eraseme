@@ -361,8 +361,10 @@ fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
 /// `dashboard`, `calendar`, `requests list` and `manual-tasks list` are thin
 /// wrappers over an MCP tool (`mcp.ContractHandler()`), which is why each pair of
 /// ids carries the same recorded bytes. They are listed here because the
-/// selection predicate and the replay body both need them.
-const CONTRACT_TOOL_OPERATIONS: [&str; 14] = [
+/// selection predicate and the replay body both need them. The `generate-*`
+/// commands are the same shape: thin wrappers whose text mode prints only
+/// `success`.
+const CONTRACT_TOOL_OPERATIONS: [&str; 17] = [
     "dashboard-json",
     "operate-dashboard",
     "calendar-json",
@@ -377,6 +379,9 @@ const CONTRACT_TOOL_OPERATIONS: [&str; 14] = [
     "operate-events-show",
     "operate-grant",
     "grant-dry-run",
+    "operate-generate-dashboard",
+    "operate-generate-report",
+    "operate-generate-scheduler",
 ];
 
 /// `plan status` and `plan tick` answer the Go oracle's recorded bytes.
@@ -532,8 +537,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 155);
-    assert_eq!(deferred.len(), 11);
+    assert_eq!(selected.len(), 158);
+    assert_eq!(deferred.len(), 8);
 
     let root = unique_root();
     let home = root.join("home");
@@ -569,7 +574,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
         // The phase-two capture runs every schedule case in its own
         // `cli/<id>/cwd`, so the generated wrappers record that directory; the
         // replay has to run in the same layout or the folded paths differ.
-        let case_cwd = if id.starts_with("operate-schedule") {
+        // `generate-dashboard` always names a file (`report.html` by
+        // default), so it gets the same isolated layout — and the shared
+        // cwd stays empty for the assertion below.
+        let case_cwd = if id.starts_with("operate-schedule") || id == "operate-generate-dashboard" {
             let dir = root.join("cli").join(id).join("cwd");
             fs::create_dir_all(&dir).expect("isolated schedule cwd");
             dir

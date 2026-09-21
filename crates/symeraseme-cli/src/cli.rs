@@ -199,6 +199,13 @@ struct Parsed {
     flags: BTreeMap<String, String>,
     help: bool,
     help_path: Vec<String>,
+    /// `--output` seen before any subcommand: Go binds it to the root
+    /// persistent flag (the display format). `--output` after a subcommand
+    /// belongs to a shadowing local file flag and never reaches the format.
+    root_output: Option<String>,
+    /// `--output` seen after a subcommand: the local file flag of
+    /// `generate-dashboard` / `generate-report`.
+    local_output: Option<String>,
 }
 
 fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
@@ -207,6 +214,8 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
     let mut flags = BTreeMap::new();
     let mut help = false;
     let mut help_path = Vec::new();
+    let mut root_output: Option<String> = None;
+    let mut local_output: Option<String> = None;
     let mut index = 0;
 
     while index < args.len() {
@@ -225,6 +234,8 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                     flags,
                     help: false,
                     help_path,
+                    root_output: None,
+                    local_output: None,
                 });
             }
             return Err("unknown flag: --version\n".to_owned());
@@ -255,6 +266,13 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                         .cloned()
                         .ok_or_else(|| format!("flag needs an argument: --{name}\n"))?
                 };
+                if name == "output" {
+                    if path.is_empty() {
+                        root_output = Some(value.clone());
+                    } else {
+                        local_output = Some(value.clone());
+                    }
+                }
                 flags.insert(name.to_owned(), value);
             }
             index += 1;
@@ -322,6 +340,8 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
         flags,
         help,
         help_path,
+        root_output,
+        local_output,
     })
 }
 
@@ -448,6 +468,9 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             Err(outcome) => outcome,
         },
         "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
+        "generate-dashboard" => generate_dashboard_command(parsed),
+        "generate-report" => generate_report_command(parsed),
+        "generate-scheduler" => generate_scheduler_command(parsed),
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
         "schedule status" => schedule_status(parsed),
@@ -967,13 +990,25 @@ fn contract_result(
     arguments: &Map<String, Value>,
     parsed: &Parsed,
 ) -> Result<Option<Value>, Outcome> {
+    contract_result_with_format(tool, arguments, output_format(parsed))
+}
+
+/// [`contract_result`] with an explicit format: `generate-dashboard` and
+/// `generate-report` declare their own `--output` file flag, so Go reads the
+/// format from the root persistent flag instead of the merged value. Like
+/// Go's `RunE`, the tool runs before the format is validated, so a tool
+/// error takes precedence over a format error.
+fn contract_result_with_format(
+    tool: &str,
+    arguments: &Map<String, Value>,
+    format: Result<&str, Outcome>,
+) -> Result<Option<Value>, Outcome> {
     let handler =
         contract_handler().map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
     let result = handler
         .call(tool, arguments)
         .map_err(|error| Outcome::Stderr(format!("{}\n", error.0).into_bytes()))?;
-    let format = output_format(parsed)?;
-    Ok((format == "json").then_some(result))
+    Ok((format? == "json").then_some(result))
 }
 
 /// `contract_command` for the tools whose JSON result is carried as pre-rendered
@@ -1027,6 +1062,124 @@ fn grant_arguments(parsed: &Parsed) -> Map<String, Value> {
     );
     arguments.insert("dry_run".to_owned(), json!(bool_flag(parsed, "dry-run")));
     arguments
+}
+
+/// Go's `generate-dashboard` `PreRunE`: every flag is sent, `--open` and
+/// `--auto-open` feed one argument, and the file flag defaults to
+/// `report.html`. The format comes from the root persistent `--output`
+/// because the local `--output` names the file, exactly like cobra's
+/// shadowing.
+fn generate_dashboard_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    arguments.insert(
+        "output".to_owned(),
+        json!(
+            parsed
+                .local_output
+                .clone()
+                .unwrap_or("report.html".to_owned())
+        ),
+    );
+    arguments.insert(
+        "auto_open".to_owned(),
+        json!(bool_flag(parsed, "open") || bool_flag(parsed, "auto-open")),
+    );
+    arguments.insert(
+        "auto_refresh".to_owned(),
+        json!(int_flag(parsed, "auto-refresh", 0)),
+    );
+    match contract_result_with_format("generate_dashboard", &arguments, persistent_format(parsed)) {
+        Err(outcome) => outcome,
+        Ok(None) => Outcome::Stdout(b"success\n".to_vec()),
+        Ok(Some(result)) => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+    }
+}
+
+/// Go's `generate-report` `PreRunE`: every flag is sent, `--all` and
+/// `--all-campaigns` feed one argument. Same `--output` shadowing as
+/// `generate-dashboard`.
+fn generate_report_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    arguments.insert(
+        "campaign_id".to_owned(),
+        json!(string_flag(parsed, "campaign-id")),
+    );
+    arguments.insert(
+        "format".to_owned(),
+        json!(string_flag_or(parsed, "format", "html")),
+    );
+    arguments.insert(
+        "output".to_owned(),
+        json!(parsed.local_output.clone().unwrap_or_default()),
+    );
+    arguments.insert(
+        "all_campaigns".to_owned(),
+        json!(bool_flag(parsed, "all-campaigns") || bool_flag(parsed, "all")),
+    );
+    match contract_result_with_format("generate_report", &arguments, persistent_format(parsed)) {
+        Err(outcome) => outcome,
+        Ok(None) => Outcome::Stdout(b"success\n".to_vec()),
+        Ok(Some(result)) => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+    }
+}
+
+/// Go's `outputFormat`: the root persistent `--output`, defaulting to text.
+/// A value set after the subcommand belongs to a shadowing local flag and
+/// never reaches the format.
+fn persistent_format(parsed: &Parsed) -> Result<&str, Outcome> {
+    let value = parsed.root_output.as_deref().unwrap_or("text");
+    match value {
+        "text" | "json" => Ok(value),
+        _ => Err(Outcome::Stderr(
+            format!("invalid output format {value:?}: use text or json\n").into_bytes(),
+        )),
+    }
+}
+
+/// Go's `generate-scheduler` `PreRunE`: every flag is sent. This command has
+/// no local `--output`, so the merged format applies directly.
+fn generate_scheduler_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    arguments.insert(
+        "platform".to_owned(),
+        json!(string_flag(parsed, "platform")),
+    );
+    arguments.insert(
+        "output_dir".to_owned(),
+        json!(string_flag(parsed, "output-dir")),
+    );
+    arguments.insert(
+        "tick_hour".to_owned(),
+        json!(int_flag(parsed, "tick-hour", 10)),
+    );
+    arguments.insert(
+        "tick_minute".to_owned(),
+        json!(int_flag(parsed, "tick-minute", 0)),
+    );
+    arguments.insert(
+        "poll_hours".to_owned(),
+        json!(string_flag(parsed, "poll-hours")),
+    );
+    arguments.insert(
+        "project_dir".to_owned(),
+        json!(string_flag(parsed, "project-dir")),
+    );
+    arguments.insert(
+        "symeraseme_bin".to_owned(),
+        json!(string_flag(parsed, "symeraseme-bin")),
+    );
+    arguments.insert(
+        "venv_activate".to_owned(),
+        json!(string_flag(parsed, "venv-activate")),
+    );
+    arguments.insert("dry_run".to_owned(), json!(bool_flag(parsed, "dry-run")));
+    contract_command("generate_scheduler", arguments, parsed)
 }
 
 /// Go's `calendar` `PreRunE`: `--campaign` and `--campaign-id` feed one key.
