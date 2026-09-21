@@ -380,6 +380,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "config show" => config_show(parsed),
         "brokers list" => brokers_list(parsed),
         "brokers show" => brokers_show(parsed),
+        "registry list" => registry_list(parsed),
+        "registry validate" => registry_validate(parsed),
         "completion" => completion(parsed.positional.first().map(String::as_str).unwrap_or("")),
         "render-template" => render_template(parsed),
         "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
@@ -419,6 +421,31 @@ struct BrokersListEnvelope<'a> {
 struct BrokerShowEnvelope<'a> {
     broker: &'a Broker,
     schema_version: u8,
+}
+
+/// Go builds this envelope from a `map[string]any`, whose keys `encoding/json`
+/// emits in sorted order: `brokers`, `count`, `schema_version`.
+#[derive(Serialize)]
+struct RegistryListEnvelope<'a> {
+    brokers: Vec<&'a Broker>,
+    count: usize,
+    schema_version: u8,
+}
+
+#[derive(Serialize)]
+struct RegistryValidateTotals {
+    duplicate_ids: u64,
+    failed: u64,
+    valid: usize,
+}
+
+/// Sorted-key order again: `ok`, `schema_version`, `totals`, and inside `totals`
+/// `duplicate_ids`, `failed`, `valid`.
+#[derive(Serialize)]
+struct RegistryValidateEnvelope {
+    ok: bool,
+    schema_version: u8,
+    totals: RegistryValidateTotals,
 }
 
 /// Builds the scheduler options the way Go's `schedule_*` CLI commands do.
@@ -853,6 +880,71 @@ fn brokers_show(parsed: &Parsed) -> Outcome {
         };
     }
     Outcome::Stdout(format!("{} ({})\n", broker.name, broker.id).into_bytes())
+}
+
+/// Go's `registry list`: the whole embedded registry, unfiltered.
+///
+/// Unlike `brokers list` this applies no status filter and emits no `filters`
+/// object, because `realRegistryCommand` calls `loadRegistry` and marshals the
+/// slice directly. The two commands therefore disagree on both the count
+/// (1,277 here against 1,273 active) and the envelope shape, and that
+/// disagreement is the contract.
+fn registry_list(parsed: &Parsed) -> Outcome {
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let envelope = RegistryListEnvelope {
+            count: brokers.len(),
+            brokers: brokers.iter().collect(),
+            schema_version: 1,
+        };
+        return match json_line(&envelope) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("{} broker(s)\n", brokers.len()).into_bytes())
+}
+
+/// Go's `registry validate`: it re-loads the registry and reports the count.
+///
+/// The totals are load-bearing: a load that cannot complete returns the error
+/// rather than a partial report, so `failed` and `duplicate_ids` are always
+/// zero here. Reporting them as measured zeros would overstate the check, so
+/// they are reported exactly as Go does — structurally present, always zero —
+/// and the real per-file validation evidence lives with the loader
+/// (`load_reporting_from_dir`), not in this envelope.
+fn registry_validate(parsed: &Parsed) -> Outcome {
+    let brokers = match load_brokers() {
+        Ok(brokers) => brokers,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let envelope = RegistryValidateEnvelope {
+            ok: true,
+            schema_version: 1,
+            totals: RegistryValidateTotals {
+                duplicate_ids: 0,
+                failed: 0,
+                valid: brokers.len(),
+            },
+        };
+        return match json_line(&envelope) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("OK: {} broker(s)\n", brokers.len()).into_bytes())
 }
 
 fn render_template(parsed: &Parsed) -> Outcome {

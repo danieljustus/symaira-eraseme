@@ -437,11 +437,22 @@ fn is_exact_case(case: &Value) -> bool {
         "operate-schedule-uninstall",
         "operate-version",
     ];
+    // `registry list`/`validate` are replayed now that cli.rs implements them.
+    // They carry the registry contract that `brokers list` cannot: no status
+    // filter and no `filters` object, so the count is 1,277 rather than 1,273.
+    const REGISTRY_OPERATIONS: [&str; 5] = [
+        "registry-list",
+        "registry-list-json",
+        "registry-validate",
+        "operate-registry-list",
+        "operate-registry-validate",
+    ];
     matches!(
         case["category"].as_str(),
         Some("help" | "unknown_flag" | "missing_argument" | "root_version" | "unknown_command")
     ) || case["category"] == "success" && PHASE_SUCCESS.contains(&case["id"].as_str().unwrap_or(""))
         || SURFACE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || REGISTRY_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
 }
 
 #[test]
@@ -458,7 +469,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
 
     let behavior: Value = serde_json::from_str(BEHAVIOR).expect("behavior JSON");
     let cases = behavior["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 165);
+    assert_eq!(cases.len(), 166);
     let selected = cases
         .iter()
         .filter(|case| is_exact_case(case))
@@ -467,8 +478,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 128);
-    assert_eq!(deferred.len(), 37);
+    assert_eq!(selected.len(), 133);
+    assert_eq!(deferred.len(), 33);
 
     let root = unique_root();
     let home = root.join("home");

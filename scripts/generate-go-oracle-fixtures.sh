@@ -521,6 +521,9 @@ success_argvs = [
     ("config-show", ["config", "show"]),
     ("config-show-json", ["config", "show", "--output", "json"]),
     ("registry-validate", ["registry", "validate"]),
+    # The text branch of `registry list` is the default output format, so it
+    # needs its own recorded case rather than being inferred from the JSON one.
+    ("registry-list", ["registry", "list"]),
     ("registry-list-json", ["registry", "list", "--output", "json"]),
     ("status-json", ["status", "--output", "json"]),
     ("dashboard-json", ["dashboard", "--output", "json"]),
@@ -1308,7 +1311,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 165, "mcp": 52, "http": 19, "filesystem": 7}
+expected = {"cli": 166, "mcp": 52, "http": 19, "filesystem": 7}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")
