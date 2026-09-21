@@ -4,7 +4,7 @@
 //! hexadecimal environment value, scrypt-derived passphrase, then OS keyring.
 //! Read paths never create or replace a key.
 
-use super::keyring::{KeyringBackend, OsKeyring, SERVICE_NAME, USERNAME};
+use super::keyring::{KeyringBackend, KeyringError, OsKeyring, SERVICE_NAME, USERNAME};
 use rand::Rng;
 use scrypt::{Params, scrypt};
 use std::collections::BTreeMap;
@@ -67,6 +67,8 @@ pub enum MasterKeyError {
     InvalidLength { source: &'static str, actual: usize },
     /// The memory-hard derivation parameters could not be constructed.
     DerivationFailed,
+    /// A freshly minted key could not be persisted durably.
+    PersistenceFailed,
 }
 
 impl fmt::Display for MasterKeyError {
@@ -81,6 +83,9 @@ impl fmt::Display for MasterKeyError {
                 "identity: {source} must be {KEY_LENGTH} bytes, got {actual}"
             ),
             Self::DerivationFailed => formatter.write_str("identity: derive master key failed"),
+            Self::PersistenceFailed => {
+                formatter.write_str("identity: durable keychain persistence failed")
+            }
         }
     }
 }
@@ -176,6 +181,28 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
         }
 
         Err(MasterKeyError::Missing)
+    }
+
+    /// Return the existing key, or mint one and persist it durably.
+    ///
+    /// Key creation is explicit initialization only; persistence is mandatory,
+    /// so a keyring failure fails closed without caching the new key.
+    pub fn init(&mut self) -> Result<MasterKey, MasterKeyError> {
+        if let Ok(key) = self.resolve_existing() {
+            return Ok(key);
+        }
+        let key = generate_master_key();
+        self.keyring
+            .set(SERVICE_NAME, USERNAME, &hex::encode(key.as_bytes()))
+            .map_err(|_| MasterKeyError::PersistenceFailed)?;
+        self.cached = Some(key.clone());
+        Ok(key)
+    }
+
+    /// Drop the cached key and the keyring entry.
+    pub fn delete(&mut self) -> Result<(), KeyringError> {
+        self.cached = None;
+        self.keyring.delete(SERVICE_NAME, USERNAME)
     }
 }
 

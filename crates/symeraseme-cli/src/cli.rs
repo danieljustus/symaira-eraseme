@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
 use symeraseme_core::deadlines::{self, RunOpts};
 use symeraseme_core::identity::{
-    MasterKeyResolver, Profile, ProfilePaths, load_profile, profile_exists,
+    MasterKeyResolver, Profile, ProfilePaths, init_profile, load_profile, profile_exists,
 };
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
@@ -385,6 +385,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "registry validate" => registry_validate(parsed),
         "completion" => completion(parsed.positional.first().map(String::as_str).unwrap_or("")),
         "render-template" => render_template(parsed),
+        "init-profile" => init_profile_command(parsed),
+        "show-profile" => show_profile_command(parsed),
         "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
             Outcome::Notice(
                 b"symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.\n"
@@ -1109,6 +1111,108 @@ fn render_template(parsed: &Parsed) -> Outcome {
             Outcome::Stderr(format!("{message}\n").into_bytes())
         }
     }
+}
+
+fn init_profile_command(parsed: &Parsed) -> Outcome {
+    let full_name = parsed
+        .flags
+        .get("full-name")
+        .map(|value| value.trim())
+        .unwrap_or_default();
+    let email = parsed
+        .flags
+        .get("email")
+        .map(|value| value.trim())
+        .unwrap_or_default();
+    if full_name.is_empty() || email.is_empty() {
+        return Outcome::Stderr(b"--full-name and --email are required\n".to_vec());
+    }
+    if !is_plain_address(email) {
+        return Outcome::Stderr(b"invalid email address\n".to_vec());
+    }
+    let profile = Profile {
+        full_name: full_name.to_owned(),
+        email_addresses: vec![email.to_owned()],
+        ..Profile::default()
+    };
+    let requested = parsed.flags.get("profile").cloned().unwrap_or_default();
+    let paths = ProfilePaths::from_process();
+    let mut keys = MasterKeyResolver::from_process();
+    let target = match init_profile(&profile, Path::new(&requested), &paths, &mut keys) {
+        Ok(target) => target,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let payload = json!({
+            "profile_path": target.to_string_lossy(),
+            "success": true,
+        });
+        return match json_line(&payload) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    Outcome::Stdout(format!("identity profile saved at {}\n", target.display()).into_bytes())
+}
+
+fn show_profile_command(parsed: &Parsed) -> Outcome {
+    let paths = ProfilePaths::from_process();
+    let mut keys = MasterKeyResolver::from_process();
+    let profile = match load_profile(Path::new(""), &paths, &mut keys) {
+        Ok(profile) => profile,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        return match json_line(&profile) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+    }
+    let mut output = format!("Name: {}\n", profile.full_name);
+    for value in &profile.email_addresses {
+        output.push_str(&format!("Email: {value}\n"));
+    }
+    for value in &profile.jurisdictions {
+        output.push_str(&format!("Jurisdiction: {value}\n"));
+    }
+    Outcome::Stdout(output.into_bytes())
+}
+
+/// Go accepts the address only when `mail.ParseAddress` round-trips it
+/// unchanged: a bare dot-atom local part, `@`, and a dot-atom or bracketed
+/// domain literal. Display names and quoted local parts never round-trip.
+fn is_plain_address(email: &str) -> bool {
+    let Some((local, domain)) = email.rsplit_once('@') else {
+        return false;
+    };
+    if !is_dot_atom(local) {
+        return false;
+    }
+    if let Some(literal) = domain.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
+        return !literal.is_empty()
+            && literal
+                .chars()
+                .all(|c| c > ' ' && c != '[' && c != ']' && c != '\\' && c != '\u{7f}');
+    }
+    is_dot_atom(domain)
+}
+
+fn is_dot_atom(value: &str) -> bool {
+    !value.is_empty()
+        && value.split('.').all(|atom| {
+            !atom.is_empty()
+                && atom.chars().all(|c| {
+                    c.is_ascii_alphanumeric() || "!#$%&'*+-/=?^_`{|}~".contains(c) || !c.is_ascii()
+                })
+        })
 }
 
 fn normalize_template_name(input: &str) -> &str {
