@@ -23,8 +23,9 @@ use symeraseme_core::email::service::InboxService;
 use symeraseme_core::email::session::ImapDialer;
 use symeraseme_core::email::types::{MatchedMessage, RemovalRequest};
 use symeraseme_core::identity::{
-    ConsentError, ConsentStore, DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome, OsSecretBackend,
-    SecretResolver, default_consent_directory,
+    ConsentError, ConsentStore, DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome, MasterKeyResolver,
+    OsSecretBackend, ProfileError, ProfilePaths, SecretResolver, default_consent_directory,
+    load_profile,
 };
 use symeraseme_core::jsonorder::go_map_order;
 use symeraseme_core::manualtasks::{self, ListOpts};
@@ -595,6 +596,95 @@ impl ContractHandler {
         Ok(json!({"success": true, "files": files, "dry_run": true}))
     }
 
+    /// Go's `run_web_form`: with `dry_run` the handler answers from the
+    /// registry alone; otherwise it opens the store the nil-executor adapter
+    /// falls back to a manual task through.
+    fn run_web_form(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let dry_run = get_bool(arguments, "dry_run", false);
+        // Go's order: loadRegistry, then — only for a real run — dataStore,
+        // then the adapter (webForm lookup, profile, branch).
+        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+        let store = if dry_run {
+            None
+        } else {
+            Some(self.open_store()?)
+        };
+        let broker_id = get_str(arguments, "broker_id", "");
+        // Go's adapter order: webForm lookup, then profile, then branch.
+        let preview = match campaign::web_form_preview(&brokers, &broker_id, dry_run) {
+            Err(failure) => return Ok(Value::Object(failure)),
+            Ok(preview) => preview,
+        };
+        // Go's `WebFormAdapter.profile`: an absent profile is fine, a broken
+        // one fails the run with an `interaction_failed` payload.
+        let paths = ProfilePaths::from_process();
+        let mut keys = MasterKeyResolver::from_process();
+        let profile = match load_profile(Path::new(""), &paths, &mut keys) {
+            Ok(profile) => Some(profile),
+            Err(ProfileError::NotFound) => None,
+            Err(error) => {
+                return Ok(json!({
+                    "success": false,
+                    "code": "interaction_failed",
+                    "error": error.to_string(),
+                    "reason": "generic_error",
+                    "dry_run": dry_run,
+                }));
+            }
+        };
+        // Go's `FormSpecFromBroker` step: it can only fail on a nil spec, and
+        // the parsed registry type makes that impossible, so the dry-run
+        // preview stands in for it unchanged.
+        if dry_run {
+            return Ok(Value::Object(preview));
+        }
+        let store = store.expect("store opened for a non-dry run");
+        let now = self.recorded_instant()?;
+        let request_id = get_int(arguments, "request_id", 0);
+        let task = manualtasks::create(
+            &store,
+            &manualtasks::CreateOpts {
+                request_id: (request_id != 0).then_some(request_id),
+                broker_id: field_string(&preview, "broker_id"),
+                broker_name: field_string(&preview, "broker_name"),
+                form_url: field_string(&preview, "url"),
+                reason: "dynamic_form".to_owned(),
+                ..manualtasks::CreateOpts::default()
+            },
+            profile.as_ref(),
+            now,
+        );
+        // Go's `createManualTask` reports a store failure inside the result
+        // map; it is not a handler error.
+        let mut result = Map::new();
+        result.insert("success".to_owned(), json!(false));
+        result.insert("status".to_owned(), json!("manual_action_required"));
+        result.insert("reason".to_owned(), json!("dynamic_form"));
+        result.insert(
+            "broker_id".to_owned(),
+            preview.get("broker_id").cloned().unwrap_or(Value::Null),
+        );
+        result.insert(
+            "broker_name".to_owned(),
+            preview.get("broker_name").cloned().unwrap_or(Value::Null),
+        );
+        result.insert(
+            "url".to_owned(),
+            preview.get("url").cloned().unwrap_or(Value::Null),
+        );
+        result.insert("dry_run".to_owned(), json!(false));
+        match task {
+            Ok(task) => {
+                result.insert("task_id".to_owned(), json!(task.id));
+                result.insert("instructions".to_owned(), json!(task.instructions));
+            }
+            Err(error) => {
+                result.insert("error".to_owned(), json!(error.to_string()));
+            }
+        }
+        Ok(Value::Object(result))
+    }
+
     /// Go's `plan_show`: the stored requests, optionally filtered by campaign
     /// and status, under the campaign's label — or `all` when none was named.
     ///
@@ -1107,6 +1197,7 @@ impl ContractHandler {
             "list_brokers" => self.list_brokers(arguments),
             "schedule_install" => self.schedule_install(arguments),
             "poll_inbox" => self.poll_inbox(arguments),
+            "run_web_form" => self.run_web_form(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -1152,6 +1243,16 @@ fn get_str(arguments: &Map<String, Value>, key: &str, default: &str) -> String {
         .get(key)
         .and_then(Value::as_str)
         .unwrap_or(default)
+        .to_owned()
+}
+
+/// One string field of a tool result; Go reads a missing map key as nil, and
+/// the manual-task builder only ever feeds string values through here.
+fn field_string(arguments: &Map<String, Value>, key: &str) -> String {
+    arguments
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
         .to_owned()
 }
 

@@ -58,6 +58,47 @@ fn run(argv: &[&str], home: &Path, cwd: &Path, capture: &Path, index: usize) -> 
     run_with_resources(argv, home, cwd, capture, index, None)
 }
 
+/// The capture normalized the runtime root to `<ORACLE_ROOT>` in argv, stdout
+/// and stderr; a replay has to feed the real root back in, otherwise a path
+/// case replays with a literal placeholder the oracle never saw.
+fn substitute_oracle_root(argv: &[&str], home: &Path) -> Vec<String> {
+    let root = home
+        .parent()
+        .map(|root| root.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    argv.iter()
+        .map(|arg| {
+            if root.is_empty() {
+                (*arg).to_owned()
+            } else {
+                arg.replace("<ORACLE_ROOT>", &root)
+            }
+        })
+        .collect()
+}
+
+/// The byte-level inverse of the capture's normalization: fold the runtime
+/// root back to `<ORACLE_ROOT>` so outputs compare against the recorded bytes.
+fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
+    let needle = root.to_string_lossy().into_owned();
+    let needle = needle.as_bytes();
+    if needle.is_empty() {
+        return bytes.to_vec();
+    }
+    let mut folded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index..].starts_with(needle) {
+            folded.extend_from_slice(b"<ORACLE_ROOT>");
+            index += needle.len();
+        } else {
+            folded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    folded
+}
+
 fn run_with_resources(
     argv: &[&str],
     home: &Path,
@@ -73,7 +114,7 @@ fn run_with_resources(
 
     let mut command = Command::new(binary());
     command
-        .args(argv)
+        .args(substitute_oracle_root(argv, home))
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
@@ -266,7 +307,7 @@ fn run_with_data_dir(
 
     let mut command = Command::new(binary());
     command
-        .args(argv)
+        .args(substitute_oracle_root(argv, home))
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
@@ -363,8 +404,8 @@ fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
 /// ids carries the same recorded bytes. They are listed here because the
 /// selection predicate and the replay body both need them. The `generate-*`
 /// commands are the same shape: thin wrappers whose text mode prints only
-/// `success`.
-const CONTRACT_TOOL_OPERATIONS: [&str; 17] = [
+/// `success`. `review` and `run-web-form` join them for the same reason.
+const CONTRACT_TOOL_OPERATIONS: [&str; 19] = [
     "dashboard-json",
     "operate-dashboard",
     "calendar-json",
@@ -382,6 +423,8 @@ const CONTRACT_TOOL_OPERATIONS: [&str; 17] = [
     "operate-generate-dashboard",
     "operate-generate-report",
     "operate-generate-scheduler",
+    "operate-review",
+    "operate-run-web-form",
 ];
 
 /// `plan status` and `plan tick` answer the Go oracle's recorded bytes.
@@ -537,8 +580,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 158);
-    assert_eq!(deferred.len(), 8);
+    assert_eq!(selected.len(), 160);
+    assert_eq!(deferred.len(), 6);
 
     let root = unique_root();
     let home = root.join("home");
@@ -651,9 +694,13 @@ fn frozen_command_surface_matches_phase_two_contract() {
             } else {
                 output.stdout.clone()
             };
-        assert_eq!(actual_stdout, expected_stdout, "{id} stdout");
         assert_eq!(
-            output.stderr,
+            fold_root(&actual_stdout, &root),
+            expected_stdout,
+            "{id} stdout"
+        );
+        assert_eq!(
+            fold_root(&output.stderr, &root),
             decode_base64(case["stderr_base64"].as_str().unwrap()),
             "{id} stderr"
         );
