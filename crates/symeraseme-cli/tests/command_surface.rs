@@ -504,7 +504,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 13] = [
+    const SURFACE_OPERATIONS: [&str; 14] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -514,6 +514,9 @@ fn is_exact_case(case: &Value) -> bool {
         "operate-help",
         "operate-render-template",
         "operate-serve",
+        // `mcp --stdio` serves until stdin reaches EOF; the recorded case runs
+        // against a null stdin, so stdout and stderr stay empty and exit is 0.
+        "operate-mcp",
         "operate-schedule-install",
         "operate-schedule-status",
         "operate-schedule-uninstall",
@@ -580,8 +583,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 160);
-    assert_eq!(deferred.len(), 6);
+    assert_eq!(selected.len(), 161);
+    assert_eq!(deferred.len(), 5);
 
     let root = unique_root();
     let home = root.join("home");

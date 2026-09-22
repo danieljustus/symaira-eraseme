@@ -18,6 +18,22 @@ pub(crate) enum StreamError {
     /// The scanner accepted a value the shared protocol could not parse. This
     /// is an internal inconsistency; failing loudly beats dropping a request.
     UnparsableValue(usize),
+    /// Reading stdin or writing stdout failed.
+    Io(String),
+}
+
+impl std::fmt::Display for StreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StreamError::MalformedValue(position) => {
+                write!(f, "malformed JSON value at byte {position}")
+            }
+            StreamError::UnparsableValue(position) => {
+                write!(f, "unparsable JSON value at byte {position}")
+            }
+            StreamError::Io(message) => write!(f, "{message}"),
+        }
+    }
 }
 
 /// Answers every JSON value in `input`, appending one response per request to
@@ -48,6 +64,60 @@ pub(crate) fn serve_stream(
             InitializeOutcome::ParseError => return Err(StreamError::UnparsableValue(start)),
         }
         index = end;
+    }
+}
+
+/// Go's `ServeStdio` against a live pipe: each value is answered as soon as it
+/// completes, because an MCP client waits for the initialize response before
+/// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
+/// a stream cut mid-value aborts.
+///
+/// ponytail: `skip_json_value` cannot tell a truncated value from a
+/// syntactically invalid one, so a malformed value mid-stream waits for the
+/// next read where Go's decoder errors immediately, and the abort text is ours
+/// rather than `encoding/json`'s. Neither path is recorded in the corpus.
+/// Upgrade path: port the decoder's eager syntax-error detection and text.
+pub(crate) fn serve_stdio(
+    input: &mut dyn std::io::BufRead,
+    output: &mut dyn std::io::Write,
+    handler: &dyn super::handler::ToolHandler,
+) -> Result<(), StreamError> {
+    fn map_io(error: std::io::Error) -> StreamError {
+        StreamError::Io(error.to_string())
+    }
+
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut position = 0usize;
+    loop {
+        skip_whitespace(&buffer, &mut position);
+        if position < buffer.len()
+            && let Some(end) = skip_json_value(&buffer, position)
+        {
+            match initialize(&buffer[position..end], handler) {
+                InitializeOutcome::Response(bytes) => {
+                    output.write_all(&bytes).map_err(map_io)?;
+                    output.flush().map_err(map_io)?;
+                }
+                InitializeOutcome::Notification => {}
+                InitializeOutcome::ParseError => {
+                    return Err(StreamError::UnparsableValue(position));
+                }
+            }
+            buffer.drain(..end);
+            position = 0;
+            continue;
+        }
+        let more = input.fill_buf().map_err(map_io)?;
+        if more.is_empty() {
+            return if position >= buffer.len() {
+                Ok(())
+            } else {
+                Err(StreamError::MalformedValue(position))
+            };
+        }
+        buffer.extend_from_slice(more);
+        let length = more.len();
+        input.consume(length);
     }
 }
 
