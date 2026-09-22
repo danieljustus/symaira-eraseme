@@ -596,6 +596,48 @@ impl ContractHandler {
         Ok(json!({"success": true, "files": files, "dry_run": true}))
     }
 
+    /// Go's `auto_confirm`: dataStore first, then `replies.Service.AutoConfirm`.
+    /// Only the no-reply branch (`reply == nil`) is ported — with a stored
+    /// reply Go continues into `confirmation.AutoConfirm` and its browser
+    /// click, which has no Rust subsystem, so that branch fails closed instead
+    /// of emulating Go's answer.
+    fn auto_confirm(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let request_id = get_int(arguments, "request_id", 0);
+        let has_reply = store
+            .has_inbox_reply(request_id)
+            .map_err(|error| ToolError(error.to_string()))?;
+        if has_reply {
+            return Err(ToolError(
+                "auto_confirm with a stored inbox reply is not implemented in Rust \
+                 (confirmation browser subsystem)"
+                    .to_owned(),
+            ));
+        }
+        // Go's `confirmation.Result{Step: "no_reply", ...}`: the capital-key
+        // struct order is the JSON contract the CLI writes verbatim.
+        Ok(json!({
+            "Success": false,
+            "ClickedURL": "",
+            "ClickedHost": "",
+            "ClickedURLSHA256": "",
+            "Step": "no_reply",
+            "Error": format!("no inbox reply found for request #{request_id}"),
+            "ScreenshotBefore": "",
+            "ScreenshotAfter": "",
+            "ScreenshotBeforeSHA256": "",
+            "ScreenshotAfterSHA256": "",
+            "ScreenshotBeforeBytes": 0,
+            "ScreenshotAfterBytes": 0,
+            "DryRun": get_bool(arguments, "dry_run", false),
+            "TaskID": 0,
+            "Instructions": "",
+            "Status": "",
+            "Reason": "",
+            "ManualActionRequired": false,
+        }))
+    }
+
     /// Go's `run_web_form`: with `dry_run` the handler answers from the
     /// registry alone; otherwise it opens the store the nil-executor adapter
     /// falls back to a manual task through.
@@ -1172,6 +1214,12 @@ impl ToolHandler for ContractHandler {
         if name == "manual_tasks_list" {
             return self.manual_tasks_list(arguments);
         }
+        // Go serializes `map[string]any` results with sorted keys but structs
+        // in declaration order: `auto_confirm` answers with
+        // `confirmation.Result`, so its keys must not be reordered.
+        if name == "auto_confirm" {
+            return self.call_go_map(name, arguments);
+        }
         self.call_go_map(name, arguments).map(go_map_order)
     }
 }
@@ -1198,6 +1246,7 @@ impl ContractHandler {
             "schedule_install" => self.schedule_install(arguments),
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
+            "auto_confirm" => self.auto_confirm(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"

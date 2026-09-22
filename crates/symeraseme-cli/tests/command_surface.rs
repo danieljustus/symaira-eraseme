@@ -504,7 +504,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 14] = [
+    const SURFACE_OPERATIONS: [&str; 15] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -517,6 +517,10 @@ fn is_exact_case(case: &Value) -> bool {
         // `mcp --stdio` serves until stdin reaches EOF; the recorded case runs
         // against a null stdin, so stdout and stderr stay empty and exit is 0.
         "operate-mcp",
+        // `auto-confirm` is a thin wrapper over the `auto_confirm` tool; the
+        // recorded case has no inbox reply for request 1, so the result is the
+        // no-reply struct with DryRun true and the exit is 1.
+        "operate-auto-confirm",
         "operate-schedule-install",
         "operate-schedule-status",
         "operate-schedule-uninstall",
@@ -583,8 +587,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 161);
-    assert_eq!(deferred.len(), 5);
+    assert_eq!(selected.len(), 162);
+    assert_eq!(deferred.len(), 4);
 
     let root = unique_root();
     let home = root.join("home");
@@ -616,6 +620,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 | "operate-plan-create"
                 | "operate-plan-show"
                 | "operate-plan-execute"
+                | "operate-auto-confirm"
         ) || CONTRACT_TOOL_OPERATIONS.contains(&id);
         // The phase-two capture runs every schedule case in its own
         // `cli/<id>/cwd`, so the generated wrappers record that directory; the

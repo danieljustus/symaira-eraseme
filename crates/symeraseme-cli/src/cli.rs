@@ -504,6 +504,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "schedule status" => schedule_status(parsed),
         "review" => review_command(parsed),
         "run-web-form" => run_web_form_command(parsed),
+        "auto-confirm" => auto_confirm_command(parsed),
         _ => deferred(&path),
     }
 }
@@ -1358,8 +1359,66 @@ fn run_web_form_command(parsed: &Parsed) -> Outcome {
     web_action_text(&result)
 }
 
-/// Go's `webActionError` for the `map[string]any` arm: `None` on success.
+/// `auto-confirm` — Go's `realAutoConfirmCommand`: a thin wrapper over the
+/// `auto_confirm` tool (the tool runs before the format is validated); JSON
+/// writes the confirmation result, then `webActionError` decides the exit,
+/// text renders the struct-shaped action line.
+fn auto_confirm_command(parsed: &Parsed) -> Outcome {
+    let request_id = match int_argument(parsed, "request-id", "request ID") {
+        Ok(request_id) => request_id,
+        Err(outcome) => return outcome,
+    };
+    let mut arguments = Map::new();
+    arguments.insert("request_id".to_owned(), json!(request_id));
+    arguments.insert("headed".to_owned(), json!(bool_flag(parsed, "headed")));
+    arguments.insert(
+        "screenshot_dir".to_owned(),
+        json!(string_flag(parsed, "screenshot-dir")),
+    );
+    arguments.insert("dry_run".to_owned(), json!(bool_flag(parsed, "dry-run")));
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match handler.call("auto_confirm", &arguments) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let bytes = match json_line(&result) {
+            Ok(bytes) => bytes,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        return match web_action_error_message(&result) {
+            None => Outcome::Stdout(bytes),
+            Some(message) => Outcome::StdoutStderr(bytes, message),
+        };
+    }
+    web_action_text(&result)
+}
+
+/// Go's `webActionError`: `None` on success.
+///
+/// Two shapes reach it: the lower-case `map[string]any` tool results and the
+/// capital-key `confirmation.Result` struct `auto_confirm` answers with.
 fn web_action_error_message(result: &Value) -> Option<Vec<u8>> {
+    if result.get("Success").is_some() {
+        if result
+            .get("Success")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            return None;
+        }
+        if confirmation_requires_manual(result) {
+            return Some(b"manual confirmation required\n".to_vec());
+        }
+        return Some(b"action not completed\n".to_vec());
+    }
     // ponytail: Go's default arm formats the unreachable non-map case as
     // `unexpected web action result %T`; this handler only ever answers with a
     // JSON object, so a non-object is folded into the generic failure.
@@ -1377,8 +1436,51 @@ fn web_action_error_message(result: &Value) -> Option<Vec<u8>> {
     Some(b"action not completed\n".to_vec())
 }
 
+/// Go's `case confirmation.Result` branch condition, shared by the error and
+/// the text renderer.
+fn confirmation_requires_manual(result: &Value) -> bool {
+    result
+        .get("ManualActionRequired")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || result.get("Step").and_then(Value::as_str) == Some("manual_confirmation_required")
+}
+
+/// Go's `writeWebActionText`, for the capital-key `confirmation.Result`
+/// shape `auto_confirm` returns.
+fn confirmation_text(result: &Value) -> Outcome {
+    if result
+        .get("Success")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Outcome::Stdout(b"success\n".to_vec());
+    }
+    if confirmation_requires_manual(result) {
+        let line = format!(
+            "manual_confirmation_required task_id={} url={}\n{}\n",
+            go_fmt_value(result.get("TaskID")),
+            go_fmt_value(result.get("ClickedURL")),
+            go_fmt_value(result.get("Instructions")),
+        );
+        return Outcome::StdoutStderr(
+            line.into_bytes(),
+            b"manual confirmation required\n".to_vec(),
+        );
+    }
+    let line = format!(
+        "not_completed step={}: {}\n",
+        go_fmt_value(result.get("Step")),
+        go_fmt_value(result.get("Error")),
+    );
+    Outcome::StdoutStderr(line.into_bytes(), b"action not completed\n".to_vec())
+}
+
 /// Go's `writeWebActionText` for the `map[string]any` arm.
 fn web_action_text(result: &Value) -> Outcome {
+    if result.get("Success").is_some() {
+        return confirmation_text(result);
+    }
     if result
         .get("success")
         .and_then(Value::as_bool)
