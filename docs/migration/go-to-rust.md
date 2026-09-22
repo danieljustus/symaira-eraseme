@@ -30,19 +30,19 @@ Selected: 158 · deferred: 8 (as of `93872f48`).
 
 | Task | Cases | Branch | State |
 |---|---|---|---|
-| CLI-020 | `operate-auto-confirm`, `operate-classify-reply` | `rust/cli020-triage` | dispatched (wave 1) |
-| CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | implemented — PR #1022 (`c7570432`), asserts 160/6 |
-| CLI-022 | `operate-mcp` | `rust/cli022-mcp` | dispatched (wave 1) |
+| CLI-020 | `operate-auto-confirm` only (re-scoped) | `rust/cli020-triage` | implemented — PR #1024 (`7cdf266f`), asserts 161/5 |
+| CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`), main asserts 160/6 |
+| CLI-022 | `operate-mcp` | `rust/cli022-mcp` | implemented — PR #1023 (`0fb1f5e2`), rebased onto #1022, asserts 161/5 |
 | CLI-023 | `operate-migrate` | — | ready — re-scoped from CLI-021: the recorded case only exercises `validateRoots`' stat error and the migration engine (`internal/migration`, 907 lines) is unported; needs its own slice with Go fixtures for the dry-run/report paths |
 
-Wave 1 note: the CLI-021 worker died on HTTP 429 (Codex quota, ~9 h reset)
-after 13 s with no commit; the coordinator implemented that slice directly in
-the slice worktree. CLI-020/022 were dispatched in the same batch — treat an
-empty worktree/branch as quota loss, not a failed slice.
+Integration note: CLI-020 and CLI-022 both base on the post-#1022 main and
+each assert 161/5 (different cases); whoever merges second rebases and
+reconciles the counts to 162 selected / 4 deferred.
 
-CLI-021 landed as #1022 asserting 160/6; the two still-dispatched workers
-assert their own interim counts (CLI-020: 160, CLI-022: 159) — the
-coordinator reconciles to the integrated total at merge.
+Wave 1 note: all three wave-1 workers died on HTTP 429 (Codex quota, ~9 h
+reset) after ~13 s with no commits; the coordinator implemented every slice
+directly in the slice worktrees, per the dispatch contract. Treat an empty
+worktree/branch as quota loss, not a failed slice.
 Loaded this session (do not re-load): `go-to-rust-migration`,
 `go-rust-port-parity` + `references/workflow.md`, `guard-repo`,
 `autonomous-coding-agents`, `parallel-repo-agents`,
