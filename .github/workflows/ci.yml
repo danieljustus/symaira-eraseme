@@ -114,7 +114,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: TruffleHog secrets scan
-        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        uses: trufflesecurity/trufflehog@f714bf454f350590f4a24c3ddb1aef02c35bf5b6 # v3.97.5
         with:
           path: ./
           # action.yml constructs IMAGE:VERSION; tag@digest keeps the
@@ -123,7 +123,7 @@ jobs:
           version: '3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4'
           extra_args: --exclude-detectors Lob --exclude-paths .trufflehog-exclude-paths --fail-on-scan-errors
       - name: TruffleHog protected-history scan
-        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        uses: trufflesecurity/trufflehog@f714bf454f350590f4a24c3ddb1aef02c35bf5b6 # v3.97.5
         with:
           path: ./
           image: ghcr.io/trufflesecurity/trufflehog
