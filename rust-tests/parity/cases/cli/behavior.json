@@ -3925,6 +3925,311 @@
         }
       ],
       "classification": "success"
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-empty-json/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-empty-json/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-empty-json/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--json"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "ewogICJkZXRlY3Rpb24iOiB7CiAgICAiZGV0ZWN0ZWQiOiBmYWxzZSwKICAgICJzdW1tYXJ5IjogIk5vIGtub3duIFB5dGhvbi1lcmEgU3ltYWlyYSBFcmFzZU1lIGFydGlmYWN0cyBkZXRlY3RlZCIsCiAgICAicmVhc29ucyI6IG51bGwsCiAgICAic2VjcmV0X3N0b3JlIjogewogICAgICAiZGV0ZWN0ZWQiOiBmYWxzZSwKICAgICAgIm1pZ3JhdGFibGUiOiBmYWxzZQogICAgfSwKICAgICJhcnRpZmFjdHMiOiBudWxsCiAgfSwKICAiZHJ5X3J1biI6IHRydWUsCiAgInJlc3VtZWQiOiBmYWxzZSwKICAiaXRlbXMiOiBudWxsLAogICJjb21wbGV0ZSI6IHRydWUKfQo=",
+      "stderr_base64": "",
+      "stdout_bytes": 320,
+      "stderr_bytes": 0,
+      "id": "migrate-empty-json",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-empty-json/source"
+      ],
+      "input_files": {}
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-empty-text/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-empty-text/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-empty-text/home",
+        "--platform",
+        "cron",
+        "--dry-run"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "Tm8ga25vd24gUHl0aG9uLWVyYSBTeW1haXJhIEVyYXNlTWUgYXJ0aWZhY3RzIGRldGVjdGVkCkRyeSBydW46IG5vIGZpbGVzIHdlcmUgY2hhbmdlZC4K",
+      "stderr_base64": "",
+      "stdout_bytes": 87,
+      "stderr_bytes": 0,
+      "id": "migrate-empty-text",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-empty-text/source"
+      ],
+      "input_files": {}
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-json/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-json/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-json/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--json"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "ewogICJkZXRlY3Rpb24iOiB7CiAgICAiZGV0ZWN0ZWQiOiB0cnVlLAogICAgInN1bW1hcnkiOiAiUHl0aG9uLWVyYSBTeW1haXJhIEVyYXNlTWUgaW5zdGFsbGF0aW9uIGRldGVjdGVkICg1IG1pZ3JhdGlvbiBpdGVtKHMpKSIsCiAgICAicmVhc29ucyI6IFsKICAgICAgIlB5dGhvbi1lcmEgZXZlbnQgZGF0YWJhc2UgZm91bmQiLAogICAgICAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIiwKICAgICAgIlB5dGhvbi1lcmEgY29uZmlndXJhdGlvbiBmb3VuZCIsCiAgICAgICJQeXRob24tZXJhIGVuY3J5cHRlZCBpZGVudGl0eSBwcm9maWxlIGZvdW5kIiwKICAgICAgIlB5dGhvbiBzZWNyZXRzIGFyZSBrZXlyaW5nLWJhY2tlZDsgdmFsdWVzIHdlcmUgbm90IGluc3BlY3RlZCIKICAgIF0sCiAgICAic2VjcmV0X3N0b3JlIjogewogICAgICAiZGV0ZWN0ZWQiOiB0cnVlLAogICAgICAiZGVzY3JpcHRpb24iOiAiUHl0aG9uIHNlY3JldHMgYXJlIGtleXJpbmctYmFja2VkOyB2YWx1ZXMgd2VyZSBub3QgaW5zcGVjdGVkIiwKICAgICAgIm1pZ3JhdGFibGUiOiBmYWxzZQogICAgfSwKICAgICJhcnRpZmFjdHMiOiBbCiAgICAgIHsKICAgICAgICAiaWQiOiAiY29uZmlnOi5zeW1lcmFzZW1lLnRvbWwiLAogICAgICAgICJraW5kIjogImNvbmZpZyIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS8uc3ltZXJhc2VtZS50b21sIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1hcnRpZmFjdHMtanNvbi9kZXN0aW5hdGlvbi8uc3ltZXJhc2VtZS50b21sIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgY29uZmlndXJhdGlvbiBmb3VuZCIKICAgICAgfSwKICAgICAgewogICAgICAgICJpZCI6ICJjb25maWc6Y29uZmlnLnRvbWwiLAogICAgICAgICJraW5kIjogImNvbmZpZyIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9jb25maWcudG9tbCIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtYXJ0aWZhY3RzLWpzb24vZGVzdGluYXRpb24vY29uZmlnLnRvbWwiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIgogICAgICB9LAogICAgICB7CiAgICAgICAgImlkIjogImV2ZW50LWRiIiwKICAgICAgICAia2luZCI6ICJldmVudC1kYiIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9zeW1lcmFzZW1lLmRiIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1hcnRpZmFjdHMtanNvbi9kZXN0aW5hdGlvbi9zeW1lcmFzZW1lLmRiIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZXZlbnQgZGF0YWJhc2UgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAicHJvZmlsZSIsCiAgICAgICAgImtpbmQiOiAicHJvZmlsZSIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9pZGVudGl0eS5lbmMiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL2Rlc3RpbmF0aW9uL2lkZW50aXR5LmVuY3J5cHRlZCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGVuY3J5cHRlZCBpZGVudGl0eSBwcm9maWxlIGZvdW5kIgogICAgICB9LAogICAgICB7CiAgICAgICAgImlkIjogInNlY3JldC1zdG9yZSIsCiAgICAgICAgImtpbmQiOiAic2VjcmV0LXN0b3JlIiwKICAgICAgICAic291cmNlIjogImtleXJpbmc6Ly9zeW1lcmFzZW1lIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAia2V5cmluZzovL3N5bWVyYXNlbWUiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uIHNlY3JldHMgYXJlIGtleXJpbmctYmFja2VkOyB2YWx1ZXMgd2VyZSBub3QgaW5zcGVjdGVkIgogICAgICB9CiAgICBdCiAgfSwKICAiZHJ5X3J1biI6IHRydWUsCiAgInJlc3VtZWQiOiBmYWxzZSwKICAiaXRlbXMiOiBbCiAgICB7CiAgICAgICJhcnRpZmFjdCI6IHsKICAgICAgICAiaWQiOiAiY29uZmlnOi5zeW1lcmFzZW1lLnRvbWwiLAogICAgICAgICJraW5kIjogImNvbmZpZyIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS8uc3ltZXJhc2VtZS50b21sIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1hcnRpZmFjdHMtanNvbi9kZXN0aW5hdGlvbi8uc3ltZXJhc2VtZS50b21sIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgY29uZmlndXJhdGlvbiBmb3VuZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfSwKICAgIHsKICAgICAgImFydGlmYWN0IjogewogICAgICAgICJpZCI6ICJjb25maWc6Y29uZmlnLnRvbWwiLAogICAgICAgICJraW5kIjogImNvbmZpZyIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9jb25maWcudG9tbCIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtYXJ0aWZhY3RzLWpzb24vZGVzdGluYXRpb24vY29uZmlnLnRvbWwiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogImV2ZW50LWRiIiwKICAgICAgICAia2luZCI6ICJldmVudC1kYiIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9zeW1lcmFzZW1lLmRiIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1hcnRpZmFjdHMtanNvbi9kZXN0aW5hdGlvbi9zeW1lcmFzZW1lLmRiIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZXZlbnQgZGF0YWJhc2UgZm91bmQiCiAgICAgIH0sCiAgICAgICJzdGF0dXMiOiAicGxhbm5lZCIKICAgIH0sCiAgICB7CiAgICAgICJhcnRpZmFjdCI6IHsKICAgICAgICAiaWQiOiAicHJvZmlsZSIsCiAgICAgICAgImtpbmQiOiAicHJvZmlsZSIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL3NvdXJjZS9pZGVudGl0eS5lbmMiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLWFydGlmYWN0cy1qc29uL2Rlc3RpbmF0aW9uL2lkZW50aXR5LmVuY3J5cHRlZCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGVuY3J5cHRlZCBpZGVudGl0eSBwcm9maWxlIGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogInNlY3JldC1zdG9yZSIsCiAgICAgICAgImtpbmQiOiAic2VjcmV0LXN0b3JlIiwKICAgICAgICAic291cmNlIjogImtleXJpbmc6Ly9zeW1lcmFzZW1lIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAia2V5cmluZzovL3N5bWVyYXNlbWUiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uIHNlY3JldHMgYXJlIGtleXJpbmctYmFja2VkOyB2YWx1ZXMgd2VyZSBub3QgaW5zcGVjdGVkIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9CiAgXSwKICAiY29tcGxldGUiOiBmYWxzZQp9Cg==",
+      "stderr_base64": "",
+      "stdout_bytes": 3883,
+      "stderr_bytes": 0,
+      "id": "migrate-artifacts-json",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-artifacts-json/source"
+      ],
+      "input_files": {
+        "cli/migrate-artifacts-json/source/symeraseme.db": "opaque legacy database bytes\n",
+        "cli/migrate-artifacts-json/source/config.toml": "data_dir = 'legacy'\n",
+        "cli/migrate-artifacts-json/source/.symeraseme.toml": "legacy = true\n",
+        "cli/migrate-artifacts-json/source/identity.enc": "encrypted-fixture-not-a-real-identity\n"
+      }
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-text/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-text/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-artifacts-text/home",
+        "--platform",
+        "cron",
+        "--dry-run"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "UHl0aG9uLWVyYSBTeW1haXJhIEVyYXNlTWUgaW5zdGFsbGF0aW9uIGRldGVjdGVkICg1IG1pZ3JhdGlvbiBpdGVtKHMpKQpbcGxhbm5lZF0gY29uZmlnOi5zeW1lcmFzZW1lLnRvbWwKW3BsYW5uZWRdIGNvbmZpZzpjb25maWcudG9tbApbcGxhbm5lZF0gZXZlbnQtZGIKW3BsYW5uZWRdIHByb2ZpbGUKW3BsYW5uZWRdIHNlY3JldC1zdG9yZQpEcnkgcnVuOiBubyBmaWxlcyB3ZXJlIGNoYW5nZWQuCg==",
+      "stderr_base64": "",
+      "stdout_bytes": 226,
+      "stderr_bytes": 0,
+      "id": "migrate-artifacts-text",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-artifacts-text/source"
+      ],
+      "input_files": {
+        "cli/migrate-artifacts-text/source/symeraseme.db": "opaque legacy database bytes\n",
+        "cli/migrate-artifacts-text/source/config.toml": "data_dir = 'legacy'\n",
+        "cli/migrate-artifacts-text/source/.symeraseme.toml": "legacy = true\n",
+        "cli/migrate-artifacts-text/source/identity.enc": "encrypted-fixture-not-a-real-identity\n"
+      }
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-separate-config/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-separate-config/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-separate-config/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--source-config",
+        "<ORACLE_ROOT>/cli/migrate-separate-config/legacy-config",
+        "--destination-config",
+        "<ORACLE_ROOT>/cli/migrate-separate-config/new-config",
+        "--json"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "ewogICJkZXRlY3Rpb24iOiB7CiAgICAiZGV0ZWN0ZWQiOiB0cnVlLAogICAgInN1bW1hcnkiOiAiUHl0aG9uLWVyYSBTeW1haXJhIEVyYXNlTWUgaW5zdGFsbGF0aW9uIGRldGVjdGVkICg1IG1pZ3JhdGlvbiBpdGVtKHMpKSIsCiAgICAicmVhc29ucyI6IFsKICAgICAgIlB5dGhvbi1lcmEgZXZlbnQgZGF0YWJhc2UgZm91bmQiLAogICAgICAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIiwKICAgICAgIlB5dGhvbi1lcmEgY29uZmlndXJhdGlvbiBmb3VuZCIsCiAgICAgICJQeXRob24tZXJhIGVuY3J5cHRlZCBpZGVudGl0eSBwcm9maWxlIGZvdW5kIiwKICAgICAgIlB5dGhvbiBzZWNyZXRzIGFyZSBrZXlyaW5nLWJhY2tlZDsgdmFsdWVzIHdlcmUgbm90IGluc3BlY3RlZCIKICAgIF0sCiAgICAic2VjcmV0X3N0b3JlIjogewogICAgICAiZGV0ZWN0ZWQiOiB0cnVlLAogICAgICAiZGVzY3JpcHRpb24iOiAiUHl0aG9uIHNlY3JldHMgYXJlIGtleXJpbmctYmFja2VkOyB2YWx1ZXMgd2VyZSBub3QgaW5zcGVjdGVkIiwKICAgICAgIm1pZ3JhdGFibGUiOiBmYWxzZQogICAgfSwKICAgICJhcnRpZmFjdHMiOiBbCiAgICAgIHsKICAgICAgICAiaWQiOiAiY29uZmlnOi5zeW1lcmFzZW1lLnRvbWwiLAogICAgICAgICJraW5kIjogImNvbmZpZyIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9sZWdhY3ktY29uZmlnLy5zeW1lcmFzZW1lLnRvbWwiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9uZXctY29uZmlnLy5zeW1lcmFzZW1lLnRvbWwiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIgogICAgICB9LAogICAgICB7CiAgICAgICAgImlkIjogImNvbmZpZzpjb25maWcudG9tbCIsCiAgICAgICAgImtpbmQiOiAiY29uZmlnIiwKICAgICAgICAic291cmNlIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL2xlZ2FjeS1jb25maWcvY29uZmlnLnRvbWwiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9uZXctY29uZmlnL2NvbmZpZy50b21sIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgY29uZmlndXJhdGlvbiBmb3VuZCIKICAgICAgfSwKICAgICAgewogICAgICAgICJpZCI6ICJldmVudC1kYiIsCiAgICAgICAgImtpbmQiOiAiZXZlbnQtZGIiLAogICAgICAgICJzb3VyY2UiOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zZXBhcmF0ZS1jb25maWcvc291cmNlL3N5bWVyYXNlbWUuZGIiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9kZXN0aW5hdGlvbi9zeW1lcmFzZW1lLmRiIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZXZlbnQgZGF0YWJhc2UgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAicHJvZmlsZSIsCiAgICAgICAgImtpbmQiOiAicHJvZmlsZSIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9sZWdhY3ktY29uZmlnL2lkZW50aXR5LmVuYyIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL25ldy1jb25maWcvaWRlbnRpdHkuZW5jcnlwdGVkIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZW5jcnlwdGVkIGlkZW50aXR5IHByb2ZpbGUgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAic2VjcmV0LXN0b3JlIiwKICAgICAgICAia2luZCI6ICJzZWNyZXQtc3RvcmUiLAogICAgICAgICJzb3VyY2UiOiAia2V5cmluZzovL3N5bWVyYXNlbWUiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICJrZXlyaW5nOi8vc3ltZXJhc2VtZSIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24gc2VjcmV0cyBhcmUga2V5cmluZy1iYWNrZWQ7IHZhbHVlcyB3ZXJlIG5vdCBpbnNwZWN0ZWQiCiAgICAgIH0KICAgIF0KICB9LAogICJkcnlfcnVuIjogdHJ1ZSwKICAicmVzdW1lZCI6IGZhbHNlLAogICJpdGVtcyI6IFsKICAgIHsKICAgICAgImFydGlmYWN0IjogewogICAgICAgICJpZCI6ICJjb25maWc6LnN5bWVyYXNlbWUudG9tbCIsCiAgICAgICAgImtpbmQiOiAiY29uZmlnIiwKICAgICAgICAic291cmNlIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL2xlZ2FjeS1jb25maWcvLnN5bWVyYXNlbWUudG9tbCIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL25ldy1jb25maWcvLnN5bWVyYXNlbWUudG9tbCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGNvbmZpZ3VyYXRpb24gZm91bmQiCiAgICAgIH0sCiAgICAgICJzdGF0dXMiOiAicGxhbm5lZCIKICAgIH0sCiAgICB7CiAgICAgICJhcnRpZmFjdCI6IHsKICAgICAgICAiaWQiOiAiY29uZmlnOmNvbmZpZy50b21sIiwKICAgICAgICAia2luZCI6ICJjb25maWciLAogICAgICAgICJzb3VyY2UiOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zZXBhcmF0ZS1jb25maWcvbGVnYWN5LWNvbmZpZy9jb25maWcudG9tbCIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL25ldy1jb25maWcvY29uZmlnLnRvbWwiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBjb25maWd1cmF0aW9uIGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogImV2ZW50LWRiIiwKICAgICAgICAia2luZCI6ICJldmVudC1kYiIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNlcGFyYXRlLWNvbmZpZy9zb3VyY2Uvc3ltZXJhc2VtZS5kYiIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL2Rlc3RpbmF0aW9uL3N5bWVyYXNlbWUuZGIiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBldmVudCBkYXRhYmFzZSBmb3VuZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfSwKICAgIHsKICAgICAgImFydGlmYWN0IjogewogICAgICAgICJpZCI6ICJwcm9maWxlIiwKICAgICAgICAia2luZCI6ICJwcm9maWxlIiwKICAgICAgICAic291cmNlIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2VwYXJhdGUtY29uZmlnL2xlZ2FjeS1jb25maWcvaWRlbnRpdHkuZW5jIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zZXBhcmF0ZS1jb25maWcvbmV3LWNvbmZpZy9pZGVudGl0eS5lbmNyeXB0ZWQiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBlbmNyeXB0ZWQgaWRlbnRpdHkgcHJvZmlsZSBmb3VuZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfSwKICAgIHsKICAgICAgImFydGlmYWN0IjogewogICAgICAgICJpZCI6ICJzZWNyZXQtc3RvcmUiLAogICAgICAgICJraW5kIjogInNlY3JldC1zdG9yZSIsCiAgICAgICAgInNvdXJjZSI6ICJrZXlyaW5nOi8vc3ltZXJhc2VtZSIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogImtleXJpbmc6Ly9zeW1lcmFzZW1lIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbiBzZWNyZXRzIGFyZSBrZXlyaW5nLWJhY2tlZDsgdmFsdWVzIHdlcmUgbm90IGluc3BlY3RlZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfQogIF0sCiAgImNvbXBsZXRlIjogZmFsc2UKfQo=",
+      "stderr_base64": "",
+      "stdout_bytes": 3935,
+      "stderr_bytes": 0,
+      "id": "migrate-separate-config",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-separate-config/source"
+      ],
+      "input_files": {
+        "cli/migrate-separate-config/source/symeraseme.db": "opaque legacy database bytes\n",
+        "cli/migrate-separate-config/legacy-config/config.toml": "data_dir = 'legacy'\n",
+        "cli/migrate-separate-config/legacy-config/.symeraseme.toml": "legacy = true\n",
+        "cli/migrate-separate-config/legacy-config/identity.enc": "encrypted-fixture-not-a-real-identity\n"
+      }
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-scheduler-cron/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-scheduler-cron/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-scheduler-cron/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--binary",
+        "<ORACLE_ROOT>/bin/symeraseme",
+        "--project-dir",
+        "<ORACLE_ROOT>/cli/migrate-scheduler-cron/project",
+        "--json"
+      ],
+      "stdin_base64": "",
+      "exit_code": 0,
+      "stdout_base64": "ewogICJkZXRlY3Rpb24iOiB7CiAgICAiZGV0ZWN0ZWQiOiB0cnVlLAogICAgInN1bW1hcnkiOiAiUHl0aG9uLWVyYSBTeW1haXJhIEVyYXNlTWUgaW5zdGFsbGF0aW9uIGRldGVjdGVkICg2IG1pZ3JhdGlvbiBpdGVtKHMpKSIsCiAgICAicmVhc29ucyI6IFsKICAgICAgIlB5dGhvbi1lcmEgZ2VuZXJhdGVkIHNjaGVkdWxlciBhcnRpZmFjdCBmb3VuZCIsCiAgICAgICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiLAogICAgICAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIiwKICAgICAgIlB5dGhvbi1lcmEgZ2VuZXJhdGVkIHNjaGVkdWxlciBhcnRpZmFjdCBmb3VuZCIsCiAgICAgICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiLAogICAgICAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgXSwKICAgICJzZWNyZXRfc3RvcmUiOiB7CiAgICAgICJkZXRlY3RlZCI6IGZhbHNlLAogICAgICAibWlncmF0YWJsZSI6IGZhbHNlCiAgICB9LAogICAgImFydGlmYWN0cyI6IFsKICAgICAgewogICAgICAgICJpZCI6ICJzY2hlZHVsZXI6Y3JvbnRhYi50eHQiLAogICAgICAgICJraW5kIjogInNjaGVkdWxlciIsCiAgICAgICAgInNvdXJjZSI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL3NvdXJjZS9zY2hlZHVsZXMvY3JvbnRhYi50eHQiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL2Rlc3RpbmF0aW9uL3NjaGVkdWxlcy9jcm9udGFiLnR4dCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAic2NoZWR1bGVyOmluc3RhbGwuc2giLAogICAgICAgICJraW5kIjogInNjaGVkdWxlciIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2NoZWR1bGVyLWNyb24vZGVzdGluYXRpb24vc2NoZWR1bGVzL2luc3RhbGwuc2giLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgICB9LAogICAgICB7CiAgICAgICAgImlkIjogInNjaGVkdWxlcjpzeW1lcmFzZW1lLXBvbGwuc2giLAogICAgICAgICJraW5kIjogInNjaGVkdWxlciIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2NoZWR1bGVyLWNyb24vZGVzdGluYXRpb24vc2NoZWR1bGVzL3N5bWVyYXNlbWUtcG9sbC5zaCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAic2NoZWR1bGVyOnN5bWVyYXNlbWUtcmVzY2FuLnNoIiwKICAgICAgICAia2luZCI6ICJzY2hlZHVsZXIiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL2Rlc3RpbmF0aW9uL3NjaGVkdWxlcy9zeW1lcmFzZW1lLXJlc2Nhbi5zaCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAic2NoZWR1bGVyOnN5bWVyYXNlbWUtdGljay5zaCIsCiAgICAgICAgImtpbmQiOiAic2NoZWR1bGVyIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zY2hlZHVsZXItY3Jvbi9kZXN0aW5hdGlvbi9zY2hlZHVsZXMvc3ltZXJhc2VtZS10aWNrLnNoIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZ2VuZXJhdGVkIHNjaGVkdWxlciBhcnRpZmFjdCBmb3VuZCIKICAgICAgfSwKICAgICAgewogICAgICAgICJpZCI6ICJzY2hlZHVsZXI6dW5pbnN0YWxsLnNoIiwKICAgICAgICAia2luZCI6ICJzY2hlZHVsZXIiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL2Rlc3RpbmF0aW9uL3NjaGVkdWxlcy91bmluc3RhbGwuc2giLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgICB9CiAgICBdCiAgfSwKICAiZHJ5X3J1biI6IHRydWUsCiAgInJlc3VtZWQiOiBmYWxzZSwKICAiaXRlbXMiOiBbCiAgICB7CiAgICAgICJhcnRpZmFjdCI6IHsKICAgICAgICAiaWQiOiAic2NoZWR1bGVyOmNyb250YWIudHh0IiwKICAgICAgICAia2luZCI6ICJzY2hlZHVsZXIiLAogICAgICAgICJzb3VyY2UiOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zY2hlZHVsZXItY3Jvbi9zb3VyY2Uvc2NoZWR1bGVzL2Nyb250YWIudHh0IiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zY2hlZHVsZXItY3Jvbi9kZXN0aW5hdGlvbi9zY2hlZHVsZXMvY3JvbnRhYi50eHQiLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogInNjaGVkdWxlcjppbnN0YWxsLnNoIiwKICAgICAgICAia2luZCI6ICJzY2hlZHVsZXIiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL2Rlc3RpbmF0aW9uL3NjaGVkdWxlcy9pbnN0YWxsLnNoIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZ2VuZXJhdGVkIHNjaGVkdWxlciBhcnRpZmFjdCBmb3VuZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfSwKICAgIHsKICAgICAgImFydGlmYWN0IjogewogICAgICAgICJpZCI6ICJzY2hlZHVsZXI6c3ltZXJhc2VtZS1wb2xsLnNoIiwKICAgICAgICAia2luZCI6ICJzY2hlZHVsZXIiLAogICAgICAgICJkZXN0aW5hdGlvbiI6ICI8T1JBQ0xFX1JPT1Q+L2NsaS9taWdyYXRlLXNjaGVkdWxlci1jcm9uL2Rlc3RpbmF0aW9uL3NjaGVkdWxlcy9zeW1lcmFzZW1lLXBvbGwuc2giLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogInNjaGVkdWxlcjpzeW1lcmFzZW1lLXJlc2Nhbi5zaCIsCiAgICAgICAgImtpbmQiOiAic2NoZWR1bGVyIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zY2hlZHVsZXItY3Jvbi9kZXN0aW5hdGlvbi9zY2hlZHVsZXMvc3ltZXJhc2VtZS1yZXNjYW4uc2giLAogICAgICAgICJyZWFzb24iOiAiUHl0aG9uLWVyYSBnZW5lcmF0ZWQgc2NoZWR1bGVyIGFydGlmYWN0IGZvdW5kIgogICAgICB9LAogICAgICAic3RhdHVzIjogInBsYW5uZWQiCiAgICB9LAogICAgewogICAgICAiYXJ0aWZhY3QiOiB7CiAgICAgICAgImlkIjogInNjaGVkdWxlcjpzeW1lcmFzZW1lLXRpY2suc2giLAogICAgICAgICJraW5kIjogInNjaGVkdWxlciIsCiAgICAgICAgImRlc3RpbmF0aW9uIjogIjxPUkFDTEVfUk9PVD4vY2xpL21pZ3JhdGUtc2NoZWR1bGVyLWNyb24vZGVzdGluYXRpb24vc2NoZWR1bGVzL3N5bWVyYXNlbWUtdGljay5zaCIsCiAgICAgICAgInJlYXNvbiI6ICJQeXRob24tZXJhIGdlbmVyYXRlZCBzY2hlZHVsZXIgYXJ0aWZhY3QgZm91bmQiCiAgICAgIH0sCiAgICAgICJzdGF0dXMiOiAicGxhbm5lZCIKICAgIH0sCiAgICB7CiAgICAgICJhcnRpZmFjdCI6IHsKICAgICAgICAiaWQiOiAic2NoZWR1bGVyOnVuaW5zdGFsbC5zaCIsCiAgICAgICAgImtpbmQiOiAic2NoZWR1bGVyIiwKICAgICAgICAiZGVzdGluYXRpb24iOiAiPE9SQUNMRV9ST09UPi9jbGkvbWlncmF0ZS1zY2hlZHVsZXItY3Jvbi9kZXN0aW5hdGlvbi9zY2hlZHVsZXMvdW5pbnN0YWxsLnNoIiwKICAgICAgICAicmVhc29uIjogIlB5dGhvbi1lcmEgZ2VuZXJhdGVkIHNjaGVkdWxlciBhcnRpZmFjdCBmb3VuZCIKICAgICAgfSwKICAgICAgInN0YXR1cyI6ICJwbGFubmVkIgogICAgfQogIF0sCiAgImNvbXBsZXRlIjogZmFsc2UKfQo=",
+      "stderr_base64": "",
+      "stdout_bytes": 4274,
+      "stderr_bytes": 0,
+      "id": "migrate-scheduler-cron",
+      "category": "migration",
+      "expected_outcome": "success",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-scheduler-cron/source"
+      ],
+      "input_files": {
+        "cli/migrate-scheduler-cron/source/schedules/crontab.txt": "0 10 * * * python -m symeraseme tick\n"
+      }
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-invalid-platform/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-invalid-platform/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-invalid-platform/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--json",
+        "--platform",
+        "unsupported"
+      ],
+      "stdin_base64": "",
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5zdXBwb3J0ZWQgcGxhdGZvcm06IHVuc3VwcG9ydGVkIChjaG9vc2UgY3JvbiwgbGF1bmNoZCwgb3Igc3lzdGVtZCkK",
+      "stdout_bytes": 0,
+      "stderr_bytes": 69,
+      "id": "migrate-invalid-platform",
+      "category": "migration",
+      "expected_outcome": "deterministic_backend_error",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-invalid-platform/source"
+      ],
+      "input_files": {}
+    },
+    {
+      "argv": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/cli/migrate-nested-roots/source",
+        "--destination",
+        "<ORACLE_ROOT>/cli/migrate-nested-roots/source/destination",
+        "--home",
+        "<ORACLE_ROOT>/cli/migrate-nested-roots/home",
+        "--platform",
+        "cron",
+        "--dry-run",
+        "--json"
+      ],
+      "stdin_base64": "",
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "c291cmNlIGFuZCBkZXN0aW5hdGlvbiBtdXN0IGJlIHNlcGFyYXRlLCBub24tbmVzdGVkIGRpcmVjdG9yaWVzCg==",
+      "stdout_bytes": 0,
+      "stderr_bytes": 64,
+      "id": "migrate-nested-roots",
+      "category": "migration",
+      "expected_outcome": "deterministic_backend_error",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "cli/migrate-nested-roots/source"
+      ],
+      "input_files": {}
     }
   ]
 }

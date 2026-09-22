@@ -38,7 +38,29 @@ externally blocked (llmkit ×2, IMAP ×1).
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | **merged** — #1023 (`4c0236fb`) |
 | CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`); engine behind validation stays fail-closed, see Known defects |
 
-## Next action (parked 2026-09-22, second pass — stopped early by user)
+## Active continuation (2026-09-22, CLI-024)
+
+- Verified base: `8986a3db3d60d37b89368d37e15f1e98c60672f2`; main clean and
+  equal to origin/main at dispatch. Read-only fetch used; unrelated branch
+  cleanup and the concurrent release/Windows-fix PRs were left untouched.
+- CLI-024 implementation: `rust/cli024-engine`, `.worktrees/cli024-engine`;
+  delegated writer `sa-0-04ed9c54` / `deleg_dc132177`. Session-bound, not durable.
+- CLI-024 fixtures/integration: `rust/cli024-integration`,
+  `.worktrees/cli024-integration`; coordinator owns corpus, replay and this ledger.
+- Real pinned Go generator completed with exit 0: 174 CLI cases, including eight
+  new migration scenarios; all previous 166 CLI records unchanged. Rust parity
+  is **pending**, not 171/3 verified yet. Backup/state filesystem replay added
+  against the existing `migration` record; native gates and review pending.
+- Next: prove repeat-generation stability, integrate the actual worker commits,
+  run full owning crates + workspace lint/fmt/nextest, independently review,
+  then obtain required CI before promotion. Go remains runnable; no release.
+
+Loaded this continuation: `guard-repo`, `go-rust-port-parity` plus workflow,
+contract-matrix and differential-testing; `code-editing`, `autonomous-coding-agents`,
+`parallel-repo-agents`, `evidence-gated-testing`, `port-contract-engineering`,
+`python-go-port-parity`, and this skill's worker-dispatch/porting-pitfalls references.
+
+## Prior next action (parked 2026-09-22, second pass — stopped early by user)
 
 **CLI-024 — `migrate` engine** (Detect + dry-run report + mutating path in
 `internal/migration/migration.go`, 907 lines): new recorded CLI cases for the
