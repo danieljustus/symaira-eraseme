@@ -47,15 +47,25 @@ The two llmkit transport cases remain blocked on the shared implementation.
 - Verified base: `8986a3db3d60d37b89368d37e15f1e98c60672f2`; main clean and
   equal to origin/main at dispatch. Read-only fetch used; unrelated branch
   cleanup and the concurrent release/Windows-fix PRs were left untouched.
-- CLI-024 implementation: `rust/cli024-engine`, `.worktrees/cli024-engine`;
-  delegated writer `sa-0-04ed9c54` / `deleg_dc132177`. Session-bound, not durable.
+- CLI-024 implementation: `rust/cli024-engine`, `.worktrees/cli024-engine`.
+  Managed writer `sa-0-04ed9c54` was stopped without source artifacts after its
+  reported model differed from the authorized Codex route. Replacement: Codex
+  CLI 0.155.1, explicit `gpt-6-astra`/OpenAI, verified ChatGPT login, workspace-write
+  sandbox, no API-key fallback; process `proc_068e417c7478`. Source/test files now
+  exist, but no implementation acceptance is asserted until its final checks.
 - CLI-024 fixtures/integration: `rust/cli024-integration`,
   `.worktrees/cli024-integration`; coordinator owns corpus, replay and this ledger.
 - Real pinned Go generator completed with exit 0: 174 CLI cases, including eight
   new migration scenarios; all previous 166 CLI records unchanged. Rust parity
   is **pending**, not 171/3 verified yet. Backup/state filesystem replay added
   against the existing `migration` record; native gates and review pending.
-- Next: prove repeat-generation stability, integrate the actual worker commits,
+- Expanded filesystem corpus: 11 records, adding actual Go resume, manual-secret,
+  copy-secret refusal and incomplete-backup cases. All seven prior records remain
+  identical; two complete generations matched across all six fixture files.
+  The replay checks five migration scenarios, including preparation output,
+  absent roots and retained unrecognized source files. Corruption controls are
+  prepared but await the real engine.
+- Next: integrate only verified engine source/commits,
   run full owning crates + workspace lint/fmt/nextest, independently review,
   then obtain required CI before promotion. Go remains runnable; no release.
 

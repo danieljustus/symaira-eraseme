@@ -57,6 +57,28 @@ assigned integration worktree. Acceptance uses that worktree's own `target`,
 not another candidate's binaries. Pre-integration failures are intentionally
 retained as red regression baselines, not successful migration evidence.
 
+## Additional safety corpus and execution recovery
+
+The filesystem corpus now has 11 records: the seven earlier records remain
+byte-identical, and four additional genuine Go executions pin repeat-run resume,
+manual secret-store handling, refusal of unsupported `--copy-secrets`, and
+preservation of an incomplete backup. Each case records its input bytes/modes,
+all preparation process outputs, root existence, and final filesystem manifests.
+An unrecognized source file proves that backups include more than the detected
+migration artifacts. Two full generations produced identical hashes for all six
+corpus/fixture files. The new replay compiled under all-target/all-feature Clippy;
+its path-escape regression executed and passed. Engine parity remains pending.
+
+The managed writer stopped without code artifacts. The replacement uses the
+installed Codex CLI 0.155.1 with verified ChatGPT login, explicit OpenAI model,
+workspace-write sandbox and no API-key fallback. Its process is
+`proc_068e417c7478`; prompt, runtime log and final report are retained under
+`.worktrees/cli024-engine/target/cli024-codex-*` (log: `cli024-codex.log`).
+No main-checkout edits or remote publication occurred. Corpus rejection controls
+for output hashes, backup marker hashes and root existence must pass after engine
+integration; their positive first run prevents an unimplemented engine from
+making a negative control falsely green.
+
 ## Focused acceptance after integration
 
 Run from the integration worktree, setting `CARGO_TARGET_DIR="$PWD/target"`

@@ -53,6 +53,9 @@ pub(super) fn assert_unchanged(case: &Value, root: &Path, before: &Manifest) {
 
 fn manifest(directory: &Path, runtime_root: &Path) -> Manifest {
     let mut entries = BTreeMap::new();
+    if !directory.try_exists().expect("manifest root existence") {
+        return entries;
+    }
     let mut pending = vec![directory.to_path_buf()];
     while let Some(parent) = pending.pop() {
         for entry in fs::read_dir(parent).expect("read migration output directory") {
@@ -114,17 +117,34 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
     )))
     .expect("filesystem oracle JSON");
     assert_eq!(fixture["commit"], "4e582f28");
-    let cases = fixture["cases"].as_array().expect("filesystem cases");
-    let matches: Vec<_> = cases
+    let cases: BTreeMap<_, _> = fixture["cases"]
+        .as_array()
+        .expect("filesystem cases")
         .iter()
-        .filter(|case| case["id"] == "migration")
+        .filter_map(|case| {
+            let id = case["id"].as_str().expect("case id");
+            (id == "migration" || id.starts_with("migration-")).then_some((id, case))
+        })
         .collect();
-    assert_eq!(matches.len(), 1, "exactly one frozen migration mutation");
-    let case = matches[0];
+    let mut expected_ids = [
+        "migration",
+        "migration-resume",
+        "migration-manual-secrets",
+        "migration-copy-secrets-rejected",
+        "migration-incomplete-backup",
+    ];
+    expected_ids.sort_unstable();
+    assert_eq!(cases.keys().copied().collect::<Vec<_>>(), expected_ids);
+    for (id, case) in cases {
+        replay_filesystem(id, case);
+    }
+}
+
+fn replay_filesystem(id: &str, case: &Value) {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated runtime root");
     let _cleanup = Cleanup(root.clone());
-    let case_root = root.join("filesystem/migration");
+    let case_root = input_path(&root, &format!("filesystem/{id}"));
     let source = case_root.join("legacy-source");
     let home = root.join("home");
     let cwd = case_root.join("cwd");
@@ -132,45 +152,68 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
     for directory in [&source, &home, &cwd, &capture, &case_root.join("home")] {
         fs::create_dir_all(directory).expect("isolated fixture directory");
     }
-    let config = source.join("config.toml");
-    fs::write(&config, b"data_dir = 'legacy'\n").expect("recorded legacy config input");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(config, fs::Permissions::from_mode(0o644)).expect("oracle input mode");
+    if id == "migration" {
+        write_input(&source.join("config.toml"), "data_dir = 'legacy'\n", 0o644);
+    } else {
+        for directory in case["input_directories"]
+            .as_array()
+            .expect("input directories")
+        {
+            fs::create_dir_all(input_path(&root, directory.as_str().expect("directory")))
+                .expect("input directory");
+        }
+        for (relative, input) in case["input_files"].as_object().expect("input files") {
+            let mode = u32::try_from(input["mode"].as_u64().expect("input mode"))
+                .expect("file mode fits u32");
+            write_input(
+                &input_path(&root, relative),
+                input["content"].as_str().expect("input content"),
+                mode,
+            );
+        }
     }
     let source_before = manifest(&source, &root);
-    let argv: Vec<_> = case["operation"]
-        .as_array()
-        .expect("operation argv")
-        .iter()
-        .map(|arg| arg.as_str().expect("string argument"))
-        .collect();
     assert!(binary().is_file(), "the native Rust CLI artifact exists");
-    let output = run(&argv, &home, &cwd, &capture, 0);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "migration failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(case["process"]["exit_code"], 0);
-    for (stream, bytes) in [("stdout", &output.stdout), ("stderr", &output.stderr)] {
-        let folded = fold_root(bytes, &root);
+    let mut processes: Vec<&Value> = case.get("preparation").map_or_else(Vec::new, |value| {
+        value
+            .as_array()
+            .expect("preparation processes")
+            .iter()
+            .collect()
+    });
+    processes.push(&case["process"]);
+    for (index, process) in processes.into_iter().enumerate() {
+        let argv: Vec<_> = process["argv"]
+            .as_array()
+            .expect("operation argv")
+            .iter()
+            .map(|arg| arg.as_str().expect("string argument"))
+            .collect();
+        let output = run(&argv, &home, &cwd, &capture, index);
         assert_eq!(
-            folded.len() as u64,
-            case["process"][format!("{stream}_bytes")]
-                .as_u64()
-                .expect("stream length"),
-            "migration {stream} length"
+            output.status.code().map(i64::from),
+            process["exit_code"].as_i64(),
+            "{id}: process {index}: {}",
+            String::from_utf8_lossy(&output.stderr)
         );
-        assert_eq!(
-            hex_digest(&Sha256::digest(&folded)),
-            case["process"][format!("{stream}_sha256")]
-                .as_str()
-                .expect("stream digest"),
-            "migration {stream} digest"
-        );
+        for (stream, bytes) in [("stdout", &output.stdout), ("stderr", &output.stderr)] {
+            let folded = fold_root(bytes, &root);
+            assert_eq!(
+                folded.len() as u64,
+                process[format!("{stream}_bytes")]
+                    .as_u64()
+                    .expect("stream length"),
+                "{id}: {index} {stream} length"
+            );
+            assert_eq!(
+                hex_digest(&Sha256::digest(&folded)),
+                process[format!("{stream}_sha256")]
+                    .as_str()
+                    .expect("stream digest"),
+                "{id}: {index} {stream} digest: {}",
+                String::from_utf8_lossy(&folded)
+            );
+        }
     }
     for (name, recorded_path) in case["manifest_roots"].as_object().expect("manifest roots") {
         let relative = recorded_path
@@ -179,6 +222,13 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
             .strip_prefix("<ORACLE_ROOT>/")
             .expect("isolated recorded root");
         let directory = input_path(&root, relative);
+        if let Some(exists) = case.get("root_exists") {
+            assert_eq!(
+                directory.try_exists().expect("root existence"),
+                exists[name].as_bool().expect("recorded existence"),
+                "{id}: {name} existence"
+            );
+        }
         let expected: Manifest = case["manifests"][name]
             .as_array()
             .expect("root manifest")
@@ -199,12 +249,67 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
         assert_eq!(
             manifest(&directory, &root),
             expected,
-            "migration {name} manifest"
+            "{id}: {name} manifest"
         );
     }
     assert_eq!(
         manifest(&source, &root),
         source_before,
-        "legacy source retained unchanged"
+        "{id}: legacy source retained unchanged"
     );
+}
+
+#[test]
+fn migration_filesystem_rejects_corrupted_output_and_backup() {
+    let fixture: Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../rust-tests/parity/cases/filesystem/manifests.json"
+    )))
+    .expect("filesystem oracle JSON");
+    let case = fixture["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|case| case["id"] == "migration")
+        .expect("migration case");
+    // Establish a passing positive before testing the real comparator's
+    // rejection paths; a broken engine cannot make these controls pass.
+    replay_filesystem("migration", case);
+    let mut output = case.clone();
+    output["process"]["stdout_sha256"] = "0".repeat(64).into();
+    let mut backup = case.clone();
+    let marker = backup["manifests"]["backup"]
+        .as_array_mut()
+        .expect("backup")
+        .iter_mut()
+        .find(|entry| entry["path"] == ".complete.json")
+        .expect("completion marker");
+    marker["sha256"] = "0".repeat(64).into();
+    let mut absent = case.clone();
+    absent["root_exists"] =
+        serde_json::json!({"source": true, "destination": false, "backup": true});
+    for (mutated, reason) in [
+        (output, "migration: 0 stdout digest"),
+        (backup, "migration: backup manifest"),
+        (absent, "migration: destination existence"),
+    ] {
+        let rejection = std::panic::catch_unwind(|| replay_filesystem("migration", &mutated))
+            .expect_err("corrupt oracle must be rejected");
+        let message = rejection
+            .downcast_ref::<String>()
+            .expect("assertion diagnostic");
+        assert!(message.contains(reason), "unexpected rejection: {message}");
+    }
+}
+
+fn write_input(path: &Path, content: &str, mode: u32) {
+    fs::create_dir_all(path.parent().expect("input parent")).expect("input parent directory");
+    fs::write(path, content.as_bytes()).expect("recorded input");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("oracle input mode");
+    }
+    #[cfg(not(unix))]
+    let _ = mode;
 }

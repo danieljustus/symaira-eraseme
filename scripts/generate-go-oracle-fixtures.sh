@@ -1223,6 +1223,49 @@ migration_argv = ["migrate", "--source", str(source), "--destination", str(desti
 migration_process = side_effect_process("migration", migration_argv, env, cwd)
 filesystem_cases.append(fs_case("migration", migration_argv, env, cwd, {"source": source, "destination": destination, "backup": pathlib.Path(str(destination) + ".migration-backup")}, (), (), migration_process))
 
+# Exercise resume and data-loss guards through the same real CLI, keeping the
+# previous migration record unchanged. Inputs are synthetic; outputs are Go's.
+for case_id in ("migration-resume", "migration-manual-secrets", "migration-copy-secrets-rejected", "migration-incomplete-backup"):
+    case_root, env, cwd = side_effect_runtime(case_id)
+    source = case_root / "legacy-source"
+    destination = case_root / "go-destination"
+    backup = pathlib.Path(str(destination) + ".migration-backup")
+    prefix = "filesystem/" + case_id
+    input_directories = [prefix + "/legacy-source", prefix + "/home"]
+    input_files = {
+        prefix + "/legacy-source/config.toml": {"content": "data_dir = 'legacy'\n", "mode": 0o640},
+        prefix + "/legacy-source/unrecognized/keep.txt": {"content": "also backed up, never migrated\n", "mode": 0o600},
+    }
+    if "secrets" in case_id:
+        input_files[prefix + "/legacy-source/secret-refs.json"] = {"content": '{"names":["oracle-reference"]}\n', "mode": 0o600}
+    if case_id == "migration-incomplete-backup":
+        input_directories.append(prefix + "/go-destination.migration-backup")
+        input_files[prefix + "/go-destination.migration-backup/sentinel"] = {"content": "preserve incomplete backup\n", "mode": 0o600}
+    for relative in input_directories:
+        (root / relative).mkdir(parents=True, exist_ok=True)
+    for relative, record in input_files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(record["content"].encode())
+        path.chmod(record["mode"])
+    argv = ["migrate", "--source", str(source), "--destination", str(destination), "--home", env["HOME"], "--platform", "cron", "--json"]
+    preparation = []
+    if case_id == "migration-resume":
+        preparation.append(side_effect_process(case_id + "-prepare", argv, env, cwd))
+        if preparation[0]["exit_code"] != 0:
+            raise RuntimeError("migration resume preparation failed")
+    if case_id == "migration-copy-secrets-rejected":
+        argv.append("--copy-secrets")
+    process = side_effect_process(case_id, argv, env, cwd)
+    expected_exit = 1 if case_id in ("migration-copy-secrets-rejected", "migration-incomplete-backup") else 0
+    if process["exit_code"] != expected_exit:
+        raise RuntimeError(f"{case_id}: exit={process['exit_code']}, expected {expected_exit}")
+    roots = {"source": source, "destination": destination, "backup": backup}
+    case = fs_case(case_id, argv, env, cwd, roots, process=process)
+    case.update(input_directories=input_directories, input_files=input_files, preparation=preparation,
+                root_exists={name: path.exists() for name, path in roots.items()})
+    filesystem_cases.append(case)
+
 # Verify token rotation in one isolated data directory: two independent server
 # starts replace the stable mcp_token path, while both secret values remain
 # absent from the fixture.
@@ -1365,7 +1408,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 7}
+expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 11}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")
