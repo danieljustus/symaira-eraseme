@@ -22,5 +22,10 @@ fn main() {
         cli::Outcome::Notice(bytes) => {
             let _ = std::io::stderr().write_all(&bytes);
         }
+        cli::Outcome::StdoutStderr(out, err) => {
+            let _ = std::io::stdout().write_all(&out);
+            let _ = std::io::stderr().write_all(&err);
+            std::process::exit(1);
+        }
     }
 }

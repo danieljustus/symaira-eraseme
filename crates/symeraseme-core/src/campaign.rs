@@ -579,7 +579,11 @@ fn profile_field_empty(profile: &Profile, field: &str) -> bool {
 /// Go builds a `FormSpec` before either branch, but the only parts of it those
 /// branches read are the start URL and the step count — the filled field values
 /// exist for the executor this port does not have.
-fn web_form_preview(
+/// Go's `WebFormAdapter.Run` result map for the registry lookup plus the
+/// dry-run preview; `Err` carries the `invalid_spec` failure payload. The
+/// caller is responsible for Go's profile / manual-task steps that surround
+/// it, mirroring the adapter's order.
+pub fn web_form_preview(
     brokers: &[Broker],
     broker_id: &str,
     dry_run: bool,

@@ -36,6 +36,10 @@ pub enum Outcome {
     Stdout(Vec<u8>),
     Stderr(Vec<u8>),
     Notice(Vec<u8>),
+    /// Bytes for stdout followed by a Go `RunE` error on stderr: the process
+    /// prints the action result first, then the error, and exits 1 — Go's
+    /// `writeJSON` / `writeWebActionText` followed by `webActionError`.
+    StdoutStderr(Vec<u8>, Vec<u8>),
 }
 
 /// Build the complete native Clap surface for debug assertions and tooling.
@@ -474,6 +478,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "schedule install" => schedule_install(parsed),
         "schedule uninstall" => schedule_uninstall(parsed),
         "schedule status" => schedule_status(parsed),
+        "review" => review_command(parsed),
+        "run-web-form" => run_web_form_command(parsed),
         _ => deferred(&path),
     }
 }
@@ -1237,6 +1243,128 @@ fn int_argument(parsed: &Parsed, flag: &str, name: &str) -> Result<i64, Outcome>
     argument
         .parse()
         .map_err(|_| Outcome::Stderr(format!("invalid {name} {argument:?}\n").into_bytes()))
+}
+
+/// `review` — Go's `realRedactFileCommand`: the positional wins over `--path`,
+/// an empty path fails before the tool runs, and the body is the
+/// `redact_file` contract handler (text mode prints only `success`).
+fn review_command(parsed: &Parsed) -> Outcome {
+    let path = parsed
+        .positional
+        .first()
+        .cloned()
+        .unwrap_or_else(|| string_flag(parsed, "path"));
+    if path.is_empty() {
+        return Outcome::Stderr(b"a file path is required\n".to_vec());
+    }
+    let mut arguments = Map::new();
+    arguments.insert("path".to_owned(), json!(path));
+    contract_command("redact_file", arguments, parsed)
+}
+
+/// `run-web-form` — Go's `realRunWebFormCommand`: all five arguments are sent
+/// on every call (the positional overrides `--broker-id`), the tool runs
+/// before the format is validated, and the answer goes through Go's web-action
+/// rendering.
+fn run_web_form_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    let broker_id = parsed
+        .positional
+        .first()
+        .cloned()
+        .unwrap_or_else(|| string_flag(parsed, "broker-id"));
+    arguments.insert("broker_id".to_owned(), json!(broker_id));
+    arguments.insert(
+        "request_id".to_owned(),
+        json!(int_flag(parsed, "request-id", 0)),
+    );
+    arguments.insert("headed".to_owned(), json!(bool_flag(parsed, "headed")));
+    arguments.insert(
+        "screenshot_dir".to_owned(),
+        json!(string_flag(parsed, "screenshot-dir")),
+    );
+    arguments.insert("dry_run".to_owned(), json!(bool_flag(parsed, "dry-run")));
+
+    // Same order as `contract_result_with_format`: the tool runs before the
+    // output format is validated, so a tool error wins over a format error.
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match handler.call("run_web_form", &arguments) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+    };
+    let format = match output_format(parsed) {
+        Ok(format) => format,
+        Err(outcome) => return outcome,
+    };
+    if format == "json" {
+        let bytes = match json_line(&result) {
+            Ok(bytes) => bytes,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        return match web_action_error_message(&result) {
+            None => Outcome::Stdout(bytes),
+            Some(message) => Outcome::StdoutStderr(bytes, message),
+        };
+    }
+    web_action_text(&result)
+}
+
+/// Go's `webActionError` for the `map[string]any` arm: `None` on success.
+fn web_action_error_message(result: &Value) -> Option<Vec<u8>> {
+    // ponytail: Go's default arm formats the unreachable non-map case as
+    // `unexpected web action result %T`; this handler only ever answers with a
+    // JSON object, so a non-object is folded into the generic failure.
+    // Upgrade path: mirror Go's `%T` text if a non-map result is ever wired.
+    if result
+        .get("success")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    if result.get("status").and_then(Value::as_str) == Some("manual_action_required") {
+        return Some(b"manual action required\n".to_vec());
+    }
+    Some(b"action not completed\n".to_vec())
+}
+
+/// Go's `writeWebActionText` for the `map[string]any` arm.
+fn web_action_text(result: &Value) -> Outcome {
+    if result
+        .get("success")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Outcome::Stdout(b"success\n".to_vec());
+    }
+    if result.get("status").and_then(Value::as_str) == Some("manual_action_required") {
+        let line = format!(
+            "manual_action_required task_id={} url={}\n{}\n",
+            go_fmt_value(result.get("task_id")),
+            go_fmt_value(result.get("url")),
+            go_fmt_value(result.get("instructions")),
+        );
+        return Outcome::StdoutStderr(line.into_bytes(), b"manual action required\n".to_vec());
+    }
+    let line = format!("not_completed: {}\n", go_fmt_value(result.get("error")));
+    Outcome::StdoutStderr(line.into_bytes(), b"action not completed\n".to_vec())
+}
+
+/// Go's `fmt` `%v` for the scalars a web-action map carries. Missing keys are
+/// nil and print `<nil>`.
+// ponytail: the non-scalar fallback renders compact JSON rather than Go's
+// `[a b]` slice spelling; only `task_id`, `url`, `instructions` and `error`
+// reach this helper and all four are scalars or nil.
+fn go_fmt_value(value: Option<&Value>) -> String {
+    match value {
+        None | Some(Value::Null) => "<nil>".to_owned(),
+        Some(Value::String(text)) => text.clone(),
+        Some(Value::Bool(flag)) => flag.to_string(),
+        Some(other) => other.to_string(),
+    }
 }
 
 /// `plan tick` — Go's `tickCommandWith`.

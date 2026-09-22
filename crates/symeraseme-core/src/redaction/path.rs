@@ -8,20 +8,28 @@ pub const MAX_FILE_BYTES: u64 = 16 << 20;
 
 #[derive(Debug)]
 pub enum WorkspaceRootError {
+    /// Go's `ErrPathInvalid`.
     InvalidPath,
+    /// Go's `ErrPathNullByte`.
+    NullByte,
+    /// Go's `ErrPathOutsideWorkspace`.
+    OutsideWorkspace,
     RootUnavailable,
     Io(io::Error),
     NotRegularFile,
+    /// Go's `ErrFileTooLarge`.
     FileTooLarge,
 }
 impl fmt::Display for WorkspaceRootError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::InvalidPath => "invalid workspace-relative path",
+            Self::InvalidPath => "path is not a safe workspace-relative file name",
+            Self::NullByte => "path contains a null byte",
+            Self::OutsideWorkspace => "path is outside the MCP workspace",
             Self::RootUnavailable => "workspace root is unavailable",
             Self::Io(_) => "workspace file read failed",
             Self::NotRegularFile => "workspace target is not a regular file",
-            Self::FileTooLarge => "workspace file exceeds the configured limit",
+            Self::FileTooLarge => "workspace file exceeds the maximum size",
         })
     }
 }
@@ -92,18 +100,26 @@ impl WorkspaceRoot {
                 .map(str::to_owned)
                 .ok_or(WorkspaceRootError::InvalidPath);
         }
+        // Go's `canonicalPath`: resolve symlinks when the target exists,
+        // otherwise resolve the parent and re-attach the leaf; when even the
+        // parent is missing, keep the cleaned absolute path unresolved.
         let absolute = if let Ok(canonical) = std::fs::canonicalize(path) {
             canonical
         } else {
             let parent = path.parent().ok_or(WorkspaceRootError::InvalidPath)?;
-            let parent = std::fs::canonicalize(parent).map_err(WorkspaceRootError::Io)?;
-            parent.join(path.file_name().ok_or(WorkspaceRootError::InvalidPath)?)
+            match std::fs::canonicalize(parent) {
+                Ok(parent) => parent.join(path.file_name().ok_or(WorkspaceRootError::InvalidPath)?),
+                Err(_) => path.to_path_buf(),
+            }
         };
+        // A path outside the root — including one whose symlink-resolved form
+        // diverges — is Go's `ErrPathOutsideWorkspace` (its `filepath.Rel`
+        // fails or yields a `..` prefix).
         let relative = absolute
             .strip_prefix(&self.canonical)
-            .map_err(|_| WorkspaceRootError::InvalidPath)?;
+            .map_err(|_| WorkspaceRootError::OutsideWorkspace)?;
         if relative.as_os_str().is_empty() {
-            return Err(WorkspaceRootError::InvalidPath);
+            return Err(WorkspaceRootError::OutsideWorkspace);
         }
         let value = relative.to_str().ok_or(WorkspaceRootError::InvalidPath)?;
         Ok(value.replace(std::path::MAIN_SEPARATOR, "/"))
@@ -111,27 +127,28 @@ impl WorkspaceRoot {
 }
 
 fn validate_relative(relative: &str) -> Result<Vec<PathBuf>, WorkspaceRootError> {
-    if relative.is_empty()
-        || relative.as_bytes().contains(&0)
-        || relative.contains('\\')
-        || relative.chars().any(char::is_control)
-    {
+    // Go checks the null byte first (`ErrPathNullByte`), then rejects unsafe
+    // relative names (`ErrPathInvalid`) and escapes (`ErrPathOutsideWorkspace`).
+    if relative.as_bytes().contains(&0) {
+        return Err(WorkspaceRootError::NullByte);
+    }
+    if relative.is_empty() || relative.contains('\\') || relative.chars().any(char::is_control) {
         return Err(WorkspaceRootError::InvalidPath);
     }
     let raw_parts: Vec<&str> = relative.split('/').collect();
-    if raw_parts
-        .iter()
-        .any(|part| part.is_empty() || *part == "." || *part == "..")
-    {
+    if raw_parts.contains(&"..") {
+        return Err(WorkspaceRootError::OutsideWorkspace);
+    }
+    if raw_parts.iter().any(|part| part.is_empty() || *part == ".") {
         return Err(WorkspaceRootError::InvalidPath);
     }
     let raw_bytes = relative.as_bytes();
     if raw_bytes.len() >= 2 && raw_bytes[1] == b':' && raw_bytes[0].is_ascii_alphabetic() {
-        return Err(WorkspaceRootError::InvalidPath);
+        return Err(WorkspaceRootError::OutsideWorkspace);
     }
     let path = Path::new(relative);
     if path.is_absolute() {
-        return Err(WorkspaceRootError::InvalidPath);
+        return Err(WorkspaceRootError::OutsideWorkspace);
     }
     let mut components = Vec::new();
     for component in path.components() {
