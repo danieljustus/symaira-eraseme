@@ -24,21 +24,26 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 158 · deferred: 8 (as of `93872f48`; main after #1022 = 160/6;
-target after #1023 + #1024 = 163/3).
+Selected: 163 · deferred: 3 — verified by the focused corpus test on the
+integrated HEAD `7d02cc58` (run of 2026-09-22; historical: 158/8 at
+`93872f48`, main 160/6 after #1022). The three deferred cases are all
+externally blocked (llmkit ×2, IMAP ×1).
 
 ## Open tasks (run of 2026-09-22)
 
 | Task | Cases | Branch | State |
 |---|---|---|---|
-| CLI-020 | `operate-auto-confirm` + `operate-migrate` (CLI-023) | `rust/cli020-triage` | implemented — PR #1024 (`66c734af`), asserts 162/4 |
-| CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`), main asserts 160/6 |
-| CLI-022 | `operate-mcp` | `rust/cli022-mcp` | implemented — PR #1023 (`0fb1f5e2`), rebased onto #1022, asserts 161/5 |
-| CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | implemented — PR #1024 (`66c734af`); engine behind validation stays fail-closed, see Known defects |
+| CLI-020 | `operate-auto-confirm` + `operate-migrate` (CLI-023) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`) |
+| CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`) |
+| CLI-022 | `operate-mcp` | `rust/cli022-mcp` | **merged** — #1023 (`4c0236fb`) |
+| CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`); engine behind validation stays fail-closed, see Known defects |
 
-Integration note: CLI-022 asserts 161/5, CLI-020+023 assert 162/4; whoever
-merges second rebases and reconciles to the combined 163 selected / 3
-deferred.
+Run of 2026-09-22 closed: integrated HEAD `7d02cc58`, corpus selected
+163 / deferred 3, focused corpus test + clippy + fmt + vet + gofmt all
+exit 0 on that revision. Ready non-blocked queue: empty — next run has
+nothing to start unless an externally blocked row unblocks (llmkit
+transports, IMAP transport) or the migrate engine gets its own slice with
+Go fixtures.
 
 Wave 1 note: all three wave-1 workers died on HTTP 429 (Codex quota, ~9 h
 reset) after ~13 s with no commits; the coordinator implemented every slice
@@ -59,9 +64,9 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 | `operate-generate-rebuttal`, `operate-classify-reply` | LLM | blocked — `internal/llm` reports transports as not ported (`llmkit` owns the `auth_failure` text in Go); emulating it is forbidden |
 | `operate-migrate` | migration engine | implemented — #1024, validateRoots scope only (engine fail-closed, see Known defects) |
 | `operate-review`, `operate-run-web-form` | misc | **merged** — #1022 (selected 160/6) |
-| `operate-mcp` | MCP stdio server | implemented — #1023 (asserts 161/5) |
+| `operate-mcp` | MCP stdio server | **merged** — #1023 (`4c0236fb`) |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
-| `operate-auto-confirm`, `operate-migrate` | triage / migration | implemented — #1024 (asserts 162/4) |
+| `operate-auto-confirm`, `operate-migrate` | triage / migration | **merged** — #1024 (`7d02cc58`) |
 
 ## CI caveat
 
