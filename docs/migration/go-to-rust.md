@@ -24,20 +24,21 @@ cases) is the contract. `is_exact_case()` in
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Selected: 158 · deferred: 8 (as of `93872f48`).
+Selected: 158 · deferred: 8 (as of `93872f48`; main after #1022 = 160/6;
+target after #1023 + #1024 = 163/3).
 
 ## Open tasks (run of 2026-09-22)
 
 | Task | Cases | Branch | State |
 |---|---|---|---|
-| CLI-020 | `operate-auto-confirm` only (re-scoped) | `rust/cli020-triage` | implemented — PR #1024 (`7cdf266f`), asserts 161/5 |
+| CLI-020 | `operate-auto-confirm` + `operate-migrate` (CLI-023) | `rust/cli020-triage` | implemented — PR #1024 (`66c734af`), asserts 162/4 |
 | CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`), main asserts 160/6 |
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | implemented — PR #1023 (`0fb1f5e2`), rebased onto #1022, asserts 161/5 |
-| CLI-023 | `operate-migrate` | — | ready — re-scoped from CLI-021: the recorded case only exercises `validateRoots`' stat error and the migration engine (`internal/migration`, 907 lines) is unported; needs its own slice with Go fixtures for the dry-run/report paths |
+| CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | implemented — PR #1024 (`66c734af`); engine behind validation stays fail-closed, see Known defects |
 
-Integration note: CLI-020 and CLI-022 both base on the post-#1022 main and
-each assert 161/5 (different cases); whoever merges second rebases and
-reconciles the counts to 162 selected / 4 deferred.
+Integration note: CLI-022 asserts 161/5, CLI-020+023 assert 162/4; whoever
+merges second rebases and reconciles to the combined 163 selected / 3
+deferred.
 
 Wave 1 note: all three wave-1 workers died on HTTP 429 (Codex quota, ~9 h
 reset) after ~13 s with no commits; the coordinator implemented every slice
@@ -56,11 +57,11 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 
 | `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
 | `operate-generate-rebuttal`, `operate-classify-reply` | LLM | blocked — `internal/llm` reports transports as not ported (`llmkit` owns the `auth_failure` text in Go); emulating it is forbidden |
-| `operate-migrate` | migration engine | ready — CLI-023 (engine unported; see task table) |
+| `operate-migrate` | migration engine | implemented — #1024, validateRoots scope only (engine fail-closed, see Known defects) |
 | `operate-review`, `operate-run-web-form` | misc | **merged** — #1022 (selected 160/6) |
 | `operate-mcp` | MCP stdio server | implemented — #1023 (asserts 161/5) |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
-| `operate-auto-confirm` | triage | implemented — #1024, no-reply branch only (asserts 161/5) |
+| `operate-auto-confirm`, `operate-migrate` | triage / migration | implemented — #1024 (asserts 162/4) |
 
 ## CI caveat
 
@@ -131,7 +132,24 @@ gate for cutover readiness.
 - 2026-09-22 — CLI-021 re-scoped: `review` + `run-web-form` landed as #1022
   (`c7570432`, asserts 160/6); `operate-migrate` became CLI-023 (engine is
   907 unported lines and its single recorded case pins only the
-  `validateRoots` stat error — an error-path-only port would be emulation).
+  `validateRoots` stat error).
+- 2026-09-22 — CLI-023 scoped as "port `validateRoots` for real, fail closed
+  behind it": the validation walk (absolute/clean paths, symlink-component
+  rejection, Go's wrapped `lstat` text) is a genuine port under the recorded
+  differential; only the detection/report engine stays an explicit
+  not-implemented branch. This supersedes the earlier "error-path-only would
+  be emulation" verdict — emulation would be copying the error string without
+  the validating code, which this is not. Landed in #1024 (`66c734af`).
+- 2026-09-22 — Rust's `target_os` for Go's `runtime.GOOS == "darwin"` is
+  spelled `macos`; a `#[cfg(target_os = "darwin")]` allow-list compiles
+  clean and silently never fires (found via the recorded `/tmp` symlink
+  component). Go platform guards port as `cfg(target_os = "macos")`.
+- 2026-09-22 — Rust CI gates a 90 % line coverage on `mcp/**`-matching
+  files (`rust-ci.yml` critical set); subprocess corpus replays are not
+  llvm-cov-instrumented, so new handler/serve code needs in-process tests.
+  Local replication: `cargo llvm-cov --workspace --all-features --json`
+  plus the workflow's file filter — #1023 failed at 89.65 % and passed at
+  90.43 % after its stream tests.
 - 2026-09-22 — the differential replay now substitutes the recorded
   `<ORACLE_ROOT>` in argv and folds the runtime root back out of stdout and
   stderr (byte-level), restoring the capture's normalization; before this,
@@ -143,7 +161,8 @@ gate for cutover readiness.
   (CLI-020/021/022) with disjoint subsystem scopes but a known shared-edit
   surface (`cli.rs` dispatch arms + `command_surface.rs` selection/counts);
   the coordinator merges serially and owns the final count reconciliation
-  (target selected 164 / deferred 2 once all three land).
+  (target selected 163 / deferred 3 — the third deferred slot after the
+  three blocked llmkit/IMAP cases is `classify-reply`, also llmkit).
 - 2026-09-21 — this ledger created; `docs/rust-port/handoffs/` stays the
   per-slice evidence store, not a second tracker.
 - 2026-09-21 — CLI-017 merged as #1019 (`c0573f86`).
