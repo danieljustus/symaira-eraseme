@@ -31,11 +31,18 @@ Selected: 158 · deferred: 8 (as of `93872f48`).
 | Task | Cases | Branch | State |
 |---|---|---|---|
 | CLI-020 | `operate-auto-confirm`, `operate-classify-reply` | `rust/cli020-triage` | dispatched (wave 1) |
-| CLI-021 | `operate-migrate`, `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | dispatched (wave 1) |
+| CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | implemented — PR #1022 (`c7570432`), asserts 160/6 |
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | dispatched (wave 1) |
+| CLI-023 | `operate-migrate` | — | ready — re-scoped from CLI-021: the recorded case only exercises `validateRoots`' stat error and the migration engine (`internal/migration`, 907 lines) is unported; needs its own slice with Go fixtures for the dry-run/report paths |
 
-All three worktrees base on `b39606b8`; each asserts its own interim count
-(160/161/159) — the coordinator reconciles to the integrated total at merge.
+Wave 1 note: the CLI-021 worker died on HTTP 429 (Codex quota, ~9 h reset)
+after 13 s with no commit; the coordinator implemented that slice directly in
+the slice worktree. CLI-020/022 were dispatched in the same batch — treat an
+empty worktree/branch as quota loss, not a failed slice.
+
+CLI-021 landed as #1022 asserting 160/6; the two still-dispatched workers
+assert their own interim counts (CLI-020: 160, CLI-022: 159) — the
+coordinator reconciles to the integrated total at merge.
 Loaded this session (do not re-load): `go-to-rust-migration`,
 `go-rust-port-parity` + `references/workflow.md`, `guard-repo`,
 `autonomous-coding-agents`, `parallel-repo-agents`,
@@ -49,10 +56,11 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 
 | `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
 | `operate-generate-rebuttal` | generators/LLM | deferred — no llmkit transports in Rust; emulating the auth error is forbidden |
-| `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | dispatched — CLI-021 |
+| `operate-auto-confirm`, `operate-classify-reply` | triage | dispatched — CLI-020 |
+| `operate-migrate` | migration engine | ready — CLI-023 (engine unported; see task table) |
+| `operate-review`, `operate-run-web-form` | misc | implemented — #1022 (asserts 160/6 until merge) |
 | `operate-mcp` | MCP stdio server | dispatched — CLI-022 |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
-| `operate-auto-confirm`, `operate-classify-reply` | triage | dispatched — CLI-020 |
 
 ## CI caveat
 
@@ -71,7 +79,12 @@ gate for cutover readiness.
 
 ## Known parity defects found but not fixed
 
-(none open — the `manual-tasks list` key-order defect below was fixed by #1018.)
+- **Workspace-guard edge strings.** Root-open failures still print
+  `workspace root is unavailable` where Go wraps the cause
+  (`resolve workspace root: …` / `workspace file read failed`), and a
+  cap-std `InvalidInput` open failure maps to `ErrPathInvalid`'s text where
+  Go says `workspace file read failed`. Neither path is recorded in the
+  corpus; both live in `redaction/path.rs`.
 
 ## Fixed parity defects (folded into the corpus or a regression test)
 
@@ -89,6 +102,17 @@ gate for cutover readiness.
 
 ## Decisions
 
+- 2026-09-22 — CLI-021 re-scoped: `review` + `run-web-form` landed as #1022
+  (`c7570432`, asserts 160/6); `operate-migrate` became CLI-023 (engine is
+  907 unported lines and its single recorded case pins only the
+  `validateRoots` stat error — an error-path-only port would be emulation).
+- 2026-09-22 — the differential replay now substitutes the recorded
+  `<ORACLE_ROOT>` in argv and folds the runtime root back out of stdout and
+  stderr (byte-level), restoring the capture's normalization; before this,
+  no path-bearing case could replay byte-exactly, in Go or Rust.
+- 2026-09-22 — a failed dispatch on HTTP 429 (Codex quota) is not a slice
+  outcome; the coordinator implemented CLI-021 in its worktree, per the
+  dispatch contract.
 - 2026-09-22 — wave 1 of this run dispatched three writers in parallel
   (CLI-020/021/022) with disjoint subsystem scopes but a known shared-edit
   surface (`cli.rs` dispatch arms + `command_surface.rs` selection/counts);
