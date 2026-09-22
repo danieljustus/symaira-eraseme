@@ -3,7 +3,7 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Base: `861527cf` (main, clean)
+- Base: `b39606b8` (main, clean; supersedes `861527cf`)
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
@@ -26,6 +26,21 @@ compared byte-exactly, the rest only assert the deferred stub fails closed.
 
 Selected: 158 · deferred: 8 (as of `93872f48`).
 
+## Open tasks (run of 2026-09-22)
+
+| Task | Cases | Branch | State |
+|---|---|---|---|
+| CLI-020 | `operate-auto-confirm`, `operate-classify-reply` | `rust/cli020-triage` | dispatched (wave 1) |
+| CLI-021 | `operate-migrate`, `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | dispatched (wave 1) |
+| CLI-022 | `operate-mcp` | `rust/cli022-mcp` | dispatched (wave 1) |
+
+All three worktrees base on `b39606b8`; each asserts its own interim count
+(160/161/159) — the coordinator reconciles to the integrated total at merge.
+Loaded this session (do not re-load): `go-to-rust-migration`,
+`go-rust-port-parity` + `references/workflow.md`, `guard-repo`,
+`autonomous-coding-agents`, `parallel-repo-agents`,
+`go-to-rust-migration/references/worker-dispatch.md`.
+
 ## Remaining deferred cases
 
 | Case id | Subsystem | State |
@@ -34,10 +49,10 @@ Selected: 158 · deferred: 8 (as of `93872f48`).
 
 | `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
 | `operate-generate-rebuttal` | generators/LLM | deferred — no llmkit transports in Rust; emulating the auth error is forbidden |
-| `operate-auto-confirm`, `operate-classify-reply` | triage | ready — next slice |
-| `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | ready |
-| `operate-mcp` | MCP stdio server | ready |
+| `operate-migrate`, `operate-review`, `operate-run-web-form` | misc | dispatched — CLI-021 |
+| `operate-mcp` | MCP stdio server | dispatched — CLI-022 |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
+| `operate-auto-confirm`, `operate-classify-reply` | triage | dispatched — CLI-020 |
 
 ## CI caveat
 
@@ -74,6 +89,11 @@ gate for cutover readiness.
 
 ## Decisions
 
+- 2026-09-22 — wave 1 of this run dispatched three writers in parallel
+  (CLI-020/021/022) with disjoint subsystem scopes but a known shared-edit
+  surface (`cli.rs` dispatch arms + `command_surface.rs` selection/counts);
+  the coordinator merges serially and owns the final count reconciliation
+  (target selected 164 / deferred 2 once all three land).
 - 2026-09-21 — this ledger created; `docs/rust-port/handoffs/` stays the
   per-slice evidence store, not a second tracker.
 - 2026-09-21 — CLI-017 merged as #1019 (`c0573f86`).
