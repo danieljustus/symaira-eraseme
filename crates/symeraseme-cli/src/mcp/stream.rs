@@ -162,6 +162,81 @@ mod tests {
         output
     }
 
+    /// Every recorded stream case must behave the same live (answered per
+    /// value as bytes arrive) as buffered: identical outputs, identical
+    /// abort-or-success verdict. This is the differential for `serve_stdio`
+    /// against the fixture-verified `serve_stream`.
+    #[test]
+    fn serve_stdio_matches_the_buffered_stream_for_every_fixture_case() {
+        let fixture: Fixture = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/mcp-contract/mcp-stream/cases.json"
+        ))
+        .expect("stream fixture");
+        assert_eq!(fixture.cases.len(), 13, "fixture case count changed");
+        for case in fixture.cases {
+            let input = case
+                .request_b64
+                .as_deref()
+                .map(decode_base64)
+                .unwrap_or_default();
+            let handler = no_backend_handler();
+            let mut buffered = Vec::new();
+            let buffered_result = serve_stream(&input, &mut buffered, &handler);
+            let mut live = Vec::new();
+            let live_result = serve_stdio(&mut std::io::Cursor::new(input), &mut live, &handler);
+            assert_eq!(
+                live_result.is_ok(),
+                buffered_result.is_ok(),
+                "{}",
+                case.name
+            );
+            assert_eq!(live, buffered, "{}", case.name);
+        }
+    }
+
+    /// A notification has no id: nothing is written, and the verdict matches
+    /// the buffered stream.
+    #[test]
+    fn serve_stdio_emits_nothing_for_a_notification() {
+        let handler = no_backend_handler();
+        let input = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
+        let mut live = Vec::new();
+        let live_result = serve_stdio(&mut std::io::Cursor::new(&input[..]), &mut live, &handler);
+        let mut buffered = Vec::new();
+        let buffered_result = serve_stream(&input[..], &mut buffered, &handler);
+        assert_eq!(live_result.is_ok(), buffered_result.is_ok());
+        assert_eq!(live, buffered);
+    }
+
+    /// EOF inside a value aborts without a fabricated response (Go's
+    /// `io.ErrUnexpectedEOF` direction, our wording — see `serve_stdio`).
+    #[test]
+    fn serve_stdio_reports_a_value_cut_off_mid_stream() {
+        let handler = no_backend_handler();
+        let mut output = Vec::new();
+        let truncated: &[u8] = br#"{"jsonrpc":"2.0","#;
+        let error = serve_stdio(&mut std::io::Cursor::new(truncated), &mut output, &handler)
+            .expect_err("truncated stream must abort");
+        assert_eq!(error, StreamError::MalformedValue(0));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn stream_error_text_names_position_and_io_cause() {
+        assert_eq!(
+            StreamError::MalformedValue(3).to_string(),
+            "malformed JSON value at byte 3"
+        );
+        assert_eq!(
+            StreamError::UnparsableValue(7).to_string(),
+            "unparsable JSON value at byte 7"
+        );
+        assert_eq!(
+            StreamError::Io("broken pipe".to_owned()).to_string(),
+            "broken pipe"
+        );
+    }
+
     #[test]
     fn source_bound_go_stream_fixture_matches() {
         let fixture: Fixture = serde_json::from_str(include_str!(
