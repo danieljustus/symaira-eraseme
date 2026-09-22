@@ -18,6 +18,22 @@ pub(crate) enum StreamError {
     /// The scanner accepted a value the shared protocol could not parse. This
     /// is an internal inconsistency; failing loudly beats dropping a request.
     UnparsableValue(usize),
+    /// Reading stdin or writing stdout failed.
+    Io(String),
+}
+
+impl std::fmt::Display for StreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StreamError::MalformedValue(position) => {
+                write!(f, "malformed JSON value at byte {position}")
+            }
+            StreamError::UnparsableValue(position) => {
+                write!(f, "unparsable JSON value at byte {position}")
+            }
+            StreamError::Io(message) => write!(f, "{message}"),
+        }
+    }
 }
 
 /// Answers every JSON value in `input`, appending one response per request to
@@ -48,6 +64,60 @@ pub(crate) fn serve_stream(
             InitializeOutcome::ParseError => return Err(StreamError::UnparsableValue(start)),
         }
         index = end;
+    }
+}
+
+/// Go's `ServeStdio` against a live pipe: each value is answered as soon as it
+/// completes, because an MCP client waits for the initialize response before
+/// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
+/// a stream cut mid-value aborts.
+///
+/// ponytail: `skip_json_value` cannot tell a truncated value from a
+/// syntactically invalid one, so a malformed value mid-stream waits for the
+/// next read where Go's decoder errors immediately, and the abort text is ours
+/// rather than `encoding/json`'s. Neither path is recorded in the corpus.
+/// Upgrade path: port the decoder's eager syntax-error detection and text.
+pub(crate) fn serve_stdio(
+    input: &mut dyn std::io::BufRead,
+    output: &mut dyn std::io::Write,
+    handler: &dyn super::handler::ToolHandler,
+) -> Result<(), StreamError> {
+    fn map_io(error: std::io::Error) -> StreamError {
+        StreamError::Io(error.to_string())
+    }
+
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut position = 0usize;
+    loop {
+        skip_whitespace(&buffer, &mut position);
+        if position < buffer.len()
+            && let Some(end) = skip_json_value(&buffer, position)
+        {
+            match initialize(&buffer[position..end], handler) {
+                InitializeOutcome::Response(bytes) => {
+                    output.write_all(&bytes).map_err(map_io)?;
+                    output.flush().map_err(map_io)?;
+                }
+                InitializeOutcome::Notification => {}
+                InitializeOutcome::ParseError => {
+                    return Err(StreamError::UnparsableValue(position));
+                }
+            }
+            buffer.drain(..end);
+            position = 0;
+            continue;
+        }
+        let more = input.fill_buf().map_err(map_io)?;
+        if more.is_empty() {
+            return if position >= buffer.len() {
+                Ok(())
+            } else {
+                Err(StreamError::MalformedValue(position))
+            };
+        }
+        buffer.extend_from_slice(more);
+        let length = more.len();
+        input.consume(length);
     }
 }
 
@@ -90,6 +160,81 @@ mod tests {
             }
         }
         output
+    }
+
+    /// Every recorded stream case must behave the same live (answered per
+    /// value as bytes arrive) as buffered: identical outputs, identical
+    /// abort-or-success verdict. This is the differential for `serve_stdio`
+    /// against the fixture-verified `serve_stream`.
+    #[test]
+    fn serve_stdio_matches_the_buffered_stream_for_every_fixture_case() {
+        let fixture: Fixture = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/mcp-contract/mcp-stream/cases.json"
+        ))
+        .expect("stream fixture");
+        assert_eq!(fixture.cases.len(), 13, "fixture case count changed");
+        for case in fixture.cases {
+            let input = case
+                .request_b64
+                .as_deref()
+                .map(decode_base64)
+                .unwrap_or_default();
+            let handler = no_backend_handler();
+            let mut buffered = Vec::new();
+            let buffered_result = serve_stream(&input, &mut buffered, &handler);
+            let mut live = Vec::new();
+            let live_result = serve_stdio(&mut std::io::Cursor::new(input), &mut live, &handler);
+            assert_eq!(
+                live_result.is_ok(),
+                buffered_result.is_ok(),
+                "{}",
+                case.name
+            );
+            assert_eq!(live, buffered, "{}", case.name);
+        }
+    }
+
+    /// A notification has no id: nothing is written, and the verdict matches
+    /// the buffered stream.
+    #[test]
+    fn serve_stdio_emits_nothing_for_a_notification() {
+        let handler = no_backend_handler();
+        let input = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
+        let mut live = Vec::new();
+        let live_result = serve_stdio(&mut std::io::Cursor::new(&input[..]), &mut live, &handler);
+        let mut buffered = Vec::new();
+        let buffered_result = serve_stream(&input[..], &mut buffered, &handler);
+        assert_eq!(live_result.is_ok(), buffered_result.is_ok());
+        assert_eq!(live, buffered);
+    }
+
+    /// EOF inside a value aborts without a fabricated response (Go's
+    /// `io.ErrUnexpectedEOF` direction, our wording — see `serve_stdio`).
+    #[test]
+    fn serve_stdio_reports_a_value_cut_off_mid_stream() {
+        let handler = no_backend_handler();
+        let mut output = Vec::new();
+        let truncated: &[u8] = br#"{"jsonrpc":"2.0","#;
+        let error = serve_stdio(&mut std::io::Cursor::new(truncated), &mut output, &handler)
+            .expect_err("truncated stream must abort");
+        assert_eq!(error, StreamError::MalformedValue(0));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn stream_error_text_names_position_and_io_cause() {
+        assert_eq!(
+            StreamError::MalformedValue(3).to_string(),
+            "malformed JSON value at byte 3"
+        );
+        assert_eq!(
+            StreamError::UnparsableValue(7).to_string(),
+            "unparsable JSON value at byte 7"
+        );
+        assert_eq!(
+            StreamError::Io("broken pipe".to_owned()).to_string(),
+            "broken pipe"
+        );
     }
 
     #[test]

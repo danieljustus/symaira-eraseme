@@ -35,11 +35,13 @@ const ROOT_NAME: &str = "symeraseme";
 pub enum Outcome {
     Stdout(Vec<u8>),
     Stderr(Vec<u8>),
-    Notice(Vec<u8>),
     /// Bytes for stdout followed by a Go `RunE` error on stderr: the process
     /// prints the action result first, then the error, and exits 1 — Go's
     /// `writeJSON` / `writeWebActionText` followed by `webActionError`.
     StdoutStderr(Vec<u8>, Vec<u8>),
+    /// Run the stdio MCP server: optional stderr notice first, then the
+    /// JSON-RPC loop over stdin/stdout until EOF.
+    ServeStdio(Option<Vec<u8>>),
 }
 
 /// Build the complete native Clap surface for debug assertions and tooling.
@@ -415,11 +417,26 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "render-template" => render_template(parsed),
         "init-profile" => init_profile_command(parsed),
         "show-profile" => show_profile_command(parsed),
-        "serve" if parsed.flags.get("stdio").is_some_and(|value| value == "true") => {
-            Outcome::Notice(
+        "serve"
+            if parsed
+                .flags
+                .get("stdio")
+                .is_some_and(|value| value == "true") =>
+        {
+            // Go prints the banner and then serves; only the banner was
+            // reproduced before, which made `serve` exit instead of serving.
+            Outcome::ServeStdio(Some(
                 b"symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.\n"
                     .to_vec(),
-            )
+            ))
+        }
+        "mcp"
+            if parsed
+                .flags
+                .get("stdio")
+                .is_some_and(|value| value == "true") =>
+        {
+            Outcome::ServeStdio(None)
         }
         "status" => {
             let campaign = parsed.flags.get("campaign").cloned().unwrap_or_default();
@@ -461,14 +478,21 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             let mut arguments = Map::new();
             arguments.insert(
                 "dry_run".to_owned(),
-                json!(parsed.flags.get("dry-run").is_some_and(|value| value == "true")),
+                json!(
+                    parsed
+                        .flags
+                        .get("dry-run")
+                        .is_some_and(|value| value == "true")
+                ),
             );
             contract_command("manual_tasks_cleanup", arguments, parsed)
         }
         "events show" => match int_argument(parsed, "request-id", "request ID") {
-            Ok(request_id) => {
-                contract_command_rendered("get_events", events_arguments(parsed, request_id), parsed)
-            }
+            Ok(request_id) => contract_command_rendered(
+                "get_events",
+                events_arguments(parsed, request_id),
+                parsed,
+            ),
             Err(outcome) => outcome,
         },
         "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
@@ -975,6 +999,28 @@ fn int_flag(parsed: &Parsed, name: &str, default: i64) -> i64 {
 fn contract_handler() -> Result<ContractHandler, String> {
     let root = env::current_dir().map_err(|error| error.to_string())?;
     Ok(ContractHandler::new(root).with_store(process_context(), now_utc()))
+}
+
+/// The `mcp --stdio` / `serve --stdio` body: an optional banner on stderr,
+/// then Go's `ServeStdio` loop over the process pipes. Clean EOF exits 0.
+pub(crate) fn serve_stdio(notice: Option<Vec<u8>>) -> Outcome {
+    use std::io::Write as _;
+
+    if let Some(bytes) = &notice {
+        let _ = std::io::stderr().write_all(bytes);
+    }
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut input = stdin.lock();
+    let mut output = stdout.lock();
+    match crate::mcp::stream::serve_stdio(&mut input, &mut output, &handler) {
+        Ok(()) => Outcome::Stdout(Vec::new()),
+        Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    }
 }
 
 /// The four CLI commands that are thin wrappers over an MCP tool share Go's
