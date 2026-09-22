@@ -504,7 +504,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 15] = [
+    const SURFACE_OPERATIONS: [&str; 16] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -590,8 +590,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 162);
-    assert_eq!(deferred.len(), 4);
+    assert_eq!(selected.len(), 163);
+    assert_eq!(deferred.len(), 3);
 
     let root = unique_root();
     let home = root.join("home");
