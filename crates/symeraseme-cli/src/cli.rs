@@ -505,6 +505,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         "review" => review_command(parsed),
         "run-web-form" => run_web_form_command(parsed),
         "auto-confirm" => auto_confirm_command(parsed),
+        "migrate" => migrate_command(parsed),
         _ => deferred(&path),
     }
 }
@@ -1357,6 +1358,151 @@ fn run_web_form_command(parsed: &Parsed) -> Outcome {
         };
     }
     web_action_text(&result)
+}
+
+/// `migrate` — Go's `migration.NewCommand()`: the required-flag guard, home
+/// resolution, then `migration.Run`, whose first act is `validateRoots`. The
+/// recorded case pins only that validation (a missing source directory). The
+/// detection/report engine behind it has no Rust implementation yet and fails
+/// closed rather than faking a report.
+fn migrate_command(parsed: &Parsed) -> Outcome {
+    let source = string_flag(parsed, "source");
+    let destination = string_flag(parsed, "destination");
+    if source.is_empty() || destination.is_empty() {
+        return Outcome::Stderr(
+            b"migrate requires --source and --destination; use --dry-run first\n".to_vec(),
+        );
+    }
+    // Go resolves the home directory before Run when --home is empty.
+    let mut home = string_flag(parsed, "home");
+    if home.is_empty() {
+        home = match env::var("HOME") {
+            Ok(value) if !value.is_empty() => value,
+            _ => {
+                return Outcome::Stderr(b"resolve home directory: $HOME is not defined\n".to_vec());
+            }
+        };
+    }
+    match validate_roots(&source, &destination) {
+        Err(message) => Outcome::Stderr(format!("{message}\n").into_bytes()),
+        Ok((source, destination)) => {
+            let _ = (home, source, destination);
+            Outcome::Stderr(
+                b"migrate's detection and report engine is not implemented in Rust\n".to_vec(),
+            )
+        }
+    }
+}
+
+/// Go's `migration.validateRoots`: required flags, absolute+cleaned paths, no
+/// symlink components, a real source directory, no symlink destination, and
+/// two directories that are neither equal nor nested.
+fn validate_roots(source: &str, destination: &str) -> Result<(String, String), String> {
+    if source.is_empty() || destination.is_empty() {
+        return Err("source and destination directories are required".to_owned());
+    }
+    let source =
+        absolute_dir(source).map_err(|error| format!("resolve source directory: {error}"))?;
+    let destination = absolute_dir(destination)
+        .map_err(|error| format!("resolve destination directory: {error}"))?;
+    reject_symlink_components(&source)
+        .map_err(|error| format!("source path is unsafe: {error}"))?;
+    reject_symlink_components(&destination)
+        .map_err(|error| format!("destination path is unsafe: {error}"))?;
+    let info = std::fs::symlink_metadata(&source).map_err(|error| {
+        format!(
+            "stat source directory: lstat {source}: {}",
+            go_errno_text(&error)
+        )
+    })?;
+    if !info.is_dir() || info.file_type().is_symlink() {
+        return Err("source must be a real directory".to_owned());
+    }
+    if let Ok(destination_info) = std::fs::symlink_metadata(&destination)
+        && destination_info.file_type().is_symlink()
+    {
+        return Err("destination must not be a symlink".to_owned());
+    }
+    if source == destination
+        || path_within(&source, &destination)
+        || path_within(&destination, &source)
+    {
+        return Err("source and destination must be separate, non-nested directories".to_owned());
+    }
+    Ok((source, destination))
+}
+
+/// Go's `absoluteDir`: non-empty, absolute, cleaned — no symlink resolution.
+fn absolute_dir(path: &str) -> Result<String, String> {
+    if path.is_empty() {
+        return Err("path must not be empty".to_owned());
+    }
+    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
+    Ok(absolute.to_string_lossy().into_owned())
+}
+
+/// Go's `rejectSymlinkComponents`: walk every component and refuse a symlink
+/// outside the allowed darwin system roots; a missing component stops the
+/// walk without an error (the later `Lstat` reports missing paths).
+fn reject_symlink_components(path: &str) -> Result<(), String> {
+    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
+    let mut current = std::path::PathBuf::from("/");
+    let relative = absolute.strip_prefix("/").unwrap_or(&absolute);
+    for (index, component) in relative.components().enumerate() {
+        current.push(component);
+        let text = current.to_string_lossy();
+        let info = match std::fs::symlink_metadata(&current) {
+            Ok(info) => info,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.to_string()),
+        };
+        if info.file_type().is_symlink() && (index > 0 || !is_allowed_system_symlink(&text)) {
+            return Err(format!("symlink component: {text}"));
+        }
+    }
+    Ok(())
+}
+
+/// Go's `isAllowedSystemSymlink`: only the exact system roots at the first
+/// component. Go guards this with `runtime.GOOS == "darwin"`; Rust's
+/// `target_os` for that platform is spelled `macos`.
+fn is_allowed_system_symlink(path: &str) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        matches!(std::path::Path::new(path), p if matches!(
+            p.to_str(),
+            Some("/etc" | "/private" | "/tmp" | "/var")
+        ))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        false
+    }
+}
+
+/// Go's `pathWithin`: whether `candidate` sits at or under `root`.
+fn path_within(root: &str, candidate: &str) -> bool {
+    Path::new(candidate).strip_prefix(Path::new(root)).is_ok()
+}
+
+/// Go's wrapped `os.Lstat` text: `lstat <path>: <errno>`. Rust attaches no
+/// path, so the op and path are formatted here; errno text is Go's lowercase
+/// spelling (ponytail: first-word lowercasing plus the recorded ENOENT case —
+/// upgrade path: a full errno table).
+fn go_errno_text(error: &std::io::Error) -> String {
+    match error.raw_os_error() {
+        Some(2) => "no such file or directory".to_owned(),
+        _ => {
+            let text = error.to_string();
+            let base = text.split(" (os error").next().unwrap_or(&text);
+            let mut characters = base.chars();
+            match characters.next() {
+                Some(first) => first.to_lowercase().collect::<String>() + characters.as_str(),
+                None => base.to_owned(),
+            }
+        }
+    }
 }
 
 /// `auto-confirm` — Go's `realAutoConfirmCommand`: a thin wrapper over the

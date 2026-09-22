@@ -521,6 +521,9 @@ fn is_exact_case(case: &Value) -> bool {
         // recorded case has no inbox reply for request 1, so the result is the
         // no-reply struct with DryRun true and the exit is 1.
         "operate-auto-confirm",
+        // `migrate` records only validateRoots: a missing source directory,
+        // folded back to <ORACLE_ROOT>, on stderr with exit 1.
+        "operate-migrate",
         "operate-schedule-install",
         "operate-schedule-status",
         "operate-schedule-uninstall",
