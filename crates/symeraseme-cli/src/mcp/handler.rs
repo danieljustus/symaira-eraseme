@@ -596,6 +596,48 @@ impl ContractHandler {
         Ok(json!({"success": true, "files": files, "dry_run": true}))
     }
 
+    /// Go's `auto_confirm`: dataStore first, then `replies.Service.AutoConfirm`.
+    /// Only the no-reply branch (`reply == nil`) is ported — with a stored
+    /// reply Go continues into `confirmation.AutoConfirm` and its browser
+    /// click, which has no Rust subsystem, so that branch fails closed instead
+    /// of emulating Go's answer.
+    fn auto_confirm(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let request_id = get_int(arguments, "request_id", 0);
+        let has_reply = store
+            .has_inbox_reply(request_id)
+            .map_err(|error| ToolError(error.to_string()))?;
+        if has_reply {
+            return Err(ToolError(
+                "auto_confirm with a stored inbox reply is not implemented in Rust \
+                 (confirmation browser subsystem)"
+                    .to_owned(),
+            ));
+        }
+        // Go's `confirmation.Result{Step: "no_reply", ...}`: the capital-key
+        // struct order is the JSON contract the CLI writes verbatim.
+        Ok(json!({
+            "Success": false,
+            "ClickedURL": "",
+            "ClickedHost": "",
+            "ClickedURLSHA256": "",
+            "Step": "no_reply",
+            "Error": format!("no inbox reply found for request #{request_id}"),
+            "ScreenshotBefore": "",
+            "ScreenshotAfter": "",
+            "ScreenshotBeforeSHA256": "",
+            "ScreenshotAfterSHA256": "",
+            "ScreenshotBeforeBytes": 0,
+            "ScreenshotAfterBytes": 0,
+            "DryRun": get_bool(arguments, "dry_run", false),
+            "TaskID": 0,
+            "Instructions": "",
+            "Status": "",
+            "Reason": "",
+            "ManualActionRequired": false,
+        }))
+    }
+
     /// Go's `run_web_form`: with `dry_run` the handler answers from the
     /// registry alone; otherwise it opens the store the nil-executor adapter
     /// falls back to a manual task through.
@@ -1172,6 +1214,12 @@ impl ToolHandler for ContractHandler {
         if name == "manual_tasks_list" {
             return self.manual_tasks_list(arguments);
         }
+        // Go serializes `map[string]any` results with sorted keys but structs
+        // in declaration order: `auto_confirm` answers with
+        // `confirmation.Result`, so its keys must not be reordered.
+        if name == "auto_confirm" {
+            return self.call_go_map(name, arguments);
+        }
         self.call_go_map(name, arguments).map(go_map_order)
     }
 }
@@ -1198,6 +1246,7 @@ impl ContractHandler {
             "schedule_install" => self.schedule_install(arguments),
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
+            "auto_confirm" => self.auto_confirm(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -1389,6 +1438,78 @@ mod tests {
     /// workspace to the process working directory; here the root is injected.
     /// Each test gets its own root so parallel runs cannot delete each other's
     /// files.
+    /// The recorded `operate-auto-confirm` bytes, without the trailing
+    /// newline `json_line` adds: the capital-key struct order is the contract.
+    #[test]
+    fn auto_confirm_answers_no_reply_without_a_stored_reply() {
+        let root = workspace("auto-confirm-no-reply");
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let mut environment = std::collections::BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+        let handler = ContractHandler::new(&root).with_store(
+            ConfigContext::new(root.clone(), root.clone(), environment),
+            now,
+        );
+        let mut arguments = Map::new();
+        arguments.insert("request_id".to_owned(), serde_json::json!(1));
+        arguments.insert("dry_run".to_owned(), serde_json::json!(true));
+        let result = handler.call("auto_confirm", &arguments).expect("result");
+        assert_eq!(
+            serde_json::to_string(&result).expect("serialize"),
+            r#"{"Success":false,"ClickedURL":"","ClickedHost":"","ClickedURLSHA256":"","Step":"no_reply","Error":"no inbox reply found for request #1","ScreenshotBefore":"","ScreenshotAfter":"","ScreenshotBeforeSHA256":"","ScreenshotAfterSHA256":"","ScreenshotBeforeBytes":0,"ScreenshotAfterBytes":0,"DryRun":true,"TaskID":0,"Instructions":"","Status":"","Reason":"","ManualActionRequired":false}"#
+        );
+    }
+
+    /// With a stored reply Go would run `confirmation.AutoConfirm`; Rust
+    /// fails closed instead of emulating the browser subsystem.
+    #[test]
+    fn auto_confirm_fails_closed_with_a_stored_reply() {
+        let root = workspace("auto-confirm-stored-reply");
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+        store
+            .connection()
+            .execute_batch(
+                "INSERT INTO removal_requests (broker_id, campaign_id, jurisdiction) \
+                 VALUES ('broker-1', 'campaign-1', 'eu'); \
+                 INSERT INTO inbox_replies (request_id, message_id, from_addr, snippet) \
+                 VALUES (1, 'msg-1', 'broker@example.com', 'Your request is confirmed');",
+            )
+            .expect("stored reply");
+        drop(store);
+        let mut environment = std::collections::BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant")
+            .with_timezone(&Utc);
+        let handler = ContractHandler::new(&root).with_store(
+            ConfigContext::new(root.clone(), root.clone(), environment),
+            now,
+        );
+        let mut arguments = Map::new();
+        arguments.insert("request_id".to_owned(), serde_json::json!(1));
+        arguments.insert("dry_run".to_owned(), serde_json::json!(true));
+        let error = handler
+            .call("auto_confirm", &arguments)
+            .expect_err("stored reply must fail closed");
+        assert!(
+            error.0.contains("not implemented in Rust"),
+            "unexpected error: {}",
+            error.0
+        );
+    }
+
     fn workspace(name: &str) -> PathBuf {
         let root =
             std::env::temp_dir().join(format!("eraseme-mcp-003-{}-{name}", std::process::id()));

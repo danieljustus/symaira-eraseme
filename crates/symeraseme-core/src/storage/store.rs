@@ -87,6 +87,26 @@ impl Store {
             .pragma_query_value(None, "user_version", |row| row.get(0))
     }
 
+    /// Go's `replies.Repository.Latest` reduced to existence: whether any
+    /// inbox reply is stored for the request.
+    ///
+    /// ponytail: only the nil vs not-nil branch is ported — `auto_confirm`
+    /// stops before `confirmation.AutoConfirm`, whose browser subsystem has no
+    /// Rust counterpart. Upgrade path: return the row when that port lands.
+    pub fn has_inbox_reply(&self, request_id: i64) -> Result<bool> {
+        let found = match self.connection.query_row(
+            "SELECT id FROM inbox_replies WHERE request_id = ?1 \
+             ORDER BY received_at DESC, id DESC LIMIT 1",
+            [request_id],
+            |row| row.get::<usize, i64>(0),
+        ) {
+            Ok(id) => Some(id),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(error) => return Err(error),
+        };
+        Ok(found.is_some())
+    }
+
     pub fn init_schema(&self) -> Result<()> {
         let current = self.user_version()?;
         if current > SCHEMA_VERSION {
