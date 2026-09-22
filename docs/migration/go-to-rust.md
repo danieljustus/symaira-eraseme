@@ -27,7 +27,9 @@ compared byte-exactly, the rest only assert the deferred stub fails closed.
 Selected: 163 · deferred: 3 — verified by the focused corpus test on the
 integrated HEAD `7d02cc58` (run of 2026-09-22; historical: 158/8 at
 `93872f48`, main 160/6 after #1022). The three deferred cases are all
-externally blocked (llmkit ×2, IMAP ×1).
+historically classified as blocked. The IMAP classification was stale: TLS and
+the MCP handler are implemented; CLI-025 below tracks the missing CLI adapter.
+The two llmkit transport cases remain blocked on the shared implementation.
 
 ## Open tasks (run of 2026-09-22)
 
@@ -37,6 +39,8 @@ externally blocked (llmkit ×2, IMAP ×1).
 | CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`) |
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | **merged** — #1023 (`4c0236fb`) |
 | CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`); engine behind validation stays fail-closed, see Known defects |
+| CLI-024 | migration detection, report, backup/state | `rust/cli024-engine` → `rust/cli024-integration` | **in progress** — real Go corpus and red replay baseline committed as `7e603006` |
+| CLI-025 | `operate-poll-inbox` | not dispatched | **ready after CLI-024 integration** — existing IMAP TLS + MCP handler; serialize shared `cli.rs` edits |
 
 ## Active continuation (2026-09-22, CLI-024)
 
@@ -107,8 +111,22 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 | `operate-migrate` | migration engine | implemented — #1024, validateRoots scope only (engine fail-closed, see Known defects) |
 | `operate-review`, `operate-run-web-form` | misc | **merged** — #1022 (selected 160/6) |
 | `operate-mcp` | MCP stdio server | **merged** — #1023 (`4c0236fb`) |
-| `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
+| `operate-poll-inbox` | CLI adapter | ready — TLS/STARTTLS merged in #982 (`8f060a36`), MCP handler merged in #991 (`a8c393d5`); only the CLI dispatch is deferred. Residual root-store/UTF-7 differences remain separate contract gaps. |
 | `operate-auto-confirm`, `operate-migrate` | triage / migration | **merged** — #1024 (`7d02cc58`) |
+
+## CLI-025 execution notes
+
+The prior "unported IMAP transport" blocker is disproved by current source and
+history. `crates/symeraseme-cli/src/mcp/handler.rs::poll_inbox` constructs the real
+production dialer, with the source-bound nine-case handler fixture and eleven-case
+transport corpus. The next slice must call that handler, not implement IMAP again.
+`cmd/symeraseme/extra_commands.go:92-164` supplies the exact CLI contract:
+only explicitly changed flags enter the argument map, `--since` and `--since-days`
+share one value (last spelling wins), text output prefers a nonempty `message`,
+otherwise prints `success`. Preserve these differences from other thin wrappers.
+The existing `operate-poll-inbox` recording exercises a real refused local TCP
+connection, not a transport-emulation string. The selected/deferred counters may
+only move after that native call matches its recorded output.
 
 ## CI caveat
 
