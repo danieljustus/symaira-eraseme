@@ -55,12 +55,12 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 
 
 | `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
-| `operate-generate-rebuttal` | generators/LLM | deferred — no llmkit transports in Rust; emulating the auth error is forbidden |
-| `operate-auto-confirm`, `operate-classify-reply` | triage | dispatched — CLI-020 |
+| `operate-generate-rebuttal`, `operate-classify-reply` | LLM | blocked — `internal/llm` reports transports as not ported (`llmkit` owns the `auth_failure` text in Go); emulating it is forbidden |
 | `operate-migrate` | migration engine | ready — CLI-023 (engine unported; see task table) |
-| `operate-review`, `operate-run-web-form` | misc | implemented — #1022 (asserts 160/6 until merge) |
-| `operate-mcp` | MCP stdio server | dispatched — CLI-022 |
+| `operate-review`, `operate-run-web-form` | misc | **merged** — #1022 (selected 160/6) |
+| `operate-mcp` | MCP stdio server | implemented — #1023 (asserts 161/5) |
 | `operate-poll-inbox` | IMAP | blocked — needs the unported transport; do not emulate the Go error string |
+| `operate-auto-confirm` | triage | implemented — #1024, no-reply branch only (asserts 161/5) |
 
 ## CI caveat
 
@@ -85,6 +85,21 @@ gate for cutover readiness.
   cap-std `InvalidInput` open failure maps to `ErrPathInvalid`'s text where
   Go says `workspace file read failed`. Neither path is recorded in the
   corpus; both live in `redaction/path.rs`.
+- **MCP HTTP transport (CLI-022).** `mcp`/`serve` without `--stdio` stays on
+  the deferred fail-closed stub; Go binds the port and writes an auth
+  token file. Not recorded in the corpus.
+- **MCP malformed-stream text (CLI-022).** A value cut off at EOF aborts
+  with `malformed JSON value at byte N` instead of `encoding/json`'s
+  `unexpected EOF`, and a malformed value mid-stream waits for the next read
+  where Go errors immediately. Unrecorded paths; see the `ponytail` comment
+  in `mcp/stream.rs::serve_stdio`.
+- **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
+  explicit message where Go runs `confirmation.AutoConfirm` (browser
+  subsystem unported). The recorded case is the no-reply branch.
+- **`go_map_order` exemption (CLI-020).** `ToolHandler::call` sorts every
+  result except `auto_confirm` (Go structs keep declaration order). Any
+  future Go-struct-returning tool needs the same exemption — grep the
+  comment in `mcp/handler.rs`.
 
 ## Fixed parity defects (folded into the corpus or a regression test)
 
@@ -102,6 +117,17 @@ gate for cutover readiness.
 
 ## Decisions
 
+- 2026-09-22 — all three wave-1 worker results came back HTTP 429 (Codex
+  quota); the coordinator implemented CLI-020/021/022 itself in the slice
+  worktrees. Dispatch failure is not a slice outcome.
+- 2026-09-22 — `classify-reply` re-scoped out of the triage slice to
+  `blocked` (llmkit transports): its recorded bytes are an `auth_failure`
+  chain owned by `corekit/llmkit`, which Rust's `llm` module deliberately
+  reports as not ported.
+- 2026-09-22 — `ToolHandler::call` exempts `auto_confirm` from
+  `go_map_order`: Go sorts map serialization but emits structs in field
+  order; the recorded `confirmation.Result` bytes proved the blanket sort
+  wrong.
 - 2026-09-22 — CLI-021 re-scoped: `review` + `run-web-form` landed as #1022
   (`c7570432`, asserts 160/6); `operate-migrate` became CLI-023 (engine is
   907 unported lines and its single recorded case pins only the
