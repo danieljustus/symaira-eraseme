@@ -1,5 +1,6 @@
 //! The actual stdio process must answer before EOF and keep stdout protocol-only.
 
+use base64::{Engine, engine::general_purpose::STANDARD};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
@@ -132,6 +133,100 @@ fn malformed_stdio_process_matches_go_errors() {
             "{name}: stderr"
         );
     }
+}
+
+#[test]
+fn stdio_process_matches_go_initialize_id_and_params_corpus() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/mcp-contract/initialize_cases.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        fixture["source_revision"],
+        "a51c7f3c65218924ce1d505ad8389b2216f08c92"
+    );
+    assert_eq!(
+        fixture["source_path"],
+        "internal/mcp/server.go:180-207,377-389"
+    );
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 78);
+
+    let mut input = Vec::new();
+    let mut expected = Vec::new();
+    for case in fixture["cases"].as_array().unwrap() {
+        if case["parse_error"].as_bool().unwrap_or(false) {
+            continue;
+        }
+        let request = case["request"]
+            .as_str()
+            .map(|value| value.as_bytes().to_vec())
+            .or_else(|| {
+                case["request_b64"]
+                    .as_str()
+                    .map(|value| STANDARD.decode(value).unwrap())
+            })
+            .expect("fixture request");
+        input.extend_from_slice(&request);
+        if let Some(response) = case["response"].as_str() {
+            expected.extend_from_slice(response.as_bytes());
+        }
+    }
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root =
+        std::env::temp_dir().join(format!("symeraseme-mcp008-{}-{nonce}", std::process::id()));
+    fs::create_dir(&root).unwrap();
+    let home = root.join("home");
+    fs::create_dir(&home).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+        .args(["mcp", "--stdio"])
+        .current_dir(&root)
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("XDG_DATA_HOME", home.join("data"))
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(&input).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            fs::remove_dir_all(&root).ok();
+            panic!("stdio did not finish the bounded initialize corpus");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let output = child.wait_with_output().unwrap();
+    fs::remove_dir_all(&root).unwrap();
+
+    assert!(
+        status.success(),
+        "stdio exited with {}: {}",
+        status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        output.stdout, expected,
+        "response bytes diverged from Go corpus"
+    );
+    assert!(
+        output.stderr.is_empty(),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
