@@ -1100,6 +1100,10 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
     // rendered report can contain caller-controlled multiline text, so the
     // compatibility spacing adjustment below targets a template boundary.
     let mut template_data = data.clone();
+    let campaign_count = template_data
+        .get("campaigns")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
     // Go's report template passes the timeline event-count map to a helper
     // that only joins slices, so its Details column is empty for these maps.
     // MiniJinja joins mapping values; replace only this template input with an
@@ -1120,8 +1124,31 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
         ..RenderContext::default()
     };
     let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
-    let html = html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:");
+    let html = if campaign_count == 0 {
+        compact_template_blank_lines(&html)
+    } else if campaign_count > 1 {
+        html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:")
+    } else {
+        html
+    };
     Ok(decode_data_newlines(&html))
+}
+
+fn compact_template_blank_lines(html: &str) -> String {
+    let mut compact = String::with_capacity(html.len());
+    let mut line_breaks = 0;
+    for character in html.chars() {
+        if character == '\n' {
+            line_breaks += 1;
+            if line_breaks <= 2 {
+                compact.push(character);
+            }
+        } else {
+            line_breaks = 0;
+            compact.push(character);
+        }
+    }
+    compact
 }
 
 const NEWLINE_MARKER: char = '\u{e001}';
