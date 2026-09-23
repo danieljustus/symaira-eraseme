@@ -50,6 +50,9 @@ rustls-native-certs.workspace = true
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.30.1", default-features = false }
 
+[target.'cfg(windows)'.dependencies]
+schannel = "0.1.29"
+
 [build-dependencies]
 cap-fs-ext.workspace = true
 cap-std.workspace = true
