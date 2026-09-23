@@ -288,6 +288,17 @@ jobs:
           cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
           cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+      - name: Verify registry build at 1024 descriptors
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          test ! -e "$RUNNER_TEMP/registry-fd-target"
+          (
+            ulimit -n 1024
+            CARGO_TARGET_DIR="$RUNNER_TEMP/registry-fd-target" CARGO_BUILD_JOBS=2 \
+              cargo +"$RUST_TOOLCHAIN" check -p symeraseme-core --locked
+          )
+
       - name: Test and doctest
         shell: bash
         run: |
