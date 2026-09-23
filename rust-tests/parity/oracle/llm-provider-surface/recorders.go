@@ -560,25 +560,11 @@ func restoreEnvironment(environment []string) {
 	}
 }
 
-// recordBoundaries captures what the public API shows for the llmkit-backed
-// construction path, so the port's boundary carries measured evidence.
+// recordBoundaries captures limits of the retry fixture. The llmkit-backed
+// construction and transport contract is recorded by the separate
+// llmkit-transport oracle.
 func recordBoundaries() []boundary {
-	clearManagedEnv()
-	if err := os.Setenv("PATH", ""); err != nil {
-		panic(err)
-	}
-	_, err := llm.Create(llm.CreateOptions{})
 	return []boundary{
-		{
-			Path:     "llmkit-backed construction (anthropic, openai, ollama, openai-compatible)",
-			Evidence: fmt.Sprintf("Create(CreateOptions{}) -> %v", err),
-			Reason:   "corekit/llmkit owns the transports, the credential reference format and this error text; it has no Rust counterpart, so construction stays Go.",
-		},
-		{
-			Path:     "llmkit provider descriptor defaults (env key, default model, base URL)",
-			Evidence: "not observable: the table is unexported and an llmkit client exposes no model accessor",
-			Reason:   "the port pins the provider name set and the agent branch, which are observable; the llmkit defaults cannot be read back through the public API.",
-		},
 		{
 			Path:     "cache key jitter for the empty key",
 			Evidence: "hashCacheKey(\"\") short-circuits to 0 without hashing; the recorded value for the empty key is that 0, not fnv32a(\"\")%5",

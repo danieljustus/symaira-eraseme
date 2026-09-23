@@ -4,11 +4,13 @@
 //! taxonomy, the retry loop's attempt accounting, the provider resolution order
 //! and the host-agent descriptor.
 //!
-//! The transports are **not** ported. In Go, `anthropic`, `openai`, `ollama` and
-//! `openai-compatible` all go through `corekit/llmkit`, which owns the wire
-//! dialects, the credential reference format and the `auth_failure` error text.
-//! `corekit` has no Rust counterpart, so [`create`] reports those providers as
-//! not ported instead of pretending an equivalent client exists.
+//! The non-streaming chat path used by EraseMe's classifier is implemented in
+//! [`transport`], matching Go's llmkit-backed Anthropic, OpenAI, Ollama and
+//! openai-compatible providers. Streaming, embeddings and tool calls remain
+//! outside this surface.
+
+mod transport;
+pub use transport::LlmkitClient;
 
 use std::error::Error as StdError;
 use std::ffi::OsString;
@@ -418,6 +420,7 @@ pub struct AgentClient {
     pub requested_backend: String,
     resolved_backend: String,
     available: bool,
+    provider_client: Option<LlmkitClient>,
 }
 
 /// The message Go's agent `callAPI` returns when no CLI is reachable.
@@ -461,6 +464,21 @@ impl AgentClient {
             requested_backend: agent_backend,
             resolved_backend,
             available,
+            provider_client: None,
+        }
+    }
+
+    fn with_llmkit(
+        model: String,
+        provider_client: LlmkitClient,
+        cost_tracker: Vec<UsageRecord>,
+    ) -> Self {
+        Self {
+            base: BaseClient::new(model, 3, cost_tracker),
+            requested_backend: String::new(),
+            resolved_backend: String::new(),
+            available: true,
+            provider_client: Some(provider_client),
         }
     }
 
@@ -487,6 +505,9 @@ impl AgentClient {
         user_prompt: &str,
         options: &ClassifyOptions,
     ) -> Result<(String, UsageRecord), ClientError> {
+        if let Some(client) = &self.provider_client {
+            return client.classify(&self.base, system_prompt, user_prompt, options);
+        }
         self.classify_with_timeout(
             system_prompt,
             user_prompt,
@@ -847,10 +868,53 @@ pub fn create_with(
         ));
     }
 
-    Err(ClientError::TransportNotPorted {
-        provider: provider.clone(),
-    })
+    let base_url = if !options.base_url.is_empty() {
+        options.base_url.clone()
+    } else if let Some(value) = env(ENV_BASE_URL).filter(|value| !value.is_empty()) {
+        value
+    } else if provider == "ollama" {
+        env(ENV_OLLAMA_HOST)
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("{}/v1", value.trim_end_matches('/')))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if provider == "openai-compatible" && base_url.is_empty() {
+        let detail = "llmkit: provider \"custom\" requires a base URL override (WithBaseURL)";
+        return Err(ClientError::Provider(LlmError::with_source(
+            format!("llmkit client for {provider:?}: {detail}"),
+            detail,
+        )));
+    }
+    transport::validate_provider_base_url(&provider, &base_url)?;
+    let api_key = if !options.api_key.is_empty() {
+        Some(options.api_key.clone())
+    } else if !spec.env_key.is_empty() {
+        let Some(value) = env(spec.env_key).filter(|value| !value.is_empty()) else {
+            let detail = format!(
+                "llmkit: auth_failure: environment variable {} is not set (reference {})",
+                spec.env_key, spec.env_key
+            );
+            return Err(ClientError::Provider(LlmError::with_source(
+                format!("llmkit client for {provider:?}: {detail}"),
+                detail,
+            )));
+        };
+        Some(value)
+    } else {
+        None
+    };
+    let provider_client = LlmkitClient::new(&provider, model.clone(), base_url, api_key)?;
+    Ok(AgentClient::with_llmkit(
+        model,
+        provider_client,
+        options.cost_tracker.clone(),
+    ))
 }
+
+const ENV_BASE_URL: &str = "SYMERASEME_LLM_BASE_URL";
+const ENV_OLLAMA_HOST: &str = "OLLAMA_HOST";
 
 #[cfg(all(test, unix))]
 #[path = "host_agent_tests.rs"]

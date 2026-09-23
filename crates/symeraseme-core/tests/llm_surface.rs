@@ -4,9 +4,8 @@
 //! implementation with a frozen environment and frozen inputs and recorded what it
 //! answered. This replays the same cases against `symeraseme_core::llm`.
 //!
-//! The llmkit-backed transports are out of scope: `corekit` owns them and has no
-//! Rust counterpart. The fixture records that boundary, with the measured Go error
-//! text as evidence, under `boundaries`.
+//! The provider factory, local HTTP transport and response handling are replayed
+//! separately from this fixture using source-bound Go request observations.
 
 use std::time::Duration;
 

@@ -576,16 +576,6 @@
   },
   "boundaries": [
     {
-      "path": "llmkit-backed construction (anthropic, openai, ollama, openai-compatible)",
-      "evidence": "Create(CreateOptions{}) -\u003e llmkit client for \"anthropic\": llmkit: auth_failure: environment variable ANTHROPIC_API_KEY is not set (reference ANTHROPIC_API_KEY): llmkit: auth_failure: environment variable ANTHROPIC_API_KEY is not set (reference ANTHROPIC_API_KEY)",
-      "reason": "corekit/llmkit owns the transports, the credential reference format and this error text; it has no Rust counterpart, so construction stays Go."
-    },
-    {
-      "path": "llmkit provider descriptor defaults (env key, default model, base URL)",
-      "evidence": "not observable: the table is unexported and an llmkit client exposes no model accessor",
-      "reason": "the port pins the provider name set and the agent branch, which are observable; the llmkit defaults cannot be read back through the public API."
-    },
-    {
       "path": "cache key jitter for the empty key",
       "evidence": "hashCacheKey(\"\") short-circuits to 0 without hashing; the recorded value for the empty key is that 0, not fnv32a(\"\")%5",
       "reason": "the empty key is the only input that skips the hash, so the fixture pins the rule rather than the primitive for it."

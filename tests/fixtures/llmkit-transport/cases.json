@@ -1,0 +1,176 @@
+{
+  "schema": "symeraseme.go-oracle.llmkit-transport.v1",
+  "go_module": "github.com/danieljustus/symaira-corekit v0.16.2",
+  "sources_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "go.sum": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa",
+    "internal/llm/factory.go": "8180713d346cce1f7f195fdadd0040ebe4fb96f1bf7a725170819de10f4596b4",
+    "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
+    "internal/llm/llmkit.go": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7"
+  },
+  "cases": [
+    {
+      "id": "openai-env-default-model",
+      "provider": "openai",
+      "model": "",
+      "path": "/chat/completions",
+      "headers": {
+        "anthropic-version": "",
+        "authorization": "Bearer synthetic-openai-key",
+        "x-api-key": ""
+      },
+      "request": {
+        "max_tokens": 64,
+        "messages": [
+          {
+            "content": "system",
+            "role": "system"
+          },
+          {
+            "content": "user",
+            "role": "user"
+          }
+        ],
+        "model": "gpt-4o",
+        "stream": false,
+        "temperature": 0.25
+      },
+      "text": "hello openai-env-default-model",
+      "usage_model": "gpt-4o"
+    },
+    {
+      "id": "openai-direct-key-wins",
+      "provider": "openai",
+      "model": "",
+      "path": "/chat/completions",
+      "headers": {
+        "anthropic-version": "",
+        "authorization": "Bearer synthetic-direct-openai-key",
+        "x-api-key": ""
+      },
+      "request": {
+        "max_tokens": 64,
+        "messages": [
+          {
+            "content": "system",
+            "role": "system"
+          },
+          {
+            "content": "user",
+            "role": "user"
+          }
+        ],
+        "model": "gpt-4o",
+        "stream": false,
+        "temperature": 0.25
+      },
+      "text": "hello openai-direct-key-wins",
+      "usage_model": "gpt-4o"
+    },
+    {
+      "id": "anthropic-env-explicit-model",
+      "provider": "anthropic",
+      "model": "claude-test",
+      "path": "/messages",
+      "headers": {
+        "anthropic-version": "2023-06-01",
+        "authorization": "",
+        "x-api-key": "synthetic-anthropic-key"
+      },
+      "request": {
+        "max_tokens": 64,
+        "messages": [
+          {
+            "content": "user",
+            "role": "user"
+          }
+        ],
+        "model": "claude-test",
+        "system": "system"
+      },
+      "text": "hello anthropic-env-explicit-model",
+      "usage_model": "claude-test"
+    },
+    {
+      "id": "ollama-host-no-auth",
+      "provider": "ollama",
+      "model": "",
+      "path": "/v1/chat/completions",
+      "headers": {
+        "anthropic-version": "",
+        "authorization": "",
+        "x-api-key": ""
+      },
+      "request": {
+        "max_tokens": 64,
+        "messages": [
+          {
+            "content": "system",
+            "role": "system"
+          },
+          {
+            "content": "user",
+            "role": "user"
+          }
+        ],
+        "model": "llama3.1",
+        "stream": false,
+        "temperature": 0.25
+      },
+      "text": "hello ollama-host-no-auth",
+      "usage_model": "llama3.1"
+    },
+    {
+      "id": "custom-direct-key",
+      "provider": "openai-compatible",
+      "model": "vendor-model",
+      "path": "/chat/completions",
+      "headers": {
+        "anthropic-version": "",
+        "authorization": "Bearer synthetic-custom-key",
+        "x-api-key": ""
+      },
+      "request": {
+        "max_tokens": 64,
+        "messages": [
+          {
+            "content": "system",
+            "role": "system"
+          },
+          {
+            "content": "user",
+            "role": "user"
+          }
+        ],
+        "model": "vendor-model",
+        "stream": false,
+        "temperature": 0.25
+      },
+      "text": "hello custom-direct-key",
+      "usage_model": "vendor-model"
+    }
+  ],
+  "construction_errors": [
+    {
+      "id": "custom-base-url-before-credential",
+      "provider": "openai-compatible",
+      "base_url": "",
+      "api_key": "",
+      "message": "llmkit client for \"openai-compatible\": llmkit: provider \"custom\" requires a base URL override (WithBaseURL): llmkit: provider \"custom\" requires a base URL override (WithBaseURL)"
+    },
+    {
+      "id": "openai-missing-default-credential",
+      "provider": "openai",
+      "base_url": "http://127.0.0.1:1234/v1",
+      "api_key": "",
+      "message": "llmkit client for \"openai\": llmkit: auth_failure: environment variable OPENAI_API_KEY is not set (reference OPENAI_API_KEY): llmkit: auth_failure: environment variable OPENAI_API_KEY is not set (reference OPENAI_API_KEY)"
+    },
+    {
+      "id": "openai-reject-insecure-remote-before-credential",
+      "provider": "openai",
+      "base_url": "http://api.example.com/v1",
+      "api_key": "synthetic-key",
+      "message": "llmkit client for \"openai\": llmkit: auth_failure: provider \"openai\" requires an HTTPS base URL for credentialed requests outside loopback hosts: llmkit: auth_failure: provider \"openai\" requires an HTTPS base URL for credentialed requests outside loopback hosts"
+    }
+  ]
+}
