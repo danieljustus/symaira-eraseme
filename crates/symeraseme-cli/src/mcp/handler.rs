@@ -1404,11 +1404,7 @@ fn optional_str(arguments: &Map<String, Value>, key: &str) -> Option<String> {
 fn get_int(arguments: &Map<String, Value>, key: &str, default: i64) -> i64 {
     arguments
         .get(key)
-        .and_then(|value| {
-            value
-                .as_i64()
-                .or_else(|| value.as_f64().map(|number| number as i64))
-        })
+        .and_then(|value| value.as_f64().map(|number| number as i64))
         .unwrap_or(default)
 }
 

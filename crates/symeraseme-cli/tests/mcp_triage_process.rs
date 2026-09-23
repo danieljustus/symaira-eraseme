@@ -28,7 +28,7 @@ fn mcp_triage_matches_live_go_handler_with_local_agent() {
         String::from_utf8_lossy(&go.stderr)
     );
     let cases: Vec<Value> = serde_json::from_slice(&go.stdout).expect("Go observations");
-    assert_eq!(cases.len(), 3);
+    assert_eq!(cases.len(), 4);
 
     for case in cases {
         let root = TestRoot::new();
@@ -79,11 +79,15 @@ fn mcp_triage_matches_live_go_handler_with_local_agent() {
         );
         assert!(output.stderr.is_empty());
         let response: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(
-            response["result"]["content"][0]["text"], case["result"],
-            "{}",
-            case["name"]
-        );
+        if let Some(error) = case["error"].as_str() {
+            assert_eq!(response["error"]["message"], error, "{}", case["name"]);
+        } else {
+            assert_eq!(
+                response["result"]["content"][0]["text"], case["result"],
+                "{}",
+                case["name"]
+            );
+        }
     }
 }
 
