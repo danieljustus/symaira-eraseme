@@ -182,7 +182,7 @@ SQLite, network transcript or process behavior.
 | REL-007 | release | nested Rust binary Developer ID signature | release workflow | codesign verification | side-effect | macOS | TODO |
 | REL-008 | release | DMG container signature before notarization | issue #794 | codesign/notary proof | side-effect | macOS | BLOCKED #794 |
 | REL-009 | release | notarization/stapling and release-note truth | release workflow | notary/stapler checks | side-effect | macOS | TODO |
-| REL-010 | release | SBOM, audit, deny, provenance | new Rust workflow | artifact/security checks | side-effect | all | PARTIAL (local). Offline `cargo audit --no-fetch` passed both lockfiles, `cargo deny` passed, and Syft emitted a CycloneDX 1.7 source inventory with 428 Cargo components. Artifact-level Rust SBOM and provenance remain unverified without release artifacts. |
+| REL-010 | release | SBOM, audit, deny, provenance | new Rust workflow | artifact/security checks | side-effect | all | PARTIAL (local). On `7151138`, offline `cargo audit --no-fetch` passed both lockfiles, `cargo deny --frozen check all` passed, and Syft emitted a CycloneDX 1.7 source inventory with 1,307 components. Artifact-level Rust SBOM and provenance remain unverified without the complete native release matrix. |
 | CUT-001 | cutover | explicit `SYMERASEME_BACKEND=go` fallback | dual archive | process test | side-effect | all | TODO |
 | CUT-002 | cutover | Rust upgrade reads existing plain/encrypted data | copied Go user fixtures | upgrade suite | side-effect | all | TODO |
 | CUT-003 | cutover | rollback Go reads post-Rust data | Rust-created copies | rollback suite | side-effect | all | TODO |

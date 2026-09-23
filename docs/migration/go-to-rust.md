@@ -165,6 +165,11 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   `target/go-test-7151138.log`, `target/swift-test-7151138.log`, and
   `target/macos-release-7151138.log`. These runs do not satisfy the missing
   native Windows or complete exact-head Linux matrix.
+- The `7151138` dependency gate passed offline: `cargo audit --no-fetch`
+  scanned both Cargo lockfiles, `cargo deny --frozen check all` passed, and
+  Syft produced a CycloneDX 1.7 source inventory with 1,307 components at
+  `target/sbom-source-7151138.cdx.json`. Artifact SBOM and provenance remain
+  unverified without the complete native Rust archive matrix.
 
 ## Open tasks (run of 2026-09-22)
 
