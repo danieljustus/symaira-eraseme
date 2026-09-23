@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use webpki_roots;
@@ -198,18 +198,49 @@ impl crate::email::session::ImapDialer for ImapDialer {
         } else {
             143
         };
-        let addr = format!("{}:{}", config.host, port);
+        let host = config
+            .host
+            .strip_prefix('[')
+            .and_then(|host| host.strip_suffix(']'))
+            .unwrap_or(&config.host);
+        let host_port = if host.parse::<std::net::Ipv6Addr>().is_ok() {
+            format!("[{host}]:{port}")
+        } else {
+            format!("{host}:{port}")
+        };
         let timeout = Duration::from_secs(if config.timeout_seconds > 0 {
             config.timeout_seconds as u64
         } else {
             30
         });
 
-        let parsed_addr = addr
-            .parse()
-            .map_err(|e| format!("{}: connect/login failed: {}", ERR_IMAP, e))?;
-        let stream = TcpStream::connect_timeout(&parsed_addr, timeout)
-            .map_err(|e| format!("{}: connect/login failed: {}", ERR_IMAP, e))?;
+        // ponytail: std DNS lookup is blocking; use a cancellable resolver if DNS timeout bounds become required.
+        let addresses = host_port.to_socket_addrs().map_err(|_| {
+            format!(
+                "{}: connect/login failed: dial tcp: lookup {}: no such host",
+                ERR_IMAP, config.host
+            )
+        })?;
+        let mut last_error = None;
+        let mut stream = None;
+        for address in addresses {
+            match TcpStream::connect_timeout(&address, timeout) {
+                Ok(connected) => {
+                    stream = Some(connected);
+                    break;
+                }
+                Err(error) => last_error = Some(error),
+            }
+        }
+        let stream = stream.ok_or_else(|| {
+            let error = last_error
+                .map(|error| go_dial_error(&error))
+                .unwrap_or_else(|| "no suitable address found".to_owned());
+            format!(
+                "{}: connect/login failed: dial tcp {}: connect: {}",
+                ERR_IMAP, host_port, error
+            )
+        })?;
         stream
             .set_read_timeout(Some(timeout))
             .map_err(|e| format!("{}: read timeout failed: {}", ERR_IMAP, e))?;
@@ -305,6 +336,22 @@ impl crate::email::session::ImapDialer for ImapDialer {
 
         Ok(Box::new(session))
     }
+}
+
+/// Go's `net.Dial` uses platform-independent syscall wording in its error.
+fn go_dial_error(error: &std::io::Error) -> String {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => "connection refused",
+        std::io::ErrorKind::ConnectionReset => "connection reset by peer",
+        std::io::ErrorKind::ConnectionAborted => "software caused connection abort",
+        std::io::ErrorKind::NotConnected => "transport endpoint is not connected",
+        std::io::ErrorKind::AddrInUse => "address already in use",
+        std::io::ErrorKind::AddrNotAvailable => "cannot assign requested address",
+        std::io::ErrorKind::TimedOut => "i/o timeout",
+        std::io::ErrorKind::PermissionDenied => "permission denied",
+        _ => return error.to_string(),
+    }
+    .to_owned()
 }
 
 pub struct ImapSessionImpl {
@@ -798,4 +845,27 @@ fn read_bounded_body(reader: &mut BufReader<IoStream>, len: usize) -> Result<Vec
         .read_exact(&mut body)
         .map_err(|e| format!("IMAP read body failed: {}", e))?;
     Ok(body)
+}
+
+#[cfg(test)]
+mod dial_tests {
+    use super::*;
+    use crate::email::session::ImapDialer as _;
+
+    #[test]
+    fn resolves_hostnames_and_formats_refused_connections_like_go() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port() as i64;
+        drop(listener);
+        let config = ImapConfig {
+            host: "localhost".to_owned(),
+            port,
+            ..ImapConfig::default()
+        };
+        let error = ImapDialer::new().dial(&config).err().unwrap();
+        assert_eq!(
+            error,
+            format!("email: imap error: connect/login failed: dial tcp localhost:{port}: connect: connection refused")
+        );
+    }
 }

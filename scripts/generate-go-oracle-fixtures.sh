@@ -594,6 +594,7 @@ operational_argvs = {
     "plan/status": ["--output", "json", "plan", "status"],
     "plan/tick": ["--output", "json", "plan", "tick", "--dry-run"],
     "poll-inbox": ["--output", "json", "poll-inbox", "--host", "127.0.0.1", "--port", "1", "--username", "oracle@example.invalid", "--since-days", "1", "--ssl=false"],
+    "poll-inbox-invalid-since": ["--output", "json", "poll-inbox", "--since-days", "nope"],
     "registry/list": ["registry", "list", "--output", "json"],
     "registry/validate": ["registry", "validate", "--output", "json"],
     "render-template": ["render-template", "laws/gdpr-art17.en.md.j2", "--broker-name", "Oracle Broker", "--broker-website", "https://example.invalid"],
@@ -1440,7 +1441,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 13}
+expected = {"cli": 175, "mcp": 52, "http": 19, "filesystem": 13}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")

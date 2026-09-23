@@ -3569,6 +3569,32 @@
     },
     {
       "argv": [
+        "--output",
+        "json",
+        "poll-inbox",
+        "--since-days",
+        "nope"
+      ],
+      "stdin_base64": "",
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBhcmd1bWVudCAibm9wZSIgZm9yICItLXNpbmNlLWRheXMiIGZsYWc6IHN0cmNvbnYuUGFyc2VJbnQ6IHBhcnNpbmcgIm5vcGUiOiBpbnZhbGlkIHN5bnRheAo=",
+      "stdout_bytes": 0,
+      "stderr_bytes": 98,
+      "id": "operate-poll-inbox-invalid-since",
+      "category": "operational",
+      "expected_outcome": "deterministic_backend_error",
+      "nondeterministic_fields": [
+        {
+          "path": "argv/stdout/stderr",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "classification": "deterministic_backend_error"
+    },
+    {
+      "argv": [
         "registry",
         "list",
         "--output",

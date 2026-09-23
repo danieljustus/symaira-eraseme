@@ -602,7 +602,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 16] = [
+    const SURFACE_OPERATIONS: [&str; 18] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -626,6 +626,10 @@ fn is_exact_case(case: &Value) -> bool {
         "operate-schedule-status",
         "operate-schedule-uninstall",
         "operate-version",
+        // `poll-inbox` is the real MCP handler over the production IMAP dialer;
+        // this recorded CLI case pins its surfaced connection error bytes.
+        "operate-poll-inbox",
+        "operate-poll-inbox-invalid-since",
     ];
     // `registry list`/`validate` are replayed now that cli.rs implements them.
     // They carry the registry contract that `brokers list` cannot: no status
@@ -680,7 +684,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
 
     let behavior: Value = serde_json::from_str(BEHAVIOR).expect("behavior JSON");
     let cases = behavior["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 174);
+    assert_eq!(cases.len(), 175);
     let selected = cases
         .iter()
         .filter(|case| is_exact_case(case))
@@ -689,8 +693,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 171);
-    assert_eq!(deferred.len(), 3);
+    assert_eq!(selected.len(), 173);
+    assert_eq!(deferred.len(), 2);
 
     let root = unique_root();
     let home = root.join("home");
@@ -898,9 +902,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
     }
 
     let home_entries = directory_entries(&home, "read isolated home");
-    assert!(
-        home_entries.is_empty(),
-        "isolated home stayed clean: {home_entries:?}"
+    assert_eq!(
+        home_entries,
+        [".local"],
+        "only the Go-compatible default event-store directory was created"
     );
     let cwd_entries = directory_entries(&cwd, "read isolated cwd");
     assert!(

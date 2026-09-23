@@ -128,11 +128,15 @@ fn clap_arg(flag: &FlagSpec, _shorthand: Option<char>) -> clap::Arg {
     let mut arg = clap::Arg::new(flag.name)
         .long(flag.name)
         .help(flag.usage)
-        .action(if flag.kind == "bool" {
-            clap::ArgAction::SetTrue
-        } else {
-            clap::ArgAction::Set
-        });
+        .action(clap::ArgAction::Set);
+    if flag.kind == "bool" {
+        arg = arg
+            .value_parser(clap::value_parser!(bool))
+            .default_value("false")
+            .default_missing_value("true")
+            .num_args(0..=1)
+            .require_equals(true);
+    }
     if flag.name == "version" {
         arg = arg.short('v');
     }
@@ -160,7 +164,7 @@ pub fn execute(args: &[String]) -> Outcome {
             return parse_error(error, args);
         }
     };
-    if matches.get_flag("version") {
+    if matches.get_one::<bool>("version").copied().unwrap_or(false) {
         return Outcome::Stdout(
             format!("{ROOT_NAME} version {}\n", version::BUILD_VERSION).into_bytes(),
         );
@@ -276,6 +280,22 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                         .cloned()
                         .ok_or_else(|| format!("flag needs an argument: --{name}\n"))?
                 };
+                if path == ["poll-inbox"]
+                    && matches!(name, "port" | "since" | "since-days")
+                    && let Err(error) = value.parse::<i64>()
+                {
+                    let detail = if matches!(
+                        error.kind(),
+                        std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
+                    ) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Err(format!(
+                        "invalid argument {value:?} for \"--{name}\" flag: strconv.ParseInt: parsing {value:?}: {detail}\n"
+                    ));
+                }
                 if name == "output" {
                     if path.is_empty() {
                         root_output = Some(value.clone());
@@ -283,7 +303,12 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                         local_output = Some(value.clone());
                     }
                 }
-                flags.insert(name.to_owned(), value);
+                if path == ["poll-inbox"] && matches!(name, "since" | "since-days") {
+                    flags.insert("since".to_owned(), value.clone());
+                    flags.insert("since-days".to_owned(), value);
+                } else {
+                    flags.insert(name.to_owned(), value);
+                }
             }
             index += 1;
             continue;
@@ -500,6 +525,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             Err(outcome) => outcome,
         },
         "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
+        "poll-inbox" => poll_inbox_command(parsed),
         "generate-dashboard" => generate_dashboard_command(parsed),
         "generate-report" => generate_report_command(parsed),
         "generate-scheduler" => generate_scheduler_command(parsed),
@@ -1039,6 +1065,78 @@ fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) 
             Ok(bytes) => Outcome::Stdout(bytes),
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         },
+    }
+}
+
+/// Go's `poll-inbox` CLI adapter: forward only explicitly supplied flags and
+/// print the handler's message in text mode.
+fn poll_inbox_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    for (flag, key) in [
+        ("host", "host"),
+        ("username", "username"),
+        ("oauth2-access-token", "oauth2_access_token"),
+        ("oauth2-username", "oauth2_username"),
+        ("campaign-id", "campaign_id"),
+        ("folders", "folders"),
+    ] {
+        if let Some(value) = parsed.flags.get(flag) {
+            arguments.insert(key.to_owned(), json!(value));
+        }
+    }
+    for flag in ["port", "since", "since-days"] {
+        if let Some(value) = parsed.flags.get(flag) {
+            let number = match value.parse::<i64>() {
+                Ok(number) => number,
+                Err(_) => {
+                    let parse_error = if value.parse::<i64>().is_err_and(|error| {
+                        matches!(
+                            error.kind(),
+                            std::num::IntErrorKind::PosOverflow
+                                | std::num::IntErrorKind::NegOverflow
+                        )
+                    }) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Outcome::Stderr(format!(
+                        "invalid argument {value:?} for \"--{flag}\" flag: strconv.ParseInt: parsing {value:?}: {parse_error}\n"
+                    ).into_bytes());
+                }
+            };
+            if flag == "port" {
+                arguments.insert("port".to_owned(), json!(number));
+            } else {
+                arguments.insert("since_days".to_owned(), json!(number));
+            }
+        }
+    }
+    if let Some(value) = parsed.flags.get("ssl") {
+        arguments.insert("ssl".to_owned(), json!(value == "true"));
+    }
+
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match handler.call("poll_inbox", &arguments) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+    };
+    match output_format(parsed) {
+        Err(outcome) => outcome,
+        Ok("json") => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+        Ok(_) => Outcome::Stdout(
+            result
+                .get("message")
+                .and_then(Value::as_str)
+                .map(|message| format!("{message}\n").into_bytes())
+                .unwrap_or_else(|| b"success\n".to_vec()),
+        ),
     }
 }
 
