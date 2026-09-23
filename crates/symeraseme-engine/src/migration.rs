@@ -1,9 +1,13 @@
 //! Conservative, resumable Python installation migration.
+mod json;
 use crate::scheduler::{self, Platform};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+
+#[cfg(any(windows, test))]
+mod windows_case_fold;
 
 /// Go's `migration.validateRoots`: required flags, absolute+cleaned paths, no
 /// symlink components, a real source directory, no symlink destination, and
@@ -99,9 +103,39 @@ fn is_allowed_system_symlink(path: &str) -> bool {
 /// Go's `pathWithin`: whether `candidate` sits at or under `root`.
 fn path_within(root: &str, candidate: &str) -> bool {
     match (clean_absolute(root), clean_absolute(candidate)) {
-        (Ok(root), Ok(candidate)) => candidate.starts_with(root),
+        (Ok(root), Ok(candidate)) => {
+            #[cfg(windows)]
+            {
+                path_prefix_casefold(&root, &candidate)
+            }
+            #[cfg(not(windows))]
+            {
+                candidate.starts_with(root)
+            }
+        }
         _ => false,
     }
+}
+
+// Kept executable on the host for exhaustive Go Unicode and component tests;
+// actual Windows drive/UNC and filesystem behavior still needs native tests.
+#[cfg(any(windows, test))]
+fn path_prefix_casefold(root: &Path, candidate: &Path) -> bool {
+    let mut candidates = candidate.components();
+    root.components().all(|component| {
+        candidates.next().is_some_and(|candidate| {
+            match (
+                component.as_os_str().to_str(),
+                candidate.as_os_str().to_str(),
+            ) {
+                (Some(left), Some(right)) => {
+                    let fold = |c| windows_case_fold::fold(if c == '/' { '\\' } else { c });
+                    left.chars().map(fold).eq(right.chars().map(fold))
+                }
+                _ => false,
+            }
+        })
+    })
 }
 
 /// Go's wrapped `os.Lstat` text: `lstat <path>: <errno>`. Rust attaches no
@@ -494,7 +528,15 @@ pub fn detect(o: &Options<'_>) -> Result<Detection, String> {
                         } else {
                             "scheduler file"
                         },
-                        go_errno_text(&e)
+                        io_error(
+                            if e.kind() == std::io::ErrorKind::IsADirectory {
+                                "read"
+                            } else {
+                                "open"
+                            },
+                            &path,
+                            e,
+                        )
                     )
                 })?;
             }
@@ -550,10 +592,9 @@ pub fn dry_run(o: &Options<'_>) -> Result<Report, String> {
     })
 }
 
-#[derive(Default, serde::Deserialize, Serialize)]
-#[serde(default)]
+#[derive(Default, Serialize)]
 struct State {
-    version: u32,
+    version: isize,
     source_root: String,
     destination_root: String,
     backup_dir: String,
@@ -579,7 +620,15 @@ fn file_mode(info: &fs::Metadata) -> u32 {
         use std::os::unix::fs::PermissionsExt;
         info.permissions().mode() & 0o777
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        if info.permissions().readonly() {
+            0o444
+        } else {
+            0o666
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = info;
         0o600
@@ -591,9 +640,23 @@ fn write_atomic(path: impl AsRef<Path>, data: &[u8], mode: u32) -> Result<(), St
     reject_symlink_components(path).map_err(|e| format!("destination path is unsafe: {e}"))?;
     let parent = path.parent().ok_or("destination has no parent")?;
     mkdir(parent)?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".migration-write-")
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(".migration-write-");
+    #[cfg(not(windows))]
+    let mut tmp = builder
         .tempfile_in(parent)
+        .map_err(|e| io_error("open", path, e))?;
+    // tempfile::persist on Windows resets all attributes to NORMAL. Create an
+    // ordinary temporary file and rename it without discarding READONLY.
+    #[cfg(windows)]
+    let mut tmp = builder
+        .make_in(parent, |temporary| {
+            fs::OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .open(temporary)
+        })
         .map_err(|e| io_error("open", path, e))?;
     #[cfg(unix)]
     {
@@ -602,15 +665,39 @@ fn write_atomic(path: impl AsRef<Path>, data: &[u8], mode: u32) -> Result<(), St
             .set_permissions(fs::Permissions::from_mode(mode))
             .map_err(|e| io_error("chmod", path, e))?;
     }
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     let _ = mode;
     tmp.write_all(data)
         .map_err(|e| io_error("write", path, e))?;
     tmp.as_file()
         .sync_all()
         .map_err(|e| io_error("sync", path, e))?;
+    // Windows READONLY is a file attribute, not an ACL. Apply it to the private
+    // file immediately before atomic publication, after fallible content writes.
+    #[cfg(windows)]
+    let mut permissions = {
+        let mut permissions = tmp
+            .as_file()
+            .metadata()
+            .map_err(|e| io_error("stat", tmp.path(), e))?
+            .permissions();
+        permissions.set_readonly(mode & 0o200 == 0);
+        tmp.as_file()
+            .set_permissions(permissions.clone())
+            .map_err(|e| io_error("chmod", tmp.path(), e))?;
+        permissions
+    };
+    #[cfg(not(windows))]
     tmp.persist(path)
         .map_err(|e| io_error("rename", path, e.error))?;
+    #[cfg(windows)]
+    if let Err(error) = fs::rename(tmp.path(), path) {
+        // Only our already-open temporary file is made removable. Never clear
+        // an existing destination's READONLY bit to force replacement.
+        permissions.set_readonly(false);
+        let _ = tmp.as_file().set_permissions(permissions);
+        return Err(io_error("rename", path, error));
+    }
     Ok(())
 }
 fn json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
@@ -695,8 +782,7 @@ fn ensure_backup(
                     io_error("open", &marker, e)
                 )
             })?;
-            let valid = serde_json::from_slice::<serde_json::Value>(&data)
-                .is_ok_and(|v| v["version"] == 1 && v["source"] == source);
+            let valid = json::marker_matches(&data, source);
             if !valid {
                 return Err("backup completion marker does not match this source".into());
             }
@@ -797,8 +883,7 @@ fn mutate(
     let state_path = join(destination, ".migration-state.json");
     let mut state = match fs::read(&state_path) {
         Ok(data) => {
-            let st: State = serde_json::from_slice(&data)
-                .map_err(|e| format!("decode migration state: {e}"))?;
+            let st = json::state(&data).map_err(|e| format!("decode migration state: {e}"))?;
             if st.version != 1 || st.source_root != source || st.destination_root != destination {
                 return Err(
                     "migration state does not match the requested source and destination".into(),
@@ -986,6 +1071,52 @@ fn artifact_data(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn migration_windows_fold_matches_every_go_unicode_scalar() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../rust-tests/parity/oracle/migration-safety/fold.json"
+        )))
+        .unwrap();
+        assert_eq!(fixture["toolchain"], "go1.26.6");
+        assert_eq!(fixture["unicode"], "15.0.0");
+        let pairs = fixture["pairs"].as_array().unwrap();
+        assert_eq!(pairs.len(), 1454);
+        let mut remaining = pairs.iter().peekable();
+        for value in 0..=0x10ffff {
+            let Some(character) = char::from_u32(value) else {
+                continue;
+            };
+            let expected = if remaining
+                .peek()
+                .is_some_and(|p| p[0].as_u64() == Some(u64::from(value)))
+            {
+                u32::try_from(remaining.next().unwrap()[1].as_u64().unwrap()).unwrap()
+            } else {
+                value
+            };
+            assert_eq!(
+                windows_case_fold::fold(character),
+                expected,
+                "U+{value:04X}"
+            );
+        }
+        assert!(remaining.next().is_none());
+        assert!(path_prefix_casefold(
+            Path::new("/Legacy/Σcope"),
+            Path::new("/legacy/ςCOPE/child")
+        ));
+        assert!(!path_prefix_casefold(
+            Path::new("/Legacy"),
+            Path::new("/legacy-other")
+        ));
+        assert!(!path_prefix_casefold(
+            Path::new("/Legacy/child"),
+            Path::new("/legacy")
+        ));
+        assert!(!path_prefix_casefold(Path::new("/I"), Path::new("/ı")));
+    }
     #[cfg(unix)]
     #[test]
     fn migration_path_cleaning_preserves_native_bytes() {

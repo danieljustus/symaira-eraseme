@@ -93,5 +93,112 @@ in that same target directory, or use the repository's nextest path.
 5. Exact-head PR CI and an explicit workflow-dispatch native run: normal PR CI
    skips `rust-native`, so it does not prove Linux/macOS/Windows parity.
 
-No engine PASS, 171/3 Rust corpus claim, integrated main SHA, remote CI success
-or release completion is asserted by this preparation checkpoint.
+The preparation evidence above predates integration. Its red baselines remain
+historical evidence; the following candidate supersedes their pending status.
+
+## Integrated local evidence — `afa22cb9` (2026-09-22)
+
+The coordinator recovered and reviewed the actual Codex artifact, corrected
+lossy filename handling in recursive backups and Windows prefix/root traversal,
+and retained it as engine commit `474751db07bc68ef579547a012cf338301c28b8d`.
+The integration candidate is `afa22cb9543cc53a9f3de3c1d05ba977e4a1cf75`.
+Shared main is unchanged and clean at `8986a3db`; no remote publication occurred.
+
+Parent-owned process `proc_8a6ece6d4b1a` ran with the explicit integration
+manifest, its own `target`, Rust 1.98.0, `--locked --offline`:
+
+| Gate | Observed result |
+|---|---|
+| Workspace nextest, all features | 428 executed, 428 passed; two ignored child-entry helpers |
+| Complete CLI corpus | 171 byte-exact, three deferred; all eight migration records executed |
+| Filesystem migration replay | All five declared scenario IDs executed; stream lengths/hashes, complete manifests, backup/state and unchanged source checked |
+| Comparator corruption controls | Passing positive followed by rejection of altered stdout hash, backup marker hash and root existence |
+| Workspace Clippy, all targets/features, `-D warnings` | Exit 0 |
+| Workspace format and Git diff checks | Exit 0 |
+| Workspace doctest command | Exit 0, zero doctests; not an additional runtime test claim |
+
+Nextest inventory is retained at `target/cli024-test-inventory.json`.
+Its two ignored entries are `identity::consent::filesystem_tests::id005_child`
+and `consent_api::environment_child`. The Linux-only real non-UTF-8 filename
+backup test is not compiled into the macOS inventory. macOS rejected the fixture
+creation with errno 92; only the pure native path-byte check executed here.
+Neither that test nor the host suite establishes Linux/Windows runtime evidence.
+
+### Current follow-up — combined dirty candidate
+
+The earlier JSON worker and base review have both completed. The base review
+returned **CHANGES_REQUIRED**, not approval. Its three findings were Windows
+case-aliased overlap, loss of Windows readonly attributes and incomplete scheduler
+I/O error context. The coordinator repaired those paths and integrated the
+isolated JSON decoder without overwriting the safety changes. No commits or
+remote publication followed this integration yet.
+
+- Current code/test/oracle identity: `target/cli024-final-review-inputs.json`,
+  SHA-256 `99c2e8080af60e2ddd5c1a7f5102f9aad3168d796c66c40979b01879b63b0813`,
+  base `afa22cb9`. Independent delta review: `proc_650668909fd5`; input files
+  remained frozen through its completed verdict. That verdict was
+  **CHANGES_REQUIRED** solely for the Windows test backup path; the prior three
+  production findings were resolved statically. Docs/checkpoint files are
+  outside that manifest.
+- JSON: eleven new files transferred with matching SHA-256; retained transfer
+  manifest `target/cli024-json-transfer.json`. The worker's 500 genuine Go
+  observations, generator and source identities, test results and explicit
+  macOS-only limits are in `rust-tests/parity/oracle/migration-state/`.
+- Safety: four production-Go scheduler failures pass exact diagnostic and
+  no-mutation replay. Go 1.26.6 Unicode folding was captured as 1454 mappings,
+  represented losslessly by 210 ranges, and checked for every Unicode scalar.
+  Windows publication avoids `tempfile::persist` resetting attributes to NORMAL.
+  Windows case-alias and readonly runtime tests are present, not natively passed.
+- Aggregate `proc_cd6f87dde9ab` completed with **exit 0**: 432 workspace tests
+  passed, two helper entries skipped; fresh 500-case Go capture check, fmt,
+  strict workspace Clippy and diff checks passed. Both safety fixtures passed
+  positive checks and corrupted-copy rejection without rewrite. Zero doctests
+  executed. The reviewed 1539-file input manifest was unchanged afterward.
+- Focused native Linux is **passing after attempt 4**. Attempt 1 stopped at rustup setup;
+  explicit installed-toolchain selection fixed that. Attempt 2 stopped at the
+  pre-fix control assertion without its underlying compiler output. Attempt 3
+  (`proc_b0b109a67d51`) retained that output in `target/cli024-linux-3/run.log`:
+  registry embedding failed with EMFILE. The measured container soft descriptor
+  limit is 1024, below the 1277 retained broker handles plus other selected
+  assets/traversal handles. GitHub #1034 tracks this unchanged build-script
+  limitation. Attempt 4, `proc_46cc9db786d5`, raises only the container limit to
+  8192; `target/cli024-linux-4/` retains its runner, input archive, identity and
+  full log. It exited 0, offline and non-root; no security checks were bypassed.
+  The original engine reproduced the expected scheduler-context mismatch before
+  restoration of the repaired candidate. That candidate passed five tests:
+  two JSON tests (500 declared = 500 executed), one actual non-UTF-8 filename
+  backup test, one four-case scheduler test, and one all-scalar Go fold test.
+  Host/compiler: Linux aarch64, Rust 1.98.0. All 2035 archived input hashes were
+  independently checked; all 1539 review inputs match the current candidate.
+  The only live-versus-archive drift is the two non-build handoff documents.
+  This targeted execution is not a complete Linux native workspace/CLI gate.
+  Windows cross-check stopped at `ring` with missing `assert.h`; it does not
+  certify engine code or runtime. Native Windows and exact-head CI remain open.
+
+### One-line test repair and renewed gates
+
+`migration_review_regressions.rs:144` now checks
+`Path::new(&report.backup_dir).join("source/config.toml")`, matching the actual
+Go/Rust backup layout. This is the only changed source/test input since the
+completed review; no production, oracle or other test bytes changed. The
+new 1539-file manifest is `target/cli024-review-repair-inputs.json`, SHA-256
+`935002f88832172518df1179ed194e3e700ff5800a066935885ba97aa6269488`.
+
+Bounded read-only review `proc_95d4e6d971c2` returned **PASS_STATIC** for this
+manifest, with all 1539 hashes checked before/after and no unresolved static
+findings. Fresh macOS aggregate `proc_a256a9044825` exited 0: 432 tests passed,
+two helpers skipped; strict workspace Clippy, fmt and identity checks passed.
+The aggregate log is `target/cli024-after-review.log`. The Windows-only
+assertion is still not executed on Windows. Neither the static review nor this
+host aggregate provides native Windows approval.
+
+The next external gate is `rust-ci.yml` dispatched on the exact committed and
+published candidate (native Linux/macOS/Windows); a PR alone skips that job.
+The SQLite-only `rust-target-proof.yml` does not exercise migration tests.
+Separate PR CI remains required for coverage/security/neutral-parity gates.
+No publication, merge or release is implied by the completed local checks.
+
+The three deferred recorded CLI cases are `operate-poll-inbox`,
+`operate-generate-rebuttal` and `operate-classify-reply`; none is a migration
+case. They must not be described as three unimplemented migration fixtures.
+CLI-025 remains behind CLI-024 acceptance. No release/cutover PASS is claimed.

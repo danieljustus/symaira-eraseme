@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "rust-tests/parity/oracle/migration-state/generate.py",
+    "--go",
+    "/Users/daniel/sdk/go1.26.6/bin/go",
+    "--check",
+    "--fixture",
+    "/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme/.worktrees/cli024-json/target/json-evidence/corrupted-fixture.json"
+  ],
+  "exit": 1,
+  "fixture_unchanged": true,
+  "sha256_before_after": "1c222088bdb123afb80fceb13fa6010ef61b1d32fcf3adb81185eb6fdb528dc1"
+}
