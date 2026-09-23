@@ -117,6 +117,60 @@ pub(crate) fn round1(value: f64) -> f64 {
     }
 }
 
+/// Go's `encoding/json` writes integral `float64` values without a decimal
+/// point. Reporting maps use integer JSON numbers for those wire values;
+/// `ExportJSON` restores Python's float spelling for generated report files.
+fn go_json_number(value: f64) -> Value {
+    if value.is_finite()
+        && value.fract() == 0.0
+        && value >= i64::MIN as f64
+        && value < i64::MAX as f64
+    {
+        json!(value as i64)
+    } else {
+        json!(value)
+    }
+}
+
+fn restore_python_report_floats(value: &Value) -> Value {
+    const FLOAT_FIELDS: &[&str] = &[
+        "avg_response_time_days",
+        "success_rate",
+        "confirmation_rate",
+        "rejection_rate",
+        "overall_confirmation_rate",
+        "overall_rejection_rate",
+        "overdue_rate",
+        "median_response_time_days",
+        "avg_response_time_change",
+        "confirmation_rate_change",
+        "rejection_rate_change",
+    ];
+    match value {
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, nested)| {
+                    let restored = if FLOAT_FIELDS.contains(&key.as_str()) {
+                        nested
+                            .as_i64()
+                            .and_then(|number| serde_json::Number::from_f64(number as f64))
+                            .map(Value::Number)
+                            .unwrap_or_else(|| restore_python_report_floats(nested))
+                    } else {
+                        restore_python_report_floats(nested)
+                    };
+                    (key.clone(), restored)
+                })
+                .collect(),
+        ),
+        Value::Array(items) => {
+            Value::Array(items.iter().map(restore_python_report_floats).collect())
+        }
+        other => other.clone(),
+    }
+}
+
 fn load_campaigns(store: &Store, id: &str, all: bool) -> rusqlite::Result<Vec<CampaignRow>> {
     let mut query = String::from("SELECT id, created_at, kind, notes FROM campaigns");
     if !id.is_empty() && !all {
@@ -427,7 +481,7 @@ fn response_times(rows: &[RequestRow]) -> Vec<f64> {
 
 fn round1_or_null(value: Option<f64>) -> Value {
     match value {
-        Some(number) => json!(round1(number)),
+        Some(number) => go_json_number(round1(number)),
         None => Value::Null,
     }
 }
@@ -536,8 +590,8 @@ fn aggregate_campaign(
         "confirmed": count_of(&counts, "CONFIRMED"),
         "rejected": count_of(&counts, "REJECTED_FINAL"),
         "overdue": count_of(&counts, "OVERDUE"),
-        "confirmation_rate": confirmation_rate(&counts, total),
-        "rejection_rate": rejection_rate(&counts, total),
+        "confirmation_rate": go_json_number(confirmation_rate(&counts, total)),
+        "rejection_rate": go_json_number(rejection_rate(&counts, total)),
         "avg_response_time_days": round1_or_null(average),
         "total_reminders_sent": reminders,
         "requests": request_values,
@@ -644,7 +698,7 @@ fn broker_leaderboard_value(requests: &[RequestRow]) -> Vec<Value> {
                 "rejected": stat.rejected,
                 "overdue": stat.overdue,
                 "pending": stat.pending,
-                "success_rate": round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0),
+                "success_rate": go_json_number(round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0)),
                 "avg_response_time_days": round1_or_null(average),
             })
         })
@@ -727,7 +781,7 @@ fn jurisdiction_breakdown(requests: &[RequestRow]) -> Vec<Value> {
                 "confirmed": stat.confirmed,
                 "rejected": stat.rejected,
                 "overdue": stat.overdue,
-                "confirmation_rate": round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0),
+                "confirmation_rate": go_json_number(round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0)),
             })
         })
         .collect()
@@ -770,7 +824,7 @@ fn historical_comparison(aggregates: &[Value]) -> Value {
     let previous = &aggregates[1];
     let number = |value: &Value, key: &str| value.get(key).and_then(Value::as_f64);
     let change = |key: &str| match (number(latest, key), number(previous, key)) {
-        (Some(a), Some(b)) => json!(round1(a - b)),
+        (Some(a), Some(b)) => go_json_number(round1(a - b)),
         _ => Value::Null,
     };
     json!({
@@ -802,19 +856,19 @@ fn success_metrics(requests: &[RequestRow]) -> Value {
     let (mut average, mut median) = (Value::Null, Value::Null);
     if !times.is_empty() {
         times.sort_by(|left, right| left.partial_cmp(right).expect("no NaN durations"));
-        average = json!(round1(times.iter().sum::<f64>() / times.len() as f64));
+        average = go_json_number(round1(times.iter().sum::<f64>() / times.len() as f64));
         median = if times.len() % 2 == 1 {
-            json!(times[times.len() / 2])
+            go_json_number(times[times.len() / 2])
         } else {
-            json!((times[times.len() / 2 - 1] + times[times.len() / 2]) / 2.0)
+            go_json_number((times[times.len() / 2 - 1] + times[times.len() / 2]) / 2.0)
         };
     }
     let total = requests.len() as f64;
     json!({
         "total_requests": requests.len() as i64,
-        "overall_confirmation_rate": round1(confirmed as f64 / total * 100.0),
-        "overall_rejection_rate": round1(rejected as f64 / total * 100.0),
-        "overdue_rate": round1(overdue as f64 / total * 100.0),
+        "overall_confirmation_rate": go_json_number(round1(confirmed as f64 / total * 100.0)),
+        "overall_rejection_rate": go_json_number(round1(rejected as f64 / total * 100.0)),
+        "overdue_rate": go_json_number(round1(overdue as f64 / total * 100.0)),
         "avg_response_time_days": average,
         "median_response_time_days": median,
     })
@@ -988,7 +1042,8 @@ pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result
 /// `SetEscapeHTML(false)` behavior. `to_string_pretty` indents with two
 /// spaces and appends no trailing newline, matching Go's trimmed encoder.
 fn export_json(data: &Value) -> Result<String, String> {
-    serde_json::to_string_pretty(data).map_err(|error| error.to_string())
+    serde_json::to_string_pretty(&restore_python_report_floats(data))
+        .map_err(|error| error.to_string())
 }
 
 /// Go's `ExportCSV`: CRLF rows, the fixed twelve-column header, one row per
@@ -1085,7 +1140,7 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
     // Protect data newlines while matching Go's control-tag whitespace. A
     // rendered report can contain caller-controlled multiline text, so only
     // blank lines emitted by the template may be compacted below.
-    let mut template_data = data.clone();
+    let mut template_data = restore_python_report_floats(data);
     encode_data_newlines(&mut template_data);
     let context = RenderContext {
         data: template_data,

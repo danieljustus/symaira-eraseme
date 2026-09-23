@@ -12,9 +12,12 @@
 use std::fs;
 
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use symeraseme_core::reporting::{
-    ReportOpts, get_calendar, get_campaign_status, get_dashboard_data, get_report_data,
+    ReportOpts, generate_report, get_calendar, get_campaign_status, get_dashboard_data,
+    get_report_data,
 };
 use symeraseme_core::storage::store::Store;
 use tempfile::tempdir;
@@ -23,6 +26,22 @@ const GOLDEN_REPORTING_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting.json"
 );
+const GO_REPORTING_SOURCE: &[u8] = include_bytes!("../../../internal/reporting/reporting.go");
+const GO_BYTES_ORACLE_TEST: &[u8] =
+    include_bytes!("../../../internal/reporting/reporting_json_oracle_test.go");
+const GO_REPORTING_BYTES_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/event-store/golden-reporting-bytes.json"
+);
+
+#[derive(Deserialize)]
+struct GoReportingBytes {
+    source_sha256: String,
+    report: String,
+    dashboard: String,
+    campaign_status: String,
+    calendar: String,
+}
 
 /// The seed used by Go's `fixtureStore`, copied statement for statement.
 const SEED: [&str; 4] = [
@@ -50,9 +69,91 @@ fn pinned_now() -> DateTime<Utc> {
         .with_timezone(&Utc)
 }
 
-/// Normalises a value the way the Go test does before comparing.
+/// Canonicalises integral floats the way Go's encoding/json does before the
+/// Python-authored semantic golden is compared.
 fn normalise(value: &Value) -> String {
-    serde_json::to_string(value).expect("value serialises")
+    serde_json::to_string(&normalise_go_numbers(value)).expect("value serialises")
+}
+
+fn normalise_go_numbers(value: &Value) -> Value {
+    match value {
+        Value::Number(number) if number.is_f64() => {
+            let float = number.as_f64().expect("finite JSON float");
+            if float.fract() == 0.0 && float >= i64::MIN as f64 && float < i64::MAX as f64 {
+                serde_json::json!(float as i64)
+            } else {
+                value.clone()
+            }
+        }
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, nested)| (key.clone(), normalise_go_numbers(nested)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(normalise_go_numbers).collect()),
+        _ => value.clone(),
+    }
+}
+
+fn assert_go_json_bytes(label: &str, rust_value: &Value, go_bytes: &str) {
+    let rust_bytes = serde_json::to_vec(rust_value).expect("value serialises");
+    assert_eq!(
+        rust_bytes,
+        go_bytes.as_bytes(),
+        "{label} JSON bytes differ from Go\nRust: {}\nGo:   {go_bytes}",
+        String::from_utf8_lossy(&rust_bytes),
+    );
+}
+
+#[test]
+fn reporting_surfaces_match_go_encoding_json_bytes() {
+    let fixture: GoReportingBytes = serde_json::from_str(
+        &fs::read_to_string(GO_REPORTING_BYTES_PATH).expect("Go byte fixture readable"),
+    )
+    .expect("Go byte fixture parses");
+    assert_eq!(
+        fixture.source_sha256,
+        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        "Go reporting implementation changed; regenerate and review byte fixture"
+    );
+    assert_eq!(
+        hex::encode(Sha256::digest(GO_BYTES_ORACLE_TEST)),
+        "1cf4d3929a39d5ddc11f0e1f081af4ee6bf724813ed8190cffcd8f7719e87871",
+        "Go reporting byte generator changed; review and repin it"
+    );
+    let (_tree, store) = fixture_store();
+    let now = pinned_now();
+    let report = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("report data");
+    let dashboard = get_dashboard_data(&store, "", now).expect("dashboard data");
+    let campaign_status = get_campaign_status(&store, "", now).expect("campaign status");
+    let calendar = get_calendar(&store, "", 4, now).expect("calendar");
+
+    for (label, value, go_bytes) in [
+        ("report", &report, fixture.report.as_str()),
+        ("dashboard", &dashboard, fixture.dashboard.as_str()),
+        (
+            "campaign_status",
+            &campaign_status,
+            fixture.campaign_status.as_str(),
+        ),
+        ("calendar", &calendar, fixture.calendar.as_str()),
+    ] {
+        assert_go_json_bytes(label, value, go_bytes);
+    }
+    let exported = generate_report(&report, "json", now).expect("report JSON export");
+    assert!(
+        exported.contains("\"median_response_time_days\": 2.0"),
+        "the file generator keeps Python's integral-float spelling"
+    );
 }
 
 #[test]
@@ -110,7 +211,7 @@ fn golden_reporting_anchor_values() {
     assert_eq!(report["total_requests"], 3);
     let metrics = &report["success_metrics"];
     assert_eq!(metrics["overall_confirmation_rate"], 33.3);
-    assert_eq!(metrics["median_response_time_days"], 2.0);
+    assert_eq!(metrics["median_response_time_days"].as_f64(), Some(2.0));
     assert_eq!(report["broker_leaderboard"][0]["broker_id"], "broker-a");
     assert_eq!(report["broker_leaderboard"][0]["total"], 2);
     assert_eq!(report["jurisdiction_stats"][0]["jurisdiction"], "GDPR");
