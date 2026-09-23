@@ -267,7 +267,7 @@ impl ContractHandler {
             let status = get_str(arguments, "status", "");
             let request_id = get_int(arguments, "request_id", 0);
             manualtasks::handle_list(
-                &store,
+                store,
                 &ListOpts {
                     status: (!status.is_empty()).then_some(status),
                     request_id: (request_id != 0).then_some(request_id),
@@ -282,7 +282,7 @@ impl ContractHandler {
     fn manual_tasks_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let task_id = get_int(arguments, "task_id", 0);
-            manualtasks::handle_show(&store, task_id)
+            manualtasks::handle_show(store, task_id)
                 .map(|result| result.into_value())
                 .map_err(|error| ToolError(error.to_string()))
         })
@@ -294,7 +294,7 @@ impl ContractHandler {
             let now = self.recorded_instant()?;
             let task_id = get_int(arguments, "task_id", 0);
             let notes = get_str(arguments, "notes", "");
-            manualtasks::handle_complete(&store, task_id, &notes, now)
+            manualtasks::handle_complete(store, task_id, &notes, now)
                 .map(|result| result.into_value())
                 .map_err(|error| ToolError(error.to_string()))
         })
@@ -390,7 +390,7 @@ impl ContractHandler {
     fn generate_dashboard(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let now = self.recorded_instant()?;
-            let data = reporting::get_dashboard_data(&store, "", now)
+            let data = reporting::get_dashboard_data(store, "", now)
                 .map_err(|error| ToolError(error.to_string()))?;
             let content =
                 reporting::generate_dashboard(&data, get_int(arguments, "auto_refresh", 0), now)
@@ -421,7 +421,7 @@ impl ContractHandler {
             let now = self.recorded_instant()?;
             let format = get_str(arguments, "format", "html");
             let data = reporting::get_report_data(
-                &store,
+                store,
                 &reporting::ReportOpts {
                     campaign_id: get_str(arguments, "campaign_id", ""),
                     all_campaigns: get_bool(arguments, "all_campaigns", false),
@@ -466,7 +466,7 @@ impl ContractHandler {
                 .unwrap_or_default();
             let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
             let result = campaign::plan_campaign(
-                &store,
+                store,
                 &brokers,
                 &identity_hash,
                 &campaign::PlanOpts {
@@ -533,7 +533,7 @@ impl ContractHandler {
                 .map(|profile| profile.as_ref())
                 .map_err(String::as_str);
             let result = campaign::execute_campaign(
-                &store,
+                store,
                 &get_str(arguments, "campaign_id", ""),
                 &campaign::ExecuteOpts {
                     account: get_str(arguments, "account", ""),
@@ -566,7 +566,7 @@ impl ContractHandler {
         self.with_open_store(|store| {
             let agent = self.triage_agent(arguments)?;
             let call = triage_agent_call(&agent);
-            let outcome = triage_service::Service::new(&store)
+            let outcome = triage_service::Service::new(store)
                 .classify_reply(
                     get_int(arguments, "request_id", 0),
                     &ClassifyRequest::default(),
@@ -586,7 +586,7 @@ impl ContractHandler {
         self.with_open_store(|store| {
         let agent = self.triage_agent(arguments)?;
         let call = triage_agent_call(&agent);
-        let result = triage_service::Service::new(&store)
+        let result = triage_service::Service::new(store)
             .generate_rebuttal(
                 get_int(arguments, "request_id", 0),
                 &RebuttalRequest::default(),
@@ -721,7 +721,7 @@ impl ContractHandler {
         self.with_open_store(|store| {
         let request_id = get_int(arguments, "request_id", 0);
         let dry_run = get_bool(arguments, "dry_run", false);
-        let reply = confirmation::latest_reply_body(&store, request_id)
+        let reply = confirmation::latest_reply_body(store, request_id)
             .map_err(|error| ToolError(error.to_string()))?;
         let Some(reply) = reply else {
             return Ok(json!({
@@ -786,7 +786,7 @@ impl ContractHandler {
             ));
         }
 
-        let request = Repository::new(&store)
+        let request = Repository::new(store)
             .get_removal_request(request_id)
             .map_err(|error| ToolError(error.to_string()))?;
         let host = link
@@ -806,7 +806,7 @@ impl ContractHandler {
             .unwrap_or_else(|| host.clone());
         let now = self.recorded_instant()?;
         let task = manualtasks::create(
-            &store,
+            store,
             &manualtasks::CreateOpts {
                 request_id: Some(request_id),
                 broker_id: broker_id.clone(),
@@ -878,7 +878,7 @@ impl ContractHandler {
             let now = self.recorded_instant()?;
             let request_id = get_int(arguments, "request_id", 0);
             let task = manualtasks::create(
-                &store,
+                store,
                 &manualtasks::CreateOpts {
                     request_id: (request_id != 0).then_some(request_id),
                     broker_id: field_string(&preview, "broker_id"),
@@ -935,7 +935,7 @@ impl ContractHandler {
         self.with_open_store(|store| {
             let campaign_id = get_str(arguments, "campaign_id", "");
             let status = get_str(arguments, "status", "");
-            campaign::get_plan(&store, &campaign_id, &status)
+            campaign::get_plan(store, &campaign_id, &status)
                 .map(Value::Object)
                 .map_err(|error| ToolError(error.to_string()))
         })
@@ -952,7 +952,7 @@ impl ContractHandler {
     fn dashboard_data(&self) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let now = self.recorded_instant()?;
-            reporting::get_dashboard_data(&store, "", now)
+            reporting::get_dashboard_data(store, "", now)
                 .map_err(|error| ToolError(error.to_string()))
         })
     }
@@ -962,7 +962,7 @@ impl ContractHandler {
         self.with_open_store(|store| {
             let now = self.recorded_instant()?;
             reporting::get_calendar(
-                &store,
+                store,
                 &get_str(arguments, "campaign_id", ""),
                 get_int(arguments, "weeks", 4),
                 now,
@@ -983,7 +983,7 @@ impl ContractHandler {
             }
             let campaign_id = optional_str(arguments, "campaign_id");
             let status = optional_str(arguments, "status");
-            let repository = Repository::new(&store);
+            let repository = Repository::new(store);
             let requests = repository
                 .list_removal_requests(ListRemovalRequestsOptions {
                     campaign_id: campaign_id.clone(),
@@ -1009,7 +1009,7 @@ impl ContractHandler {
     /// an event id when one was given.
     fn get_events(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
-            let events = Repository::new(&store)
+            let events = Repository::new(store)
                 .get_events(
                     get_int(arguments, "request_id", 0),
                     get_int(arguments, "after_event_id", 0),
@@ -1154,7 +1154,7 @@ impl ContractHandler {
 
         // 8. Read active matchable removal requests and build EvtSent thread map.
         self.with_open_store(|store_ref| {
-            let repo = Repository::new(&store_ref);
+            let repo = Repository::new(store_ref);
             let active_reqs_result =
                 repo.get_active_matchable_requests(if campaign_id_filter.is_empty() {
                     None

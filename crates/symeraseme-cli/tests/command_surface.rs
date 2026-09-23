@@ -174,6 +174,7 @@ fn run_program_with_data_dir(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // Test helper keeps the independent process roots explicit.
 fn run_program_inner(
     program: &Path,
     argv: &[&str],
