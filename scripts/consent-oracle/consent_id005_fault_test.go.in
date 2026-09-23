@@ -25,3 +25,12 @@ func id005BeforeChmod(path string) {
 		}
 	}
 }
+
+func id005Chmod(path string, mode os.FileMode) error {
+	if id005Fault == "chmod_failure_existing_temp" {
+		// Inject at the checked-operation boundary while preserving the temp.
+		// This exercises rollback after a chmod error, not native chmod failure.
+		return os.ErrPermission
+	}
+	return os.Chmod(path, mode)
+}

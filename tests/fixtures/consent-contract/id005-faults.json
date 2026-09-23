@@ -58,26 +58,55 @@
         }
       ],
       "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+    },
+    {
+      "name": "chmod_failure_existing_temp",
+      "failed": true,
+      "error_class": "permission_denied",
+      "entries": [
+        {
+          "path": "consent",
+          "kind": "directory",
+          "mode": 448,
+          "body": ""
+        },
+        {
+          "path": "consent/.consent-sentinel.tmp",
+          "kind": "file",
+          "mode": 384,
+          "body": "unrelated sentinel"
+        },
+        {
+          "path": "consent/consent_53479c57115bd14b.json",
+          "kind": "file",
+          "mode": 256,
+          "body": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
+        }
+      ],
+      "held": "{\"command\":\"before\",\"issued_at\":1000,\"expires_at\":1060,\"token\":\"BwcHBwcHBwcHBwcHBwcHBw\"}"
     }
   ],
   "instrumentation": {
-    "kind": "state-changing hooks before unchanged checked operations",
-    "source_sha256": "9d095c9f55155d0eddd7d3a888244e9f986d9652cfa1c12952543ef16cca54d4",
+    "kind": "state-changing hooks before checked operations plus one test-only Chmod adapter",
+    "source_sha256": "837c7d8b268dbaeef18eb7322e5b88743bd09cbeb0d29541be839d06bfe11d13",
     "hooks": {
       "\tif err := tmp.Close(); err != nil {": "\tid005BeforeClose(tmp)\n",
       "\tif err := os.Chmod(tmpName, mode); err != nil {": "\tid005BeforeChmod(tmpName)\n"
+    },
+    "replacements": {
+      "os.Chmod(tmpName, mode)": "id005Chmod(tmpName, mode)"
     }
   },
   "helper_sha256": {
-    "consent_id005_fault_test.go.in": "578e38acca8ca095faf5c1c7f7175ebfa589310be56eeeb4252cac478fc9e6c5",
-    "consent_id005_test.go.in": "3312392155a22ade5b5efdd96b9b30ecabfb5245734dbc69dc8fc5b44fc95da4",
+    "consent_id005_fault_test.go.in": "2afa99d0be7feda2d4cd4ca56264e80a9eb79387d27696b1b3a1d84cc5f0979c",
+    "consent_id005_test.go.in": "9875cee25ca82481d22f9389af1eef42b6308efefd9956173727fff6ad2193cb",
     "consent_id005_unix_test.go.in": "9ad0f2b8a8f7bba9c53726034f7d559b34170caa6a564858f3442ce4c7e02603",
     "consent_id005_windows_test.go.in": "988322e8b0d58fac593af7c8614bb6c5c55000196988b7d081d9ec53a3a369c2"
   },
-  "generator_sha256": "36126afde7d83f3e3130823bfef669652a1308d72058eecfc3f5527dd2c2da5a",
+  "generator_sha256": "45e9ece92e090b3d42937d83ba457035bae10f2fc83fcf48a346847c70681e5b",
   "blockers": {
     "delayed_close_io": "Preclosing exercises Go os.ErrClosed, not native delayed EIO/ENOSPC; no controlled faulty filesystem is available.",
-    "chmod_existing_temp": "Unlinking exercises real Chmod ENOENT but cannot prove cleanup after chmod failure with the temporary file still present; no deterministic permission-fault hook is available.",
+    "chmod_existing_temp": "A test-only adapter injects os.ErrPermission while the temp exists and proves rollback, not native chmod failure.",
     "sync": "Go has no sync operation. Rust retains sync_all and returns its error before publishing; no Go sync-error fixture exists.",
     "non_unix_close": "Rust non-Unix File drop still discards close errors; a reviewed safe checked-close adapter and native proof remain required."
   }

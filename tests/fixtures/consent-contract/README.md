@@ -107,15 +107,24 @@ native platform, verbatim errors and one executed Go test per case.
   0400 token, its open-handle bytes, and the unrelated 0600 stale sentinel.
   Because the injector removed the temp, this does not prove cleanup following
   a chmod error while the temporary file still exists.
+- `chmod_failure_existing_temp`: the disposable Go archive routes the checked
+  Chmod call through a source-bound test adapter that returns `os.ErrPermission`
+  while leaving the temp file present. Rust injects the same permission error at
+  its chmod adapter. Both preserve the old 0400 token and sentinel, then remove
+  the owned temp. This proves rollback after a chmod error, not a native chmod
+  permission fault.
 
-The Rust consumers are the three `id005_atomic_*` tests in
-`consent_filesystem_tests.rs`. The chmod case calls the actual required chmod
-operation after unlink, and compares the observed error category and complete
-filesystem manifest with Go. The close test performs real checked close, then
-injects a typed adapter error; it checks exact error propagation and compares
-only failure/rollback effects with Go. It explicitly does **not** compare that
-injected error with Go's `os.ErrClosed` or claim native close-fault parity.
-A corrupted-sentinel negative control exercises the actual comparator.
+The Rust consumers are the `id005_atomic_*` tests in
+`consent_filesystem_tests.rs`. The `chmod_failure` case calls native chmod after
+unlink and compares the observed error category and complete filesystem
+manifest with Go. The `chmod_failure_existing_temp` case injects the same
+permission error at Rust's chmod adapter while retaining the temp until guard
+cleanup, then compares rollback effects with the source-bound Go adapter case.
+The close test performs real checked close, then injects a typed adapter error;
+it checks exact error propagation and compares only failure/rollback effects
+with Go. It explicitly does **not** compare that injected error with Go's
+`os.ErrClosed` or claim native close-fault parity. Corrupted-manifest negative
+controls exercise the actual comparators.
 `id005_fault_fixture_is_bound_to_source_and_probe` rejects source/helper/generator
 drift.
 
