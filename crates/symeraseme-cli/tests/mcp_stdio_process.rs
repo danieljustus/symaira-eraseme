@@ -340,8 +340,8 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     let canonical_root = fs::canonicalize(&root).unwrap();
     let state = root.join("crontab");
     fs::write(&state, "# user schedule\n").unwrap();
-    let fake_crontab = format!(
-        "#!/bin/sh\ncase \"$1\" in\n  -l)\n    [ -f \"$SCHEDULER_CRONTAB_STATE\" ] || exit 1\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\n  *)\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$1\" > \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\nesac\n"
+    let fake_crontab = String::from(
+        "#!/bin/sh\ncase \"$1\" in\n  -l)\n    [ -f \"$SCHEDULER_CRONTAB_STATE\" ] || exit 1\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\n  *)\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$1\" > \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\nesac\n",
     );
     fs::write(bin.join("crontab"), fake_crontab).unwrap();
     #[cfg(unix)]

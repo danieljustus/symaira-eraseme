@@ -1110,10 +1110,10 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
     // empty slice to preserve the actual Go output without changing report data.
     if let Some(Value::Array(timeline)) = template_data.get_mut("timeline") {
         for entry in timeline {
-            if let Value::Object(fields) = entry {
-                if matches!(fields.get("events"), Some(Value::Object(_))) {
-                    fields.insert("events".to_owned(), Value::Array(Vec::new()));
-                }
+            if let Value::Object(fields) = entry
+                && matches!(fields.get("events"), Some(Value::Object(_)))
+            {
+                fields.insert("events".to_owned(), Value::Array(Vec::new()));
             }
         }
     }

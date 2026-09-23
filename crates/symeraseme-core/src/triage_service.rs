@@ -54,8 +54,10 @@ pub fn classify_reply(
     llm: Option<&LlmCall<'_>>,
 ) -> ClassifyOutcome {
     let Some(llm) = llm else {
-        let mut result = ClassificationResult::default();
-        result.summary = SummaryBytes::from_text("Classifier not initialized");
+        let result = ClassificationResult {
+            summary: SummaryBytes::from_text("Classifier not initialized"),
+            ..ClassificationResult::default()
+        };
         return ClassifyOutcome {
             result,
             error: None,
@@ -82,8 +84,10 @@ pub fn classify_reply(
             usage: response.usage,
         },
         Err(error) => {
-            let mut result = ClassificationResult::default();
-            result.summary = SummaryBytes::from_text(&format!("API error: {error}"));
+            let result = ClassificationResult {
+                summary: SummaryBytes::from_text(&format!("API error: {error}")),
+                ..ClassificationResult::default()
+            };
             ClassifyOutcome {
                 result,
                 error: Some(error),
@@ -163,13 +167,12 @@ pub fn generate_rebuttal(
     }
     let (mut name, mut label, mut description, mut jurisdiction) = rejection_template(key);
     let available = templating::list_template_names();
-    if !available.contains(&name) {
-        if let Some(candidate) = available
+    if !available.contains(&name)
+        && let Some(candidate) = available
             .iter()
             .find(|candidate| candidate.starts_with(&jurisdiction.to_lowercase()))
-        {
-            name = candidate;
-        }
+    {
+        name = candidate;
     }
     if !available.contains(&name) {
         name = "gdpr-art17.en.md.j2";
