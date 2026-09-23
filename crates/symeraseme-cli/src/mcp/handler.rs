@@ -2919,15 +2919,22 @@ mod tests {
 
         #[derive(Deserialize)]
         struct ClockFixture {
-            source_revision: String,
-            source_path: String,
+            oracle_source: String,
             now: String,
             cases: Vec<ClockCase>,
         }
 
         let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let root = workspace("clock-parity");
-        let hostile = root.join("hostile-inherited-env");
+        let hostile_project = root.join("hostile-project");
+        let hostile_db = root.join("hostile-project-db");
+        let hostile_env = root.join("hostile-inherited-env");
+        fs::create_dir_all(&hostile_project).expect("hostile project dir");
+        fs::write(
+            hostile_project.join(".symeraseme.toml"),
+            format!("db_dir = {:?}\n", hostile_db.to_string_lossy()),
+        )
+        .expect("hostile project config");
         let module_cache = std::env::var_os("GOMODCACHE")
             .map(PathBuf::from)
             .or_else(|| {
@@ -2944,8 +2951,12 @@ mod tests {
         let build_cache = root.join("go-build");
         let isolated_home = root.join("go-home");
         fs::create_dir_all(&isolated_home).expect("Go home");
-        let oracle = std::process::Command::new("go")
-            .args(["run", "./rust-tests/parity/oracle/mcp-clock"])
+        let oracle_binary = root.join(format!("mcp-clock-oracle{}", std::env::consts::EXE_SUFFIX));
+        let mut build = std::process::Command::new("go");
+        build
+            .args(["build", "-o"])
+            .arg(&oracle_binary)
+            .arg("./rust-tests/parity/oracle/mcp-clock")
             .current_dir(&repository_root)
             .env_clear()
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
@@ -2956,38 +2967,100 @@ mod tests {
             .env("GOTOOLCHAIN", "local")
             .env("GOPROXY", "off")
             .env("GOSUMDB", "off")
-            // Negative control: the Go helper must discard these caller-owned
-            // paths before resolving its config or opening the store.
+            .env("HOME", &isolated_home)
+            .env("USERPROFILE", &isolated_home)
+            .env("XDG_CONFIG_HOME", isolated_home.join("config"))
+            .env("XDG_DATA_HOME", isolated_home.join("data"))
+            .env("XDG_STATE_HOME", isolated_home.join("state"))
+            .env("XDG_CACHE_HOME", isolated_home.join("cache"));
+        let build = build.output().expect("build current Go MCP clock oracle");
+        assert!(
+            build.status.success(),
+            "{}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+
+        let oracle = std::process::Command::new(&oracle_binary)
+            .current_dir(&hostile_project)
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .env("HOME", &isolated_home)
             .env("USERPROFILE", &isolated_home)
             .env("XDG_CONFIG_HOME", isolated_home.join("config"))
             .env("XDG_DATA_HOME", isolated_home.join("data"))
             .env("XDG_STATE_HOME", isolated_home.join("state"))
             .env("XDG_CACHE_HOME", isolated_home.join("cache"))
-            .env("SYMERASEME_DB_DIR", hostile.join("db"))
-            .env("SYMERASEME_DATA_DIR", hostile.join("data"))
+            // Negative control: the Go helper must discard these caller-owned
+            // paths before resolving its config or opening the store.
+            .env("SYMERASEME_DB_DIR", hostile_env.join("db"))
+            .env("SYMERASEME_DATA_DIR", hostile_env.join("data"))
             .output()
-            .expect("run source-bound Go MCP clock oracle");
+            .expect("run current Go MCP clock oracle from hostile project cwd");
         assert!(
             oracle.status.success(),
             "{}",
             String::from_utf8_lossy(&oracle.stderr)
         );
         assert!(
-            !hostile.exists(),
-            "Go oracle touched a path inherited from the caller: {}",
-            hostile.display()
+            !hostile_env.exists(),
+            "Go oracle touched an inherited storage path: {}",
+            hostile_env.display()
+        );
+        assert!(
+            !hostile_db.exists(),
+            "Go oracle read hostile project config and touched {}",
+            hostile_db.display()
         );
         let fixture: ClockFixture = serde_json::from_slice(&oracle.stdout).expect("clock oracle");
         assert_eq!(
-            fixture.source_revision,
-            "bfe2873937947479347c626512d74730fceaa3ac"
+            fixture.oracle_source,
+            "live current-checkout Go ContractHandler"
         );
-        assert_eq!(
-            fixture.source_path,
-            "internal/mcp/contract_handler.go:438-444,500-506; internal/reporting/reporting.go:455-494,592-654"
-        );
+        assert_eq!(fixture.now, "2026-08-05T12:00:00Z");
         assert_eq!(fixture.cases.len(), 6);
+        let expected = [
+            ("empty_dashboard", "empty", "get_dashboard_data", json!({})),
+            (
+                "empty_calendar_defaults_to_four_weeks",
+                "empty",
+                "get_calendar",
+                json!({}),
+            ),
+            (
+                "populated_dashboard_counts_request_statuses",
+                "populated",
+                "get_dashboard_data",
+                json!({}),
+            ),
+            (
+                "calendar_includes_exact_horizon_and_current_instant",
+                "populated",
+                "get_calendar",
+                json!({"weeks": 1}),
+            ),
+            (
+                "calendar_zero_weeks_keeps_past_and_current_markers",
+                "populated",
+                "get_calendar",
+                json!({"weeks": 0}),
+            ),
+            (
+                "calendar_filters_campaign",
+                "populated",
+                "get_calendar",
+                json!({"campaign_id": "alpha", "weeks": 1}),
+            ),
+        ];
+        for (case, (name, state, tool, arguments)) in fixture.cases.iter().zip(expected) {
+            assert_eq!(case.name, name);
+            assert_eq!(case.state, state, "{name}");
+            assert_eq!(case.tool, tool, "{name}");
+            assert_eq!(
+                serde_json::to_value(&case.arguments).expect("case arguments"),
+                arguments,
+                "{name} arguments"
+            );
+        }
         let now = DateTime::parse_from_rfc3339(&fixture.now)
             .expect("fixed instant")
             .with_timezone(&Utc);

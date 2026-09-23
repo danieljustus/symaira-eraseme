@@ -15,11 +15,7 @@ import (
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 )
 
-const (
-	sourceRevision = "bfe2873937947479347c626512d74730fceaa3ac"
-	sourcePath     = "internal/mcp/contract_handler.go:438-444,500-506; internal/reporting/reporting.go:455-494,592-654"
-	nowText        = "2026-08-05T12:00:00Z"
-)
+const nowText = "2026-08-05T12:00:00Z"
 
 type fixtureCase struct {
 	Name      string          `json:"name"`
@@ -33,11 +29,18 @@ func main() {
 	// The helper is also run with hostile inherited config variables by its
 	// parity test. Clear them before any path resolution or store access.
 	os.Clearenv()
+	tempRoot := os.TempDir()
 	root, err := os.MkdirTemp("", "mcp-clock-oracle-")
 	if err != nil {
 		fail(err)
 	}
-	defer os.RemoveAll(root)
+	defer func() {
+		_ = os.Chdir(tempRoot)
+		_ = os.RemoveAll(root)
+	}()
+	if err := os.Chdir(root); err != nil {
+		fail(err)
+	}
 	home := filepath.Join(root, "home")
 	if err := os.MkdirAll(home, 0o700); err != nil {
 		fail(err)
@@ -88,11 +91,10 @@ func main() {
 	call("calendar_filters_campaign", "populated", "get_calendar", map[string]any{"campaign_id": "alpha", "weeks": 1})
 
 	if err := json.NewEncoder(os.Stdout).Encode(struct {
-		SourceRevision string        `json:"source_revision"`
-		SourcePath     string        `json:"source_path"`
-		Now            string        `json:"now"`
-		Cases          []fixtureCase `json:"cases"`
-	}{sourceRevision, sourcePath, nowText, cases}); err != nil {
+		OracleSource string        `json:"oracle_source"`
+		Now          string        `json:"now"`
+		Cases        []fixtureCase `json:"cases"`
+	}{"live current-checkout Go ContractHandler", nowText, cases}); err != nil {
 		fail(err)
 	}
 }
