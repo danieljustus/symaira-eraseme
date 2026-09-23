@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use symeraseme_core::llm::{create_with, ClassifyOptions, ClientError, CreateOptions};
+use symeraseme_core::llm::{ClassifyOptions, ClientError, CreateOptions, create_with};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
