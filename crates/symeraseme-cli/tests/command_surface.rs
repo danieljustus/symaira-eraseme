@@ -135,12 +135,24 @@ fn run_with_resources(
     index: usize,
     resources: Option<&Path>,
 ) -> ProcessOutput {
+    run_program_with_resources(&binary(), argv, home, cwd, capture, index, resources)
+}
+
+fn run_program_with_resources(
+    program: &Path,
+    argv: &[&str],
+    home: &Path,
+    cwd: &Path,
+    capture: &Path,
+    index: usize,
+    resources: Option<&Path>,
+) -> ProcessOutput {
     let stdout_path = capture.join(format!("{index}.stdout"));
     let stderr_path = capture.join(format!("{index}.stderr"));
     let stdout = fs::File::create(&stdout_path).expect("create stdout capture");
     let stderr = fs::File::create(&stderr_path).expect("create stderr capture");
 
-    let mut command = Command::new(binary());
+    let mut command = Command::new(program);
     command
         .args(substitute_oracle_root(argv, home))
         .current_dir(cwd)
@@ -183,6 +195,58 @@ fn run_with_resources(
         stdout: read_bounded(&stdout_path),
         stderr: read_bounded(&stderr_path),
     }
+}
+
+/// Build the frozen CLI's pinned Go source for the current host. OS error
+/// messages must come from a native oracle, not from the Unix fixture.
+#[cfg(windows)]
+fn pinned_go_binary(root: &Path, revision: &str) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let archive = root.join("go-oracle.tar");
+    let source = root.join("go-oracle");
+    fs::create_dir_all(&source).expect("isolated pinned oracle source");
+    let archived = Command::new("git")
+        .current_dir(&repo)
+        .args(["archive", "--format=tar", "-o"])
+        .arg(&archive)
+        .arg(revision)
+        .output()
+        .expect("archive pinned Go source");
+    assert!(
+        archived.status.success(),
+        "pinned Go source unavailable: {}",
+        String::from_utf8_lossy(&archived.stderr)
+    );
+    let extracted = Command::new("tar")
+        .arg("-xf")
+        .arg(&archive)
+        .arg("-C")
+        .arg(&source)
+        .output()
+        .expect("extract pinned Go source");
+    assert!(
+        extracted.status.success(),
+        "pinned Go source extraction failed: {}",
+        String::from_utf8_lossy(&extracted.stderr)
+    );
+    let program = root.join("symeraseme-go.exe");
+    let built = Command::new("go")
+        .current_dir(&source)
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .arg("build")
+        .arg("-o")
+        .arg(&program)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build pinned Go CLI");
+    assert!(
+        built.status.success(),
+        "pinned Go CLI build failed: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    program
 }
 
 fn capture_exceeded(stdout_path: &Path, stderr_path: &Path) -> bool {
@@ -632,6 +696,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
     fs::create_dir_all(&capture).expect("capture directory");
     let _cleanup = Cleanup(root.clone());
 
+    #[cfg(windows)]
+    let go_binary = {
+        assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
+        pinned_go_binary(&root, "4e582f28")
+    };
+
     for (index, case) in selected.iter().enumerate() {
         let argv = case["argv"]
             .as_array()
@@ -753,9 +823,30 @@ fn frozen_command_surface_matches_phase_two_contract() {
             expected_stdout,
             "{id} stdout"
         );
+        let expected_stderr = {
+            #[cfg(windows)]
+            if id == "operate-migrate" {
+                let go = run_program_with_resources(
+                    &go_binary,
+                    &argv,
+                    &home,
+                    &case_cwd,
+                    &capture,
+                    index + cases.len(),
+                    None,
+                );
+                assert_eq!(go.status.code(), Some(1), "native Go migrate exit");
+                assert!(go.stdout.is_empty(), "native Go migrate stdout");
+                fold_root(&go.stderr, &root)
+            } else {
+                decode_base64(case["stderr_base64"].as_str().unwrap())
+            }
+            #[cfg(not(windows))]
+            decode_base64(case["stderr_base64"].as_str().unwrap())
+        };
         assert_eq!(
             fold_root(&output.stderr, &root),
-            decode_base64(case["stderr_base64"].as_str().unwrap()),
+            expected_stderr,
             "{id} stderr"
         );
     }
