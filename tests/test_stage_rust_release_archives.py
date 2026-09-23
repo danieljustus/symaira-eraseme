@@ -18,7 +18,7 @@ from verify_release_archives import main as verify_archives
 
 class StageRustReleaseArchivesTests(unittest.TestCase):
     def test_six_archive_set_matches_offline_release_validator(self) -> None:
-        with tempfile.TemporaryDirectory(dir=ROOT) as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             inputs = root / "inputs"
             output = root / "staged"
