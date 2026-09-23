@@ -118,8 +118,7 @@ pub(crate) fn round1(value: f64) -> f64 {
 }
 
 /// Go's `encoding/json` writes integral `float64` values without a decimal
-/// point. Reporting maps use integer JSON numbers for those wire values;
-/// `ExportJSON` restores Python's float spelling for generated report files.
+/// point. Reporting maps use integer JSON numbers for those wire values.
 fn go_json_number(value: f64) -> Value {
     if value.is_finite()
         && value.fract() == 0.0
@@ -129,45 +128,6 @@ fn go_json_number(value: f64) -> Value {
         json!(value as i64)
     } else {
         json!(value)
-    }
-}
-
-fn restore_python_report_floats(value: &Value) -> Value {
-    const FLOAT_FIELDS: &[&str] = &[
-        "avg_response_time_days",
-        "success_rate",
-        "confirmation_rate",
-        "rejection_rate",
-        "overall_confirmation_rate",
-        "overall_rejection_rate",
-        "overdue_rate",
-        "median_response_time_days",
-        "avg_response_time_change",
-        "confirmation_rate_change",
-        "rejection_rate_change",
-    ];
-    match value {
-        Value::Object(fields) => Value::Object(
-            fields
-                .iter()
-                .map(|(key, nested)| {
-                    let restored = if FLOAT_FIELDS.contains(&key.as_str()) {
-                        nested
-                            .as_i64()
-                            .and_then(|number| serde_json::Number::from_f64(number as f64))
-                            .map(Value::Number)
-                            .unwrap_or_else(|| restore_python_report_floats(nested))
-                    } else {
-                        restore_python_report_floats(nested)
-                    };
-                    (key.clone(), restored)
-                })
-                .collect(),
-        ),
-        Value::Array(items) => {
-            Value::Array(items.iter().map(restore_python_report_floats).collect())
-        }
-        other => other.clone(),
     }
 }
 
@@ -1042,8 +1002,26 @@ pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result
 /// `SetEscapeHTML(false)` behavior. `to_string_pretty` indents with two
 /// spaces and appends no trailing newline, matching Go's trimmed encoder.
 fn export_json(data: &Value) -> Result<String, String> {
-    serde_json::to_string_pretty(&restore_python_report_floats(data))
-        .map_err(|error| error.to_string())
+    serde_json::to_string_pretty(&sort_json_object_keys(data)).map_err(|error| error.to_string())
+}
+
+/// Go's `encoding/json` sorts map keys before writing them. The workspace
+/// enables `serde_json`'s insertion-ordered maps, so normalize recursively.
+fn sort_json_object_keys(value: &Value) -> Value {
+    match value {
+        Value::Object(fields) => {
+            let mut entries = fields.iter().collect::<Vec<_>>();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            Value::Object(
+                entries
+                    .into_iter()
+                    .map(|(key, nested)| (key.clone(), sort_json_object_keys(nested)))
+                    .collect(),
+            )
+        }
+        Value::Array(items) => Value::Array(items.iter().map(sort_json_object_keys).collect()),
+        other => other.clone(),
+    }
 }
 
 /// Go's `ExportCSV`: CRLF rows, the fixed twelve-column header, one row per
@@ -1138,9 +1116,22 @@ fn export_csv(data: &Value) -> String {
 /// Go's `ExportHTML`: the report template over the report data.
 fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
     // Protect data newlines while matching Go's control-tag whitespace. A
-    // rendered report can contain caller-controlled multiline text, so only
-    // blank lines emitted by the template may be compacted below.
-    let mut template_data = restore_python_report_floats(data);
+    // rendered report can contain caller-controlled multiline text, so the
+    // compatibility spacing adjustment below targets a template boundary.
+    let mut template_data = data.clone();
+    // Go's report template passes the timeline event-count map to a helper
+    // that only joins slices, so its Details column is empty for these maps.
+    // MiniJinja joins mapping values; replace only this template input with an
+    // empty slice to preserve the actual Go output without changing report data.
+    if let Some(Value::Array(timeline)) = template_data.get_mut("timeline") {
+        for entry in timeline {
+            if let Value::Object(fields) = entry {
+                if matches!(fields.get("events"), Some(Value::Object(_))) {
+                    fields.insert("events".to_owned(), Value::Array(Vec::new()));
+                }
+            }
+        }
+    }
     encode_data_newlines(&mut template_data);
     let context = RenderContext {
         data: template_data,
@@ -1148,20 +1139,8 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
         ..RenderContext::default()
     };
     let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
-    let mut compact = String::with_capacity(html.len());
-    let mut line_breaks = 0;
-    for character in html.chars() {
-        if character == '\n' {
-            line_breaks += 1;
-            if line_breaks <= 2 {
-                compact.push(character);
-            }
-        } else {
-            line_breaks = 0;
-            compact.push(character);
-        }
-    }
-    Ok(decode_data_newlines(&compact))
+    let html = html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:");
+    Ok(decode_data_newlines(&html))
 }
 
 const NEWLINE_MARKER: char = '\u{e001}';

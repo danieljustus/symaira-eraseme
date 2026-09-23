@@ -29,9 +29,18 @@ const GOLDEN_REPORTING_PATH: &str = concat!(
 const GO_REPORTING_SOURCE: &[u8] = include_bytes!("../../../internal/reporting/reporting.go");
 const GO_BYTES_ORACLE_TEST: &[u8] =
     include_bytes!("../../../internal/reporting/reporting_json_oracle_test.go");
+const GO_REPORTING_EXPORT_TEST: &[u8] =
+    include_bytes!("../../../internal/reporting/reporting_export_oracle_test.go");
+const GO_REPORT_TEMPLATE: &[u8] =
+    include_bytes!("../../../internal/templating/templates/report.html.gotmpl");
+const GO_TEMPLATING_SOURCE: &[u8] = include_bytes!("../../../internal/templating/templating.go");
 const GO_REPORTING_BYTES_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting-bytes.json"
+);
+const GO_REPORTING_EXPORTS_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/event-store/golden-reporting-exports.json"
 );
 
 #[derive(Deserialize)]
@@ -41,6 +50,15 @@ struct GoReportingBytes {
     dashboard: String,
     campaign_status: String,
     calendar: String,
+}
+
+#[derive(Deserialize)]
+struct GoReportingExports {
+    reporting_source_sha256: String,
+    template_source_sha256: String,
+    templating_source_sha256: String,
+    json: String,
+    html: String,
 }
 
 /// The seed used by Go's `fixtureStore`, copied statement for statement.
@@ -149,10 +167,87 @@ fn reporting_surfaces_match_go_encoding_json_bytes() {
     ] {
         assert_go_json_bytes(label, value, go_bytes);
     }
-    let exported = generate_report(&report, "json", now).expect("report JSON export");
-    assert!(
-        exported.contains("\"median_response_time_days\": 2.0"),
-        "the file generator keeps Python's integral-float spelling"
+}
+
+#[test]
+fn generated_report_exports_match_go() {
+    let fixture: GoReportingExports = serde_json::from_str(
+        &fs::read_to_string(GO_REPORTING_EXPORTS_PATH).expect("Go export fixture readable"),
+    )
+    .expect("Go export fixture parses");
+    assert_eq!(
+        fixture.reporting_source_sha256,
+        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        "Go reporting implementation changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        fixture.template_source_sha256,
+        hex::encode(Sha256::digest(GO_REPORT_TEMPLATE)),
+        "Go report template changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        fixture.templating_source_sha256,
+        hex::encode(Sha256::digest(GO_TEMPLATING_SOURCE)),
+        "Go templating helpers changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        hex::encode(Sha256::digest(GO_REPORTING_EXPORT_TEST)),
+        "e9a1ef7eff13f61230be52448b183a095a4e1629120d8b220676425f40b1f9e4",
+        "Go export oracle changed; review and repin it"
+    );
+
+    let (_tree, store) = fixture_store();
+    let now = pinned_now();
+    let mut report = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("report data");
+    report["success_rate"] = serde_json::json!(42);
+    report["caller_integral"] = serde_json::json!(7);
+    assert_eq!(report["success_rate"], 42);
+    assert_eq!(report["caller_integral"], 7);
+    let assert_output = |label: &str, rust: String, go: &str| {
+        if rust != go {
+            let offset = rust
+                .bytes()
+                .zip(go.bytes())
+                .position(|(left, right)| left != right)
+                .unwrap_or(rust.len().min(go.len()));
+            let mut start = offset.saturating_sub(80);
+            let mut end_rust = rust.len().min(offset.saturating_add(120));
+            let mut end_go = go.len().min(offset.saturating_add(120));
+            while start > 0 && (!rust.is_char_boundary(start) || !go.is_char_boundary(start)) {
+                start -= 1;
+            }
+            while end_rust < rust.len() && !rust.is_char_boundary(end_rust) {
+                end_rust += 1;
+            }
+            while end_go < go.len() && !go.is_char_boundary(end_go) {
+                end_go += 1;
+            }
+            panic!(
+                "{label} export differs at byte {offset} (Rust {} bytes, Go {} bytes)\nRust: {:?}\nGo:   {:?}",
+                rust.len(),
+                go.len(),
+                &rust[start..end_rust],
+                &go[start..end_go],
+            );
+        }
+    };
+    assert_output(
+        "JSON",
+        generate_report(&report, "json", now).expect("report JSON export"),
+        &fixture.json,
+    );
+    assert_output(
+        "HTML",
+        generate_report(&report, "html", now).expect("report HTML export"),
+        &fixture.html,
     );
 }
 
