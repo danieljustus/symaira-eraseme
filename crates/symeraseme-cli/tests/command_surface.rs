@@ -1,3 +1,6 @@
+#[path = "support/migration_oracle.rs"]
+mod migration_oracle;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -660,6 +663,7 @@ fn is_exact_case(case: &Value) -> bool {
         || PROFILE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || PLAN_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || CONTRACT_TOOL_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || case["category"] == "migration"
 }
 
 #[test]
@@ -676,7 +680,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
 
     let behavior: Value = serde_json::from_str(BEHAVIOR).expect("behavior JSON");
     let cases = behavior["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 166);
+    assert_eq!(cases.len(), 174);
     let selected = cases
         .iter()
         .filter(|case| is_exact_case(case))
@@ -685,7 +689,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 163);
+    assert_eq!(selected.len(), 171);
     assert_eq!(deferred.len(), 3);
 
     let root = unique_root();
@@ -711,6 +715,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .map(|arg| arg.as_str().expect("string argv"))
             .collect::<Vec<_>>();
         let id = case["id"].as_str().unwrap_or("");
+        let migration_before =
+            (case["category"] == "migration").then(|| migration_oracle::prepare(case, &root));
         // The store-backed operations read the event store, so they run against
         // their own data directory: the shared isolated HOME has to stay empty
         // for the assertion below.
@@ -866,6 +872,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
             expected_stderr,
             "{id} stderr"
         );
+        if let Some(before) = migration_before {
+            migration_oracle::assert_unchanged(case, &root, &before);
+        }
     }
 
     for (offset, case) in deferred.iter().enumerate() {

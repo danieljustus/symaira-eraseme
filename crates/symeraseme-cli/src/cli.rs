@@ -113,6 +113,10 @@ fn build_command(specs: &[CommandSpec], path: &[&str]) -> clap::Command {
                 .trailing_var_arg(true),
         );
     }
+    // Cobra migration flags use the last supplied value.
+    if spec.path == "migrate" {
+        command = command.args_override_self(true);
+    }
     for child in command_surface::children(specs, path) {
         let child_path = child.path.split_whitespace().collect::<Vec<_>>();
         command = command.subcommand(build_command(specs, &child_path));
@@ -1360,11 +1364,7 @@ fn run_web_form_command(parsed: &Parsed) -> Outcome {
     web_action_text(&result)
 }
 
-/// `migrate` — Go's `migration.NewCommand()`: the required-flag guard, home
-/// resolution, then `migration.Run`, whose first act is `validateRoots`. The
-/// recorded case pins only that validation (a missing source directory). The
-/// detection/report engine behind it has no Rust implementation yet and fails
-/// closed rather than faking a report.
+/// Render the migration report even when a per-item operation fails.
 fn migrate_command(parsed: &Parsed) -> Outcome {
     let source = string_flag(parsed, "source");
     let destination = string_flag(parsed, "destination");
@@ -1383,135 +1383,62 @@ fn migrate_command(parsed: &Parsed) -> Outcome {
             }
         };
     }
-    match validate_roots(&source, &destination) {
-        Err(message) => Outcome::Stderr(format!("{message}\n").into_bytes()),
-        Ok((source, destination)) => {
-            let _ = (home, source, destination);
-            Outcome::Stderr(
-                b"migrate's detection and report engine is not implemented in Rust\n".to_vec(),
-            )
-        }
+    let options = symeraseme_engine::migration::Options {
+        source_root: source,
+        destination_root: destination,
+        home_dir: home,
+        source_config_root: string_flag(parsed, "source-config"),
+        destination_config_root: string_flag(parsed, "destination-config"),
+        backup_dir: string_flag(parsed, "backup"),
+        platform: string_flag(parsed, "platform"),
+        binary_path: string_flag(parsed, "binary"),
+        project_dir: string_flag(parsed, "project-dir"),
+        copy_secrets: bool_flag(parsed, "copy-secrets"),
+        dry_run: bool_flag(parsed, "dry-run"),
+        ..Default::default()
+    };
+    let (report, error) = symeraseme_engine::migration::run(&options);
+    match report {
+        Some(report) => migration_output(parsed, &report, error),
+        None => Outcome::Stderr(format!("{}\n", error.unwrap_or_default()).into_bytes()),
     }
 }
 
-/// Go's `migration.validateRoots`: required flags, absolute+cleaned paths, no
-/// symlink components, a real source directory, no symlink destination, and
-/// two directories that are neither equal nor nested.
-fn validate_roots(source: &str, destination: &str) -> Result<(String, String), String> {
-    if source.is_empty() || destination.is_empty() {
-        return Err("source and destination directories are required".to_owned());
-    }
-    let source =
-        absolute_dir(source).map_err(|error| format!("resolve source directory: {error}"))?;
-    let destination = absolute_dir(destination)
-        .map_err(|error| format!("resolve destination directory: {error}"))?;
-    reject_symlink_components(&source)
-        .map_err(|error| format!("source path is unsafe: {error}"))?;
-    reject_symlink_components(&destination)
-        .map_err(|error| format!("destination path is unsafe: {error}"))?;
-    let info = std::fs::symlink_metadata(&source).map_err(|error| {
-        // Go's os.Lstat reports the Win32 operation and preserves its native
-        // error text; the Unix fixture instead records `lstat` + errno.
-        // ponytail: the recorded Windows case is a missing source. Extend the
-        // native oracle cases before mapping other Windows Lstat failures.
-        if cfg!(windows) && error.kind() == std::io::ErrorKind::NotFound {
-            let text = error.to_string();
-            let cause = text.split(" (os error").next().unwrap_or(&text);
-            format!("stat source directory: GetFileAttributesEx {source}: {cause}")
-        } else {
-            format!(
-                "stat source directory: lstat {source}: {}",
-                go_errno_text(&error)
-            )
-        }
-    })?;
-    if !info.is_dir() || info.file_type().is_symlink() {
-        return Err("source must be a real directory".to_owned());
-    }
-    if let Ok(destination_info) = std::fs::symlink_metadata(&destination)
-        && destination_info.file_type().is_symlink()
-    {
-        return Err("destination must not be a symlink".to_owned());
-    }
-    if source == destination
-        || path_within(&source, &destination)
-        || path_within(&destination, &source)
-    {
-        return Err("source and destination must be separate, non-nested directories".to_owned());
-    }
-    Ok((source, destination))
-}
-
-/// Go's `absoluteDir`: non-empty, absolute, cleaned — no symlink resolution.
-fn absolute_dir(path: &str) -> Result<String, String> {
-    if path.is_empty() {
-        return Err("path must not be empty".to_owned());
-    }
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    Ok(absolute.to_string_lossy().into_owned())
-}
-
-/// Go's `rejectSymlinkComponents`: walk every component and refuse a symlink
-/// outside the allowed darwin system roots; a missing component stops the
-/// walk without an error (the later `Lstat` reports missing paths).
-fn reject_symlink_components(path: &str) -> Result<(), String> {
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    let mut current = std::path::PathBuf::from("/");
-    let relative = absolute.strip_prefix("/").unwrap_or(&absolute);
-    for (index, component) in relative.components().enumerate() {
-        current.push(component);
-        let text = current.to_string_lossy();
-        let info = match std::fs::symlink_metadata(&current) {
-            Ok(info) => info,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(error) => return Err(error.to_string()),
-        };
-        if info.file_type().is_symlink() && (index > 0 || !is_allowed_system_symlink(&text)) {
-            return Err(format!("symlink component: {text}"));
-        }
-    }
-    Ok(())
-}
-
-/// Go's `isAllowedSystemSymlink`: only the exact system roots at the first
-/// component. Go guards this with `runtime.GOOS == "darwin"`; Rust's
-/// `target_os` for that platform is spelled `macos`.
-fn is_allowed_system_symlink(path: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        matches!(std::path::Path::new(path), p if matches!(
-            p.to_str(),
-            Some("/etc" | "/private" | "/tmp" | "/var")
-        ))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = path;
-        false
-    }
-}
-
-/// Go's `pathWithin`: whether `candidate` sits at or under `root`.
-fn path_within(root: &str, candidate: &str) -> bool {
-    Path::new(candidate).strip_prefix(Path::new(root)).is_ok()
-}
-
-/// Go's wrapped `os.Lstat` text: `lstat <path>: <errno>`. Rust attaches no
-/// path, so the op and path are formatted here; errno text is Go's lowercase
-/// spelling (ponytail: first-word lowercasing plus the recorded ENOENT case —
-/// upgrade path: a full errno table).
-fn go_errno_text(error: &std::io::Error) -> String {
-    match error.raw_os_error() {
-        Some(2) => "no such file or directory".to_owned(),
-        _ => {
-            let text = error.to_string();
-            let base = text.split(" (os error").next().unwrap_or(&text);
-            let mut characters = base.chars();
-            match characters.next() {
-                Some(first) => first.to_lowercase().collect::<String>() + characters.as_str(),
-                None => base.to_owned(),
+fn migration_output(
+    parsed: &Parsed,
+    report: &symeraseme_engine::migration::Report,
+    error: Option<String>,
+) -> Outcome {
+    let bytes = if bool_flag(parsed, "json") {
+        match serde_json::to_vec_pretty(report) {
+            Ok(mut bytes) => {
+                normalize_go_json(&mut bytes);
+                bytes.push(b'\n');
+                bytes
             }
+            Err(e) => return Outcome::Stderr(format!("{e}\n").into_bytes()),
         }
+    } else {
+        let mut text = format!("{}\n", report.detection.summary);
+        if !report.backup_dir.is_empty() {
+            text.push_str(&format!("Backup: {}\n", report.backup_dir));
+        }
+        for item in report.items.iter().flatten() {
+            text.push_str(&format!("[{}] {}\n", item.status, item.artifact.id));
+        }
+        for warning in &report.warnings {
+            text.push_str(&format!("Warning: {warning}\n"));
+        }
+        if report.dry_run {
+            text.push_str("Dry run: no files were changed.\n");
+        } else if report.complete {
+            text.push_str("Migration complete; the Python source was retained.\n");
+        }
+        text.into_bytes()
+    };
+    match error {
+        Some(error) => Outcome::StdoutStderr(bytes, format!("{error}\n").into_bytes()),
+        None => Outcome::Stdout(bytes),
     }
 }
 
@@ -2400,5 +2327,97 @@ mod tests {
             .find(|child| child.get_name() == "serve")
             .expect("hidden serve compatibility command");
         assert!(serve.is_hide_set());
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    struct Scratch(std::path::PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let root = std::env::temp_dir().join(format!(
+                "migration-cli-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&root).unwrap();
+            Self(root)
+        }
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn migration_failed_secret_copy_emits_report_and_error() {
+        let root = Scratch::new();
+        let source = root.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("identity.enc"), b"synthetic encrypted fixture").unwrap();
+        let destination = root.path().join("destination");
+        let args = vec![
+            "migrate".into(),
+            "--source".into(),
+            source.to_string_lossy().into_owned(),
+            "--destination".into(),
+            destination.to_string_lossy().into_owned(),
+            "--home".into(),
+            root.path().to_string_lossy().into_owned(),
+            "--platform".into(),
+            "cron".into(),
+            "--copy-secrets".into(),
+            "--json".into(),
+        ];
+        let Outcome::StdoutStderr(stdout, stderr) = execute(&args) else {
+            panic!("expected report and error")
+        };
+        let report: Value = serde_json::from_slice(&stdout).unwrap();
+        assert_eq!(report["items"][0]["status"], "planned");
+        assert_eq!(
+            stderr,
+            b"secret store was detected but no migratable SecretStore was injected\n"
+        );
+        assert!(!destination.exists());
+    }
+    #[test]
+    fn migration_repeated_platform_uses_last_value() {
+        let root = Scratch::new();
+        let source = root.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        let args = vec![
+            "migrate".into(),
+            "--source".into(),
+            source.to_string_lossy().into_owned(),
+            "--destination".into(),
+            root.path()
+                .join("destination")
+                .to_string_lossy()
+                .into_owned(),
+            "--home".into(),
+            root.path().to_string_lossy().into_owned(),
+            "--platform".into(),
+            "cron".into(),
+            "--platform".into(),
+            "unsupported".into(),
+            "--dry-run".into(),
+        ];
+        let Outcome::Stderr(stderr) = execute(&args) else {
+            panic!("expected invalid platform")
+        };
+        assert_eq!(
+            stderr,
+            b"unsupported platform: unsupported (choose cron, launchd, or systemd)\n"
+        );
     }
 }

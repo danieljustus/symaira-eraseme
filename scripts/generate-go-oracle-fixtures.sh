@@ -445,12 +445,18 @@ def cli_case_environment(case_id):
     return env, cwd
 
 
-def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=None, normalizers=(), isolate_cli=True):
+def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=None, normalizers=(), isolate_cli=True, input_directories=(), input_files=None):
     if isolate_cli:
         isolated_env, isolated_cwd = cli_case_environment(case_id)
         if env_extra:
             isolated_env.update(env_extra)
         env_extra, cwd = isolated_env, str(isolated_cwd)
+        for relative in input_directories:
+            (root / relative).mkdir(parents=True, exist_ok=True)
+        for relative, content in (input_files or {}).items():
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
     else:
         cwd = None
     result = run_process(argv, stdin, case_id, env_extra=env_extra, cwd=cwd)
@@ -475,6 +481,9 @@ def case_capture(case_id, category, argv, stdin=b"", expected=None, env_extra=No
         "expected_outcome": expected or "observed",
         "nondeterministic_fields": nondeterministic,
     })
+    if input_directories or input_files:
+        result["input_directories"] = list(input_directories)
+        result["input_files"] = input_files or {}
     return result
 
 
@@ -622,6 +631,51 @@ for key in sorted(operational_argvs):
     result["expected_outcome"] = result["classification"]
     operational_cases.append(result)
 
+# Migration reports must be recorded after real detection, not just the old
+# missing-source error. The input layout is replay data, not an expected report.
+migration_cases = []
+migration_scenarios = [
+    ("migrate-empty-json", "empty", ["--json"]),
+    ("migrate-empty-text", "empty", []),
+    ("migrate-artifacts-json", "artifacts", ["--json"]),
+    ("migrate-artifacts-text", "artifacts", []),
+    ("migrate-separate-config", "separate", ["--json"]),
+    ("migrate-scheduler-cron", "scheduler", ["--json"]),
+    ("migrate-invalid-platform", "empty", ["--json", "--platform", "unsupported"]),
+    ("migrate-nested-roots", "nested", ["--json"]),
+]
+for case_id, scenario, flags in migration_scenarios:
+    prefix = "cli/" + case_id
+    source = prefix + "/source"
+    destination = source + "/destination" if scenario == "nested" else prefix + "/destination"
+    directories = [source]
+    files = {}
+    argv = ["migrate", "--source", str(root / source), "--destination", str(root / destination),
+            "--home", str(root / prefix / "home"), "--platform", "cron", "--dry-run"]
+    if scenario in ("artifacts", "separate"):
+        config = prefix + "/legacy-config" if scenario == "separate" else source
+        files[source + "/symeraseme.db"] = "opaque legacy database bytes\n"
+        files[config + "/config.toml"] = "data_dir = 'legacy'\n"
+        files[config + "/.symeraseme.toml"] = "legacy = true\n"
+        files[config + "/identity.enc"] = "encrypted-fixture-not-a-real-identity\n"
+        if scenario == "separate":
+            argv.extend(["--source-config", str(root / config), "--destination-config", str(root / prefix / "new-config")])
+    if scenario == "scheduler":
+        files[source + "/schedules/crontab.txt"] = "0 10 * * * python -m symeraseme tick\n"
+        argv.extend(["--binary", str(root / "bin" / "symeraseme"), "--project-dir", str(root / prefix / "project")])
+    argv.extend(flags)
+    result = case_capture(case_id, "migration", argv, input_directories=directories, input_files=files)
+    expected_exit = 1 if scenario == "nested" or case_id == "migrate-invalid-platform" else 0
+    if result["exit_code"] != expected_exit:
+        raise RuntimeError(f"migration oracle case {case_id} exited {result['exit_code']}, expected {expected_exit}")
+    result["expected_outcome"] = "success" if expected_exit == 0 else "deterministic_backend_error"
+    if (root / destination).exists() or pathlib.Path(str(root / destination) + ".migration-backup").exists():
+        raise RuntimeError(f"migration dry-run wrote destination or backup: {case_id}")
+    for relative, content in files.items():
+        if (root / relative).read_bytes() != content.encode():
+            raise RuntimeError(f"migration dry-run changed source: {case_id}: {relative}")
+    migration_cases.append(result)
+
 cli_document = {
     "schema": "symeraseme.go-oracle.cli.v1",
     "commit": commit,
@@ -629,7 +683,7 @@ cli_document = {
     "normalization": normalization_contract,
     "environment": {"timezone": "UTC", "locale": "C", "credentials": "cleared", "home": "isolated", "keychain": "not_accessed", "path": "private_empty"},
     "surface_file": "surface.json",
-    "cases": root_behavior_cases + help_cases + success_cases + operational_cases,
+    "cases": root_behavior_cases + help_cases + success_cases + operational_cases + migration_cases,
 }
 write_json = lambda path, value: path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 write_json(out / "cases" / "cli" / "surface.json", surface)
@@ -1169,6 +1223,49 @@ migration_argv = ["migrate", "--source", str(source), "--destination", str(desti
 migration_process = side_effect_process("migration", migration_argv, env, cwd)
 filesystem_cases.append(fs_case("migration", migration_argv, env, cwd, {"source": source, "destination": destination, "backup": pathlib.Path(str(destination) + ".migration-backup")}, (), (), migration_process))
 
+# Exercise resume and data-loss guards through the same real CLI, keeping the
+# previous migration record unchanged. Inputs are synthetic; outputs are Go's.
+for case_id in ("migration-resume", "migration-manual-secrets", "migration-copy-secrets-rejected", "migration-incomplete-backup"):
+    case_root, env, cwd = side_effect_runtime(case_id)
+    source = case_root / "legacy-source"
+    destination = case_root / "go-destination"
+    backup = pathlib.Path(str(destination) + ".migration-backup")
+    prefix = "filesystem/" + case_id
+    input_directories = [prefix + "/legacy-source", prefix + "/home"]
+    input_files = {
+        prefix + "/legacy-source/config.toml": {"content": "data_dir = 'legacy'\n", "mode": 0o640},
+        prefix + "/legacy-source/unrecognized/keep.txt": {"content": "also backed up, never migrated\n", "mode": 0o600},
+    }
+    if "secrets" in case_id:
+        input_files[prefix + "/legacy-source/secret-refs.json"] = {"content": '{"names":["oracle-reference"]}\n', "mode": 0o600}
+    if case_id == "migration-incomplete-backup":
+        input_directories.append(prefix + "/go-destination.migration-backup")
+        input_files[prefix + "/go-destination.migration-backup/sentinel"] = {"content": "preserve incomplete backup\n", "mode": 0o600}
+    for relative in input_directories:
+        (root / relative).mkdir(parents=True, exist_ok=True)
+    for relative, record in input_files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(record["content"].encode())
+        path.chmod(record["mode"])
+    argv = ["migrate", "--source", str(source), "--destination", str(destination), "--home", env["HOME"], "--platform", "cron", "--json"]
+    preparation = []
+    if case_id == "migration-resume":
+        preparation.append(side_effect_process(case_id + "-prepare", argv, env, cwd))
+        if preparation[0]["exit_code"] != 0:
+            raise RuntimeError("migration resume preparation failed")
+    if case_id == "migration-copy-secrets-rejected":
+        argv.append("--copy-secrets")
+    process = side_effect_process(case_id, argv, env, cwd)
+    expected_exit = 1 if case_id in ("migration-copy-secrets-rejected", "migration-incomplete-backup") else 0
+    if process["exit_code"] != expected_exit:
+        raise RuntimeError(f"{case_id}: exit={process['exit_code']}, expected {expected_exit}")
+    roots = {"source": source, "destination": destination, "backup": backup}
+    case = fs_case(case_id, argv, env, cwd, roots, process=process)
+    case.update(input_directories=input_directories, input_files=input_files, preparation=preparation,
+                root_exists={name: path.exists() for name, path in roots.items()})
+    filesystem_cases.append(case)
+
 # Verify token rotation in one isolated data directory: two independent server
 # starts replace the stable mcp_token path, while both secret values remain
 # absent from the fixture.
@@ -1311,7 +1408,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 166, "mcp": 52, "http": 19, "filesystem": 7}
+expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 11}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")

@@ -1,0 +1,41 @@
+{
+  "worktree": "/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme/.worktrees/cli024-json",
+  "branch": "rust/cli024-json",
+  "base_head": "afa22cb9543cc53a9f3de3c1d05ba977e4a1cf75",
+  "origin": "https://github.com/danieljustus/symaira-eraseme.git",
+  "source_sha256": {
+    "crates/symeraseme-engine/src/migration.rs": "663031d3817bc5f4d289d6ad201624003d9bc2c5520e21298a8533f02a6c5f39",
+    "crates/symeraseme-engine/src/migration/json.rs": "a76bfd47cf2703f13e7d5c7cca2c121716380ab13144ce93c9b6f1d6439ddf8a",
+    "crates/symeraseme-engine/tests/migration_json.rs": "22511ac97fdb3e842cd12db32be201004d38affb66a1c1ad1e30b70e27d80413"
+  },
+  "replay_binary": "target/debug/deps/migration_json-650d09231ff4ab40",
+  "replay_binary_sha256": "a59cdca57476744a9885492853ba11ebfb6901ae877c036771e5d0cabeb2f118",
+  "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "fixture_sha256": "3b6839287256b08d74e891203ed663a88fdc9851c6779d41ed5c9397f8a84d9f",
+  "native": "darwin/arm64",
+  "focused_tests_passed": 2,
+  "declared_case_count": 500,
+  "executed_case_count": 500,
+  "engine_test_counts": [
+    17,
+    14,
+    2,
+    0,
+    3,
+    6,
+    0
+  ],
+  "engine_total_passed": 42,
+  "metadata_assertions": [
+    "workspace_root == assigned worktree",
+    "target_directory == assigned worktree/target",
+    "engine and CLI manifest paths in assigned worktree",
+    "all selected package target src_path entries inside assigned worktree"
+  ],
+  "native_linux_executed": false,
+  "native_windows_executed": false,
+  "initial_state_clean": true,
+  "final_state": "uncommitted scoped implementation",
+  "dev_external_status": "sandbox denied migration.lock; mounted volume checked directly"
+}

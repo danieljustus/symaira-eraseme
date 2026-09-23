@@ -506,6 +506,565 @@
     },
     {
       "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-resume",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-resume/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-resume/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1151,
+        "stderr_bytes": 0,
+        "stdout_sha256": "aac6c31d6c2942ae68fef67cc580a63af9d0955dda2cd67a686745597485e3ba",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-resume/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 320,
+            "type": "file",
+            "sha256": "e196b893e62ccbffa60c14bd194a89b3657e21245e8e668b7367c9d0bd119204"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 156,
+            "type": "file",
+            "sha256": "5ef85ef2467cba1ba17cc12bae17ae65248f2e7b14f418643f5c24b071f7f30a"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 128,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "source/unrecognized",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-resume/legacy-source",
+        "filesystem/migration-resume/home"
+      ],
+      "input_files": {
+        "filesystem/migration-resume/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-resume/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        }
+      },
+      "preparation": [
+        {
+          "argv": [
+            "migrate",
+            "--source",
+            "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+            "--destination",
+            "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+            "--home",
+            "<ORACLE_ROOT>/filesystem/migration-resume/home",
+            "--platform",
+            "cron",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout_bytes": 1149,
+          "stderr_bytes": 0,
+          "stdout_sha256": "a403072b82f9a4fcc3ee660ae217d2b8cd81c4332a02fce64bdde26e3357dc3a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "output_policy": "bytes_not_embedded; secrets and private state excluded"
+        }
+      ],
+      "root_exists": {
+        "source": true,
+        "destination": true,
+        "backup": true
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-manual-secrets",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1989,
+        "stderr_bytes": 0,
+        "stdout_sha256": "2ef0bc6fc8e3c78d6832841dad2ee49043afd1c6bd9f43cd22c3a77d29576fc7",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 374,
+            "type": "file",
+            "sha256": "4a99d93569b33995f0e81968e45cf5bdee9c7ec8f47e3eb24d77effd3a214e00"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 184,
+            "type": "file",
+            "sha256": "df2c570f64fa3fb7dc8f7072f629522a2b76f1102a9cf0c7164b968d3e589ae5"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 160,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "source/secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "source/unrecognized",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-manual-secrets/legacy-source",
+        "filesystem/migration-manual-secrets/home"
+      ],
+      "input_files": {
+        "filesystem/migration-manual-secrets/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-manual-secrets/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-manual-secrets/legacy-source/secret-refs.json": {
+          "content": "{\"names\":[\"oracle-reference\"]}\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": true,
+        "backup": true
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-copy-secrets-rejected",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/home",
+        "--platform",
+        "cron",
+        "--json",
+        "--copy-secrets"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/home",
+          "--platform",
+          "cron",
+          "--json",
+          "--copy-secrets"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 1823,
+        "stderr_bytes": 69,
+        "stdout_sha256": "38206823ad5fdef75dbae63cb0fd29180781eea1143f9c7a4a8f8398fb572b19",
+        "stderr_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [],
+        "backup": []
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-copy-secrets-rejected/legacy-source",
+        "filesystem/migration-copy-secrets-rejected/home"
+      ],
+      "input_files": {
+        "filesystem/migration-copy-secrets-rejected/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-copy-secrets-rejected/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-copy-secrets-rejected/legacy-source/secret-refs.json": {
+          "content": "{\"names\":[\"oracle-reference\"]}\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": false,
+        "backup": false
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-incomplete-backup",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 1104,
+        "stderr_bytes": 76,
+        "stdout_sha256": "1babb5577ff17b9384e4a7b8f8a1d20e3dc99a58b10e2f4e71949989c80d8c05",
+        "stderr_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [],
+        "backup": [
+          {
+            "path": "sentinel",
+            "mode": "0o600",
+            "size_bytes": 27,
+            "type": "file",
+            "sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-incomplete-backup/legacy-source",
+        "filesystem/migration-incomplete-backup/home",
+        "filesystem/migration-incomplete-backup/go-destination.migration-backup"
+      ],
+      "input_files": {
+        "filesystem/migration-incomplete-backup/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-incomplete-backup/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-incomplete-backup/go-destination.migration-backup/sentinel": {
+          "content": "preserve incomplete backup\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": false,
+        "backup": true
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
       "id": "mcp-token-rotation",
       "operation": [
         "mcp",
