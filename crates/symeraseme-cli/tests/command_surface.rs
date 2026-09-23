@@ -768,6 +768,26 @@ fn frozen_command_surface_matches_phase_two_contract() {
             Some(case["exit_code"].as_i64().unwrap() as i32),
             "{id} status"
         );
+        #[cfg(windows)]
+        let native_go = if id == "operate-migrate" || id.starts_with("operate-schedule") {
+            let go = run_program_with_resources(
+                &go_binary,
+                &argv,
+                &home,
+                &case_cwd,
+                &capture,
+                index + cases.len(),
+                None,
+            );
+            assert_eq!(
+                go.status.code(),
+                output.status.code(),
+                "{id} native Go exit"
+            );
+            Some(go)
+        } else {
+            None
+        };
         let expected_stdout = match id {
             "root-version" => {
                 format!("symeraseme version {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
@@ -793,6 +813,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 .expect("native Go filepath.Join profile path")
             )
             .into_bytes(),
+            #[cfg(windows)]
+            id if id.starts_with("operate-schedule") => fold_schedule_output(
+                &native_go.as_ref().expect("native schedule oracle").stdout,
+                &root,
+                &go_binary,
+            ),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // `plan status` reports a wall clock, so its value is masked before the
@@ -823,27 +849,17 @@ fn frozen_command_surface_matches_phase_two_contract() {
             expected_stdout,
             "{id} stdout"
         );
-        let expected_stderr = {
-            #[cfg(windows)]
+        #[cfg(windows)]
+        let expected_stderr = if let Some(go) = &native_go {
             if id == "operate-migrate" {
-                let go = run_program_with_resources(
-                    &go_binary,
-                    &argv,
-                    &home,
-                    &case_cwd,
-                    &capture,
-                    index + cases.len(),
-                    None,
-                );
-                assert_eq!(go.status.code(), Some(1), "native Go migrate exit");
                 assert!(go.stdout.is_empty(), "native Go migrate stdout");
-                fold_root(&go.stderr, &root)
-            } else {
-                decode_base64(case["stderr_base64"].as_str().unwrap())
             }
-            #[cfg(not(windows))]
+            fold_root(&go.stderr, &root)
+        } else {
             decode_base64(case["stderr_base64"].as_str().unwrap())
         };
+        #[cfg(not(windows))]
+        let expected_stderr = decode_base64(case["stderr_base64"].as_str().unwrap());
         assert_eq!(
             fold_root(&output.stderr, &root),
             expected_stderr,
@@ -1188,17 +1204,16 @@ fn seed_schedule_case(home: &Path, id: &str) {
 /// resolves `/var/...` to `/private/var/...`) and the CLI's own resolved
 /// executable path.
 fn fold_schedule_output(bytes: &[u8], root: &Path, resolved_binary: &Path) -> Vec<u8> {
-    let mut text = String::from_utf8_lossy(bytes).into_owned();
-    let binary = resolved_binary.to_string_lossy().to_string();
-    if !binary.is_empty() {
-        text = text.replace(&binary, "<ORACLE_ROOT>/bin/symeraseme");
-    }
+    let text = fold_path(
+        &String::from_utf8_lossy(bytes),
+        resolved_binary,
+        "<ORACLE_ROOT>/bin/symeraseme",
+    );
     // Only the literal root is folded. The CLI resolves its working directory
     // through symlinks, so the payload can carry `/private<literal>`; the
     // phase-two capture folded exactly the literal value too, leaving the
     // `/private` prefix in place, and matching that keeps the bytes comparable.
-    text.replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
-        .into_bytes()
+    fold_path(&text, root, "<ORACLE_ROOT>").into_bytes()
 }
 
 /// Renders a digest as lowercase hex, matching Go's `%x`.
