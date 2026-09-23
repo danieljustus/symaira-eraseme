@@ -129,30 +129,8 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
     if error.is_eof() {
         return None;
     }
-    for (first, literal) in [
-        (b'n', b"null".as_slice()),
-        (b't', b"true"),
-        (b'f', b"false"),
-    ] {
-        if input.first() == Some(&first) {
-            for (actual, expected) in input.iter().zip(literal) {
-                if actual != expected {
-                    let name = match first {
-                        b'n' => "null",
-                        b't' => "true",
-                        _ => "false",
-                    };
-                    return Some(StreamError::Syntax(format!(
-                        "invalid character '{}' in literal {name} (expecting '{}')",
-                        char::from(*actual),
-                        char::from(*expected)
-                    )));
-                }
-            }
-        }
-    }
     let (mut in_string, mut escaped) = (false, false);
-    for byte in input {
+    for (index, byte) in input.iter().enumerate() {
         if escaped {
             if !matches!(
                 *byte,
@@ -168,6 +146,24 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
             escaped = true;
         } else if *byte == b'"' {
             in_string = !in_string;
+        } else if !in_string {
+            let (name, literal): (&str, &[u8]) = match *byte {
+                b'n' => ("null", b"null"),
+                b't' => ("true", b"true"),
+                b'f' => ("false", b"false"),
+                _ => continue,
+            };
+            for (offset, expected) in literal.iter().enumerate() {
+                if let Some(actual) = input.get(index + offset)
+                    && actual != expected
+                {
+                    return Some(StreamError::Syntax(format!(
+                        "invalid character '{}' in literal {name} (expecting '{}')",
+                        char::from(*actual),
+                        char::from(*expected)
+                    )));
+                }
+            }
         }
     }
     let trimmed = input

@@ -56,6 +56,20 @@
       "exit_code": 0,
       "stdout": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n",
       "stderr": ""
+    },
+    {
+      "name": "object-malformed-literal",
+      "input": "{\"x\":nope}",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character 'o' in literal null (expecting 'u')\n"
+    },
+    {
+      "name": "array-malformed-literal",
+      "input": "[nope]",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character 'o' in literal null (expecting 'u')\n"
     }
   ]
 }
