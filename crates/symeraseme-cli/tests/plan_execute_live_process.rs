@@ -82,7 +82,6 @@ fn prepare(root: &Path) -> (PathBuf, PathBuf, PathBuf, String) {
             chrono::DateTime::from_timestamp(1_800_000_000, 0).unwrap(),
         )
         .expect("planned event");
-    drop(repository);
     drop(store);
 
     let token = symeraseme_core::identity::ConsentStore::new(&data)
