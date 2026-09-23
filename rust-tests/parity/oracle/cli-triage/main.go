@@ -108,6 +108,11 @@ var cases = []commandCase{
 		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
 	},
 	{
+		id:          "classify-request-id-flag-negative",
+		argv:        []string{"classify-reply", "--request-id", "-1", "--provider", "agent"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
 		id:          "classify-request-id-flag-underscore",
 		argv:        []string{"classify-reply", "--request-id", "0x_1", "--provider", "agent", "--output", "json"},
 		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},

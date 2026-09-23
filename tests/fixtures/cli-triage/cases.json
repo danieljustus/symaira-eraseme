@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.go-oracle.cli-triage.v1",
-  "generator_sha256": "e2159a703b05ea4b21c8b3a58785a5c166b4aeb5b535b1c5c76f88f562259d50",
+  "generator_sha256": "79f408b8229241cbb3e7d87da6bb0fe187a2567be8b163573f5d8c1197e65490",
   "fake_agent_sha256": "b09f3dcab7603e9e67639f1ba78ff408cbe6595b4114b3a912d7eceba445e20d",
   "sources": [
     {
@@ -205,6 +205,29 @@
             "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
           }
         ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-negative",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "-1",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bm8gdW5jbGFzc2lmaWVkIGluYm94IHJlcGx5IGZvdW5kIGZvciByZXF1ZXN0ICMtMQo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
       }
     },
     {

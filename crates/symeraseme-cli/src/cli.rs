@@ -92,6 +92,7 @@ fn build_command(specs: &[CommandSpec], path: &[&str]) -> clap::Command {
                 .long("output")
                 .global(true)
                 .value_name("string")
+                .allow_hyphen_values(true)
                 .default_value("text")
                 .help("output format: text or json"),
         );
@@ -144,6 +145,8 @@ fn clap_arg(flag: &FlagSpec, _shorthand: Option<char>) -> clap::Arg {
             .default_missing_value("true")
             .num_args(0..=1)
             .require_equals(true);
+    } else {
+        arg = arg.allow_hyphen_values(true);
     }
     if flag.name == "version" {
         arg = arg.short('v');
@@ -284,7 +287,6 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                 } else {
                     index += 1;
                     args.get(index)
-                        .filter(|value| !value.starts_with('-'))
                         .cloned()
                         .ok_or_else(|| format!("flag needs an argument: --{name}\n"))?
                 };
