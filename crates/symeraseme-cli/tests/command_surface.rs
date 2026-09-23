@@ -48,6 +48,8 @@ fn binary() -> PathBuf {
         .or_else(|| std::env::var_os("CARGO_BIN_EXE_symeraseme_rust"))
         .map(PathBuf::from)
         .expect("Cargo provides the CLI binary path")
+        .canonicalize()
+        .expect("Cargo CLI binary path resolves")
 }
 
 #[derive(Debug)]
