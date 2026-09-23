@@ -32,3 +32,6 @@ tests/fixtures/mcp-contract/** text eol=lf
 # Migration oracle inputs and generator identities are byte-hashed on Windows.
 rust-tests/parity/oracle/migration-state/** text eol=lf
 rust-tests/parity/oracle/migration-safety/** text eol=lf
+
+# Broker reply corpus bytes are pinned by triage-corpus/dom004c.json.
+tests/fixtures/broker_replies/*.txt text eol=lf

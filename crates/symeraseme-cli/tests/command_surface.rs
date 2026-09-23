@@ -102,7 +102,47 @@ fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
     folded
 }
 
+/// Fold only a known volatile path, in raw text and in a JSON-escaped string.
+fn fold_path(value: &str, path: &Path, placeholder: &str) -> String {
+    let literal = path.to_string_lossy();
+    if literal.is_empty() {
+        return value.to_owned();
+    }
+    value
+        .replace(&literal.replace('\\', "\\\\"), placeholder)
+        .replace(literal.as_ref(), placeholder)
+}
+
+#[test]
+fn fold_path_only_replaces_the_recorded_root() {
+    let root = Path::new(r"C:\isolated\case");
+    assert_eq!(
+        fold_path(
+            r#"{"path":"C:\\isolated\\case\\data","other":"D:\\keep"}"#,
+            root,
+            "<CASE>"
+        ),
+        r#"{"path":"<CASE>\\data","other":"D:\\keep"}"#
+    );
+    assert_eq!(
+        fold_path(r"C:\isolated\case\data D:\keep", root, "<CASE>"),
+        r"<CASE>\data D:\keep"
+    );
+}
+
 fn run_with_resources(
+    argv: &[&str],
+    home: &Path,
+    cwd: &Path,
+    capture: &Path,
+    index: usize,
+    resources: Option<&Path>,
+) -> ProcessOutput {
+    run_program_with_resources(&binary(), argv, home, cwd, capture, index, resources)
+}
+
+fn run_program_with_resources(
+    program: &Path,
     argv: &[&str],
     home: &Path,
     cwd: &Path,
@@ -115,12 +155,13 @@ fn run_with_resources(
     let stdout = fs::File::create(&stdout_path).expect("create stdout capture");
     let stderr = fs::File::create(&stderr_path).expect("create stderr capture");
 
-    let mut command = Command::new(binary());
+    let mut command = Command::new(program);
     command
         .args(substitute_oracle_root(argv, home))
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
+        .env("USERPROFILE", home)
         .env("LC_ALL", "C")
         .env("TZ", "UTC")
         .env("PWD", cwd)
@@ -157,6 +198,59 @@ fn run_with_resources(
         stdout: read_bounded(&stdout_path),
         stderr: read_bounded(&stderr_path),
     }
+}
+
+/// Build the frozen CLI's pinned Go source for the current host. OS error
+/// messages must come from a native oracle, not from the Unix fixture.
+#[cfg(windows)]
+fn pinned_go_binary(root: &Path, revision: &str) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let archive = root.join("go-oracle.tar");
+    let source = root.join("go-oracle");
+    fs::create_dir_all(&source).expect("isolated pinned oracle source");
+    let archived = Command::new("git")
+        .current_dir(&repo)
+        .args(["archive", "--format=tar", "-o"])
+        .arg(&archive)
+        .arg(revision)
+        .output()
+        .expect("archive pinned Go source");
+    assert!(
+        archived.status.success(),
+        "pinned Go source unavailable: {}",
+        String::from_utf8_lossy(&archived.stderr)
+    );
+    let extracted = Command::new("tar")
+        .current_dir(root)
+        .arg("-xf")
+        .arg("go-oracle.tar")
+        .arg("-C")
+        .arg("go-oracle")
+        .output()
+        .expect("extract pinned Go source");
+    assert!(
+        extracted.status.success(),
+        "pinned Go source extraction failed: {}",
+        String::from_utf8_lossy(&extracted.stderr)
+    );
+    let program = root.join("symeraseme-go.exe");
+    let built = Command::new("go")
+        .current_dir(&source)
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .arg("build")
+        .arg("-o")
+        .arg(&program)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build pinned Go CLI");
+    assert!(
+        built.status.success(),
+        "pinned Go CLI build failed: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    program
 }
 
 fn capture_exceeded(stdout_path: &Path, stderr_path: &Path) -> bool {
@@ -314,6 +408,7 @@ fn run_with_data_dir(
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
+        .env("USERPROFILE", home)
         .env("LC_ALL", "C")
         .env("TZ", "UTC")
         .env("PWD", cwd)
@@ -606,6 +701,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
     fs::create_dir_all(&capture).expect("capture directory");
     let _cleanup = Cleanup(root.clone());
 
+    #[cfg(windows)]
+    let go_binary = {
+        assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
+        pinned_go_binary(&root, "4e582f28")
+    };
+
     for (index, case) in selected.iter().enumerate() {
         let argv = case["argv"]
             .as_array()
@@ -674,6 +775,26 @@ fn frozen_command_surface_matches_phase_two_contract() {
             Some(case["exit_code"].as_i64().unwrap() as i32),
             "{id} status"
         );
+        #[cfg(windows)]
+        let native_go = if id == "operate-migrate" || id.starts_with("operate-schedule") {
+            let go = run_program_with_resources(
+                &go_binary,
+                &argv,
+                &home,
+                &case_cwd,
+                &capture,
+                index + cases.len(),
+                None,
+            );
+            assert_eq!(
+                go.status.code(),
+                output.status.code(),
+                "{id} native Go exit"
+            );
+            Some(go)
+        } else {
+            None
+        };
         let expected_stdout = match id {
             "root-version" => {
                 format!("symeraseme version {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
@@ -686,6 +807,25 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .into_bytes(),
             "config-show" => b"data_dir=~/.local/share/symeraseme\nport=8000\n".to_vec(),
             "config-show-json" | "operate-config-show" => b"{\"config\":{\"data_dir\":\"~/.local/share/symeraseme\",\"db_dir\":\"\",\"encrypt_db\":false,\"port\":8000,\"allow_remote\":false},\"success\":true}\n".to_vec(),
+            #[cfg(windows)]
+            "operate-init-profile" => format!(
+                "{{\"profile_path\":{},\"success\":true}}\n",
+                serde_json::to_string(
+                    &root.join("cli")
+                        .join(id)
+                        .join("data")
+                        .join("identity.encrypted")
+                        .to_string_lossy()
+                )
+                .expect("native Go filepath.Join profile path")
+            )
+            .into_bytes(),
+            #[cfg(windows)]
+            id if id.starts_with("operate-schedule") => fold_schedule_output(
+                &native_go.as_ref().expect("native schedule oracle").stdout,
+                &root,
+                &go_binary,
+            ),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // `plan status` reports a wall clock, so its value is masked before the
@@ -698,7 +838,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 )
             {
                 mask_wall_clock(&output.stdout)
-            } else if id == "operate-init-profile" {
+            } else if id == "operate-init-profile" && !cfg!(windows) {
                 String::from_utf8_lossy(&output.stdout)
                     .replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
                     .into_bytes()
@@ -716,9 +856,20 @@ fn frozen_command_surface_matches_phase_two_contract() {
             expected_stdout,
             "{id} stdout"
         );
+        #[cfg(windows)]
+        let expected_stderr = if let Some(go) = &native_go {
+            if id == "operate-migrate" {
+                assert!(go.stdout.is_empty(), "native Go migrate stdout");
+            }
+            fold_root(&go.stderr, &root)
+        } else {
+            decode_base64(case["stderr_base64"].as_str().unwrap())
+        };
+        #[cfg(not(windows))]
+        let expected_stderr = decode_base64(case["stderr_base64"].as_str().unwrap());
         assert_eq!(
             fold_root(&output.stderr, &root),
-            decode_base64(case["stderr_base64"].as_str().unwrap()),
+            expected_stderr,
             "{id} stderr"
         );
         if let Some(before) = migration_before {
@@ -1063,17 +1214,16 @@ fn seed_schedule_case(home: &Path, id: &str) {
 /// resolves `/var/...` to `/private/var/...`) and the CLI's own resolved
 /// executable path.
 fn fold_schedule_output(bytes: &[u8], root: &Path, resolved_binary: &Path) -> Vec<u8> {
-    let mut text = String::from_utf8_lossy(bytes).into_owned();
-    let binary = resolved_binary.to_string_lossy().to_string();
-    if !binary.is_empty() {
-        text = text.replace(&binary, "<ORACLE_ROOT>/bin/symeraseme");
-    }
+    let text = fold_path(
+        &String::from_utf8_lossy(bytes),
+        resolved_binary,
+        "<ORACLE_ROOT>/bin/symeraseme",
+    );
     // Only the literal root is folded. The CLI resolves its working directory
     // through symlinks, so the payload can carry `/private<literal>`; the
     // phase-two capture folded exactly the literal value too, leaving the
     // `/private` prefix in place, and matching that keeps the bytes comparable.
-    text.replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
-        .into_bytes()
+    fold_path(&text, root, "<ORACLE_ROOT>").into_bytes()
 }
 
 /// Renders a digest as lowercase hex, matching Go's `%x`.
@@ -1096,7 +1246,7 @@ fn fold_volatile(value: &str, root: &Path, case_root: &Path, resolved_binary: &P
     let fold = |needle: &Path, placeholder: &str, out: &mut String| {
         let literal = needle.to_string_lossy().to_string();
         if !literal.is_empty() {
-            *out = out.replace(&literal, placeholder);
+            *out = fold_path(out, needle, placeholder);
         }
         if let Ok(canonical) = needle.canonicalize() {
             let canonical = canonical.to_string_lossy().to_string();
@@ -1156,6 +1306,51 @@ fn hash_tree(
     out
 }
 
+/// The frozen schedule bytes were recorded on Unix. On Windows, execute the
+/// same checked-in Go oracle rather than comparing against Unix path syntax.
+#[cfg(windows)]
+fn windows_schedule_fixture() -> Value {
+    let root = unique_root();
+    fs::create_dir_all(&root).expect("isolated oracle capture root");
+    let _cleanup = Cleanup(root.clone());
+    let stdout_path = root.join("go-schedule.stdout");
+    let stderr_path = root.join("go-schedule.stderr");
+    let stdout = fs::File::create(&stdout_path).expect("create Go stdout capture");
+    let stderr = fs::File::create(&stderr_path).expect("create Go stderr capture");
+    let mut command = Command::new("go");
+    command
+        .args(["run", "./rust-tests/parity/oracle/cli-schedule"])
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("TMP", &root)
+        .env("TEMP", &root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr));
+    configure_process_group(&mut command);
+    let mut child = command.spawn().expect("pinned Go oracle starts");
+    let started = Instant::now();
+    let status = loop {
+        if capture_exceeded(&stdout_path, &stderr_path) {
+            terminate_bounded(&mut child).expect("oversized Go oracle cleanup");
+            panic!("Go schedule oracle exceeded the capture limit");
+        }
+        if let Some(status) = child.try_wait().expect("poll Go oracle") {
+            break status;
+        }
+        if started.elapsed() >= Duration::from_secs(180) {
+            terminate_bounded(&mut child).expect("timed-out Go oracle cleanup");
+            panic!("Go schedule oracle exceeded 180 seconds");
+        }
+        thread::sleep(Duration::from_millis(25));
+    };
+    assert!(
+        status.success(),
+        "Go schedule oracle failed: {}",
+        String::from_utf8_lossy(&read_bounded(&stderr_path))
+    );
+    serde_json::from_slice(&read_bounded(&stdout_path)).expect("Windows Go schedule fixture")
+}
+
 /// `schedule install/uninstall/status` answer the Go oracle's recorded bytes.
 ///
 /// PATH is cleared so no real `launchctl`, `systemctl` or `crontab` can be
@@ -1165,6 +1360,9 @@ fn hash_tree(
 /// exact everywhere else.
 #[test]
 fn schedule_commands_match_the_go_oracle() {
+    #[cfg(windows)]
+    let fixture = windows_schedule_fixture();
+    #[cfg(not(windows))]
     let fixture: Value = serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture");
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.cli.v1");
     assert_eq!(
@@ -1173,6 +1371,19 @@ fn schedule_commands_match_the_go_oracle() {
     );
     let cases = fixture["cases"].as_array().expect("cases");
     assert_eq!(cases.len(), 13, "the fixture lost cases");
+    #[cfg(windows)]
+    {
+        let frozen: Value = serde_json::from_str(SCHEDULE_FIXTURE).expect("frozen case inventory");
+        let ids = |fixture: &Value| {
+            fixture["cases"]
+                .as_array()
+                .expect("cases")
+                .iter()
+                .map(|case| case["id"].as_str().expect("case id").to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&fixture), ids(&frozen), "Windows oracle case inventory");
+    }
 
     let root = unique_root();
     let capture = root.join("capture");
@@ -1208,10 +1419,9 @@ fn schedule_commands_match_the_go_oracle() {
         let resolved_binary = binary();
         let fold = |bytes: &[u8]| -> Vec<u8> {
             let text = String::from_utf8_lossy(bytes).into_owned();
-            text.replace(&resolved_binary.to_string_lossy().to_string(), "<BINARY>")
-                .replace(&case_root.to_string_lossy().to_string(), "<CASE>")
-                .replace(&root.to_string_lossy().to_string(), "<ROOT>")
-                .into_bytes()
+            let text = fold_path(&text, &resolved_binary, "<BINARY>");
+            let text = fold_path(&text, &case_root, "<CASE>");
+            fold_path(&text, &root, "<ROOT>").into_bytes()
         };
         assert_eq!(
             fold(&output.stdout),
@@ -1299,8 +1509,8 @@ fn init_profile_round_trips_through_show_profile() {
     assert_eq!(
         output.stdout,
         format!(
-            "identity profile saved at {}/identity.encrypted\n",
-            data_dir.display()
+            "identity profile saved at {}\n",
+            data_dir.join("identity.encrypted").display()
         )
         .into_bytes()
     );
@@ -1520,8 +1730,12 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     assert_eq!(
         dry_run.stdout,
         format!(
-            "{{\"dry_run\":true,\"message\":\"Would remove 1 artifact(s) from {}. Use --yes to confirm.\",\"removed\":0,\"skipped\":1,\"success\":true}}\n",
-            tasks_dir.display()
+            "{{\"dry_run\":true,\"message\":{},\"removed\":0,\"skipped\":1,\"success\":true}}\n",
+            serde_json::to_string(&format!(
+                "Would remove 1 artifact(s) from {}. Use --yes to confirm.",
+                tasks_dir.display()
+            ))
+            .expect("JSON message")
         )
         .into_bytes(),
         "cleanup dry-run stdout"
@@ -1543,8 +1757,12 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     assert_eq!(
         removed.stdout,
         format!(
-            "{{\"dry_run\":false,\"message\":\"Removed 1 artifact(s) from {}.\",\"removed\":1,\"skipped\":0,\"success\":true}}\n",
-            tasks_dir.display()
+            "{{\"dry_run\":false,\"message\":{},\"removed\":1,\"skipped\":0,\"success\":true}}\n",
+            serde_json::to_string(&format!(
+                "Removed 1 artifact(s) from {}.",
+                tasks_dir.display()
+            ))
+            .expect("JSON message")
         )
         .into_bytes(),
         "cleanup stdout"

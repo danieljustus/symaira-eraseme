@@ -25,10 +25,16 @@ fn validate_roots(source: &str, destination: &str) -> Result<(String, String), S
     reject_symlink_components(&destination)
         .map_err(|error| format!("destination path is unsafe: {error}"))?;
     let info = std::fs::symlink_metadata(&source).map_err(|error| {
-        format!(
-            "stat source directory: lstat {source}: {}",
-            go_errno_text(&error)
-        )
+        if cfg!(windows) && error.kind() == std::io::ErrorKind::NotFound {
+            let text = error.to_string();
+            let cause = text.split(" (os error").next().unwrap_or(&text);
+            format!("stat source directory: GetFileAttributesEx {source}: {cause}")
+        } else {
+            format!(
+                "stat source directory: lstat {source}: {}",
+                go_errno_text(&error)
+            )
+        }
     })?;
     if !info.is_dir() || info.file_type().is_symlink() {
         return Err("source must be a real directory".to_owned());
