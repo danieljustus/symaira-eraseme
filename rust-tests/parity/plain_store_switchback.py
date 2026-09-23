@@ -110,6 +110,8 @@ def sandbox(root, executable):
         '(version 1)', '(allow default)', '(deny network*)',
         '(deny file-read* (subpath ' + quote(Path.home().resolve()) + ') (subpath ' + quote(REPO) + '))',
         '(allow file-read* (subpath ' + quote(root) + '))',
+        # SQLite resolves ancestors. Permit their metadata, not their contents.
+        '(allow file-read-metadata ' + ' '.join('(literal ' + quote(p) + ')' for p in root.parents) + ')',
         '(deny file-write*)',
         '(allow file-write* (subpath ' + quote(root) + ') (literal "/dev/null"))',
         '(deny process-exec)',
@@ -124,9 +126,11 @@ for i,path in enumerate(sys.argv[1:2]):
   with open(path,'rb') as stream: stream.read(1)
  except PermissionError: result['read_denied_'+str(i)]=True
  else: result['read_denied_'+str(i)]=False
-try: os.stat(sys.argv[2])
-except PermissionError: result['home_metadata_denied']=True
-else: result['home_metadata_denied']=False
+try: entries=os.scandir(sys.argv[2])
+except PermissionError: result['home_directory_read_denied']=True
+else:
+ entries.close()
+ result['home_directory_read_denied']=False
 try:
  with socket.socket() as sock: sock.connect(('127.0.0.1',9))
 except OSError as exc: result['network_denied']=exc.errno in (errno.EPERM,errno.EACCES)
@@ -193,7 +197,7 @@ def run(go, rust, go_tool, root):
         command(root, 'sandbox-negative', ['/usr/bin/sandbox-exec', '-p', negative_policy,
                 str(python), '-I', '-S', '-c', PROBE, str(REPO / 'Cargo.toml'), str(Path.home().resolve())], env)
         controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
-        require(set(controls) == {'read_denied_0', 'home_metadata_denied', 'network_denied', 'child_exec_denied'}
+        require(set(controls) == {'read_denied_0', 'home_directory_read_denied', 'network_denied', 'child_exec_denied'}
                 and all(value is True for value in controls.values()), 'sandbox control failed')
         report['sandbox_controls'] = controls
         policy = sandbox(root, active)

@@ -9,11 +9,55 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 import plain_store_switchback as gate
 
 
 class SwitchbackControls(unittest.TestCase):
+    def test_nested_run_allows_sqlite_but_denies_protected_data(self):
+        python = Path(sys.executable).resolve()
+        app = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
+        if app.is_file():
+            python = app.resolve()
+        source = '''import os,sqlite3,sys
+from pathlib import Path
+root,home,repo=map(Path,sys.argv[1:])
+root.parent.stat()
+with sqlite3.connect(root/'owned.db') as db:
+ db.execute('CREATE TABLE items(value INTEGER)')
+ db.execute('INSERT INTO items VALUES(42)')
+ assert db.execute('SELECT value FROM items').fetchall()==[(42,)]
+for path in (home/'private',repo/'private'):
+ try: path.read_bytes()
+ except PermissionError: pass
+ else: raise AssertionError('protected file is readable')
+try: entries=os.scandir(home)
+except PermissionError: pass
+else:
+ entries.close()
+ raise AssertionError('protected directory is readable')
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            home, repo = base / 'operator-home', base / 'checkout'
+            for parent in (home, repo):
+                parent.mkdir()
+                (parent / 'private').write_text('synthetic sentinel, not operator data')
+            for parent in (base, home, repo):
+                with self.subTest(parent=parent.name):
+                    root = parent / 'run'
+                    root.mkdir()
+                    with patch.object(Path, 'home', return_value=home), patch.object(gate, 'REPO', repo):
+                        policy = gate.sandbox(root, python)
+                    env = {'HOME': str(root), 'PATH': '', 'LC_ALL': 'C'}
+                    try:
+                        gate.command(root, 'owned', ['/usr/bin/sandbox-exec', '-p', policy,
+                                     str(python), '-I', '-S', '-c', source,
+                                     str(root), str(home), str(repo)], env)
+                    except ValueError:
+                        self.fail((root / 'owned.stderr').read_text())
+
     def test_typed_comparison_rejects_semantic_mutations(self):
         gate.same({'a': None, 'b': [1, 2]}, {'b': [1, 2], 'a': None}, 'positive')
         for actual, expected in [(True, 1), (1.0, 1), ({}, {'a': None}),

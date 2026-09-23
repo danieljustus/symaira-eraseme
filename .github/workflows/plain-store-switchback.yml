@@ -57,7 +57,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go build -mod=readonly -trimpath -o "$RUNNER_TEMP/switchback-binaries/go" ./cmd/symeraseme 2>&1 | tee "$RUNNER_TEMP/switchback-logs/go-build.log"
+          go build -mod=readonly -trimpath -buildvcs=true -o "$RUNNER_TEMP/switchback-binaries/go" ./cmd/symeraseme 2>&1 | tee "$RUNNER_TEMP/switchback-logs/go-build.log"
+          go version -m "$RUNNER_TEMP/switchback-binaries/go" > "$RUNNER_TEMP/switchback-logs/go-build-info.txt"
+          python3 -c 'from pathlib import Path; import sys; settings={line.strip() for line in Path(sys.argv[1]).read_text().splitlines()}; revision=Path(sys.argv[2]).read_text().strip(); assert {"build\tvcs.revision="+revision,"build\tvcs.modified=false"} <= settings, "Go artifact does not match the clean checkout"' "$RUNNER_TEMP/switchback-logs/go-build-info.txt" "$RUNNER_TEMP/switchback-logs/source-revision.txt"
           cargo build --locked -p symeraseme-cli --bin symeraseme-rust 2>&1 | tee "$RUNNER_TEMP/switchback-logs/rust-build.log"
       - name: Execute all six real switchback cases
         shell: bash

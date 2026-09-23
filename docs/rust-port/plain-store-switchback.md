@@ -40,8 +40,12 @@ that capture is separate from this new repository gate.
 
 Runtime uses empty PATH, isolated HOME/USERPROFILE/XDG/temp roots, an absent
 profile and explicit unencrypted storage. macOS sandboxing denies network,
-other executable launches and operator-home/repository reads outside the owned
-run directory. Harmless denial probes run before the real CLI. Commands have a
+other executable launches and operator-home/repository contents outside the owned
+run directory. Only metadata of the run directory's exact ancestors is readable:
+SQLite needs it when the run is nested under HOME or the checkout (as in CI).
+Sibling file contents and HOME directory enumeration remain denied. A regression
+checks SQLite access plus these denials with outside/HOME/checkout run layouts.
+Harmless denial probes run before the real CLI. Commands have a
 30-second deadline, process-group cleanup and a 4 MiB per-file write ceiling.
 
 Unsupported hosts fail explicitly. Native Linux/Windows confinement and cleanup,
