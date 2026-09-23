@@ -17,6 +17,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::campaign;
 use symeraseme_core::config::{ConfigContext, resolve_storage};
+use symeraseme_core::confirmation;
 use symeraseme_core::email::config::{ImapConfigOptions, load_imap_config_with_options};
 use symeraseme_core::email::hwm::HwmStore;
 use symeraseme_core::email::service::InboxService;
@@ -682,46 +683,110 @@ impl ContractHandler {
         serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
     }
 
-    /// Go's `auto_confirm`: dataStore first, then `replies.Service.AutoConfirm`.
-    /// Only the no-reply branch (`reply == nil`) is ported — with a stored
-    /// reply Go continues into `confirmation.AutoConfirm` and its browser
-    /// click, which has no Rust subsystem, so that branch fails closed instead
-    /// of emulating Go's answer.
+    /// Go's `auto_confirm`: previews a trusted link on dry-run, otherwise
+    /// creates the same durable manual task used when no clicker is available.
     fn auto_confirm(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let store = self.open_store()?;
         let request_id = get_int(arguments, "request_id", 0);
-        let has_reply = store
-            .has_inbox_reply(request_id)
+        let dry_run = get_bool(arguments, "dry_run", false);
+        let reply = confirmation::latest_reply_body(&store, request_id)
             .map_err(|error| ToolError(error.to_string()))?;
-        if has_reply {
-            return Err(ToolError(
-                "auto_confirm with a stored inbox reply is not implemented in Rust \
-                 (confirmation browser subsystem)"
-                    .to_owned(),
+        let Some(reply) = reply else {
+            return Ok(json!({
+                "Success": false,
+                "ClickedURL": "",
+                "ClickedHost": "",
+                "ClickedURLSHA256": "",
+                "Step": "no_reply",
+                "Error": format!("no inbox reply found for request #{request_id}"),
+                "ScreenshotBefore": "",
+                "ScreenshotAfter": "",
+                "ScreenshotBeforeSHA256": "",
+                "ScreenshotAfterSHA256": "",
+                "ScreenshotBeforeBytes": 0,
+                "ScreenshotAfterBytes": 0,
+                "DryRun": dry_run,
+                "TaskID": 0,
+                "Instructions": "",
+                "Status": "",
+                "Reason": "",
+                "ManualActionRequired": false,
+            }));
+        };
+        let links = confirmation::extract_confirmation_links(&reply);
+        let Some(link) = links.first() else {
+            return Ok(confirmation_result(
+                false,
+                "no_links",
+                "No confirmation links found in reply body".to_owned(),
+                "",
+                dry_run,
+                0,
+                "",
+                "",
+                false,
+            ));
+        };
+        if dry_run {
+            return Ok(confirmation_result(
+                true,
+                "dry_run",
+                String::new(),
+                link,
+                true,
+                0,
+                "",
+                "",
+                false,
             ));
         }
-        // Go's `confirmation.Result{Step: "no_reply", ...}`: the capital-key
-        // struct order is the JSON contract the CLI writes verbatim.
-        Ok(json!({
-            "Success": false,
-            "ClickedURL": "",
-            "ClickedHost": "",
-            "ClickedURLSHA256": "",
-            "Step": "no_reply",
-            "Error": format!("no inbox reply found for request #{request_id}"),
-            "ScreenshotBefore": "",
-            "ScreenshotAfter": "",
-            "ScreenshotBeforeSHA256": "",
-            "ScreenshotAfterSHA256": "",
-            "ScreenshotBeforeBytes": 0,
-            "ScreenshotAfterBytes": 0,
-            "DryRun": get_bool(arguments, "dry_run", false),
-            "TaskID": 0,
-            "Instructions": "",
-            "Status": "",
-            "Reason": "",
-            "ManualActionRequired": false,
-        }))
+
+        let request = Repository::new(&store)
+            .get_removal_request(request_id)
+            .map_err(|error| ToolError(error.to_string()))?;
+        let host = link
+            .strip_prefix("https://")
+            .unwrap_or(link)
+            .split(['/', '?', '#'])
+            .next()
+            .unwrap_or_default()
+            .split(':')
+            .next()
+            .unwrap_or_default()
+            .trim_start_matches("www.")
+            .to_ascii_lowercase();
+        let broker_id = request
+            .as_ref()
+            .map(|request| request.broker_id.clone())
+            .filter(|broker_id| !broker_id.is_empty())
+            .unwrap_or_else(|| host.clone());
+        let now = self.recorded_instant()?;
+        let task = manualtasks::create(
+            &store,
+            &manualtasks::CreateOpts {
+                request_id: Some(request_id),
+                broker_id: broker_id.clone(),
+                broker_name: broker_id,
+                form_url: link.clone(),
+                reason: "dynamic_form".to_owned(),
+                extra_instructions: "Open the confirmation URL and complete the confirmation manually; no click was attempted.".to_owned(),
+                ..manualtasks::CreateOpts::default()
+            },
+            None,
+            now,
+        )
+        .map_err(|error| ToolError(error.to_string()))?;
+        Ok(confirmation_result(
+            false,
+            "manual_confirmation_required",
+            String::new(),
+            link,
+            false,
+            task.id,
+            &task.instructions,
+            "manual_action_required",
+            true,
+        ))
     }
 
     /// Go's `run_web_form`: with `dry_run` the handler answers from the
@@ -1372,6 +1437,39 @@ fn write_generated_file(path: &str, content: &[u8]) -> Result<String, ToolError>
 }
 
 /// Go's `getStr`: a value of another type falls back to the default.
+fn confirmation_result(
+    success: bool,
+    step: &str,
+    error: String,
+    clicked_url: &str,
+    dry_run: bool,
+    task_id: i64,
+    instructions: &str,
+    status: &str,
+    manual_action_required: bool,
+) -> Value {
+    json!({
+        "Success": success,
+        "ClickedURL": clicked_url,
+        "ClickedHost": "",
+        "ClickedURLSHA256": "",
+        "Step": step,
+        "Error": error,
+        "ScreenshotBefore": "",
+        "ScreenshotAfter": "",
+        "ScreenshotBeforeSHA256": "",
+        "ScreenshotAfterSHA256": "",
+        "ScreenshotBeforeBytes": 0,
+        "ScreenshotAfterBytes": 0,
+        "DryRun": dry_run,
+        "TaskID": task_id,
+        "Instructions": instructions,
+        "Status": status,
+        "Reason": if manual_action_required { "dynamic_form" } else { "" },
+        "ManualActionRequired": manual_action_required,
+    })
+}
+
 fn get_str(arguments: &Map<String, Value>, key: &str, default: &str) -> String {
     arguments
         .get(key)
@@ -1525,10 +1623,40 @@ mod tests {
         );
     }
 
-    /// With a stored reply Go would run `confirmation.AutoConfirm`; Rust
-    /// fails closed instead of emulating the browser subsystem.
+    /// A stored link is previewed on dry-run, then queued as a manual task
+    /// without attempting a browser action.
     #[test]
-    fn auto_confirm_fails_closed_with_a_stored_reply() {
+    fn auto_confirm_previews_then_creates_manual_task_without_clicking() {
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let oracle_process = std::process::Command::new("go")
+            .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
+            .current_dir(&repository_root)
+            .env("TMPDIR", "/tmp")
+            .output()
+            .expect("run source-bound Go auto-confirm oracle");
+        assert!(
+            oracle_process.status.success(),
+            "Go oracle failed: {}",
+            String::from_utf8_lossy(&oracle_process.stderr)
+        );
+        let oracle: Value =
+            serde_json::from_slice(&oracle_process.stdout).expect("decode Go oracle output");
+        assert_eq!(
+            oracle["source_revision"],
+            "e8a8c969cb1a3b5a7f77dfe28f807e3707d0a8d8"
+        );
+        let oracle_response = |key: &str| -> Value {
+            let frame: Value =
+                serde_json::from_str(oracle[key].as_str().expect("oracle process response"))
+                    .expect("decode Go MCP frame");
+            serde_json::from_str(
+                frame["result"]["content"][0]["text"]
+                    .as_str()
+                    .expect("MCP result text"),
+            )
+            .expect("decode Go tool result")
+        };
+
         let root = workspace("auto-confirm-stored-reply");
         let data_dir = root.join("data");
         fs::create_dir_all(&data_dir).expect("data dir");
@@ -1537,9 +1665,9 @@ mod tests {
             .connection()
             .execute_batch(
                 "INSERT INTO removal_requests (broker_id, campaign_id, jurisdiction) \
-                 VALUES ('broker-1', 'campaign-1', 'eu'); \
+                 VALUES ('broker-a', 'mcp-auto-confirm', 'GDPR'); \
                  INSERT INTO inbox_replies (request_id, message_id, from_addr, snippet) \
-                 VALUES (1, 'msg-1', 'broker@example.com', 'Your request is confirmed');",
+                 VALUES (1, 'msg-1', 'broker@example.com', 'Confirm here: https://acxiom.com/confirm');",
             )
             .expect("stored reply");
         drop(store);
@@ -1558,14 +1686,83 @@ mod tests {
         let mut arguments = Map::new();
         arguments.insert("request_id".to_owned(), serde_json::json!(1));
         arguments.insert("dry_run".to_owned(), serde_json::json!(true));
-        let error = handler
-            .call("auto_confirm", &arguments)
-            .expect_err("stored reply must fail closed");
-        assert!(
-            error.0.contains("not implemented in Rust"),
-            "unexpected error: {}",
-            error.0
+        let dry_run = handler.call("auto_confirm", &arguments).expect("dry run");
+        assert_eq!(dry_run, oracle_response("dry_run_response"));
+        assert_eq!(dry_run["Success"], true);
+        assert_eq!(dry_run["Step"], "dry_run");
+        assert_eq!(dry_run["ClickedURL"], "https://acxiom.com/confirm");
+        assert_eq!(dry_run["DryRun"], true);
+        assert_eq!(
+            Store::open(data_dir.join("symeraseme.db"))
+                .expect("reopen dry-run store")
+                .db()
+                .query_row("SELECT count(*) FROM manual_tasks", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("dry-run tasks"),
+            0
         );
+        assert_eq!(oracle["dry_run_state"]["tasks"], 0);
+        assert_eq!(oracle["dry_run_state"]["human_action_required_events"], 0);
+
+        arguments.insert("dry_run".to_owned(), serde_json::json!(false));
+        let result = handler
+            .call("auto_confirm", &arguments)
+            .expect("manual fallback");
+        assert_eq!(result, oracle_response("manual_response"));
+        assert_eq!(result["Success"], false);
+        assert_eq!(result["Step"], "manual_confirmation_required");
+        assert_eq!(result["Status"], "manual_action_required");
+        assert_eq!(result["Reason"], "dynamic_form");
+        assert_eq!(result["ManualActionRequired"], true);
+        assert_eq!(result["ClickedURL"], "https://acxiom.com/confirm");
+        assert!(result["TaskID"].as_i64().unwrap_or_default() > 0);
+        let store = Store::open(data_dir.join("symeraseme.db")).expect("reopen final store");
+        assert_eq!(
+            store
+                .db()
+                .query_row("SELECT count(*) FROM manual_tasks", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("task count"),
+            1
+        );
+        assert_eq!(
+            store
+                .db()
+                .query_row(
+                    "SELECT count(*) FROM request_events WHERE event_type = 'HUMAN_ACTION_REQUIRED'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .expect("human action events"),
+            1
+        );
+        assert_eq!(
+            store
+                .db()
+                .query_row(
+                    "SELECT count(*) FROM request_events WHERE event_type = 'CONFIRMATION_LINK_CLICKED'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .expect("click events"),
+            0
+        );
+        let oracle_state = &oracle["final_state"];
+        assert_eq!(oracle_state["tasks"], 1);
+        assert_eq!(oracle_state["human_action_required_events"], 1);
+        assert_eq!(oracle_state["confirmation_link_clicked_events"], 0);
+        assert_eq!(oracle_state["failure_notes"], 0);
+        let task_state: (String, String, String) = store
+            .db()
+            .query_row(
+                "SELECT form_url, instructions, status FROM manual_tasks ORDER BY id LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("manual task state");
+        assert_eq!(task_state.0, oracle_state["form_url"]);
+        assert_eq!(task_state.1, oracle_state["instructions"]);
+        assert_eq!(task_state.2, oracle_state["task_status"]);
     }
 
     fn workspace(name: &str) -> PathBuf {
