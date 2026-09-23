@@ -1,6 +1,6 @@
 {
   "source_revision": "29d483171195eff3c9444a538dbefb3dd06bb2c6",
-  "go_version": "go version go1.27.1 darwin/arm64",
+  "go_version": "go version go1.26.6 darwin/arm64",
   "source_files": [
     {
       "path": "cmd/symeraseme/main.go",
@@ -12,7 +12,7 @@
     }
   ],
   "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
-  "generator_sha256": "d41cd31577e291fafe18fa76e35e5566e4b8f558c60b9b9041c5574c964194aa",
+  "generator_sha256": "1ac9189147ced3e2668fd4d92f17a076a919e661cbd25146395430112922c74a",
   "cases": [
     {
       "name": "initialize_trailing_comma_is_parse_error",
@@ -48,7 +48,7 @@
       },
       "exit_code": 1,
       "stdout_base64": "",
-      "stderr_base64": "aW52YWxpZCBlc2NhcGUgc2VxdWVuY2UgYFx4YCBpbiBzdHJpbmcK"
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
     },
     {
       "name": "method_with_invalid_escape_is_invalid_request",
@@ -57,7 +57,7 @@
       },
       "exit_code": 1,
       "stdout_base64": "",
-      "stderr_base64": "aW52YWxpZCBlc2NhcGUgc2VxdWVuY2UgYFx4YCBpbiBzdHJpbmcK"
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
     },
     {
       "name": "jsonrpc_with_invalid_escape_is_invalid_request",
@@ -66,7 +66,7 @@
       },
       "exit_code": 1,
       "stdout_base64": "",
-      "stderr_base64": "aW52YWxpZCBlc2NhcGUgc2VxdWVuY2UgYFx4YCBpbiBzdHJpbmcK"
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
     },
     {
       "name": "size-below-8k",
@@ -106,7 +106,7 @@
       },
       "exit_code": 1,
       "stdout_base64": "",
-      "stderr_base64": "ZXhjZWVkZWQgbWF4IGRlcHRoCg=="
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1snIGV4Y2VlZGVkIG1heCBkZXB0aAo="
     }
   ]
 }

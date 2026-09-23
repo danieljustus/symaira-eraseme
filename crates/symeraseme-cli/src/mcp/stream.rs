@@ -58,7 +58,7 @@ pub(crate) fn serve_stream(
         let start = index;
         let end = match scan_json_value(input, start, false) {
             Ok(Some(end)) => end,
-            Err(_) => return Err(max_depth_error()),
+            Err(byte) => return Err(max_depth_error(byte)),
             Ok(None) => {
                 return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
             }
@@ -93,7 +93,7 @@ pub(crate) fn serve_stdio(
         if position < buffer.len() {
             let end = match scan_json_value(&buffer, position, false) {
                 Ok(Some(end)) => Some(end),
-                Err(_) => return Err(max_depth_error()),
+                Err(byte) => return Err(max_depth_error(byte)),
                 Ok(None) => None,
             };
             if let Some(end) = end {
@@ -131,8 +131,11 @@ pub(crate) fn serve_stdio(
     }
 }
 
-fn max_depth_error() -> StreamError {
-    StreamError::Syntax("exceeded max depth".to_owned())
+fn max_depth_error(byte: u8) -> StreamError {
+    StreamError::Syntax(format!(
+        "invalid character '{}' exceeded max depth",
+        go_quoted_byte(byte)
+    ))
 }
 
 fn go_quoted_byte(byte: u8) -> String {
@@ -203,7 +206,7 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
                 b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' | b'u'
             ) {
                 return Some(StreamError::Syntax(format!(
-                    "invalid escape sequence `\\{}` in string",
+                    "invalid character '{}' in string escape code",
                     go_quoted_byte(*byte)
                 )));
             }

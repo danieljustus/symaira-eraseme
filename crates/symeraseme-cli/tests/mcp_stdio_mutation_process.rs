@@ -148,7 +148,7 @@ fn run_bounded(child: &mut Child, input: Vec<u8>) -> (std::process::ExitStatus, 
 #[test]
 fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     let fixture: Value = serde_json::from_str(FIXTURE).expect("Go mutation oracle fixture");
-    assert!(fixture["go_version"].as_str().unwrap().starts_with("go"));
+    assert!(fixture["go_version"].as_str().unwrap().contains("go1.26.6"));
     assert_eq!(fixture["source_files"][0]["path"], "cmd/symeraseme/main.go");
     assert_eq!(fixture["source_files"][1]["path"], "internal/mcp/server.go");
     assert_eq!(fixture["source_files"][0]["sha256"], sha256(GO_MAIN));
@@ -158,7 +158,10 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         sha256(INITIALIZE_BYTES)
     );
     assert_eq!(fixture["generator_sha256"], sha256(GENERATOR));
-    assert!(fixture["source_revision"].as_str().is_some());
+    assert_eq!(
+        fixture["source_revision"],
+        "29d483171195eff3c9444a538dbefb3dd06bb2c6"
+    );
 
     let initialize: Value = serde_json::from_str(INITIALIZE).unwrap();
     let expected_parse_errors: Vec<_> = initialize["cases"]

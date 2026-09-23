@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
+SOURCE_REVISION = "29d483171195eff3c9444a538dbefb3dd06bb2c6"
 INITIALIZE = ROOT / "tests/fixtures/mcp-contract/initialize_cases.json"
 SOURCE_PATHS = ["cmd/symeraseme/main.go", "internal/mcp/server.go"]
 
@@ -62,6 +63,13 @@ def materialize(spec):
 
 def main():
     go = Path(sys.argv[1]).resolve()
+    assert "go1.26.6" in subprocess.check_output([str(go), "version"], text=True)
+    subprocess.run(
+        ["git", "diff", "--exit-code", SOURCE_REVISION, "--", *SOURCE_PATHS],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
     target = ROOT / "rust-tests/parity/oracle/mcp-stdio-mutations/cases.json"
     recorded = []
     with tempfile.TemporaryDirectory(prefix="symeraseme-mcp008-") as directory:
@@ -86,7 +94,7 @@ def main():
                 }
             )
     fixture = {
-        "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_revision": SOURCE_REVISION,
         "go_version": subprocess.check_output([str(go), "version"], text=True).strip(),
         "source_files": [
             {"path": path, "sha256": digest((ROOT / path).read_bytes())} for path in SOURCE_PATHS
