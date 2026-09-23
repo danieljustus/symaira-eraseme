@@ -429,7 +429,13 @@ impl ContractHandler {
             now,
         )
         .map_err(|error| ToolError(error.to_string()))?;
-        serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
+        // Go marshals the PlanResult struct into the content text before the
+        // outer MCP envelope. Keep declaration order and Go's HTML escaping.
+        let bytes = serde_json::to_vec(&result).map_err(|error| ToolError(error.to_string()))?;
+        Ok(Value::String(
+            String::from_utf8(super::envelope::go_escape_json_strings(&bytes))
+                .expect("escaped JSON remains UTF-8"),
+        ))
     }
 
     /// Go's non-interactive `execute`: require explicit consent for live
