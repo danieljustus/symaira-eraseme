@@ -282,14 +282,14 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     .expect("scheduler oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "4af87d9d2cd127722aa4d0e3942057b0365bd7d9"
+        "1f531eb7e46815af5c31508904b632c69909e725"
     );
     assert_eq!(
         fixture["source_files"],
         serde_json::json!([
             {
                 "path": "internal/mcp/contract_handler.go",
-                "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"
+                "sha256": "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"
             },
             {
                 "path": "internal/scheduler/scheduler.go",
@@ -521,12 +521,12 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
     .expect("campaign oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "bfe2873937947479347c626512d74730fceaa3ac"
+        "1f531eb7e46815af5c31508904b632c69909e725"
     );
     assert_eq!(
         fixture["source_files"],
         serde_json::json!([
-            {"path":"internal/mcp/contract_handler.go","sha256":"b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+            {"path":"internal/mcp/contract_handler.go","sha256":"1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"},
             {"path":"internal/campaign/campaign.go","sha256":"9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
             {"path":"internal/campaign/planning.go","sha256":"ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
             {"path":"internal/campaign/execution.go","sha256":"eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},

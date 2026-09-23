@@ -1,9 +1,9 @@
 {
-  "source_revision": "bfe2873937947479347c626512d74730fceaa3ac",
+  "source_revision": "1f531eb7e46815af5c31508904b632c69909e725",
   "source_files": [
     {
       "path": "internal/mcp/contract_handler.go",
-      "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"
+      "sha256": "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"
     },
     {
       "path": "internal/campaign/campaign.go",

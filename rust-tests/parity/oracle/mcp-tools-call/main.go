@@ -35,17 +35,17 @@ const (
 	storeFixtureDir = "tests/fixtures/mcp-contract/mcp-003-store"
 )
 
-const schedulerSourceRevision = "4af87d9d2cd127722aa4d0e3942057b0365bd7d9"
+const schedulerSourceRevision = "1f531eb7e46815af5c31508904b632c69909e725"
 
-const campaignSourceRevision = "bfe2873937947479347c626512d74730fceaa3ac"
+const campaignSourceRevision = "1f531eb7e46815af5c31508904b632c69909e725"
 
 var schedulerSourceFiles = []sourceFileDigest{
-	{Path: "internal/mcp/contract_handler.go", SHA256: "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+	{Path: "internal/mcp/contract_handler.go", SHA256: "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"},
 	{Path: "internal/scheduler/scheduler.go", SHA256: "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"},
 }
 
 var campaignSourceFiles = []sourceFileDigest{
-	{Path: "internal/mcp/contract_handler.go", SHA256: "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+	{Path: "internal/mcp/contract_handler.go", SHA256: "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"},
 	{Path: "internal/campaign/campaign.go", SHA256: "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
 	{Path: "internal/campaign/planning.go", SHA256: "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
 	{Path: "internal/campaign/execution.go", SHA256: "eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},
