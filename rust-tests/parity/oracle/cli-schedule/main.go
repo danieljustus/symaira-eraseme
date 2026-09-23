@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -102,7 +103,7 @@ func main() {
 	}
 	defer func() { _ = os.RemoveAll(root) }()
 
-	binary := filepath.Join(root, "symeraseme")
+	binary := oracleBinary(root)
 	build := exec.Command("go", "build", "-o", binary, "./cmd/symeraseme")
 	build.Stdout = os.Stderr
 	build.Stderr = os.Stderr
@@ -248,9 +249,25 @@ func fold(value string, root string, caseRoot string) string {
 	// The CLI resolves its own executable path into the generated wrappers, so
 	// that value is machine-specific by design. It is folded to a named
 	// placeholder here and its format is asserted by the replay instead.
-	value = strings.ReplaceAll(value, filepath.Join(root, "symeraseme"), "<BINARY>")
-	value = strings.ReplaceAll(value, caseRoot, "<CASE>")
-	return strings.ReplaceAll(value, root, "<ROOT>")
+	for _, item := range []struct{ path, placeholder string }{
+		{oracleBinary(root), "<BINARY>"},
+		{caseRoot, "<CASE>"},
+		{root, "<ROOT>"},
+	} {
+		// A JSON string escapes Windows backslashes; the plain path occurs in
+		// generated files. Fold both spellings without changing their suffixes.
+		value = strings.ReplaceAll(value, strings.ReplaceAll(item.path, `\`, `\\`), item.placeholder)
+		value = strings.ReplaceAll(value, item.path, item.placeholder)
+	}
+	return value
+}
+
+func oracleBinary(root string) string {
+	name := "symeraseme"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(root, name)
 }
 
 // captureFiles walks the case root and hashes every regular file, so the replay
