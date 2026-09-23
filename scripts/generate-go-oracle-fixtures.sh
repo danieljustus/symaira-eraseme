@@ -1186,6 +1186,19 @@ schedule_dir = case_root / "scheduler"
 schedule_argv = ["generate-scheduler", "--platform", "cron", "--output-dir", str(schedule_dir), "--project-dir", str(case_root / "project"), "--symeraseme-bin", str(root / "bin" / "symeraseme")]
 filesystem_cases.append(fs_case("schedule-generate", schedule_argv, env, cwd, {"scheduler_dir": schedule_dir}, (), (), side_effect_process("schedule-generate", schedule_argv, env, cwd)))
 
+# Re-run generation over an existing script with a non-default mode. Go's
+# os.WriteFile truncates an existing file without changing its permissions.
+case_root, env, cwd = side_effect_runtime("schedule-generate-overwrite")
+schedule_dir = case_root / "scheduler"
+schedule_dir.mkdir(parents=True)
+existing_script = schedule_dir / "install.sh"
+existing_script.write_text("preserve existing mode\n", encoding="utf-8")
+existing_script.chmod(0o640)
+schedule_argv = ["generate-scheduler", "--platform", "cron", "--output-dir", str(schedule_dir), "--project-dir", str(case_root / "project"), "--symeraseme-bin", str(root / "bin" / "symeraseme")]
+overwrite_case = fs_case("schedule-generate-overwrite", schedule_argv, env, cwd, {"scheduler_dir": schedule_dir}, (), (), side_effect_process("schedule-generate-overwrite", schedule_argv, env, cwd))
+overwrite_case["preconditions"] = [{"path": "scheduler/install.sh", "content": "preserve existing mode\n", "mode": "0o640"}]
+filesystem_cases.append(overwrite_case)
+
 # Report generation writes an HTML artifact. Its two structurally known
 # rendered timestamps are normalized, then the normalized bytes remain as
 # evidence (both content and hash) instead of being discarded.
@@ -1427,7 +1440,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 12}
+expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 13}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")

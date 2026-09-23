@@ -256,6 +256,106 @@
     },
     {
       "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "schedule-generate-overwrite",
+      "operation": [
+        "generate-scheduler",
+        "--platform",
+        "cron",
+        "--output-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler",
+        "--project-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/project",
+        "--symeraseme-bin",
+        "<ORACLE_ROOT>/bin/symeraseme"
+      ],
+      "process": {
+        "argv": [
+          "generate-scheduler",
+          "--platform",
+          "cron",
+          "--output-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler",
+          "--project-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/project",
+          "--symeraseme-bin",
+          "<ORACLE_ROOT>/bin/symeraseme"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "scheduler_dir": "isolated"
+      },
+      "manifest_roots": {
+        "scheduler_dir": "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler"
+      },
+      "manifests": {
+        "scheduler_dir": [
+          {
+            "path": "crontab.txt",
+            "mode": "0o644",
+            "size_bytes": 395,
+            "type": "file",
+            "sha256": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47"
+          },
+          {
+            "path": "install.sh",
+            "mode": "0o640",
+            "size_bytes": 499,
+            "type": "file",
+            "sha256": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c"
+          },
+          {
+            "path": "symeraseme-poll.sh",
+            "mode": "0o755",
+            "size_bytes": 386,
+            "type": "file",
+            "sha256": "9dbb27c937e167c0961b96569a3a5fccd2e1b5b04b82e1f80fa4732818d36364"
+          },
+          {
+            "path": "symeraseme-rescan.sh",
+            "mode": "0o755",
+            "size_bytes": 299,
+            "type": "file",
+            "sha256": "140284c3c3f578a6eba659791b5fa9407549de1433f08bce3b041ad230717440"
+          },
+          {
+            "path": "symeraseme-tick.sh",
+            "mode": "0o755",
+            "size_bytes": 287,
+            "type": "file",
+            "sha256": "94ed71b34deb5654341925c6766bf7798b41bd19b24ea7f0b8c95802f13970b4"
+          },
+          {
+            "path": "uninstall.sh",
+            "mode": "0o755",
+            "size_bytes": 356,
+            "type": "file",
+            "sha256": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "preconditions": [
+        {
+          "path": "scheduler/install.sh",
+          "content": "preserve existing mode\n",
+          "mode": "0o640"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
       "id": "report-generate",
       "operation": [
         "generate-report",

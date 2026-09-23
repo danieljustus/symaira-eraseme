@@ -1082,13 +1082,17 @@ fn export_csv(data: &Value) -> String {
 
 /// Go's `ExportHTML`: the report template over the report data.
 fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
+    // Protect data newlines while matching Go's control-tag whitespace. A
+    // rendered report can contain caller-controlled multiline text, so only
+    // blank lines emitted by the template may be compacted below.
+    let mut template_data = data.clone();
+    encode_data_newlines(&mut template_data);
     let context = RenderContext {
-        data: data.clone(),
+        data: template_data,
         now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
         ..RenderContext::default()
     };
     let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
-    // Go's inline template controls omit blank lines for absent optional sections.
     let mut compact = String::with_capacity(html.len());
     let mut line_breaks = 0;
     for character in html.chars() {
@@ -1102,5 +1106,71 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
             compact.push(character);
         }
     }
-    Ok(compact)
+    Ok(decode_data_newlines(&compact))
+}
+
+const NEWLINE_MARKER: char = '\u{e001}';
+const ESCAPE_MARKER: char = '\u{e000}';
+
+fn encode_data_newlines(value: &mut Value) {
+    match value {
+        Value::String(text) => {
+            let mut encoded = String::with_capacity(text.len());
+            for character in text.chars() {
+                match character {
+                    '\n' => encoded.push(NEWLINE_MARKER),
+                    ESCAPE_MARKER => {
+                        encoded.push(ESCAPE_MARKER);
+                        encoded.push('0');
+                    }
+                    NEWLINE_MARKER => {
+                        encoded.push(ESCAPE_MARKER);
+                        encoded.push('1');
+                    }
+                    other => encoded.push(other),
+                }
+            }
+            *text = encoded;
+        }
+        Value::Array(values) => values.iter_mut().for_each(encode_data_newlines),
+        Value::Object(values) => values.values_mut().for_each(encode_data_newlines),
+        _ => {}
+    }
+}
+
+fn decode_data_newlines(text: &str) -> String {
+    let mut decoded = String::with_capacity(text.len());
+    let mut characters = text.chars();
+    while let Some(character) = characters.next() {
+        match character {
+            NEWLINE_MARKER => decoded.push('\n'),
+            ESCAPE_MARKER => match characters.next() {
+                Some('0') => decoded.push(ESCAPE_MARKER),
+                Some('1') => decoded.push(NEWLINE_MARKER),
+                Some(other) => {
+                    decoded.push(ESCAPE_MARKER);
+                    decoded.push(other);
+                }
+                None => decoded.push(ESCAPE_MARKER),
+            },
+            other => decoded.push(other),
+        }
+    }
+    decoded
+}
+
+#[cfg(test)]
+mod report_html_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn html_report_preserves_multiline_dynamic_fields() {
+        let data = json!({"campaigns": [{"campaign_id": "first\n\n\nlast\u{e000}\u{e001}"}]});
+        let now = DateTime::parse_from_rfc3339("2026-01-02T03:04:00Z")
+            .unwrap()
+            .to_utc();
+        let html = export_html(&data, now).expect("render report");
+        assert!(html.contains("Campaign: first\n\n\nlast\u{e000}\u{e001}"));
+    }
 }

@@ -75,6 +75,31 @@ fn run(case: &Value, root: &Path, id: &str) -> Output {
     ] {
         fs::create_dir_all(path).expect("isolated case directory");
     }
+    if let Some(preconditions) = case.get("preconditions").and_then(Value::as_array) {
+        for precondition in preconditions {
+            let relative = precondition["path"].as_str().expect("precondition path");
+            let path = case_root.join(relative);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).expect("precondition parent directory");
+            }
+            fs::write(
+                &path,
+                precondition["content"]
+                    .as_str()
+                    .expect("precondition content"),
+            )
+            .expect("precondition file");
+            #[cfg(unix)]
+            if let Some(mode) = precondition["mode"].as_str() {
+                use std::os::unix::fs::PermissionsExt;
+                let mode =
+                    u32::from_str_radix(mode.strip_prefix("0o").expect("octal file mode"), 8)
+                        .expect("valid octal file mode");
+                fs::set_permissions(&path, fs::Permissions::from_mode(mode))
+                    .expect("precondition file mode");
+            }
+        }
+    }
     let argv = case["process"]["argv"]
         .as_array()
         .expect("process argv")
@@ -328,7 +353,12 @@ fn filesystem_generators_match_go_observations() {
     )))
     .expect("filesystem oracle JSON");
     assert_eq!(fixture["commit"], "4e582f28");
-    for id in ["schedule-generate", "report-generate", "dashboard-generate"] {
+    for id in [
+        "schedule-generate",
+        "schedule-generate-overwrite",
+        "report-generate",
+        "dashboard-generate",
+    ] {
         let case = fixture["cases"]
             .as_array()
             .expect("filesystem cases")
