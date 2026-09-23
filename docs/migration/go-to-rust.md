@@ -183,6 +183,30 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   `/tmp/eraseme-encrypted-switchback-20260923-06`;
   `rust-tests/parity/{plain,encrypted}_store_switchback.py` is the executable
   gate. Native Linux/Windows and real restore/cutover remain open.
+- Current integrated code candidate `49eb79a8` passed 493/493 macOS arm64
+  workspace tests (two child-entry helpers skipped), strict all-target/all-
+  feature Clippy, Rust format, Go 1.26.6 `go test ./...` and `go vet ./...`,
+  tracked-Go format, and all 41 Swift app tests against the Rust debug binary.
+  The six-step plain and six-step encrypted Go→Rust→Go switchbacks passed again
+  using the current Rust release binary and pinned Go 1.26.6; reports are in
+  `/tmp/eraseme-{plain,encrypted}-switchback-49eb79a`. Logs are in
+  `/tmp/eraseme-{nextest,clippy,go-test,go-vet,swift}-49eb79a.log`.
+- On that code candidate, both macOS arm64 and x86_64 Rust release binaries
+  launched with `symeraseme 0.13.0` and linked only Apple system libraries;
+  the x86_64 SQLite portability smoke passed under Rosetta. The arm64 binary
+  SHA-256 is `d3ea067a53e63916bd689c99efa5f7224f670dce668f167abea861c898de1043`;
+  x86_64 is `c18f401c9d22ced554c717346ae4a200523d1a3764be8b862f9af8437397a86b`.
+  Windows GNU workspace all-target check and strict Clippy passed by cross
+  compilation after a two-line Windows lint repair. These are not native
+  Windows runtime tests. Offline Cargo audit (both lockfiles), deny, the
+  six-placeholder archive gate, and current Homebrew formula syntax/contract
+  passed; no Rust release archive matrix or publication was produced.
+- An optional full macOS x86_64 workspace run under Rosetta did not pass:
+  nextest stopped after 69 passed and two fixed 10-second CLI process timeouts
+  under parallel load (422 cases not run). Both failed cases passed when
+  serialized (2/2). Logs: `/tmp/eraseme-nextest-macos-x86-49eb79a.log` and
+  `/tmp/eraseme-nextest-macos-x86-focused-49eb79a.log`. This is not a complete
+  macOS x86_64 workspace gate.
 
 ## Open tasks (run of 2026-09-22)
 
