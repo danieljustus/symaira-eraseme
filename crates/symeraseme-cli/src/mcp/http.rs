@@ -101,6 +101,7 @@ async fn serve_async(
     let connection_slots = Arc::new(Semaphore::new(MAX_HTTP_CONNECTIONS));
     let mut connections = JoinSet::new();
     loop {
+        while connections.try_join_next().is_some() {}
         if stopping.load(Ordering::Relaxed) {
             break;
         }
@@ -256,13 +257,7 @@ async fn handle_request(
         .is_some_and(|length| length > MAX_BODY_BYTES);
     let reply = if request.method() != Method::POST {
         rpc_reply(405, -32600, "POST required")
-    } else if request
-        .headers()
-        .get(http::header::ORIGIN)
-        .and_then(|origin| origin.to_str().ok())
-        .filter(|origin| !origin.is_empty())
-        .is_some_and(|origin| !allowed_origin(origin))
-    {
+    } else if !origin_header_allowed(request.headers().get(http::header::ORIGIN)) {
         rpc_reply(403, -32000, "Forbidden: disallowed Origin")
     } else if !authorized(request.headers(), token) {
         rpc_reply(401, -32000, "Unauthorized")
@@ -325,6 +320,10 @@ fn allowed_origin(raw: &str) -> bool {
                 .map(|host| host.trim_matches(['[', ']']).to_ascii_lowercase())
         })
         .is_some_and(|host| matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1"))
+}
+
+fn origin_header_allowed(origin: Option<&http::HeaderValue>) -> bool {
+    origin.is_none_or(|origin| origin.is_empty() || origin.to_str().is_ok_and(allowed_origin))
 }
 
 fn protocol_reply(body: &[u8], handler: &dyn ToolHandler) -> HttpReply {
@@ -412,4 +411,32 @@ fn rpc_reply(status: u16, code: i32, message: &'static str) -> HttpReply {
     let mut body = body;
     body.push(b'\n');
     HttpReply { status, body }
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::origin_header_allowed;
+    use http::{HeaderMap, HeaderValue, header};
+
+    #[test]
+    fn origin_header_validation_distinguishes_absent_empty_and_invalid_bytes() {
+        let absent = HeaderMap::new();
+        assert!(origin_header_allowed(absent.get(header::ORIGIN)));
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::ORIGIN, HeaderValue::from_static(""));
+        assert!(origin_header_allowed(headers.get(header::ORIGIN)));
+
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_bytes(b"http://localhost\xff").unwrap(),
+        );
+        assert!(!origin_header_allowed(headers.get(header::ORIGIN)));
+
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("http://localhost:8000"),
+        );
+        assert!(origin_header_allowed(headers.get(header::ORIGIN)));
+    }
 }

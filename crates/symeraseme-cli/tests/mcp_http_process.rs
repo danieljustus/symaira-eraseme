@@ -171,6 +171,21 @@ fn exchange(
     read_response(&mut stream)
 }
 
+fn exchange_obs_text_origin(port: u16, token: &str) -> (u16, String, Vec<u8>) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let mut request = format!(
+        "POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nAuthorization: Bearer {token}\r\nOrigin: http://local"
+    )
+    .into_bytes();
+    request.extend_from_slice(&[0xff]);
+    request.extend_from_slice(b"host\r\nContent-Length: 2\r\n\r\n{}");
+    stream.write_all(&request).unwrap();
+    read_response(&mut stream)
+}
+
 fn oversized_declared_request(port: u16, token: &str) -> (u16, String, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
@@ -608,6 +623,21 @@ fn slow_header_connections_are_bounded_and_backpressured() {
 
 #[test]
 #[cfg(unix)]
+fn many_sequential_http_connections_complete_cleanly() {
+    let root = TestDir::new();
+    let port = free_port();
+    let mut child = start(root.path(), port, "127.0.0.1", false);
+    wait_ready(&mut child, port);
+    for _ in 0..512 {
+        let (status, content_type, _) = exchange(port, "GET", b"", &[]);
+        assert_eq!(status, 405);
+        assert_eq!(content_type, "application/json");
+    }
+    signal(&mut child, "TERM");
+}
+
+#[test]
+#[cfg(unix)]
 fn go_oracle_http_wire_transcripts_match() {
     // Reproduction: cargo test -p symeraseme-cli --test mcp_http_process go_oracle_http_wire_transcripts_match -- --exact
     // This compiles the checked-out Go CLI and compares real HTTP process transcripts.
@@ -735,4 +765,29 @@ fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
         );
         drop(occupied);
     }
+}
+
+#[test]
+#[cfg(unix)]
+fn obs_text_origin_rejection_matches_go_and_rust_processes() {
+    let root = TestDir::new();
+    let oracle = build_go_oracle(root.path());
+    let go_port = free_port();
+    let rust_port = free_port();
+    let go_root = root.path().join("go-obs-text");
+    let rust_root = root.path().join("rust-obs-text");
+    std::fs::create_dir_all(&go_root).unwrap();
+    std::fs::create_dir_all(&rust_root).unwrap();
+    let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
+    let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
+    wait_ready(&mut go, go_port);
+    wait_ready(&mut rust, rust_port);
+    let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
+    let rust_token = token(&rust_root);
+    let go_response = exchange_obs_text_origin(go_port, &go_token);
+    let rust_response = exchange_obs_text_origin(rust_port, &rust_token);
+    assert_eq!(go_response.0, 403, "Go rejected the raw obs-text Origin");
+    assert_eq!(rust_response, go_response);
+    signal(&mut go, "TERM");
+    signal(&mut rust, "TERM");
 }
