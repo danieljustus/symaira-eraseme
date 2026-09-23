@@ -1207,6 +1207,25 @@ report_case["artifact_evidence"] = {
 }
 filesystem_cases.append(report_case)
 
+# Dashboard generation is a real file-writing path. Keep the rendered HTML as
+# normalized evidence so the CLI parity replay can compare the complete artifact.
+case_root, env, cwd = side_effect_runtime("dashboard-generate")
+dashboard_path = case_root / "reports" / "dashboard.html"
+dashboard_argv = ["generate-dashboard", "--output", str(dashboard_path)]
+dashboard_process = side_effect_process("dashboard-generate", dashboard_argv, env, cwd)
+dashboard_bytes = bounded_read(dashboard_path, 16 * 1024 * 1024, "dashboard artifact", "dashboard-generate")
+dashboard_bytes = normalize_root_bytes(dashboard_bytes)
+dashboard_bytes, dashboard_timestamp_count = re.subn(rb"20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC", b"<TIMESTAMP>", dashboard_bytes)
+if dashboard_timestamp_count != 1:
+    raise RuntimeError(f"expected exactly one dashboard timestamp, got {dashboard_timestamp_count}")
+dashboard_case = fs_case("dashboard-generate", dashboard_argv, env, cwd, {"reports": dashboard_path.parent}, ("dashboard.html",), ({"path": "manifests.reports[dashboard.html].content", "reason": "dashboard content is represented by normalized evidence below", "replacement": "normalized content evidence"},), dashboard_process)
+dashboard_case["artifact_evidence"] = {
+    "path": "reports/dashboard.html", "encoding": "base64", "content_base64": b64(dashboard_bytes),
+    "size_bytes": len(dashboard_bytes), "sha256": hashlib.sha256(dashboard_bytes).hexdigest(),
+    "normalizations": [{"path": "artifact rendered timestamp", "occurrences": dashboard_timestamp_count, "replacement": "<TIMESTAMP>"}],
+}
+filesystem_cases.append(dashboard_case)
+
 # A known registry entry with no browser executor creates the durable manual
 # fallback path (and returns a classified manual-action outcome).
 case_root, env, cwd = side_effect_runtime("manual-task-create")
@@ -1408,7 +1427,7 @@ mcp = [json.loads(line) for line in (cases / "mcp" / "transcript.jsonl").read_te
 http = json.loads((cases / "http" / "transcript.json").read_text())
 filesystem = json.loads((cases / "filesystem" / "manifests.json").read_text())
 surface = json.loads((cases / "cli" / "surface.json").read_text())
-expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 11}
+expected = {"cli": 174, "mcp": 52, "http": 19, "filesystem": 12}
 actual = {"cli": len(cli["cases"]), "mcp": len(mcp), "http": len(http["cases"]), "filesystem": len(filesystem["cases"])}
 if actual != expected:
     raise SystemExit(f"coverage changed: expected {expected}, got {actual}")

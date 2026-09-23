@@ -312,6 +312,7 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
         .iter()
         .find(|template| template.name == name)
         .ok_or_else(|| TemplateError::new("unknown template"))?;
+    let is_html = template.html;
     validate_context(context)?;
 
     let mut environment = Environment::new();
@@ -360,7 +361,14 @@ pub fn render(template_name: &str, context: &RenderContext) -> Result<String, Te
     template
         .render_captured_to(variables, &mut output)
         .map_err(|_| TemplateError::named("template could not be rendered", name))?;
-    output.finish()
+    let rendered = output.finish()?;
+    if is_html {
+        // Go's html/template emits &#39; for apostrophes; MiniJinja emits
+        // &#x27;. Keep HTML escaping intact while matching the Go artifact bytes.
+        Ok(rendered.replace("&#x27;", "&#39;"))
+    } else {
+        Ok(rendered)
+    }
 }
 
 /// Explicitly named variant of [`render`].

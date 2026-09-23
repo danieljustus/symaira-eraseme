@@ -1087,5 +1087,20 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
         now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
         ..RenderContext::default()
     };
-    render("report.html.j2", &context).map_err(|error| error.to_string())
+    let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
+    // Go's inline template controls omit blank lines for absent optional sections.
+    let mut compact = String::with_capacity(html.len());
+    let mut line_breaks = 0;
+    for character in html.chars() {
+        if character == '\n' {
+            line_breaks += 1;
+            if line_breaks <= 2 {
+                compact.push(character);
+            }
+        } else {
+            line_breaks = 0;
+            compact.push(character);
+        }
+    }
+    Ok(compact)
 }

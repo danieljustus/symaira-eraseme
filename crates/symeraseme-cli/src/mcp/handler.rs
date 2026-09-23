@@ -412,8 +412,7 @@ impl ContractHandler {
         serde_json::to_value(&outcome).map_err(|error| ToolError(error.to_string()))
     }
 
-    /// Go's `generate_scheduler`. The dry run returns the generated file
-    /// contents; writing them to disk is not part of this slice.
+    /// Go's `generate_scheduler`, including writing files outside dry-run mode.
     fn generate_scheduler(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let cfg = scheduler::Config {
             platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
@@ -433,9 +432,13 @@ impl ContractHandler {
                 "dry_run": true,
             }));
         }
-        Err(ToolError(
-            "writing scheduler files is not implemented in this slice".to_owned(),
-        ))
+        let written = scheduler::write_files(&cfg.output_dir, &files)
+            .map_err(|error| ToolError(error.to_string()))?;
+        Ok(json!({
+            "success": true,
+            "files": written.iter().map(|path| path.to_string_lossy()).collect::<Vec<_>>(),
+            "dry_run": false,
+        }))
     }
 
     /// Go's `generate_dashboard`: dashboard data, rendered template, and the
