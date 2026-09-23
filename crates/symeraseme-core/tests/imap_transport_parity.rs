@@ -143,9 +143,18 @@ fn server_for(case: &Value) -> (ScriptedImapServer, Option<RootCertStore>) {
             "Missing".to_string(),
             FolderState {
                 uid_validity: 7,
-                messages,
+                messages: messages.clone(),
             },
         );
+        if case["name"] == "select_unicode_folder_uses_modified_utf7" {
+            folders.insert(
+                "&AMQ-rger &- Archiv".to_string(),
+                FolderState {
+                    uid_validity: 1,
+                    messages,
+                },
+            );
+        }
     }
     (server, roots)
 }

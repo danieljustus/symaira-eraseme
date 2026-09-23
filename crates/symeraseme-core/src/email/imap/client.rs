@@ -26,7 +26,7 @@ use crate::email::policy::ERR_IMAP;
 use crate::email::session::{FetchedMessage, ImapSession};
 use crate::email::types::ImapConfig;
 use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 use chrono::{DateTime, Utc};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
@@ -392,15 +392,37 @@ pub struct ImapSessionImpl {
 /// raw (servers handle a quoted INBOX badly — `imap.FormatMailboxName` special
 /// cases it, case-insensitively) and every other name is a quoted string.
 ///
-/// ponytail: names outside US-ASCII are sent as UTF-8 instead of Go's modified
-/// UTF-7 (`utf7.Encoding`). The configuration's folder comes from `IMAP_FOLDER`
-/// and is ASCII in every pinned case; upgrade by encoding the name in modified
-/// UTF-7 before quoting when a non-ASCII folder has to be supported.
 fn mailbox_argument(folder: &str) -> String {
     if folder.eq_ignore_ascii_case("INBOX") {
         return folder.to_string();
     }
-    format!("\"{}\"", folder.replace('\\', "\\\\").replace('"', "\\\""))
+    fn flush_shift(encoded: &mut String, utf16_bytes: &mut Vec<u8>) {
+        if !utf16_bytes.is_empty() {
+            encoded.push('&');
+            encoded.push_str(&STANDARD_NO_PAD.encode(&*utf16_bytes).replace('/', ","));
+            encoded.push('-');
+            utf16_bytes.clear();
+        }
+    }
+
+    let mut encoded = String::new();
+    let mut utf16_bytes = Vec::new();
+    for ch in folder.chars() {
+        if (' '..='~').contains(&ch) {
+            flush_shift(&mut encoded, &mut utf16_bytes);
+            if ch == '&' {
+                encoded.push_str("&-");
+            } else {
+                encoded.push(ch);
+            }
+        } else {
+            for unit in ch.encode_utf16(&mut [0; 2]).iter() {
+                utf16_bytes.extend_from_slice(&unit.to_be_bytes());
+            }
+        }
+    }
+    flush_shift(&mut encoded, &mut utf16_bytes);
+    format!("\"{}\"", encoded.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn read_line(reader: &mut BufReader<IoStream>) -> Result<String, String> {

@@ -232,6 +232,45 @@
       "replay": "byte"
     },
     {
+      "name": "select_unicode_folder_uses_modified_utf7",
+      "server_mode": "plain",
+      "uid_validity": 100,
+      "messages": [
+        {
+          "uid": 1,
+          "flags": [
+            "\\Seen"
+          ],
+          "header": "Subject: First\r\nMessage-ID: \u003cm1@example.com\u003e\r\nDate: Mon, 21 Jul 2026 10:00:00 +0000\r\n\r\n",
+          "body": "first body"
+        },
+        {
+          "uid": 2,
+          "header": "Subject: Second\r\nMessage-ID: \u003cm2@example.com\u003e\r\nDate: Mon, 21 Jul 2026 11:00:00 +0000\r\n\r\n",
+          "body": "second body"
+        }
+      ],
+      "config": {
+        "use_tls": false,
+        "allow_insecure_cleartext_auth": true,
+        "username": "testuser",
+        "password": "testpass",
+        "timeout_seconds": 5,
+        "server_require_user": "testuser",
+        "server_require_pass": "testpass"
+      },
+      "ops": [
+        "select:Ärger \u0026 Archiv"
+      ],
+      "transcript": [
+        "\u003ctag\u003e CAPABILITY",
+        "\u003ctag\u003e LOGIN \"testuser\" \"testpass\"",
+        "\u003ctag\u003e EXAMINE \"\u0026AMQ-rger \u0026- Archiv\""
+      ],
+      "selected_uid_validity": 1,
+      "replay": "byte"
+    },
+    {
       "name": "search_then_empty_result",
       "server_mode": "plain",
       "uid_validity": 100,
