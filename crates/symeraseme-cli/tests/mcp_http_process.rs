@@ -1,13 +1,16 @@
 //! Exercise token-authenticated MCP over the real local process/network path.
 
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 struct TestDir(PathBuf);
+type OracleCase<'a> = (&'a str, &'a [u8], Vec<(&'a str, String)>);
 
 impl TestDir {
     fn new() -> Self {
@@ -35,14 +38,31 @@ impl Drop for TestDir {
 }
 
 fn free_port() -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.local_addr().unwrap().port()
+    static ALLOCATED: OnceLock<Mutex<HashSet<u16>>> = OnceLock::new();
+    let allocated = ALLOCATED.get_or_init(|| Mutex::new(HashSet::new()));
+    loop {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        if allocated.lock().unwrap().insert(port) {
+            return port;
+        }
+    }
 }
 
 fn start(root: &Path, port: u16, host: &str, allow_remote: bool) -> Child {
+    start_binary(
+        Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
+        root,
+        port,
+        host,
+        allow_remote,
+    )
+}
+
+fn start_binary(binary: &Path, root: &Path, port: u16, host: &str, allow_remote: bool) -> Child {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    let mut command = Command::new(binary);
     command.args(["mcp", "--host", host, "--port", &port.to_string()]);
     if allow_remote {
         command.arg("--allow-remote");
@@ -86,14 +106,6 @@ fn token(root: &Path) -> String {
         assert_eq!(
             std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
             0o600
-        );
-        assert_eq!(
-            std::fs::metadata(root.join("data"))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o700
         );
     }
     value
@@ -144,9 +156,8 @@ fn chunked_oversized_request(port: u16, token: &str) -> (u16, String, Vec<u8>) {
         let _ = writer.write_all(&body);
         let _ = writer.write_all(b"\r\n0\r\n\r\n");
     });
-    let reply = read_response(&mut stream);
     let _ = sender.join();
-    reply
+    read_response(&mut stream)
 }
 
 fn read_response(stream: &mut TcpStream) -> (u16, String, Vec<u8>) {
@@ -218,13 +229,7 @@ fn stop_with_args(args: &[&str], root: &Path) -> (std::process::ExitStatus, Stri
 
 #[cfg(unix)]
 fn signal(child: &mut Child, name: &str) {
-    assert!(
-        Command::new("kill")
-            .args([format!("-{name}"), child.id().to_string()])
-            .status()
-            .unwrap()
-            .success()
-    );
+    send_signal(child, name);
     let deadline = std::time::Instant::now() + Duration::from_secs(6);
     loop {
         if let Some(status) = child.try_wait().unwrap() {
@@ -239,14 +244,54 @@ fn signal(child: &mut Child, name: &str) {
     }
 }
 
+#[cfg(unix)]
+fn send_signal(child: &mut Child, name: &str) {
+    assert!(
+        Command::new("kill")
+            .args([format!("-{name}"), child.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
 #[test]
 #[cfg(unix)]
 fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() {
     let root = TestDir::new();
+    std::fs::create_dir_all(root.path().join("data")).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(
+            root.path().join("data"),
+            std::fs::Permissions::from_mode(0o777),
+        )
+        .unwrap();
+        std::fs::write(root.path().join("data/mcp_token"), "old-token").unwrap();
+        std::fs::set_permissions(
+            root.path().join("data/mcp_token"),
+            std::fs::Permissions::from_mode(0o666),
+        )
+        .unwrap();
+    }
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
     wait_ready(&mut child, port);
     let first_token = token(root.path());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(root.path().join("data"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o777,
+            "Go MkdirAll semantics preserve permissions on an existing directory"
+        );
+    }
 
     let (status, content_type, body) = exchange(port, "GET", b"", &[]);
     assert_eq!(status, 405);
@@ -352,4 +397,262 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
     let mut remote = start(root.path(), remote_port, "0.0.0.0", true);
     wait_ready(&mut remote, remote_port);
     signal(&mut remote, "TERM");
+}
+
+#[test]
+#[cfg(unix)]
+fn signal_stops_accepting_before_in_flight_request_drains() {
+    let root = TestDir::new();
+    let port = free_port();
+    let mut child = start(root.path(), port, "127.0.0.1", false);
+    wait_ready(&mut child, port);
+    let bearer = token(root.path());
+
+    let mut in_flight = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    in_flight
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    write!(in_flight, "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {bearer}\r\nContent-Length: 10\r\nConnection: close\r\n\r\n{{}}").unwrap();
+    thread::sleep(Duration::from_millis(100));
+    send_signal(&mut child, "TERM");
+    thread::sleep(Duration::from_millis(150));
+
+    let mut later = match TcpStream::connect(("127.0.0.1", port)) {
+        Ok(stream) => stream,
+        Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+            in_flight.write_all(b"12345678").unwrap();
+            let (status, _, _) = read_response(&mut in_flight);
+            assert_eq!(status, 200);
+            let status = child.wait().unwrap();
+            assert!(
+                status.success(),
+                "server failed while draining in-flight request"
+            );
+            return;
+        }
+        Err(error) => panic!("new connection during shutdown failed unexpectedly: {error}"),
+    };
+    later
+        .set_read_timeout(Some(Duration::from_millis(400)))
+        .unwrap();
+    later
+        .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = [0; 1];
+    match later.read(&mut response) {
+        Ok(0) => {}
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock
+                    | std::io::ErrorKind::TimedOut
+                    | std::io::ErrorKind::ConnectionReset
+            ) => {}
+        Ok(count) => panic!(
+            "server answered a connection after shutdown began: {:?}",
+            &response[..count]
+        ),
+        Err(error) => panic!("unexpected read result after shutdown: {error}"),
+    }
+
+    in_flight.write_all(b"12345678").unwrap();
+    let (status, _, _) = read_response(&mut in_flight);
+    assert_eq!(status, 200);
+    let status = child.wait().unwrap();
+    assert!(
+        status.success(),
+        "server failed while draining in-flight request"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn incomplete_request_headers_expire_at_the_go_five_second_timeout() {
+    let root = TestDir::new();
+    let port = free_port();
+    let mut child = start(root.path(), port, "127.0.0.1", false);
+    wait_ready(&mut child, port);
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(7)))
+        .unwrap();
+    stream
+        .write_all(b"POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer partial")
+        .unwrap();
+    let started = Instant::now();
+    let mut response = Vec::new();
+    let read_result = stream.read_to_end(&mut response);
+    let elapsed = started.elapsed();
+    assert!(
+        read_result.is_ok()
+            || read_result
+                .as_ref()
+                .is_err_and(|error| error.kind() == std::io::ErrorKind::ConnectionReset),
+        "timed out header connection did not close: {read_result:?}"
+    );
+    assert!(
+        (Duration::from_millis(4500)..=Duration::from_secs(7)).contains(&elapsed),
+        "header connection closed after {elapsed:?}, expected Go's five second timeout"
+    );
+    send_signal(&mut child, "TERM");
+    let status = child.wait().unwrap();
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn slow_header_connections_are_bounded_and_backpressured() {
+    let root = TestDir::new();
+    let port = free_port();
+    let mut child = start(root.path(), port, "127.0.0.1", false);
+    wait_ready(&mut child, port);
+
+    let mut held = Vec::with_capacity(128);
+    for _ in 0..128 {
+        held.push(TcpStream::connect(("127.0.0.1", port)).unwrap());
+    }
+    thread::sleep(Duration::from_millis(150));
+
+    let mut queued = match TcpStream::connect(("127.0.0.1", port)) {
+        Ok(stream) => stream,
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            assert!(
+                child.try_wait().unwrap().is_none(),
+                "server exited under connection load"
+            );
+            drop(held);
+            signal(&mut child, "TERM");
+            return;
+        }
+        Err(error) => panic!("over-capacity connection failed unexpectedly: {error}"),
+    };
+    queued
+        .set_read_timeout(Some(Duration::from_millis(250)))
+        .unwrap();
+    queued
+        .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut first_byte = [0; 1];
+    match queued.read(&mut first_byte) {
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ) => {}
+        Ok(0) => panic!("over-capacity connection was closed instead of backpressured"),
+        Ok(count) => panic!(
+            "over-capacity connection was served before a slot opened: {:?}",
+            &first_byte[..count]
+        ),
+        Err(error) => panic!("over-capacity connection failed unexpectedly: {error}"),
+    }
+
+    drop(held.pop());
+    queued
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let (status, _, _) = read_response(&mut queued);
+    assert_eq!(
+        status, 405,
+        "queued connection was not served after a slot opened"
+    );
+    drop(held);
+    signal(&mut child, "TERM");
+}
+
+#[test]
+#[cfg(unix)]
+fn go_oracle_http_wire_transcripts_match() {
+    // Reproduction: cargo test -p symeraseme-cli --test mcp_http_process go_oracle_http_wire_transcripts_match -- --exact
+    // This compiles the checked-out Go CLI and compares real HTTP process transcripts.
+    let root = TestDir::new();
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let oracle = root.path().join("symeraseme-go-oracle");
+    let build = Command::new("go")
+        .args(["build", "-o"])
+        .arg(&oracle)
+        .arg("./cmd/symeraseme")
+        .current_dir(repo)
+        .output()
+        .expect("Go toolchain is required to reproduce the HTTP oracle transcript");
+    assert!(
+        build.status.success(),
+        "Go oracle build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let go_port = free_port();
+    let rust_port = free_port();
+    let go_root = root.path().join("go");
+    let rust_root = root.path().join("rust");
+    std::fs::create_dir_all(&go_root).unwrap();
+    std::fs::create_dir_all(&rust_root).unwrap();
+    let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
+    let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
+    wait_ready(&mut go, go_port);
+    wait_ready(&mut rust, rust_port);
+    let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
+    let rust_token = token(&rust_root);
+
+    let cases: [OracleCase<'_>; 5] = [
+        ("GET", b"", vec![]),
+        ("POST", br#"{}"#, vec![]),
+        (
+            "POST",
+            br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            vec![
+                ("Authorization", format!("Bearer {go_token}")),
+                ("Origin", "https://evil.example".into()),
+            ],
+        ),
+        (
+            "POST",
+            br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            vec![
+                ("Authorization", format!("Bearer {go_token}")),
+                ("Origin", "http://[::1]:8000".into()),
+            ],
+        ),
+        (
+            "POST",
+            br#"{"jsonrpc":"2.0","method":"initialize"}"#,
+            vec![("Authorization", format!("Bearer {go_token}"))],
+        ),
+    ];
+    for (method, body, headers) in cases {
+        let go_headers: Vec<_> = headers
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect();
+        let go_reply = exchange(go_port, method, body, &go_headers);
+        let rust_headers: Vec<_> = headers
+            .iter()
+            .map(|(name, value)| {
+                (
+                    *name,
+                    if *name == "Authorization" {
+                        format!("Bearer {rust_token}")
+                    } else {
+                        value.clone()
+                    },
+                )
+            })
+            .collect();
+        let rust_headers: Vec<_> = rust_headers
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect();
+        let rust_reply = exchange(rust_port, method, body, &rust_headers);
+        assert_eq!(
+            rust_reply, go_reply,
+            "wire transcript differs for {method} {body:?}"
+        );
+    }
+    signal(&mut go, "TERM");
+    signal(&mut rust, "TERM");
 }

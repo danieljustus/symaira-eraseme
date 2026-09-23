@@ -3,20 +3,29 @@
 use super::handler::ToolHandler;
 use super::protocol::{InitializeOutcome, initialize, skip_json_value, skip_whitespace};
 use base64::Engine;
+use http_body_util::{BodyExt, Full, Limited};
+use hyper::body::{Bytes, Incoming};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Method, Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
 use rand::Rng;
 use serde::Serialize;
-use std::fs;
-use std::io::Read;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::net::IpAddr;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use subtle::ConstantTimeEq;
-use tiny_http::{Header, Request, Response, Server, StatusCode};
+use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
+use tokio::sync::watch;
+use tokio::task::JoinSet;
 
 const MAX_BODY_BYTES: usize = 5 * 1024 * 1024;
+const MAX_HTTP_CONNECTIONS: usize = 128;
 
 #[derive(Serialize)]
 struct RpcError<'a> {
@@ -65,7 +74,10 @@ pub(crate) fn serve(
     } else {
         format!("{host}:{port}")
     };
-    let server = Server::http(address).map_err(|error| error.to_string())?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| error.to_string())?;
     let stopping = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
@@ -73,43 +85,84 @@ pub(crate) fn serve(
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
 
-    let mut workers: Vec<JoinHandle<()>> = Vec::new();
-    while !stopping.load(Ordering::Relaxed) {
-        if let Some(request) = server
-            .recv_timeout(Duration::from_millis(100))
-            .map_err(|e| e.to_string())?
-        {
-            let token = Arc::clone(&token);
-            let handler = Arc::clone(&handler);
-            workers.push(thread::spawn(move || {
-                handle_request(request, &token, handler.as_ref())
-            }));
+    runtime.block_on(serve_async(address, token, handler, stopping))
+}
+
+async fn serve_async(
+    address: String,
+    token: Arc<String>,
+    handler: Arc<dyn ToolHandler>,
+    stopping: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let listener = TcpListener::bind(&address)
+        .await
+        .map_err(|error| error.to_string())?;
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let connection_slots = Arc::new(Semaphore::new(MAX_HTTP_CONNECTIONS));
+    let mut connections = JoinSet::new();
+    loop {
+        if stopping.load(Ordering::Relaxed) {
+            break;
         }
-        reap_finished(&mut workers);
+        let permit = tokio::select! {
+            permit = Arc::clone(&connection_slots).acquire_owned() => permit.map_err(|error| error.to_string())?,
+            _ = tokio::time::sleep(Duration::from_millis(50)) => continue,
+        };
+        if stopping.load(Ordering::Relaxed) {
+            drop(permit);
+            break;
+        }
+        tokio::select! {
+            accepted = listener.accept() => {
+                let (stream, _) = accepted.map_err(|error| error.to_string())?;
+                let token = Arc::clone(&token);
+                let handler = Arc::clone(&handler);
+                let shutdown_rx = shutdown_rx.clone();
+                connections.spawn(async move {
+                    let _permit = permit;
+                    let mut builder = http1::Builder::new();
+                    builder.timer(hyper_util::rt::TokioTimer::new());
+                    builder.header_read_timeout(Duration::from_secs(5));
+                    let service = service_fn(move |request| {
+                        let token = Arc::clone(&token);
+                        let handler = Arc::clone(&handler);
+                        async move { Ok::<_, std::convert::Infallible>(handle_request(request, &token, handler.as_ref()).await) }
+                    });
+                    let mut connection = Box::pin(builder.serve_connection(TokioIo::new(stream), service));
+                    tokio::select! {
+                        result = &mut connection => result.map_err(|error| error.to_string()),
+                        _ = wait_for_shutdown(shutdown_rx) => {
+                            connection.as_mut().graceful_shutdown();
+                            connection.await.map_err(|error| error.to_string())
+                        }
+                    }
+                });
+            }
+            _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+        }
     }
 
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while !workers.is_empty() && Instant::now() < deadline {
-        reap_finished(&mut workers);
-        thread::sleep(Duration::from_millis(10));
-    }
-    if workers.is_empty() {
-        Ok(())
-    } else {
-        Err("context deadline exceeded".to_owned())
+    // Dropping the listener closes the accept path before active requests drain.
+    drop(listener);
+    let _ = shutdown_tx.send(true);
+    match tokio::time::timeout(Duration::from_secs(5), async {
+        while connections.join_next().await.is_some() {}
+    })
+    .await
+    {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            connections.abort_all();
+            Err("context deadline exceeded".to_owned())
+        }
     }
 }
 
-fn reap_finished(workers: &mut Vec<JoinHandle<()>>) {
-    let mut index = 0;
-    while index < workers.len() {
-        if workers[index].is_finished() {
-            let worker = workers.swap_remove(index);
-            let _ = worker.join();
-        } else {
-            index += 1;
-        }
+async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
+    if *shutdown.borrow() {
+        return;
     }
+    let _ = shutdown.changed().await;
 }
 
 fn is_loopback_host(host: &str) -> bool {
@@ -132,9 +185,31 @@ fn write_token() -> std::io::Result<Arc<String>> {
     rand::rng().fill_bytes(&mut bytes);
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
     let path = dir.join("mcp_token");
-    fs::write(&path, token.as_bytes())?;
-    set_mode(&path)?;
+    write_token_file(&path, &token)?;
     Ok(Arc::new(token))
+}
+
+#[cfg(unix)]
+fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(token.as_bytes())?;
+    set_mode(path)
+}
+
+#[cfg(not(unix))]
+fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    file.write_all(token.as_bytes())
 }
 
 #[cfg(unix)]
@@ -160,57 +235,65 @@ fn set_mode(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn handle_request(mut request: Request, token: &str, handler: &dyn ToolHandler) {
-    let reply = if request.method().as_str() != "POST" {
+async fn handle_request(
+    request: Request<Incoming>,
+    token: &str,
+    handler: &dyn ToolHandler,
+) -> Response<Full<Bytes>> {
+    let declared_too_large = request
+        .headers()
+        .get(http::header::CONTENT_LENGTH)
+        .and_then(|length| length.to_str().ok())
+        .and_then(|length| length.parse::<usize>().ok())
+        .is_some_and(|length| length > MAX_BODY_BYTES);
+    let reply = if request.method() != Method::POST {
         rpc_reply(405, -32600, "POST required")
     } else if request
         .headers()
-        .iter()
-        .find(|header| header.field.equiv("Origin"))
-        .is_some_and(|header| !allowed_origin(header.value.as_str()))
+        .get(http::header::ORIGIN)
+        .and_then(|origin| origin.to_str().ok())
+        .is_some_and(|origin| !allowed_origin(origin))
     {
         rpc_reply(403, -32000, "Forbidden: disallowed Origin")
     } else if !authorized(request.headers(), token) {
         rpc_reply(401, -32000, "Unauthorized")
-    } else if request
-        .body_length()
-        .is_some_and(|length| length > MAX_BODY_BYTES)
-    {
+    } else if declared_too_large {
         rpc_reply(413, -32600, "Invalid Request")
     } else {
-        let mut body = Vec::new();
-        let read = request
-            .as_reader()
-            .take((MAX_BODY_BYTES + 1) as u64)
-            .read_to_end(&mut body);
-        if read.is_err() || body.len() > MAX_BODY_BYTES {
-            rpc_reply(200, -32700, "parse error")
+        let body = Limited::new(request.into_body(), MAX_BODY_BYTES + 1)
+            .collect()
+            .await;
+        if let Ok(body) = body {
+            let body = body.to_bytes();
+            if body.len() <= MAX_BODY_BYTES {
+                protocol_reply(&body, handler)
+            } else {
+                rpc_reply(200, -32700, "parse error")
+            }
         } else {
-            protocol_reply(&body, handler)
+            rpc_reply(200, -32700, "parse error")
         }
     };
 
-    let status = StatusCode(reply.status);
-    let mut response = Response::from_data(reply.body).with_status_code(status);
+    let mut response = Response::builder()
+        .status(StatusCode::from_u16(reply.status).expect("valid static status"));
     if reply.status != 204 {
-        response = response.with_header(
-            Header::from_bytes("Content-Type", "application/json").expect("static header"),
-        );
+        response = response.header(http::header::CONTENT_TYPE, "application/json");
     }
-    let _ = request.respond(response);
+    response
+        .body(Full::new(Bytes::from(reply.body)))
+        .expect("static response headers")
 }
 
-fn authorized(headers: &[Header], token: &str) -> bool {
-    let mut values = headers
-        .iter()
-        .filter(|header| header.field.equiv("Authorization"));
-    let Some(header) = values.next() else {
+fn authorized(headers: &http::HeaderMap, token: &str) -> bool {
+    let mut values = headers.get_all(http::header::AUTHORIZATION).iter();
+    let Some(header) = values.next().and_then(|header| header.to_str().ok()) else {
         return false;
     };
     if values.next().is_some() {
         return false;
     }
-    let Some(supplied) = header.value.as_str().strip_prefix("Bearer ") else {
+    let Some(supplied) = header.strip_prefix("Bearer ") else {
         return false;
     };
     if supplied.is_empty() {
