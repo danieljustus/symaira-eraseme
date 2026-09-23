@@ -1290,8 +1290,8 @@ fn init_profile_round_trips_through_show_profile() {
     assert_eq!(
         output.stdout,
         format!(
-            "identity profile saved at {}/identity.encrypted\n",
-            data_dir.display()
+            "identity profile saved at {}\n",
+            data_dir.join("identity.encrypted").display()
         )
         .into_bytes()
     );
@@ -1511,8 +1511,12 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     assert_eq!(
         dry_run.stdout,
         format!(
-            "{{\"dry_run\":true,\"message\":\"Would remove 1 artifact(s) from {}. Use --yes to confirm.\",\"removed\":0,\"skipped\":1,\"success\":true}}\n",
-            tasks_dir.display()
+            "{{\"dry_run\":true,\"message\":{},\"removed\":0,\"skipped\":1,\"success\":true}}\n",
+            serde_json::to_string(&format!(
+                "Would remove 1 artifact(s) from {}. Use --yes to confirm.",
+                tasks_dir.display()
+            ))
+            .expect("JSON message")
         )
         .into_bytes(),
         "cleanup dry-run stdout"
@@ -1534,8 +1538,12 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     assert_eq!(
         removed.stdout,
         format!(
-            "{{\"dry_run\":false,\"message\":\"Removed 1 artifact(s) from {}.\",\"removed\":1,\"skipped\":0,\"success\":true}}\n",
-            tasks_dir.display()
+            "{{\"dry_run\":false,\"message\":{},\"removed\":1,\"skipped\":0,\"success\":true}}\n",
+            serde_json::to_string(&format!(
+                "Removed 1 artifact(s) from {}.",
+                tasks_dir.display()
+            ))
+            .expect("JSON message")
         )
         .into_bytes(),
         "cleanup stdout"
