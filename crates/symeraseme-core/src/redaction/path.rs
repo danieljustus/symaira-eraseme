@@ -42,29 +42,29 @@ pub struct WorkspaceRoot {
 impl WorkspaceRoot {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, WorkspaceRootError> {
         let path = path.as_ref();
-        let canonical =
-            std::fs::canonicalize(path).map_err(|_| WorkspaceRootError::RootUnavailable)?;
+        // Go's ReadWorkspaceFile wraps root resolution and capability-open
+        // failures in workspaceReadError, so preserve its opaque display.
+        let canonical = std::fs::canonicalize(path).map_err(WorkspaceRootError::Io)?;
         let probe = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
-            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        let pre_open = probe
-            .metadata(".")
-            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
+            .map_err(WorkspaceRootError::Io)?;
+        let pre_open = probe.metadata(".").map_err(WorkspaceRootError::Io)?;
         if !pre_open.is_dir() {
-            return Err(WorkspaceRootError::RootUnavailable);
+            return Err(WorkspaceRootError::Io(io::Error::new(
+                io::ErrorKind::NotADirectory,
+                "workspace root is not a directory",
+            )));
         }
         let dir = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
-            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
-        let opened = dir
-            .metadata(".")
-            .map_err(|_| WorkspaceRootError::RootUnavailable)?;
+            .map_err(WorkspaceRootError::Io)?;
+        let opened = dir.metadata(".").map_err(WorkspaceRootError::Io)?;
         if !same_file(&pre_open, &opened) {
-            return Err(WorkspaceRootError::RootUnavailable);
+            return Err(WorkspaceRootError::OutsideWorkspace);
         }
         Ok(Self { dir, canonical })
     }
 
     pub fn current() -> Result<Self, WorkspaceRootError> {
-        Self::open(std::env::current_dir().map_err(|_| WorkspaceRootError::RootUnavailable)?)
+        Self::open(std::env::current_dir().map_err(WorkspaceRootError::Io)?)
     }
 
     pub fn read(&self, relative: &str) -> Result<Vec<u8>, WorkspaceRootError> {
@@ -189,11 +189,10 @@ fn read_open_file(file: File) -> Result<Vec<u8>, WorkspaceRootError> {
 }
 
 fn map_open_error(error: io::Error) -> WorkspaceRootError {
-    if error.kind() == io::ErrorKind::InvalidInput {
-        WorkspaceRootError::InvalidPath
-    } else {
-        WorkspaceRootError::Io(error)
-    }
+    // Go wraps errors from Root.Lstat/OpenRoot/OpenFile in opaqueWorkspaceError.
+    // InvalidInput here is an OS/cap-std failure after our explicit path
+    // validation, not a Go ErrPathInvalid validation result.
+    WorkspaceRootError::Io(error)
 }
 
 fn same_file(expected: &cap_std::fs::Metadata, opened: &cap_std::fs::Metadata) -> bool {
@@ -219,4 +218,52 @@ pub fn read_workspace_text(path: &Path, root: Option<&Path>) -> Result<String, W
             "workspace file is not UTF-8",
         ))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{WorkspaceRoot, WorkspaceRootError, map_open_error, read_workspace_file};
+    use std::fs;
+    use std::io;
+    use std::path::Path;
+
+    #[test]
+    fn root_open_failures_match_go_opaque_error_text() {
+        let temp = tempfile::tempdir().expect("temporary workspace");
+        let missing = temp.path().join("missing-root");
+        let regular_file = temp.path().join("root-file");
+        fs::write(&regular_file, b"not a directory").expect("root fixture file");
+
+        for path in [&missing, &regular_file] {
+            let error = match read_workspace_file(Path::new("inside.txt"), Some(path)) {
+                Ok(_) => panic!("{} unexpectedly read a workspace file", path.display()),
+                Err(error) => error,
+            };
+            assert_eq!(error.to_string(), "workspace file read failed");
+        }
+    }
+
+    #[test]
+    fn cap_std_invalid_input_remains_an_opaque_read_error() {
+        let error = map_open_error(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source-bound invalid-input probe",
+        ));
+        assert!(matches!(error, WorkspaceRootError::Io(_)));
+        assert_eq!(error.to_string(), "workspace file read failed");
+    }
+
+    #[test]
+    fn explicit_path_validation_stays_distinct_and_fail_closed() {
+        let temp = tempfile::tempdir().expect("temporary workspace");
+        let root = WorkspaceRoot::open(temp.path()).expect("workspace root");
+        assert!(matches!(
+            root.read("../outside.txt"),
+            Err(WorkspaceRootError::OutsideWorkspace)
+        ));
+        assert!(matches!(
+            root.read("bad\0name.txt"),
+            Err(WorkspaceRootError::NullByte)
+        ));
+    }
 }
