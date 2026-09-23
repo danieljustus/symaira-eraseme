@@ -114,7 +114,8 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
             case["test_timeout_millis"]
                 .as_u64()
                 .filter(|millis| *millis > 0)
-                .unwrap_or(5000),
+                .unwrap_or(5000)
+                .max(1000), // Let the fake shell start even under parallel CI load.
         );
         let result = agent.classify_with_command(
             case["system_prompt"].as_str().expect("system prompt"),
