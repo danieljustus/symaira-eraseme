@@ -117,8 +117,8 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
                 .unwrap_or(5000),
         );
         let result = agent.classify_with_command(
-            &case["system_prompt"].as_str().expect("system prompt"),
-            &case["user_prompt"].as_str().expect("user prompt"),
+            case["system_prompt"].as_str().expect("system prompt"),
+            case["user_prompt"].as_str().expect("user prompt"),
             &super::ClassifyOptions::default(),
             AgentCommandConfig {
                 timeout,
