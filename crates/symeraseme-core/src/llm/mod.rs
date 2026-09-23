@@ -834,9 +834,14 @@ pub fn create_with(
     };
 
     if spec.kind == ProviderKind::Agent {
+        let agent_backend = if options.agent_backend.is_empty() {
+            env("SYMERASEME_AGENT_BACKEND").unwrap_or_default()
+        } else {
+            options.agent_backend.clone()
+        };
         return Ok(AgentClient::with_probe(
             model,
-            options.agent_backend.clone(),
+            agent_backend,
             options.cost_tracker.clone(),
             on_path,
         ));
