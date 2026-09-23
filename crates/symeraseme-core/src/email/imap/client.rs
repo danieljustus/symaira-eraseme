@@ -221,39 +221,20 @@ impl crate::email::session::ImapDialer for ImapDialer {
                 ERR_IMAP, config.host
             )
         })?;
-        let mut last_error = None;
-        let mut failed_address = None;
-        let mut stream = None;
-        for address in addresses {
-            match TcpStream::connect_timeout(&address, timeout) {
-                Ok(connected) => {
-                    stream = Some(connected);
-                    break;
-                }
-                Err(error) => {
-                    let refused = error.kind() == std::io::ErrorKind::ConnectionRefused;
-                    failed_address = Some(address);
-                    last_error = Some(error);
-                    // Go's Dial returns the refusal for the resolved address
-                    // it attempted first (for localhost this is commonly
-                    // [::1]), instead of replacing it with the input hostname.
-                    if refused {
-                        break;
-                    }
-                }
+        let stream = connect_addresses(addresses, timeout).map_err(|failure| {
+            if let Some((address, error)) = failure {
+                format!(
+                    "{}: connect/login failed: dial tcp {}: connect: {}",
+                    ERR_IMAP,
+                    address,
+                    go_dial_error(&error)
+                )
+            } else {
+                format!(
+                    "{}: connect/login failed: dial tcp {}: connect: no suitable address found",
+                    ERR_IMAP, host_port
+                )
             }
-        }
-        let stream = stream.ok_or_else(|| {
-            let error = last_error
-                .map(|error| go_dial_error(&error))
-                .unwrap_or_else(|| "no suitable address found".to_owned());
-            let address = failed_address
-                .map(|address| address.to_string())
-                .unwrap_or_else(|| host_port.clone());
-            format!(
-                "{}: connect/login failed: dial tcp {}: connect: {}",
-                ERR_IMAP, address, error
-            )
         })?;
         stream
             .set_read_timeout(Some(timeout))
@@ -366,6 +347,30 @@ fn go_dial_error(error: &std::io::Error) -> String {
         _ => return error.to_string(),
     }
     .to_owned()
+}
+
+/// Attempts resolved addresses in order, as Go's Dial does. If every address
+/// fails, a refusal is reported using the first refused TCPAddr; other failures
+/// use the last address and error.
+fn connect_addresses(
+    addresses: impl IntoIterator<Item = std::net::SocketAddr>,
+    timeout: Duration,
+) -> Result<TcpStream, Option<(std::net::SocketAddr, std::io::Error)>> {
+    let mut first_refusal = None;
+    let mut last_failure = None;
+    for address in addresses {
+        match TcpStream::connect_timeout(&address, timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+                // Keep trying: a later resolved address may accept the connection.
+                if first_refusal.is_none() {
+                    first_refusal = Some((address, error));
+                }
+            }
+            Err(error) => last_failure = Some((address, error)),
+        }
+    }
+    Err(first_refusal.or(last_failure))
 }
 
 pub struct ImapSessionImpl {
@@ -888,5 +893,23 @@ mod dial_tests {
                 "email: imap error: connect/login failed: dial tcp {expected_address}: connect: connection refused"
             )
         );
+    }
+
+    #[test]
+    fn falls_back_after_refused_ipv6_address_to_live_ipv4_address() {
+        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let ipv4_address = listener.local_addr().unwrap();
+        let ipv6_refusal =
+            std::net::SocketAddr::new(std::net::Ipv6Addr::LOCALHOST.into(), ipv4_address.port());
+        let addresses = [ipv6_refusal, ipv4_address];
+
+        let (connected, accepted) = std::thread::scope(|scope| {
+            let accepting = scope.spawn(|| listener.accept().unwrap().0);
+            let connected = connect_addresses(addresses, Duration::from_secs(1)).unwrap();
+            (connected, accepting.join().unwrap())
+        });
+
+        assert!(connected.peer_addr().unwrap().is_ipv4());
+        assert!(accepted.peer_addr().unwrap().is_ipv4());
     }
 }
