@@ -3,7 +3,7 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Integrated base: `afa22cb9543cc53a9f3de3c1d05ba977e4a1cf75`, branch `rust/cli024-integration`; JSON/review repairs are uncommitted. Shared main remains clean at `8986a3db`.
+- Integrated local continuation: `main` is ahead of `origin/main`. No push, publication, cutover, Go removal or release is authorized. The CLI-024, CLI-025, MCP HTTP/stdio and macOS Swift integration slices are committed locally; the older slice notes below are historical.
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
@@ -18,20 +18,153 @@ go vet ./... && gofmt -l .
 
 ## Contract
 
-The CLI corpus `rust-tests/parity/cases/cli/behavior.json` (174 recorded Go
+The CLI corpus `rust-tests/parity/cases/cli/behavior.json` (175 recorded Go
 cases) is the contract. `is_exact_case()` in
 `crates/symeraseme-cli/tests/command_surface.rs` splits it: selected cases are
 compared byte-exactly, the rest only assert the deferred stub fails closed.
 **Migration progress = cases moved into the selected set**, not files ported.
 
-Local selected: **171 · deferred: 3**, executed on `afa22cb9` by the complete
-workspace nextest gate on 2026-09-22. All 166 previous CLI records are unchanged;
-eight migration records were added. Last merged evidence remains 163/3 at
-`7d02cc58` (historical: 158/8 at `93872f48`, 160/6 after #1022).
-A green recorded CLI corpus does not close the separate JSON-state, review or native gates. The three deferred CLI cases are IMAP/LLM, not migration cases.
-The IMAP classification was stale: TLS and the MCP handler are implemented;
-CLI-025 below tracks the missing CLI adapter. The two llmkit transport cases
-remain blocked on the shared implementation.
+Local selected: **175 · deferred: 0** on the integrated local tree. The real
+`poll-inbox` adapter, invalid `--since`, and both reply-triage commands replay
+source-bound Go cases. The LLM-backed cases reproduce Go's missing-key error
+without a paid call. A
+green CLI corpus does not close JSON-state, review or native platform gates.
+
+## Integrated continuation (2026-09-23)
+
+- CLI-024 migration engine and its 500-case Go JSON oracle are committed.
+  Focused macOS and Linux aarch64 tests passed; native Windows and an exact-head
+  remote matrix remain open. The earlier 432-test workspace result applies to
+  that CLI-024 candidate, not automatically to this later integrated head.
+- CLI-025 polls a real IMAP adapter with 175 recorded Go CLI cases, all selected
+  after the LLM transport integration. Filesystem generators, populated manual tasks,
+  events and grants, and source-bound malformed MCP stdio/process cases are
+  integrated and exercised on macOS.
+- MCP HTTP starts a real Rust server with bearer auth, Origin and bind policy,
+  body limits, token rotation and signal drain. The integrated macOS
+  `mcp_http_process` plus `mcp_stdio_process` gate passed 12 tests; native
+  Linux/Windows process behavior remains open.
+- The Swift app's opt-in Rust process test launches the HTTP binary, checks an
+  unauthenticated 401, token-backed tools/list and `list_brokers` calls, and
+  verifies shutdown. This exposed two existing app response-shape defects,
+  fixed in `026c3839`. The Swift suite passed 41 tests with the Rust binary.
+- IMAP modified UTF-7 mailbox names and outbound MIME bytes replay pinned Go
+  fixtures. Default IMAP TLS now loads platform roots, including Windows
+  LocalMachine ROOT; the follow-up passed independent static review and five
+  focused macOS IMAP tests at `c7954258`. Native Windows chain policy and a
+  custom macOS Keychain root remain unverified. No paid LLM or SMTP provider
+  was called.
+- The four Go tick histories now replay through Rust scan, apply, persisted
+  scheduler events and projections (`efc718b`); the two Go conformance tests
+  and four Rust tick-apply tests pass. Core manual-task HandleList/Show/Complete/
+  Cleanup orchestration is integrated at `96da417f`, independently reviewed,
+  with eight source-bound Go handler cases and nine focused integrated Rust
+  tests passing. Positive tick CLI actions now retain Go's capitalized struct
+  keys and declaration order (`ef8ba9c`); matching Go/Rust wire tests pass.
+  Native filesystem evidence remains open.
+- The offline release checker at `4fa11368` verifies six current Go snapshot
+  archives, exact root files, member uniqueness/type and SHA-256 entries.
+  Four malformed-archive controls and the real snapshot pass. This establishes
+  the existing package contract; the release workflow still packages Go.
+  Offline Cargo audit/deny and a source CycloneDX inventory passed, while Rust
+  release artifacts, artifact SBOM/provenance, signing and notarization remain
+  unverified.
+- Local Rust archive staging now produces the six required archive names,
+  root members and checksums from explicit caller-supplied binaries (`1f63e692`).
+  Its placeholder-binary test passes the offline verifier; native Rust binary
+  format, runtime, signing and publication are not established by that test.
+- Core `GetPlan` now serves both CLI and MCP reads. The independently reviewed
+  source-bound Go campaign oracle at `131fb6b4` checks all seven pinned plan
+  timestamps before and after execution, plus local no-send web-form/manual
+  fallback and missing-email-sender transitions. Three integrated Rust tests
+  passed. MCP `execute` now has isolated local replay; broader execution paths
+  remain open.
+- `review` now has eight live Go/Rust CLI differential cases for positional and
+  `--path` aliases, text/JSON modes and failures (`fe9250a`); the input file is
+  unchanged and four successful paths must redact its address.
+- Core reply classification and rebuttal service orchestration is integrated
+  (`4af87d9d`). A source-hash-pinned Go oracle compares full results, saved
+  reply columns, ordered event records and stable projections with injected
+  local clients; 19 focused Rust tests passed after integration. Both CLI
+  wrappers replay 15 local-agent Go cases, including save flags, aliases and
+  errors (`23a44ff`, `e1450c5`). MCP `classify_reply` and `generate_rebuttal`
+  replay the live Go handler through the Rust stdio process (`f690b8bd`). Four
+  llmkit-backed chat providers now use Rust transports with five fake-local
+  HTTP Go cases (`d355e3b2`); echoed keys are redacted from errors and Debug
+  output (`17607327`). No paid provider was used. Native target runs remain open.
+- The real Rust MCP stdio process now replays 72 valid Go initialize ID/params
+  cases as adjacent JSON values (`7cc76c8a`) with bounded I/O and exact output;
+  its focused integrated test passed. Ten malformed/truncated cases remain
+  source-bound. Six malformed parse cases and four size/depth boundaries also
+  replay Go 1.26.6 process bytes (`6ccd1a4`); broader fuzzing remains open.
+- MCP scheduler install, status and uninstall now replay source-bound Go cases
+  through the real Rust stdio process (`c485e852`). Cron runs against a private
+  crontab; launchd and systemd installs use isolated HOME roots and fake service
+  commands. All five integrated stdio process tests passed. Native target runs
+  and more scheduler failure paths remain open.
+- MCP `plan_create` and `execute` now replay five source-bound Go cases through
+  the real Rust stdio process (`aea9f15`). The cases cover the default and a
+  corrupt explicit profile, dry-run preview, denied live execution, and a
+  consented local manual fallback without a network sender. The first
+  integrated replay exposed Go struct field ordering in the content text; the
+  focused stdio process suite then passed 6/6 and the CLI package passed 96/96.
+  Consent directory resolution now uses `USERPROFILE` on Windows and propagates
+  missing-home errors; native Windows execution remains unverified.
+- Reporting JSON and HTML now have raw Go byte oracles on isolated stores
+  (`29d48317`). The zero-campaign CLI artifact, one-campaign export, and
+  two-campaign export with an empty first campaign cover the HTML boundaries;
+  the focused integrated core tests passed 6/6 and filesystem replay passed 1/1.
+- A new PlanCampaign/GetPlan oracle (`956bd9db`) compares raw Go/Rust result,
+  request, campaign and persisted event bytes. It exposed Go's sorted JSON map
+  order in `payload_json`; the shared event append now matches it (`c0d6dd19`).
+  The focused integrated plan tests passed 3/3.
+- The integrated tree at `29d48317` passed 481 workspace tests (two helper
+  tests skipped) with `TMPDIR=/tmp`; `go vet ./...` and `cargo fmt --all --check`
+  passed. A preceding run with a longer temporary path hit the macOS Unix
+  socket path limit in `identity_profile`; that test passed with `/tmp`.
+- The later integrated tree at `79f309f` passed 491/491 macOS workspace tests
+  (two child-entry helpers skipped) with `TMPDIR=/tmp`. A test-only host-agent
+  deadline was raised after one load-dependent fake-process timeout; its
+  focused replay passed. At `20ef924`, `go vet ./...`, tracked-Go `gofmt -l`,
+  `cargo fmt --all --check` and strict offline workspace Clippy passed. A
+  macOS arm64 Rust release binary built at that head, ran `version`, and linked
+  only Apple system frameworks/libraries; the other five native release targets
+  and exact-head target matrix remain open.
+- On native Linux aarch64, the offline `20ef924` workspace check, 176 Rust
+  unit tests (one ignored), frozen 175-case CLI replay and focused LLM tests
+  passed. The later `a022c169` fake-sender campaign oracle passed 1/1. That
+  container had cached Go 1.26.8 rather than the pinned 1.26.6 and lacked
+  rustfmt/Clippy; it is scoped Linux evidence, not a complete final-head
+  matrix. Logs are under `target/linux-aarch64-latest-20ef924.log` and
+  `target/linux-aarch64-campaign-a022.log`.
+- The source-bound campaign oracle now also executes a local two-request
+  batch: one fake email send fails and persists `SEND_FAILED`, the next
+  succeeds and persists `SENT`. The raw Go/Rust results, events and projections
+  match at `a022c169`; the focused macOS test passed 1/1. Real provider and
+  broader CLI wrapper behavior remain open.
+- MCP `auto_confirm` now reads the newest stored reply, previews a trusted
+  link on dry-run, and creates the Go-equivalent durable manual task when a
+  clicker is unavailable (`17daf2c5`). A source-bound Go MCP process oracle
+  and the focused Rust test compare the response and SQLite effects, including
+  a NULL-snippet/no-link failure note. No browser click or network request is
+  attempted. The production CLI and MCP campaign callers keep the newly
+  injectable fake email sender unset.
+- An offline formula gate checks the current separate Homebrew tap formula's
+  four versioned macOS/Linux archive URLs, SHA-256 syntax, install command and
+  version test; Ruby syntax also passes. It cannot verify hashes against Rust
+  release artifacts or perform a local install while those artifacts do not
+  exist.
+- Final local macOS gate on `7151138`: 491/491 Rust workspace tests passed
+  (two helpers skipped); strict all-target/all-feature Clippy and Rust format
+  passed; full `go test ./...`, `go vet ./...` and tracked-Go format passed.
+  The opt-in Swift suite ran against that exact Rust debug binary and passed
+  41/41 tests, including the live HTTP/auth/shutdown integration case. The
+  release build on the same commit produced a Mach-O arm64 executable,
+  `version` returned `symeraseme 0.13.0`, and `otool -L` showed only Apple
+  system frameworks/libraries. Logs: `target/macos-nextest-7151138.log`,
+  `target/go-test-7151138.log`, `target/swift-test-7151138.log`, and
+  `target/macos-release-7151138.log`. These runs do not satisfy the missing
+  native Windows or complete exact-head Linux matrix.
 
 ## Open tasks (run of 2026-09-22)
 
@@ -41,10 +174,10 @@ remain blocked on the shared implementation.
 | CLI-021 | `operate-review`, `operate-run-web-form` | `rust/cli021-misc` | **merged** — #1022 (`c511736b`) |
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | **merged** — #1023 (`4c0236fb`) |
 | CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`); engine behind validation stays fail-closed, see Known defects |
-| CLI-024 | migration detection, report, backup/state | `rust/cli024-integration`; JSON follow-up `rust/cli024-json` | **in progress** — base `afa22cb9` plus uncommitted repairs; static review, macOS workspace and focused native Linux gates pass; native Windows and exact-head CI remain open |
-| CLI-025 | `operate-poll-inbox` | not dispatched | **pending CLI-024 acceptance** — existing IMAP TLS + MCP handler; serialize shared `cli.rs` edits |
+| CLI-024 | migration detection, report, backup/state | local `main` | **integrated locally** — macOS and focused native Linux pass; native Windows and exact-head CI remain open |
+| CLI-025 | `operate-poll-inbox` | local `main` | **integrated locally** — real IMAP adapter, source-bound CLI replay; corpus now 175 selected/0 deferred after LLM transport integration |
 
-## Active continuation (2026-09-22, CLI-024)
+## Historical continuation (2026-09-22, CLI-024)
 
 - Mode/status: execute / local verification complete; native CI/publication pending.
   Coordinator: `.worktrees/cli024-integration`, `rust/cli024-integration`.
@@ -158,33 +291,34 @@ Loaded this session (do not re-load): `go-to-rust-migration`,
 `autonomous-coding-agents`, `parallel-repo-agents`,
 `go-to-rust-migration/references/worker-dispatch.md`.
 
-## Remaining deferred cases
+## Historical deferred-case queue
 
 | Case id | Subsystem | State |
 |---|---|---|
 
 
 | `operate-generate-dashboard/-report/-scheduler` | generators | done — #1021 |
-| `operate-generate-rebuttal`, `operate-classify-reply` | LLM | blocked — `internal/llm` reports transports as not ported (`llmkit` owns the `auth_failure` text in Go); emulating it is forbidden |
+| `operate-generate-rebuttal`, `operate-classify-reply` | LLM | integrated locally — real Rust llmkit chat transport and exact missing-key Go CLI replay (`e8a8c96`) |
 | `operate-migrate` | migration engine | implemented — #1024, validateRoots scope only (engine fail-closed, see Known defects) |
 | `operate-review`, `operate-run-web-form` | misc | **merged** — #1022 (selected 160/6) |
 | `operate-mcp` | MCP stdio server | **merged** — #1023 (`4c0236fb`) |
-| `operate-poll-inbox` | CLI adapter | ready — TLS/STARTTLS merged in #982 (`8f060a36`), MCP handler merged in #991 (`a8c393d5`); only the CLI dispatch is deferred. Residual root-store/UTF-7 differences remain separate contract gaps. |
+| `operate-poll-inbox` | CLI adapter | integrated locally — real CLI dispatch and transport replay; native trust-store behavior remains a separate gate |
 | `operate-auto-confirm`, `operate-migrate` | triage / migration | **merged** — #1024 (`7d02cc58`) |
 
 ## CLI-025 execution notes
 
-The prior "unported IMAP transport" blocker is disproved by current source and
+The prior "unported IMAP transport" blocker was disproved by source and
 history. `crates/symeraseme-cli/src/mcp/handler.rs::poll_inbox` constructs the real
 production dialer, with the source-bound nine-case handler fixture and eleven-case
-transport corpus. The next slice must call that handler, not implement IMAP again.
+transport corpus. CLI-025 now calls that handler.
 `cmd/symeraseme/extra_commands.go:92-164` supplies the exact CLI contract:
 only explicitly changed flags enter the argument map, `--since` and `--since-days`
 share one value (last spelling wins), text output prefers a nonempty `message`,
 otherwise prints `success`. Preserve these differences from other thin wrappers.
 The existing `operate-poll-inbox` recording exercises a real refused local TCP
-connection, not a transport-emulation string. The selected/deferred counters may
-only move after that native call matches its recorded output.
+connection, not a transport-emulation string. Its native call and invalid
+`--since` case now match Go; after the LLM transport slice the selected/deferred
+counters are 175/0.
 
 ## CI caveat
 
@@ -201,29 +335,16 @@ gate for cutover readiness.
   nothing, but it is not read-only, and the recorded `SENT` removes that
   request from the next batch. Changing it is a contract change (CLI-017).
 
-## Known parity defects found but not fixed
+## Remaining parity gaps
 
-- **Migration review/native acceptance (CLI-024, local dirty candidate).**
-  JSON state/completion decoding and all review findings are repaired and
-  statically accepted against manifest `935002f8`. The post-repair 432-test
-  macOS workspace gate and focused five-test Linux gate pass. These do not
-  substitute for native Windows runtime evidence or exact-head CI. The
-  low-descriptor-limit registry build failure remains separately tracked in
-  #1034; raising the test-container limit is not a production fix.
-- **Workspace-guard edge strings.** Root-open failures still print
-  `workspace root is unavailable` where Go wraps the cause
-  (`resolve workspace root: …` / `workspace file read failed`), and a
-  cap-std `InvalidInput` open failure maps to `ErrPathInvalid`'s text where
-  Go says `workspace file read failed`. Neither path is recorded in the
-  corpus; both live in `redaction/path.rs`.
-- **MCP HTTP transport (CLI-022).** `mcp`/`serve` without `--stdio` stays on
-  the deferred fail-closed stub; Go binds the port and writes an auth
-  token file. Not recorded in the corpus.
-- **MCP malformed-stream text (CLI-022).** A value cut off at EOF aborts
-  with `malformed JSON value at byte N` instead of `encoding/json`'s
-  `unexpected EOF`, and a malformed value mid-stream waits for the next read
-  where Go errors immediately. Unrecorded paths; see the `ponytail` comment
-  in `mcp/stream.rs::serve_stdio`.
+- **CLI-024 native acceptance.** JSON state/completion decoding and review
+  findings are committed; the 432-test macOS candidate gate and focused
+  five-test Linux gate passed. Native Windows runtime and exact-head CI remain
+  unverified. The low-descriptor-limit registry build failure is tracked in
+  #1034; raising a test-container limit is not a production fix.
+- **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
+  truncated process cases and ten parse/size/depth mutations now match Go
+  1.26.6; broader bounded fuzz/performance evidence remains open under MCP-015.
 - **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
   explicit message where Go runs `confirmation.AutoConfirm` (browser
   subsystem unported). The recorded case is the no-reply branch.
@@ -234,6 +355,11 @@ gate for cutover readiness.
 
 ## Fixed parity defects (folded into the corpus or a regression test)
 
+- **Workspace-guard edge strings.** The root-open and `InvalidInput` branches
+  now match Go, with three focused Rust cases and two Go source-bound cases.
+- **MCP HTTP transport and malformed-stream text.** Live HTTP starts with
+  bearer auth/token rotation and signal drain; ten malformed stdio cases now
+  replay Go process exit/stdout/stderr. Native platform evidence remains open.
 - **`manual-tasks list` nested task key order.** Fixed by #1018
   (`a96d65d5`): `serde_json` now builds with `preserve_order`, ported
   structs keep declaration order, and every payload Go builds from a
