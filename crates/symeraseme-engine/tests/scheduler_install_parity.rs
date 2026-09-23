@@ -134,23 +134,44 @@ impl Runner for RecordingRunner {
 fn normalize_path(value: &str, case_root: &Path, temp_root: &Path) -> String {
     // Fold HOME first: the later root folding would rewrite the raw path into
     // `<TMPROOT>/<case>/home`, after which the raw form no longer matches.
-    let home = case_root.join("home").to_string_lossy().to_string();
-    let folded = value.replace(&home, "\u{1}HOME\u{1}");
+    let home = path_slashes(&case_root.join("home").to_string_lossy(), cfg!(windows));
+    let folded = path_slashes(value, cfg!(windows)).replace(&home, "\u{1}HOME\u{1}");
     normalize(&folded, case_root, temp_root).replace("\u{1}HOME\u{1}", "<HOME>")
+}
+
+/// Match Go's filepath.ToSlash, which converts separators only on Windows.
+fn path_slashes(value: &str, windows: bool) -> String {
+    if windows {
+        value.replace('\\', "/")
+    } else {
+        value.to_string()
+    }
+}
+
+#[test]
+fn path_slashes_preserves_unix_and_normalizes_windows() {
+    assert_eq!(
+        path_slashes(r"C:\tmp\sched\install.sh", true),
+        "C:/tmp/sched/install.sh"
+    );
+    assert_eq!(
+        path_slashes(r"relative\literal", false),
+        r"relative\literal"
+    );
 }
 
 /// Folds the volatile roots the way the capture does, so hashes and command
 /// lines agree across machines.
 fn normalize(value: &str, case_root: &Path, temp_root: &Path) -> String {
-    let mut out = value.to_string();
-    let temp = temp_root.to_string_lossy().to_string();
-    let case = case_root.to_string_lossy().to_string();
+    let mut out = path_slashes(value, cfg!(windows));
+    let temp = path_slashes(&temp_root.to_string_lossy(), cfg!(windows));
+    let case = path_slashes(&case_root.to_string_lossy(), cfg!(windows));
     out = out.replace(&temp, "<TMPROOT>");
     out = out.replace(&case, "<CASE>");
     // The crontab staging file lives in the system temp directory, whose form
     // differs by platform: macOS keeps a trailing separator ("/var/folders/.../T/"),
     // Linux does not ("/tmp"). Trim it to match Go's folding.
-    let staging = std::env::temp_dir().to_string_lossy().to_string();
+    let staging = path_slashes(&std::env::temp_dir().to_string_lossy(), cfg!(windows));
     let staging = staging.trim_end_matches('/');
     out = out.replace(
         &format!("{staging}/.symeraseme-crontab-"),
