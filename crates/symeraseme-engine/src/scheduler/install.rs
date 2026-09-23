@@ -58,16 +58,19 @@ impl Runner for ExecRunner {
 /// alone would fall back to a system search path, so a cleared `PATH` would
 /// still find `/bin/launchctl` — a silent behavioural difference from Go, and
 /// one that would run a system binary where Go refuses.
+fn missing_executable(name: &str) -> io::Error {
+    let path_variable = if cfg!(windows) { "%PATH%" } else { "$PATH" };
+    io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("exec: {name:?}: executable file not found in {path_variable}"),
+    )
+}
+
 fn look_path(name: &str) -> io::Result<PathBuf> {
     if name.contains('/') {
         return Ok(PathBuf::from(name));
     }
-    let not_found = || {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("exec: {name:?}: executable file not found in $PATH"),
-        )
-    };
+    let not_found = || missing_executable(name);
     let path = std::env::var_os("PATH").ok_or_else(not_found)?;
     if path.is_empty() {
         return Err(not_found());
@@ -614,4 +617,16 @@ pub fn uninstall(options: &InstallOptions<'_>) -> Result<(), SchedulerError> {
     }
     let _ = run(options, "systemctl", &["--user", "daemon-reload"]);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn missing_executable_matches_go_platform_wording() {
+        let variable = if cfg!(windows) { "%PATH%" } else { "$PATH" };
+        assert_eq!(
+            super::missing_executable("launchctl").to_string(),
+            format!("exec: \"launchctl\": executable file not found in {variable}")
+        );
+    }
 }

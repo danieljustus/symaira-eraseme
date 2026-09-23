@@ -134,23 +134,44 @@ impl Runner for RecordingRunner {
 fn normalize_path(value: &str, case_root: &Path, temp_root: &Path) -> String {
     // Fold HOME first: the later root folding would rewrite the raw path into
     // `<TMPROOT>/<case>/home`, after which the raw form no longer matches.
-    let home = case_root.join("home").to_string_lossy().to_string();
-    let folded = value.replace(&home, "\u{1}HOME\u{1}");
+    let home = path_slashes(&case_root.join("home").to_string_lossy(), cfg!(windows));
+    let folded = path_slashes(value, cfg!(windows)).replace(&home, "\u{1}HOME\u{1}");
     normalize(&folded, case_root, temp_root).replace("\u{1}HOME\u{1}", "<HOME>")
+}
+
+/// Match Go's filepath.ToSlash, which converts separators only on Windows.
+fn path_slashes(value: &str, windows: bool) -> String {
+    if windows {
+        value.replace('\\', "/")
+    } else {
+        value.to_string()
+    }
+}
+
+#[test]
+fn path_slashes_preserves_unix_and_normalizes_windows() {
+    assert_eq!(
+        path_slashes(r"C:\tmp\sched\install.sh", true),
+        "C:/tmp/sched/install.sh"
+    );
+    assert_eq!(
+        path_slashes(r"relative\literal", false),
+        r"relative\literal"
+    );
 }
 
 /// Folds the volatile roots the way the capture does, so hashes and command
 /// lines agree across machines.
 fn normalize(value: &str, case_root: &Path, temp_root: &Path) -> String {
-    let mut out = value.to_string();
-    let temp = temp_root.to_string_lossy().to_string();
-    let case = case_root.to_string_lossy().to_string();
+    let mut out = path_slashes(value, cfg!(windows));
+    let temp = path_slashes(&temp_root.to_string_lossy(), cfg!(windows));
+    let case = path_slashes(&case_root.to_string_lossy(), cfg!(windows));
     out = out.replace(&temp, "<TMPROOT>");
     out = out.replace(&case, "<CASE>");
     // The crontab staging file lives in the system temp directory, whose form
     // differs by platform: macOS keeps a trailing separator ("/var/folders/.../T/"),
     // Linux does not ("/tmp"). Trim it to match Go's folding.
-    let staging = std::env::temp_dir().to_string_lossy().to_string();
+    let staging = path_slashes(&std::env::temp_dir().to_string_lossy(), cfg!(windows));
     let staging = staging.trim_end_matches('/');
     out = out.replace(
         &format!("{staging}/.symeraseme-crontab-"),
@@ -305,12 +326,67 @@ fn plain_config(platform: Platform, output_dir: &str) -> Config {
     }
 }
 
+/// The committed capture is from Unix. Native Windows Go reports different
+/// permission bits and renders the install/uninstall shell wrappers differently;
+/// those values are still compared in full against the live Go run below.
+fn comparable_fixture_cases(cases: &Value, windows: bool) -> Value {
+    let mut cases = cases.clone();
+    if windows {
+        for case in cases.as_object_mut().expect("cases object").values_mut() {
+            case.as_object_mut().expect("case object").remove("mode");
+            let files = case["files"].as_object_mut().expect("files object");
+            files.remove("schedules/install.sh");
+            files.remove("schedules/uninstall.sh");
+        }
+    }
+    cases
+}
+
+#[test]
+fn windows_fixture_projection_keeps_unrelated_hashes_strict() {
+    let fixture: Value = serde_json::from_str(FIXTURE).expect("committed fixture is JSON");
+    let mut changed = fixture["cases"].clone();
+    changed["cron_install_writes_block"]["files"]["schedules/install.sh"] =
+        Value::String("windows".into());
+    assert_eq!(
+        comparable_fixture_cases(&changed, true),
+        comparable_fixture_cases(&fixture["cases"], true),
+        "the known Windows wrapper difference must not stale the Unix fixture"
+    );
+    changed["cron_install_writes_block"]["files"]["schedules/symeraseme-poll.sh"] =
+        Value::String("changed".into());
+    assert_ne!(
+        comparable_fixture_cases(&changed, true),
+        comparable_fixture_cases(&fixture["cases"], true),
+        "other file hashes must still reject a stale capture"
+    );
+}
+
 #[test]
 fn rust_install_status_uninstall_match_the_go_capture() {
     let document = live_oracle_capture();
     let committed: Value = serde_json::from_str(FIXTURE).expect("committed fixture is JSON");
+    assert_eq!(document["runner_script"], committed["runner_script"]);
+    let live_cases = comparable_fixture_cases(&document["cases"], cfg!(windows));
+    let committed_cases = comparable_fixture_cases(&committed["cases"], cfg!(windows));
+    #[cfg(windows)]
+    for (name, case) in document["cases"].as_object().expect("cases object") {
+        assert_eq!(
+            case["files"]
+                .as_object()
+                .expect("files object")
+                .keys()
+                .collect::<Vec<_>>(),
+            committed["cases"][name]["files"]
+                .as_object()
+                .expect("files object")
+                .keys()
+                .collect::<Vec<_>>(),
+            "{name}: generated file inventory differs from the Unix fixture"
+        );
+    }
     assert_eq!(
-        document["cases"], committed["cases"],
+        live_cases, committed_cases,
         "the committed fixture no longer matches live Go behaviour; regenerate it"
     );
 
