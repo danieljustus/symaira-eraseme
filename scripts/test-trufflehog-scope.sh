@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INCLUDE_PATHS="$ROOT_DIR/.trufflehog-include-paths"
 EXCLUDE_PATHS="$ROOT_DIR/.trufflehog-exclude-paths"
-TRUFFLEHOG_IMAGE="${TRUFFLEHOG_IMAGE:-ghcr.io/trufflesecurity/trufflehog:3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4}"
+TRUFFLEHOG_IMAGE="${TRUFFLEHOG_IMAGE:-ghcr.io/trufflesecurity/trufflehog:3.97.5@sha256:1cec88f18ca39e26e04e61fe9d886c9c4e5f2fc0ba4f2ed185cac0722bd8a076}"
 
 if [[ ! "$TRUFFLEHOG_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]; then
   printf '%s\n' 'TRUFFLEHOG_IMAGE must use an immutable sha256 digest.' >&2
