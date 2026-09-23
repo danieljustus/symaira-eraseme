@@ -1,15 +1,67 @@
 {
   "source_revision": "bfe2873937947479347c626512d74730fceaa3ac",
   "source_files": [
-    {"path": "internal/mcp/contract_handler.go", "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
-    {"path": "internal/campaign/campaign.go", "sha256": "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
-    {"path": "internal/campaign/planning.go", "sha256": "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
-    {"path": "internal/campaign/execution.go", "sha256": "eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},
-    {"path": "internal/campaign/webform.go", "sha256": "2ba434e161ccd6ed64b8f883e44c1e211ee2c9c45a23a936bda9c7511746a398"},
-    {"path": "internal/identity/profile.go", "sha256": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"},
-    {"path": "internal/identity/gate.go", "sha256": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"}
+    {
+      "path": "internal/mcp/contract_handler.go",
+      "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"
+    },
+    {
+      "path": "internal/campaign/campaign.go",
+      "sha256": "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"
+    },
+    {
+      "path": "internal/campaign/planning.go",
+      "sha256": "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"
+    },
+    {
+      "path": "internal/campaign/execution.go",
+      "sha256": "eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"
+    },
+    {
+      "path": "internal/campaign/webform.go",
+      "sha256": "2ba434e161ccd6ed64b8f883e44c1e211ee2c9c45a23a936bda9c7511746a398"
+    },
+    {
+      "path": "internal/identity/profile.go",
+      "sha256": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"
+    },
+    {
+      "path": "internal/identity/gate.go",
+      "sha256": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"
+    }
   ],
   "source_path": "internal/mcp/contract_handler.go; internal/campaign/{campaign,planning,execution,webform}.go; internal/identity/{profile,gate}.go",
   "seed": "tests/fixtures/mcp-contract/mcp-003-campaign/seed.sql",
-  "cases": []
+  "cases": [
+    {
+      "name": "plan_create_uses_default_path_when_profile_is_missing",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_create\",\"arguments\":{\"campaign_id\":\"campaign-default-profile\",\"max_brokers\":1}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"campaign_id\\\":\\\"campaign-default-profile\\\",\\\"total_brokers\\\":1273,\\\"matched\\\":1273,\\\"planned\\\":1,\\\"requests\\\":[{\\\"request_id\\\":1,\\\"broker_id\\\":\\\"0ptimus-analytics-us\\\",\\\"broker_name\\\":\\\"0ptimus Analytics\\\",\\\"channel\\\":\\\"email\\\",\\\"template\\\":\\\"ccpa-deletion.en.md.j2\\\"}]}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "plan_create_loads_an_explicit_existing_profile",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"plan_create\",\"arguments\":{\"campaign_id\":\"campaign-existing-profile\",\"max_brokers\":1,\"profile_path\":\"profiles/existing.enc\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"identity: profile corrupt: no header separator\"},\"id\":2}\n",
+      "existing_profile": "profiles/existing.enc"
+    },
+    {
+      "name": "execute_dry_run_previews_a_web_form_without_consent",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"execute\",\"arguments\":{\"campaign_id\":\"campaign-web\",\"dry_run\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"batch_size\\\":1,\\\"campaign_id\\\":\\\"campaign-web\\\",\\\"results\\\":[{\\\"broker_id\\\":\\\"dentsu-uk-eu\\\",\\\"broker_name\\\":\\\"Dentsu UK\\\",\\\"dry_run\\\":true,\\\"request_id\\\":1,\\\"success\\\":true,\\\"url\\\":\\\"https://www.dentsu.com/privacy-notices\\\"}],\\\"total_planned\\\":1}\",\"type\":\"text\"}]},\"id\":3}\n",
+      "seed": true
+    },
+    {
+      "name": "execute_denies_live_dispatch_without_consent",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"execute\",\"arguments\":{\"campaign_id\":\"campaign-web\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"identity: consent denied\"},\"id\":4}\n",
+      "seed": true
+    },
+    {
+      "name": "execute_creates_local_manual_task_without_network_send",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"execute\",\"arguments\":{\"campaign_id\":\"campaign-web\",\"consent_token\":\"$CONSENT_TOKEN\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"batch_size\\\":1,\\\"campaign_id\\\":\\\"campaign-web\\\",\\\"results\\\":[{\\\"broker_id\\\":\\\"dentsu-uk-eu\\\",\\\"broker_name\\\":\\\"Dentsu UK\\\",\\\"dry_run\\\":false,\\\"reason\\\":\\\"dynamic_form\\\",\\\"request_id\\\":1,\\\"status\\\":\\\"manual_action_required\\\",\\\"success\\\":false,\\\"task_id\\\":1,\\\"url\\\":\\\"https://www.dentsu.com/privacy-notices\\\"}],\\\"total_planned\\\":1}\",\"type\":\"text\"}]},\"id\":5}\n",
+      "seed": true,
+      "issue_consent": true
+    }
+  ]
 }
