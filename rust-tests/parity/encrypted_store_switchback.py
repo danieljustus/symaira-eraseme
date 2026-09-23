@@ -9,7 +9,10 @@ import json
 import os
 from pathlib import Path
 import platform
+import resource
 import shutil
+import signal
+import subprocess
 
 import plain_store_switchback as gate
 
@@ -17,7 +20,46 @@ import plain_store_switchback as gate
 FIXTURE = gate.REPO / "tests/fixtures/event-store/crypto/golden-campaign-v3-legacy-go.db"
 MASTER_KEY = b"symaira-eraseme-golden-master-32"
 CASES = ("go-existing-state", "rust-existing-state", "rust-write",
-         "rust-readback", "go-after-rust")
+         "rust-mcp-read", "rust-readback", "go-after-rust")
+
+
+def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
+    """Run one bounded stdio MCP request while retaining protocol evidence."""
+    def bounds():
+        maximum = 4 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
+
+    record = {"argv": list(map(str, argv)), "cwd": str(root), "exit_code": None,
+              "timed_out": False, "success": False,
+              "stdin": {"size": len(stdin_bytes),
+                        "sha256": hashlib.sha256(stdin_bytes).hexdigest()}}
+    try:
+        with (root / (label + ".stdout")).open("xb") as out, \
+                (root / (label + ".stderr")).open("xb") as err:
+            child = subprocess.Popen(argv, cwd=root, env=env, stdin=subprocess.PIPE,
+                                     stdout=out, stderr=err, start_new_session=True,
+                                     preexec_fn=bounds)
+            try:
+                child.stdin.write(stdin_bytes)
+                child.stdin.close()
+                child.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                record["timed_out"] = True
+            finally:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                record["exit_code"] = child.wait(timeout=5)
+        record["success"] = record["exit_code"] == 0 and not record["timed_out"]
+    finally:
+        for stream in ("stdout", "stderr"):
+            path = root / (label + "." + stream)
+            if path.exists():
+                record[stream] = {"path": path.name, **gate.identity(path)}
+        gate.save(root / (label + ".json"), record)
+    gate.require(record["success"], label + ": MCP process failed; retained raw evidence")
+    return record
 
 
 def run(go, rust, output):
@@ -90,6 +132,36 @@ def run(go, rust, output):
         gate.require(created["campaign_id"] == "post-rust-encrypted"
                      and type(created["planned"]) is int and created["planned"] == 1,
                      "Rust did not create exactly one request")
+        # Exercise the same encrypted store through the Rust MCP boundary. This
+        # read also verifies the handler explicitly closes/re-encrypts its store.
+        step = {"id": "rust-mcp-read", "success": False}
+        report["steps"].append(step)
+        mcp_request = (b'{"jsonrpc":"2.0","id":"encrypted-switchback",'
+                       b'"method":"tools/call","params":{"name":"manual_tasks_list",'
+                       b'"arguments":{}}}\n')
+        try:
+            step["command"] = mcp_command(
+                output, "rust-mcp-read",
+                ["/usr/bin/sandbox-exec", "-p", policy, str(active), "mcp", "--stdio"],
+                env, mcp_request)
+        finally:
+            record = output / "rust-mcp-read.json"
+            if record.exists():
+                step["command"] = json.loads(record.read_bytes())
+        gate.require(not (output / "rust-mcp-read.stderr").read_bytes(),
+                     "rust-mcp-read: unexpected stderr")
+        mcp_response = json.loads((output / "rust-mcp-read.stdout").read_bytes())
+        gate.require(mcp_response.get("id") == "encrypted-switchback"
+                     and "error" not in mcp_response,
+                     "Rust MCP did not return a successful tool call")
+        contents = mcp_response.get("result", {}).get("content", [])
+        gate.require(len(contents) == 1 and contents[0].get("type") == "text",
+                     "Rust MCP returned an unexpected tool result")
+        mcp_result = json.loads(contents[0]["text"])
+        gate.require(mcp_result.get("success") is True
+                     and isinstance(mcp_result.get("tasks"), list),
+                     "Rust MCP failed to read manual tasks from encrypted state")
+        step["success"] = True
         rust_after = execute("rust-readback", rust,
                              ["requests", "list", "--output", "json"])
         gate.require(rust_after["total"] == 4 and len(rust_after["requests"]) == 4,

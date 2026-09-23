@@ -5,6 +5,7 @@ mod command_surface;
 mod commands;
 #[allow(dead_code)]
 mod mcp;
+mod store;
 
 use std::io::Write;
 

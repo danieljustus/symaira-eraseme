@@ -10,7 +10,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use symeraseme_core::campaign;
-use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
+use symeraseme_core::config::{Config, ConfigContext};
 use symeraseme_core::deadlines::{self, RunOpts, TickAction};
 use symeraseme_core::identity::{
     ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
@@ -856,16 +856,27 @@ fn process_context() -> ConfigContext {
 /// Go's `dataStore()`: resolve the storage location, create the database
 /// directory with mode `0700`, then open the event store.
 fn open_store() -> Result<Store, String> {
-    let storage = resolve_storage(&process_context()).map_err(|error| error.to_string())?;
-    std::fs::create_dir_all(&storage.db_dir)
-        .map_err(|error| format!("eventstore: create database directory: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&storage.db_dir, std::fs::Permissions::from_mode(0o700))
-            .map_err(|error| format!("eventstore: secure database directory: {error}"))?;
+    crate::store::open(&process_context())
+}
+
+fn with_store_outcome(store: Store, operation: impl FnOnce(&Store) -> Outcome) -> Outcome {
+    let (outcome, close) = crate::store::with_store(store, operation);
+    let Err(close) = close else {
+        return outcome;
+    };
+    let close = format!("eventstore: close: {close}\n").into_bytes();
+    match outcome {
+        Outcome::Stdout(stdout) => Outcome::StdoutStderr(stdout, close),
+        Outcome::StdoutStderr(stdout, mut stderr) => {
+            stderr.extend_from_slice(&close);
+            Outcome::StdoutStderr(stdout, stderr)
+        }
+        Outcome::Stderr(mut stderr) => {
+            stderr.extend_from_slice(&close);
+            Outcome::Stderr(stderr)
+        }
+        _ => Outcome::Stderr(close),
     }
-    Store::open(&storage.db_path).map_err(|error| error.to_string())
 }
 
 /// Go's `%v` rendering of a string-keyed map: sorted keys, plain values.
@@ -918,40 +929,42 @@ fn plan_create(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let options = campaign::PlanOpts {
-        campaign_id,
-        jurisdiction: string_flag(parsed, "jurisdiction"),
-        law: string_flag(parsed, "law"),
-        priority: string_flag(parsed, "priority"),
-        category: string_flag(parsed, "category"),
-        status: string_flag_or(parsed, "status", "active"),
-        include_inactive: bool_flag(parsed, "include-inactive"),
-        include_disabled: false,
-        max_brokers: int_flag(parsed, "max", 30),
-        notes: string_flag(parsed, "notes"),
-    };
-    let result =
-        match campaign::plan_campaign(&store, &brokers, &identity_hash, &options, now_utc()) {
-            Ok(result) => result,
-            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let options = campaign::PlanOpts {
+            campaign_id,
+            jurisdiction: string_flag(parsed, "jurisdiction"),
+            law: string_flag(parsed, "law"),
+            priority: string_flag(parsed, "priority"),
+            category: string_flag(parsed, "category"),
+            status: string_flag_or(parsed, "status", "active"),
+            include_inactive: bool_flag(parsed, "include-inactive"),
+            include_disabled: false,
+            max_brokers: int_flag(parsed, "max", 30),
+            notes: string_flag(parsed, "notes"),
         };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        let result =
+            match campaign::plan_campaign(store, &brokers, &identity_hash, &options, now_utc()) {
+                Ok(result) => result,
+                Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
         };
-    }
-    Outcome::Stdout(
-        format!(
-            "planned {} request(s) for campaign {}\n",
-            result.planned, result.campaign_id
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(
+            format!(
+                "planned {} request(s) for campaign {}\n",
+                result.planned, result.campaign_id
+            )
+            .into_bytes(),
         )
-        .into_bytes(),
-    )
+    })
 }
 
 /// `plan show` — Go's `campaign.GetPlan` behind the `show` subcommand.
@@ -960,25 +973,27 @@ fn plan_show(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let campaign_id = string_flag(parsed, "campaign");
-    let status = string_flag(parsed, "status");
-    let result = match campaign::get_plan(&store, &campaign_id, &status) {
-        Ok(result) => Value::Object(result),
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let label = result["campaign_id"].as_str().unwrap_or("all");
-    let total = result["total"].as_u64().unwrap_or_default();
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let campaign_id = string_flag(parsed, "campaign");
+        let status = string_flag(parsed, "status");
+        let result = match campaign::get_plan(store, &campaign_id, &status) {
+            Ok(result) => Value::Object(result),
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(format!("campaign {label}: {total} request(s)\n").into_bytes())
+        let label = result["campaign_id"].as_str().unwrap_or("all");
+        let total = result["total"].as_u64().unwrap_or_default();
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("campaign {label}: {total} request(s)\n").into_bytes())
+    })
 }
 
 /// `plan execute` — Go's `realPlanCommand`'s `execute`.
@@ -996,44 +1011,46 @@ fn plan_execute(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let dry_run = bool_flag(parsed, "dry-run");
-    if !dry_run && let Err(error) = consent_gate(parsed) {
-        return Outcome::Stderr(format!("{error}\n").into_bytes());
-    }
-    let brokers = match load_brokers() {
-        Ok(brokers) => brokers,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let profile = planning_profile(parsed);
-    let result = match campaign::execute_campaign(
-        &store,
-        &campaign_id,
-        &campaign::ExecuteOpts {
-            account: string_flag(parsed, "account"),
-            dry_run,
-            email_sender: None,
-            brokers: &brokers,
-        },
-        profile.as_ref().map(Option::as_ref).map_err(String::as_str),
-        int_flag(parsed, "batch-size", 5),
-        now_utc(),
-    ) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let dry_run = bool_flag(parsed, "dry-run");
+        if !dry_run && let Err(error) = consent_gate(parsed) {
+            return Outcome::Stderr(format!("{error}\n").into_bytes());
+        }
+        let brokers = match load_brokers() {
+            Ok(brokers) => brokers,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(
-        format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
-    )
+        let profile = planning_profile(parsed);
+        let result = match campaign::execute_campaign(
+            store,
+            &campaign_id,
+            &campaign::ExecuteOpts {
+                account: string_flag(parsed, "account"),
+                dry_run,
+                email_sender: None,
+                brokers: &brokers,
+            },
+            profile.as_ref().map(Option::as_ref).map_err(String::as_str),
+            int_flag(parsed, "batch-size", 5),
+            now_utc(),
+        ) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(
+            format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
+        )
+    })
 }
 
 /// Go's `identity.ConsentGate("execute", ...)` for the flags `execute` declares.
@@ -1076,21 +1093,23 @@ fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let result = match reporting::get_campaign_status(&store, campaign_id, now_utc()) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let result = match reporting::get_campaign_status(store, campaign_id, now_utc()) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+    })
 }
 
 /// One string flag as the command saw it; `""` when it was not given.
@@ -1298,32 +1317,34 @@ fn classify_reply_command(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let agent = match triage_agent(parsed) {
-        Ok(agent) => agent,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let call = triage_agent_call(&agent);
-    let outcome = match triage_service::Service::new(&store).classify_reply(
-        request_id,
-        &ClassifyRequest::default(),
-        None,
-        Some(&call),
-        bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
-    ) {
-        Ok(outcome) => outcome,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    if let Some(error) = outcome.error {
-        return Outcome::Stderr(format!("{error}\n").into_bytes());
-    }
-    match output_format(parsed) {
-        Ok("json") => match json_line(&outcome.result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
-        },
-        Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
-        Err(outcome) => outcome,
-    }
+    with_store_outcome(store, |store| {
+        let agent = match triage_agent(parsed) {
+            Ok(agent) => agent,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let call = triage_agent_call(&agent);
+        let outcome = match triage_service::Service::new(store).classify_reply(
+            request_id,
+            &ClassifyRequest::default(),
+            None,
+            Some(&call),
+            bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+        ) {
+            Ok(outcome) => outcome,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        if let Some(error) = outcome.error {
+            return Outcome::Stderr(format!("{error}\n").into_bytes());
+        }
+        match output_format(parsed) {
+            Ok("json") => match json_line(&outcome.result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            },
+            Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+            Err(outcome) => outcome,
+        }
+    })
 }
 
 fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
@@ -1335,41 +1356,43 @@ fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let agent = match triage_agent(parsed) {
-        Ok(agent) => agent,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let call = triage_agent_call(&agent);
-    let result = match triage_service::Service::new(&store).generate_rebuttal(
-        request_id,
-        &RebuttalRequest::default(),
-        None,
-        Some(&call),
-        bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
-    ) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let result = json!({
-        "template_name": result.template_name,
-        "label": result.label,
-        "description": result.description,
-        "jurisdiction": result.jurisdiction,
-        "rejection_classification": result.rejection_classification,
-        "confidence": result.confidence,
-        "rebuttal_body": result.rebuttal_body,
-        "needs_human_review": result.needs_human_review,
-        "llm_used": result.llm_used,
-        "usage": result.usage.record(),
-    });
-    match output_format(parsed) {
-        Ok("json") => match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
-        },
-        Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
-        Err(outcome) => outcome,
-    }
+    with_store_outcome(store, |store| {
+        let agent = match triage_agent(parsed) {
+            Ok(agent) => agent,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let call = triage_agent_call(&agent);
+        let result = match triage_service::Service::new(store).generate_rebuttal(
+            request_id,
+            &RebuttalRequest::default(),
+            None,
+            Some(&call),
+            bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+        ) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let result = json!({
+            "template_name": result.template_name,
+            "label": result.label,
+            "description": result.description,
+            "jurisdiction": result.jurisdiction,
+            "rejection_classification": result.rejection_classification,
+            "confidence": result.confidence,
+            "rebuttal_body": result.rebuttal_body,
+            "needs_human_review": result.needs_human_review,
+            "llm_used": result.llm_used,
+            "usage": result.usage.record(),
+        });
+        match output_format(parsed) {
+            Ok("json") => match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            },
+            Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+            Err(outcome) => outcome,
+        }
+    })
 }
 
 /// The tool result when the command asked for JSON, `None` for text mode.
@@ -1951,32 +1974,34 @@ fn plan_tick(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let dry_run = parsed
-        .flags
-        .get("dry-run")
-        .is_some_and(|value| value == "true");
-    let actions = match deadlines::run_tick(
-        &store,
-        &RunOpts {
-            dry_run,
-            batch_size: 0,
-        },
-        now_utc(),
-    ) {
-        Ok(actions) => actions,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match tick_actions_json(&actions, dry_run) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let dry_run = parsed
+            .flags
+            .get("dry-run")
+            .is_some_and(|value| value == "true");
+        let actions = match deadlines::run_tick(
+            store,
+            &RunOpts {
+                dry_run,
+                batch_size: 0,
+            },
+            now_utc(),
+        ) {
+            Ok(actions) => actions,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match tick_actions_json(&actions, dry_run) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+    })
 }
 
 fn tick_actions_json(actions: &[TickAction], dry_run: bool) -> Result<Vec<u8>, serde_json::Error> {
