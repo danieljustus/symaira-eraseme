@@ -1,4 +1,5 @@
 //! Exercise token-authenticated MCP over the real local process/network path.
+#![cfg(unix)]
 
 use std::collections::HashSet;
 use std::io::{Read, Write};

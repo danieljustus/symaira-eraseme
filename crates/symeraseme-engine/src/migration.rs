@@ -700,6 +700,7 @@ fn write_atomic(path: impl AsRef<Path>, data: &[u8], mode: u32) -> Result<(), St
     if let Err(error) = fs::rename(tmp.path(), path) {
         // Only our already-open temporary file is made removable. Never clear
         // an existing destination's READONLY bit to force replacement.
+        #[allow(clippy::permissions_set_readonly_false)]
         permissions.set_readonly(false);
         let _ = tmp.as_file().set_permissions(permissions);
         return Err(io_error("rename", path, error));
