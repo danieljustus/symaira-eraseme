@@ -9,7 +9,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use symeraseme_core::email::config::{ImapConfigOptions, load_imap_config_with};
 use symeraseme_core::email::hwm::{HwmStore, MemoryHwmStore};
 use symeraseme_core::email::policy::{parse_email_body, poll_folders, poll_inbox};
@@ -96,7 +96,7 @@ struct Recorder {
 
 struct ScriptedDialer {
     folders: HashMap<String, FolderScript>,
-    recorder: Rc<RefCell<Recorder>>,
+    recorder: Arc<Mutex<Recorder>>,
 }
 
 impl ImapDialer for ScriptedDialer {
@@ -118,7 +118,7 @@ impl ImapDialer for ScriptedDialer {
 struct ScriptedSession {
     script: FolderScript,
     folder: String,
-    recorder: Rc<RefCell<Recorder>>,
+    recorder: Arc<Mutex<Recorder>>,
 }
 
 impl ImapSession for ScriptedSession {
@@ -134,7 +134,7 @@ impl ImapSession for ScriptedSession {
         uid_range: &str,
         since: Option<DateTime<Utc>>,
     ) -> Result<Vec<u32>, String> {
-        self.recorder.borrow_mut().searches.push((
+        self.recorder.lock().expect("recorder lock").searches.push((
             self.folder.clone(),
             uid_range.to_string(),
             since.is_some(),
@@ -146,7 +146,11 @@ impl ImapSession for ScriptedSession {
     }
 
     fn fetch(&mut self, uids: &[u32]) -> Result<Vec<FetchedMessage>, String> {
-        self.recorder.borrow_mut().fetches.push(uids.to_vec());
+        self.recorder
+            .lock()
+            .expect("recorder lock")
+            .fetches
+            .push(uids.to_vec());
         if let Some(error) = &self.script.fetch_error {
             return Err(error.clone());
         }
@@ -451,7 +455,7 @@ fn recorded_polls_agree() {
         seed_hwm(&state, &case["initial_hwm"]);
 
         for (index, recorded) in case["calls"].as_array().expect("calls").iter().enumerate() {
-            let recorder = Rc::new(RefCell::new(Recorder::default()));
+            let recorder = Arc::new(Mutex::new(Recorder::default()));
             let dialer = ScriptedDialer {
                 folders: build_script(&case["script"]),
                 recorder: recorder.clone(),
@@ -479,7 +483,7 @@ fn recorded_polls_agree() {
                 }
             }
 
-            let recorder = recorder.borrow();
+            let recorder = recorder.lock().expect("recorder lock");
             let searches: Vec<Value> = recorder
                 .searches
                 .iter()
@@ -563,7 +567,7 @@ fn recorded_service_runs_agree() {
             ..ImapConfig::default()
         };
         let state = MemoryHwmStore::new();
-        let recorder = Rc::new(RefCell::new(Recorder::default()));
+        let recorder = Arc::new(Mutex::new(Recorder::default()));
         let dialer = ScriptedDialer {
             folders: build_script(&case["script"]),
             recorder,

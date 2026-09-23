@@ -137,7 +137,8 @@ fn golden_tick_histories_scan_and_persist_all_four_go_actions() {
         .expect("timestamp")
         .with_timezone(&Utc);
 
-    let histories: [(&str, &[(EventType, Value, i64)]); 4] = [
+    type History<'a> = (&'a str, &'a [(EventType, Value, i64)]);
+    let histories: [History<'_>; 4] = [
         (
             "broker-a",
             &[
