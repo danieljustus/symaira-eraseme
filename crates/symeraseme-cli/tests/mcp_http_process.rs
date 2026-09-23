@@ -599,7 +599,7 @@ fn go_oracle_http_wire_transcripts_match() {
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = token(&rust_root);
 
-    let cases: [OracleCase<'_>; 5] = [
+    let cases: [OracleCase<'_>; 6] = [
         ("GET", b"", vec![]),
         ("POST", br#"{}"#, vec![]),
         (
@@ -608,6 +608,14 @@ fn go_oracle_http_wire_transcripts_match() {
             vec![
                 ("Authorization", format!("Bearer {go_token}")),
                 ("Origin", "https://evil.example".into()),
+            ],
+        ),
+        (
+            "POST",
+            br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#,
+            vec![
+                ("Authorization", format!("Bearer {go_token}")),
+                ("Origin", String::new()),
             ],
         ),
         (

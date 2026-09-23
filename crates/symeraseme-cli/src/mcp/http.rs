@@ -252,6 +252,7 @@ async fn handle_request(
         .headers()
         .get(http::header::ORIGIN)
         .and_then(|origin| origin.to_str().ok())
+        .filter(|origin| !origin.is_empty())
         .is_some_and(|origin| !allowed_origin(origin))
     {
         rpc_reply(403, -32000, "Forbidden: disallowed Origin")
