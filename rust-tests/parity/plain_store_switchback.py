@@ -282,7 +282,7 @@ try:
  with open(sys.argv[3],'r+b'): pass
 except OSError as exc: result['outside_write_denied']=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
 else: result['outside_write_denied']=False
-for key,path in (('host_share_write_denied',sys.argv[4]),('guest_local_write_denied',sys.argv[5])):
+for key,path in zip(('host_share_write_denied','guest_local_write_denied'),sys.argv[4:6]):
  try:
   with open(path,'r+b'): pass
  except OSError as exc: result[key]=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
