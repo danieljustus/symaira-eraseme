@@ -147,7 +147,7 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
     }
     assert_eq!(
         hex::encode(Sha256::digest(go_oracle)),
-        "f83f277ae57019bd420d6db73dc0ce9fb78ef735bc33ca7c0e646b1e527b314a",
+        "7c193ee86ae19b06b1fff4bd1f8d967a42e46d44e54b08f0f2be9691ed353f9c",
         "Go oracle source changed; review and repin this executable contract"
     );
     assert_eq!(
@@ -291,12 +291,88 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
             )
         })
         .collect::<Map<_, _>>();
+
+    let fake_campaign = "dom002-fake-send";
+    repository
+        .create_campaign(fake_campaign, "initial", "")
+        .expect("create fake-send campaign");
+    let fake_failure_id = repository
+        .create_removal_request("fake-failure", "email", fake_campaign, "DE", "", "")
+        .expect("create failing fake-send request");
+    let fake_success_id = repository
+        .create_removal_request("fake-success", "email", fake_campaign, "DE", "", "")
+        .expect("create succeeding fake-send request");
+    for (id, broker_id, endpoint) in [
+        (fake_failure_id, "fake-failure", "failure@example.invalid"),
+        (fake_success_id, "fake-success", "success@example.invalid"),
+    ] {
+        store
+            .append_and_project(
+                id,
+                &EventType::Planned,
+                &json!({"broker_name": broker_id, "endpoint": endpoint})
+                    .as_object()
+                    .expect("fake-send planned payload")
+                    .clone(),
+                &Source::System,
+                pinned_now(),
+            )
+            .expect("append fake-send planned event");
+    }
+    pin_request_timestamps(&store, &[fake_failure_id, fake_success_id]);
+    let fake_send_plan_before =
+        Value::Object(get_plan(&store, fake_campaign, "").expect("get fake-send plan"));
+    let fake_sender = |to: &str, _: &str, _: &str| {
+        if to == "failure@example.invalid" {
+            Err("synthetic send failure".to_owned())
+        } else {
+            let mut result = Map::new();
+            result.insert("message_id".to_owned(), json!("fake-42"));
+            Ok(result)
+        }
+    };
+    let fake_send_result = execute_campaign(
+        &store,
+        fake_campaign,
+        &ExecuteOpts {
+            email_sender: Some(&fake_sender),
+            ..ExecuteOpts::default()
+        },
+        Ok(Some(&profile)),
+        5,
+        pinned_now(),
+    )
+    .expect("execute batch through fake sender");
+    pin_request_timestamps(&store, &[fake_failure_id, fake_success_id]);
+    let fake_send_plan_after = Value::Object(
+        get_plan(&store, fake_campaign, "").expect("get fake-send plan after execution"),
+    );
+    let mut fake_send_events = Vec::new();
+    for id in [fake_failure_id, fake_success_id] {
+        fake_send_events.extend(
+            Repository::new(&store)
+                .get_events(id, 0)
+                .expect("read fake-send events")
+                .into_iter()
+                .map(|event| {
+                    json!({
+                        "type": event.event_type.as_str(),
+                        "request_id": event.request_id,
+                        "payload": event.payload,
+                    })
+                }),
+        );
+    }
     let actual = json!({
         "plan_before": plan_before,
         "plan_after": plan_after,
         "result": result,
         "events": events,
         "statuses": statuses,
+        "fake_send_plan_before": fake_send_plan_before,
+        "fake_send_plan_after": fake_send_plan_after,
+        "fake_send_result": fake_send_result,
+        "fake_send_events": fake_send_events,
     });
     assert_eq!(actual, expected);
 }

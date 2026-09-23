@@ -397,17 +397,18 @@ fn go_timestamp(value: &str) -> Value {
 /// resolution here, as it does for planning, and hands the failure through.
 pub type ProfileSource<'a> = Result<Option<&'a Profile>, &'a str>;
 
-/// Go's `ExecuteOpts`, minus the injectable adapters.
+/// Go's `ExecuteOpts` without a network-capable adapter implementation.
 ///
 /// `realPlanCommand` leaves `ExecuteOpts.Email` nil and supplies a
-/// `WebFormAdapter` without a `FormExecutor`, so neither adapter can reach the
-/// network: the email branch always stops at `email_sender is required`, and the
-/// web-form branch always previews (dry run) or records a manual task. This port
-/// carries no adapter fields at all, which makes that structural.
-#[derive(Debug, Clone, Default)]
+/// `WebFormAdapter` without a `FormExecutor`. Tests may inject a local sender;
+/// the production command remains unable to reach an email provider here.
+#[derive(Clone, Default)]
 pub struct ExecuteOpts<'a> {
     pub account: String,
     pub dry_run: bool,
+    /// Injectable sender matching Go's `ExecuteOpts.Email`; callers can keep
+    /// execution offline by supplying a local stub.
+    pub email_sender: Option<&'a dyn Fn(&str, &str, &str) -> Result<Map<String, Value>, String>>,
     /// The registry the web-form adapter previews against, as
     /// `realPlanCommand` passes `loadRegistry()` to `NewWebFormAdapter`.
     pub brokers: &'a [Broker],
@@ -419,6 +420,7 @@ pub enum ExecuteError {
     IdentityProfile(String),
     IdentityProfileNotFound,
     EmailSenderRequired,
+    EmailSend { request_id: i64, message: String },
     Database(rusqlite::Error),
     Projection(ProjectionError),
 }
@@ -438,6 +440,12 @@ impl std::fmt::Display for ExecuteError {
                 formatter,
                 "campaign: email_sender is required for email-based requests"
             ),
+            Self::EmailSend {
+                request_id,
+                message,
+            } => {
+                write!(formatter, "campaign: request {request_id}: {message}")
+            }
             Self::Database(error) => write!(formatter, "{error}"),
             Self::Projection(error) => write!(formatter, "{error}"),
         }
@@ -545,22 +553,26 @@ pub fn execute_request(
         .map(|event| event.payload.clone())
         .unwrap_or_default();
     execute_email_request(
+        store,
         request_id,
         &broker_name,
         &payload,
         &request.template_id,
         opts,
         profile,
+        now,
     )
 }
 
 fn execute_email_request(
+    store: &Store,
     request_id: i64,
     broker_name: &str,
     payload: &Map<String, Value>,
     template_id: &str,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
+    now: DateTime<Utc>,
 ) -> Result<ExecuteResult, ExecuteError> {
     let endpoint = payload
         .get("endpoint")
@@ -599,7 +611,53 @@ fn execute_email_request(
         out.insert("body".to_owned(), json!(rendered));
         return Ok(out);
     }
-    Err(ExecuteError::EmailSenderRequired)
+    let Some(sender) = opts.email_sender else {
+        return Err(ExecuteError::EmailSenderRequired);
+    };
+    let send_result = match sender(endpoint, &subject, &rendered) {
+        Ok(result) => result,
+        Err(message) => {
+            let mut payload = Map::new();
+            payload.insert("error".to_owned(), json!(message));
+            payload.insert("to".to_owned(), json!(endpoint));
+            store.append_and_project(
+                request_id,
+                &EventType::SendFailed,
+                &payload,
+                &Source::System,
+                now,
+            )?;
+            return Err(ExecuteError::EmailSend {
+                request_id,
+                message,
+            });
+        }
+    };
+
+    let expected_days = payload
+        .get("expected_response_days")
+        .and_then(Value::as_i64)
+        .filter(|days| *days > 0)
+        .unwrap_or(30);
+    let mut sent = Map::new();
+    sent.insert("to".to_owned(), json!(endpoint));
+    sent.insert("template".to_owned(), json!(template_id));
+    sent.insert("account".to_owned(), json!(opts.account));
+    sent.insert("expected_response_days".to_owned(), json!(expected_days));
+    sent.insert(
+        "message_id".to_owned(),
+        json!(send_result.get("message_id")),
+    );
+    sent.insert(
+        "identity_snapshot_hash".to_owned(),
+        json!(crate::identity::hash_profile(profile)),
+    );
+    store.append_and_project(request_id, &EventType::Sent, &sent, &Source::System, now)?;
+    let mut out = Map::new();
+    out.insert("success".to_owned(), json!(true));
+    out.insert("request_id".to_owned(), json!(request_id));
+    out.insert("result".to_owned(), json!(send_result));
+    Ok(out)
 }
 
 /// Go's `defaultRenderer`: a deterministic placeholder body. `realPlanCommand`

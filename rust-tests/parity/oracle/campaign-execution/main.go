@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,11 +26,15 @@ type input struct {
 }
 
 type output struct {
-	PlanBefore map[string]any    `json:"plan_before"`
-	PlanAfter  map[string]any    `json:"plan_after"`
-	Result     map[string]any    `json:"result"`
-	Events     []eventSnapshot   `json:"events"`
-	Statuses   map[string]string `json:"statuses"`
+	PlanBefore         map[string]any    `json:"plan_before"`
+	PlanAfter          map[string]any    `json:"plan_after"`
+	Result             map[string]any    `json:"result"`
+	Events             []eventSnapshot   `json:"events"`
+	Statuses           map[string]string `json:"statuses"`
+	FakeSendPlanBefore map[string]any    `json:"fake_send_plan_before"`
+	FakeSendPlanAfter  map[string]any    `json:"fake_send_plan_after"`
+	FakeSendResult     map[string]any    `json:"fake_send_result"`
+	FakeSendEvents     []eventSnapshot   `json:"fake_send_events"`
 }
 
 type eventSnapshot struct {
@@ -144,7 +149,73 @@ func main() {
 		id := request["id"].(int64)
 		statuses[fmt.Sprint(id)], _ = request["current_status"].(string)
 	}
-	resultDoc := output{PlanBefore: planBefore, PlanAfter: planAfter, Result: result, Events: snapshots, Statuses: statuses}
+	if _, err := repo.CreateCampaign(ctx, "dom002-fake-send", "initial", ""); err != nil {
+		fatal(err.Error())
+	}
+	failureID, err := repo.CreateRemovalRequest(ctx, "fake-failure", "email", "dom002-fake-send", "DE", "", "")
+	if err != nil {
+		fatal(err.Error())
+	}
+	successID, err := repo.CreateRemovalRequest(ctx, "fake-success", "email", "dom002-fake-send", "DE", "", "")
+	if err != nil {
+		fatal(err.Error())
+	}
+	for _, item := range []struct {
+		id       int64
+		brokerID string
+		endpoint string
+	}{
+		{failureID, "fake-failure", "failure@example.invalid"},
+		{successID, "fake-success", "success@example.invalid"},
+	} {
+		if _, _, err := store.AppendAndProject(ctx, item.id, eventstore.EvtPlanned,
+			map[string]any{"broker_name": item.brokerID, "endpoint": item.endpoint}, eventstore.SrcSystem, fixedTime()); err != nil {
+			fatal(err.Error())
+		}
+	}
+	if err := pinRequestTimestamps(ctx, store, failureID, successID); err != nil {
+		fatal(err.Error())
+	}
+	fakePlanBefore, err := campaign.GetPlan(ctx, repo, "dom002-fake-send", "")
+	if err != nil {
+		fatal(err.Error())
+	}
+	fakeResult, err := campaign.ExecuteCampaign(ctx, store, "dom002-fake-send", campaign.ExecuteOpts{
+		ProfilePath: profilePath,
+		Email: func(_ context.Context, to, _, _ string) (map[string]string, error) {
+			if to == "failure@example.invalid" {
+				return nil, errors.New("synthetic send failure")
+			}
+			return map[string]string{"message_id": "fake-42"}, nil
+		},
+	}, 5)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := pinRequestTimestamps(ctx, store, failureID, successID); err != nil {
+		fatal(err.Error())
+	}
+	fakePlanAfter, err := campaign.GetPlan(ctx, repo, "dom002-fake-send", "")
+	if err != nil {
+		fatal(err.Error())
+	}
+	fakeEvents := make([]eventSnapshot, 0, 4)
+	for _, id := range []int64{failureID, successID} {
+		events, err := store.GetEvents(ctx, id, 0)
+		if err != nil {
+			fatal(err.Error())
+		}
+		for _, event := range events {
+			fakeEvents = append(fakeEvents, eventSnapshot{
+				Type: string(event.EventType), RequestID: event.RequestID, Payload: event.Payload,
+			})
+		}
+	}
+	resultDoc := output{
+		PlanBefore: planBefore, PlanAfter: planAfter, Result: result, Events: snapshots, Statuses: statuses,
+		FakeSendPlanBefore: fakePlanBefore, FakeSendPlanAfter: fakePlanAfter,
+		FakeSendResult: fakeResult, FakeSendEvents: fakeEvents,
+	}
 	if err := json.NewEncoder(os.Stdout).Encode(resultDoc); err != nil {
 		fatal(err.Error())
 	}
