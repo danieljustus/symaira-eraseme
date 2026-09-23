@@ -436,6 +436,10 @@ fn render_context(
         now,
         ..RenderContext::default()
     };
+    if profile.is_none() {
+        // Go's text/template writes `<no value>` for this missing map key.
+        context.full_name = "<no value>".to_owned();
+    }
     if let Some(profile) = profile {
         context.full_name = profile.full_name.clone();
         context.name_variants = profile.name_variants.clone();
