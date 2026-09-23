@@ -99,7 +99,7 @@ fn malformed_stdio_process_matches_go_errors() {
     .unwrap();
     assert_eq!(fixture["source_revision"], "4e582f28");
     let cases = fixture["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 6);
+    assert_eq!(cases.len(), 8);
     for case in cases {
         let name = case["name"].as_str().unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))

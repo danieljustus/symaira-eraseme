@@ -123,7 +123,7 @@ pub(crate) fn serve_stdio(
 }
 
 fn syntax_error(input: &[u8]) -> Option<StreamError> {
-    // ponytail: the six recorded Go error classes are matched; port Go's
+    // ponytail: the recorded Go error classes are matched; port Go's
     // full scanner if a wider malformed-input corpus requires exact wording.
     let error = serde_json::from_slice::<serde_json::Value>(input).err()?;
     if error.is_eof() {

@@ -15,6 +15,8 @@ cases = {
     "invalid-string-escape": b'"bad\\x"',
     "array-trailing-comma": b"[1,]",
     "object-trailing-comma": b'{"x":1,}',
+    "literal-then-junk": b"truex",
+    "adjacent-valid-scalars": b"01",
 }
 go = Path(sys.argv[1]).resolve()
 assert "go1.26.6" in subprocess.check_output([str(go), "version"], text=True)

@@ -42,6 +42,20 @@
       "exit_code": 1,
       "stdout": "",
       "stderr": "invalid character '}' looking for beginning of object key string\n"
+    },
+    {
+      "name": "literal-then-junk",
+      "input": "truex",
+      "exit_code": 1,
+      "stdout": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n",
+      "stderr": "invalid character 'x' looking for beginning of value\n"
+    },
+    {
+      "name": "adjacent-valid-scalars",
+      "input": "01",
+      "exit_code": 0,
+      "stdout": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n",
+      "stderr": ""
     }
   ]
 }

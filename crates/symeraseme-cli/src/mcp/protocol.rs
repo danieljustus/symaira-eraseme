@@ -653,15 +653,53 @@ pub(crate) fn skip_json_value(raw: &[u8], mut index: usize) -> Option<usize> {
         }
         _ => {}
     }
-    let start = index;
-    while raw
-        .get(index)
-        .is_some_and(|byte| !is_json_whitespace(*byte) && !matches!(byte, b',' | b'}' | b']'))
-    {
+    skip_json_primitive(raw, index)
+}
+
+fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
+    let tail = raw.get(index..)?;
+    for literal in [b"null".as_slice(), b"true", b"false"] {
+        if tail.starts_with(literal) {
+            return Some(index + literal.len());
+        }
+    }
+    if raw.get(index) == Some(&b'-') {
         index += 1;
     }
-    let token = &raw[start..index];
-    (is_json_primitive(token)).then_some(index)
+    match raw.get(index)? {
+        b'0' => index += 1,
+        b'1'..=b'9' => {
+            index += 1;
+            while raw.get(index).is_some_and(u8::is_ascii_digit) {
+                index += 1;
+            }
+        }
+        _ => return None,
+    }
+    if raw.get(index) == Some(&b'.') {
+        index += 1;
+        let start = index;
+        while raw.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return None;
+        }
+    }
+    if matches!(raw.get(index), Some(b'e' | b'E')) {
+        index += 1;
+        if matches!(raw.get(index), Some(b'+' | b'-')) {
+            index += 1;
+        }
+        let start = index;
+        while raw.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return None;
+        }
+    }
+    Some(index)
 }
 
 fn skip_json_value_with_finite_numbers(raw: &[u8], mut index: usize) -> Option<usize> {
