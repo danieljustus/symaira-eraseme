@@ -600,60 +600,151 @@ fn flush_pending_surrogate(output: &mut String, pending_high: &mut Option<u16>) 
     }
 }
 
-pub(crate) fn skip_json_value(raw: &[u8], mut index: usize) -> Option<usize> {
-    if raw.get(index) == Some(&b'"') {
-        return skip_json_string(raw, index);
-    }
-    match raw.get(index) {
-        Some(b'{') => {
-            index += 1;
+const GO_MAX_JSON_NESTING_DEPTH: usize = 10_000;
+
+#[derive(Clone, Copy)]
+enum JsonFrame {
+    Object(ObjectState),
+    Array(ArrayState),
+}
+
+#[derive(Clone, Copy)]
+enum ObjectState {
+    FirstKeyOrEnd,
+    KeyAfterComma,
+    AfterValue,
+}
+
+#[derive(Clone, Copy)]
+enum ArrayState {
+    FirstValueOrEnd,
+    ValueAfterComma,
+    AfterValue,
+}
+
+/// Scans one value without recursion. Go's `encoding/json` accepts nesting up
+/// to 10,000 composite values, so keeping an explicit stack also avoids Rust
+/// stack overflow on valid Go-sized inputs.
+pub(crate) fn scan_json_value(
+    raw: &[u8],
+    mut index: usize,
+    finite_numbers_only: bool,
+) -> Result<Option<usize>, u8> {
+    let mut frames = Vec::new();
+    let mut needs_value = true;
+    loop {
+        if needs_value {
             skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b'}') {
-                return Some(index + 1);
-            }
-            loop {
-                let key_end = skip_json_string(raw, index)?;
-                index = key_end;
-                skip_whitespace(raw, &mut index);
-                if raw.get(index) != Some(&b':') {
-                    return None;
+            match raw.get(index) {
+                Some(b'{') => {
+                    if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
+                        return Err(b'{');
+                    }
+                    frames.push(JsonFrame::Object(ObjectState::FirstKeyOrEnd));
+                    index += 1;
+                    needs_value = false;
+                    continue;
                 }
-                index += 1;
-                skip_whitespace(raw, &mut index);
-                index = skip_json_value(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
+                Some(b'[') => {
+                    if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
+                        return Err(b'[');
+                    }
+                    frames.push(JsonFrame::Array(ArrayState::FirstValueOrEnd));
+                    index += 1;
+                    needs_value = false;
+                    continue;
+                }
+                Some(b'"') => {
+                    let Some(end) = skip_json_string(raw, index) else {
+                        return Ok(None);
+                    };
+                    index = end;
+                }
+                Some(_) => {
+                    let start = index;
+                    let Some(end) = skip_json_primitive(raw, index) else {
+                        return Ok(None);
+                    };
+                    if finite_numbers_only {
+                        let token = &raw[start..end];
+                        if is_json_number(token)
+                            && std::str::from_utf8(token)
+                                .ok()
+                                .and_then(|text| text.parse::<f64>().ok())
+                                .is_none_or(|value| !value.is_finite())
+                        {
+                            return Ok(None);
+                        }
+                    }
+                    index = end;
+                }
+                None => return Ok(None),
+            }
+            needs_value = false;
+        }
+
+        let Some(frame) = frames.last_mut() else {
+            return Ok(Some(index));
+        };
+        skip_whitespace(raw, &mut index);
+        match frame {
+            JsonFrame::Object(state) => match state {
+                ObjectState::FirstKeyOrEnd if raw.get(index) == Some(&b'}') => {
+                    frames.pop();
+                    index += 1;
+                }
+                ObjectState::FirstKeyOrEnd | ObjectState::KeyAfterComma => {
+                    let Some(key_end) = skip_json_string(raw, index) else {
+                        return Ok(None);
+                    };
+                    index = key_end;
+                    skip_whitespace(raw, &mut index);
+                    if raw.get(index) != Some(&b':') {
+                        return Ok(None);
+                    }
+                    index += 1;
+                    *state = ObjectState::AfterValue;
+                    needs_value = true;
+                }
+                ObjectState::AfterValue => match raw.get(index) {
                     Some(b',') => {
                         index += 1;
-                        skip_whitespace(raw, &mut index);
+                        *state = ObjectState::KeyAfterComma;
                     }
-                    Some(b'}') => return Some(index + 1),
-                    _ => return None,
+                    Some(b'}') => {
+                        frames.pop();
+                        index += 1;
+                    }
+                    _ => return Ok(None),
+                },
+            },
+            JsonFrame::Array(state) => match state {
+                ArrayState::FirstValueOrEnd if raw.get(index) == Some(&b']') => {
+                    frames.pop();
+                    index += 1;
                 }
-            }
-        }
-        Some(b'[') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b']') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_value(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
+                ArrayState::FirstValueOrEnd | ArrayState::ValueAfterComma => {
+                    *state = ArrayState::AfterValue;
+                    needs_value = true;
+                }
+                ArrayState::AfterValue => match raw.get(index) {
                     Some(b',') => {
                         index += 1;
-                        skip_whitespace(raw, &mut index);
+                        *state = ArrayState::ValueAfterComma;
                     }
-                    Some(b']') => return Some(index + 1),
-                    _ => return None,
-                }
-            }
+                    Some(b']') => {
+                        frames.pop();
+                        index += 1;
+                    }
+                    _ => return Ok(None),
+                },
+            },
         }
-        _ => {}
     }
-    skip_json_primitive(raw, index)
+}
+
+pub(crate) fn skip_json_value(raw: &[u8], index: usize) -> Option<usize> {
+    scan_json_value(raw, index, false).ok().flatten()
 }
 
 fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
@@ -702,83 +793,8 @@ fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
     Some(index)
 }
 
-fn skip_json_value_with_finite_numbers(raw: &[u8], mut index: usize) -> Option<usize> {
-    if raw.get(index) == Some(&b'"') {
-        return skip_json_string(raw, index);
-    }
-    match raw.get(index) {
-        Some(b'{') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b'}') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_string(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                if raw.get(index) != Some(&b':') {
-                    return None;
-                }
-                index += 1;
-                skip_whitespace(raw, &mut index);
-                index = skip_json_value_with_finite_numbers(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
-                    Some(b',') => {
-                        index += 1;
-                        skip_whitespace(raw, &mut index);
-                        if raw.get(index) == Some(&b'}') {
-                            return None;
-                        }
-                    }
-                    Some(b'}') => return Some(index + 1),
-                    _ => return None,
-                }
-            }
-        }
-        Some(b'[') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b']') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_value_with_finite_numbers(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
-                    Some(b',') => {
-                        index += 1;
-                        skip_whitespace(raw, &mut index);
-                        if raw.get(index) == Some(&b']') {
-                            return None;
-                        }
-                    }
-                    Some(b']') => return Some(index + 1),
-                    _ => return None,
-                }
-            }
-        }
-        _ => {}
-    }
-    let start = index;
-    while raw
-        .get(index)
-        .is_some_and(|byte| !is_json_whitespace(*byte) && !matches!(byte, b',' | b'}' | b']'))
-    {
-        index += 1;
-    }
-    let token = &raw[start..index];
-    if is_json_number(token) {
-        let value = std::str::from_utf8(token).ok()?.parse::<f64>().ok()?;
-        if !value.is_finite() {
-            return None;
-        }
-    }
-    is_json_primitive(token).then_some(index)
-}
-
-fn is_json_primitive(value: &[u8]) -> bool {
-    matches!(value, b"null" | b"true" | b"false") || is_json_number(value)
+fn skip_json_value_with_finite_numbers(raw: &[u8], index: usize) -> Option<usize> {
+    scan_json_value(raw, index, true).ok().flatten()
 }
 
 fn is_json_number(value: &[u8]) -> bool {

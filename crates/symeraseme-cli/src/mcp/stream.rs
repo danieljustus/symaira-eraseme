@@ -9,7 +9,7 @@
 //! Framing reuses the byte scanner that the shared protocol already uses for
 //! Go-compatible acceptance, so both paths accept exactly the same values.
 
-use super::protocol::{InitializeOutcome, initialize, skip_json_value, skip_whitespace};
+use super::protocol::{InitializeOutcome, initialize, scan_json_value, skip_whitespace};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum StreamError {
@@ -56,8 +56,12 @@ pub(crate) fn serve_stream(
             return Ok(());
         }
         let start = index;
-        let Some(end) = skip_json_value(input, start) else {
-            return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
+        let end = match scan_json_value(input, start, false) {
+            Ok(Some(end)) => end,
+            Err(_) => return Err(max_depth_error()),
+            Ok(None) => {
+                return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
+            }
         };
         match initialize(&input[start..end], handler) {
             InitializeOutcome::Response(bytes) => output.extend_from_slice(&bytes),
@@ -86,22 +90,27 @@ pub(crate) fn serve_stdio(
     let mut position = 0usize;
     loop {
         skip_whitespace(&buffer, &mut position);
-        if position < buffer.len()
-            && let Some(end) = skip_json_value(&buffer, position)
-        {
-            match initialize(&buffer[position..end], handler) {
-                InitializeOutcome::Response(bytes) => {
-                    output.write_all(&bytes).map_err(map_io)?;
-                    output.flush().map_err(map_io)?;
+        if position < buffer.len() {
+            let end = match scan_json_value(&buffer, position, false) {
+                Ok(Some(end)) => Some(end),
+                Err(_) => return Err(max_depth_error()),
+                Ok(None) => None,
+            };
+            if let Some(end) = end {
+                match initialize(&buffer[position..end], handler) {
+                    InitializeOutcome::Response(bytes) => {
+                        output.write_all(&bytes).map_err(map_io)?;
+                        output.flush().map_err(map_io)?;
+                    }
+                    InitializeOutcome::Notification => {}
+                    InitializeOutcome::ParseError => {
+                        return Err(StreamError::UnparsableValue(position));
+                    }
                 }
-                InitializeOutcome::Notification => {}
-                InitializeOutcome::ParseError => {
-                    return Err(StreamError::UnparsableValue(position));
-                }
+                buffer.drain(..end);
+                position = 0;
+                continue;
             }
-            buffer.drain(..end);
-            position = 0;
-            continue;
         }
         if position < buffer.len()
             && let Some(error) = syntax_error(&buffer[position..])
@@ -122,11 +131,68 @@ pub(crate) fn serve_stdio(
     }
 }
 
+fn max_depth_error() -> StreamError {
+    StreamError::Syntax("exceeded max depth".to_owned())
+}
+
+fn go_quoted_byte(byte: u8) -> String {
+    match byte {
+        b'\\' => "\\\\".to_owned(),
+        b'\'' => "\\'".to_owned(),
+        b'\t' => "\\t".to_owned(),
+        b'\n' => "\\n".to_owned(),
+        b'\r' => "\\r".to_owned(),
+        0x0b => "\\v".to_owned(),
+        b'\x0c' => "\\f".to_owned(),
+        b'\x08' => "\\b".to_owned(),
+        0..=0x1f => format!("\\x{byte:02x}"),
+        _ => char::from(byte).to_string(),
+    }
+}
+
+fn expects_object_key(input: &[u8], end: usize) -> bool {
+    let mut containers = Vec::<(u8, bool)>::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    for byte in input.iter().take(end).copied() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => containers.push((b'{', true)),
+            b'[' => containers.push((b'[', false)),
+            b'}' | b']' => {
+                containers.pop();
+            }
+            b':' => {
+                if let Some((b'{', expect_key)) = containers.last_mut() {
+                    *expect_key = false;
+                }
+            }
+            b',' => {
+                if let Some((b'{', expect_key)) = containers.last_mut() {
+                    *expect_key = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    matches!(containers.last(), Some((b'{', true)))
+}
+
 fn syntax_error(input: &[u8]) -> Option<StreamError> {
     // ponytail: the recorded Go error classes are matched; port Go's
     // full scanner if a wider malformed-input corpus requires exact wording.
     let error = serde_json::from_slice::<serde_json::Value>(input).err()?;
-    if error.is_eof() {
+    if error.is_eof() || error.to_string().starts_with("recursion limit exceeded") {
         return None;
     }
     let (mut in_string, mut escaped) = (false, false);
@@ -137,8 +203,8 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
                 b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' | b'u'
             ) {
                 return Some(StreamError::Syntax(format!(
-                    "invalid character '{}' in string escape code",
-                    char::from(*byte)
+                    "invalid escape sequence `\\{}` in string",
+                    go_quoted_byte(*byte)
                 )));
             }
             escaped = false;
@@ -159,8 +225,8 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
                 {
                     return Some(StreamError::Syntax(format!(
                         "invalid character '{}' in literal {name} (expecting '{}')",
-                        char::from(*actual),
-                        char::from(*expected)
+                        go_quoted_byte(*actual),
+                        go_quoted_byte(*expected)
                     )));
                 }
             }
@@ -181,9 +247,22 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
         .copied()
         .or_else(|| input.last().copied())
         .unwrap_or_default();
+    let error_position = error.column().saturating_sub(1);
+    let preceding = input
+        .iter()
+        .take(error_position)
+        .rev()
+        .copied()
+        .find(|value| !matches!(*value, b' ' | b'\t' | b'\r' | b'\n'));
+    if byte == 0x0b && (preceding == Some(b'{') || expects_object_key(input, error_position)) {
+        return Some(StreamError::Syntax(format!(
+            "invalid character '{}' looking for beginning of object key string",
+            go_quoted_byte(byte)
+        )));
+    }
     Some(StreamError::Syntax(format!(
         "invalid character '{}' looking for beginning of value",
-        char::from(byte)
+        go_quoted_byte(byte)
     )))
 }
 
