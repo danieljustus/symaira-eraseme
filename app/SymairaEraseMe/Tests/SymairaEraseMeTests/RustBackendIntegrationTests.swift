@@ -12,13 +12,22 @@ final class RustBackendIntegrationTests: XCTestCase {
         XCTAssertEqual(URL(fileURLWithPath: binary).lastPathComponent, "symeraseme-rust")
 
         let defaults = UserDefaults.standard
-        let keys = ["symeraseme_binary_path", "symeraseme_data_dir", "symeraseme_host", "symeraseme_port"]
+        let keys = [
+            "symeraseme_binary_path", "symeraseme_data_dir", "symeraseme_host",
+            "symeraseme_port", "symeraseme_anthropic_key"
+        ]
         let previous = Dictionary(uniqueKeysWithValues: keys.compactMap { key in defaults.object(forKey: key).map { (key, $0) } })
+        let previousHost = MCPClient.configuredHost
+        let previousPort = MCPClient.configuredPort
+        let previousDataDir = MCPClient.configuredDataDir
         defer {
             for key in keys {
                 if let value = previous[key] { defaults.set(value, forKey: key) }
                 else { defaults.removeObject(forKey: key) }
             }
+            MCPClient.configuredHost = previousHost
+            MCPClient.configuredPort = previousPort
+            MCPClient.configuredDataDir = previousDataDir
         }
 
         let dataDir = FileManager.default.temporaryDirectory
