@@ -99,7 +99,7 @@ impl LlmkitClient {
         };
         if base_url.is_empty() && custom_url {
             let detail =
-                format!("llmkit: provider \"custom\" requires a base URL override (WithBaseURL)");
+                "llmkit: provider \"custom\" requires a base URL override (WithBaseURL)".to_owned();
             return Err(ClientError::Provider(LlmError::with_source(
                 format!("llmkit client for {provider:?}: {detail}"),
                 detail,

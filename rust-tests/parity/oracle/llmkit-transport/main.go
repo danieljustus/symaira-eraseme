@@ -21,22 +21,22 @@ import (
 )
 
 type observation struct {
-	ID          string         `json:"id"`
-	Provider    string         `json:"provider"`
-	Model       string         `json:"model"`
-	Path        string         `json:"path"`
-	Headers     map[string]string `json:"headers"`
-	Request     map[string]any `json:"request"`
-	Text        string         `json:"text"`
-	UsageModel  string         `json:"usage_model"`
+	ID         string            `json:"id"`
+	Provider   string            `json:"provider"`
+	Model      string            `json:"model"`
+	Path       string            `json:"path"`
+	Headers    map[string]string `json:"headers"`
+	Request    map[string]any    `json:"request"`
+	Text       string            `json:"text"`
+	UsageModel string            `json:"usage_model"`
 }
 
 type fixture struct {
-	Schema       string            `json:"schema"`
-	GoModule     string            `json:"go_module"`
-	Sources      map[string]string `json:"sources_sha256"`
-	Cases        []observation     `json:"cases"`
-	Errors       []errorObservation `json:"construction_errors"`
+	Schema   string             `json:"schema"`
+	GoModule string             `json:"go_module"`
+	Sources  map[string]string  `json:"sources_sha256"`
+	Cases    []observation      `json:"cases"`
+	Errors   []errorObservation `json:"construction_errors"`
 }
 
 type errorObservation struct {
@@ -63,7 +63,7 @@ func main() {
 	for _, spec := range []struct {
 		id, provider, model string
 		env                 map[string]string
-		key, base            string
+		key, base           string
 	}{
 		{id: "openai-env-default-model", provider: "openai", env: map[string]string{"OPENAI_API_KEY": "synthetic-openai-key"}},
 		{id: "openai-direct-key-wins", provider: "openai", key: "synthetic-direct-openai-key", env: map[string]string{"OPENAI_API_KEY": "ignored-environment-key"}},
@@ -112,8 +112,8 @@ func runCase(id, provider, model string, env map[string]string, key, _ string) (
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotHeaders = map[string]string{
-			"authorization": strings.TrimSpace(r.Header.Get("Authorization")),
-			"x-api-key": strings.TrimSpace(r.Header.Get("x-api-key")),
+			"authorization":     strings.TrimSpace(r.Header.Get("Authorization")),
+			"x-api-key":         strings.TrimSpace(r.Header.Get("x-api-key")),
 			"anthropic-version": strings.TrimSpace(r.Header.Get("anthropic-version")),
 		}
 		body, err := io.ReadAll(r.Body)
