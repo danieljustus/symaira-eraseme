@@ -602,7 +602,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 18] = [
+    const SURFACE_OPERATIONS: [&str; 20] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -630,6 +630,8 @@ fn is_exact_case(case: &Value) -> bool {
         // this recorded CLI case pins its surfaced connection error bytes.
         "operate-poll-inbox",
         "operate-poll-inbox-invalid-since",
+        "operate-classify-reply",
+        "operate-generate-rebuttal",
     ];
     // `registry list`/`validate` are replayed now that cli.rs implements them.
     // They carry the registry contract that `brokers list` cannot: no status
@@ -693,8 +695,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 173);
-    assert_eq!(deferred.len(), 2);
+    assert_eq!(selected.len(), 175);
+    assert_eq!(deferred.len(), 0);
 
     let root = unique_root();
     let home = root.join("home");
