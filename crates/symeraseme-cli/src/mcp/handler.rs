@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::campaign;
-use symeraseme_core::config::{ConfigContext, resolve_storage};
+use symeraseme_core::config::ConfigContext;
 use symeraseme_core::confirmation;
 use symeraseme_core::email::config::{ImapConfigOptions, load_imap_config_with_options};
 use symeraseme_core::email::hwm::HwmStore;
@@ -208,9 +208,31 @@ impl ContractHandler {
             .config
             .as_ref()
             .ok_or_else(|| ToolError("the store-backed tools need a configuration".to_owned()))?;
-        let storage = resolve_storage(config).map_err(|error| ToolError(error.to_string()))?;
-        std::fs::create_dir_all(&storage.db_dir).map_err(|error| ToolError(error.to_string()))?;
-        Store::open(&storage.db_path).map_err(|error| ToolError(error.to_string()))
+        crate::store::open(config).map_err(ToolError)
+    }
+
+    fn with_open_store(
+        &self,
+        operation: impl FnOnce(&Store) -> Result<Value, ToolError>,
+    ) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let (result, close) = crate::store::with_store(store, operation);
+        Self::close_result(result, close)
+    }
+
+    fn close_result(
+        result: Result<Value, ToolError>,
+        close: Result<(), symeraseme_core::storage::EncryptedStoreError>,
+    ) -> Result<Value, ToolError> {
+        match (result, close) {
+            (Ok(value), Ok(())) => Ok(value),
+            (Err(error), Ok(())) => Err(error),
+            (Ok(_), Err(close)) => Err(ToolError(format!("eventstore: close: {close}"))),
+            (Err(error), Err(close)) => Err(ToolError(format!(
+                "{}; eventstore: close: {close}",
+                error.0
+            ))),
+        }
     }
 
     fn recorded_instant(&self) -> Result<DateTime<Utc>, ToolError> {
@@ -241,38 +263,41 @@ impl ContractHandler {
 
     /// Go's `HandleList`.
     fn manual_tasks_list(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let status = get_str(arguments, "status", "");
-        let request_id = get_int(arguments, "request_id", 0);
-        manualtasks::handle_list(
-            &store,
-            &ListOpts {
-                status: (!status.is_empty()).then_some(status),
-                request_id: (request_id != 0).then_some(request_id),
-            },
-        )
-        .map(|result| result.into_value())
-        .map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let status = get_str(arguments, "status", "");
+            let request_id = get_int(arguments, "request_id", 0);
+            manualtasks::handle_list(
+                &store,
+                &ListOpts {
+                    status: (!status.is_empty()).then_some(status),
+                    request_id: (request_id != 0).then_some(request_id),
+                },
+            )
+            .map(|result| result.into_value())
+            .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     /// Go's `HandleShow`.
     fn manual_tasks_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let task_id = get_int(arguments, "task_id", 0);
-        manualtasks::handle_show(&store, task_id)
-            .map(|result| result.into_value())
-            .map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let task_id = get_int(arguments, "task_id", 0);
+            manualtasks::handle_show(&store, task_id)
+                .map(|result| result.into_value())
+                .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     /// Go's `HandleComplete`.
     fn manual_tasks_complete(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        let task_id = get_int(arguments, "task_id", 0);
-        let notes = get_str(arguments, "notes", "");
-        manualtasks::handle_complete(&store, task_id, &notes, now)
-            .map(|result| result.into_value())
-            .map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            let task_id = get_int(arguments, "task_id", 0);
+            let notes = get_str(arguments, "notes", "");
+            manualtasks::handle_complete(&store, task_id, &notes, now)
+                .map(|result| result.into_value())
+                .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     /// Go's `HandleCleanup`.
@@ -363,107 +388,111 @@ impl ContractHandler {
     /// always is. Paths resolve against the process working directory, like
     /// Go's `filepath.Abs`.
     fn generate_dashboard(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        let data = reporting::get_dashboard_data(&store, "", now)
-            .map_err(|error| ToolError(error.to_string()))?;
-        let content =
-            reporting::generate_dashboard(&data, get_int(arguments, "auto_refresh", 0), now)
-                .map_err(ToolError)?;
-        if get_str(arguments, "output", "").is_empty() {
-            return Ok(json!({
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            let data = reporting::get_dashboard_data(&store, "", now)
+                .map_err(|error| ToolError(error.to_string()))?;
+            let content =
+                reporting::generate_dashboard(&data, get_int(arguments, "auto_refresh", 0), now)
+                    .map_err(ToolError)?;
+            if get_str(arguments, "output", "").is_empty() {
+                return Ok(json!({
+                    "success": true,
+                    "dashboard": content,
+                    "campaigns": data["total_campaigns"],
+                    "requests": data["total_requests"],
+                }));
+            }
+            let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
+            Ok(json!({
                 "success": true,
-                "dashboard": content,
+                "output_file": path,
+                "size_bytes": content.len() as i64,
                 "campaigns": data["total_campaigns"],
                 "requests": data["total_requests"],
-            }));
-        }
-        let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
-        Ok(json!({
-            "success": true,
-            "output_file": path,
-            "size_bytes": content.len() as i64,
-            "campaigns": data["total_campaigns"],
-            "requests": data["total_requests"],
-        }))
+            }))
+        })
     }
 
     /// Go's `generate_report`: report data in the requested format, and the
     /// file write when `output` is set.
     fn generate_report(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        let format = get_str(arguments, "format", "html");
-        let data = reporting::get_report_data(
-            &store,
-            &reporting::ReportOpts {
-                campaign_id: get_str(arguments, "campaign_id", ""),
-                all_campaigns: get_bool(arguments, "all_campaigns", false),
-            },
-            now,
-        )
-        .map_err(|error| ToolError(error.to_string()))?;
-        let content = reporting::generate_report(&data, &format, now).map_err(ToolError)?;
-        if get_str(arguments, "output", "").is_empty() {
-            return Ok(json!({
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            let format = get_str(arguments, "format", "html");
+            let data = reporting::get_report_data(
+                &store,
+                &reporting::ReportOpts {
+                    campaign_id: get_str(arguments, "campaign_id", ""),
+                    all_campaigns: get_bool(arguments, "all_campaigns", false),
+                },
+                now,
+            )
+            .map_err(|error| ToolError(error.to_string()))?;
+            let content = reporting::generate_report(&data, &format, now).map_err(ToolError)?;
+            if get_str(arguments, "output", "").is_empty() {
+                return Ok(json!({
+                    "success": true,
+                    "report": content,
+                    "format": format,
+                }));
+            }
+            let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
+            Ok(json!({
                 "success": true,
-                "report": content,
+                "output_file": path,
+                "size_bytes": content.len() as i64,
                 "format": format,
-            }));
-        }
-        let path = write_generated_file(&get_str(arguments, "output", ""), content.as_bytes())?;
-        Ok(json!({
-            "success": true,
-            "output_file": path,
-            "size_bytes": content.len() as i64,
-            "format": format,
-        }))
+            }))
+        })
     }
 
     /// Go's `plan_create`: resolve and load the requested identity profile,
     /// then plan against the embedded registry.
     fn plan_create(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        let profile_path = get_str(arguments, "profile_path", "");
-        let paths = ProfilePaths::from_process();
-        let mut keys = MasterKeyResolver::from_process();
-        let profile = match load_profile(Path::new(&profile_path), &paths, &mut keys) {
-            Ok(profile) => Some(profile),
-            Err(ProfileError::NotFound) => None,
-            Err(error) => return Err(ToolError(error.to_string())),
-        };
-        let identity_hash = profile
-            .as_ref()
-            .map(symeraseme_core::identity::hash_profile)
-            .unwrap_or_default();
-        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
-        let result = campaign::plan_campaign(
-            &store,
-            &brokers,
-            &identity_hash,
-            &campaign::PlanOpts {
-                campaign_id: get_str(arguments, "campaign_id", ""),
-                jurisdiction: get_str(arguments, "jurisdiction", ""),
-                law: get_str(arguments, "law", ""),
-                priority: get_str(arguments, "priority", ""),
-                category: get_str(arguments, "category", ""),
-                status: get_str(arguments, "status", "active"),
-                include_inactive: get_bool(arguments, "include_inactive", false),
-                include_disabled: get_bool(arguments, "include_disabled", false),
-                max_brokers: get_int(arguments, "max_brokers", 30),
-                notes: get_str(arguments, "notes", ""),
-            },
-            now,
-        )
-        .map_err(|error| ToolError(error.to_string()))?;
-        // Go marshals the PlanResult struct into the content text before the
-        // outer MCP envelope. Keep declaration order and Go's HTML escaping.
-        let bytes = serde_json::to_vec(&result).map_err(|error| ToolError(error.to_string()))?;
-        Ok(Value::String(
-            String::from_utf8(super::envelope::go_escape_json_strings(&bytes))
-                .expect("escaped JSON remains UTF-8"),
-        ))
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            let profile_path = get_str(arguments, "profile_path", "");
+            let paths = ProfilePaths::from_process();
+            let mut keys = MasterKeyResolver::from_process();
+            let profile = match load_profile(Path::new(&profile_path), &paths, &mut keys) {
+                Ok(profile) => Some(profile),
+                Err(ProfileError::NotFound) => None,
+                Err(error) => return Err(ToolError(error.to_string())),
+            };
+            let identity_hash = profile
+                .as_ref()
+                .map(symeraseme_core::identity::hash_profile)
+                .unwrap_or_default();
+            let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+            let result = campaign::plan_campaign(
+                &store,
+                &brokers,
+                &identity_hash,
+                &campaign::PlanOpts {
+                    campaign_id: get_str(arguments, "campaign_id", ""),
+                    jurisdiction: get_str(arguments, "jurisdiction", ""),
+                    law: get_str(arguments, "law", ""),
+                    priority: get_str(arguments, "priority", ""),
+                    category: get_str(arguments, "category", ""),
+                    status: get_str(arguments, "status", "active"),
+                    include_inactive: get_bool(arguments, "include_inactive", false),
+                    include_disabled: get_bool(arguments, "include_disabled", false),
+                    max_brokers: get_int(arguments, "max_brokers", 30),
+                    notes: get_str(arguments, "notes", ""),
+                },
+                now,
+            )
+            .map_err(|error| ToolError(error.to_string()))?;
+            // Go marshals the PlanResult struct into the content text before the
+            // outer MCP envelope. Keep declaration order and Go's HTML escaping.
+            let bytes =
+                serde_json::to_vec(&result).map_err(|error| ToolError(error.to_string()))?;
+            Ok(Value::String(
+                String::from_utf8(super::envelope::go_escape_json_strings(&bytes))
+                    .expect("escaped JSON remains UTF-8"),
+            ))
+        })
     }
 
     /// Go's non-interactive `execute`: require explicit consent for live
@@ -471,53 +500,54 @@ impl ContractHandler {
     /// or browser executor configured. Web forms can create manual tasks; no
     /// request can reach a network adapter.
     fn execute_campaign(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let dry_run = get_bool(arguments, "dry_run", false);
-        if !dry_run {
-            let consent_directory =
-                default_consent_directory().map_err(|error| ToolError(error.to_string()))?;
-            let consent = ConsentStore::new(consent_directory);
-            consent
-                .authorize(
-                    "execute",
-                    &ConsentOptions {
-                        consent_token: Some(get_str(arguments, "consent_token", "")),
-                        consent_file: Some(get_str(arguments, "consent_file", "")),
-                        consent_env_var: Some("SYMERASEME_CONSENT".to_owned()),
-                        consent_file_env_var: Some("SYMERASEME_CONSENT_FILE".to_owned()),
-                        interactive: false,
-                        ..ConsentOptions::default()
-                    },
-                )
-                .map_err(|error| ToolError(error.to_string()))?;
-        }
-        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
-        let paths = ProfilePaths::from_process();
-        let mut keys = MasterKeyResolver::from_process();
-        let profile_result = match load_profile(Path::new(""), &paths, &mut keys) {
-            Ok(profile) => Ok(Some(profile)),
-            Err(ProfileError::NotFound) => Ok(None),
-            Err(error) => Err(error.to_string()),
-        };
-        let profile = profile_result
-            .as_ref()
-            .map(|profile| profile.as_ref())
-            .map_err(String::as_str);
-        let result = campaign::execute_campaign(
-            &store,
-            &get_str(arguments, "campaign_id", ""),
-            &campaign::ExecuteOpts {
-                account: get_str(arguments, "account", ""),
-                dry_run,
-                email_sender: None,
-                brokers: &brokers,
-            },
-            profile,
-            get_int(arguments, "batch_size", 5),
-            self.recorded_instant()?,
-        )
-        .map_err(|error| ToolError(error.to_string()))?;
-        Ok(Value::Object(result))
+        self.with_open_store(|store| {
+            let dry_run = get_bool(arguments, "dry_run", false);
+            if !dry_run {
+                let consent_directory =
+                    default_consent_directory().map_err(|error| ToolError(error.to_string()))?;
+                let consent = ConsentStore::new(consent_directory);
+                consent
+                    .authorize(
+                        "execute",
+                        &ConsentOptions {
+                            consent_token: Some(get_str(arguments, "consent_token", "")),
+                            consent_file: Some(get_str(arguments, "consent_file", "")),
+                            consent_env_var: Some("SYMERASEME_CONSENT".to_owned()),
+                            consent_file_env_var: Some("SYMERASEME_CONSENT_FILE".to_owned()),
+                            interactive: false,
+                            ..ConsentOptions::default()
+                        },
+                    )
+                    .map_err(|error| ToolError(error.to_string()))?;
+            }
+            let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+            let paths = ProfilePaths::from_process();
+            let mut keys = MasterKeyResolver::from_process();
+            let profile_result = match load_profile(Path::new(""), &paths, &mut keys) {
+                Ok(profile) => Ok(Some(profile)),
+                Err(ProfileError::NotFound) => Ok(None),
+                Err(error) => Err(error.to_string()),
+            };
+            let profile = profile_result
+                .as_ref()
+                .map(|profile| profile.as_ref())
+                .map_err(String::as_str);
+            let result = campaign::execute_campaign(
+                &store,
+                &get_str(arguments, "campaign_id", ""),
+                &campaign::ExecuteOpts {
+                    account: get_str(arguments, "account", ""),
+                    dry_run,
+                    email_sender: None,
+                    brokers: &brokers,
+                },
+                profile,
+                get_int(arguments, "batch_size", 5),
+                self.recorded_instant()?,
+            )
+            .map_err(|error| ToolError(error.to_string()))?;
+            Ok(Value::Object(result))
+        })
     }
 
     fn triage_agent(&self, arguments: &Map<String, Value>) -> Result<AgentClient, ToolError> {
@@ -533,26 +563,27 @@ impl ContractHandler {
     }
 
     fn classify_reply(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let agent = self.triage_agent(arguments)?;
-        let call = triage_agent_call(&agent);
-        let outcome = triage_service::Service::new(&store)
-            .classify_reply(
-                get_int(arguments, "request_id", 0),
-                &ClassifyRequest::default(),
-                None,
-                Some(&call),
-                get_bool(arguments, "save", true),
-            )
-            .map_err(ToolError)?;
-        if let Some(error) = outcome.error {
-            return Err(ToolError(error));
-        }
-        go_struct_text(&outcome.result)
+        self.with_open_store(|store| {
+            let agent = self.triage_agent(arguments)?;
+            let call = triage_agent_call(&agent);
+            let outcome = triage_service::Service::new(&store)
+                .classify_reply(
+                    get_int(arguments, "request_id", 0),
+                    &ClassifyRequest::default(),
+                    None,
+                    Some(&call),
+                    get_bool(arguments, "save", true),
+                )
+                .map_err(ToolError)?;
+            if let Some(error) = outcome.error {
+                return Err(ToolError(error));
+            }
+            go_struct_text(&outcome.result)
+        })
     }
 
     fn generate_rebuttal(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
+        self.with_open_store(|store| {
         let agent = self.triage_agent(arguments)?;
         let call = triage_agent_call(&agent);
         let result = triage_service::Service::new(&store)
@@ -583,6 +614,7 @@ impl ContractHandler {
                 "Cost": if result.usage.cost == 0.0 { json!(0) } else { json!(result.usage.cost) },
             },
         }))
+        })
     }
 
     /// Go's `list_brokers`: the embedded registry through the shared filter.
@@ -686,7 +718,7 @@ impl ContractHandler {
     /// Go's `auto_confirm`: previews a trusted link on dry-run, otherwise
     /// creates the same durable manual task used when no clicker is available.
     fn auto_confirm(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
+        self.with_open_store(|store| {
         let request_id = get_int(arguments, "request_id", 0);
         let dry_run = get_bool(arguments, "dry_run", false);
         let reply = confirmation::latest_reply_body(&store, request_id)
@@ -796,6 +828,7 @@ impl ContractHandler {
             false,
             Some(&task),
         ))
+        })
     }
 
     /// Go's `run_web_form`: with `dry_run` the handler answers from the
@@ -811,80 +844,86 @@ impl ContractHandler {
         } else {
             Some(self.open_store()?)
         };
-        let broker_id = get_str(arguments, "broker_id", "");
-        // Go's adapter order: webForm lookup, then profile, then branch.
-        let preview = match campaign::web_form_preview(&brokers, &broker_id, dry_run) {
-            Err(failure) => return Ok(Value::Object(failure)),
-            Ok(preview) => preview,
-        };
-        // Go's `WebFormAdapter.profile`: an absent profile is fine, a broken
-        // one fails the run with an `interaction_failed` payload.
-        let paths = ProfilePaths::from_process();
-        let mut keys = MasterKeyResolver::from_process();
-        let profile = match load_profile(Path::new(""), &paths, &mut keys) {
-            Ok(profile) => Some(profile),
-            Err(ProfileError::NotFound) => None,
-            Err(error) => {
-                return Ok(json!({
-                    "success": false,
-                    "code": "interaction_failed",
-                    "error": error.to_string(),
-                    "reason": "generic_error",
-                    "dry_run": dry_run,
-                }));
+        let result = (|| {
+            let broker_id = get_str(arguments, "broker_id", "");
+            // Go's adapter order: webForm lookup, then profile, then branch.
+            let preview = match campaign::web_form_preview(&brokers, &broker_id, dry_run) {
+                Err(failure) => return Ok(Value::Object(failure)),
+                Ok(preview) => preview,
+            };
+            // Go's `WebFormAdapter.profile`: an absent profile is fine, a broken
+            // one fails the run with an `interaction_failed` payload.
+            let paths = ProfilePaths::from_process();
+            let mut keys = MasterKeyResolver::from_process();
+            let profile = match load_profile(Path::new(""), &paths, &mut keys) {
+                Ok(profile) => Some(profile),
+                Err(ProfileError::NotFound) => None,
+                Err(error) => {
+                    return Ok(json!({
+                        "success": false,
+                        "code": "interaction_failed",
+                        "error": error.to_string(),
+                        "reason": "generic_error",
+                        "dry_run": dry_run,
+                    }));
+                }
+            };
+            // Go's `FormSpecFromBroker` step: it can only fail on a nil spec, and
+            // the parsed registry type makes that impossible, so the dry-run
+            // preview stands in for it unchanged.
+            if dry_run {
+                return Ok(Value::Object(preview));
             }
-        };
-        // Go's `FormSpecFromBroker` step: it can only fail on a nil spec, and
-        // the parsed registry type makes that impossible, so the dry-run
-        // preview stands in for it unchanged.
-        if dry_run {
-            return Ok(Value::Object(preview));
+            let store = store.as_ref().expect("store opened for a non-dry run");
+            let now = self.recorded_instant()?;
+            let request_id = get_int(arguments, "request_id", 0);
+            let task = manualtasks::create(
+                &store,
+                &manualtasks::CreateOpts {
+                    request_id: (request_id != 0).then_some(request_id),
+                    broker_id: field_string(&preview, "broker_id"),
+                    broker_name: field_string(&preview, "broker_name"),
+                    form_url: field_string(&preview, "url"),
+                    reason: "dynamic_form".to_owned(),
+                    ..manualtasks::CreateOpts::default()
+                },
+                profile.as_ref(),
+                now,
+            );
+            // Go's `createManualTask` reports a store failure inside the result
+            // map; it is not a handler error.
+            let mut result = Map::new();
+            result.insert("success".to_owned(), json!(false));
+            result.insert("status".to_owned(), json!("manual_action_required"));
+            result.insert("reason".to_owned(), json!("dynamic_form"));
+            result.insert(
+                "broker_id".to_owned(),
+                preview.get("broker_id").cloned().unwrap_or(Value::Null),
+            );
+            result.insert(
+                "broker_name".to_owned(),
+                preview.get("broker_name").cloned().unwrap_or(Value::Null),
+            );
+            result.insert(
+                "url".to_owned(),
+                preview.get("url").cloned().unwrap_or(Value::Null),
+            );
+            result.insert("dry_run".to_owned(), json!(false));
+            match task {
+                Ok(task) => {
+                    result.insert("task_id".to_owned(), json!(task.id));
+                    result.insert("instructions".to_owned(), json!(task.instructions));
+                }
+                Err(error) => {
+                    result.insert("error".to_owned(), json!(error.to_string()));
+                }
+            }
+            Ok(Value::Object(result))
+        })();
+        match store {
+            Some(store) => Self::close_result(result, store.close()),
+            None => result,
         }
-        let store = store.expect("store opened for a non-dry run");
-        let now = self.recorded_instant()?;
-        let request_id = get_int(arguments, "request_id", 0);
-        let task = manualtasks::create(
-            &store,
-            &manualtasks::CreateOpts {
-                request_id: (request_id != 0).then_some(request_id),
-                broker_id: field_string(&preview, "broker_id"),
-                broker_name: field_string(&preview, "broker_name"),
-                form_url: field_string(&preview, "url"),
-                reason: "dynamic_form".to_owned(),
-                ..manualtasks::CreateOpts::default()
-            },
-            profile.as_ref(),
-            now,
-        );
-        // Go's `createManualTask` reports a store failure inside the result
-        // map; it is not a handler error.
-        let mut result = Map::new();
-        result.insert("success".to_owned(), json!(false));
-        result.insert("status".to_owned(), json!("manual_action_required"));
-        result.insert("reason".to_owned(), json!("dynamic_form"));
-        result.insert(
-            "broker_id".to_owned(),
-            preview.get("broker_id").cloned().unwrap_or(Value::Null),
-        );
-        result.insert(
-            "broker_name".to_owned(),
-            preview.get("broker_name").cloned().unwrap_or(Value::Null),
-        );
-        result.insert(
-            "url".to_owned(),
-            preview.get("url").cloned().unwrap_or(Value::Null),
-        );
-        result.insert("dry_run".to_owned(), json!(false));
-        match task {
-            Ok(task) => {
-                result.insert("task_id".to_owned(), json!(task.id));
-                result.insert("instructions".to_owned(), json!(task.instructions));
-            }
-            Err(error) => {
-                result.insert("error".to_owned(), json!(error.to_string()));
-            }
-        }
-        Ok(Value::Object(result))
     }
 
     /// Go's `plan_show`: the stored requests, optionally filtered by campaign
@@ -893,12 +932,13 @@ impl ContractHandler {
     /// Go builds this through `campaign.GetPlan`, which passes neither a limit
     /// nor an offset, so the answer is the whole matching set.
     fn plan_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let campaign_id = get_str(arguments, "campaign_id", "");
-        let status = get_str(arguments, "status", "");
-        campaign::get_plan(&store, &campaign_id, &status)
-            .map(Value::Object)
-            .map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let campaign_id = get_str(arguments, "campaign_id", "");
+            let status = get_str(arguments, "status", "");
+            campaign::get_plan(&store, &campaign_id, &status)
+                .map(Value::Object)
+                .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     /// Go's `list_requests`: a page of stored requests plus the total that
@@ -910,68 +950,73 @@ impl ContractHandler {
     /// broker filter narrows the rows but not `total`.
     /// Go's `get_dashboard_data`: the whole dashboard for every campaign.
     fn dashboard_data(&self) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        reporting::get_dashboard_data(&store, "", now).map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            reporting::get_dashboard_data(&store, "", now)
+                .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     /// Go's `get_calendar`: `weeks` defaults to 4, `campaign_id` to all.
     fn calendar(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let now = self.recorded_instant()?;
-        reporting::get_calendar(
-            &store,
-            &get_str(arguments, "campaign_id", ""),
-            get_int(arguments, "weeks", 4),
-            now,
-        )
-        .map_err(|error| ToolError(error.to_string()))
+        self.with_open_store(|store| {
+            let now = self.recorded_instant()?;
+            reporting::get_calendar(
+                &store,
+                &get_str(arguments, "campaign_id", ""),
+                get_int(arguments, "weeks", 4),
+                now,
+            )
+            .map_err(|error| ToolError(error.to_string()))
+        })
     }
 
     fn list_requests(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let page = get_int(arguments, "page", 1);
-        if page < 1 {
-            return Err(ToolError("page must be at least 1".to_owned()));
-        }
-        let page_size = get_int(arguments, "page_size", 100);
-        if page_size < 1 {
-            return Err(ToolError("page_size must be at least 1".to_owned()));
-        }
-        let campaign_id = optional_str(arguments, "campaign_id");
-        let status = optional_str(arguments, "status");
-        let repository = Repository::new(&store);
-        let requests = repository
-            .list_removal_requests(ListRemovalRequestsOptions {
-                campaign_id: campaign_id.clone(),
-                status: status.clone(),
-                broker_id: optional_str(arguments, "broker_id"),
-                limit: Some(page_size),
-                offset: Some((page - 1) * page_size),
-            })
-            .map_err(|error| ToolError(error.to_string()))?;
-        let total = repository
-            .count_removal_requests(campaign_id.as_deref(), status.as_deref())
-            .map_err(|error| ToolError(error.to_string()))?;
-        Ok(json!({
-            "requests": request_rows(requests),
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-        }))
+        self.with_open_store(|store| {
+            let page = get_int(arguments, "page", 1);
+            if page < 1 {
+                return Err(ToolError("page must be at least 1".to_owned()));
+            }
+            let page_size = get_int(arguments, "page_size", 100);
+            if page_size < 1 {
+                return Err(ToolError("page_size must be at least 1".to_owned()));
+            }
+            let campaign_id = optional_str(arguments, "campaign_id");
+            let status = optional_str(arguments, "status");
+            let repository = Repository::new(&store);
+            let requests = repository
+                .list_removal_requests(ListRemovalRequestsOptions {
+                    campaign_id: campaign_id.clone(),
+                    status: status.clone(),
+                    broker_id: optional_str(arguments, "broker_id"),
+                    limit: Some(page_size),
+                    offset: Some((page - 1) * page_size),
+                })
+                .map_err(|error| ToolError(error.to_string()))?;
+            let total = repository
+                .count_removal_requests(campaign_id.as_deref(), status.as_deref())
+                .map_err(|error| ToolError(error.to_string()))?;
+            Ok(json!({
+                "requests": request_rows(requests),
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+            }))
+        })
     }
 
     /// Go's `get_events`: one request's events in replay order, resuming after
     /// an event id when one was given.
     fn get_events(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        let store = self.open_store()?;
-        let events = Repository::new(&store)
-            .get_events(
-                get_int(arguments, "request_id", 0),
-                get_int(arguments, "after_event_id", 0),
-            )
-            .map_err(|error| ToolError(error.to_string()))?;
-        event_list(events)
+        self.with_open_store(|store| {
+            let events = Repository::new(&store)
+                .get_events(
+                    get_int(arguments, "request_id", 0),
+                    get_int(arguments, "after_event_id", 0),
+                )
+                .map_err(|error| ToolError(error.to_string()))?;
+            event_list(events)
+        })
     }
     /// Go's `poll_inbox`: load IMAP settings from args/env, resolve password,
     /// read active matchable requests + EvtSent thread map from the store,
@@ -1108,104 +1153,105 @@ impl ContractHandler {
         let campaign_id_filter = get_str(arguments, "campaign_id", "");
 
         // 8. Read active matchable removal requests and build EvtSent thread map.
-        let store_ref = self.open_store()?;
-        let repo = Repository::new(&store_ref);
-        let active_reqs_result =
-            repo.get_active_matchable_requests(if campaign_id_filter.is_empty() {
-                None
-            } else {
-                Some(&campaign_id_filter)
-            });
-        let active_reqs = active_reqs_result
-            .map_err(|e| ToolError(format!("email: cannot read active requests: {e}")))?;
-        let mut removal_reqs = Vec::new();
-        let mut req_ids = Vec::new();
-        for row in &active_reqs {
-            req_ids.push(row.id);
-            removal_reqs.push(RemovalRequest {
-                id: row.id,
-                broker_id: row.broker_id.clone(),
-            });
-        }
-        let mut thread_map = HashMap::<String, i64>::new();
-        if !req_ids.is_empty() {
-            let evt_sent = symeraseme_core::storage::types::EventType::Sent;
-            let events_result = repo.get_events_for_requests(&req_ids, Some(&evt_sent));
-            let events_by_req =
-                events_result.map_err(|e| ToolError(format!("email: cannot read events: {e}")))?;
-            for (rid, evts) in events_by_req {
-                for ev in evts {
-                    // Go keeps only a non-empty string `message_id`; anything else
-                    // is skipped rather than recorded as a thread.
-                    if let Some(msg_id) = ev
-                        .payload
-                        .get("message_id")
-                        .and_then(|value| value.as_str())
-                        && !msg_id.is_empty()
-                    {
-                        thread_map.insert(msg_id.to_string(), rid);
+        self.with_open_store(|store_ref| {
+            let repo = Repository::new(&store_ref);
+            let active_reqs_result =
+                repo.get_active_matchable_requests(if campaign_id_filter.is_empty() {
+                    None
+                } else {
+                    Some(&campaign_id_filter)
+                });
+            let active_reqs = active_reqs_result
+                .map_err(|e| ToolError(format!("email: cannot read active requests: {e}")))?;
+            let mut removal_reqs = Vec::new();
+            let mut req_ids = Vec::new();
+            for row in &active_reqs {
+                req_ids.push(row.id);
+                removal_reqs.push(RemovalRequest {
+                    id: row.id,
+                    broker_id: row.broker_id.clone(),
+                });
+            }
+            let mut thread_map = HashMap::<String, i64>::new();
+            if !req_ids.is_empty() {
+                let evt_sent = symeraseme_core::storage::types::EventType::Sent;
+                let events_result = repo.get_events_for_requests(&req_ids, Some(&evt_sent));
+                let events_by_req = events_result
+                    .map_err(|e| ToolError(format!("email: cannot read events: {e}")))?;
+                for (rid, evts) in events_by_req {
+                    for ev in evts {
+                        // Go keeps only a non-empty string `message_id`; anything else
+                        // is skipped rather than recorded as a thread.
+                        if let Some(msg_id) = ev
+                            .payload
+                            .get("message_id")
+                            .and_then(|value| value.as_str())
+                            && !msg_id.is_empty()
+                        {
+                            thread_map.insert(msg_id.to_string(), rid);
+                        }
                     }
                 }
             }
-        }
 
-        // 9. Create the InboxService with injected (or default) dialer and HWM store.
-        let dialer_ref = self.imap_dialer.as_ref();
-        let hwm_store_ref = self.hwm_store.as_ref();
+            // 9. Create the InboxService with injected (or default) dialer and HWM store.
+            let dialer_ref = self.imap_dialer.as_ref();
+            let hwm_store_ref = self.hwm_store.as_ref();
 
-        // Note: the production default dialer is symeraseme_core::email::imap::ImapDialer (new())
-        // and the default HWM store is MemoryHwmStore. When either is None,
-        // we fall back to the same behavior Go uses: a new default instance.
-        let matched = if let Some(d_ref) = dialer_ref {
-            let service = InboxService::new(d_ref.as_ref(), hwm_store_ref.map(|s| s.as_ref()));
-            service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
-        } else {
-            let default_dialer = symeraseme_core::email::imap::ImapDialer::new();
-            let default_service =
-                InboxService::new(&default_dialer, hwm_store_ref.map(|s| s.as_ref()));
-            default_service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
-        };
-        let matched = matched.map_err(|e| ToolError(e.to_string()))?;
-
-        // 10. Build the result payload. Go returns a `map[string]any`, so the
-        // outer keys come out sorted, while the nested structs keep their
-        // declaration order — and `json.Marshal` HTML-escapes `<`, `>` and `&`.
-        // A `Value` here would re-sort the struct fields alphabetically and lose
-        // the escaping, so the payload is assembled as text and handed to the
-        // envelope verbatim (a string result is used as-is).
-        let total_fetched = matched.len() as i64;
-        let matched_count = matched.iter().filter(|m| m.request_id.is_some()).count() as i64;
-        let mut lines: Vec<String> = Vec::new();
-        lines.push(format!("Fetched {total_fetched} messages from inbox"));
-        lines.push(format!("Matched to requests: {matched_count}"));
-        for m in &matched {
-            let req_id_str = m
-                .request_id
-                .map(|id| format!("{id}"))
-                .unwrap_or_else(|| "unmatched".to_owned());
-            let subj = if m.message.subject.is_empty() {
-                "(no subject)".to_owned()
+            // Note: the production default dialer is symeraseme_core::email::imap::ImapDialer (new())
+            // and the default HWM store is MemoryHwmStore. When either is None,
+            // we fall back to the same behavior Go uses: a new default instance.
+            let matched = if let Some(d_ref) = dialer_ref {
+                let service = InboxService::new(d_ref.as_ref(), hwm_store_ref.map(|s| s.as_ref()));
+                service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
             } else {
-                m.message.subject.clone()
+                let default_dialer = symeraseme_core::email::imap::ImapDialer::new();
+                let default_service =
+                    InboxService::new(&default_dialer, hwm_store_ref.map(|s| s.as_ref()));
+                default_service.poll_and_match(&cfg, &folders, &removal_reqs, &thread_map, None)
             };
-            lines.push(format!("  [{req_id_str}] {subj}"));
-        }
-        if matched.is_empty() {
-            lines.push("No new messages found.".to_owned());
-        }
-        let messages = matched
-            .iter()
-            .map(go_matched_message_json)
-            .collect::<Vec<_>>()
-            .join(",");
+            let matched = matched.map_err(|e| ToolError(e.to_string()))?;
 
-        Ok(Value::String(format!(
-            "{{\"message\":{},\"messages\":[{}],\"total_fetched\":{},\"total_matched\":{}}}",
-            go_json_string(&lines.join("\n")),
-            messages,
-            total_fetched,
-            matched_count
-        )))
+            // 10. Build the result payload. Go returns a `map[string]any`, so the
+            // outer keys come out sorted, while the nested structs keep their
+            // declaration order — and `json.Marshal` HTML-escapes `<`, `>` and `&`.
+            // A `Value` here would re-sort the struct fields alphabetically and lose
+            // the escaping, so the payload is assembled as text and handed to the
+            // envelope verbatim (a string result is used as-is).
+            let total_fetched = matched.len() as i64;
+            let matched_count = matched.iter().filter(|m| m.request_id.is_some()).count() as i64;
+            let mut lines: Vec<String> = Vec::new();
+            lines.push(format!("Fetched {total_fetched} messages from inbox"));
+            lines.push(format!("Matched to requests: {matched_count}"));
+            for m in &matched {
+                let req_id_str = m
+                    .request_id
+                    .map(|id| format!("{id}"))
+                    .unwrap_or_else(|| "unmatched".to_owned());
+                let subj = if m.message.subject.is_empty() {
+                    "(no subject)".to_owned()
+                } else {
+                    m.message.subject.clone()
+                };
+                lines.push(format!("  [{req_id_str}] {subj}"));
+            }
+            if matched.is_empty() {
+                lines.push("No new messages found.".to_owned());
+            }
+            let messages = matched
+                .iter()
+                .map(go_matched_message_json)
+                .collect::<Vec<_>>()
+                .join(",");
+
+            Ok(Value::String(format!(
+                "{{\"message\":{},\"messages\":[{}],\"total_fetched\":{},\"total_matched\":{}}}",
+                go_json_string(&lines.join("\n")),
+                messages,
+                total_fetched,
+                matched_count
+            )))
+        })
     }
 }
 
