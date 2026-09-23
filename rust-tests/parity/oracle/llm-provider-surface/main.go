@@ -92,14 +92,15 @@ type boundary struct {
 }
 
 type fixture struct {
-	Schema         string           `json:"schema"`
-	Source         string           `json:"source"`
-	Providers      []string         `json:"providers"`
-	UsageRecords   []usageCase      `json:"usage_records"`
-	CacheKeyJitter map[string]int64 `json:"cache_key_jitter"`
-	CreateCases    []createCase     `json:"create_cases"`
-	RetryCases     []retryCase      `json:"retry_cases"`
-	Boundaries     []boundary       `json:"boundaries"`
+	Schema         string            `json:"schema"`
+	Source         string            `json:"source"`
+	Providers      []string          `json:"providers"`
+	UsageRecords   []usageCase       `json:"usage_records"`
+	CacheKeyJitter map[string]int64  `json:"cache_key_jitter"`
+	CreateCases    []createCase      `json:"create_cases"`
+	RetryCases     []retryCase       `json:"retry_cases"`
+	HostAgent      hostAgentProtocol `json:"host_agent_protocol"`
+	Boundaries     []boundary        `json:"boundaries"`
 }
 
 func main() {
@@ -119,6 +120,7 @@ func main() {
 	recorded.CacheKeyJitter = recordCacheKeyJitter()
 	recorded.CreateCases = recordCreateCases()
 	recorded.RetryCases = recordRetryCases()
+	recorded.HostAgent = recordHostAgentProtocol()
 	recorded.Boundaries = recordBoundaries()
 
 	encoded, err := json.MarshalIndent(recorded, "", "  ")

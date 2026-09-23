@@ -11,9 +11,14 @@
 //! not ported instead of pretending an equivalent client exists.
 
 use std::error::Error as StdError;
+use std::ffi::OsString;
 use std::fmt;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 
 /// A single LLM usage and cost record, mirroring Go's `UsageRecord`.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -417,6 +422,14 @@ pub struct AgentClient {
 
 /// The message Go's agent `callAPI` returns when no CLI is reachable.
 pub const NO_AGENT_CLI_MESSAGE: &str = "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND";
+const AGENT_SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
+
+struct AgentCommandConfig<'a> {
+    timeout: Duration,
+    executable_override: Option<&'a Path>,
+    environment: &'a [(OsString, OsString)],
+    inherit_environment: bool,
+}
 
 impl AgentClient {
     /// Go's `NewAgentClient`, including the empty-model fallback to `auto`. The
@@ -465,6 +478,253 @@ impl AgentClient {
     /// reachable CLI the shared retry loop is handed the unchanged error.
     pub fn unavailable_error(&self) -> ClientError {
         ClientError::Provider(LlmError::new(NO_AGENT_CLI_MESSAGE))
+    }
+
+    /// Go's `AgentClient.Classify`, using the shared retry loop and real host CLI.
+    pub fn classify(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.classify_with_timeout(
+            system_prompt,
+            user_prompt,
+            options,
+            AGENT_SUBPROCESS_TIMEOUT,
+        )
+    }
+
+    fn classify_with_timeout(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        timeout: Duration,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.classify_with_command(
+            system_prompt,
+            user_prompt,
+            options,
+            AgentCommandConfig {
+                timeout,
+                executable_override: None,
+                environment: &[],
+                inherit_environment: true,
+            },
+        )
+    }
+
+    fn classify_with_command(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        command: AgentCommandConfig<'_>,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.base.classify(
+            system_prompt,
+            user_prompt,
+            options,
+            |system, user, _| {
+                if command.executable_override.is_none()
+                    && command.environment.is_empty()
+                    && command.inherit_environment
+                {
+                    self.call_api(system, user, command.timeout)
+                } else {
+                    self.call_api_with(
+                        system,
+                        user,
+                        command.timeout,
+                        command.executable_override,
+                        command.environment,
+                        command.inherit_environment,
+                    )
+                }
+            },
+            |wait| {
+                thread::sleep(wait);
+                true
+            },
+            || None,
+        )
+    }
+
+    fn call_api(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        timeout: Duration,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.call_api_with(system_prompt, user_prompt, timeout, None, &[], true)
+    }
+
+    fn call_api_with(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        timeout: Duration,
+        executable_override: Option<&Path>,
+        environment: &[(OsString, OsString)],
+        inherit_environment: bool,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        let Some(def) = AGENT_DEFS
+            .iter()
+            .find(|def| def.name == self.resolved_backend)
+        else {
+            return Err(self.unavailable_error());
+        };
+
+        let combined = combine_prompts(system_prompt, user_prompt);
+        let mut arguments = def
+            .invoke_template
+            .iter()
+            .skip(1)
+            .map(|part| OsString::from(part.replace("{prompt}", &combined)))
+            .collect::<Vec<_>>();
+        if !self.base.model.is_empty() && self.base.model != "auto" && def.name == "claude" {
+            arguments.push(OsString::from("--model"));
+            arguments.push(OsString::from(&self.base.model));
+        }
+
+        let executable = executable_override.unwrap_or_else(|| Path::new(def.cli));
+        let mut command = Command::new(executable);
+        command
+            .args(arguments)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if !inherit_environment {
+            command.env_clear();
+        }
+        command.envs(environment.iter().cloned());
+        // Go appends TERM=dumb to the inherited environment for every agent.
+        command.env("TERM", "dumb");
+
+        let start = Instant::now();
+        let mut child = command.spawn().map_err(|error| {
+            ClientError::Provider(LlmError::new(format!(
+                "failed to invoke host agent: {}",
+                go_spawn_error(def.cli, executable_override, &error)
+            )))
+        })?;
+        let stdout = child.stdout.take().expect("stdout was piped");
+        let stderr = child.stderr.take().expect("stderr was piped");
+        let stdout_reader = thread::spawn(move || read_pipe(stdout));
+        let stderr_reader = thread::spawn(move || read_pipe(stderr));
+
+        let mut timed_out = false;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break Some(status),
+                Ok(None) if start.elapsed() >= timeout => {
+                    timed_out = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break None;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(5)),
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(ClientError::Provider(LlmError::new(format!(
+                        "failed to invoke host agent: {}",
+                        error
+                    ))));
+                }
+            }
+        };
+        let stdout = stdout_reader
+            .join()
+            .map_err(|_| {
+                ClientError::Provider(LlmError::new(
+                    "failed to invoke host agent: stdout capture failed",
+                ))
+            })?
+            .map_err(|error| {
+                ClientError::Provider(LlmError::new(format!(
+                    "failed to invoke host agent: {}",
+                    error
+                )))
+            })?;
+        let stderr = stderr_reader
+            .join()
+            .map_err(|_| {
+                ClientError::Provider(LlmError::new(
+                    "failed to invoke host agent: stderr capture failed",
+                ))
+            })?
+            .map_err(|error| {
+                ClientError::Provider(LlmError::new(format!(
+                    "failed to invoke host agent: {}",
+                    error
+                )))
+            })?;
+
+        if timed_out {
+            return Err(ClientError::Provider(LlmError::new(format!(
+                "host agent timed out after {}m{}s",
+                AGENT_SUBPROCESS_TIMEOUT.as_secs() / 60,
+                AGENT_SUBPROCESS_TIMEOUT.as_secs() % 60
+            ))));
+        }
+
+        let status = status.expect("a completed child has an exit status");
+        if !status.success() {
+            let stderr = trim_go_space(&stderr);
+            let stderr = truncate_go_bytes(stderr, 500);
+            return Err(ClientError::Provider(LlmError::new(format!(
+                "host agent exited with code {}: {}",
+                status.code().unwrap_or(-1),
+                stderr
+            ))));
+        }
+
+        let text = String::from_utf8_lossy(&stdout).trim().to_owned();
+        if text.is_empty() {
+            return Err(ClientError::Provider(LlmError::new(
+                "host agent returned empty response",
+            )));
+        }
+        Ok((
+            text,
+            UsageRecord {
+                model: format!("agent:{}", def.name),
+                ..UsageRecord::default()
+            },
+        ))
+    }
+}
+
+fn combine_prompts(system_prompt: &str, user_prompt: &str) -> String {
+    format!("{system_prompt}\n\n---\n\n{user_prompt}")
+}
+
+fn read_pipe(mut pipe: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    pipe.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+fn trim_go_space(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).trim().to_owned()
+}
+
+fn truncate_go_bytes(text: String, limit: usize) -> String {
+    if text.len() <= limit {
+        return text;
+    }
+    String::from_utf8_lossy(&text.as_bytes()[..limit]).into_owned()
+}
+
+fn go_spawn_error(cli: &str, override_path: Option<&Path>, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::NotFound && override_path.is_none() {
+        format!("exec: {cli:?}: executable file not found in $PATH")
+    } else {
+        error.to_string()
     }
 }
 
@@ -586,3 +846,7 @@ pub fn create_with(
         provider: provider.clone(),
     })
 }
+
+#[cfg(all(test, unix))]
+#[path = "host_agent_tests.rs"]
+mod host_agent_tests;

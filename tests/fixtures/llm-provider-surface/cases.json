@@ -482,6 +482,98 @@
       "error_type": "Error"
     }
   ],
+  "host_agent_protocol": {
+    "program": "#!/bin/sh\nprintf '%s\\0' \"$@\" \u003e \"$AGENT_CAPTURE_DIR/arguments\"\nprintf '%s\\0' \"$TERM\" \"$AGENT_SENTINEL\" \u003e \"$AGENT_CAPTURE_DIR/environment\"\nif IFS= read -r ignored; then printf 'input' \u003e \"$AGENT_CAPTURE_DIR/stdin\"; else printf 'eof' \u003e \"$AGENT_CAPTURE_DIR/stdin\"; fi\ncase \"$AGENT_SCENARIO\" in\nsuccess)\n  printf ' \\tanswer from fake agent \\n'\n  printf 'ignored success stderr\\n' \u003e\u00262\n  ;;\nexit)\n  printf '%s' \"$AGENT_STDERR\" \u003e\u00262\n  exit \"$AGENT_EXIT_CODE\"\n  ;;\ntimeout)\n  exec /bin/sleep 300\n  ;;\nesac\n",
+    "cases": [
+      {
+        "id": "success-claude-arguments-and-environment",
+        "mode": "success",
+        "model": "test-model",
+        "system_prompt": " system prompt ",
+        "user_prompt": "user prompt\nwith newline",
+        "timeout_millis": 0,
+        "test_timeout_millis": 0,
+        "result": {
+          "text": "answer from fake agent",
+          "usage_model": "agent:claude",
+          "arguments": [
+            "-p",
+            " system prompt \n\n---\n\nuser prompt\nwith newline",
+            "--output-format",
+            "text",
+            "--no-input",
+            "--model",
+            "test-model"
+          ],
+          "environment": {
+            "AGENT_SENTINEL": "environment-survived",
+            "TERM": "dumb"
+          },
+          "stdin_eof": true
+        }
+      },
+      {
+        "id": "exit-code-trims-and-truncates-stderr",
+        "mode": "exit",
+        "model": "test-model",
+        "system_prompt": "system",
+        "user_prompt": "exit",
+        "timeout_millis": 0,
+        "test_timeout_millis": 0,
+        "stderr": "  eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \t\n",
+        "exit_code": 23,
+        "result": {
+          "text": "",
+          "usage_model": "",
+          "error": "host agent exited with code 23: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "error_type": "Error",
+          "arguments": [
+            "-p",
+            "system\n\n---\n\nexit",
+            "--output-format",
+            "text",
+            "--no-input",
+            "--model",
+            "test-model"
+          ],
+          "environment": {
+            "AGENT_SENTINEL": "environment-survived",
+            "TERM": "dumb"
+          },
+          "stdin_eof": true
+        }
+      },
+      {
+        "id": "host-agent-subprocess-timeout",
+        "mode": "timeout",
+        "model": "test-model",
+        "system_prompt": "system",
+        "user_prompt": "timeout",
+        "timeout_millis": 120000,
+        "test_timeout_millis": 80,
+        "result": {
+          "text": "",
+          "usage_model": "",
+          "error": "host agent timed out after 2m0s",
+          "error_type": "Error",
+          "arguments": [
+            "-p",
+            "system\n\n---\n\ntimeout",
+            "--output-format",
+            "text",
+            "--no-input",
+            "--model",
+            "test-model"
+          ],
+          "environment": {
+            "AGENT_SENTINEL": "environment-survived",
+            "TERM": "dumb"
+          },
+          "stdin_eof": true
+        }
+      }
+    ]
+  },
   "boundaries": [
     {
       "path": "llmkit-backed construction (anthropic, openai, ollama, openai-compatible)",
