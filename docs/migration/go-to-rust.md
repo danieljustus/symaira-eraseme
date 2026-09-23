@@ -170,6 +170,9 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   Syft produced a CycloneDX 1.7 source inventory with 1,307 components at
   `target/sbom-source-7151138.cdx.json`. Artifact SBOM and provenance remain
   unverified without the complete native Rust archive matrix.
+- Three additional local-only Go HTTP observations now cover LLM 429 retry
+  exhaustion, malformed success JSON and empty choices (`3d74a200`). The
+  integrated Rust transport test passed 5/5; no paid provider was contacted.
 
 ## Open tasks (run of 2026-09-22)
 
