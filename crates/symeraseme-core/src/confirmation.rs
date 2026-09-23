@@ -12,13 +12,12 @@ pub fn latest_reply_body(store: &Store, request_id: i64) -> rusqlite::Result<Opt
     store
         .db()
         .query_row(
-            "SELECT snippet FROM inbox_replies WHERE request_id = ?1 \
+            "SELECT COALESCE(snippet, '') FROM inbox_replies WHERE request_id = ?1 \
              ORDER BY received_at DESC, id DESC LIMIT 1",
             [request_id],
-            |row| row.get::<_, Option<String>>(0),
+            |row| row.get::<_, String>(0),
         )
         .optional()
-        .map(|reply| reply.flatten())
 }
 
 /// The fixed broker host set used by the Go confirmation oracle.

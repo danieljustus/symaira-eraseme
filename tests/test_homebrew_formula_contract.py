@@ -22,6 +22,7 @@ def fail(message: str) -> None:
 def main(formula_path: Path) -> None:
     source = formula_path.read_text(encoding="utf-8")
     urls = {}
+    versions = set()
     lines = source.splitlines()
     for index, line in enumerate(lines):
         url_match = re.search(r'^\s*url "([^"]+)"\s*$', line)
@@ -37,6 +38,7 @@ def main(formula_path: Path) -> None:
         details = match.groupdict()
         if details["version"] != details["archive_version"]:
             fail(f"release and archive versions differ in {url_match.group(1)}")
+        versions.add(details["version"])
         key = (details["os"], details["arch"])
         if key in urls:
             fail(f"duplicate release target: {key[0]}-{key[1]}")
@@ -45,6 +47,8 @@ def main(formula_path: Path) -> None:
     expected = {(os_name, arch) for os_name in ("darwin", "linux") for arch in ("amd64", "arm64")}
     if set(urls) != expected:
         fail(f"expected four macOS/Linux architecture URLs, got {sorted(urls)}")
+    if len(versions) != 1:
+        fail(f"formula mixes release versions: {sorted(versions)}")
     if not re.search(r'(?ms)^  def install\n.*?^    bin\.install "symeraseme"\n.*?^  end$', source):
         fail('install must place the archive root binary with bin.install "symeraseme"')
     if not re.search(r'(?ms)^  test do\n.*?^    system "#\{bin\}/symeraseme", "version"\n.*?^  end$', source):

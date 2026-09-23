@@ -4,11 +4,9 @@
 //! tools; a handler maps a *validated* `tools/call` to a result, and a handler
 //! failure becomes a sanitized `-32603` response.
 //!
-//! Scope of this slice: only the tools whose Rust cores already exist are
-//! wired. `redact_file` is the first one; a catalogue tool that is not wired
-//! yet reports that explicitly instead of pretending to be unknown, while a
-//! name outside the catalogue (`status`, the legacy alias) reproduces Go's
-//! switch default — the handler has no case for it either.
+//! All 26 catalogue tools dispatch to Rust handlers. Some adapter paths remain
+//! partial; an unknown name (including the legacy `status` alias) reproduces
+//! Go's switch default.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -35,6 +33,7 @@ use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
 use symeraseme_core::reporting;
 use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
+use symeraseme_core::storage::types::{EventType, Source};
 use symeraseme_core::storage::{EventRecord, RemovalRequestRow, Store};
 use symeraseme_core::timeutil;
 use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, RebuttalRequest};
@@ -510,6 +509,7 @@ impl ContractHandler {
             &campaign::ExecuteOpts {
                 account: get_str(arguments, "account", ""),
                 dry_run,
+                email_sender: None,
                 brokers: &brokers,
             },
             profile,
@@ -715,12 +715,31 @@ impl ContractHandler {
         };
         let links = confirmation::extract_confirmation_links(&reply);
         let Some(link) = links.first() else {
+            let error = "No confirmation links found in reply body";
+            if !dry_run {
+                store
+                    .append_and_project(
+                        request_id,
+                        &EventType::NoteAdded,
+                        &json!({
+                            "note": format!("Auto-confirm failed: {error}"),
+                            "url_host": "",
+                            "url_sha256": "",
+                        })
+                        .as_object()
+                        .expect("note payload")
+                        .clone(),
+                        &Source::System,
+                        self.recorded_instant()?,
+                    )
+                    .map_err(|error| ToolError(error.to_string()))?;
+            }
             return Ok(confirmation_result(
                 false,
                 "no_links",
-                "No confirmation links found in reply body".to_owned(),
+                error.to_owned(),
                 "",
-                dry_run,
+                false,
                 0,
                 "",
                 "",
@@ -753,7 +772,6 @@ impl ContractHandler {
             .split(':')
             .next()
             .unwrap_or_default()
-            .trim_start_matches("www.")
             .to_ascii_lowercase();
         let broker_id = request
             .as_ref()
@@ -1667,7 +1685,11 @@ mod tests {
                 "INSERT INTO removal_requests (broker_id, campaign_id, jurisdiction) \
                  VALUES ('broker-a', 'mcp-auto-confirm', 'GDPR'); \
                  INSERT INTO inbox_replies (request_id, message_id, from_addr, snippet) \
-                 VALUES (1, 'msg-1', 'broker@example.com', 'Confirm here: https://acxiom.com/confirm');",
+                 VALUES (1, 'msg-1', 'broker@example.com', 'Confirm here: https://acxiom.com/confirm'); \
+                 INSERT INTO removal_requests (broker_id, campaign_id, jurisdiction) \
+                 VALUES ('broker-b', 'mcp-auto-confirm', 'GDPR'); \
+                 INSERT INTO inbox_replies (request_id, message_id, from_addr, snippet) \
+                 VALUES (2, 'msg-2', 'broker@example.com', NULL);",
             )
             .expect("stored reply");
         drop(store);
@@ -1763,6 +1785,28 @@ mod tests {
         assert_eq!(task_state.0, oracle_state["form_url"]);
         assert_eq!(task_state.1, oracle_state["instructions"]);
         assert_eq!(task_state.2, oracle_state["task_status"]);
+
+        arguments.insert("request_id".to_owned(), json!(2));
+        arguments.insert("dry_run".to_owned(), json!(true));
+        let no_links_dry = handler
+            .call("auto_confirm", &arguments)
+            .expect("no-links dry run");
+        assert_eq!(no_links_dry, oracle_response("no_links_dry_response"));
+        assert_eq!(no_links_dry["DryRun"], false);
+        arguments.insert("dry_run".to_owned(), json!(false));
+        let no_links = handler
+            .call("auto_confirm", &arguments)
+            .expect("no-links result");
+        assert_eq!(no_links, oracle_response("no_links_response"));
+        let notes: i64 = store
+            .db()
+            .query_row(
+                "SELECT count(*) FROM request_events WHERE request_id = 2 AND event_type = 'NOTE_ADDED'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("no-links notes");
+        assert_eq!(notes, oracle["no_links_notes"]);
     }
 
     fn workspace(name: &str) -> PathBuf {

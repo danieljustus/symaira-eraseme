@@ -1011,6 +1011,7 @@ fn plan_execute(parsed: &Parsed) -> Outcome {
         &campaign::ExecuteOpts {
             account: string_flag(parsed, "account"),
             dry_run,
+            email_sender: None,
             brokers: &brokers,
         },
         profile.as_ref().map(Option::as_ref).map_err(String::as_str),

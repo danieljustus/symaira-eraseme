@@ -32,12 +32,15 @@ type snapshot struct {
 }
 
 type oracleResult struct {
-	SourceRevision string   `json:"source_revision"`
-	SourcePath     string   `json:"source_path"`
-	DryRunResponse string   `json:"dry_run_response"`
-	DryRunState    snapshot `json:"dry_run_state"`
-	ManualResponse string   `json:"manual_response"`
-	FinalState     snapshot `json:"final_state"`
+	SourceRevision     string   `json:"source_revision"`
+	SourcePath         string   `json:"source_path"`
+	DryRunResponse     string   `json:"dry_run_response"`
+	DryRunState        snapshot `json:"dry_run_state"`
+	ManualResponse     string   `json:"manual_response"`
+	FinalState         snapshot `json:"final_state"`
+	NoLinksDryResponse string   `json:"no_links_dry_response"`
+	NoLinksResponse    string   `json:"no_links_response"`
+	NoLinksNotes       int      `json:"no_links_notes"`
 }
 
 func main() {
@@ -70,6 +73,16 @@ func main() {
 	if _, err := replies.NewRepository(store).InsertReply(ctx, &requestID, "msg-1", "thread-1", "broker@acxiom.com", "Confirm", "Confirm here: https://acxiom.com/confirm", ""); err != nil {
 		fail(err)
 	}
+	noLinksID, err := store.CreateRemovalRequest(ctx, "broker-b", "email", "mcp-auto-confirm", "GDPR", "", "")
+	if err != nil {
+		fail(err)
+	}
+	if _, err := replies.NewRepository(store).InsertReply(ctx, &noLinksID, "msg-2", "thread-2", "broker@acxiom.com", "No link", "", ""); err != nil {
+		fail(err)
+	}
+	if _, err := store.DB().Exec(`UPDATE inbox_replies SET snippet = NULL WHERE request_id = ?`, noLinksID); err != nil {
+		fail(err)
+	}
 	if err := store.Close(); err != nil {
 		fail(err)
 	}
@@ -78,14 +91,30 @@ func main() {
 	dryState := inspect(storage.DBPath)
 	manualResponse := call(callRequest(requestID, false))
 	finalState := inspect(storage.DBPath)
+	noLinksDryResponse := call(callRequest(noLinksID, true))
+	noLinksResponse := call(callRequest(noLinksID, false))
+	noLinksStore, err := eventstore.Open(storage.DBPath)
+	if err != nil {
+		fail(err)
+	}
+	var noLinksNotes int
+	if err := noLinksStore.DB().QueryRow(`SELECT count(*) FROM request_events WHERE request_id = ? AND event_type = 'NOTE_ADDED'`, noLinksID).Scan(&noLinksNotes); err != nil {
+		fail(err)
+	}
+	if err := noLinksStore.Close(); err != nil {
+		fail(err)
+	}
 
 	if err := json.NewEncoder(os.Stdout).Encode(oracleResult{
-		SourceRevision: sourceRevision,
-		SourcePath:     sourcePath,
-		DryRunResponse: dryResponse,
-		DryRunState:    dryState,
-		ManualResponse: manualResponse,
-		FinalState:     finalState,
+		SourceRevision:     sourceRevision,
+		SourcePath:         sourcePath,
+		DryRunResponse:     dryResponse,
+		DryRunState:        dryState,
+		ManualResponse:     manualResponse,
+		FinalState:         finalState,
+		NoLinksDryResponse: noLinksDryResponse,
+		NoLinksResponse:    noLinksResponse,
+		NoLinksNotes:       noLinksNotes,
 	}); err != nil {
 		fail(err)
 	}
