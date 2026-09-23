@@ -1,0 +1,84 @@
+{
+  "schema": "symeraseme.campaign.plan-bytes-oracle.v1",
+  "generator_sha256": "b011d71878ea397dbb99e51d3363f829e68bc4bec02cb4611330b7cbf2d12b65",
+  "sources": [
+    {
+      "path": "internal/campaign/campaign.go",
+      "sha256": "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"
+    },
+    {
+      "path": "internal/campaign/planning.go",
+      "sha256": "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"
+    },
+    {
+      "path": "internal/eventstore/repo.go",
+      "sha256": "339cf7d383d03de0fbb1f3cba994f8282b45c060a9a5294891e36893374a4625"
+    },
+    {
+      "path": "internal/eventstore/store.go",
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    },
+    {
+      "path": "internal/eventstore/projection.go",
+      "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+    },
+    {
+      "path": "internal/identity/profile.go",
+      "sha256": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"
+    },
+    {
+      "path": "internal/identity/secrets.go",
+      "sha256": "462c8fda343842bd674e50e974e59e1f6970794c9b60946dee3b39207362dd44"
+    },
+    {
+      "path": "internal/registry/loader.go",
+      "sha256": "0f8ad425d8b660b7b7a894882fea7d7473823d765a0ca6baf9a7380816319dff"
+    },
+    {
+      "path": "tests/fixtures/registry-contract/golden-email-eu.yaml",
+      "sha256": "2d45fad1efd4db4a90d2d7cfdc6f0cbe4621436d86ab6dcd701d1ef2d2cf3d04"
+    },
+    {
+      "path": "tests/fixtures/registry-contract/golden-multi-uk.yaml",
+      "sha256": "abb38dddb79a7e66432f5244504c8dd4a395e0e4e57799cd2b9d8a16ca962fd4"
+    },
+    {
+      "path": "tests/fixtures/registry-contract/golden-webform-us.yaml",
+      "sha256": "f2bc8363007c4db11a4d4df91ff36d7405c7608f4d9354c350bb4c94286bb819"
+    }
+  ],
+  "plan_campaign_json": "{\"campaign_id\":\"campaign-plan-byte-oracle\",\"total_brokers\":3,\"matched\":3,\"planned\":3,\"requests\":[{\"request_id\":1,\"broker_id\":\"golden-email-eu\",\"broker_name\":\"Golden Email Broker\",\"channel\":\"email\",\"template\":\"gdpr-art17.de.md.j2\"},{\"request_id\":2,\"broker_id\":\"golden-multi-uk\",\"broker_name\":\"Golden Multi Channel Broker\",\"channel\":\"email\",\"template\":\"gdpr-art17.en.md.j2\"},{\"request_id\":3,\"broker_id\":\"golden-webform-us\",\"broker_name\":\"Golden Web Form Broker\",\"channel\":\"web_form\",\"template\":\"\"}]}",
+  "get_plan_json": "{\"campaign_id\":\"campaign-plan-byte-oracle\",\"requests\":[{\"acknowledged_at\":null,\"broker_id\":\"golden-email-eu\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"channel\":\"email\",\"created_at\":\"2026-08-06T12:00:00Z\",\"current_status\":\"PLANNED\",\"deadline_at\":null,\"escalation_level\":0,\"id\":1,\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\",\"jurisdiction\":\"DE\",\"last_event_at\":\"2026-08-06T12:00:00Z\",\"next_action_at\":null,\"reminders_sent\":0,\"resolved_at\":null,\"sent_at\":null,\"template_id\":\"gdpr-art17.de.md.j2\"},{\"acknowledged_at\":null,\"broker_id\":\"golden-multi-uk\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"channel\":\"email\",\"created_at\":\"2026-08-06T12:00:00Z\",\"current_status\":\"PLANNED\",\"deadline_at\":null,\"escalation_level\":0,\"id\":2,\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\",\"jurisdiction\":\"UK\",\"last_event_at\":\"2026-08-06T12:00:00Z\",\"next_action_at\":null,\"reminders_sent\":0,\"resolved_at\":null,\"sent_at\":null,\"template_id\":\"gdpr-art17.en.md.j2\"},{\"acknowledged_at\":null,\"broker_id\":\"golden-webform-us\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"channel\":\"web_form\",\"created_at\":\"2026-08-06T12:00:00Z\",\"current_status\":\"PLANNED\",\"deadline_at\":null,\"escalation_level\":0,\"id\":3,\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\",\"jurisdiction\":\"US\",\"last_event_at\":\"2026-08-06T12:00:00Z\",\"next_action_at\":null,\"reminders_sent\":0,\"resolved_at\":null,\"sent_at\":null,\"template_id\":\"\"}],\"total\":3}",
+  "campaign_row_json": "{\"id\":\"campaign-plan-byte-oracle\",\"created_at\":\"2026-08-06 12:00:00\",\"kind\":\"initial\",\"notes\":\"raw byte oracle\"}",
+  "request_rows_json": [
+    "{\"id\":1,\"broker_id\":\"golden-email-eu\",\"channel\":\"email\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"created_at\":\"2026-08-06 12:00:00\",\"jurisdiction\":\"DE\",\"template_id\":\"gdpr-art17.de.md.j2\",\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\"}",
+    "{\"id\":2,\"broker_id\":\"golden-multi-uk\",\"channel\":\"email\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"created_at\":\"2026-08-06 12:00:00\",\"jurisdiction\":\"UK\",\"template_id\":\"gdpr-art17.en.md.j2\",\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\"}",
+    "{\"id\":3,\"broker_id\":\"golden-webform-us\",\"channel\":\"web_form\",\"campaign_id\":\"campaign-plan-byte-oracle\",\"created_at\":\"2026-08-06 12:00:00\",\"jurisdiction\":\"US\",\"template_id\":\"\",\"identity_snapshot_hash\":\"8ab122f928929618f2c7d890023482a8fa190dc1476df4cdfd0f5b5b425d6aa0\"}"
+  ],
+  "events": [
+    {
+      "request_id": 1,
+      "occurred_at": "2026-08-06 12:00:00",
+      "recorded_at": "2026-08-06 12:00:00",
+      "event_type": "PLANNED",
+      "source": "system",
+      "payload_json": "{\"broker_name\":\"Golden Email Broker\",\"broker_website\":\"https://golden-email.example.eu\",\"channel\":\"email\",\"endpoint\":\"privacy@golden-email.example.eu\",\"expected_response_days\":45,\"locale\":\"de\",\"template\":\"gdpr-art17.de.md.j2\"}"
+    },
+    {
+      "request_id": 2,
+      "occurred_at": "2026-08-06 12:00:00",
+      "recorded_at": "2026-08-06 12:00:00",
+      "event_type": "PLANNED",
+      "source": "system",
+      "payload_json": "{\"broker_name\":\"Golden Multi Channel Broker\",\"broker_website\":\"https://golden-multi.example.uk\",\"channel\":\"email\",\"endpoint\":\"privacy@golden-multi.example.uk\",\"expected_response_days\":30,\"locale\":\"en\",\"template\":\"gdpr-art17.en.md.j2\"}"
+    },
+    {
+      "request_id": 3,
+      "occurred_at": "2026-08-06 12:00:00",
+      "recorded_at": "2026-08-06 12:00:00",
+      "event_type": "PLANNED",
+      "source": "system",
+      "payload_json": "{\"broker_name\":\"Golden Web Form Broker\",\"broker_website\":\"https://golden-webform.example.com\",\"channel\":\"web_form\",\"endpoint\":\"https://golden-webform.example.com/optout\",\"expected_response_days\":30,\"locale\":\"\",\"template\":\"\"}"
+    }
+  ]
+}
