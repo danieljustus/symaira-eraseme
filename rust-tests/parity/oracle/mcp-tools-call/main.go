@@ -35,9 +35,9 @@ const (
 	storeFixtureDir = "tests/fixtures/mcp-contract/mcp-003-store"
 )
 
-const schedulerSourceRevision = "1f531eb7e46815af5c31508904b632c69909e725"
+const schedulerSourceRevision = "3b61859ff95702536a4390d0675c474c7b5077c3"
 
-const campaignSourceRevision = "1f531eb7e46815af5c31508904b632c69909e725"
+const campaignSourceRevision = "3b61859ff95702536a4390d0675c474c7b5077c3"
 
 var schedulerSourceFiles = []sourceFileDigest{
 	{Path: "internal/mcp/contract_handler.go", SHA256: "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"},

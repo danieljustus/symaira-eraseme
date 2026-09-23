@@ -1,5 +1,5 @@
 {
-  "source_revision": "1f531eb7e46815af5c31508904b632c69909e725",
+  "source_revision": "3b61859ff95702536a4390d0675c474c7b5077c3",
   "source_files": [
     {
       "path": "internal/mcp/contract_handler.go",

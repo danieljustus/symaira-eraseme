@@ -282,7 +282,7 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     .expect("scheduler oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "1f531eb7e46815af5c31508904b632c69909e725"
+        "3b61859ff95702536a4390d0675c474c7b5077c3"
     );
     assert_eq!(
         fixture["source_files"],
@@ -521,7 +521,7 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
     .expect("campaign oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "1f531eb7e46815af5c31508904b632c69909e725"
+        "3b61859ff95702536a4390d0675c474c7b5077c3"
     );
     assert_eq!(
         fixture["source_files"],
