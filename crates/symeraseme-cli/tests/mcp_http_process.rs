@@ -83,11 +83,16 @@ fn startup_error(
     root: &Path,
     port: u16,
     host: &str,
+    allow_remote: bool,
 ) -> (std::process::ExitStatus, String) {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    let mut child = Command::new(binary)
-        .args(["mcp", "--host", host, "--port", &port.to_string()])
+    let mut command = Command::new(binary);
+    command.args(["mcp", "--host", host, "--port", &port.to_string()]);
+    if allow_remote {
+        command.arg("--allow-remote");
+    }
+    let mut child = command
         .env("HOME", &home)
         .env("USERPROFILE", &home)
         .env("SYMERASEME_DATA_DIR", root.join("data"))
@@ -746,8 +751,8 @@ fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
         let rust_root = root.path().join(format!("rust-{host}"));
         std::fs::create_dir_all(&go_root).unwrap();
         std::fs::create_dir_all(&rust_root).unwrap();
-        let (go_status, go_stderr) = startup_error(&oracle, &go_root, port, host);
-        let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host);
+        let (go_status, go_stderr) = startup_error(&oracle, &go_root, port, host, true);
+        let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host, true);
         assert!(!go_status.success());
         assert!(!rust_status.success());
         assert_eq!(
@@ -765,6 +770,41 @@ fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
         );
         drop(occupied);
     }
+}
+
+#[test]
+#[cfg(unix)]
+fn unavailable_local_address_error_matches_go() {
+    let host = "192.0.2.1";
+    let probe = TcpListener::bind(format!("{host}:0")).unwrap_err();
+    assert_eq!(
+        probe.kind(),
+        std::io::ErrorKind::AddrNotAvailable,
+        "the reserved TEST-NET address must be unavailable on this host"
+    );
+
+    let root = TestDir::new();
+    let oracle = build_go_oracle(root.path());
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    let port = free_port();
+    let go_root = root.path().join("go-unavailable");
+    let rust_root = root.path().join("rust-unavailable");
+    std::fs::create_dir_all(&go_root).unwrap();
+    std::fs::create_dir_all(&rust_root).unwrap();
+    let (go_status, go_stderr) = startup_error(&oracle, &go_root, port, host, true);
+    let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host, true);
+    assert!(!go_status.success());
+    assert!(!rust_status.success());
+    assert_eq!(rust_stderr, go_stderr);
+    let native_message = if cfg!(target_os = "linux") {
+        "cannot assign requested address"
+    } else {
+        "can't assign requested address"
+    };
+    assert_eq!(
+        rust_stderr.trim(),
+        format!("listen tcp {host}:{port}: bind: {native_message}")
+    );
 }
 
 #[test]

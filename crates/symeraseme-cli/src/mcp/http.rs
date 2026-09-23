@@ -160,11 +160,28 @@ async fn serve_async(
 }
 
 fn listen_error(address: &str, error: std::io::Error) -> String {
-    if error.kind() == std::io::ErrorKind::AddrInUse {
-        format!("listen tcp {address}: bind: address already in use")
-    } else {
-        format!("listen tcp {address}: {error}")
+    match error.kind() {
+        std::io::ErrorKind::AddrInUse => {
+            format!("listen tcp {address}: bind: address already in use")
+        }
+        std::io::ErrorKind::AddrNotAvailable => {
+            format!(
+                "listen tcp {address}: bind: {}",
+                addr_not_available_message()
+            )
+        }
+        _ => format!("listen tcp {address}: {error}"),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn addr_not_available_message() -> &'static str {
+    "cannot assign requested address"
+}
+
+#[cfg(not(target_os = "linux"))]
+fn addr_not_available_message() -> &'static str {
+    "can't assign requested address"
 }
 
 async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
