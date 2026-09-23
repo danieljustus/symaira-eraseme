@@ -90,3 +90,77 @@ fn stdio_answers_each_request_before_eof_without_stdout_pollution() {
         "extra stdout after two responses"
     );
 }
+
+#[test]
+fn malformed_stdio_process_matches_go_errors() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../rust-tests/parity/cases/mcp/stdio-errors.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["source_revision"], "4e582f28");
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 6);
+    for case in cases {
+        let name = case["name"].as_str().unwrap();
+        let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+            .args(["mcp", "--stdio"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(case["input"].as_str().unwrap().as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(
+            output.status.code(),
+            case["exit_code"].as_i64().map(|n| n as i32),
+            "{name}: exit"
+        );
+        assert_eq!(
+            output.stdout,
+            case["stdout"].as_str().unwrap().as_bytes(),
+            "{name}: stdout"
+        );
+        assert_eq!(
+            output.stderr,
+            case["stderr"].as_str().unwrap().as_bytes(),
+            "{name}: stderr"
+        );
+    }
+}
+
+#[test]
+fn malformed_stdio_exits_before_stdin_eof() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+        .args(["mcp", "--stdio"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut input = child.stdin.take().unwrap();
+    input.write_all(b"nope").unwrap();
+    input.flush().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            panic!("malformed stdio waited for EOF");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(status.code(), Some(1));
+    assert_eq!(
+        std::io::read_to_string(child.stderr.take().unwrap()).unwrap(),
+        "invalid character 'o' in literal null (expecting 'u')\n"
+    );
+}

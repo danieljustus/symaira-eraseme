@@ -1,0 +1,47 @@
+{
+  "source_revision": "4e582f28",
+  "cases": [
+    {
+      "name": "truncated",
+      "input": "{\"jsonrpc\":\"2.0\",",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "unexpected EOF\n"
+    },
+    {
+      "name": "junk-after-response",
+      "input": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"} @@",
+      "exit_code": 1,
+      "stdout": "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n",
+      "stderr": "invalid character '@' looking for beginning of value\n"
+    },
+    {
+      "name": "malformed-literal",
+      "input": "nope\n",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character 'o' in literal null (expecting 'u')\n"
+    },
+    {
+      "name": "invalid-string-escape",
+      "input": "\"bad\\x\"",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character 'x' in string escape code\n"
+    },
+    {
+      "name": "array-trailing-comma",
+      "input": "[1,]",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character ']' looking for beginning of value\n"
+    },
+    {
+      "name": "object-trailing-comma",
+      "input": "{\"x\":1,}",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "invalid character '}' looking for beginning of object key string\n"
+    }
+  ]
+}

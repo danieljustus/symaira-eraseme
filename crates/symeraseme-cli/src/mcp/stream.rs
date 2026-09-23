@@ -13,8 +13,10 @@ use super::protocol::{InitializeOutcome, initialize, skip_json_value, skip_white
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum StreamError {
-    /// The stream holds no further complete JSON value but is not exhausted.
-    MalformedValue(usize),
+    /// Go's decoder reached EOF inside an otherwise valid JSON value.
+    UnexpectedEof,
+    /// Go's decoder rejected a byte before EOF.
+    Syntax(String),
     /// The scanner accepted a value the shared protocol could not parse. This
     /// is an internal inconsistency; failing loudly beats dropping a request.
     UnparsableValue(usize),
@@ -25,9 +27,8 @@ pub(crate) enum StreamError {
 impl std::fmt::Display for StreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StreamError::MalformedValue(position) => {
-                write!(f, "malformed JSON value at byte {position}")
-            }
+            StreamError::UnexpectedEof => write!(f, "unexpected EOF"),
+            StreamError::Syntax(message) => write!(f, "{message}"),
             StreamError::UnparsableValue(position) => {
                 write!(f, "unparsable JSON value at byte {position}")
             }
@@ -56,7 +57,7 @@ pub(crate) fn serve_stream(
         }
         let start = index;
         let Some(end) = skip_json_value(input, start) else {
-            return Err(StreamError::MalformedValue(start));
+            return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
         };
         match initialize(&input[start..end], handler) {
             InitializeOutcome::Response(bytes) => output.extend_from_slice(&bytes),
@@ -72,11 +73,6 @@ pub(crate) fn serve_stream(
 /// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
 /// a stream cut mid-value aborts.
 ///
-/// ponytail: `skip_json_value` cannot tell a truncated value from a
-/// syntactically invalid one, so a malformed value mid-stream waits for the
-/// next read where Go's decoder errors immediately, and the abort text is ours
-/// rather than `encoding/json`'s. Neither path is recorded in the corpus.
-/// Upgrade path: port the decoder's eager syntax-error detection and text.
 pub(crate) fn serve_stdio(
     input: &mut dyn std::io::BufRead,
     output: &mut dyn std::io::Write,
@@ -107,18 +103,92 @@ pub(crate) fn serve_stdio(
             position = 0;
             continue;
         }
+        if position < buffer.len()
+            && let Some(error) = syntax_error(&buffer[position..])
+        {
+            return Err(error);
+        }
         let more = input.fill_buf().map_err(map_io)?;
         if more.is_empty() {
             return if position >= buffer.len() {
                 Ok(())
             } else {
-                Err(StreamError::MalformedValue(position))
+                Err(StreamError::UnexpectedEof)
             };
         }
         buffer.extend_from_slice(more);
         let length = more.len();
         input.consume(length);
     }
+}
+
+fn syntax_error(input: &[u8]) -> Option<StreamError> {
+    // ponytail: the six recorded Go error classes are matched; port Go's
+    // full scanner if a wider malformed-input corpus requires exact wording.
+    let error = serde_json::from_slice::<serde_json::Value>(input).err()?;
+    if error.is_eof() {
+        return None;
+    }
+    for (first, literal) in [
+        (b'n', b"null".as_slice()),
+        (b't', b"true"),
+        (b'f', b"false"),
+    ] {
+        if input.first() == Some(&first) {
+            for (actual, expected) in input.iter().zip(literal) {
+                if actual != expected {
+                    let name = match first {
+                        b'n' => "null",
+                        b't' => "true",
+                        _ => "false",
+                    };
+                    return Some(StreamError::Syntax(format!(
+                        "invalid character '{}' in literal {name} (expecting '{}')",
+                        char::from(*actual),
+                        char::from(*expected)
+                    )));
+                }
+            }
+        }
+    }
+    let (mut in_string, mut escaped) = (false, false);
+    for byte in input {
+        if escaped {
+            if !matches!(
+                *byte,
+                b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' | b'u'
+            ) {
+                return Some(StreamError::Syntax(format!(
+                    "invalid character '{}' in string escape code",
+                    char::from(*byte)
+                )));
+            }
+            escaped = false;
+        } else if in_string && *byte == b'\\' {
+            escaped = true;
+        } else if *byte == b'"' {
+            in_string = !in_string;
+        }
+    }
+    let trimmed = input
+        .iter()
+        .copied()
+        .filter(|byte| !matches!(*byte, b' ' | b'\t' | b'\r' | b'\n'))
+        .collect::<Vec<_>>();
+    if trimmed.ends_with(b",}") {
+        return Some(StreamError::Syntax(
+            "invalid character '}' looking for beginning of object key string".to_owned(),
+        ));
+    }
+    let byte = input
+        .get(error.column().saturating_sub(1))
+        .copied()
+        .or_else(|| input.last().copied())
+        .unwrap_or_default();
+    Some(StreamError::Syntax(format!(
+        "invalid character '{}' looking for beginning of value",
+        char::from(byte)
+    )))
 }
 
 #[cfg(test)]
@@ -217,16 +287,13 @@ mod tests {
         let truncated: &[u8] = br#"{"jsonrpc":"2.0","#;
         let error = serve_stdio(&mut std::io::Cursor::new(truncated), &mut output, &handler)
             .expect_err("truncated stream must abort");
-        assert_eq!(error, StreamError::MalformedValue(0));
+        assert_eq!(error, StreamError::UnexpectedEof);
         assert!(output.is_empty());
     }
 
     #[test]
     fn stream_error_text_names_position_and_io_cause() {
-        assert_eq!(
-            StreamError::MalformedValue(3).to_string(),
-            "malformed JSON value at byte 3"
-        );
+        assert_eq!(StreamError::UnexpectedEof.to_string(), "unexpected EOF");
         assert_eq!(
             StreamError::UnparsableValue(7).to_string(),
             "unparsable JSON value at byte 7"
@@ -286,11 +353,11 @@ mod tests {
     }
 
     #[test]
-    fn a_truncated_stream_reports_the_offset_and_writes_nothing_extra() {
+    fn a_truncated_stream_reports_unexpected_eof_and_writes_nothing_extra() {
         let mut output = Vec::new();
         let error =
             serve_stream(br#"{"jsonrpc":"2.0","#, &mut output, &no_backend_handler()).unwrap_err();
-        assert_eq!(error, StreamError::MalformedValue(0));
+        assert_eq!(error, StreamError::UnexpectedEof);
         assert!(output.is_empty());
     }
 }
