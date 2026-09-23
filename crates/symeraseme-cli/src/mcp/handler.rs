@@ -462,25 +462,72 @@ impl ContractHandler {
         }))
     }
 
-    /// Go's `schedule_install`. Only the dry run is implemented: it delegates to
-    /// the same generator as `generate_scheduler`, leaving the paths to the
-    /// engine's defaults — which is what Go does, since this tool accepts only
-    /// the platform and the tick time. Installing for real writes into the
-    /// platform's scheduler directories and is not part of this slice.
+    /// Go's `schedule_install`, using the same scheduler engine as the CLI.
     fn schedule_install(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
-        if !get_bool(arguments, "dry_run", false) {
-            return Err(ToolError(
-                "installing the schedule is not implemented in this slice".to_owned(),
-            ));
-        }
         let config = scheduler::Config {
             platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
             tick_hour: get_int(arguments, "tick_hour", 10) as i32,
             tick_minute: get_int(arguments, "tick_minute", 0) as i32,
             ..scheduler::Config::default()
         };
-        let files = scheduler::generate(&config).map_err(|error| ToolError(error.to_string()))?;
-        Ok(json!({"success": true, "files": files, "dry_run": true}))
+        if get_bool(arguments, "dry_run", false) {
+            let files =
+                scheduler::generate(&config).map_err(|error| ToolError(error.to_string()))?;
+            return Ok(json!({"success": true, "files": files, "dry_run": true}));
+        }
+        let mut options = scheduler::install::InstallOptions::new(config);
+        options.platform_name = Some(get_str(arguments, "platform", ""));
+        options.replace_legacy = get_bool(arguments, "replace_legacy", false);
+        let result =
+            scheduler::install::install(&options).map_err(|error| ToolError(error.to_string()))?;
+        let legacy = result
+            .legacy
+            .into_iter()
+            .map(|unit| {
+                json!({
+                    "Platform": unit.platform.map(|platform| platform.to_string()).unwrap_or_default(),
+                    "Kind": unit.kind,
+                    "Name": unit.name,
+                    "Path": unit.path.to_string_lossy(),
+                    "IsPython": unit.is_python,
+                    "Reason": unit.reason,
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(json!({
+            "Platform": result.platform,
+            "OutputDir": result.output_dir,
+            "Files": result.files,
+            "Legacy": if legacy.is_empty() && result.platform == scheduler::Platform::Cron {
+                Value::Null
+            } else {
+                json!(legacy)
+            },
+            "ReplacementRequired": result.replacement_required,
+        }))
+    }
+
+    fn schedule_uninstall(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let config = scheduler::Config {
+            platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
+            ..scheduler::Config::default()
+        };
+        let mut options = scheduler::install::InstallOptions::new(config);
+        options.platform_name = Some(get_str(arguments, "platform", ""));
+        scheduler::install::uninstall(&options).map_err(|error| ToolError(error.to_string()))?;
+        Ok(json!({"success": true}))
+    }
+
+    fn schedule_status(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let config = scheduler::Config {
+            platform: scheduler::Platform::parse(&get_str(arguments, "platform", "")),
+            ..scheduler::Config::default()
+        };
+        let mut options = scheduler::install::InstallOptions::new(config);
+        options.platform_name = Some(get_str(arguments, "platform", ""));
+        let result =
+            scheduler::install::status(&options).map_err(|error| ToolError(error.to_string()))?;
+        serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `auto_confirm`: dataStore first, then `replies.Service.AutoConfirm`.
@@ -1088,10 +1135,13 @@ impl ToolHandler for ContractHandler {
         if name == "manual_tasks_list" {
             return self.manual_tasks_list(arguments);
         }
-        // Go serializes `map[string]any` results with sorted keys but structs
-        // in declaration order: `auto_confirm` answers with
-        // `confirmation.Result`, so its keys must not be reordered.
-        if name == "auto_confirm" {
+        // Go serializes map results with sorted keys but struct results in
+        // declaration order: `auto_confirm`, `schedule_install`, and
+        // `schedule_status` return structs, so their keys must not be reordered.
+        if matches!(
+            name,
+            "auto_confirm" | "schedule_install" | "schedule_status"
+        ) {
             return self.call_go_map(name, arguments);
         }
         self.call_go_map(name, arguments).map(go_map_order)
@@ -1118,6 +1168,8 @@ impl ContractHandler {
             "get_events" => self.get_events(arguments),
             "list_brokers" => self.list_brokers(arguments),
             "schedule_install" => self.schedule_install(arguments),
+            "schedule_uninstall" => self.schedule_uninstall(arguments),
+            "schedule_status" => self.schedule_status(arguments),
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
             "auto_confirm" => self.auto_confirm(arguments),
@@ -2053,7 +2105,7 @@ mod tests {
     /// the oracle could not record the answer. The file *names* are stable and
     /// are asserted here against the set Go's real handler produced.
     #[test]
-    fn schedule_install_dry_run_shape_and_refusal() {
+    fn schedule_install_dry_run_shape() {
         let root = workspace("schedule-install");
         let handler = ContractHandler::new(&root);
         let call = |arguments: &str| -> Value {
@@ -2096,16 +2148,6 @@ mod tests {
                 "symeraseme-tick.sh",
                 "uninstall.sh",
             ]
-        );
-
-        // Writing into the platform's scheduler directories is not in this slice.
-        let refused = call(r#"{"dry_run":false}"#);
-        assert!(
-            refused["error"]["message"]
-                .as_str()
-                .unwrap_or("")
-                .contains("installing the schedule is not implemented"),
-            "{refused}"
         );
 
         let _ = fs::remove_dir_all(&root);

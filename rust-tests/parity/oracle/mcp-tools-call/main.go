@@ -9,12 +9,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -31,6 +34,18 @@ const (
 	storeFixtureDir = "tests/fixtures/mcp-contract/mcp-003-store"
 )
 
+const schedulerSourceRevision = "4af87d9d2cd127722aa4d0e3942057b0365bd7d9"
+
+var schedulerSourceFiles = []sourceFileDigest{
+	{Path: "internal/mcp/contract_handler.go", SHA256: "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+	{Path: "internal/scheduler/scheduler.go", SHA256: "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"},
+}
+
+type sourceFileDigest struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+}
+
 type fixtureCase struct {
 	Name       string  `json:"name"`
 	Request    string  `json:"request,omitempty"`
@@ -39,9 +54,14 @@ type fixtureCase struct {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--scheduler-fixture" {
+		writeSchedulerFixtures()
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--fixture" {
 		writeFixture()
 		writeStoreFixtures()
+		writeSchedulerFixtures()
 		return
 	}
 	raw, err := io.ReadAll(os.Stdin)
@@ -57,6 +77,251 @@ func main() {
 		BodyB64 string `json:"body_b64"`
 	}{BodyB64: base64.StdEncoding.EncodeToString(output.Bytes())}); err != nil {
 		fail(err)
+	}
+}
+
+// writeSchedulerFixtures measures real install/status/uninstall calls while
+// every scheduler command resolves to a private fake crontab on PATH.
+func writeSchedulerFixtures() {
+	verifySchedulerSources()
+	root, err := os.MkdirTemp("", "mcp-scheduler-oracle")
+	if err != nil {
+		fail(err)
+	}
+	defer os.RemoveAll(root)
+
+	home := filepath.Join(root, "home")
+	data := filepath.Join(root, "data")
+	bin := filepath.Join(root, "bin")
+	tmp := filepath.Join(root, "tmp")
+	state := filepath.Join(root, "crontab")
+	for _, dir := range []string{home, data, bin, tmp} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.WriteFile(state, []byte("# user schedule\n"), 0o600); err != nil {
+		fail(err)
+	}
+	script := `#!/bin/sh
+case "$1" in
+  -l)
+    [ -f "$SCHEDULER_CRONTAB_STATE" ] || exit 1
+    while IFS= read -r line; do printf '%s\n' "$line"; done < "$SCHEDULER_CRONTAB_STATE"
+    ;;
+  *)
+    while IFS= read -r line; do printf '%s\n' "$line"; done < "$1" > "$SCHEDULER_CRONTAB_STATE"
+    ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "crontab"), []byte(script), 0o700); err != nil {
+		fail(err)
+	}
+	origin, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	oldHome, hadHome := os.LookupEnv("HOME")
+	oldPath, hadPath := os.LookupEnv("PATH")
+	oldData, hadData := os.LookupEnv("SYMERASEME_DATA_DIR")
+	oldState, hadState := os.LookupEnv("SCHEDULER_CRONTAB_STATE")
+	oldTemp, hadTemp := os.LookupEnv("TMPDIR")
+	oldXDGConfig, hadXDGConfig := os.LookupEnv("XDG_CONFIG_HOME")
+	oldXDGData, hadXDGData := os.LookupEnv("XDG_DATA_HOME")
+	oldXDGState, hadXDGState := os.LookupEnv("XDG_STATE_HOME")
+	oldXDGCache, hadXDGCache := os.LookupEnv("XDG_CACHE_HOME")
+	defer func() {
+		_ = os.Chdir(origin)
+		restoreEnv("HOME", oldHome, hadHome)
+		restoreEnv("PATH", oldPath, hadPath)
+		restoreEnv("SYMERASEME_DATA_DIR", oldData, hadData)
+		restoreEnv("SCHEDULER_CRONTAB_STATE", oldState, hadState)
+		restoreEnv("TMPDIR", oldTemp, hadTemp)
+		restoreEnv("XDG_CONFIG_HOME", oldXDGConfig, hadXDGConfig)
+		restoreEnv("XDG_DATA_HOME", oldXDGData, hadXDGData)
+		restoreEnv("XDG_STATE_HOME", oldXDGState, hadXDGState)
+		restoreEnv("XDG_CACHE_HOME", oldXDGCache, hadXDGCache)
+	}()
+	for key, value := range map[string]string{
+		"HOME": home, "PATH": bin, "SYMERASEME_DATA_DIR": data, "TMPDIR": tmp,
+		"XDG_CONFIG_HOME": filepath.Join(home, "config"), "XDG_DATA_HOME": filepath.Join(home, "data"),
+		"XDG_STATE_HOME": filepath.Join(home, "state"), "XDG_CACHE_HOME": filepath.Join(home, "cache"),
+		"SCHEDULER_CRONTAB_STATE": state,
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.Chdir(root); err != nil {
+		fail(err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		fail(err)
+	}
+	cases := []fixtureCase{
+		{Name: "schedule_install_writes_only_through_private_crontab", Request: callRequest(1, "schedule_install", `{"platform":"cron","tick_hour":9,"tick_minute":30}`)},
+		{Name: "schedule_status_reports_the_installed_cron_block", Request: callRequest(2, "schedule_status", `{"platform":"cron"}`)},
+		{Name: "schedule_uninstall_removes_only_the_managed_cron_block", Request: callRequest(3, "schedule_uninstall", `{"platform":"cron"}`)},
+		{Name: "schedule_status_reports_the_uninstalled_cron_block", Request: callRequest(4, "schedule_status", `{"platform":"cron"}`)},
+	}
+	nativeCases := []fixtureCase{
+		schedulerInstallCase("launchd", 5),
+		schedulerInstallCase("systemd", 6),
+	}
+	crontabAfterInstall := false
+	filesAfterInstall := []string(nil)
+	for index := range cases {
+		var output bytes.Buffer
+		server := mcp.NewServer(mcp.ContractHandler())
+		if err := server.ServeStdio(context.Background(), bytes.NewReader(append([]byte(cases[index].Request), '\n')), &output); err != nil {
+			fail(err)
+		}
+		if output.Len() != 0 {
+			body := strings.ReplaceAll(output.String(), canonicalRoot, "<SCHEDULE_ROOT>")
+			body = strings.ReplaceAll(body, root, "<SCHEDULE_ROOT>")
+			cases[index].Response = &body
+		}
+		if index == 0 {
+			installed, err := os.ReadFile(state)
+			if err != nil {
+				fail(err)
+			}
+			crontabAfterInstall = strings.Contains(string(installed), "# Symaira EraseMe scheduled tasks")
+			files, err := os.ReadDir(filepath.Join(root, "schedules"))
+			if err != nil {
+				fail(err)
+			}
+			filesAfterInstall = make([]string, 0, len(files))
+			for _, file := range files {
+				filesAfterInstall = append(filesAfterInstall, file.Name())
+			}
+		}
+	}
+
+	cronAfterUninstall, err := os.ReadFile(state)
+	if err != nil {
+		fail(err)
+	}
+	fixture := struct {
+		SourceRevision string             `json:"source_revision"`
+		SourceFiles    []sourceFileDigest `json:"source_files"`
+		SourcePath     string             `json:"source_path"`
+		Cases          []fixtureCase      `json:"cases"`
+		NativeCases    []fixtureCase      `json:"native_install_cases"`
+		SideEffects    struct {
+			FilesAfterInstall   []string `json:"files_after_install"`
+			CrontabAfterInstall bool     `json:"crontab_after_install"`
+			CrontabAfterRemove  string   `json:"crontab_after_uninstall"`
+		} `json:"side_effects"`
+	}{
+		SourceRevision: schedulerSourceRevision,
+		SourceFiles:    schedulerSourceFiles,
+		SourcePath:     "internal/mcp/contract_handler.go; internal/scheduler/scheduler.go",
+		Cases:          cases,
+		NativeCases:    nativeCases,
+	}
+	fixture.SideEffects.FilesAfterInstall = filesAfterInstall
+	fixture.SideEffects.CrontabAfterInstall = crontabAfterInstall
+	fixture.SideEffects.CrontabAfterRemove = string(cronAfterUninstall)
+	encoded, err := json.MarshalIndent(fixture, "", "  ")
+	if err != nil {
+		fail(err)
+	}
+	destination := filepath.Join(origin, "tests", "fixtures", "mcp-contract", "mcp-003-scheduler", "cases.json")
+	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+		fail(err)
+	}
+	if err := os.WriteFile(destination, append(encoded, '\n'), 0o644); err != nil {
+		fail(err)
+	}
+}
+
+func verifySchedulerSources() {
+	for _, source := range schedulerSourceFiles {
+		pinned, err := exec.Command("git", "show", schedulerSourceRevision+":"+source.Path).Output()
+		if err != nil {
+			fail(fmt.Errorf("read pinned Go oracle source %s: %w", source.Path, err))
+		}
+		working, err := os.ReadFile(source.Path)
+		if err != nil {
+			fail(fmt.Errorf("read working Go oracle source %s: %w", source.Path, err))
+		}
+		pinnedHash := sha256.Sum256(pinned)
+		workingHash := sha256.Sum256(working)
+		if !bytes.Equal(pinned, working) || hex.EncodeToString(workingHash[:]) != source.SHA256 || hex.EncodeToString(pinnedHash[:]) != source.SHA256 {
+			fail(fmt.Errorf("Go oracle source %s does not match pinned revision %s", source.Path, schedulerSourceRevision))
+		}
+	}
+}
+
+func schedulerInstallCase(platform string, id int) fixtureCase {
+	root, err := os.MkdirTemp("", "mcp-scheduler-"+platform)
+	if err != nil {
+		fail(err)
+	}
+	defer os.RemoveAll(root)
+
+	home, data, tmp, bin := filepath.Join(root, "home"), filepath.Join(root, "data"), filepath.Join(root, "tmp"), filepath.Join(root, "bin")
+	for _, dir := range []string{home, data, tmp, bin} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			fail(err)
+		}
+	}
+	command := "launchctl"
+	if platform == "systemd" {
+		command = "systemctl"
+	}
+	if err := os.WriteFile(filepath.Join(bin, command), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		fail(err)
+	}
+	origin, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	keys := []string{"HOME", "PATH", "SYMERASEME_DATA_DIR", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"}
+	old := make(map[string]string, len(keys))
+	existed := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		old[key], existed[key] = os.LookupEnv(key)
+	}
+	defer func() {
+		_ = os.Chdir(origin)
+		for _, key := range keys {
+			restoreEnv(key, old[key], existed[key])
+		}
+	}()
+	for key, value := range map[string]string{
+		"HOME": home, "PATH": bin, "SYMERASEME_DATA_DIR": data, "TMPDIR": tmp,
+		"XDG_CONFIG_HOME": filepath.Join(home, "config"), "XDG_DATA_HOME": filepath.Join(home, "data"),
+		"XDG_STATE_HOME": filepath.Join(home, "state"), "XDG_CACHE_HOME": filepath.Join(home, "cache"),
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.Chdir(root); err != nil {
+		fail(err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		fail(err)
+	}
+	request := callRequest(id, "schedule_install", fmt.Sprintf(`{"platform":%q,"tick_hour":9,"tick_minute":30}`, platform))
+	var output bytes.Buffer
+	if err := mcp.NewServer(mcp.ContractHandler()).ServeStdio(context.Background(), bytes.NewReader(append([]byte(request), '\n')), &output); err != nil {
+		fail(err)
+	}
+	response := strings.ReplaceAll(output.String(), canonicalRoot, "<SCHEDULE_ROOT>")
+	response = strings.ReplaceAll(response, root, "<SCHEDULE_ROOT>")
+	return fixtureCase{Name: "schedule_install_" + platform + "_returns_empty_legacy_array", Request: request, Response: &response}
+}
+
+func restoreEnv(key, value string, existed bool) {
+	if existed {
+		_ = os.Setenv(key, value)
+	} else {
+		_ = os.Unsetenv(key)
 	}
 }
 

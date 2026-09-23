@@ -1,0 +1,60 @@
+{
+  "source_revision": "4af87d9d2cd127722aa4d0e3942057b0365bd7d9",
+  "source_files": [
+    {
+      "path": "internal/mcp/contract_handler.go",
+      "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"
+    },
+    {
+      "path": "internal/scheduler/scheduler.go",
+      "sha256": "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"
+    }
+  ],
+  "source_path": "internal/mcp/contract_handler.go; internal/scheduler/scheduler.go",
+  "cases": [
+    {
+      "name": "schedule_install_writes_only_through_private_crontab",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_install\",\"arguments\":{\"platform\":\"cron\",\"tick_hour\":9,\"tick_minute\":30}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"Platform\\\":\\\"cron\\\",\\\"OutputDir\\\":\\\"./schedules\\\",\\\"Files\\\":[\\\"\u003cSCHEDULE_ROOT\u003e/schedules/crontab.txt\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/install.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-poll.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-rescan.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-tick.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/uninstall.sh\\\"],\\\"Legacy\\\":null,\\\"ReplacementRequired\\\":false}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "schedule_status_reports_the_installed_cron_block",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_status\",\"arguments\":{\"platform\":\"cron\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"Platform\\\":\\\"cron\\\",\\\"Entries\\\":[{\\\"Label\\\":\\\"cron\\\",\\\"Installed\\\":true,\\\"Active\\\":false,\\\"Path\\\":\\\"crontab\\\",\\\"Legacy\\\":false,\\\"Error\\\":\\\"\\\"}]}\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
+      "name": "schedule_uninstall_removes_only_the_managed_cron_block",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_uninstall\",\"arguments\":{\"platform\":\"cron\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":3}\n"
+    },
+    {
+      "name": "schedule_status_reports_the_uninstalled_cron_block",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_status\",\"arguments\":{\"platform\":\"cron\"}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"Platform\\\":\\\"cron\\\",\\\"Entries\\\":[{\\\"Label\\\":\\\"cron\\\",\\\"Installed\\\":false,\\\"Active\\\":false,\\\"Path\\\":\\\"crontab\\\",\\\"Legacy\\\":false,\\\"Error\\\":\\\"\\\"}]}\",\"type\":\"text\"}]},\"id\":4}\n"
+    }
+  ],
+  "native_install_cases": [
+    {
+      "name": "schedule_install_launchd_returns_empty_legacy_array",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_install\",\"arguments\":{\"platform\":\"launchd\",\"tick_hour\":9,\"tick_minute\":30}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"Platform\\\":\\\"launchd\\\",\\\"OutputDir\\\":\\\"./schedules\\\",\\\"Files\\\":[\\\"\u003cSCHEDULE_ROOT\u003e/schedules/com.symeraseme.poll.plist\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/com.symeraseme.rescan.plist\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/com.symeraseme.tick.plist\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/install.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-poll.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-rescan.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-tick.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/uninstall.sh\\\"],\\\"Legacy\\\":[],\\\"ReplacementRequired\\\":false}\",\"type\":\"text\"}]},\"id\":5}\n"
+    },
+    {
+      "name": "schedule_install_systemd_returns_empty_legacy_array",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"schedule_install\",\"arguments\":{\"platform\":\"systemd\",\"tick_hour\":9,\"tick_minute\":30}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"Platform\\\":\\\"systemd\\\",\\\"OutputDir\\\":\\\"./schedules\\\",\\\"Files\\\":[\\\"\u003cSCHEDULE_ROOT\u003e/schedules/install.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-poll.service\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-poll.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-poll.timer\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-rescan.service\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-rescan.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-rescan.timer\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-tick.service\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-tick.sh\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/symeraseme-tick.timer\\\",\\\"\u003cSCHEDULE_ROOT\u003e/schedules/uninstall.sh\\\"],\\\"Legacy\\\":[],\\\"ReplacementRequired\\\":false}\",\"type\":\"text\"}]},\"id\":6}\n"
+    }
+  ],
+  "side_effects": {
+    "files_after_install": [
+      "crontab.txt",
+      "install.sh",
+      "symeraseme-poll.sh",
+      "symeraseme-rescan.sh",
+      "symeraseme-tick.sh",
+      "uninstall.sh"
+    ],
+    "crontab_after_install": true,
+    "crontab_after_uninstall": "# user schedule\n"
+  }
+}
