@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,18 +37,24 @@ type observation struct {
 }
 
 func main() {
-	const (
-		id     = "openai-forbidden-echoed-key"
-		apiKey = "synthetic-403-key"
-		body   = `permission denied; key synthetic-403-key`
-	)
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (403 or 404)")
+	flag.Parse()
+	var id, apiKey, body string
+	switch *status {
+	case http.StatusForbidden:
+		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
+	case http.StatusNotFound:
+		id, apiKey, body = "openai-model-not-found-echoed-key", "synthetic-404-key", `model not found; key synthetic-404-key`
+	default:
+		fatalIf(fmt.Errorf("unsupported synthetic status %d", *status))
+	}
 	_, here, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(here), "../../../.."))
 	obs := observation{
 		Schema:   "symeraseme.go-oracle.llm-failures-next.v1",
 		GoModule: "github.com/danieljustus/symaira-corekit v0.16.2",
 		ID:       id,
-		Status:   http.StatusForbidden,
+		Status:   *status,
 		APIKey:   apiKey,
 		Body:     body,
 	}
@@ -64,7 +71,7 @@ func main() {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts.Add(1)
 		requestPath.Store(r.URL.Path)
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(*status)
 		_, _ = io.WriteString(w, body)
 	}))
 	defer srv.Close()

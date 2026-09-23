@@ -11,10 +11,23 @@ const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/case.json"
 ));
+const FIXTURE_404: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/case-404.json"
+));
 
 #[test]
 fn forbidden_provider_response_matches_go_with_secret_redaction() {
-    let fixture: Value = serde_json::from_str(FIXTURE).expect("Go fixture parses");
+    assert_failure_matches_go(FIXTURE, 403);
+}
+
+#[test]
+fn missing_model_response_matches_go_with_secret_redaction() {
+    assert_failure_matches_go(FIXTURE_404, 404);
+}
+
+fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
+    let fixture: Value = serde_json::from_str(fixture_json).expect("Go fixture parses");
     assert_eq!(
         fixture["schema"],
         "symeraseme.go-oracle.llm-failures-next.v1"
@@ -30,7 +43,9 @@ fn forbidden_provider_response_matches_go_with_secret_redaction() {
 
     let api_key = fixture["api_key"].as_str().unwrap();
     let attempts = fixture["attempts"].as_u64().unwrap() as usize;
-    let (base_url, server) = local_403_server(attempts, fixture["body"].as_str().unwrap());
+    assert_eq!(fixture["status"], expected_status);
+    let (base_url, server) =
+        local_failure_server(attempts, expected_status, fixture["body"].as_str().unwrap());
     let client = create_with(
         &CreateOptions {
             provider: "openai".to_owned(),
@@ -43,7 +58,7 @@ fn forbidden_provider_response_matches_go_with_secret_redaction() {
     )
     .expect("local fake provider client");
     let result = client.classify("system", "user", &ClassifyOptions::default());
-    let paths = server.join().expect("local 403 server thread");
+    let paths = server.join().expect("local provider server thread");
 
     assert_eq!(paths.len(), attempts, "Go retry count");
     let go_path = fixture["path"].as_str().unwrap();
@@ -81,8 +96,12 @@ fn go_source(path: &str) -> &'static [u8] {
     }
 }
 
-fn local_403_server(attempts: usize, body: &str) -> (String, thread::JoinHandle<Vec<String>>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback 403 server");
+fn local_failure_server(
+    attempts: usize,
+    status: u16,
+    body: &str,
+) -> (String, thread::JoinHandle<Vec<String>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback provider server");
     listener
         .set_nonblocking(true)
         .expect("nonblocking listener");
@@ -106,8 +125,8 @@ fn local_403_server(attempts: usize, body: &str) -> (String, thread::JoinHandle<
             let (mut stream, path) = read_request(stream);
             paths.push(path);
             let response = format!(
-                "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
+                "HTTP/1.1 {status} Synthetic Failure\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len(),
             );
             stream
                 .write_all(response.as_bytes())
@@ -119,6 +138,9 @@ fn local_403_server(attempts: usize, body: &str) -> (String, thread::JoinHandle<
 }
 
 fn read_request(stream: TcpStream) -> (TcpStream, String) {
+    stream
+        .set_nonblocking(false)
+        .expect("set accepted provider stream blocking");
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     reader.read_line(&mut line).expect("read request line");
