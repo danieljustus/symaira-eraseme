@@ -173,6 +173,16 @@ green CLI corpus does not close JSON-state, review or native platform gates.
 - Three additional local-only Go HTTP observations now cover LLM 429 retry
   exhaustion, malformed success JSON and empty choices (`3d74a200`). The
   integrated Rust transport test passed 5/5; no paid provider was contacted.
+- CLI and MCP now open the configured encrypted store and explicitly close it,
+  propagating finalization failures (`a4757a66`, `60a1656a`). The two sandboxed
+  macOS arm64 switchback runners each passed six steps with a Go 1.26.6 binary
+  and the integrated Rust release binary: Rust read existing plain/V3-encrypted
+  state, wrote one request, and Go read the post-Rust state. The encrypted run
+  also read through Rust MCP stdio and retained its V3 envelope. Evidence and
+  artifact hashes are under `/tmp/eraseme-plain-switchback-20260923-05` and
+  `/tmp/eraseme-encrypted-switchback-20260923-06`;
+  `rust-tests/parity/{plain,encrypted}_store_switchback.py` is the executable
+  gate. Native Linux/Windows and real restore/cutover remain open.
 
 ## Open tasks (run of 2026-09-22)
 
