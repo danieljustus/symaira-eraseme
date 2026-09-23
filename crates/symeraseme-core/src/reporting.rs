@@ -1096,9 +1096,9 @@ fn export_csv(data: &Value) -> String {
 
 /// Go's `ExportHTML`: the report template over the report data.
 fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
-    // Protect data newlines while matching Go's control-tag whitespace. A
-    // rendered report can contain caller-controlled multiline text, so the
-    // compatibility spacing adjustment below targets a template boundary.
+    // Keep caller text untouched; Go and MiniJinja retain different template
+    // blank lines when there are no campaigns, one campaign, or repeated
+    // campaigns, so normalize only those template-generated boundaries below.
     let mut template_data = data.clone();
     let campaign_count = template_data
         .get("campaigns")
@@ -1126,8 +1126,11 @@ fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
     let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
     let html = if campaign_count == 0 {
         compact_template_blank_lines(&html)
+    } else if campaign_count == 1 {
+        html.replace("\n\n\n  <h2>Campaign:", "\n\n  <h2>Campaign:")
     } else if campaign_count > 1 {
         html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:")
+            .replace("</p>\n  <h2>Campaign:", "</p>\n\n  <h2>Campaign:")
     } else {
         html
     };

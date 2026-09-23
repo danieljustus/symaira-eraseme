@@ -59,6 +59,8 @@ struct GoReportingExports {
     templating_source_sha256: String,
     json: String,
     html: String,
+    html_single_campaign: String,
+    html_empty_campaign: String,
 }
 
 /// The seed used by Go's `fixtureStore`, copied statement for statement.
@@ -192,7 +194,7 @@ fn generated_report_exports_match_go() {
     );
     assert_eq!(
         hex::encode(Sha256::digest(GO_REPORTING_EXPORT_TEST)),
-        "e9a1ef7eff13f61230be52448b183a095a4e1629120d8b220676425f40b1f9e4",
+        "47a1fee4f37f7ec5af50d95673378df57ad019aab5f2a39d27707335f84d2581",
         "Go export oracle changed; review and repin it"
     );
 
@@ -248,6 +250,48 @@ fn generated_report_exports_match_go() {
         "HTML",
         generate_report(&report, "html", now).expect("report HTML export"),
         &fixture.html,
+    );
+
+    let single_campaign = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: "new".to_owned(),
+            all_campaigns: false,
+        },
+        now,
+    )
+    .expect("single campaign report data");
+    assert_output(
+        "single campaign HTML",
+        generate_report(&single_campaign, "html", now).expect("single campaign HTML export"),
+        &fixture.html_single_campaign,
+    );
+
+    let (_empty_tree, empty_store) = fixture_store();
+    empty_store
+        .connection()
+        .execute_batch(
+            "DELETE FROM request_events WHERE request_id=3;
+             DELETE FROM request_state WHERE request_id=3;
+             DELETE FROM removal_requests WHERE id=3;
+             DELETE FROM campaigns WHERE id='old';
+             INSERT INTO campaigns(id,created_at,kind,notes)
+             VALUES ('empty','2026-08-01T08:00:00+00:00','initial','empty');",
+        )
+        .expect("seed empty-campaign report");
+    let empty_campaign_report = get_report_data(
+        &empty_store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("empty-campaign report data");
+    assert_output(
+        "two campaigns with one empty HTML",
+        generate_report(&empty_campaign_report, "html", now).expect("empty-campaign HTML export"),
+        &fixture.html_empty_campaign,
     );
 }
 

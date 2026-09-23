@@ -20,6 +20,8 @@ type reportingExportFixture struct {
 	TemplatingSourceSHA256 string `json:"templating_source_sha256"`
 	JSON                   string `json:"json"`
 	HTML                   string `json:"html"`
+	HTMLSingleCampaign     string `json:"html_single_campaign"`
+	HTMLEmptyCampaign      string `json:"html_empty_campaign"`
 }
 
 // TestReportingExportFixture captures the bytes returned by Go's real
@@ -49,6 +51,33 @@ func TestReportingExportFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	singleCampaign, err := GetReportData(context.Background(), store, ReportOpts{CampaignID: "new", Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	singleHTML, err := GenerateReport(singleCampaign, "html", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		`DELETE FROM request_events WHERE request_id=3`,
+		`DELETE FROM request_state WHERE request_id=3`,
+		`DELETE FROM removal_requests WHERE id=3`,
+		`DELETE FROM campaigns WHERE id='old'`,
+		`INSERT INTO campaigns(id,created_at,kind,notes) VALUES ('empty','2026-08-01T08:00:00+00:00','initial','empty')`,
+	} {
+		if _, err := store.DB().ExecContext(context.Background(), statement); err != nil {
+			t.Fatalf("prepare empty-campaign report: %v", err)
+		}
+	}
+	emptyCampaignData, err := GetReportData(context.Background(), store, ReportOpts{AllCampaigns: true, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyCampaignHTML, err := GenerateReport(emptyCampaignData, "html", now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	readSHA256 := func(path string) string {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, path))
@@ -64,6 +93,8 @@ func TestReportingExportFixture(t *testing.T) {
 		TemplatingSourceSHA256: readSHA256("internal/templating/templating.go"),
 		JSON:                   jsonText,
 		HTML:                   htmlText,
+		HTMLSingleCampaign:     singleHTML,
+		HTMLEmptyCampaign:      emptyCampaignHTML,
 	}
 	path := filepath.Join(root, reportingExportFixturePath)
 	if os.Getenv("UPDATE_REPORTING_EXPORT_FIXTURE") == "1" {
