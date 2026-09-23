@@ -65,25 +65,55 @@ fn pinned_now() -> DateTime<Utc> {
         .with_timezone(&Utc)
 }
 
-fn normalize_plan(mut plan: Map<String, Value>) -> Value {
-    if let Some(rows) = plan.get_mut("requests").and_then(Value::as_array_mut) {
-        for row in rows {
-            if let Some(row) = row.as_object_mut() {
-                for key in [
-                    "created_at",
-                    "last_event_at",
-                    "sent_at",
-                    "acknowledged_at",
-                    "resolved_at",
-                    "deadline_at",
-                    "next_action_at",
-                ] {
-                    row.insert(key.to_owned(), Value::Null);
-                }
-            }
+fn pin_request_timestamps(store: &Store, ids: &[i64]) {
+    const CREATED: &str = "2026-02-03 04:05:06";
+    const LAST_EVENT: &str = "2026-02-04 05:06:07";
+    const SENT: &str = "2026-02-05 06:07:08";
+    const ACKNOWLEDGED: &str = "2026-02-06 07:08:09";
+    const RESOLVED: &str = "2026-02-07 08:09:10";
+    const DEADLINE: &str = "2026-02-08 09:10:11";
+    const NEXT_ACTION: &str = "2026-02-09 10:11:12";
+    for id in ids {
+        store
+            .connection()
+            .execute(
+                "UPDATE removal_requests SET created_at = ?1 WHERE id = ?2",
+                rusqlite::params![CREATED, id],
+            )
+            .expect("pin request creation time");
+        store
+            .connection()
+            .execute(
+                "UPDATE request_state SET last_event_at = ?1, sent_at = ?2, acknowledged_at = ?3, \
+                 resolved_at = ?4, deadline_at = ?5, next_action_at = ?6 WHERE request_id = ?7",
+                rusqlite::params![
+                    LAST_EVENT,
+                    SENT,
+                    ACKNOWLEDGED,
+                    RESOLVED,
+                    DEADLINE,
+                    NEXT_ACTION,
+                    id
+                ],
+            )
+            .expect("pin request state timestamps");
+    }
+}
+
+fn assert_pinned_timestamps(plan: &Value) {
+    for row in plan["requests"].as_array().expect("plan requests") {
+        for (field, value) in [
+            ("created_at", "2026-02-03T04:05:06Z"),
+            ("last_event_at", "2026-02-04T05:06:07Z"),
+            ("sent_at", "2026-02-05T06:07:08Z"),
+            ("acknowledged_at", "2026-02-06T07:08:09Z"),
+            ("resolved_at", "2026-02-07T08:09:10Z"),
+            ("deadline_at", "2026-02-08T09:10:11Z"),
+            ("next_action_at", "2026-02-09T10:11:12Z"),
+        ] {
+            assert_eq!(row[field], value, "GetPlan.{field}");
         }
     }
-    Value::Object(plan)
 }
 
 #[test]
@@ -117,7 +147,7 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
     }
     assert_eq!(
         hex::encode(Sha256::digest(go_oracle)),
-        "244627adcb446cb791cafedeffc98906d5cfcaaec119ae55db72e7098d4bf4c3",
+        "f83f277ae57019bd420d6db73dc0ce9fb78ef735bc33ca7c0e646b1e527b314a",
         "Go oracle source changed; review and repin this executable contract"
     );
     assert_eq!(
@@ -203,7 +233,9 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         )
         .expect("append email planned event");
 
-    let plan = get_plan(&store, campaign_id, "").expect("get campaign plan");
+    pin_request_timestamps(&store, &[request_id, email_id]);
+    let plan_before = Value::Object(get_plan(&store, campaign_id, "").expect("get campaign plan"));
+    assert_pinned_timestamps(&plan_before);
     let all_plans = get_plan(&store, "", "").expect("get all plans");
     assert_eq!(all_plans["campaign_id"], "all");
     assert_eq!(all_plans["total"], 2);
@@ -227,6 +259,10 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         pinned_now(),
     )
     .expect("execute campaign without send adapters");
+    pin_request_timestamps(&store, &[request_id, email_id]);
+    let plan_after =
+        Value::Object(get_plan(&store, campaign_id, "").expect("get plan after execution"));
+    assert_pinned_timestamps(&plan_after);
     let mut events = Vec::new();
     for id in [request_id, email_id] {
         events.extend(
@@ -256,7 +292,8 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         })
         .collect::<Map<_, _>>();
     let actual = json!({
-        "plan": normalize_plan(plan),
+        "plan_before": plan_before,
+        "plan_after": plan_after,
         "result": result,
         "events": events,
         "statuses": statuses,

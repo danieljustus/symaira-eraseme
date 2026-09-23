@@ -25,10 +25,11 @@ type input struct {
 }
 
 type output struct {
-	Plan     map[string]any    `json:"plan"`
-	Result   map[string]any    `json:"result"`
-	Events   []eventSnapshot   `json:"events"`
-	Statuses map[string]string `json:"statuses"`
+	PlanBefore map[string]any    `json:"plan_before"`
+	PlanAfter  map[string]any    `json:"plan_after"`
+	Result     map[string]any    `json:"result"`
+	Events     []eventSnapshot   `json:"events"`
+	Statuses   map[string]string `json:"statuses"`
 }
 
 type eventSnapshot struct {
@@ -86,11 +87,13 @@ func main() {
 	if err != nil {
 		fatal(err.Error())
 	}
-	plan, err := campaign.GetPlan(ctx, repo, in.CampaignID, "")
+	if err := pinRequestTimestamps(ctx, store, requestID, emailID); err != nil {
+		fatal(err.Error())
+	}
+	planBefore, err := campaign.GetPlan(ctx, repo, in.CampaignID, "")
 	if err != nil {
 		fatal(err.Error())
 	}
-	normalizePlan(plan)
 	brokers, err := registry.LoadFromDir("registry")
 	if err != nil {
 		fatal(err.Error())
@@ -107,6 +110,13 @@ func main() {
 	result, err := campaign.ExecuteCampaign(ctx, store, in.CampaignID, campaign.ExecuteOpts{
 		WebForm: webForm.Run, ProfilePath: profilePath,
 	}, 5)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := pinRequestTimestamps(ctx, store, requestID, emailID); err != nil {
+		fatal(err.Error())
+	}
+	planAfter, err := campaign.GetPlan(ctx, repo, in.CampaignID, "")
 	if err != nil {
 		fatal(err.Error())
 	}
@@ -134,7 +144,7 @@ func main() {
 		id := request["id"].(int64)
 		statuses[fmt.Sprint(id)], _ = request["current_status"].(string)
 	}
-	resultDoc := output{Plan: plan, Result: result, Events: snapshots, Statuses: statuses}
+	resultDoc := output{PlanBefore: planBefore, PlanAfter: planAfter, Result: result, Events: snapshots, Statuses: statuses}
 	if err := json.NewEncoder(os.Stdout).Encode(resultDoc); err != nil {
 		fatal(err.Error())
 	}
@@ -146,13 +156,26 @@ func fixedTime() time.Time {
 
 func stringPtr(value string) *string { return &value }
 
-func normalizePlan(plan map[string]any) {
-	rows, _ := plan["requests"].([]map[string]any)
-	for _, row := range rows {
-		for _, key := range []string{"created_at", "last_event_at", "sent_at", "acknowledged_at", "resolved_at", "deadline_at", "next_action_at"} {
-			row[key] = nil
+func pinRequestTimestamps(ctx context.Context, store *eventstore.Store, ids ...int64) error {
+	const created = "2026-02-03 04:05:06"
+	const lastEvent = "2026-02-04 05:06:07"
+	const sent = "2026-02-05 06:07:08"
+	const acknowledged = "2026-02-06 07:08:09"
+	const resolved = "2026-02-07 08:09:10"
+	const deadline = "2026-02-08 09:10:11"
+	const nextAction = "2026-02-09 10:11:12"
+	for _, id := range ids {
+		if _, err := store.DB().ExecContext(ctx, "UPDATE removal_requests SET created_at = ? WHERE id = ?", created, id); err != nil {
+			return err
+		}
+		if _, err := store.DB().ExecContext(ctx, `
+			UPDATE request_state SET last_event_at = ?, sent_at = ?, acknowledged_at = ?,
+				resolved_at = ?, deadline_at = ?, next_action_at = ? WHERE request_id = ?`,
+			lastEvent, sent, acknowledged, resolved, deadline, nextAction, id); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func fatal(message string) {
