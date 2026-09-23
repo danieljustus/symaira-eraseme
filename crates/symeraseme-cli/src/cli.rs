@@ -11,7 +11,7 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 use symeraseme_core::campaign;
 use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
-use symeraseme_core::deadlines::{self, RunOpts};
+use symeraseme_core::deadlines::{self, RunOpts, TickAction};
 use symeraseme_core::identity::{
     ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
     init_profile, load_profile, profile_exists,
@@ -1753,28 +1753,40 @@ fn plan_tick(parsed: &Parsed) -> Outcome {
         Err(outcome) => return outcome,
     };
     if format == "json" {
-        // Go marshals a `map[string]any`, so the keys come out sorted, and a nil
-        // action slice stays `null` rather than becoming `[]`.
-        let serialized = match serde_json::to_value(&actions) {
-            Ok(value) => value,
-            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-        };
-        let actions_value = if actions.is_empty() {
-            Value::Null
-        } else {
-            serialized
-        };
-        let payload = json!({
-            "actions": actions_value,
-            "dry_run": dry_run,
-            "success": true,
-        });
-        return match json_line(&payload) {
+        return match tick_actions_json(&actions, dry_run) {
             Ok(bytes) => Outcome::Stdout(bytes),
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
     }
     Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+}
+
+fn tick_actions_json(actions: &[TickAction], dry_run: bool) -> Result<Vec<u8>, serde_json::Error> {
+    // Go's outer map sorts keys, while Action is a struct and retains its
+    // declared capitalized field order. Its Payload is a sorted Go map.
+    let actions = if actions.is_empty() {
+        Value::Null
+    } else {
+        Value::Array(
+            actions
+                .iter()
+                .map(|action| {
+                    json!({
+                        "RequestID": action.request_id,
+                        "BrokerID": action.broker_id,
+                        "CampaignID": action.campaign_id,
+                        "CurrentStatus": action.current_status,
+                        "ActionType": action.action_type,
+                        "EventType": action.event_type,
+                        "Description": action.description,
+                        "Payload": go_map_order(Value::Object(action.payload.clone())),
+                        "DryRun": action.dry_run,
+                    })
+                })
+                .collect(),
+        )
+    };
+    json_line(&json!({"actions": actions, "dry_run": dry_run, "success": true}))
 }
 
 fn output_format(parsed: &Parsed) -> Result<&str, Outcome> {
@@ -2437,7 +2449,8 @@ fn default_suffix(flag: &FlagSpec) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::clap_surface;
+    use super::{TickAction, clap_surface, tick_actions_json};
+    use serde_json::json;
 
     fn count_commands(command: &clap::Command) -> usize {
         1 + command.get_subcommands().map(count_commands).sum::<usize>()
@@ -2453,6 +2466,25 @@ mod tests {
             .find(|child| child.get_name() == "serve")
             .expect("hidden serve compatibility command");
         assert!(serve.is_hide_set());
+    }
+
+    #[test]
+    fn positive_tick_action_uses_go_struct_json_bytes() {
+        let action = TickAction {
+            request_id: 7,
+            broker_id: "broker-a".to_owned(),
+            campaign_id: "c".to_owned(),
+            current_status: "OVERDUE".to_owned(),
+            action_type: "draft_dpa_complaint".to_owned(),
+            event_type: "DPA_COMPLAINT_DRAFTED".to_owned(),
+            description: "Act <now>".to_owned(),
+            payload: json!({"z": 2, "a": 1}).as_object().unwrap().clone(),
+            dry_run: true,
+        };
+        assert_eq!(
+            tick_actions_json(&[action], true).unwrap(),
+            b"{\"actions\":[{\"RequestID\":7,\"BrokerID\":\"broker-a\",\"CampaignID\":\"c\",\"CurrentStatus\":\"OVERDUE\",\"ActionType\":\"draft_dpa_complaint\",\"EventType\":\"DPA_COMPLAINT_DRAFTED\",\"Description\":\"Act \\u003cnow\\u003e\",\"Payload\":{\"a\":1,\"z\":2},\"DryRun\":true}],\"dry_run\":true,\"success\":true}\n"
+        );
     }
 }
 
