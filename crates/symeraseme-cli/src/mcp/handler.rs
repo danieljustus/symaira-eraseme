@@ -622,23 +622,10 @@ impl ContractHandler {
     fn plan_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let store = self.open_store()?;
         let campaign_id = get_str(arguments, "campaign_id", "");
-        let requests = Repository::new(&store)
-            .list_removal_requests(ListRemovalRequestsOptions {
-                campaign_id: optional_str(arguments, "campaign_id"),
-                status: optional_str(arguments, "status"),
-                ..ListRemovalRequestsOptions::default()
-            })
-            .map_err(|error| ToolError(error.to_string()))?;
-        let label = if campaign_id.is_empty() {
-            "all".to_owned()
-        } else {
-            campaign_id
-        };
-        Ok(json!({
-            "campaign_id": label,
-            "total": requests.len(),
-            "requests": request_rows(requests),
-        }))
+        let status = get_str(arguments, "status", "");
+        campaign::get_plan(&store, &campaign_id, &status)
+            .map(Value::Object)
+            .map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `list_requests`: a page of stored requests plus the total that

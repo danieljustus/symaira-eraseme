@@ -324,6 +324,73 @@ pub fn plan_campaign(
 /// The outcome of one executed request, as Go's `map[string]any`.
 pub type ExecuteResult = Map<String, Value>;
 
+/// Go's `GetPlan`: list every request matching the optional campaign/status
+/// filters. Empty campaign IDs are labeled `all` and impose no campaign filter.
+pub fn get_plan(
+    store: &Store,
+    campaign_id: &str,
+    status: &str,
+) -> Result<Map<String, Value>, rusqlite::Error> {
+    let requests = Repository::new(store).list_removal_requests(ListRemovalRequestsOptions {
+        campaign_id: (!campaign_id.is_empty()).then(|| campaign_id.to_owned()),
+        status: (!status.is_empty()).then(|| status.to_owned()),
+        ..ListRemovalRequestsOptions::default()
+    })?;
+    let rows = requests
+        .iter()
+        .map(|request| {
+            json!({
+                "id": request.id,
+                "broker_id": request.broker_id,
+                "channel": request.channel,
+                "campaign_id": request.campaign_id,
+                "created_at": go_timestamp(&request.created_at),
+                "jurisdiction": request.jurisdiction,
+                "template_id": request.template_id,
+                "identity_snapshot_hash": request.identity_snapshot_hash,
+                "current_status": request.current_status,
+                "last_event_at": request.last_event_at.as_deref().map(go_timestamp),
+                "sent_at": request.sent_at.as_deref().map(go_timestamp),
+                "acknowledged_at": request.acknowledged_at.as_deref().map(go_timestamp),
+                "resolved_at": request.resolved_at.as_deref().map(go_timestamp),
+                "deadline_at": request.deadline_at.as_deref().map(go_timestamp),
+                "next_action_at": request.next_action_at.as_deref().map(go_timestamp),
+                "reminders_sent": request.reminders_sent,
+                "escalation_level": request.escalation_level,
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut result = Map::new();
+    result.insert(
+        "campaign_id".to_owned(),
+        json!(if campaign_id.is_empty() {
+            "all"
+        } else {
+            campaign_id
+        }),
+    );
+    result.insert("total".to_owned(), json!(rows.len()));
+    result.insert(
+        "requests".to_owned(),
+        if rows.is_empty() {
+            Value::Null
+        } else {
+            Value::Array(rows)
+        },
+    );
+    let Value::Object(result) = go_map_order(Value::Object(result)) else {
+        unreachable!("go_map_order keeps objects as objects")
+    };
+    Ok(result)
+}
+
+fn go_timestamp(value: &str) -> Value {
+    match crate::timeutil::parse_timestamp(value) {
+        Ok(parsed) => Value::String(parsed.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)),
+        Err(_) => Value::String(value.to_owned()),
+    }
+}
+
 /// The resolved identity profile, or the message of the failure that resolving
 /// it produced. Go resolves the profile inside `ExecuteRequest`, so a broken
 /// profile fails one request instead of the whole batch; the caller owns the

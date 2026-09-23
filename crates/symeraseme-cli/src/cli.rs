@@ -1,7 +1,7 @@
 //! Clap-compatible command surface, Cobra-compatible help, and handlers.
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
-use crate::mcp::handler::{ContractHandler, ToolHandler, request_rows};
+use crate::mcp::handler::{ContractHandler, ToolHandler};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -22,7 +22,6 @@ use symeraseme_core::registry::{
 };
 use symeraseme_core::reporting;
 use symeraseme_core::storage::Store;
-use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
 use symeraseme_core::version;
 use symeraseme_engine::scheduler::install::{self, InstallOptions};
@@ -876,26 +875,12 @@ fn plan_show(parsed: &Parsed) -> Outcome {
     };
     let campaign_id = string_flag(parsed, "campaign");
     let status = string_flag(parsed, "status");
-    let requests = match Repository::new(&store).list_removal_requests(ListRemovalRequestsOptions {
-        campaign_id: (!campaign_id.is_empty()).then(|| campaign_id.clone()),
-        status: (!status.is_empty()).then_some(status),
-        ..ListRemovalRequestsOptions::default()
-    }) {
-        Ok(requests) => requests,
+    let result = match campaign::get_plan(&store, &campaign_id, &status) {
+        Ok(result) => Value::Object(result),
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let label = if campaign_id.is_empty() {
-        "all".to_owned()
-    } else {
-        campaign_id
-    };
-    let total = requests.len();
-    // Go marshals a `map[string]any`, so the keys come out sorted.
-    let result = go_map_order(json!({
-        "campaign_id": label.clone(),
-        "total": total,
-        "requests": request_rows(requests),
-    }));
+    let label = result["campaign_id"].as_str().unwrap_or("all");
+    let total = result["total"].as_u64().unwrap_or_default();
     let format = match output_format(parsed) {
         Ok(format) => format,
         Err(outcome) => return outcome,
