@@ -246,6 +246,22 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   their source/artifact identities and step evidence in
   `/tmp/eraseme-{plain,encrypted}-switchback-92a573ba/report.json`;
   neither run touched a production store or performed a cutover.
+- Linux aarch64 disposable switchbacks now pass six plain and six encrypted
+  Go→Rust→Go steps using Go 1.26.6 and Rust 1.98.0 binaries built from clean
+  `d333ed84` (production code unchanged from `92a573ba`). The Linux runner
+  confines each CLI/probe child with private mount, network and PID namespaces,
+  read-only host shares, Landlock ABI 4, a dropped uid and no-new-privileges.
+  Seven focused controls pass, including a no-namespace fail-closed case;
+  all eight runtime denial probes pass. The host-share (`virtiofs`) and
+  guest-local (`ext4`) write markers remained byte-identical and were removed.
+  The source/build manifest and copied reports are in
+  `/tmp/symeraseme-native-gate-host/switchback-linux-d333-logs/`.
+  On the integrated `cb21489` runner, macOS plain and encrypted switchbacks
+  passed six steps each in `/tmp/eraseme-{plain,encrypted}-switchback-b6a43136-r2/`;
+  its focused controls passed six cases with the Linux-only case skipped.
+  The one-line macOS probe fix changed no Linux behavior; Linux focused
+  controls passed again after that fix. Native Windows switchbacks and a
+  real user-data restore remain open; no production cutover occurred.
 
 ## Open tasks (run of 2026-09-22)
 
