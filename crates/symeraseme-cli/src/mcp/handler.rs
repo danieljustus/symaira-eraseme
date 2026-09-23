@@ -2902,4 +2902,103 @@ mod tests {
         }
         let _ = fs::remove_dir_all(&root);
     }
+
+    #[test]
+    fn source_bound_go_mcp_clock_results_match_fixed_instant() {
+        use std::collections::BTreeMap;
+        use symeraseme_core::config::ConfigContext;
+
+        #[derive(Deserialize)]
+        struct ClockCase {
+            name: String,
+            state: String,
+            tool: String,
+            arguments: Map<String, Value>,
+            result: Value,
+        }
+
+        #[derive(Deserialize)]
+        struct ClockFixture {
+            source_revision: String,
+            source_path: String,
+            now: String,
+            cases: Vec<ClockCase>,
+        }
+
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let oracle = std::process::Command::new("go")
+            .args(["run", "./rust-tests/parity/oracle/mcp-clock"])
+            .current_dir(&repository_root)
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .output()
+            .expect("run source-bound Go MCP clock oracle");
+        assert!(
+            oracle.status.success(),
+            "{}",
+            String::from_utf8_lossy(&oracle.stderr)
+        );
+        let fixture: ClockFixture = serde_json::from_slice(&oracle.stdout).expect("clock oracle");
+        assert_eq!(
+            fixture.source_revision,
+            "bfe2873937947479347c626512d74730fceaa3ac"
+        );
+        assert_eq!(
+            fixture.source_path,
+            "internal/mcp/contract_handler.go:438-444,500-506; internal/reporting/reporting.go:455-494,592-654"
+        );
+        assert_eq!(fixture.cases.len(), 6);
+        let now = DateTime::parse_from_rfc3339(&fixture.now)
+            .expect("fixed instant")
+            .with_timezone(&Utc);
+
+        let root = workspace("clock-parity");
+        for case in fixture.cases {
+            let data_dir = root.join(&case.name).join("data");
+            fs::create_dir_all(&data_dir).expect("data dir");
+            let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+            if case.state == "populated" {
+                store
+                    .connection()
+                    .execute_batch(
+                        "INSERT INTO campaigns (id, created_at, kind, notes) VALUES
+                            ('alpha', '2026-08-01T12:00:00+00:00', 'initial', NULL),
+                            ('beta', '2026-08-02T12:00:00+00:00', 'initial', NULL);
+                         INSERT INTO removal_requests (id, broker_id, channel, campaign_id, created_at, jurisdiction, template_id) VALUES
+                            (1, 'broker-past', 'email', 'alpha', '2026-08-01T13:00:00+00:00', 'DE', ''),
+                            (2, 'broker-horizon', 'email', 'alpha', '2026-08-01T14:00:00+00:00', 'DE', ''),
+                            (3, 'broker-now', 'email', 'alpha', '2026-08-01T15:00:00+00:00', 'DE', ''),
+                            (4, 'broker-resolved', 'email', 'alpha', '2026-08-01T16:00:00+00:00', 'DE', ''),
+                            (5, 'broker-after', 'email', 'alpha', '2026-08-01T17:00:00+00:00', 'DE', ''),
+                            (6, 'broker-beta', 'email', 'beta', '2026-08-02T13:00:00+00:00', 'US', '');
+                         INSERT INTO request_state (request_id, current_status, last_event_at, sent_at, resolved_at, deadline_at, next_action_at, reminders_sent, escalation_level) VALUES
+                            (1, 'SENT', '2026-08-01T13:00:00+00:00', '2026-08-01T13:00:00+00:00', NULL, '2026-08-04T12:00:00+00:00', NULL, 0, 0),
+                            (2, 'AWAITING_RESPONSE', '2026-08-01T14:00:00+00:00', '2026-08-01T14:00:00+00:00', NULL, '2026-08-12T12:00:00+00:00', NULL, 1, 1),
+                            (3, 'AWAITING_ACK', '2026-08-01T15:00:00+00:00', '2026-08-01T15:00:00+00:00', NULL, '2026-08-20T12:00:00+00:00', '2026-08-05T12:00:00+00:00', 0, 0),
+                            (4, 'CONFIRMED', '2026-08-01T16:00:00+00:00', '2026-08-01T16:00:00+00:00', '2026-08-03T12:00:00+00:00', '2026-08-04T12:00:00+00:00', NULL, 0, 0),
+                            (5, 'REJECTED_FINAL', '2026-08-01T17:00:00+00:00', '2026-08-01T17:00:00+00:00', NULL, '2026-08-12T12:00:01+00:00', NULL, 0, 2),
+                            (6, 'PLANNED', '2026-08-02T13:00:00+00:00', NULL, NULL, '2026-08-06T12:00:00+00:00', NULL, 0, 0);",
+                    )
+                    .expect("seed populated calendar and statuses");
+            } else {
+                assert_eq!(case.state, "empty", "{}", case.name);
+            }
+            store.close().expect("close seed store");
+
+            let mut environment = BTreeMap::new();
+            environment.insert(
+                "SYMERASEME_DATA_DIR".to_owned(),
+                data_dir.to_string_lossy().into_owned(),
+            );
+            let handler = ContractHandler::new(&root).with_store(
+                ConfigContext::new(root.clone(), root.clone(), environment),
+                now,
+            );
+            let actual = handler
+                .call(&case.tool, &case.arguments)
+                .unwrap_or_else(|error| panic!("{}: {error}", case.name));
+            assert_eq!(actual, case.result, "{}", case.name);
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
 }
