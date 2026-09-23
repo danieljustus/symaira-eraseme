@@ -1,0 +1,93 @@
+{
+  "schema": "symeraseme.go-oracle.cli-triage.v1",
+  "generator_sha256": "f2586663ce1ff95016b0fdbe38a16e4fc938e6cf490592aa9f504f0cd5da1fa4",
+  "fake_agent_sha256": "4b7e89201dce0f2ddb9559748c71c32e780740322b9177fb0b066516525ca747",
+  "sources": [
+    {
+      "path": "cmd/symeraseme/extra_commands.go",
+      "sha256": "b329243eef1438feaa340c835a9abe0c1c7b782c9a1fe3d6435cc664ef79b51a"
+    },
+    {
+      "path": "internal/mcp/contract_handler.go",
+      "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"
+    },
+    {
+      "path": "internal/replies/service.go",
+      "sha256": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281"
+    },
+    {
+      "path": "internal/replies/repository.go",
+      "sha256": "725369fd4a9527004870ab757cbfbb95b6d61e02015ff6debd7e3685cc753e7f"
+    },
+    {
+      "path": "internal/triage/classifier.go",
+      "sha256": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97"
+    },
+    {
+      "path": "internal/triage/rebuttal.go",
+      "sha256": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+    },
+    {
+      "path": "internal/llm/agent.go",
+      "sha256": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8"
+    },
+    {
+      "path": "internal/eventstore/store.go",
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    }
+  ],
+  "cases": [
+    {
+      "id": "classify-reply-json",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "generate-rebuttal-text",
+      "argv": [
+        "generate-rebuttal",
+        "1",
+        "--provider",
+        "agent"
+      ],
+      "exit_code": 0,
+      "stdout_base64": "c3VjY2Vzcwo=",
+      "stderr_base64": "",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "REBUTTAL_SENT",
+            "source": "system",
+            "payload_json": "{\"broker_message_snippet\":\"Your current address does not match our records.\",\"confidence\":0.91,\"llm_used\":true,\"rejection_classification\":\"address_mismatch\",\"template_name\":\"gdpr-rebuttal-address.md.j2\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -17,12 +17,14 @@ use symeraseme_core::identity::{
     init_profile, load_profile, profile_exists,
 };
 use symeraseme_core::jsonorder::go_map_order;
+use symeraseme_core::llm::{self, AgentClient, CreateOptions};
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
 };
 use symeraseme_core::reporting;
 use symeraseme_core::storage::Store;
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
+use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, RebuttalRequest};
 use symeraseme_core::version;
 use symeraseme_engine::scheduler::install::{self, InstallOptions};
 use symeraseme_engine::scheduler::{Config as SchedulerConfig, Platform};
@@ -547,6 +549,8 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         },
         "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
         "poll-inbox" => poll_inbox_command(parsed),
+        "classify-reply" => classify_reply_command(parsed),
+        "generate-rebuttal" => generate_rebuttal_command(parsed),
         "generate-dashboard" => generate_dashboard_command(parsed),
         "generate-report" => generate_report_command(parsed),
         "generate-scheduler" => generate_scheduler_command(parsed),
@@ -1165,6 +1169,122 @@ fn poll_inbox_command(parsed: &Parsed) -> Outcome {
                 .map(|message| format!("{message}\n").into_bytes())
                 .unwrap_or_else(|| b"success\n".to_vec()),
         ),
+    }
+}
+
+/// Build the local host-agent client selected by Go's `llm.Create`. Provider
+/// transports that Rust does not own remain explicit errors; this path never
+/// constructs an HTTP client or sends network traffic.
+fn triage_agent(parsed: &Parsed) -> Result<AgentClient, String> {
+    llm::create(
+        &CreateOptions {
+            provider: string_flag(parsed, "provider"),
+            model: string_flag(parsed, "model"),
+            ..CreateOptions::default()
+        },
+        &|name| env::var(name).ok(),
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn triage_agent_call<'a>(
+    agent: &'a AgentClient,
+) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + 'a {
+    move |system_prompt, user_prompt, cache_key| {
+        let (text, usage) = agent
+            .classify(
+                system_prompt,
+                user_prompt,
+                &llm::ClassifyOptions {
+                    cache_key: cache_key.to_owned(),
+                    ..llm::ClassifyOptions::default()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+        Ok(LlmResponse { text, usage })
+    }
+}
+
+fn classify_reply_command(parsed: &Parsed) -> Outcome {
+    let request_id = match int_argument(parsed, "request-id", "request ID") {
+        Ok(request_id) => request_id,
+        Err(outcome) => return outcome,
+    };
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let agent = match triage_agent(parsed) {
+        Ok(agent) => agent,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let call = triage_agent_call(&agent);
+    let outcome = match triage_service::Service::new(&store).classify_reply(
+        request_id,
+        &ClassifyRequest::default(),
+        None,
+        Some(&call),
+        bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+    ) {
+        Ok(outcome) => outcome,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    if let Some(error) = outcome.error {
+        return Outcome::Stderr(format!("{error}\n").into_bytes());
+    }
+    match output_format(parsed) {
+        Ok("json") => match json_line(&outcome.result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+        Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+        Err(outcome) => outcome,
+    }
+}
+
+fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
+    let request_id = match int_argument(parsed, "request-id", "request ID") {
+        Ok(request_id) => request_id,
+        Err(outcome) => return outcome,
+    };
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let agent = match triage_agent(parsed) {
+        Ok(agent) => agent,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let call = triage_agent_call(&agent);
+    let result = match triage_service::Service::new(&store).generate_rebuttal(
+        request_id,
+        &RebuttalRequest::default(),
+        None,
+        Some(&call),
+        bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+    ) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = json!({
+        "template_name": result.template_name,
+        "label": result.label,
+        "description": result.description,
+        "jurisdiction": result.jurisdiction,
+        "rejection_classification": result.rejection_classification,
+        "confidence": result.confidence,
+        "rebuttal_body": result.rebuttal_body,
+        "needs_human_review": result.needs_human_review,
+        "llm_used": result.llm_used,
+        "usage": result.usage.record(),
+    });
+    match output_format(parsed) {
+        Ok("json") => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+        Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+        Err(outcome) => outcome,
     }
 }
 
