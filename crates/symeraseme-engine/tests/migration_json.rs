@@ -133,8 +133,6 @@ fn migration_json_replay() {
         cases.len(),
         "duplicate/missing declarations"
     );
-    let target = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
-    fs::create_dir_all(&target).unwrap();
     let mut executed = BTreeSet::new();
     for case in cases {
         let id = case["id"].as_str().unwrap();
@@ -146,7 +144,7 @@ fn migration_json_replay() {
         );
         let root = tempfile::Builder::new()
             .prefix("migration-json-")
-            .tempdir_in(&target)
+            .tempdir()
             .unwrap();
         let root = root.path().canonicalize().unwrap();
         let mut command = Command::new(std::env::current_exe().unwrap());
