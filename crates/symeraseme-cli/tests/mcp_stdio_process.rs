@@ -94,7 +94,7 @@ fn stdio_answers_each_request_before_eof_without_stdout_pollution() {
 #[test]
 fn malformed_stdio_process_matches_go_errors() {
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../rust-tests/parity/cases/mcp/stdio-errors.json"
+        "../../../rust-tests/parity/oracle/mcp-stdio-errors/cases.json"
     ))
     .unwrap();
     assert_eq!(fixture["source_revision"], "4e582f28");

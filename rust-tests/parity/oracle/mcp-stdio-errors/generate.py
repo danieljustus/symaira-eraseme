@@ -49,5 +49,5 @@ with tempfile.TemporaryDirectory(prefix="symeraseme-mcp015-") as directory:
                 "stderr": result.stderr.decode(),
             }
         )
-target = root / "rust-tests/parity/cases/mcp/stdio-errors.json"
+target = root / "rust-tests/parity/oracle/mcp-stdio-errors/cases.json"
 target.write_text(json.dumps({"source_revision": "4e582f28", "cases": recorded}, indent=2) + "\n")
