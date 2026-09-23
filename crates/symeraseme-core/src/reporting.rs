@@ -1002,26 +1002,7 @@ pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result
 /// `SetEscapeHTML(false)` behavior. `to_string_pretty` indents with two
 /// spaces and appends no trailing newline, matching Go's trimmed encoder.
 fn export_json(data: &Value) -> Result<String, String> {
-    serde_json::to_string_pretty(&sort_json_object_keys(data)).map_err(|error| error.to_string())
-}
-
-/// Go's `encoding/json` sorts map keys before writing them. The workspace
-/// enables `serde_json`'s insertion-ordered maps, so normalize recursively.
-fn sort_json_object_keys(value: &Value) -> Value {
-    match value {
-        Value::Object(fields) => {
-            let mut entries = fields.iter().collect::<Vec<_>>();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-            Value::Object(
-                entries
-                    .into_iter()
-                    .map(|(key, nested)| (key.clone(), sort_json_object_keys(nested)))
-                    .collect(),
-            )
-        }
-        Value::Array(items) => Value::Array(items.iter().map(sort_json_object_keys).collect()),
-        other => other.clone(),
-    }
+    serde_json::to_string_pretty(&go_map_order(data.clone())).map_err(|error| error.to_string())
 }
 
 /// Go's `ExportCSV`: CRLF rows, the fixed twelve-column header, one row per
