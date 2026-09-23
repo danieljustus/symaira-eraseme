@@ -349,28 +349,35 @@ fn go_dial_error(error: &std::io::Error) -> String {
     .to_owned()
 }
 
-/// Attempts resolved addresses in order, as Go's Dial does. If every address
-/// fails, a refusal is reported using the first refused TCPAddr; other failures
-/// use the last address and error.
+/// Attempts resolved addresses in order. A later connection may succeed, but if
+/// every address fails Go's dialSerial reports the first address's error.
 fn connect_addresses(
     addresses: impl IntoIterator<Item = std::net::SocketAddr>,
     timeout: Duration,
 ) -> Result<TcpStream, Option<(std::net::SocketAddr, std::io::Error)>> {
-    let mut first_refusal = None;
-    let mut last_failure = None;
+    connect_addresses_with(addresses, timeout, |address, timeout| {
+        TcpStream::connect_timeout(address, timeout)
+    })
+}
+
+fn connect_addresses_with<I, F>(
+    addresses: I,
+    timeout: Duration,
+    mut connect: F,
+) -> Result<TcpStream, Option<(std::net::SocketAddr, std::io::Error)>>
+where
+    I: IntoIterator<Item = std::net::SocketAddr>,
+    F: FnMut(&std::net::SocketAddr, Duration) -> std::io::Result<TcpStream>,
+{
+    let mut first_failure = None;
     for address in addresses {
-        match TcpStream::connect_timeout(&address, timeout) {
+        match connect(&address, timeout) {
             Ok(stream) => return Ok(stream),
-            Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
-                // Keep trying: a later resolved address may accept the connection.
-                if first_refusal.is_none() {
-                    first_refusal = Some((address, error));
-                }
-            }
-            Err(error) => last_failure = Some((address, error)),
+            Err(error) if first_failure.is_none() => first_failure = Some((address, error)),
+            Err(_) => {}
         }
     }
-    Err(first_refusal.or(last_failure))
+    Err(first_failure)
 }
 
 pub struct ImapSessionImpl {
@@ -911,5 +918,22 @@ mod dial_tests {
 
         assert!(connected.peer_addr().unwrap().is_ipv4());
         assert!(accepted.peer_addr().unwrap().is_ipv4());
+    }
+
+    #[test]
+    fn reports_first_resolved_error_when_later_address_has_a_different_error() {
+        let first: std::net::SocketAddr = "[::1]:143".parse().unwrap();
+        let second: std::net::SocketAddr = "127.0.0.1:143".parse().unwrap();
+        let result =
+            connect_addresses_with([first, second], Duration::from_secs(1), |address, _| {
+                let kind = if address.is_ipv6() {
+                    std::io::ErrorKind::TimedOut
+                } else {
+                    std::io::ErrorKind::ConnectionRefused
+                };
+                Err(std::io::Error::from(kind))
+            });
+        let (_, error) = result.expect_err("all resolved addresses fail").unwrap();
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
     }
 }
