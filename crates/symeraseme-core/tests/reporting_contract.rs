@@ -194,7 +194,7 @@ fn generated_report_exports_match_go() {
     );
     assert_eq!(
         hex::encode(Sha256::digest(GO_REPORTING_EXPORT_TEST)),
-        "47a1fee4f37f7ec5af50d95673378df57ad019aab5f2a39d27707335f84d2581",
+        "f4a94713c8bb36ce0cb905a7dbbe2dd25675a676285ba2481c25a51c396a10a7",
         "Go export oracle changed; review and repin it"
     );
 
@@ -276,7 +276,7 @@ fn generated_report_exports_match_go() {
              DELETE FROM removal_requests WHERE id=3;
              DELETE FROM campaigns WHERE id='old';
              INSERT INTO campaigns(id,created_at,kind,notes)
-             VALUES ('empty','2026-08-01T08:00:00+00:00','initial','empty');",
+             VALUES ('empty','2026-08-03T08:00:00+00:00','initial','empty');",
         )
         .expect("seed empty-campaign report");
     let empty_campaign_report = get_report_data(

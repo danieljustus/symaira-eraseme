@@ -64,7 +64,7 @@ func TestReportingExportFixture(t *testing.T) {
 		`DELETE FROM request_state WHERE request_id=3`,
 		`DELETE FROM removal_requests WHERE id=3`,
 		`DELETE FROM campaigns WHERE id='old'`,
-		`INSERT INTO campaigns(id,created_at,kind,notes) VALUES ('empty','2026-08-01T08:00:00+00:00','initial','empty')`,
+		`INSERT INTO campaigns(id,created_at,kind,notes) VALUES ('empty','2026-08-03T08:00:00+00:00','initial','empty')`,
 	} {
 		if _, err := store.DB().ExecContext(context.Background(), statement); err != nil {
 			t.Fatalf("prepare empty-campaign report: %v", err)
