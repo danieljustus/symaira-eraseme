@@ -78,6 +78,47 @@ fn start_binary(binary: &Path, root: &Path, port: u16, host: &str, allow_remote:
         .unwrap()
 }
 
+fn startup_error(
+    binary: &Path,
+    root: &Path,
+    port: u16,
+    host: &str,
+) -> (std::process::ExitStatus, String) {
+    let home = root.join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let mut child = Command::new(binary)
+        .args(["mcp", "--host", host, "--port", &port.to_string()])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("SYMERASEME_DATA_DIR", root.join("data"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let status = child.wait().unwrap();
+    let stderr = std::io::read_to_string(child.stderr.take().unwrap()).unwrap();
+    (status, stderr)
+}
+
+fn build_go_oracle(root: &Path) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let oracle = root.join("symeraseme-go-oracle");
+    let build = Command::new("go")
+        .args(["build", "-o"])
+        .arg(&oracle)
+        .arg("./cmd/symeraseme")
+        .current_dir(repo)
+        .output()
+        .expect("Go toolchain is required to reproduce the HTTP oracle transcript");
+    assert!(
+        build.status.success(),
+        "Go oracle build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    oracle
+}
+
 fn wait_ready(child: &mut Child, port: u16) {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
@@ -571,20 +612,7 @@ fn go_oracle_http_wire_transcripts_match() {
     // Reproduction: cargo test -p symeraseme-cli --test mcp_http_process go_oracle_http_wire_transcripts_match -- --exact
     // This compiles the checked-out Go CLI and compares real HTTP process transcripts.
     let root = TestDir::new();
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let oracle = root.path().join("symeraseme-go-oracle");
-    let build = Command::new("go")
-        .args(["build", "-o"])
-        .arg(&oracle)
-        .arg("./cmd/symeraseme")
-        .current_dir(repo)
-        .output()
-        .expect("Go toolchain is required to reproduce the HTTP oracle transcript");
-    assert!(
-        build.status.success(),
-        "Go oracle build failed: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
+    let oracle = build_go_oracle(root.path());
 
     let go_port = free_port();
     let rust_port = free_port();
@@ -663,4 +691,48 @@ fn go_oracle_http_wire_transcripts_match() {
     }
     signal(&mut go, "TERM");
     signal(&mut rust, "TERM");
+}
+
+#[test]
+#[cfg(unix)]
+fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
+    let root = TestDir::new();
+    let oracle = build_go_oracle(root.path());
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+
+    let mut hosts = vec!["127.0.0.1"];
+    if TcpListener::bind("[::1]:0").is_ok() {
+        hosts.push("::1");
+    }
+    for host in hosts {
+        let bind_address = if host.contains(':') {
+            format!("[{host}]:0")
+        } else {
+            format!("{host}:0")
+        };
+        let occupied = TcpListener::bind(&bind_address).unwrap();
+        let port = occupied.local_addr().unwrap().port();
+        let go_root = root.path().join(format!("go-{host}"));
+        let rust_root = root.path().join(format!("rust-{host}"));
+        std::fs::create_dir_all(&go_root).unwrap();
+        std::fs::create_dir_all(&rust_root).unwrap();
+        let (go_status, go_stderr) = startup_error(&oracle, &go_root, port, host);
+        let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host);
+        assert!(!go_status.success());
+        assert!(!rust_status.success());
+        assert_eq!(
+            rust_stderr, go_stderr,
+            "bind startup error differs for {host}"
+        );
+        let address = if host.contains(':') {
+            format!("[{host}]:{port}")
+        } else {
+            format!("{host}:{port}")
+        };
+        assert_eq!(
+            rust_stderr.trim(),
+            format!("listen tcp {address}: bind: address already in use")
+        );
+        drop(occupied);
+    }
 }

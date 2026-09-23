@@ -96,7 +96,7 @@ async fn serve_async(
 ) -> Result<(), String> {
     let listener = TcpListener::bind(&address)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| listen_error(&address, error))?;
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let connection_slots = Arc::new(Semaphore::new(MAX_HTTP_CONNECTIONS));
     let mut connections = JoinSet::new();
@@ -155,6 +155,14 @@ async fn serve_async(
             connections.abort_all();
             Err("context deadline exceeded".to_owned())
         }
+    }
+}
+
+fn listen_error(address: &str, error: std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::AddrInUse {
+        format!("listen tcp {address}: bind: address already in use")
+    } else {
+        format!("listen tcp {address}: {error}")
     }
 }
 
