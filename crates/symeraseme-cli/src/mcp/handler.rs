@@ -28,6 +28,7 @@ use symeraseme_core::identity::{
     default_consent_directory, load_profile,
 };
 use symeraseme_core::jsonorder::go_map_order;
+use symeraseme_core::llm::{self, AgentClient, CreateOptions};
 use symeraseme_core::manualtasks::{self, ListOpts};
 use symeraseme_core::redaction::{read_workspace_file, redact_bytes};
 use symeraseme_core::registry::{self, load_embedded, load_from_dir};
@@ -35,6 +36,7 @@ use symeraseme_core::reporting;
 use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
 use symeraseme_core::storage::{EventRecord, RemovalRequestRow, Store};
 use symeraseme_core::timeutil;
+use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, RebuttalRequest};
 use symeraseme_engine::scheduler;
 
 use super::tools_call::catalogue_has_tool;
@@ -66,6 +68,32 @@ fn go_json_string(value: &str) -> String {
         serialized.as_bytes(),
     ))
     .expect("escaped JSON is UTF-8")
+}
+
+fn go_struct_text(value: &impl serde::Serialize) -> Result<Value, ToolError> {
+    let bytes = serde_json::to_vec(value).map_err(|error| ToolError(error.to_string()))?;
+    Ok(Value::String(
+        String::from_utf8(super::envelope::go_escape_json_strings(&bytes))
+            .expect("escaped JSON remains UTF-8"),
+    ))
+}
+
+fn triage_agent_call(
+    agent: &AgentClient,
+) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + '_ {
+    move |system, user, cache_key| {
+        let (text, usage) = agent
+            .classify(
+                system,
+                user,
+                &llm::ClassifyOptions {
+                    cache_key: cache_key.to_owned(),
+                    ..llm::ClassifyOptions::default()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+        Ok(LlmResponse { text, usage })
+    }
 }
 
 /// One `email.MatchedMessage` as Go marshals it: the embedded `Message` keeps
@@ -489,6 +517,71 @@ impl ContractHandler {
         )
         .map_err(|error| ToolError(error.to_string()))?;
         Ok(Value::Object(result))
+    }
+
+    fn triage_agent(&self, arguments: &Map<String, Value>) -> Result<AgentClient, ToolError> {
+        llm::create(
+            &CreateOptions {
+                provider: get_str(arguments, "provider", ""),
+                model: get_str(arguments, "model", ""),
+                ..CreateOptions::default()
+            },
+            &|name| std::env::var(name).ok(),
+        )
+        .map_err(|error| ToolError(error.to_string()))
+    }
+
+    fn classify_reply(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let agent = self.triage_agent(arguments)?;
+        let call = triage_agent_call(&agent);
+        let outcome = triage_service::Service::new(&store)
+            .classify_reply(
+                get_int(arguments, "request_id", 0),
+                &ClassifyRequest::default(),
+                None,
+                Some(&call),
+                get_bool(arguments, "save", true),
+            )
+            .map_err(ToolError)?;
+        if let Some(error) = outcome.error {
+            return Err(ToolError(error));
+        }
+        go_struct_text(&outcome.result)
+    }
+
+    fn generate_rebuttal(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let agent = self.triage_agent(arguments)?;
+        let call = triage_agent_call(&agent);
+        let result = triage_service::Service::new(&store)
+            .generate_rebuttal(
+                get_int(arguments, "request_id", 0),
+                &RebuttalRequest::default(),
+                None,
+                Some(&call),
+                get_bool(arguments, "save", true),
+            )
+            .map_err(ToolError)?;
+        go_struct_text(&json!({
+            "TemplateName": result.template_name,
+            "Label": result.label,
+            "Description": result.description,
+            "Jurisdiction": result.jurisdiction,
+            "RejectionClassification": result.rejection_classification,
+            "Confidence": result.confidence,
+            "RebuttalBody": result.rebuttal_body,
+            "NeedsHumanReview": result.needs_human_review,
+            "LLMUsed": result.llm_used,
+            "Usage": {
+                "Model": result.usage.model,
+                "InputTokens": result.usage.input_tokens,
+                "OutputTokens": result.usage.output_tokens,
+                "CacheCreationTokens": result.usage.cache_creation_tokens,
+                "CacheReadTokens": result.usage.cache_read_tokens,
+                "Cost": if result.usage.cost == 0.0 { json!(0) } else { json!(result.usage.cost) },
+            },
+        }))
     }
 
     /// Go's `list_brokers`: the embedded registry through the shared filter.
@@ -1199,7 +1292,11 @@ impl ToolHandler for ContractHandler {
         // `schedule_status` return structs, so their keys must not be reordered.
         if matches!(
             name,
-            "auto_confirm" | "schedule_install" | "schedule_status"
+            "auto_confirm"
+                | "schedule_install"
+                | "schedule_status"
+                | "classify_reply"
+                | "generate_rebuttal"
         ) {
             return self.call_go_map(name, arguments);
         }
@@ -1233,6 +1330,8 @@ impl ContractHandler {
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
             "auto_confirm" => self.auto_confirm(arguments),
+            "classify_reply" => self.classify_reply(arguments),
+            "generate_rebuttal" => self.generate_rebuttal(arguments),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"

@@ -2,12 +2,12 @@ Subject: RE: Request for erasure under Article 17 GDPR — Rebuttal
 
 To whom it may concern,
 
-I refer to your response to my data erasure request ({{ request_id | default("reference") }})
+I refer to your response to my data erasure request ({{ request_id | default("reference", true) }})
 regarding {{ broker_name }}, in which you declined to erase my personal data.
 
 You responded with the following:
 
-> {{ broker_reply_snippet | default("") }}
+> {{ broker_reply_snippet | default("", true) }}
 
 I respectfully disagree with your assessment and hereby reaffirm my request for
 the erasure of my personal data under Article 17(1) GDPR.
