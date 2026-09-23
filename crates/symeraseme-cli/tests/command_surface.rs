@@ -218,10 +218,11 @@ fn pinned_go_binary(root: &Path, revision: &str) -> PathBuf {
         String::from_utf8_lossy(&archived.stderr)
     );
     let extracted = Command::new("tar")
+        .current_dir(root)
         .arg("-xf")
-        .arg(&archive)
+        .arg("go-oracle.tar")
         .arg("-C")
-        .arg(&source)
+        .arg("go-oracle")
         .output()
         .expect("extract pinned Go source");
     assert!(
