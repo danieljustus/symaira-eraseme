@@ -4,6 +4,7 @@
 import hashlib
 import json
 import re
+import stat
 import sys
 import tarfile
 import zipfile
@@ -56,17 +57,30 @@ def main(dist: Path) -> None:
         if name.endswith(".tar.gz"):
             with tarfile.open(archive, "r:gz") as bundle:
                 members = bundle.getmembers()
-                paths = {member.name for member in members}
+                names = [member.name for member in members]
+                if len(names) != len(set(names)):
+                    fail(f"{name} has duplicate archive members")
+                paths = set(names)
                 top_level = {path.split("/", 1)[0] for path in paths}
-                executable = next((item for item in members if item.name == binary), None)
-                if executable is None or not executable.isfile() or not executable.mode & 0o111:
+                by_name = {member.name: member for member in members}
+                if any(not by_name[path].isfile() for path in (binary, "LICENSE", "README.md")):
+                    fail(f"{name} expected members must be regular files")
+                if not by_name[binary].mode & 0o111:
                     fail(f"{name} has no executable {binary} at its root")
         else:
             with zipfile.ZipFile(archive) as bundle:
-                paths = set(bundle.namelist())
+                infos = bundle.infolist()
+                names = [info.filename for info in infos]
+                if len(names) != len(set(names)):
+                    fail(f"{name} has duplicate archive members")
+                paths = set(names)
                 top_level = {path.split("/", 1)[0] for path in paths}
-                if binary not in paths:
-                    fail(f"{name} has no {binary} at its root")
+                by_name = {info.filename: info for info in infos}
+                for path in (binary, "LICENSE", "README.md"):
+                    info = by_name.get(path)
+                    file_type = stat.S_IFMT(info.external_attr >> 16) if info else 0
+                    if info is None or info.is_dir() or file_type not in (0, stat.S_IFREG):
+                        fail(f"{name} expected members must be regular files")
 
         if paths != {binary, "LICENSE", "README.md"} or top_level != paths:
             fail(f"{name} has unexpected root contents: {sorted(paths)}")
