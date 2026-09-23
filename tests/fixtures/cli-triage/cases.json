@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.go-oracle.cli-triage.v1",
-  "generator_sha256": "4569a0051a10efd58666b1572e7616549f13d7932ce795aa223fb3c19512627f",
+  "generator_sha256": "e2159a703b05ea4b21c8b3a58785a5c166b4aeb5b535b1c5c76f88f562259d50",
   "fake_agent_sha256": "b09f3dcab7603e9e67639f1ba78ff408cbe6595b4114b3a912d7eceba445e20d",
   "sources": [
     {
@@ -205,6 +205,84 @@
             "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
           }
         ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-underscore",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "0x_1",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-underscore-decimal",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "1_0",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bm8gdW5jbGFzc2lmaWVkIGluYm94IHJlcGx5IGZvdW5kIGZvciByZXF1ZXN0ICMxMAo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-request-id-flag-double-underscore-error",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "1__0",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBhcmd1bWVudCAiMV9fMCIgZm9yICItLXJlcXVlc3QtaWQiIGZsYWc6IHN0cmNvbnYuUGFyc2VJbnQ6IHBhcnNpbmcgIjFfXzAiOiBpbnZhbGlkIHN5bnRheAo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
       }
     },
     {

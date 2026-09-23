@@ -443,10 +443,26 @@ fn parse_go_int_flag(value: &str) -> Result<i64, std::num::IntErrorKind> {
     } else {
         (unsigned, 10)
     };
-    if digits.is_empty() || digits.contains('_') {
+    let prefixed = unsigned.starts_with("0x")
+        || unsigned.starts_with("0X")
+        || unsigned.starts_with("0b")
+        || unsigned.starts_with("0B")
+        || unsigned.starts_with("0o")
+        || unsigned.starts_with("0O");
+    let bytes = digits.as_bytes();
+    if digits.is_empty()
+        || bytes.iter().enumerate().any(|(index, byte)| {
+            *byte == b'_'
+                && (index + 1 == bytes.len()
+                    || (index == 0 && !prefixed)
+                    || (index > 0 && bytes[index - 1] == b'_')
+                    || bytes[index + 1] == b'_')
+        })
+    {
         return Err(std::num::IntErrorKind::InvalidDigit);
     }
-    let magnitude = u64::from_str_radix(digits, base).map_err(|error| *error.kind())?;
+    let magnitude =
+        u64::from_str_radix(&digits.replace('_', ""), base).map_err(|error| *error.kind())?;
     let limit = i64::MAX as u64 + u64::from(negative);
     if magnitude > limit {
         return Err(if negative {
