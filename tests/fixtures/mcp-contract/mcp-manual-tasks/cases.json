@@ -3,6 +3,16 @@
   "source_path": "internal/mcp/contract_handler.go:167-320, internal/manualtasks/service.go:37-135",
   "cases": [
     {
+      "name": "manual_tasks_list_returns_the_populated_queue",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_list\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Manual tasks (1):\\\\n  #1 [pending] Broker A (captcha_failed) @ 2026-08-06T12:00:00Z\\\",\\\"success\\\":true,\\\"tasks\\\":[{\\\"id\\\":1,\\\"request_id\\\":1,\\\"broker_id\\\":\\\"broker-a\\\",\\\"broker_name\\\":\\\"Broker A\\\",\\\"form_url\\\":\\\"https://broker-a.example/optout\\\",\\\"reason\\\":\\\"captcha_failed\\\",\\\"instructions\\\":\\\"The CAPTCHA solver failed for Broker A's opt-out form. Please visit the URL below and complete the CAPTCHA manually.\\\",\\\"screenshot_path\\\":\\\"\\\",\\\"html_snapshot_path\\\":\\\"\\\",\\\"form_fields_json\\\":\\\"{}\\\",\\\"status\\\":\\\"pending\\\",\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"completed_at\\\":null,\\\"notes\\\":\\\"\\\"}]}\",\"type\":\"text\"}]},\"id\":1}\n"
+    },
+    {
+      "name": "manual_tasks_show_returns_the_task_details",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_show\",\"arguments\":{\"task_id\":1}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"broker_id\\\":\\\"broker-a\\\",\\\"broker_name\\\":\\\"Broker A\\\",\\\"completed_at\\\":null,\\\"created_at\\\":\\\"2026-08-06T12:00:00Z\\\",\\\"form_fields_json\\\":\\\"{}\\\",\\\"form_url\\\":\\\"https://broker-a.example/optout\\\",\\\"html_snapshot_path\\\":\\\"\\\",\\\"id\\\":1,\\\"instructions\\\":\\\"The CAPTCHA solver failed for Broker A's opt-out form. Please visit the URL below and complete the CAPTCHA manually.\\\",\\\"message\\\":\\\"Manual task #1:\\\\n  Broker:     Broker A (broker-a)\\\\n  URL:        https://broker-a.example/optout\\\\n  Reason:     captcha_failed\\\\n  Status:     pending\\\\n  Created:    2026-08-06T12:00:00Z\\\\n\\\\nInstructions:\\\\nThe CAPTCHA solver failed for Broker A's opt-out form. Please visit the URL below and complete the CAPTCHA manually.\\\",\\\"notes\\\":\\\"\\\",\\\"reason\\\":\\\"captcha_failed\\\",\\\"request_id\\\":1,\\\"screenshot_path\\\":\\\"\\\",\\\"status\\\":\\\"pending\\\",\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":2}\n"
+    },
+    {
       "name": "manual_tasks_show_reports_a_missing_task",
       "request": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_show\",\"arguments\":{\"task_id\":999}}}",
       "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"error\\\":\\\"Manual task #999 not found. Run 'symeraseme manual-tasks list' to see available tasks.\\\",\\\"success\\\":false}\",\"type\":\"text\"}]},\"id\":3}\n"
@@ -13,9 +23,24 @@
       "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"Manual task #1 marked as completed.\\\",\\\"success\\\":true,\\\"task_id\\\":1}\",\"type\":\"text\"}]},\"id\":4}\n"
     },
     {
-      "name": "manual_tasks_cleanup_reports_a_missing_directory",
-      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_cleanup\",\"arguments\":{\"dry_run\":true}}}",
-      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"message\\\":\\\"No manual tasks directory found — nothing to clean up.\\\",\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":5}\n"
+      "name": "manual_tasks_complete_reports_a_missing_task",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_complete\",\"arguments\":{\"task_id\":999}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"error\\\":\\\"Manual task #999 not found. Run 'symeraseme manual-tasks list' to see available tasks.\\\",\\\"success\\\":false}\",\"type\":\"text\"}]},\"id\":5}\n"
+    },
+    {
+      "name": "manual_tasks_cleanup_counts_artifacts_without_removing_them",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_cleanup\",\"arguments\":{\"dry_run\":true}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"dry_run\\\":true,\\\"message\\\":\\\"Would remove 1 artifact(s) from ORACLE_ROOT/data/manual_tasks. Use --yes to confirm.\\\",\\\"removed\\\":0,\\\"skipped\\\":1,\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":6}\n"
+    },
+    {
+      "name": "manual_tasks_cleanup_removes_artifacts",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_cleanup\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"dry_run\\\":false,\\\"message\\\":\\\"Removed 1 artifact(s) from ORACLE_ROOT/data/manual_tasks.\\\",\\\"removed\\\":1,\\\"skipped\\\":0,\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":7}\n"
+    },
+    {
+      "name": "manual_tasks_cleanup_keeps_unrelated_files",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"manual_tasks_cleanup\",\"arguments\":{}}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"text\":\"{\\\"dry_run\\\":false,\\\"message\\\":\\\"Removed 0 artifact(s) from ORACLE_ROOT/data/manual_tasks.\\\",\\\"removed\\\":0,\\\"skipped\\\":0,\\\"success\\\":true}\",\"type\":\"text\"}]},\"id\":8}\n"
     }
   ]
 }

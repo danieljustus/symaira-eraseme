@@ -216,91 +216,24 @@ impl ContractHandler {
         let store = self.open_store()?;
         let status = get_str(arguments, "status", "");
         let request_id = get_int(arguments, "request_id", 0);
-        let tasks = manualtasks::list(
+        manualtasks::handle_list(
             &store,
             &ListOpts {
                 status: (!status.is_empty()).then_some(status),
                 request_id: (request_id != 0).then_some(request_id),
             },
         )
-        .map_err(|error| ToolError(error.to_string()))?;
-
-        let message = if tasks.is_empty() {
-            "No manual tasks found.".to_owned()
-        } else {
-            let mut message = format!("Manual tasks ({}):", tasks.len());
-            for task in &tasks {
-                let broker = if task.broker_name.is_empty() {
-                    task.broker_id.as_str()
-                } else {
-                    task.broker_name.as_str()
-                };
-                message.push_str(&format!(
-                    "\n  #{} [{}] {} ({}) @ {}",
-                    task.id, task.status, broker, task.reason, task.created_at
-                ));
-            }
-            message
-        };
-        let values: Vec<Value> = tasks.iter().map(task_value).collect();
-        Ok(Self::result_payload(
-            true,
-            None,
-            vec![("tasks", json!(values)), ("message", json!(message))],
-        ))
+        .map(|result| result.into_value())
+        .map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `HandleShow`.
     fn manual_tasks_show(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let store = self.open_store()?;
         let task_id = get_int(arguments, "task_id", 0);
-        let task =
-            manualtasks::get(&store, task_id).map_err(|error| ToolError(error.to_string()))?;
-        let Some(task) = task else {
-            return Ok(Self::result_payload(
-                false,
-                Some(missing_task_message(task_id)),
-                Vec::new(),
-            ));
-        };
-        let mut message = format!(
-            "Manual task #{}:\n  Broker:     {} ({})\n  URL:        {}\n  Reason:     {}\n  Status:     {}\n  Created:    {}",
-            task.id,
-            task.broker_name,
-            task.broker_id,
-            task.form_url,
-            task.reason,
-            task.status,
-            task.created_at
-        );
-        if let Some(completed_at) = &task.completed_at
-            && !completed_at.is_empty()
-        {
-            message.push_str("\n  Completed:  ");
-            message.push_str(completed_at);
-        }
-        if !task.screenshot_path.is_empty() {
-            message.push_str("\n  Screenshot: ");
-            message.push_str(&task.screenshot_path);
-        }
-        if !task.html_snapshot_path.is_empty() {
-            message.push_str("\n  HTML:       ");
-            message.push_str(&task.html_snapshot_path);
-        }
-        message.push_str("\n\nInstructions:\n");
-        message.push_str(&task.instructions);
-        if !task.notes.is_empty() {
-            message.push_str("\n\nNotes: ");
-            message.push_str(&task.notes);
-        }
-
-        let Value::Object(mut data) = task_value(&task) else {
-            return Err(ToolError("task payload is an object".to_owned()));
-        };
-        // Go's Result marshalling flattens the task map next to `success`.
-        data.insert("success".to_owned(), json!(true));
-        data.insert("message".to_owned(), json!(message));
-        Ok(Value::Object(data))
+        manualtasks::handle_show(&store, task_id)
+            .map(|result| result.into_value())
+            .map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `HandleComplete`.
@@ -309,26 +242,9 @@ impl ContractHandler {
         let now = self.recorded_instant()?;
         let task_id = get_int(arguments, "task_id", 0);
         let notes = get_str(arguments, "notes", "");
-        let task = manualtasks::complete(&store, task_id, &notes, true, now)
-            .map_err(|error| ToolError(error.to_string()))?;
-        if task.is_none() {
-            return Ok(Self::result_payload(
-                false,
-                Some(missing_task_message(task_id)),
-                Vec::new(),
-            ));
-        }
-        Ok(Self::result_payload(
-            true,
-            None,
-            vec![
-                ("task_id", json!(task_id)),
-                (
-                    "message",
-                    json!(format!("Manual task #{task_id} marked as completed.")),
-                ),
-            ],
-        ))
+        manualtasks::handle_complete(&store, task_id, &notes, now)
+            .map(|result| result.into_value())
+            .map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `HandleCleanup`.
@@ -336,41 +252,9 @@ impl ContractHandler {
         let dry_run = get_bool(arguments, "dry_run", false);
         let directory = manualtasks::tasks_dir_in(self.data_dir.as_deref())
             .map_err(|error| ToolError(error.to_string()))?;
-        if !directory.exists() {
-            return Ok(Self::result_payload(
-                true,
-                None,
-                vec![(
-                    "message",
-                    json!("No manual tasks directory found — nothing to clean up."),
-                )],
-            ));
-        }
-        let outcome = manualtasks::cleanup(&directory, dry_run)
-            .map_err(|error| ToolError(error.to_string()))?;
-        let message = if dry_run {
-            format!(
-                "Would remove {} artifact(s) from {}. Use --yes to confirm.",
-                outcome.skipped,
-                directory.display()
-            )
-        } else {
-            format!(
-                "Removed {} artifact(s) from {}.",
-                outcome.removed,
-                directory.display()
-            )
-        };
-        Ok(Self::result_payload(
-            true,
-            None,
-            vec![
-                ("removed", json!(outcome.removed)),
-                ("skipped", json!(outcome.skipped)),
-                ("dry_run", json!(outcome.dry_run)),
-                ("message", json!(message)),
-            ],
-        ))
+        manualtasks::handle_cleanup(&directory, dry_run)
+            .map(|result| result.into_value())
+            .map_err(|error| ToolError(error.to_string()))
     }
 
     /// Go's `grant`. The dry-run branch echoes its arguments and touches no
@@ -1334,33 +1218,6 @@ fn get_bool(arguments: &Map<String, Value>, key: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Go's `taskMap`.
-fn task_value(task: &manualtasks::ManualTask) -> Value {
-    json!({
-        "id": task.id,
-        "request_id": task.request_id,
-        "broker_id": task.broker_id,
-        "broker_name": task.broker_name,
-        "form_url": task.form_url,
-        "reason": task.reason,
-        "instructions": task.instructions,
-        "screenshot_path": task.screenshot_path,
-        "html_snapshot_path": task.html_snapshot_path,
-        "form_fields_json": task.form_fields_json,
-        "status": task.status,
-        "created_at": task.created_at,
-        "completed_at": task.completed_at,
-        "notes": task.notes,
-    })
-}
-
-/// The shared not-found text of the manual-task tools.
-fn missing_task_message(task_id: i64) -> String {
-    format!(
-        "Manual task #{task_id} not found. Run 'symeraseme manual-tasks list' to see available tasks."
-    )
-}
-
 /// Go's `validate`: load (and thereby validate) a registry directory, or the
 /// embedded registry when no directory is given. A relative directory resolves
 /// against the workspace root, which stands in for Go's process working
@@ -1785,10 +1642,8 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The manual-task tools answer from an isolated store; the fixture holds
-    /// only the cases that carry no wall-clock value (Go fills `created_at`
-    /// from `time.Now()` with no injection point, so `list` and the `show`
-    /// detail block cannot be pinned).
+    /// The manual-task tools answer from an isolated store. The Go oracle pins
+    /// the stored task timestamp so list and detail responses are byte-stable.
     #[test]
     fn source_bound_go_manual_task_fixture_matches() {
         use std::collections::BTreeMap;
@@ -1826,7 +1681,18 @@ mod tests {
         opts.html_snapshot.clear();
         let task = manualtasks::create(&store, &opts, None, now).expect("seed task");
         assert_eq!(task.id, 1, "fixture expects the first task id");
+        store
+            .connection()
+            .execute(
+                "UPDATE manual_tasks SET created_at = '2026-08-06 12:00:00' WHERE id = 1",
+                [],
+            )
+            .expect("pin manual task timestamp");
         drop(store);
+        let tasks_dir = data_dir.join("manual_tasks");
+        fs::create_dir_all(&tasks_dir).expect("manual task artifacts dir");
+        fs::write(tasks_dir.join("evidence.png"), "artifact").expect("seed artifact");
+        fs::write(tasks_dir.join("keep.txt"), "keep").expect("seed unrelated file");
 
         let handler = ContractHandler::new(&root)
             .with_store(config, now)
@@ -1840,11 +1706,21 @@ mod tests {
             fixture.source_revision,
             "42614bc27527711baec9b3e9d2805ce1e1dee185"
         );
-        assert_eq!(fixture.cases.len(), 3, "fixture case count changed");
+        assert_eq!(fixture.cases.len(), 8, "fixture case count changed");
 
         for case in fixture.cases {
             let actual = match initialize(case.request.as_bytes(), &handler) {
-                InitializeOutcome::Response(bytes) => Some(String::from_utf8(bytes).unwrap()),
+                InitializeOutcome::Response(bytes) => {
+                    let mut envelope: Value = serde_json::from_slice(&bytes).unwrap();
+                    if let Some(text) = envelope["result"]["content"][0]["text"].as_str() {
+                        let normalized =
+                            text.replace(&root.to_string_lossy().to_string(), "ORACLE_ROOT");
+                        envelope["result"]["content"][0]["text"] = json!(normalized);
+                    }
+                    let mut normalized = serde_json::to_vec(&envelope).unwrap();
+                    normalized.push(b'\n');
+                    Some(String::from_utf8(normalized).unwrap())
+                }
                 InitializeOutcome::Notification => None,
                 InitializeOutcome::ParseError => {
                     panic!("{} unexpectedly parsed as error", case.name)
@@ -1855,9 +1731,8 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// The paths the oracle cannot pin — `list` and the `show` detail block
-    /// carry a wall-clock `created_at` — are asserted by shape instead, plus the
-    /// branches the fixture does not reach.
+    /// Covers list/show branches and optional task fields outside the oracle
+    /// fixture's pinned populated-task case.
     #[test]
     fn manual_task_shapes_and_unreached_branches() {
         use std::collections::BTreeMap;
