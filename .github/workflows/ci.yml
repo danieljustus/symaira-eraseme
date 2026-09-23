@@ -114,20 +114,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: TruffleHog secrets scan
-        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        uses: trufflesecurity/trufflehog@f714bf454f350590f4a24c3ddb1aef02c35bf5b6 # v3.97.5
         with:
           path: ./
           # action.yml constructs IMAGE:VERSION; tag@digest keeps the
-          # 3.97.4 label while pinning the manifest immutably.
+          # 3.97.5 label while pinning the manifest immutably.
           image: ghcr.io/trufflesecurity/trufflehog
-          version: '3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4'
+          version: '3.97.5@sha256:1cec88f18ca39e26e04e61fe9d886c9c4e5f2fc0ba4f2ed185cac0722bd8a076'
           extra_args: --exclude-detectors Lob --exclude-paths .trufflehog-exclude-paths --fail-on-scan-errors
       - name: TruffleHog protected-history scan
-        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        uses: trufflesecurity/trufflehog@f714bf454f350590f4a24c3ddb1aef02c35bf5b6 # v3.97.5
         with:
           path: ./
           image: ghcr.io/trufflesecurity/trufflehog
-          version: '3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4'
+          version: '3.97.5@sha256:1cec88f18ca39e26e04e61fe9d886c9c4e5f2fc0ba4f2ed185cac0722bd8a076'
           # --since-commit excludes its base commit. Starting at the known
           # fixture commit therefore scans the scanner-safe remediation and
           # every later revision of the one path omitted above.
