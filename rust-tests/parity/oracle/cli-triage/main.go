@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
@@ -26,6 +27,8 @@ const fixturePath = "tests/fixtures/cli-triage/cases.json"
 
 const fakeAgentScript = `#!/bin/sh
 case "$*" in
+  *"--model oracle-env-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from environment","extracted_fields":{"ticket":"T-42"}}' ;;
+  *"--model oracle-flag-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from flag","extracted_fields":{"ticket":"T-42"}}' ;;
   *"rejection classifier"*) printf '%s\n' '{"classification":"address_mismatch","confidence":0.91,"summary":"address differs","key_points":[],"jurisdiction":"GDPR"}' ;;
   *"email classifier"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"deletion confirmed","extracted_fields":{"ticket":"T-42"}}' ;;
   *) printf '%s\n' '{"classification":"other","confidence":0.1,"summary":"unexpected prompt","key_points":[],"jurisdiction":"unknown"}' ;;
@@ -47,12 +50,13 @@ type event struct {
 }
 
 type recordedCase struct {
-	ID           string   `json:"id"`
-	Argv         []string `json:"argv"`
-	ExitCode     int      `json:"exit_code"`
-	StdoutBase64 string   `json:"stdout_base64"`
-	StderrBase64 string   `json:"stderr_base64"`
-	State        snapshot `json:"state"`
+	ID           string            `json:"id"`
+	Argv         []string          `json:"argv"`
+	Environment  map[string]string `json:"environment"`
+	ExitCode     int               `json:"exit_code"`
+	StdoutBase64 string            `json:"stdout_base64"`
+	StderrBase64 string            `json:"stderr_base64"`
+	State        snapshot          `json:"state"`
 }
 
 type source struct {
@@ -68,12 +72,69 @@ type fixture struct {
 	Cases           []recordedCase `json:"cases"`
 }
 
-var cases = []struct {
-	id   string
-	argv []string
-}{
-	{"classify-reply-json", []string{"classify-reply", "1", "--provider", "agent", "--output", "json"}},
-	{"generate-rebuttal-text", []string{"generate-rebuttal", "1", "--provider", "agent"}},
+type commandCase struct {
+	id          string
+	argv        []string
+	environment map[string]string
+}
+
+var cases = []commandCase{
+	{
+		id: "classify-reply-json", argv: []string{"classify-reply", "1", "--provider", "agent", "--output", "json"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id: "generate-rebuttal-text", argv: []string{"generate-rebuttal", "1", "--provider", "agent"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "agent", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "classify-save-false-env-provider",
+		argv:        []string{"classify-reply", "--request-id=0x1", "--save=false", "--output", "json"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "agent", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "rebuttal-save-false-env-provider",
+		argv:        []string{"generate-rebuttal", "--request-id", "1", "--save=false"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "agent", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "classify-positional-overrides-request-id-flag",
+		argv:        []string{"classify-reply", "1", "--request-id", "999", "--provider", "agent", "--output", "json"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "classify-request-id-flag-hex",
+		argv:        []string{"classify-reply", "--request-id", "0x1", "--provider", "agent", "--output", "json"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "classify-missing-reply-error",
+		argv:        []string{"classify-reply", "999", "--provider", "agent"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id: "classify-invalid-provider-error", argv: []string{"classify-reply", "1"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "not-a-provider", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:          "classify-invalid-request-id-flag-error",
+		argv:        []string{"classify-reply", "--request-id=bad", "--provider", "agent", "--output", "json"},
+		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "agent", "SYMERASEME_AGENT_BACKEND": "claude"},
+	},
+	{
+		id:   "classify-model-env-default",
+		argv: []string{"classify-reply", "1", "--output", "json"},
+		environment: map[string]string{
+			"SYMERASEME_LLM_PROVIDER": "agent", "SYMERASEME_LLM_MODEL": "oracle-env-model", "SYMERASEME_AGENT_BACKEND": "claude",
+		},
+	},
+	{
+		id:   "classify-model-flag-overrides-env",
+		argv: []string{"classify-reply", "1", "--provider", "agent", "--model", "oracle-flag-model", "--output", "json"},
+		environment: map[string]string{
+			"SYMERASEME_LLM_PROVIDER": "not-a-provider", "SYMERASEME_LLM_MODEL": "oracle-env-model", "SYMERASEME_AGENT_BACKEND": "claude",
+		},
+	},
 }
 
 var sourcePaths = []string{
@@ -132,9 +193,15 @@ func main() {
 			"HOME=" + home,
 			"PATH=" + agentDir,
 			"SYMERASEME_DATA_DIR=" + dataDir,
-			"SYMERASEME_LLM_PROVIDER=agent",
-			"SYMERASEME_AGENT_BACKEND=claude",
 			"TERM=dumb",
+		}
+		environmentNames := make([]string, 0, len(testCase.environment))
+		for name := range testCase.environment {
+			environmentNames = append(environmentNames, name)
+		}
+		sort.Strings(environmentNames)
+		for _, name := range environmentNames {
+			command.Env = append(command.Env, name+"="+testCase.environment[name])
 		}
 		var stdout, stderr strings.Builder
 		command.Stdout, command.Stderr = &stdout, &stderr
@@ -146,10 +213,11 @@ func main() {
 				fail("run %v: %v", testCase.argv, err)
 			}
 		}
+		stderrBytes := normalizeProviderOrder([]byte(stderr.String()))
 		result.Cases = append(result.Cases, recordedCase{
-			ID: testCase.id, Argv: testCase.argv, ExitCode: exitCode,
+			ID: testCase.id, Argv: testCase.argv, Environment: testCase.environment, ExitCode: exitCode,
 			StdoutBase64: base64.StdEncoding.EncodeToString([]byte(stdout.String())),
-			StderrBase64: base64.StdEncoding.EncodeToString([]byte(stderr.String())),
+			StderrBase64: base64.StdEncoding.EncodeToString(stderrBytes),
 			State:        readSnapshot(dataDir),
 		})
 	}
@@ -206,7 +274,7 @@ func readSnapshot(dataDir string) snapshot {
 		fail("open result store: %v", err)
 	}
 	defer store.Close()
-	var result snapshot
+	result := snapshot{Events: []event{}}
 	if err := store.DB().QueryRow(`SELECT classified_as, classifier_confidence, llm_summary FROM inbox_replies WHERE id = 1`).Scan(&result.Classification, &result.Confidence, &result.Summary); err != nil && err != sql.ErrNoRows {
 		fail("read reply result: %v", err)
 	}
@@ -226,6 +294,23 @@ func readSnapshot(dataDir string) snapshot {
 		fail("read events: %v", err)
 	}
 	return result
+}
+
+func normalizeProviderOrder(stderr []byte) []byte {
+	const marker = "Known providers: "
+	text := string(stderr)
+	index := strings.Index(text, marker)
+	if index < 0 {
+		return stderr
+	}
+	start := index + len(marker)
+	end := strings.IndexByte(text[start:], '\n')
+	if end < 0 {
+		end = len(text) - start
+	}
+	providers := strings.Split(text[start:start+end], ", ")
+	sort.Strings(providers)
+	return []byte(text[:start] + strings.Join(providers, ", ") + text[start+end:])
 }
 
 func digest(value []byte) string {

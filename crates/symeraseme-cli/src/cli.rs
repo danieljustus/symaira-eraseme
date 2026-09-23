@@ -304,6 +304,22 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                         "invalid argument {value:?} for \"--{name}\" flag: strconv.ParseInt: parsing {value:?}: {detail}\n"
                     ));
                 }
+                if matches!(path.as_slice(), [command] if command == "classify-reply" || command == "generate-rebuttal")
+                    && name == "request-id"
+                    && let Err(kind) = parse_go_int_flag(&value)
+                {
+                    let detail = if matches!(
+                        kind,
+                        std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
+                    ) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Err(format!(
+                        "invalid argument {value:?} for \"--{name}\" flag: strconv.ParseInt: parsing {value:?}: {detail}\n"
+                    ));
+                }
                 if name == "output" {
                     if path.is_empty() {
                         root_output = Some(value.clone());
@@ -394,6 +410,55 @@ fn split_flag(raw: &str) -> (&str, Option<String>) {
         (name, Some(value.to_owned()))
     } else {
         (raw, None)
+    }
+}
+
+/// Parse Go's base-zero integer syntax used by `pflag.IntVar` for the reply
+/// triage `--request-id` flags. Positional IDs continue to use decimal Atoi.
+fn parse_go_int_flag(value: &str) -> Result<i64, std::num::IntErrorKind> {
+    let (negative, unsigned) = if let Some(rest) = value.strip_prefix('-') {
+        (true, rest)
+    } else if let Some(rest) = value.strip_prefix('+') {
+        (false, rest)
+    } else {
+        (false, value)
+    };
+    let (digits, base) = if let Some(rest) = unsigned
+        .strip_prefix("0x")
+        .or_else(|| unsigned.strip_prefix("0X"))
+    {
+        (rest, 16)
+    } else if let Some(rest) = unsigned
+        .strip_prefix("0b")
+        .or_else(|| unsigned.strip_prefix("0B"))
+    {
+        (rest, 2)
+    } else if let Some(rest) = unsigned
+        .strip_prefix("0o")
+        .or_else(|| unsigned.strip_prefix("0O"))
+    {
+        (rest, 8)
+    } else if unsigned.len() > 1 && unsigned.starts_with('0') {
+        (unsigned, 8)
+    } else {
+        (unsigned, 10)
+    };
+    if digits.is_empty() || digits.contains('_') {
+        return Err(std::num::IntErrorKind::InvalidDigit);
+    }
+    let magnitude = u64::from_str_radix(digits, base).map_err(|error| *error.kind())?;
+    let limit = i64::MAX as u64 + u64::from(negative);
+    if magnitude > limit {
+        return Err(if negative {
+            std::num::IntErrorKind::NegOverflow
+        } else {
+            std::num::IntErrorKind::PosOverflow
+        });
+    }
+    if negative {
+        Ok((-(magnitude as i128)) as i64)
+    } else {
+        Ok(magnitude as i64)
     }
 }
 
@@ -1206,7 +1271,7 @@ fn triage_agent_call<'a>(
 }
 
 fn classify_reply_command(parsed: &Parsed) -> Outcome {
-    let request_id = match int_argument(parsed, "request-id", "request ID") {
+    let request_id = match triage_request_id(parsed) {
         Ok(request_id) => request_id,
         Err(outcome) => return outcome,
     };
@@ -1243,7 +1308,7 @@ fn classify_reply_command(parsed: &Parsed) -> Outcome {
 }
 
 fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
-    let request_id = match int_argument(parsed, "request-id", "request ID") {
+    let request_id = match triage_request_id(parsed) {
         Ok(request_id) => request_id,
         Err(outcome) => return outcome,
     };
@@ -1541,6 +1606,20 @@ fn int_argument(parsed: &Parsed, flag: &str, name: &str) -> Result<i64, Outcome>
     argument
         .parse()
         .map_err(|_| Outcome::Stderr(format!("invalid {name} {argument:?}\n").into_bytes()))
+}
+
+fn triage_request_id(parsed: &Parsed) -> Result<i64, Outcome> {
+    if let Some(argument) = parsed.positional.first() {
+        return argument.parse().map_err(|_| {
+            Outcome::Stderr(format!("invalid request ID {argument:?}\n").into_bytes())
+        });
+    }
+    match parsed.flags.get("request-id") {
+        Some(value) => parse_go_int_flag(value).map_err(|_| {
+            Outcome::Stderr(b"invalid request ID flag after successful argument parsing\n".to_vec())
+        }),
+        None => Ok(0),
+    }
 }
 
 /// `review` — Go's `realRedactFileCommand`: the positional wins over `--path`,

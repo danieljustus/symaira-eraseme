@@ -21,6 +21,8 @@ const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 const FAKE_AGENT_SCRIPT: &str = r#"#!/bin/sh
 case "$*" in
+  *"--model oracle-env-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from environment","extracted_fields":{"ticket":"T-42"}}' ;;
+  *"--model oracle-flag-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from flag","extracted_fields":{"ticket":"T-42"}}' ;;
   *"rejection classifier"*) printf '%s\n' '{"classification":"address_mismatch","confidence":0.91,"summary":"address differs","key_points":[],"jurisdiction":"GDPR"}' ;;
   *"email classifier"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"deletion confirmed","extracted_fields":{"ticket":"T-42"}}' ;;
   *) printf '%s\n' '{"classification":"other","confidence":0.1,"summary":"unexpected prompt","key_points":[],"jurisdiction":"unknown"}' ;;
@@ -46,6 +48,7 @@ struct Source {
 struct Case {
     id: String,
     argv: Vec<String>,
+    environment: std::collections::BTreeMap<String, String>,
     exit_code: i32,
     stdout_base64: String,
     stderr_base64: String,
@@ -136,8 +139,7 @@ fn replay_case(case: &Case) {
         .env("HOME", &home)
         .env("PATH", &bin_dir)
         .env("SYMERASEME_DATA_DIR", &data_dir)
-        .env("SYMERASEME_LLM_PROVIDER", "agent")
-        .env("SYMERASEME_AGENT_BACKEND", "claude")
+        .envs(case.environment.iter())
         .env("TERM", "dumb")
         .output()
         .unwrap_or_else(|error| panic!("spawn Rust {}: {error}", case.id));
@@ -156,11 +158,12 @@ fn replay_case(case: &Case) {
         "{} stdout",
         case.id
     );
+    let expected_stderr = base64::engine::general_purpose::STANDARD
+        .decode(&case.stderr_base64)
+        .expect("fixture stderr base64");
     assert_eq!(
-        output.stderr,
-        base64::engine::general_purpose::STANDARD
-            .decode(&case.stderr_base64)
-            .expect("fixture stderr base64"),
+        normalize_provider_order(&output.stderr),
+        normalize_provider_order(&expected_stderr),
         "{} stderr",
         case.id
     );
@@ -262,6 +265,23 @@ fn read_snapshot(data_dir: &Path) -> Snapshot {
         summary,
         events,
     }
+}
+
+// Go iterates its provider registry map in randomized order in unknown-provider
+// errors. Canonicalize only that list so the fixture stays stable without hiding
+// missing or unexpected providers.
+fn normalize_provider_order(stderr: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(stderr);
+    let Some(index) = text.find("Known providers: ") else {
+        return stderr.to_vec();
+    };
+    let start = index + "Known providers: ".len();
+    let end = text[start..]
+        .find('\n')
+        .map_or(text.len(), |offset| start + offset);
+    let mut providers = text[start..end].split(", ").collect::<Vec<_>>();
+    providers.sort_unstable();
+    format!("{}{}{}", &text[..start], providers.join(", "), &text[end..]).into_bytes()
 }
 
 fn sha256(bytes: &[u8]) -> String {
