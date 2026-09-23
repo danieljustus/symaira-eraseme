@@ -1,0 +1,4 @@
+-- One planned web-form request for the handler's local/manual execution path.
+INSERT INTO removal_requests (id, broker_id, channel, campaign_id, created_at, jurisdiction, template_id, identity_snapshot_hash) VALUES (1, 'dentsu-uk-eu', 'web_form', 'campaign-web', '2026-09-01 00:00:00', 'EU', 'gdpr-art17', '');
+INSERT INTO request_state (request_id, current_status, last_event_id, last_event_at, sent_at, acknowledged_at, resolved_at, deadline_at, next_action_at, reminders_sent, escalation_level) VALUES (1, 'PLANNED', 1, '2026-09-01 00:00:00', NULL, NULL, NULL, NULL, NULL, 0, 0);
+INSERT INTO request_events (id, request_id, occurred_at, recorded_at, event_type, payload_json, source) VALUES (1, 1, '2026-09-01 00:00:00', '2026-09-01 00:00:01', 'PLANNED', '{"endpoint":"","required_fields":[]}', 'system');

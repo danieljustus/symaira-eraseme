@@ -1,0 +1,15 @@
+{
+  "source_revision": "bfe2873937947479347c626512d74730fceaa3ac",
+  "source_files": [
+    {"path": "internal/mcp/contract_handler.go", "sha256": "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+    {"path": "internal/campaign/campaign.go", "sha256": "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
+    {"path": "internal/campaign/planning.go", "sha256": "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
+    {"path": "internal/campaign/execution.go", "sha256": "eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},
+    {"path": "internal/campaign/webform.go", "sha256": "2ba434e161ccd6ed64b8f883e44c1e211ee2c9c45a23a936bda9c7511746a398"},
+    {"path": "internal/identity/profile.go", "sha256": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"},
+    {"path": "internal/identity/gate.go", "sha256": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"}
+  ],
+  "source_path": "internal/mcp/contract_handler.go; internal/campaign/{campaign,planning,execution,webform}.go; internal/identity/{profile,gate}.go",
+  "seed": "tests/fixtures/mcp-contract/mcp-003-campaign/seed.sql",
+  "cases": []
+}

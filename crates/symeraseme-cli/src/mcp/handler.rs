@@ -23,9 +23,9 @@ use symeraseme_core::email::service::InboxService;
 use symeraseme_core::email::session::ImapDialer;
 use symeraseme_core::email::types::{MatchedMessage, RemovalRequest};
 use symeraseme_core::identity::{
-    ConsentError, ConsentStore, DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome, MasterKeyResolver,
-    OsSecretBackend, ProfileError, ProfilePaths, SecretResolver, default_consent_directory,
-    load_profile,
+    ConsentError, ConsentOptions, ConsentStore, DEFAULT_TOKEN_TTL, GrantOptions, GrantOutcome,
+    MasterKeyResolver, OsSecretBackend, ProfileError, ProfilePaths, SecretResolver,
+    default_consent_directory, load_profile,
 };
 use symeraseme_core::jsonorder::go_map_order;
 use symeraseme_core::manualtasks::{self, ListOpts};
@@ -387,33 +387,28 @@ impl ContractHandler {
         }))
     }
 
-    /// Go's `plan_create`: plan against the embedded registry.
-    ///
-    /// Only the missing-profile branch is implemented — it records an empty
-    /// snapshot hash, which is Python's `FileNotFoundError` path. An empty
-    /// `profile_path` or an existing profile needs the keyring-backed load and
-    /// reports that it is not part of this slice.
+    /// Go's `plan_create`: resolve and load the requested identity profile,
+    /// then plan against the embedded registry.
     fn plan_create(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let store = self.open_store()?;
         let now = self.recorded_instant()?;
         let profile_path = get_str(arguments, "profile_path", "");
-        if profile_path.is_empty() {
-            return Err(ToolError(
-                "plan_create without an explicit profile_path is not implemented in this slice"
-                    .to_owned(),
-            ));
-        }
-        let resolved = self.workspace_root.join(&profile_path);
-        if resolved.exists() {
-            return Err(ToolError(
-                "reading an existing identity profile is not implemented in this slice".to_owned(),
-            ));
-        }
+        let paths = ProfilePaths::from_process();
+        let mut keys = MasterKeyResolver::from_process();
+        let profile = match load_profile(Path::new(&profile_path), &paths, &mut keys) {
+            Ok(profile) => Some(profile),
+            Err(ProfileError::NotFound) => None,
+            Err(error) => return Err(ToolError(error.to_string())),
+        };
+        let identity_hash = profile
+            .as_ref()
+            .map(symeraseme_core::identity::hash_profile)
+            .unwrap_or_default();
         let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
         let result = campaign::plan_campaign(
             &store,
             &brokers,
-            "",
+            &identity_hash,
             &campaign::PlanOpts {
                 campaign_id: get_str(arguments, "campaign_id", ""),
                 jurisdiction: get_str(arguments, "jurisdiction", ""),
@@ -430,6 +425,57 @@ impl ContractHandler {
         )
         .map_err(|error| ToolError(error.to_string()))?;
         serde_json::to_value(result).map_err(|error| ToolError(error.to_string()))
+    }
+
+    /// Go's non-interactive `execute`: require explicit consent for live
+    /// execution, then dispatch through the core executor with no email sender
+    /// or browser executor configured. Web forms can create manual tasks; no
+    /// request can reach a network adapter.
+    fn execute_campaign(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let store = self.open_store()?;
+        let dry_run = get_bool(arguments, "dry_run", false);
+        if !dry_run {
+            let consent = ConsentStore::new(default_consent_directory().unwrap_or_default());
+            consent
+                .authorize(
+                    "execute",
+                    &ConsentOptions {
+                        consent_token: Some(get_str(arguments, "consent_token", "")),
+                        consent_file: Some(get_str(arguments, "consent_file", "")),
+                        consent_env_var: Some("SYMERASEME_CONSENT".to_owned()),
+                        consent_file_env_var: Some("SYMERASEME_CONSENT_FILE".to_owned()),
+                        interactive: false,
+                        ..ConsentOptions::default()
+                    },
+                )
+                .map_err(|error| ToolError(error.to_string()))?;
+        }
+        let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+        let paths = ProfilePaths::from_process();
+        let mut keys = MasterKeyResolver::from_process();
+        let profile_result = match load_profile(Path::new(""), &paths, &mut keys) {
+            Ok(profile) => Ok(Some(profile)),
+            Err(ProfileError::NotFound) => Ok(None),
+            Err(error) => Err(error.to_string()),
+        };
+        let profile = profile_result
+            .as_ref()
+            .map(|profile| profile.as_ref())
+            .map_err(String::as_str);
+        let result = campaign::execute_campaign(
+            &store,
+            &get_str(arguments, "campaign_id", ""),
+            &campaign::ExecuteOpts {
+                account: get_str(arguments, "account", ""),
+                dry_run,
+                brokers: &brokers,
+            },
+            profile,
+            get_int(arguments, "batch_size", 5),
+            self.recorded_instant()?,
+        )
+        .map_err(|error| ToolError(error.to_string()))?;
+        Ok(Value::Object(result))
     }
 
     /// Go's `list_brokers`: the embedded registry through the shared filter.
@@ -1161,6 +1207,7 @@ impl ContractHandler {
             "generate_dashboard" => self.generate_dashboard(arguments),
             "generate_report" => self.generate_report(arguments),
             "plan_create" => self.plan_create(arguments),
+            "execute" => self.execute_campaign(arguments),
             "plan_show" => self.plan_show(arguments),
             "list_requests" => self.list_requests(arguments),
             "get_dashboard_data" => self.dashboard_data(),
@@ -1943,20 +1990,6 @@ mod tests {
         let absolute = call(&absolute_arguments, "validate");
         assert_eq!(absolute["totals"]["valid"], 3);
 
-        // A catalogue tool that is not wired yet says so instead of pretending
-        // to be unknown.
-        // `execute` is in the catalogue but not wired in this slice. Its required
-        // argument has to be supplied, otherwise validation answers first — which
-        // is the correct order.
-        let unwired = call_envelope(r#"{"campaign_id":"c1"}"#, "execute");
-        assert!(
-            unwired["error"]["message"]
-                .as_str()
-                .unwrap_or("")
-                .contains("not implemented in this slice"),
-            "envelope was {unwired}"
-        );
-
         // The writing tool fails explicitly when no instant was injected.
         let without_clock = ContractHandler::new(&root);
         let outcome = initialize(
@@ -1975,11 +2008,10 @@ mod tests {
     }
 
     /// `plan_create` answers with the removal-request ids it just created, so
-    /// the oracle could not record it: its store isolation did not hold and the
-    /// ids came from the developer's real store. The shape is asserted here
-    /// instead, including both branches this slice does not implement.
+    /// the oracle records the response only in its isolated store. This test
+    /// checks the result shape and the missing/corrupt profile branches.
     #[test]
-    fn plan_create_shape_and_unimplemented_branches() {
+    fn plan_create_shape_and_profile_paths() {
         use std::collections::BTreeMap;
         use symeraseme_core::config::ConfigContext;
 
@@ -2013,7 +2045,12 @@ mod tests {
         };
 
         let planned = call(
-            r#"{"campaign_id":"mcp-plan","max_brokers":2,"profile_path":"missing-profile.enc"}"#,
+            &json!({
+                "campaign_id": "mcp-plan",
+                "max_brokers": 2,
+                "profile_path": root.join("missing-profile.enc").to_string_lossy(),
+            })
+            .to_string(),
             "plan_create",
         );
         let payload = &planned["result"]["content"][0]["text"];
@@ -2030,27 +2067,34 @@ mod tests {
         assert_eq!(requests[0]["request_id"], 1);
         assert_eq!(requests[1]["request_id"], 2);
 
-        // An empty profile path and an existing profile both need the
-        // keyring-backed load, which this slice does not implement.
-        for (arguments, expected) in [
-            (
-                r#"{"campaign_id":"x"}"#,
-                "without an explicit profile_path is not implemented",
-            ),
-            (
-                r#"{"campaign_id":"x","profile_path":"registry/manifest.json"}"#,
-                "reading an existing identity profile is not implemented",
-            ),
-        ] {
-            let rejected = call(arguments, "plan_create");
-            assert!(
-                rejected["error"]["message"]
-                    .as_str()
-                    .expect("error")
-                    .contains(expected),
-                "{rejected}"
-            );
-        }
+        // A missing profile is valid and hashes as the empty identity. An
+        // existing malformed envelope is loaded and reports Go's profile
+        // corruption error before any keyring lookup.
+        let missing = call(
+            &json!({
+                "campaign_id": "missing-profile",
+                "profile_path": root.join("missing-profile.enc").to_string_lossy(),
+                "max_brokers": 1,
+            })
+            .to_string(),
+            "plan_create",
+        );
+        assert!(missing["result"].is_object(), "{missing}");
+
+        let malformed_path = root.join("malformed-profile.enc");
+        fs::write(&malformed_path, b"not-an-encrypted-profile").expect("malformed profile");
+        let malformed = call(
+            &json!({
+                "campaign_id": "malformed-profile",
+                "profile_path": malformed_path.to_string_lossy(),
+            })
+            .to_string(),
+            "plan_create",
+        );
+        assert_eq!(
+            malformed["error"]["message"],
+            "identity: profile corrupt: no header separator"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

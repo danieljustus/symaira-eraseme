@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/danieljustus/symaira-eraseme/internal/identity"
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
 
 	_ "modernc.org/sqlite"
@@ -36,9 +37,21 @@ const (
 
 const schedulerSourceRevision = "4af87d9d2cd127722aa4d0e3942057b0365bd7d9"
 
+const campaignSourceRevision = "bfe2873937947479347c626512d74730fceaa3ac"
+
 var schedulerSourceFiles = []sourceFileDigest{
 	{Path: "internal/mcp/contract_handler.go", SHA256: "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
 	{Path: "internal/scheduler/scheduler.go", SHA256: "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"},
+}
+
+var campaignSourceFiles = []sourceFileDigest{
+	{Path: "internal/mcp/contract_handler.go", SHA256: "b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+	{Path: "internal/campaign/campaign.go", SHA256: "9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
+	{Path: "internal/campaign/planning.go", SHA256: "ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
+	{Path: "internal/campaign/execution.go", SHA256: "eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},
+	{Path: "internal/campaign/webform.go", SHA256: "2ba434e161ccd6ed64b8f883e44c1e211ee2c9c45a23a936bda9c7511746a398"},
+	{Path: "internal/identity/profile.go", SHA256: "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"},
+	{Path: "internal/identity/gate.go", SHA256: "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"},
 }
 
 type sourceFileDigest struct {
@@ -53,9 +66,22 @@ type fixtureCase struct {
 	ParseError bool    `json:"parse_error,omitempty"`
 }
 
+type campaignFixtureCase struct {
+	Name            string  `json:"name"`
+	Request         string  `json:"request"`
+	Response        *string `json:"response"`
+	Seed            bool    `json:"seed,omitempty"`
+	IssueConsent    bool    `json:"issue_consent,omitempty"`
+	ExistingProfile string  `json:"existing_profile,omitempty"`
+}
+
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--scheduler-fixture" {
 		writeSchedulerFixtures()
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--campaign-fixture" {
+		writeCampaignFixtures()
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--fixture" {
@@ -315,6 +341,179 @@ func schedulerInstallCase(platform string, id int) fixtureCase {
 	response := strings.ReplaceAll(output.String(), canonicalRoot, "<SCHEDULE_ROOT>")
 	response = strings.ReplaceAll(response, root, "<SCHEDULE_ROOT>")
 	return fixtureCase{Name: "schedule_install_" + platform + "_returns_empty_legacy_array", Request: request, Response: &response}
+}
+
+// writeCampaignFixtures records handler-level planning and execution cases in
+// private homes/data dirs. The only live execution case has a web-form request
+// and the production handler's nil executor, so it can create a manual task but
+// cannot submit a form or send email.
+func writeCampaignFixtures() {
+	verifyCampaignSources()
+	origin, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	cases := []campaignFixtureCase{
+		{
+			Name:    "plan_create_uses_default_path_when_profile_is_missing",
+			Request: callRequest(1, "plan_create", `{"campaign_id":"campaign-default-profile","max_brokers":1}`),
+		},
+		{
+			Name:            "plan_create_loads_an_explicit_existing_profile",
+			Request:         callRequest(2, "plan_create", `{"campaign_id":"campaign-existing-profile","max_brokers":1,"profile_path":"profiles/existing.enc"}`),
+			ExistingProfile: "profiles/existing.enc",
+		},
+		{
+			Name:    "execute_dry_run_previews_a_web_form_without_consent",
+			Request: callRequest(3, "execute", `{"campaign_id":"campaign-web","dry_run":true}`),
+			Seed:    true,
+		},
+		{
+			Name:    "execute_denies_live_dispatch_without_consent",
+			Request: callRequest(4, "execute", `{"campaign_id":"campaign-web"}`),
+			Seed:    true,
+		},
+		{
+			Name:         "execute_creates_local_manual_task_without_network_send",
+			Request:      callRequest(5, "execute", `{"campaign_id":"campaign-web","consent_token":"$CONSENT_TOKEN"}`),
+			Seed:         true,
+			IssueConsent: true,
+		},
+	}
+	seed, err := os.ReadFile(filepath.Join(origin, "tests", "fixtures", "mcp-contract", "mcp-003-campaign", "seed.sql"))
+	if err != nil {
+		fail(err)
+	}
+	for index := range cases {
+		cases[index].Response = recordCampaignCase(origin, seed, &cases[index])
+	}
+	fixture := struct {
+		SourceRevision string                `json:"source_revision"`
+		SourceFiles    []sourceFileDigest    `json:"source_files"`
+		SourcePath     string                `json:"source_path"`
+		Seed           string                `json:"seed"`
+		Cases          []campaignFixtureCase `json:"cases"`
+	}{
+		SourceRevision: campaignSourceRevision,
+		SourceFiles:    campaignSourceFiles,
+		SourcePath:     "internal/mcp/contract_handler.go; internal/campaign/{campaign,planning,execution,webform}.go; internal/identity/{profile,gate}.go",
+		Seed:           "tests/fixtures/mcp-contract/mcp-003-campaign/seed.sql",
+		Cases:          cases,
+	}
+	target, err := os.Create(filepath.Join(origin, "tests", "fixtures", "mcp-contract", "mcp-003-campaign", "cases.json"))
+	if err != nil {
+		fail(err)
+	}
+	defer target.Close()
+	encoder := json.NewEncoder(target)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(fixture); err != nil {
+		fail(err)
+	}
+}
+
+func recordCampaignCase(origin string, seed []byte, testCase *campaignFixtureCase) *string {
+	root, err := os.MkdirTemp("", "mcp-campaign-oracle")
+	if err != nil {
+		fail(err)
+	}
+	defer os.RemoveAll(root)
+	home := filepath.Join(root, "home")
+	data := filepath.Join(root, "data")
+	tmp := filepath.Join(root, "tmp")
+	bin := filepath.Join(root, "bin")
+	xdg := filepath.Join(root, "xdg")
+	for _, dir := range []string{home, data, tmp, bin, xdg} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			fail(err)
+		}
+	}
+	keys := []string{
+		"HOME", "USERPROFILE", "PATH", "SYMERASEME_DATA_DIR", "SYMERASEME_DB_DIR",
+		"SYMERASEME_IDENTITY_PATH", "SYMERASEME_CONFIG_DIR", "SYMERASEME_CONSENT",
+		"SYMERASEME_CONSENT_FILE", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
+		"XDG_STATE_HOME", "XDG_CACHE_HOME",
+	}
+	old := make(map[string]string, len(keys))
+	existed := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		old[key], existed[key] = os.LookupEnv(key)
+		_ = os.Unsetenv(key)
+	}
+	defer func() {
+		_ = os.Chdir(origin)
+		for _, key := range keys {
+			restoreEnv(key, old[key], existed[key])
+		}
+	}()
+	for key, value := range map[string]string{
+		"HOME": home, "USERPROFILE": home, "PATH": bin,
+		"SYMERASEME_DATA_DIR": data, "TMPDIR": tmp,
+		"XDG_CONFIG_HOME": xdg, "XDG_DATA_HOME": filepath.Join(root, "xdg-data"),
+		"XDG_STATE_HOME": filepath.Join(root, "xdg-state"), "XDG_CACHE_HOME": filepath.Join(root, "xdg-cache"),
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.Chdir(root); err != nil {
+		fail(err)
+	}
+	if testCase.ExistingProfile != "" {
+		path := filepath.Join(root, testCase.ExistingProfile)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			fail(err)
+		}
+		if err := os.WriteFile(path, []byte("not-an-encrypted-profile"), 0o600); err != nil {
+			fail(err)
+		}
+	}
+	var ignored bytes.Buffer
+	if err := mcp.NewServer(mcp.ContractHandler()).ServeStdio(
+		context.Background(),
+		bytes.NewReader([]byte(callRequest(0, "list_requests", `{}`)+"\n")),
+		&ignored,
+	); err != nil {
+		fail(err)
+	}
+	if testCase.Seed {
+		applySeed(filepath.Join(data, "symeraseme.db"), seed)
+	}
+	request := testCase.Request
+	if testCase.IssueConsent {
+		token, err := identity.IssueTokenInDir(data, "execute", 600)
+		if err != nil {
+			fail(err)
+		}
+		request = strings.ReplaceAll(request, "$CONSENT_TOKEN", token)
+	}
+	var output bytes.Buffer
+	if err := mcp.NewServer(mcp.ContractHandler()).ServeStdio(
+		context.Background(), bytes.NewReader([]byte(request+"\n")), &output,
+	); err != nil {
+		fail(err)
+	}
+	response := strings.ReplaceAll(output.String(), root, "<CAMPAIGN_ROOT>")
+	_ = os.Chdir(origin)
+	return &response
+}
+
+func verifyCampaignSources() {
+	for _, source := range campaignSourceFiles {
+		pinned, err := exec.Command("git", "show", campaignSourceRevision+":"+source.Path).Output()
+		if err != nil {
+			fail(fmt.Errorf("read pinned Go oracle source %s: %w", source.Path, err))
+		}
+		working, err := os.ReadFile(source.Path)
+		if err != nil {
+			fail(fmt.Errorf("read working Go oracle source %s: %w", source.Path, err))
+		}
+		pinnedHash := sha256.Sum256(pinned)
+		workingHash := sha256.Sum256(working)
+		if !bytes.Equal(pinned, working) || hex.EncodeToString(workingHash[:]) != source.SHA256 || hex.EncodeToString(pinnedHash[:]) != source.SHA256 {
+			fail(fmt.Errorf("Go oracle source %s does not match pinned revision %s", source.Path, campaignSourceRevision))
+		}
+	}
 }
 
 func restoreEnv(key, value string, existed bool) {

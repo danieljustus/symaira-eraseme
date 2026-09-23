@@ -514,6 +514,155 @@ fn run_native_scheduler_case(case: &serde_json::Value) {
 }
 
 #[test]
+fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/mcp-contract/mcp-003-campaign/cases.json"
+    ))
+    .expect("campaign oracle fixture");
+    assert_eq!(
+        fixture["source_revision"],
+        "bfe2873937947479347c626512d74730fceaa3ac"
+    );
+    assert_eq!(
+        fixture["source_files"],
+        serde_json::json!([
+            {"path":"internal/mcp/contract_handler.go","sha256":"b70d4a121aaced8a0efc548380e95f2618c5a172f456c0e944a36921338b488f"},
+            {"path":"internal/campaign/campaign.go","sha256":"9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
+            {"path":"internal/campaign/planning.go","sha256":"ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
+            {"path":"internal/campaign/execution.go","sha256":"eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},
+            {"path":"internal/campaign/webform.go","sha256":"2ba434e161ccd6ed64b8f883e44c1e211ee2c9c45a23a936bda9c7511746a398"},
+            {"path":"internal/identity/profile.go","sha256":"c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"},
+            {"path":"internal/identity/gate.go","sha256":"2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"}
+        ])
+    );
+    let source_bytes = [
+        include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
+        include_bytes!("../../../internal/campaign/campaign.go").as_slice(),
+        include_bytes!("../../../internal/campaign/planning.go").as_slice(),
+        include_bytes!("../../../internal/campaign/execution.go").as_slice(),
+        include_bytes!("../../../internal/campaign/webform.go").as_slice(),
+        include_bytes!("../../../internal/identity/profile.go").as_slice(),
+        include_bytes!("../../../internal/identity/gate.go").as_slice(),
+    ];
+    for (source, bytes) in fixture["source_files"]
+        .as_array()
+        .expect("source file metadata")
+        .iter()
+        .zip(source_bytes)
+    {
+        let actual_hash: String = Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(
+            actual_hash,
+            source["sha256"].as_str().expect("source file hash"),
+            "Go oracle source drift: {}",
+            source["path"].as_str().expect("source file path")
+        );
+    }
+    assert_eq!(
+        fixture["seed"],
+        "tests/fixtures/mcp-contract/mcp-003-campaign/seed.sql"
+    );
+    let cases = fixture["cases"].as_array().expect("cases");
+    assert_eq!(cases.len(), 5);
+
+    for case in cases {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symeraseme-mcp-campaign-{}-{nonce}",
+            std::process::id()
+        ));
+        let home = root.join("home");
+        let data = root.join("data");
+        let tmp = root.join("tmp");
+        let bin = root.join("bin");
+        let xdg = root.join("xdg");
+        for directory in [&home, &data, &tmp, &bin, &xdg] {
+            fs::create_dir_all(directory).unwrap();
+        }
+        if let Some(profile) = case["existing_profile"].as_str() {
+            let path = root.join(profile);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"not-an-encrypted-profile").unwrap();
+        }
+        if case["seed"].as_bool().unwrap_or(false) {
+            let store = symeraseme_core::storage::Store::open(data.join("symeraseme.db"))
+                .expect("private seeded store");
+            store
+                .connection()
+                .execute_batch(include_str!(
+                    "../../../tests/fixtures/mcp-contract/mcp-003-campaign/seed.sql"
+                ))
+                .expect("campaign fixture seed");
+            store.close().expect("close seeded store");
+        }
+        let token = if case["issue_consent"].as_bool().unwrap_or(false) {
+            symeraseme_core::identity::ConsentStore::new(&data)
+                .issue_token("execute", 600)
+                .expect("private execute consent")
+        } else {
+            String::new()
+        };
+        let request = case["request"]
+            .as_str()
+            .expect("fixture request")
+            .replace("$CONSENT_TOKEN", &token);
+        let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+            .args(["mcp", "--stdio"])
+            .current_dir(&root)
+            .env_clear()
+            .env("PATH", &bin)
+            .env("HOME", &home)
+            .env("USERPROFILE", &home)
+            .env("XDG_CONFIG_HOME", &xdg)
+            .env("XDG_DATA_HOME", root.join("xdg-data"))
+            .env("XDG_STATE_HOME", root.join("xdg-state"))
+            .env("XDG_CACHE_HOME", root.join("xdg-cache"))
+            .env("TMPDIR", &tmp)
+            .env("SYMERASEME_DATA_DIR", &data)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(format!("{request}\n").as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}",
+            case["name"],
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}: {}",
+            case["name"],
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let actual = String::from_utf8(output.stdout)
+            .unwrap()
+            .replace(root.to_string_lossy().as_ref(), "<CAMPAIGN_ROOT>");
+        assert_eq!(
+            actual,
+            case["response"].as_str().expect("fixture response"),
+            "{}",
+            case["name"]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[test]
 fn malformed_stdio_exits_before_stdin_eof() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
         .args(["mcp", "--stdio"])
