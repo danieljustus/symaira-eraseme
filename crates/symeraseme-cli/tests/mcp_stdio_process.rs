@@ -2,7 +2,7 @@
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -149,11 +149,23 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
         fixture["source_path"],
         "internal/mcp/server.go:180-207,377-389"
     );
-    assert_eq!(fixture["cases"].as_array().unwrap().len(), 78);
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 78);
+    let parse_errors = cases
+        .iter()
+        .filter(|case| case["parse_error"].as_bool().unwrap_or(false))
+        .count();
+    assert_eq!(parse_errors, 6, "pinned Go parse-error corpus size");
+    assert_eq!(
+        cases.len() - parse_errors,
+        72,
+        "pinned Go request corpus size"
+    );
 
     let mut input = Vec::new();
     let mut expected = Vec::new();
-    for case in fixture["cases"].as_array().unwrap() {
+    let mut request_count = 0;
+    for case in cases {
         if case["parse_error"].as_bool().unwrap_or(false) {
             continue;
         }
@@ -167,10 +179,12 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
             })
             .expect("fixture request");
         input.extend_from_slice(&request);
+        request_count += 1;
         if let Some(response) = case["response"].as_str() {
             expected.extend_from_slice(response.as_bytes());
         }
     }
+    assert_eq!(request_count, 72, "selected Go request corpus size");
 
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -195,8 +209,27 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(&input).unwrap();
     let deadline = Instant::now() + Duration::from_secs(10);
+    let stdin = child.stdin.take().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let (writer_tx, writer_rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut stdin = stdin;
+        let _ = writer_tx.send(stdin.write_all(&input));
+    });
+    let (stdout_tx, stdout_rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let mut stdout = stdout;
+        let _ = stdout_tx.send(stdout.read_to_end(&mut bytes).map(|_| bytes));
+    });
+    let (stderr_tx, stderr_rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let mut stderr = stderr;
+        let _ = stderr_tx.send(stderr.read_to_end(&mut bytes).map(|_| bytes));
+    });
     let status = loop {
         if let Some(status) = child.try_wait().unwrap() {
             break status;
@@ -209,23 +242,32 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
         }
         std::thread::sleep(Duration::from_millis(10));
     };
-    let output = child.wait_with_output().unwrap();
+    let remaining = || deadline.saturating_duration_since(Instant::now());
+    writer_rx
+        .recv_timeout(remaining())
+        .expect("bounded stdin write did not finish")
+        .unwrap();
+    let stdout = stdout_rx
+        .recv_timeout(remaining())
+        .expect("bounded stdout drain did not finish")
+        .unwrap();
+    let stderr = stderr_rx
+        .recv_timeout(remaining())
+        .expect("bounded stderr drain did not finish")
+        .unwrap();
     fs::remove_dir_all(&root).unwrap();
 
     assert!(
         status.success(),
         "stdio exited with {}: {}",
         status,
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&stderr)
     );
-    assert_eq!(
-        output.stdout, expected,
-        "response bytes diverged from Go corpus"
-    );
+    assert_eq!(stdout, expected, "response bytes diverged from Go corpus");
     assert!(
-        output.stderr.is_empty(),
+        stderr.is_empty(),
         "unexpected stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&stderr)
     );
 }
 
