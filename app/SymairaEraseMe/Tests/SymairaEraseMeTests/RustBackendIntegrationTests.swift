@@ -45,7 +45,11 @@ final class RustBackendIntegrationTests: XCTestCase {
         defer { manager.stop() }
 
         try await Self.waitUntil(timeout: 10) {
-            manager.isRunning && FileManager.default.fileExists(atPath: dataDir.appendingPathComponent("mcp_token").path)
+            guard manager.isRunning,
+                  FileManager.default.fileExists(atPath: dataDir.appendingPathComponent("mcp_token").path) else {
+                return false
+            }
+            return await MCPClient.shared.ping() == .connected
         }
 
         let token = try String(contentsOf: dataDir.appendingPathComponent("mcp_token"), encoding: .utf8)
@@ -64,7 +68,9 @@ final class RustBackendIntegrationTests: XCTestCase {
         let tools = try await MCPClient.shared.listTools()
         XCTAssertTrue(tools.contains { $0["name"] as? String == "list_brokers" })
         let call = try await MCPClient.shared.callToolRaw("list_brokers")
-        XCTAssertEqual(call["success"] as? Bool, true)
+        XCTAssertEqual(call["count"] as? Int, 1273)
+        let brokerList: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
+        XCTAssertEqual(brokerList.count, brokerList.brokers.count)
 
         guard let pid = manager.pid else {
             XCTFail("The app did not retain the launched backend PID")
@@ -76,7 +82,7 @@ final class RustBackendIntegrationTests: XCTestCase {
 
     private static func waitUntil(
         timeout: TimeInterval,
-        condition: @MainActor () -> Bool
+        condition: @MainActor () async -> Bool
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
