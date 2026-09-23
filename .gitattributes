@@ -28,3 +28,6 @@ rust-tests/parity/oracle/profile_read/cases.json text eol=lf
 # platform default core.autocrlf=true rewrites the trailing LF to CRLF and the
 # comparison then fails on Windows only, while every Unix gate stays green.
 tests/fixtures/mcp-contract/** text eol=lf
+
+# Broker reply corpus bytes are pinned by triage-corpus/dom004c.json.
+tests/fixtures/broker_replies/*.txt text eol=lf
