@@ -202,7 +202,7 @@ fn dirs_home() -> Option<PathBuf> {
         let path = std::env::var_os("HOMEPATH")?;
         let mut combined = PathBuf::from(drive);
         combined.push(path);
-        return Some(combined);
+        Some(combined)
     }
     #[cfg(not(windows))]
     {

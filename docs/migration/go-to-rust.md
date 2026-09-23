@@ -38,6 +38,26 @@ externally blocked (llmkit ×2, IMAP ×1).
 | CLI-022 | `operate-mcp` | `rust/cli022-mcp` | **merged** — #1023 (`4c0236fb`) |
 | CLI-023 | `operate-migrate` (validateRoots scope) | `rust/cli020-triage` | **merged** — #1024 (`7d02cc58`); engine behind validation stays fail-closed, see Known defects |
 
+## Next action (parked 2026-09-22, second pass — stopped early by user)
+
+**CLI-024 — `migrate` engine** (Detect + dry-run report + mutating path in
+`internal/migration/migration.go`, 907 lines): new recorded CLI cases for the
+dry-run scenarios (extend `scripts/generate-go-oracle-fixtures.sh`, bump
+`expected["cli"]` and `command_surface.rs` 166/163/3 in the same change); the
+mutating path is already pinned by the filesystem `migration` case in
+`rust-tests/parity/cases/filesystem/manifests.json` (backup/state/manifests +
+stdout/stderr sha256) — no Rust replay consumer exists for that case yet, so
+wiring the replay is part of the slice. Planned worktree `.worktrees/cli024-*`
+@ `305b394b` (git-ignored); worker dispatch prepared but not sent.
+
+Verified 2026-09-22 (second pass): `git diff 4e582f28 HEAD -- internal/migration
+internal/scheduler` is empty (fixtures pin current Go behavior); the Rust
+engine scheduler already exports `generate`, `detect_legacy_python_unit`,
+`detect_platform`; PR #1031 merged as `305b394b` (windows clippy fix). Known
+unowned WIP left untouched: detached worktree `.claude/worktrees/determined-lewin-d87b4f`
+@ `52e594eb` ("manual-tasks list task objects in Go struct order", clean, not
+in main — superseded by #1018; salvage or drop in a later cleanup).
+
 Run of 2026-09-22 closed: integrated HEAD `7d02cc58`, corpus selected
 163 / deferred 3, focused corpus test + clippy + fmt + vet + gofmt all
 exit 0 on that revision. Ready non-blocked queue: empty — next run has
