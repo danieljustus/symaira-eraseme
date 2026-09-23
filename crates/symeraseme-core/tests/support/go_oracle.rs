@@ -80,6 +80,8 @@ fn oracle_executable(package: &'static str) -> PathBuf {
         .args(["build", "-o"])
         .arg(&executable)
         .arg(format!("./rust-tests/parity/oracle/{package}"))
+        // Go's out-of-range float-to-int conversion is target-specific.
+        .env("GOARCH", go_arch())
         .env("GOWORK", "off");
     let run = run_bounded(
         build,
@@ -96,6 +98,14 @@ fn oracle_executable(package: &'static str) -> PathBuf {
     );
     registry.insert(package, executable.clone());
     executable
+}
+
+fn go_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        arch => panic!("Go parity oracle has no target mapping for Rust architecture {arch}"),
+    }
 }
 
 /// Runs the named oracle with an optional stdin payload, building it first if
