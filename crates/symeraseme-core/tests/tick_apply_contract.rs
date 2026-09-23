@@ -5,9 +5,11 @@
 //! `scheduler`, dry runs write nothing, and the projections are rebuilt.
 
 use chrono::{DateTime, Duration, Utc};
+use serde_json::{Map, Value, json};
 use symeraseme_core::deadlines::{RunOpts, apply_tick_actions, run_tick};
 use symeraseme_core::storage::repository::Repository;
 use symeraseme_core::storage::store::Store;
+use symeraseme_core::storage::types::{EventType, Source};
 use tempfile::tempdir;
 
 fn pinned_now() -> DateTime<Utc> {
@@ -119,4 +121,159 @@ fn apply_without_actions_writes_nothing() {
     let store = Store::open(tree.path().join("db.sqlite")).expect("open store");
     let results = apply_tick_actions(&store, &[], pinned_now()).expect("apply");
     assert!(results.is_empty());
+}
+
+#[test]
+fn golden_tick_histories_scan_and_persist_all_four_go_actions() {
+    // The same event histories and fixture consumed by Go's
+    // TestGoldenTickConformance and TestApplyTickActionsWritesEvents.
+    let tree = tempdir().expect("temp dir");
+    let store = Store::open(tree.path().join("db.sqlite")).expect("open store");
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/event-store/golden-tick.json"
+    ))
+    .expect("golden tick fixture");
+    let now = DateTime::parse_from_rfc3339(fixture["now"].as_str().expect("now"))
+        .expect("timestamp")
+        .with_timezone(&Utc);
+
+    let histories: [(&str, &[(EventType, Value, i64)]); 4] = [
+        (
+            "broker-a",
+            &[
+                (EventType::Sent, json!({"expected_response_days": 30}), -21),
+                (
+                    EventType::ReminderSent,
+                    json!({"count": 1, "days_since_sent": 14}),
+                    -14,
+                ),
+            ],
+        ),
+        (
+            "broker-b",
+            &[
+                (EventType::Sent, json!({"expected_response_days": 30}), -40),
+                (EventType::VerificationProvided, json!({}), -38),
+            ],
+        ),
+        (
+            "broker-c",
+            &[
+                (EventType::Sent, json!({"expected_response_days": 30}), -50),
+                (
+                    EventType::DeadlineReached,
+                    json!({"deadline_days": 30}),
+                    -20,
+                ),
+            ],
+        ),
+        (
+            "broker-d",
+            &[
+                (EventType::Sent, json!({"expected_response_days": 30}), -100),
+                (EventType::Ack, json!({"message_id": "m-1"}), -98),
+                (EventType::Confirmed, json!({"via": "ack"}), -98),
+            ],
+        ),
+    ];
+    for (broker, events) in histories {
+        let id = Repository::new(&store)
+            .create_removal_request(broker, "email", "golden-tick", "GDPR", "", "")
+            .expect("create request");
+        for (event_type, payload, days) in events {
+            let payload: Map<String, Value> = payload.as_object().expect("object").clone();
+            store
+                .append_and_project(
+                    id,
+                    event_type,
+                    &payload,
+                    &Source::System,
+                    now + Duration::days(*days),
+                )
+                .expect("append event");
+        }
+    }
+    store.rebuild_all_states(500).expect("rebuild states");
+
+    let actions = run_tick(
+        &store,
+        &RunOpts {
+            dry_run: false,
+            batch_size: 0,
+        },
+        now,
+    )
+    .expect("run tick");
+    assert_eq!(
+        serde_json::to_value(&actions).expect("actions JSON"),
+        fixture["actions"]
+    );
+    let results = apply_tick_actions(&store, &actions, now).expect("apply tick");
+    assert_eq!(results.len(), 4);
+    assert!(
+        results
+            .iter()
+            .all(|result| result.executed && result.error.is_empty())
+    );
+
+    let mut statement = store
+        .connection()
+        .prepare(
+            "SELECT request_id, event_type, payload_json, source FROM request_events
+         WHERE source = 'scheduler' ORDER BY id",
+        )
+        .expect("scheduler events query");
+    let persisted: Vec<(i64, String, Value, String)> = statement
+        .query_map([], |row| {
+            let payload: String = row.get(2)?;
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                serde_json::from_str(&payload).expect("payload JSON"),
+                row.get(3)?,
+            ))
+        })
+        .expect("scheduler events")
+        .map(|row| row.expect("scheduler event"))
+        .collect();
+    let expected: Vec<(i64, String, Value, String)> = fixture["actions"]
+        .as_array()
+        .expect("actions")
+        .iter()
+        .map(|action| {
+            (
+                action["request_id"].as_i64().expect("request id"),
+                action["event_type"]
+                    .as_str()
+                    .expect("event type")
+                    .to_owned(),
+                action["payload"].clone(),
+                "scheduler".to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(persisted, expected);
+
+    let projected: Vec<(i64, String, i64, i64)> = store
+        .connection()
+        .prepare(
+            "SELECT request_id, current_status, reminders_sent, escalation_level
+             FROM request_state ORDER BY request_id",
+        )
+        .expect("projection query")
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .expect("projections")
+        .map(|row| row.expect("projection"))
+        .collect();
+    assert_eq!(
+        projected,
+        [
+            (1, "AWAITING_ACK".to_owned(), 2, 0),
+            (2, "OVERDUE".to_owned(), 0, 1),
+            (3, "ESCALATED".to_owned(), 0, 2),
+            (4, "RE_SCAN_DUE".to_owned(), 0, 0),
+        ]
+    );
 }
