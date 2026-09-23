@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	"github.com/danieljustus/symaira-eraseme/internal/llm"
 )
@@ -32,11 +34,12 @@ type observation struct {
 }
 
 type fixture struct {
-	Schema   string             `json:"schema"`
-	GoModule string             `json:"go_module"`
-	Sources  map[string]string  `json:"sources_sha256"`
-	Cases    []observation      `json:"cases"`
-	Errors   []errorObservation `json:"construction_errors"`
+	Schema   string               `json:"schema"`
+	GoModule string               `json:"go_module"`
+	Sources  map[string]string    `json:"sources_sha256"`
+	Cases    []observation        `json:"cases"`
+	Failures []failureObservation `json:"failure_cases"`
+	Errors   []errorObservation   `json:"construction_errors"`
 }
 
 type errorObservation struct {
@@ -45,6 +48,14 @@ type errorObservation struct {
 	BaseURL  string `json:"base_url"`
 	APIKey   string `json:"api_key"`
 	Message  string `json:"message"`
+}
+
+type failureObservation struct {
+	ID        string `json:"id"`
+	Attempts  int    `json:"attempts"`
+	ErrorKind string `json:"error_kind"`
+	Message   string `json:"message"`
+	Text      string `json:"text"`
 }
 
 func main() {
@@ -75,11 +86,59 @@ func main() {
 		f.Cases = append(f.Cases, observation{spec.id, spec.provider, spec.model, path, headers, request, text, usageModel})
 	}
 	f.Errors = recordConstructionErrors()
+	f.Failures = recordFailures()
 	b, err := json.MarshalIndent(f, "", "  ")
 	fatalIf(err)
 	fatalIf(os.MkdirAll(filepath.Dir(*out), 0o755))
 	fatalIf(os.WriteFile(*out, append(b, '\n'), 0o644))
-	fmt.Printf("recorded %d local-only Go llmkit transport cases to %s\n", len(f.Cases), *out)
+	fmt.Printf("recorded %d success, %d failure, and %d construction cases to %s\n", len(f.Cases), len(f.Failures), len(f.Errors), *out)
+}
+
+func recordFailures() []failureObservation {
+	out := make([]failureObservation, 0, 3)
+	for _, spec := range []struct {
+		id     string
+		status int
+		body   string
+	}{
+		{"openai-rate-limit-exhausted", http.StatusTooManyRequests, `{"error":{"message":"try later","type":"rate_limit_error"}}`},
+		{"openai-invalid-json-response", http.StatusOK, `{not json`},
+		{"openai-empty-choices-response", http.StatusOK, `{"choices":[]}`},
+	} {
+		var attempts atomic.Int64
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			attempts.Add(1)
+			w.WriteHeader(spec.status)
+			_, _ = io.WriteString(w, spec.body)
+		}))
+		for _, name := range []string{"SYMERASEME_LLM_PROVIDER", "SYMERASEME_LLM_MODEL", "SYMERASEME_LLM_BASE_URL", "OLLAMA_HOST", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"} {
+			fatalIf(os.Unsetenv(name))
+		}
+		fatalIf(os.Setenv("SYMERASEME_LLM_BASE_URL", srv.URL))
+		client, err := llm.Create(llm.CreateOptions{Provider: "openai", APIKey: "synthetic-failure-key"})
+		fatalIf(err)
+		text, _, err := client.Classify(context.Background(), "system", "user", llm.ClassifyOptions{MaxTokens: 64, Temperature: 0.25})
+		observation := failureObservation{ID: spec.id, Attempts: int(attempts.Load()), Text: text}
+		if err == nil {
+			observation.ErrorKind = "none"
+		} else {
+			observation.Message = err.Error()
+			var rate *llm.RateLimitError
+			var provider *llm.Error
+			switch {
+			case errors.As(err, &rate):
+				observation.ErrorKind = "rate_limit"
+			case errors.As(err, &provider):
+				observation.ErrorKind = "provider"
+			default:
+				observation.ErrorKind = "other"
+			}
+		}
+		srv.Close()
+		fatalIf(os.Unsetenv("SYMERASEME_LLM_BASE_URL"))
+		out = append(out, observation)
+	}
+	return out
 }
 
 func recordConstructionErrors() []errorObservation {

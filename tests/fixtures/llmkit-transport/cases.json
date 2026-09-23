@@ -150,6 +150,29 @@
       "usage_model": "vendor-model"
     }
   ],
+  "failure_cases": [
+    {
+      "id": "openai-rate-limit-exhausted",
+      "attempts": 3,
+      "error_kind": "rate_limit",
+      "message": "llmkit: rate_limited (status 429): {\"error\":{\"message\":\"try later\",\"type\":\"rate_limit_error\"}}: llmkit: rate_limited (status 429): {\"error\":{\"message\":\"try later\",\"type\":\"rate_limit_error\"}}",
+      "text": ""
+    },
+    {
+      "id": "openai-invalid-json-response",
+      "attempts": 3,
+      "error_kind": "provider",
+      "message": "llmkit: provider_error: decode chat response: invalid character 'n' looking for beginning of object key string: llmkit: provider_error: decode chat response: invalid character 'n' looking for beginning of object key string",
+      "text": ""
+    },
+    {
+      "id": "openai-empty-choices-response",
+      "attempts": 3,
+      "error_kind": "provider",
+      "message": "llmkit: provider_error: chat response contained no choices: llmkit: provider_error: chat response contained no choices",
+      "text": ""
+    }
+  ],
   "construction_errors": [
     {
       "id": "custom-base-url-before-credential",
