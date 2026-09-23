@@ -271,7 +271,12 @@ impl ContractHandler {
         };
         // Go resolves the consent directory inside the token paths only, so a
         // dry run answers without one.
-        let store = ConsentStore::new(default_consent_directory().unwrap_or_default());
+        let consent_directory = if options.dry_run {
+            PathBuf::new()
+        } else {
+            default_consent_directory().map_err(|error| ToolError(error.to_string()))?
+        };
+        let store = ConsentStore::new(consent_directory);
         let outcome = store.grant(&options).map_err(|error| match error {
             // The only `grant` branch that reports a missing token is the
             // single-token revoke, and Go words it without the package prefix.
@@ -435,7 +440,9 @@ impl ContractHandler {
         let store = self.open_store()?;
         let dry_run = get_bool(arguments, "dry_run", false);
         if !dry_run {
-            let consent = ConsentStore::new(default_consent_directory().unwrap_or_default());
+            let consent_directory =
+                default_consent_directory().map_err(|error| ToolError(error.to_string()))?;
+            let consent = ConsentStore::new(consent_directory);
             consent
                 .authorize(
                     "execute",

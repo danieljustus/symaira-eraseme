@@ -477,29 +477,48 @@ impl ConsentStore {
 
 /// Return the configured default data directory used for consent files.
 pub fn default_consent_directory() -> io::Result<PathBuf> {
-    if let Ok(value) = std::env::var("SYMERASEME_DATA_DIR")
-        && !value.is_empty()
-    {
-        return Ok(expand_home(value));
+    let home = consent_home_from_environment(
+        std::env::var_os("HOME"),
+        std::env::var_os("USERPROFILE"),
+        cfg!(windows),
+    );
+    consent_directory_from(std::env::var("SYMERASEME_DATA_DIR").ok(), home.as_deref())
+}
+
+fn consent_home_from_environment(
+    home: Option<std::ffi::OsString>,
+    userprofile: Option<std::ffi::OsString>,
+    windows: bool,
+) -> Option<PathBuf> {
+    let value = if windows { userprofile } else { home }?;
+    if value.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(value))
     }
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory unavailable"))?;
+}
+
+fn consent_directory_from(data_dir: Option<String>, home: Option<&Path>) -> io::Result<PathBuf> {
+    if let Some(value) = data_dir.filter(|value| !value.is_empty()) {
+        return expand_home(value, home);
+    }
+    let home =
+        home.ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory unavailable"))?;
     Ok(home.join(".local/share/symeraseme"))
 }
 
-fn expand_home(value: String) -> PathBuf {
+fn expand_home(value: String, home: Option<&Path>) -> io::Result<PathBuf> {
     if value == "~" {
-        return std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_default();
+        return home
+            .map(Path::to_path_buf)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory unavailable"));
     }
-    if let Some(rest) = value.strip_prefix("~/")
-        && let Some(home) = std::env::var_os("HOME")
-    {
-        return PathBuf::from(home).join(rest);
+    if let Some(rest) = value.strip_prefix("~/") {
+        return home
+            .map(|home| home.join(rest))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory unavailable"));
     }
-    PathBuf::from(value)
+    Ok(PathBuf::from(value))
 }
 
 fn token_filename(token: &str) -> String {
@@ -621,6 +640,37 @@ mod tests {
         ConsentStore::new(directory)
             .with_clock(|| 1_000_000)
             .with_random_source(|length| Ok((0..length).map(|value| value as u8).collect()))
+    }
+
+    #[test]
+    fn windows_consent_directory_uses_userprofile() {
+        use std::ffi::OsString;
+
+        let home = consent_home_from_environment(
+            Some(OsString::from("/unix/home")),
+            Some(OsString::from("/windows/profile")),
+            true,
+        );
+        assert_eq!(
+            consent_directory_from(None, home.as_deref()).unwrap(),
+            PathBuf::from("/windows/profile/.local/share/symeraseme")
+        );
+        assert_eq!(
+            consent_directory_from(Some("~/custom-data".to_owned()), home.as_deref()).unwrap(),
+            PathBuf::from("/windows/profile/custom-data")
+        );
+    }
+
+    #[test]
+    fn default_consent_directory_requires_home_instead_of_using_an_empty_path() {
+        assert_eq!(
+            consent_directory_from(None, None).unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+        assert_eq!(
+            expand_home("~/data".to_owned(), None).unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
     }
 
     #[test]
