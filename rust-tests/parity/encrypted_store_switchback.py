@@ -63,10 +63,20 @@ def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
 
 
 def run(go, rust, output):
-    gate.require(os.sys.platform == "darwin", "unsupported: this gate requires macOS sandbox-exec")
+    gate.require(os.sys.platform == "darwin" or os.sys.platform.startswith("linux"),
+                 "unsupported: switchback confinement is available on macOS and Linux")
+    if os.sys.platform.startswith("linux"):
+        gate.require(os.getuid() != 0 and os.getgid() != 0,
+                     "Linux sandbox runner must start as an unprivileged user")
+        gate.require(gate.platform.machine().lower() in ("aarch64", "arm64"),
+                     "Linux disposable switchback requires native aarch64")
+    output = Path(output)
+    gate.require(not output.is_symlink(), "switchback output root must not be a symlink")
     output = output.resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    report = {"scope": "macos-encrypted-store-runtime-only", "status": "failed",
+    scope = ("linux-aarch64-encrypted-store-disposable-runtime-only"
+             if os.sys.platform.startswith("linux") else "macos-encrypted-store-runtime-only")
+    report = {"scope": scope, "status": "failed",
               "platform": {"system": platform.system(), "machine": platform.machine()},
               "required_cases": list(CASES), "steps": [], "database_restore_performed": False,
               "production_cutover_verified": False,
@@ -78,6 +88,8 @@ def run(go, rust, output):
         fixture_identity = gate.identity(FIXTURE)
         report["fixture"] = fixture_identity
         report["runner_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        if os.sys.platform.startswith("linux"):
+            report["sandbox_helper"] = gate.identity(gate.LINUX_SANDBOX)
         go, rust = (path.resolve(strict=True) for path in (go, rust))
         report["artifacts"] = {"go": gate.identity(go), "rust": gate.identity(rust)}
         gate.require(report["artifacts"]["go"]["sha256"] != report["artifacts"]["rust"]["sha256"],
@@ -96,6 +108,47 @@ def run(go, rust, output):
                "SYMERASEME_IDENTITY_MASTER_KEY": key_hex}
         policy = gate.sandbox(output, active.resolve())
         gate.save(output / "sandbox-policy.json", policy)
+        if os.sys.platform.startswith("linux"):
+            python = Path(os.sys.executable).resolve()
+            host_write_probe = guest_write_probe = None
+            try:
+                host_write_probe = gate.create_write_probe(output, "encrypted", host_share=True)
+                guest_write_probe = gate.create_write_probe(output, "encrypted", host_share=False)
+                gate.command(
+                    output, "sandbox-negative",
+                    gate.sandbox_command(
+                        output, "sandbox-negative", python,
+                        ["-I", "-S", "-c", gate.PROBE,
+                         str(gate.REPO / "Cargo.toml"), str(Path.home().resolve()),
+                         str(gate.REPO / "Cargo.toml"), host_write_probe["path"],
+                         guest_write_probe["path"]], env),
+                    env)
+                controls = json.loads((output / "sandbox-negative.stdout").read_bytes())
+                gate.require(set(controls) == {
+                    "read_denied_0", "home_directory_read_denied", "network_denied",
+                    "udp_network_denied", "outside_write_denied", "host_share_write_denied",
+                    "guest_local_write_denied", "child_exec_denied"}
+                    and all(value is True for value in controls.values()),
+                    "Linux sandbox control failed")
+            finally:
+                report["outside_write_probes"] = {}
+                if host_write_probe is not None:
+                    report["outside_write_probes"]["host_share"] = {
+                        **host_write_probe, **gate.remove_write_probe(host_write_probe)}
+                if guest_write_probe is not None:
+                    report["outside_write_probes"]["guest_local"] = {
+                        **guest_write_probe, **gate.remove_write_probe(guest_write_probe)}
+            audit = json.loads((output / ".sandbox/sandbox-negative.audit.json").read_bytes())
+            required = ("mnt", "net", "pid")
+            gate.require(audit["status"] == "running" and audit["landlock_abi"] >= 4
+                         and audit["no_new_privs"] is True
+                         and audit["uid"] == os.getuid() and audit["gid"] == os.getgid()
+                         and all(audit["caller_namespace_ids"][name] !=
+                                 audit["sandbox_namespace_ids"][name] for name in required)
+                         and audit["read_only_virtiofs_mounts"],
+                         "Linux namespace or filesystem boundary was not enforced")
+            report["sandbox_controls"] = controls
+            report["sandbox_isolation"] = audit
 
         def execute(label, artifact, args):
             step = {"id": label, "success": False}
@@ -108,7 +161,7 @@ def run(go, rust, output):
             step["installed"] = gate.identity(active)
             try:
                 gate.command(output, label,
-                             ["/usr/bin/sandbox-exec", "-p", policy, str(active), *args], env)
+                             gate.sandbox_command(output, label, active, args, env), env)
             finally:
                 record = output / (label + ".json")
                 if record.exists():
@@ -142,7 +195,7 @@ def run(go, rust, output):
         try:
             step["command"] = mcp_command(
                 output, "rust-mcp-read",
-                ["/usr/bin/sandbox-exec", "-p", policy, str(active), "mcp", "--stdio"],
+                gate.sandbox_command(output, "rust-mcp-read", active, ["mcp", "--stdio"], env),
                 env, mcp_request)
         finally:
             record = output / "rust-mcp-read.json"

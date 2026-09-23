@@ -22,7 +22,7 @@ class SwitchbackControls(unittest.TestCase):
             python = app.resolve()
         source = '''import os,sqlite3,sys
 from pathlib import Path
-root,home,repo=map(Path,sys.argv[1:])
+root,home,repo=map(Path,sys.argv[1:4])
 root.parent.stat()
 with sqlite3.connect(root/'owned.db') as db:
  db.execute('CREATE TABLE items(value INTEGER)')
@@ -32,6 +32,15 @@ for path in (home/'private',repo/'private'):
  try: path.read_bytes()
  except PermissionError: pass
  else: raise AssertionError('protected file is readable')
+try:
+ with open(repo/'private','r+b'): pass
+except OSError: pass
+else: raise AssertionError('protected file is writable')
+for path in map(Path,sys.argv[4:]):
+ try:
+  with open(path,'r+b'): pass
+ except OSError: pass
+ else: raise AssertionError('outside run-root file is writable')
 try: entries=os.scandir(home)
 except PermissionError: pass
 else:
@@ -48,15 +57,26 @@ else:
                 with self.subTest(parent=parent.name):
                     root = parent / 'run'
                     root.mkdir()
-                    with patch.object(Path, 'home', return_value=home), patch.object(gate, 'REPO', repo):
-                        policy = gate.sandbox(root, python)
+                    probes = []
+                    args = ['-I', '-S', '-c', source, str(root), str(home), str(repo)]
                     env = {'HOME': str(root), 'PATH': '', 'LC_ALL': 'C'}
                     try:
-                        gate.command(root, 'owned', ['/usr/bin/sandbox-exec', '-p', policy,
-                                     str(python), '-I', '-S', '-c', source,
-                                     str(root), str(home), str(repo)], env)
+                        if sys.platform.startswith('linux'):
+                            probes.append(gate.create_write_probe(base, 'control-' + parent.name,
+                                                                  host_share=True))
+                            probes.append(gate.create_write_probe(base, 'control-' + parent.name,
+                                                                  host_share=False))
+                            args.extend(probe['path'] for probe in probes)
+                        with patch.object(Path, 'home', return_value=home), patch.object(gate, 'REPO', repo):
+                            gate.command(root, 'owned',
+                                         gate.sandbox_command(root, 'owned', python,
+                                                              args,
+                                                              env), env)
                     except ValueError:
                         self.fail((root / 'owned.stderr').read_text())
+                    finally:
+                        for probe in probes:
+                            gate.remove_write_probe(probe)
 
     def test_typed_comparison_rejects_semantic_mutations(self):
         gate.same({'a': None, 'b': [1, 2]}, {'b': [1, 2], 'a': None}, 'positive')
@@ -131,6 +151,24 @@ else:
                                     capture_output=True, text=True, timeout=5, check=False)
             self.assertTrue(result.returncode == 1 or result.stdout.strip().startswith('Z'),
                             'descendant remains running: ' + result.stdout.strip())
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'Linux namespace helper control')
+    def test_linux_helper_fails_closed_without_private_namespaces(self):
+        namespace_ids = {name: os.stat('/proc/self/ns/' + name).st_ino
+                         for name in ('mnt', 'net', 'pid')}
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'config.json'
+            config.write_text(json.dumps({'parent_namespace': namespace_ids}))
+            before = Path('/proc/self/mountinfo').read_bytes()
+            result = subprocess.run(
+                ['/usr/bin/sudo', '-n', '/usr/bin/python3', '-I', '-S',
+                 str(gate.LINUX_SANDBOX), '--inside', str(config)],
+                capture_output=True, timeout=5, check=False)
+            after = Path('/proc/self/mountinfo').read_bytes()
+            self.assertEqual(result.returncode, 125)
+            self.assertIn(b'required private mount, network and PID namespaces are absent',
+                          result.stderr)
+            self.assertEqual(after, before, 'helper changed mount state without namespace isolation')
 
 
 if __name__ == '__main__':
