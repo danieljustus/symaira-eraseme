@@ -54,7 +54,7 @@ impl std::fmt::Display for ToolError {
 }
 
 /// Maps a validated tool name and its arguments to a result.
-pub trait ToolHandler {
+pub trait ToolHandler: Send + Sync {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError>;
 }
 

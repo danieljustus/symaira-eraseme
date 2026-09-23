@@ -42,6 +42,13 @@ pub enum Outcome {
     /// Run the stdio MCP server: optional stderr notice first, then the
     /// JSON-RPC loop over stdin/stdout until EOF.
     ServeStdio(Option<Vec<u8>>),
+    /// Run the token-authenticated MCP HTTP server.
+    ServeHttp {
+        host: String,
+        port: i64,
+        allow_remote: bool,
+        notice: Option<Vec<u8>>,
+    },
 }
 
 /// Build the complete native Clap surface for debug assertions and tooling.
@@ -459,6 +466,15 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
                     .to_vec(),
             ))
         }
+        "serve" => Outcome::ServeHttp {
+            host: string_flag_or(parsed, "host", "127.0.0.1"),
+            port: int_flag(parsed, "port", 8000),
+            allow_remote: bool_flag(parsed, "allow-remote"),
+            notice: Some(
+                b"symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.\n"
+                    .to_vec(),
+            ),
+        },
         "mcp"
             if parsed
                 .flags
@@ -467,6 +483,12 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         {
             Outcome::ServeStdio(None)
         }
+        "mcp" => Outcome::ServeHttp {
+            host: string_flag_or(parsed, "host", "127.0.0.1"),
+            port: int_flag(parsed, "port", 8000),
+            allow_remote: bool_flag(parsed, "allow-remote"),
+            notice: None,
+        },
         "status" => {
             let campaign = parsed.flags.get("campaign").cloned().unwrap_or_default();
             campaign_status(parsed, &campaign)
@@ -1050,6 +1072,27 @@ pub(crate) fn serve_stdio(notice: Option<Vec<u8>>) -> Outcome {
     let mut input = stdin.lock();
     let mut output = stdout.lock();
     match crate::mcp::stream::serve_stdio(&mut input, &mut output, &handler) {
+        Ok(()) => Outcome::Stdout(Vec::new()),
+        Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    }
+}
+
+/// Starts the production MCP HTTP server after the command surface has been
+/// parsed, keeping long-running process behavior out of the parser outcome.
+pub(crate) fn serve_http(
+    host: String,
+    port: i64,
+    allow_remote: bool,
+    notice: Option<Vec<u8>>,
+) -> Outcome {
+    use std::io::Write as _;
+
+    if let Some(bytes) = notice {
+        let _ = std::io::stderr().write_all(&bytes);
+    }
+    match crate::mcp::http::serve(host, port, allow_remote, || {
+        contract_handler().map(|handler| std::sync::Arc::new(handler) as std::sync::Arc<_>)
+    }) {
         Ok(()) => Outcome::Stdout(Vec::new()),
         Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
     }

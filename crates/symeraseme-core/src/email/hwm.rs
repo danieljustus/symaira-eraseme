@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 /// Persists the last processed UID per host/folder together with the
 /// UIDVALIDITY it was observed under. A UIDVALIDITY change forces a cold start.
-pub trait HwmStore {
+pub trait HwmStore: Send + Sync {
     fn get(&self, host: &str, folder: &str) -> Result<(Option<u32>, Option<u32>), String>;
     fn set(&self, host: &str, folder: &str, uid_validity: u32, last_uid: u32)
     -> Result<(), String>;

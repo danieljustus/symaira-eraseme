@@ -26,6 +26,7 @@ cap-std = "4.0.3"
 cbc = "0.2.1"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 crypto-common = { version = "0.2.2", features = ["zeroize"] }
+http = "1.5.0"
 flate2 = "1.1.10"
 hmac = { version = "0.13.0", features = ["zeroize"] }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["backup", "bundled"] }
@@ -48,7 +49,10 @@ rustls = { version = "0.23.45", default-features = false, features = ["ring", "s
 webpki-roots = "1.0.9"
 hex = "0.4.3"
 rand = "0.10.2"
+signal-hook = "0.3.18"
 scrypt = "0.12.0"
+subtle = "2.6.1"
+tiny_http = "0.12.0"
 zeroize = "1.8.2"
 keyring = "3.6.3"
 

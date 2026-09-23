@@ -15,6 +15,12 @@ fn main() {
     // before the common report path.
     let outcome = match cli::execute(&args) {
         cli::Outcome::ServeStdio(notice) => cli::serve_stdio(notice),
+        cli::Outcome::ServeHttp {
+            host,
+            port,
+            allow_remote,
+            notice,
+        } => cli::serve_http(host, port, allow_remote, notice),
         other => other,
     };
     match outcome {
@@ -32,5 +38,6 @@ fn main() {
         }
         // Handled above; a nested ServeStdio would mean serve_stdio returned one.
         cli::Outcome::ServeStdio(_) => unreachable!("serve_stdio does not return ServeStdio"),
+        cli::Outcome::ServeHttp { .. } => unreachable!("serve_http does not return ServeHttp"),
     }
 }
