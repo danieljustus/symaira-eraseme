@@ -1,4 +1,4 @@
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -25,6 +25,14 @@ fn message(case: &Value) -> EmailMessage {
     }
 }
 
+fn local_offset(case: &Value) -> FixedOffset {
+    let offset = case["local_offset"].as_str().unwrap();
+    DateTime::parse_from_str(&format!("2000-01-01T00:00:00{offset}"), "%+")
+        .unwrap()
+        .offset()
+        .to_owned()
+}
+
 fn actual(case: &Value) -> Value {
     let message = message(case);
     let now = DateTime::parse_from_rfc3339(case["input"]["date"].as_str().unwrap()).unwrap();
@@ -32,12 +40,14 @@ fn actual(case: &Value) -> Value {
         &message,
         case["input"]["from"].as_str().unwrap(),
         now,
+        local_offset(case),
         case["input"]["message_id"].as_str().unwrap(),
     );
     match result {
         Ok((raw, message_id)) => json!({
             "name": case["name"],
             "input": case["input"],
+            "local_offset": case["local_offset"],
             "message": String::from_utf8(raw).unwrap(),
             "message_id": message_id,
             "recipients": recipients(&message),
@@ -45,6 +55,7 @@ fn actual(case: &Value) -> Value {
         Err(error) => json!({
             "name": case["name"],
             "input": case["input"],
+            "local_offset": case["local_offset"],
             "recipients": recipients(&message),
             "error": error.to_string(),
         }),
@@ -65,10 +76,20 @@ fn source_bound_go_mime_bytes_recipients_and_errors_match() {
     }
 
     let cases = document["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 4);
+    assert_eq!(cases.len(), 5);
     for case in cases {
         assert_eq!(actual(case), *case, "{}", case["name"]);
     }
+    let non_utc = cases
+        .iter()
+        .find(|case| case["name"] == "non_utc_input_converted_to_local_utc")
+        .unwrap();
+    assert!(
+        non_utc["message"]
+            .as_str()
+            .unwrap()
+            .contains("Date: Mon, 31 Aug 2026 12:05:06 +0000\r\n")
+    );
 
     let first = &cases[0];
     let actual = actual(first);
@@ -111,6 +132,7 @@ fn outbound_uses_only_the_fake_transport_and_preserves_go_error_text() {
         &message,
         case["input"]["from"].as_str().unwrap(),
         now,
+        local_offset(case),
         message_id,
         &failing,
     )
@@ -125,6 +147,7 @@ fn outbound_uses_only_the_fake_transport_and_preserves_go_error_text() {
             &message,
             case["input"]["from"].as_str().unwrap(),
             now,
+            local_offset(case),
             message_id,
             &successful,
         )
@@ -145,7 +168,14 @@ fn empty_message_id_uses_go_shaped_random_id_and_boundary() {
         bcc: String::new(),
     };
     let now = DateTime::parse_from_rfc3339("2026-08-31T12:00:00Z").unwrap();
-    let (raw, message_id) = build_mime_at(&message, "sender@example.test", now, "").unwrap();
+    let (raw, message_id) = build_mime_at(
+        &message,
+        "sender@example.test",
+        now,
+        FixedOffset::east_opt(0).unwrap(),
+        "",
+    )
+    .unwrap();
     assert_eq!(message_id.len(), 37);
     assert!(message_id.starts_with('<') && message_id.ends_with("@symeraseme>"));
     assert!(

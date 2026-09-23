@@ -45,11 +45,14 @@ pub trait SmtpTransport {
     fn send(&self, recipients: Option<&[String]>, message: &[u8]) -> Result<(), String>;
 }
 
-/// Build Go-compatible multipart MIME bytes from fixed time and message ID.
+/// Build Go-compatible multipart MIME bytes from a fixed instant, local offset,
+/// and message ID. Go formats `Date` after converting the instant to `time.Local`;
+/// callers provide that offset so this function stays deterministic.
 pub fn build_mime_at(
     message: &EmailMessage,
     from: &str,
     now: DateTime<FixedOffset>,
+    local_offset: FixedOffset,
     message_id: &str,
 ) -> Result<(Vec<u8>, String), SmtpError> {
     if from.trim().is_empty() {
@@ -80,7 +83,9 @@ pub fn build_mime_at(
     write_header(
         &mut mime,
         "Date",
-        &now.format("%a, %d %b %Y %H:%M:%S %z").to_string(),
+        &now.with_timezone(&local_offset)
+            .format("%a, %d %b %Y %H:%M:%S %z")
+            .to_string(),
     );
     write_header(&mut mime, "Message-ID", &message_id);
     write_header(&mut mime, "MIME-Version", "1.0");
@@ -117,10 +122,11 @@ pub fn send_message_at(
     message: &EmailMessage,
     from: &str,
     now: DateTime<FixedOffset>,
+    local_offset: FixedOffset,
     message_id: &str,
     transport: &dyn SmtpTransport,
 ) -> Result<String, SmtpError> {
-    let (raw, message_id) = build_mime_at(message, from, now, message_id)?;
+    let (raw, message_id) = build_mime_at(message, from, now, local_offset, message_id)?;
     transport
         .send(recipients(message).as_deref(), &raw)
         .map_err(SmtpError::Transport)?;

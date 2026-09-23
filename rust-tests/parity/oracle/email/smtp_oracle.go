@@ -30,12 +30,13 @@ type smtpFixtureInput struct {
 }
 
 type smtpFixtureCase struct {
-	Name       string           `json:"name"`
-	Input      smtpFixtureInput `json:"input"`
-	Message    string           `json:"message,omitempty"`
-	MessageID  string           `json:"message_id,omitempty"`
-	Recipients []string         `json:"recipients"`
-	Error      string           `json:"error,omitempty"`
+	Name        string           `json:"name"`
+	Input       smtpFixtureInput `json:"input"`
+	LocalOffset string           `json:"local_offset"`
+	Message     string           `json:"message,omitempty"`
+	MessageID   string           `json:"message_id,omitempty"`
+	Recipients  []string         `json:"recipients"`
+	Error       string           `json:"error,omitempty"`
 }
 
 func smtpCases() []smtpFixtureInput {
@@ -81,6 +82,17 @@ func smtpCases() []smtpFixtureInput {
 			Date:      "2026-08-31T12:00:00Z",
 			MessageID: "<error@example.test>",
 		},
+		{
+			Name: "non_utc_input_converted_to_local_utc",
+			From: "sender@example.test",
+			Message: email.EmailMessage{
+				To:      "recipient@example.test",
+				Subject: "local date conversion",
+				Body:    "body",
+			},
+			Date:      "2026-08-31T14:05:06+02:00",
+			MessageID: "<non-utc@example.test>",
+		},
 	}
 }
 
@@ -103,14 +115,15 @@ func collectSMTPFixture() (smtpFixtureDocument, error) {
 		document.SourceSHA256[path] = hex.EncodeToString(digest[:])
 	}
 	for _, input := range smtpCases() {
-		entry := smtpFixtureCase{
-			Name:       input.Name,
-			Input:      input,
-			Recipients: email.Recipients(input.Message),
-		}
 		now, err := time.Parse(time.RFC3339, input.Date)
 		if err != nil {
 			return smtpFixtureDocument{}, fmt.Errorf("%s date: %w", input.Name, err)
+		}
+		entry := smtpFixtureCase{
+			Name:        input.Name,
+			Input:       input,
+			LocalOffset: now.Local().Format("-07:00"),
+			Recipients:  email.Recipients(input.Message),
 		}
 		raw, messageID, err := email.BuildMIMEAt(input.Message, input.From, now, input.MessageID)
 		if err != nil {

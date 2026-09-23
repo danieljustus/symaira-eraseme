@@ -4,7 +4,7 @@
     "internal/email/smtp.go": "dba6bd8332b966a0b441901293e34576283620e48dfd39cf725e831ea1bce70f",
     "internal/email/types.go": "c7260405e2f9e4990bd5abfeb06335630ecf5844240e52cb6a34201694a2273b",
     "rust-tests/parity/oracle/email/main.go": "13ba339678e27c93a278c0a47cdf0cd4e0ab51c91988fddc7e53597e3e00b361",
-    "rust-tests/parity/oracle/email/smtp_oracle.go": "a1bdcd4ab6fabd1ad4416a626032f7cd2ed0dda510168bc50fdb948591272bbf"
+    "rust-tests/parity/oracle/email/smtp_oracle.go": "320224dde522fadb083873a40a64a4b8ca885673c053923b97488082e83fc78a"
   },
   "cases": [
     {
@@ -22,6 +22,7 @@
         "date": "2026-08-31T12:05:06Z",
         "message_id": "\u003cfixed-message@example.test\u003e"
       },
+      "local_offset": "+00:00",
       "message": "From: sender@example.test\r\nTo:  first@example.test, second@example.test \r\nCc: copy@example.test\r\nSubject: Data request ✓\r\nDate: Mon, 31 Aug 2026 12:05:06 +0000\r\nMessage-ID: \u003cfixed-message@example.test\u003e\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"=_symeraseme_0bdf58d15e42a919\"\r\n\r\n--=_symeraseme_0bdf58d15e42a919\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\nFirst\nSecond\nThird\n\r\n--=_symeraseme_0bdf58d15e42a919--\r\n",
       "message_id": "\u003cfixed-message@example.test\u003e",
       "recipients": [
@@ -46,6 +47,7 @@
         "date": "2026-08-31T12:00:00Z",
         "message_id": "\u003csanitized@example.test\u003e"
       },
+      "local_offset": "+00:00",
       "message": "From: sender@example.testBcc: injected@example.test\r\nTo: recipient@example.testBcc: leaked@example.test\r\nSubject: subjectInjected: yes\r\nDate: Mon, 31 Aug 2026 12:00:00 +0000\r\nMessage-ID: \u003csanitized@example.test\u003e\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"=_symeraseme_66939642d2df4aa2\"\r\n\r\n--=_symeraseme_66939642d2df4aa2\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\nbody\r\n--=_symeraseme_66939642d2df4aa2--\r\n",
       "message_id": "\u003csanitized@example.test\u003e",
       "recipients": [
@@ -67,6 +69,7 @@
         "date": "2026-08-31T12:00:00Z",
         "message_id": "\u003cerror@example.test\u003e"
       },
+      "local_offset": "+00:00",
       "recipients": [
         "recipient@example.test"
       ],
@@ -87,8 +90,31 @@
         "date": "2026-08-31T12:00:00Z",
         "message_id": "\u003cerror@example.test\u003e"
       },
+      "local_offset": "+00:00",
       "recipients": null,
       "error": "email: smtp error: recipient is empty"
+    },
+    {
+      "name": "non_utc_input_converted_to_local_utc",
+      "input": {
+        "name": "non_utc_input_converted_to_local_utc",
+        "from": "sender@example.test",
+        "message": {
+          "To": "recipient@example.test",
+          "Subject": "local date conversion",
+          "Body": "body",
+          "CC": "",
+          "BCC": ""
+        },
+        "date": "2026-08-31T14:05:06+02:00",
+        "message_id": "\u003cnon-utc@example.test\u003e"
+      },
+      "local_offset": "+00:00",
+      "message": "From: sender@example.test\r\nTo: recipient@example.test\r\nSubject: local date conversion\r\nDate: Mon, 31 Aug 2026 12:05:06 +0000\r\nMessage-ID: \u003cnon-utc@example.test\u003e\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"=_symeraseme_2c8e96d9de316f6c\"\r\n\r\n--=_symeraseme_2c8e96d9de316f6c\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\nbody\r\n--=_symeraseme_2c8e96d9de316f6c--\r\n",
+      "message_id": "\u003cnon-utc@example.test\u003e",
+      "recipients": [
+        "recipient@example.test"
+      ]
     }
   ],
   "send_error": "email: smtp error: offline synthetic transport"
