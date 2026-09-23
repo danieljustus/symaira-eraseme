@@ -16,12 +16,8 @@
 //!   '<tag> STARTTLS', expect its tagged OK, handshake, then continue.
 //! - TLS configuration precedence: an injected configuration wins over the
 //!   dialer-level default; the default is MinVersion TLS 1.2 with ServerName
-//!   = config host. Roots for the product default come from bundled webpki-roots.
+//!   = config host. Roots for the product default come from the platform store.
 //!
-//! DOCUMENTED DIVERGENCE: Go uses the *platform* root store; the port uses the
-//! bundled webpki roots, so a private/enterprise CA installed in the OS store is
-//! trusted by Go and not by the port.
-
 use crate::email::policy::ERR_IMAP;
 use crate::email::session::{FetchedMessage, ImapSession};
 use crate::email::types::ImapConfig;
@@ -34,7 +30,6 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use webpki_roots;
 
 /// Read+Write abstraction shared between plain TCP and TLS sessions.
 pub trait ReadWrite: Read + Write + Send + Sync {}
@@ -118,12 +113,12 @@ impl Write for IoStream {
 /// Go's `imapTLSConfig` sets `MinVersion: tls.VersionTLS12` and `ServerName`
 /// to the configured host; an injected configuration wins over the default.
 /// rustls' default protocol versions are exactly "TLS 1.2 or newer", so the
-/// minimum-version semantics match. Go uses the platform root store, this port
-/// the bundled webpki roots — an enterprise CA installed in the OS store is
-/// trusted by Go and not here.
+/// minimum-version semantics match. Default roots come from the platform store.
 fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, String> {
-    let root_store =
-        root_store.unwrap_or_else(|| webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect());
+    let root_store = match root_store {
+        Some(roots) => roots,
+        None => platform_root_store()?,
+    };
     // The provider is named explicitly: relying on rustls' process-level
     // auto-detection makes the build's feature unification load-bearing.
     let provider = Arc::new(rustls::crypto::ring::default_provider());
@@ -133,6 +128,33 @@ fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, St
         .with_root_certificates(root_store)
         .with_no_client_auth();
     Ok(config)
+}
+
+fn platform_root_store() -> Result<RootCertStore, String> {
+    let loaded = rustls_native_certs::load_native_certs();
+    let mut roots = RootCertStore::empty();
+    roots.add_parsable_certificates(loaded.certs);
+    if roots.is_empty() {
+        return Err(format!(
+            "{}: no platform TLS root certificates could be loaded: {:?}",
+            ERR_IMAP, loaded.errors
+        ));
+    }
+    Ok(roots)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::platform_root_store;
+
+    #[test]
+    fn default_root_store_loads_platform_certificates() {
+        assert!(
+            !platform_root_store()
+                .expect("platform certificate store loads")
+                .is_empty()
+        );
+    }
 }
 
 /// Perform a TLS handshake on an already-connected TcpStream, returning a

@@ -344,14 +344,14 @@ fn imap_transport_transcript_cases_match_the_go_oracle() {
 }
 
 #[test]
-fn the_default_root_store_rejects_an_untrusted_certificate() {
+fn the_default_platform_root_store_rejects_an_untrusted_certificate() {
     let (config, _trusted_roots) = tls_material();
     let server = ScriptedImapServer::new_tls(config, TlsMode::Implicit).expect("TLS server starts");
     let case = tls_case();
     let observed = measure(&case, &server, None);
     let error = observed
         .error
-        .expect("the bundled webpki roots must not trust a locally minted certificate");
+        .expect("the platform roots must not trust a locally minted certificate");
     assert!(
         error.contains("UnknownIssuer") || error.contains("certificate"),
         "the rejection must be a certificate failure, got: {error}"
