@@ -67,6 +67,39 @@ fn constructor_errors_match_the_go_oracle_and_validation_order() {
 }
 
 #[test]
+fn echoed_api_keys_are_redacted_from_provider_errors_and_debug() {
+    let api_key = "synthetic-secret-that-must-not-leak";
+    let options = CreateOptions {
+        api_key: api_key.to_owned(),
+        ..CreateOptions::default()
+    };
+    let debug = format!("{options:?}");
+    assert!(!debug.contains(api_key));
+    assert!(debug.contains("has_api_key: true"));
+
+    let (base_url, server) = local_error_server(api_key);
+    let mut client = create_with(
+        &CreateOptions {
+            provider: "openai".to_owned(),
+            base_url,
+            api_key: api_key.to_owned(),
+            ..CreateOptions::default()
+        },
+        &|_| None,
+        &|_| false,
+    )
+    .expect("local fake provider client");
+    client.base.max_retries = 1;
+    let error = client
+        .classify("system", "user", &ClassifyOptions::default())
+        .expect_err("fake provider rejects the request");
+    let message = error.to_string();
+    assert!(!message.contains(api_key));
+    assert!(message.contains("[REDACTED]"));
+    server.join().expect("fake server thread");
+}
+
+#[test]
 fn local_transport_matches_go_factory_and_llmkit_cases() {
     let fixture = fixture();
     let cases = fixture["cases"].as_array().expect("recorded cases");
@@ -170,6 +203,27 @@ fn local_server(provider: &str, id: &str) -> (String, thread::JoinHandle<(String
             headers,
             serde_json::from_slice(&body).expect("JSON request"),
         )
+    });
+    (base_url, server)
+}
+
+fn local_error_server(api_key: &str) -> (String, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback fake provider");
+    let address = listener.local_addr().unwrap();
+    let base_url = format!("http://{address}");
+    let api_key = api_key.to_owned();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept provider request");
+        let _ = read_http_request(&mut stream);
+        let response_body = format!("provider echoed credential: {api_key}");
+        let response = format!(
+            "HTTP/1.1 401 Unauthorized\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write local error response");
     });
     (base_url, server)
 }

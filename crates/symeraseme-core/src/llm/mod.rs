@@ -362,7 +362,7 @@ pub fn provider_spec(name: &str) -> Option<&'static ProviderSpec> {
 }
 
 /// Go's `CreateOptions`.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct CreateOptions {
     pub provider: String,
     pub model: String,
@@ -370,6 +370,20 @@ pub struct CreateOptions {
     pub base_url: String,
     pub agent_backend: String,
     pub cost_tracker: Vec<UsageRecord>,
+}
+
+impl fmt::Debug for CreateOptions {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CreateOptions")
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("has_api_key", &!self.api_key.is_empty())
+            .field("base_url", &self.base_url)
+            .field("agent_backend", &self.agent_backend)
+            .field("cost_tracker", &self.cost_tracker)
+            .finish()
+    }
 }
 
 /// A host coding-agent CLI, mirroring Go's `agentDefs` entry.

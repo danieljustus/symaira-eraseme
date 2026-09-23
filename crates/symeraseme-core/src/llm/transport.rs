@@ -223,7 +223,7 @@ impl LlmkitClient {
             let mut reader = response.body_mut().as_reader().take(MAX_ERROR_BYTES);
             let body = read_body(&mut reader)
                 .map_err(|error| provider_error("read response", error.to_string()))?;
-            return Err(http_error(status, &body));
+            return Err(http_error(status, &body, &self.api_key));
         }
         let mut reader = response.body_mut().as_reader().take(MAX_RESPONSE_BYTES);
         let body = read_body(&mut reader)
@@ -401,8 +401,13 @@ fn provider_error(stage: &str, source: String) -> ClientError {
     ClientError::Provider(LlmError::with_source(detail.clone(), detail))
 }
 
-fn http_error(status: u16, body: &[u8]) -> ClientError {
+fn http_error(status: u16, body: &[u8], api_key: &str) -> ClientError {
     let body = String::from_utf8_lossy(body);
+    let body = if api_key.is_empty() {
+        body.into_owned()
+    } else {
+        body.replace(api_key, "[REDACTED]")
+    };
     let body = body.trim();
     let excerpt = if body.len() > 512 {
         let mut end = 512;
