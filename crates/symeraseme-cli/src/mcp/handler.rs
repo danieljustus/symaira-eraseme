@@ -740,10 +740,7 @@ impl ContractHandler {
                 error.to_owned(),
                 "",
                 false,
-                0,
-                "",
-                "",
-                false,
+                None,
             ));
         };
         if dry_run {
@@ -753,10 +750,7 @@ impl ContractHandler {
                 String::new(),
                 link,
                 true,
-                0,
-                "",
-                "",
-                false,
+                None,
             ));
         }
 
@@ -800,10 +794,7 @@ impl ContractHandler {
             String::new(),
             link,
             false,
-            task.id,
-            &task.instructions,
-            "manual_action_required",
-            true,
+            Some(&task),
         ))
     }
 
@@ -1461,11 +1452,9 @@ fn confirmation_result(
     error: String,
     clicked_url: &str,
     dry_run: bool,
-    task_id: i64,
-    instructions: &str,
-    status: &str,
-    manual_action_required: bool,
+    task: Option<&manualtasks::ManualTask>,
 ) -> Value {
+    let manual_action_required = task.is_some();
     json!({
         "Success": success,
         "ClickedURL": clicked_url,
@@ -1480,9 +1469,9 @@ fn confirmation_result(
         "ScreenshotBeforeBytes": 0,
         "ScreenshotAfterBytes": 0,
         "DryRun": dry_run,
-        "TaskID": task_id,
-        "Instructions": instructions,
-        "Status": status,
+        "TaskID": task.map_or(0, |task| task.id),
+        "Instructions": task.map_or("", |task| task.instructions.as_str()),
+        "Status": if manual_action_required { "manual_action_required" } else { "" },
         "Reason": if manual_action_required { "dynamic_form" } else { "" },
         "ManualActionRequired": manual_action_required,
     })

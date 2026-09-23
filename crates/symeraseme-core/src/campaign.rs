@@ -23,7 +23,7 @@ use crate::registry::{Broker, BrokerFilter, Channel, RegistryError, Template, fi
 use crate::storage::Store;
 use crate::storage::projection::ProjectionError;
 use crate::storage::repository::{ListRemovalRequestsOptions, Repository};
-use crate::storage::types::{EventType, Source};
+use crate::storage::types::{EventType, RemovalRequest, Source};
 
 /// Empty strings mean "no filter"; `status` defaults to `active`, matching the
 /// Python loader default. `max_brokers <= 0` disables the cap.
@@ -396,6 +396,7 @@ fn go_timestamp(value: &str) -> Value {
 /// profile fails one request instead of the whole batch; the caller owns the
 /// resolution here, as it does for planning, and hands the failure through.
 pub type ProfileSource<'a> = Result<Option<&'a Profile>, &'a str>;
+pub type EmailSender<'a> = dyn Fn(&str, &str, &str) -> Result<Map<String, Value>, String> + 'a;
 
 /// Go's `ExecuteOpts` without a network-capable adapter implementation.
 ///
@@ -408,7 +409,7 @@ pub struct ExecuteOpts<'a> {
     pub dry_run: bool,
     /// Injectable sender matching Go's `ExecuteOpts.Email`; callers can keep
     /// execution offline by supplying a local stub.
-    pub email_sender: Option<&'a dyn Fn(&str, &str, &str) -> Result<Map<String, Value>, String>>,
+    pub email_sender: Option<&'a EmailSender<'a>>,
     /// The registry the web-form adapter previews against, as
     /// `realPlanCommand` passes `loadRegistry()` to `NewWebFormAdapter`.
     pub brokers: &'a [Broker],
@@ -538,42 +539,34 @@ pub fn execute_request(
         return Err(ExecuteError::RequestNotFound(request_id));
     };
     // Go reads `req["broker_id"]` into `brokerName` and passes it on as both.
-    let broker_name = request.broker_id;
+    let broker_name = &request.broker_id;
     let channel = if request.channel.is_empty() {
         "email"
     } else {
         request.channel.as_str()
     };
     if channel == "web_form" {
-        return execute_web_form_request(store, request_id, &broker_name, opts, profile, now);
+        return execute_web_form_request(store, request_id, broker_name, opts, profile, now);
     }
     let events = repository.get_events(request_id, 0)?;
     let payload = events
         .last()
         .map(|event| event.payload.clone())
         .unwrap_or_default();
-    execute_email_request(
-        store,
-        request_id,
-        &broker_name,
-        &payload,
-        &request.template_id,
-        opts,
-        profile,
-        now,
-    )
+    execute_email_request(store, &request, &payload, opts, profile, now)
 }
 
 fn execute_email_request(
     store: &Store,
-    request_id: i64,
-    broker_name: &str,
+    request: &RemovalRequest,
     payload: &Map<String, Value>,
-    template_id: &str,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
     now: DateTime<Utc>,
 ) -> Result<ExecuteResult, ExecuteError> {
+    let request_id = request.id;
+    let broker_name = &request.broker_id;
+    let template_id = &request.template_id;
     let endpoint = payload
         .get("endpoint")
         .and_then(Value::as_str)
