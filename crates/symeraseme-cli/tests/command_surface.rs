@@ -1075,6 +1075,79 @@ fn brokers_json_operations_match_source_bound_goldens() {
 }
 
 #[test]
+fn review_positional_and_path_aliases_match_the_live_go_cli() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root.clone());
+    let input = cwd.join("review.txt");
+    let original = b"Alice Example <alice@example.invalid>\n";
+    fs::write(&input, original).expect("review input");
+
+    let go_binary = root.join(if cfg!(windows) {
+        "symeraseme-go.exe"
+    } else {
+        "symeraseme-go"
+    });
+    let build = Command::new("go")
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .args(["build", "-o"])
+        .arg(&go_binary)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build live Go CLI");
+    assert!(
+        build.status.success(),
+        "Go CLI build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let cases: &[&[&str]] = &[
+        &["review"],
+        &["review", "--path", "review.txt", "--output", "json"],
+        &[
+            "review",
+            "review.txt",
+            "--path",
+            "missing.txt",
+            "--output",
+            "json",
+        ],
+        &["review", "missing.txt", "--path", "review.txt"],
+        &["review", "review.txt"],
+        &["--output", "json", "review", "review.txt"],
+        &["review", "--path", "missing.txt", "--output", "json"],
+        &["review", "review.txt", "--output", "yaml"],
+    ];
+    for (index, argv) in cases.iter().enumerate() {
+        let go =
+            run_program_with_resources(&go_binary, argv, &home, &cwd, &capture, index * 2, None);
+        let rust =
+            run_program_with_resources(&binary(), argv, &home, &cwd, &capture, index * 2 + 1, None);
+        assert_eq!(rust.status.code(), go.status.code(), "{argv:?} status");
+        assert_eq!(rust.stdout, go.stdout, "{argv:?} stdout");
+        assert_eq!(rust.stderr, go.stderr, "{argv:?} stderr");
+        if matches!(index, 1 | 2 | 4 | 5) {
+            assert!(go.status.success(), "{argv:?} did not exercise redaction");
+            assert!(
+                !go.stdout
+                    .windows(b"alice@example.invalid".len())
+                    .any(|window| { window == b"alice@example.invalid" }),
+                "{argv:?} exposed the input address"
+            );
+        }
+    }
+    assert_eq!(fs::read(input).expect("review input remains"), original);
+}
+
+#[test]
 fn render_template_unknown_name_matches_go_error() {
     let root = unique_root();
     let home = root.join("home");
