@@ -19,4 +19,5 @@ pub mod templating;
 pub mod timeutil;
 pub mod triage_contract;
 pub mod triage_prompts;
+pub mod triage_service;
 pub mod version;
