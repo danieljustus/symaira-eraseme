@@ -146,6 +146,7 @@ fn run_with_resources(
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
+        .env("USERPROFILE", home)
         .env("LC_ALL", "C")
         .env("TZ", "UTC")
         .env("PWD", cwd)
@@ -339,6 +340,7 @@ fn run_with_data_dir(
         .current_dir(cwd)
         .env_clear()
         .env("HOME", home)
+        .env("USERPROFILE", home)
         .env("LC_ALL", "C")
         .env("TZ", "UTC")
         .env("PWD", cwd)
@@ -1261,7 +1263,7 @@ fn schedule_commands_match_the_go_oracle() {
                 .as_array()
                 .expect("cases")
                 .iter()
-                .map(|case| case["id"].as_str().expect("case id"))
+                .map(|case| case["id"].as_str().expect("case id").to_owned())
                 .collect::<Vec<_>>()
         };
         assert_eq!(ids(&fixture), ids(&frozen), "Windows oracle case inventory");

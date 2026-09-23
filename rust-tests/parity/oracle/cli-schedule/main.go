@@ -304,7 +304,7 @@ func captureFiles(root string, oracleRoot string) (map[string]string, error) {
 // does: private home, private XDG root, UTC clock, C locale. PATH stays empty on
 // purpose so no real scheduler binary can be reached.
 func cliEnvironment(root string) []string {
-	return []string{
+	environment := []string{
 		"HOME=" + filepath.Join(root, "home"),
 		"XDG_CONFIG_HOME=" + filepath.Join(root, "xdg"),
 		"TZ=UTC",
@@ -315,6 +315,10 @@ func cliEnvironment(root string) []string {
 		// literal path. Setting it keeps the capture deterministic.
 		"PWD=" + root,
 	}
+	if runtime.GOOS == "windows" {
+		environment = append(environment, "USERPROFILE="+filepath.Join(root, "home"))
+	}
+	return environment
 }
 
 func fail(format string, arguments ...any) {
