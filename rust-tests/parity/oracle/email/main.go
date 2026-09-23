@@ -10,7 +10,8 @@
 // Usage:
 //
 //	GOTOOLCHAIN=go1.26.6 go run ./rust-tests/parity/oracle/email            # stdout
-//	GOTOOLCHAIN=go1.26.6 go run ./rust-tests/parity/oracle/email --fixture  # writes the fixture
+//	GOTOOLCHAIN=go1.26.6 go run ./rust-tests/parity/oracle/email --fixture      # writes the inbox fixture
+//	GOTOOLCHAIN=go1.26.6 go run ./rust-tests/parity/oracle/email --smtp-fixture # writes the outbound MIME fixture
 //
 // The document is stable: running it twice must produce identical bytes.
 package main
@@ -190,6 +191,25 @@ type document struct {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--smtp-fixture" {
+		// BuildMIMEAt formats Date in time.Local; pin the oracle environment.
+		time.Local = time.UTC
+		file, err := os.Create("rust-tests/parity/oracle/email/smtp_cases.json")
+		if err != nil {
+			fail(err)
+		}
+		defer file.Close()
+		document, err := collectSMTPFixture()
+		if err != nil {
+			fail(err)
+		}
+		encoder := json.NewEncoder(file)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(document); err != nil {
+			fail(err)
+		}
+		return
+	}
 	target := os.Stdout
 	if len(os.Args) == 2 && os.Args[1] == "--fixture" {
 		file, err := os.Create(fixturePath)
