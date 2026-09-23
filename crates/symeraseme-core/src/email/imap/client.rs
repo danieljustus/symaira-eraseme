@@ -222,6 +222,7 @@ impl crate::email::session::ImapDialer for ImapDialer {
             )
         })?;
         let mut last_error = None;
+        let mut failed_address = None;
         let mut stream = None;
         for address in addresses {
             match TcpStream::connect_timeout(&address, timeout) {
@@ -229,16 +230,29 @@ impl crate::email::session::ImapDialer for ImapDialer {
                     stream = Some(connected);
                     break;
                 }
-                Err(error) => last_error = Some(error),
+                Err(error) => {
+                    let refused = error.kind() == std::io::ErrorKind::ConnectionRefused;
+                    failed_address = Some(address);
+                    last_error = Some(error);
+                    // Go's Dial returns the refusal for the resolved address
+                    // it attempted first (for localhost this is commonly
+                    // [::1]), instead of replacing it with the input hostname.
+                    if refused {
+                        break;
+                    }
+                }
             }
         }
         let stream = stream.ok_or_else(|| {
             let error = last_error
                 .map(|error| go_dial_error(&error))
                 .unwrap_or_else(|| "no suitable address found".to_owned());
+            let address = failed_address
+                .map(|address| address.to_string())
+                .unwrap_or_else(|| host_port.clone());
             format!(
                 "{}: connect/login failed: dial tcp {}: connect: {}",
-                ERR_IMAP, host_port, error
+                ERR_IMAP, address, error
             )
         })?;
         stream
@@ -857,6 +871,11 @@ mod dial_tests {
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port() as i64;
         drop(listener);
+        let expected_address = format!("localhost:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap();
         let config = ImapConfig {
             host: "localhost".to_owned(),
             port,
@@ -865,7 +884,9 @@ mod dial_tests {
         let error = ImapDialer::new().dial(&config).err().unwrap();
         assert_eq!(
             error,
-            format!("email: imap error: connect/login failed: dial tcp localhost:{port}: connect: connection refused")
+            format!(
+                "email: imap error: connect/login failed: dial tcp {expected_address}: connect: connection refused"
+            )
         );
     }
 }
