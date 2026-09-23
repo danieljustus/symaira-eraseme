@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""macOS plain-store Go -> Rust -> Go regression, never release acceptance.
+
+The caller supplies independently built artifacts. No production store, old
+fallback evidence, schema guard or installed executable is changed. Linux and
+Windows need their own confinement/cleanup proof before this gate supports them.
+"""
+import argparse
+from contextlib import closing
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import shutil
+import signal
+import sqlite3
+import subprocess
+import sys
+
+REPO = Path(__file__).resolve().parents[2]
+CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
+         'go-plan-after-switch', 'go-requests-after-switch')
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False,
+                      default=lambda value: {'sqlite_blob_hex': value.hex()})
+
+
+def save(path, value):
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
+
+
+def same(actual, expected, message):
+    require(canonical(actual) == canonical(expected), message)
+
+
+def identity(path):
+    require(path.is_file() and not path.is_symlink(), 'artifact must be a regular file')
+    raw = path.read_bytes()
+    return {'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
+
+
+def command(root, label, argv, env, timeout=30):
+    """Retain failures and raw bytes; bound file growth and the owned process group."""
+    import resource
+
+    def bounds():
+        maximum = 4 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
+
+    record = {'argv': list(map(str, argv)), 'cwd': str(root), 'exit_code': None,
+              'timed_out': False, 'success': False}
+    try:
+        with (root / (label + '.stdout')).open('xb') as out, \
+                (root / (label + '.stderr')).open('xb') as err:
+            child = subprocess.Popen(argv, cwd=root, env=env, stdin=subprocess.DEVNULL,
+                                     stdout=out, stderr=err, start_new_session=True,
+                                     preexec_fn=bounds)
+            try:
+                child.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                record['timed_out'] = True
+            finally:
+                # Exactly one group cleanup, including descendants of an exited leader.
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                record['exit_code'] = child.wait(timeout=5)
+        record['success'] = record['exit_code'] == 0 and not record['timed_out']
+    finally:
+        for stream in ('stdout', 'stderr'):
+            path = root / (label + '.' + stream)
+            if path.exists():
+                record[stream] = {'path': path.name, **identity(path)}
+        save(root / (label + '.json'), record)
+    require(record['success'], label + ': command failed; retained raw evidence')
+    return record
+
+
+def snapshot(database):
+    # This is our disposable store, not the immutable repository fixture.
+    # Read live WAL and close explicitly: a sqlite connection context doesn't close.
+    with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as db:
+        tables = [r[0] for r in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+        state = {}
+        for name in tables:
+            quoted = '"' + name.replace('"', '""') + '"'
+            state[name] = {
+                'columns': list(db.execute('PRAGMA table_info(' + quoted + ')')),
+                'rows': sorted((canonical(list(row)) for row in db.execute('SELECT * FROM ' + quoted))),
+            }
+        return {'user_version': db.execute('PRAGMA user_version').fetchone()[0],
+                'integrity': db.execute('PRAGMA integrity_check').fetchall(),
+                'schema': db.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
+                'tables': state}
+
+
+def sandbox(root, executable):
+    quote = lambda value: json.dumps(str(value))
+    return '\n'.join([
+        '(version 1)', '(allow default)', '(deny network*)',
+        '(deny file-read* (subpath ' + quote(Path.home().resolve()) + ') (subpath ' + quote(REPO) + '))',
+        '(allow file-read* (subpath ' + quote(root) + '))',
+        # SQLite resolves ancestors. Permit their metadata, not their contents.
+        '(allow file-read-metadata ' + ' '.join('(literal ' + quote(p) + ')' for p in root.parents) + ')',
+        '(deny file-write*)',
+        '(allow file-write* (subpath ' + quote(root) + ') (literal "/dev/null"))',
+        '(deny process-exec)',
+        '(allow process-exec (literal ' + quote(executable) + '))',
+    ])
+
+
+PROBE = '''import errno,json,os,socket,subprocess,sys
+result={}
+for i,path in enumerate(sys.argv[1:2]):
+ try:
+  with open(path,'rb') as stream: stream.read(1)
+ except PermissionError: result['read_denied_'+str(i)]=True
+ else: result['read_denied_'+str(i)]=False
+try: entries=os.scandir(sys.argv[2])
+except PermissionError: result['home_directory_read_denied']=True
+else:
+ entries.close()
+ result['home_directory_read_denied']=False
+try:
+ with socket.socket() as sock: sock.connect(('127.0.0.1',9))
+except OSError as exc: result['network_denied']=exc.errno in (errno.EPERM,errno.EACCES)
+else: result['network_denied']=False
+try: subprocess.run(['/usr/bin/true'],check=True)
+except PermissionError: result['child_exec_denied']=True
+else: result['child_exec_denied']=False
+print(json.dumps(result,sort_keys=True))
+sys.exit(0 if all(result.values()) else 1)
+'''
+
+
+def run(go, rust, go_tool, root):
+    require(sys.platform == 'darwin', 'unsupported: this gate requires macOS sandbox-exec')
+    root = root.resolve()
+    root.mkdir(mode=0o700, parents=True, exist_ok=False)
+    report = {'scope': 'macos-plain-store-runtime-only', 'status': 'failed',
+              'platform': {'system': platform.system(), 'machine': platform.machine()},
+              'required_cases': list(CASES), 'steps': [], 'schema_sequence': [],
+              'database_restore_performed': False, 'publication_verified': False,
+              'source_binding': 'requires caller build evidence; hashes alone are not source identity'}
+    try:
+        for name in ('data', 'home', 'config', 'cache', 'tmp', 'bin', 'empty-path'):
+            (root / name).mkdir(mode=0o700)
+        active, database = root / 'bin/symeraseme', root / 'data/symeraseme.db'
+        go, rust, go_tool = (p.resolve(strict=True) for p in (go, rust, go_tool))
+        report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
+        require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
+        fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
+        report['fixture'] = identity(fixture)
+        report['runner'] = identity(Path(__file__))
+        shutil.copyfile(Path(__file__), root / 'producer.py')
+        shutil.copyfile(fixture, database)  # The only database copy into the active path.
+        env = {'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
+               'XDG_CONFIG_HOME': str(root / 'config'), 'XDG_DATA_HOME': str(root / 'data'),
+               'XDG_CACHE_HOME': str(root / 'cache'), 'TMPDIR': str(root / 'tmp'),
+               'TEMP': str(root / 'tmp'), 'TMP': str(root / 'tmp'),
+               'PATH': str(root / 'empty-path'), 'LC_ALL': 'C', 'TZ': 'UTC',
+               'GOTOOLCHAIN': 'local', 'GOWORK': 'off',
+               'SYMERASEME_DATA_DIR': str(database.parent), 'SYMERASEME_DB_DIR': str(database.parent),
+               'SYMERASEME_ENCRYPT_DB': 'false'}
+        report['environment'] = env
+        command(root, 'go-build-info', [str(go_tool), 'version', '-m', str(go)], env)
+        metadata = (root / 'go-build-info.stdout').read_text()
+        require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
+        arch = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
+        settings = {line.strip() for line in metadata.splitlines()}
+        require({'build\tCGO_ENABLED=0', 'build\tGOOS=darwin', 'build\tGOARCH=' + arch} <= settings,
+                'Go artifact must be CGO-free and native')
+        try:
+            command(root, 'wrapper-negative', ['/usr/bin/false'], env)
+        except ValueError:
+            failed = json.loads((root / 'wrapper-negative.json').read_bytes())
+            require(failed['exit_code'] == 1 and failed['timed_out'] is False, 'invalid wrapper control')
+        else:
+            raise ValueError('wrapper masked a failing exit')
+        report['wrapper_control'] = True
+        python = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
+        python = (python if python.is_file() else Path(sys.executable)).resolve()
+        negative_policy = sandbox(root, python)
+        negative_policy += '\n(allow file-read* (subpath ' + json.dumps(str(Path(sys.base_prefix).resolve())) + '))'
+        save(root / 'sandbox-negative-policy.json', negative_policy)
+        # Harmless existing repository files only; never probe credential contents.
+        command(root, 'sandbox-negative', ['/usr/bin/sandbox-exec', '-p', negative_policy,
+                str(python), '-I', '-S', '-c', PROBE, str(REPO / 'Cargo.toml'), str(Path.home().resolve())], env)
+        controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
+        require(set(controls) == {'read_denied_0', 'home_directory_read_denied', 'network_denied', 'child_exec_denied'}
+                and all(value is True for value in controls.values()), 'sandbox control failed')
+        report['sandbox_controls'] = controls
+        policy = sandbox(root, active)
+        save(root / 'sandbox-policy.json', policy)
+        missing_profile = root / 'home/absent-profile.enc'
+
+        def execute(label, args, artifact=None):
+            step = {'id': label, 'success': False}
+            report['steps'].append(step)
+            if artifact is not None:
+                stage = active.with_suffix('.next')
+                shutil.copyfile(artifact, stage)
+                stage.chmod(0o700)
+                require(identity(stage) == identity(artifact), 'staged executable mismatch')
+                os.replace(stage, active)
+            step['installed'] = identity(active)
+            try:
+                step['command'] = command(root, label, ['/usr/bin/sandbox-exec', '-p', policy, str(active), *args], env)
+            finally:
+                record = root / (label + '.json')
+                if record.exists():
+                    step['command'] = json.loads(record.read_bytes())
+            require(not (root / (label + '.stderr')).read_bytes(), label + ': unexpected stderr')
+            return json.loads((root / (label + '.stdout')).read_bytes())
+
+        initial = snapshot(database)
+        report['schema_sequence'].append(initial['user_version'])
+        require(initial['user_version'] == 1, 'fixture schema must start at v1')
+        baseline = execute('go-baseline', ['requests', 'list', '--output', 'json'], go)
+        require(type(baseline['total']) is int and baseline['total'] == 3 and len(baseline['requests']) == 3,
+                'baseline must read all three requests')
+        before = snapshot(database)
+        save(root / 'go-baseline-state.json', before)
+        report['schema_sequence'].append(before['user_version'])
+        require(before['user_version'] == 2, 'current Go must migrate the baseline to v2')
+        report['steps'][-1]['success'] = True
+        created = execute('rust-write', ['plan', 'create', '--campaign', 'post-rust', '--max', '1',
+                          '--profile', str(missing_profile), '--output', 'json'], rust)
+        require(created['campaign_id'] == 'post-rust' and type(created['planned']) is int and created['planned'] == 1,
+                'Rust must create one request in the new campaign')
+        report['steps'][-1]['success'] = True
+        plan = execute('rust-plan', ['plan', 'show', '--campaign', 'post-rust', '--output', 'json'])
+        require(type(plan['total']) is int and plan['total'] == 1 and len(plan['requests']) == 1, 'Rust plan readback')
+        report['steps'][-1]['success'] = True
+        requests = execute('rust-requests', ['requests', 'list', '--output', 'json'])
+        require(type(requests['total']) is int and requests['total'] == 4 and len(requests['requests']) == 4,
+                'Rust must retain baseline requests plus its new write')
+        for old in baseline['requests']:
+            require(sum(canonical(old) == canonical(row) for row in requests['requests']) == 1,
+                    'baseline request changed or missing')
+        after = snapshot(database)
+        save(root / 'rust-postwrite-state.json', after)
+        for name, table in before['tables'].items():
+            require(canonical(after['tables'][name]['columns']) == canonical(table['columns']), 'table shape changed')
+            if name != 'sqlite_sequence':
+                require(all(row in after['tables'][name]['rows'] for row in table['rows']), 'baseline row lost')
+        require(len(after['tables']['campaigns']['rows']) == len(before['tables']['campaigns']['rows']) + 1,
+                'campaign was not persisted')
+        require(after['integrity'] == [('ok',)] and 'imap_state' in after['tables'], 'invalid SQLite state')
+        report['schema_sequence'].append(after['user_version'])
+        report['steps'][-1]['success'] = True
+        restored_plan = execute('go-plan-after-switch', ['plan', 'show', '--campaign', 'post-rust', '--output', 'json'], go)
+        same(restored_plan, plan, 'Go plan differs after switchback')
+        report['steps'][-1]['success'] = True
+        restored_requests = execute('go-requests-after-switch', ['requests', 'list', '--output', 'json'])
+        same(restored_requests, requests, 'Go requests differ after switchback')
+        final = snapshot(database)
+        save(root / 'go-final-state.json', final)
+        same(final, after, 'complete post-Rust SQLite state differs')
+        report['schema_sequence'].append(final['user_version'])
+        require(report['schema_sequence'] == [1, 2, 2, 2], 'unexpected schema sequence')
+        require(not missing_profile.exists() and identity(active) == identity(go), 'final runtime identity changed')
+        require(identity(fixture) == report['fixture'], 'source fixture changed')
+        report['steps'][-1]['success'] = True
+        require([step['id'] for step in report['steps']] == list(CASES)
+                and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')
+        report['status'] = 'passed'
+    finally:
+        save(root / 'report.json', report)
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for flag in ('go', 'rust', 'go-tool', 'output-dir'):
+        parser.add_argument('--' + flag, type=Path, required=True)
+    args = parser.parse_args()
+    result = run(args.go, args.rust, args.go_tool, args.output_dir)
+    print(json.dumps({'status': result['status'], 'scope': result['scope'],
+                      'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
+
+
+if __name__ == '__main__':
+    main()

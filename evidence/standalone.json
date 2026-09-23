@@ -1,0 +1,12 @@
+{
+  "tag": "v0.17.0",
+  "commit": "0c2c7769ac6074264e1c02fcdf903188b4f3fa08",
+  "artifact": "evidence/artifact/symeraseme",
+  "artifact_sha256": "6b67b14732b699526d2cffa6a1f18afdb8d9be56205bde136259b11c8e094f3f",
+  "observed": {
+    "command": "env -i PATH=/usr/bin:/bin HOME=/var/folders/7v/7bpq0fjn44lflpxdylsx8qs40000gn/T/ev-home-g4v6nw37 /Users/daniel/.hermes/cache/scratch/evidence-wt/symaira-eraseme/evidence/artifact/symeraseme version",
+    "exit_code": 0,
+    "stdout": "symeraseme dev\n",
+    "stderr": ""
+  }
+}

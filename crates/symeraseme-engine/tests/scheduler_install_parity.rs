@@ -188,6 +188,7 @@ fn capture(
 ) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
     use sha2::{Digest, Sha256};
     let mut hashes = BTreeMap::new();
+    #[cfg_attr(windows, allow(unused_mut))]
     let mut modes = BTreeMap::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(current) = stack.pop() {
@@ -450,6 +451,7 @@ fn rust_install_status_uninstall_match_the_go_capture() {
             );
         }
 
+        #[cfg_attr(windows, allow(unused_variables))]
         let (hashes, modes) = capture(&case_root, &case_root, &root);
         let expected_files: BTreeMap<String, String> =
             serde_json::from_value(case["files"].clone()).expect("files shape");
