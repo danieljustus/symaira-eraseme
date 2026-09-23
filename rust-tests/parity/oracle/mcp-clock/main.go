@@ -30,7 +30,10 @@ type fixtureCase struct {
 }
 
 func main() {
-	root, err := os.MkdirTemp("/tmp", "mcp-clock-oracle-")
+	// The helper is also run with hostile inherited config variables by its
+	// parity test. Clear them before any path resolution or store access.
+	os.Clearenv()
+	root, err := os.MkdirTemp("", "mcp-clock-oracle-")
 	if err != nil {
 		fail(err)
 	}
@@ -41,6 +44,18 @@ func main() {
 	}
 	if err := os.Setenv("HOME", home); err != nil {
 		fail(err)
+	}
+	if err := os.Setenv("USERPROFILE", home); err != nil {
+		fail(err)
+	}
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		path := filepath.Join(home, name)
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			fail(err)
+		}
+		if err := os.Setenv(name, path); err != nil {
+			fail(err)
+		}
 	}
 	data := filepath.Join(root, "data")
 	if err := os.Setenv("SYMERASEME_DATA_DIR", data); err != nil {

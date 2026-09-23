@@ -2926,17 +2926,57 @@ mod tests {
         }
 
         let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root = workspace("clock-parity");
+        let hostile = root.join("hostile-inherited-env");
+        let module_cache = std::env::var_os("GOMODCACHE")
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("GOPATH")
+                    .map(PathBuf::from)
+                    .map(|path| path.join("pkg/mod"))
+            })
+            .unwrap_or_else(|| {
+                let home = std::env::var_os("HOME")
+                    .or_else(|| std::env::var_os("USERPROFILE"))
+                    .expect("home for Go module cache");
+                PathBuf::from(home).join("go/pkg/mod")
+            });
+        let build_cache = root.join("go-build");
+        let isolated_home = root.join("go-home");
+        fs::create_dir_all(&isolated_home).expect("Go home");
         let oracle = std::process::Command::new("go")
             .args(["run", "./rust-tests/parity/oracle/mcp-clock"])
             .current_dir(&repository_root)
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("GOMODCACHE", &module_cache)
+            .env("GOCACHE", &build_cache)
+            .env("GOENV", "off")
+            .env("GOWORK", "off")
+            .env("GOTOOLCHAIN", "local")
             .env("GOPROXY", "off")
             .env("GOSUMDB", "off")
+            // Negative control: the Go helper must discard these caller-owned
+            // paths before resolving its config or opening the store.
+            .env("HOME", &isolated_home)
+            .env("USERPROFILE", &isolated_home)
+            .env("XDG_CONFIG_HOME", isolated_home.join("config"))
+            .env("XDG_DATA_HOME", isolated_home.join("data"))
+            .env("XDG_STATE_HOME", isolated_home.join("state"))
+            .env("XDG_CACHE_HOME", isolated_home.join("cache"))
+            .env("SYMERASEME_DB_DIR", hostile.join("db"))
+            .env("SYMERASEME_DATA_DIR", hostile.join("data"))
             .output()
             .expect("run source-bound Go MCP clock oracle");
         assert!(
             oracle.status.success(),
             "{}",
             String::from_utf8_lossy(&oracle.stderr)
+        );
+        assert!(
+            !hostile.exists(),
+            "Go oracle touched a path inherited from the caller: {}",
+            hostile.display()
         );
         let fixture: ClockFixture = serde_json::from_slice(&oracle.stdout).expect("clock oracle");
         assert_eq!(
@@ -2952,7 +2992,6 @@ mod tests {
             .expect("fixed instant")
             .with_timezone(&Utc);
 
-        let root = workspace("clock-parity");
         for case in fixture.cases {
             let data_dir = root.join(&case.name).join("data");
             fs::create_dir_all(&data_dir).expect("data dir");
