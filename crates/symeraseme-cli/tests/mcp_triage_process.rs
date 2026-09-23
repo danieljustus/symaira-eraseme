@@ -28,7 +28,7 @@ fn mcp_triage_matches_live_go_handler_with_local_agent() {
         String::from_utf8_lossy(&go.stderr)
     );
     let cases: Vec<Value> = serde_json::from_slice(&go.stdout).expect("Go observations");
-    assert_eq!(cases.len(), 2);
+    assert_eq!(cases.len(), 3);
 
     for case in cases {
         let root = TestRoot::new();
@@ -43,9 +43,13 @@ fn mcp_triage_matches_live_go_handler_with_local_agent() {
         fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
         seed(&data);
 
+        let arguments = case["wire_arguments"]
+            .as_str()
+            .map(|wire| serde_json::from_str::<Value>(wire).expect("numeric wire arguments"))
+            .unwrap_or_else(|| case["arguments"].clone());
         let frame = json!({
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": case["name"], "arguments": case["arguments"]},
+            "params": {"name": case["name"], "arguments": arguments},
         });
         let mut input = serde_json::to_vec(&frame).unwrap();
         input.push(b'\n');

@@ -15,10 +15,11 @@ import (
 )
 
 type observation struct {
-	Name      string         `json:"name"`
-	Arguments map[string]any `json:"arguments"`
-	Result    string         `json:"result,omitempty"`
-	Error     string         `json:"error,omitempty"`
+	Name          string         `json:"name"`
+	Arguments     map[string]any `json:"arguments"`
+	WireArguments string         `json:"wire_arguments,omitempty"`
+	Result        string         `json:"result,omitempty"`
+	Error         string         `json:"error,omitempty"`
 }
 
 func main() {
@@ -48,6 +49,7 @@ func main() {
 	handler := mcp.ContractHandler()
 	cases := []observation{
 		{Name: "classify_reply", Arguments: map[string]any{"request_id": id, "save": false}},
+		{Name: "classify_reply", Arguments: map[string]any{"request_id": float64(id), "save": false}, WireArguments: `{"request_id":1.0,"save":false}`},
 		{Name: "generate_rebuttal", Arguments: map[string]any{"request_id": id, "save": false}},
 	}
 	for i := range cases {
