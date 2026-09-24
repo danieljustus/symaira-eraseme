@@ -1,5 +1,9 @@
 //! The actual stdio process must answer before EOF and keep stdout protocol-only.
 
+#[cfg(unix)]
+#[path = "../../symeraseme-core/tests/support/imap_server.rs"]
+mod imap_server;
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -8,6 +12,128 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
+
+#[cfg(unix)]
+use imap_server::{ScriptedImapServer, TlsMode};
+
+#[cfg(unix)]
+fn local_starttls_server() -> ScriptedImapServer {
+    use rcgen::generate_simple_self_signed;
+    use rustls::ServerConfig;
+    use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+    use std::sync::Arc;
+
+    let certified = generate_simple_self_signed(vec!["127.0.0.1".to_owned()]).unwrap();
+    let certificate: CertificateDer<'static> = certified.cert.der().clone();
+    let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(
+        certified.signing_key.serialize_der(),
+    ));
+    let config =
+        ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_no_client_auth()
+            .with_single_cert(vec![certificate], key)
+            .unwrap();
+    ScriptedImapServer::new_tls(Arc::new(config), TlsMode::StartTls).unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
+    // Reachability proof only: the process uses native roots, while the source
+    // Go MCP process has no equivalent local-root injection for byte parity.
+    let server = local_starttls_server();
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "symeraseme-mcp003-starttls-{}-{nonce}",
+        std::process::id()
+    ));
+    let home = root.join("home");
+    let data = root.join("data");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&data).unwrap();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "poll_inbox",
+            "arguments": {
+                "host": "127.0.0.1",
+                "port": server.port,
+                "username": "process-proof@example.invalid",
+                "since_days": 3650,
+                "ssl": false,
+                "folders": ["INBOX"]
+            }
+        }
+    });
+    // A fresh process gets the default empty in-memory HWM plus this private data dir.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+        .args(["mcp", "--stdio"])
+        .current_dir(&root)
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("XDG_DATA_HOME", home.join("xdg-data"))
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .env("SYMERASEME_DATA_DIR", &data)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(format!("{request}\n").as_bytes())
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if child.try_wait().unwrap().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            panic!("poll_inbox stdio process did not finish within 15 seconds");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let response: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(
+        stdout.lines().count(),
+        1,
+        "stdout must contain one MCP frame"
+    );
+    let message = response["error"]["message"].as_str().unwrap();
+    assert_eq!(response["error"]["code"], -32603);
+    assert!(message.contains("UnknownIssuer"), "{message}");
+    assert!(
+        output.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.status.success());
+
+    let transcript = server.get_transcript();
+    assert!(transcript.iter().any(|line| line.contains(" CAPABILITY")));
+    assert!(transcript.iter().any(|line| line.contains(" STARTTLS")));
+    assert!(!transcript.iter().any(|line| line.contains(" LOGIN")));
+    assert!(data.join("symeraseme.db").is_file());
+    fs::remove_dir_all(root).unwrap();
+}
 
 #[test]
 fn stdio_answers_each_request_before_eof_without_stdout_pollution() {
