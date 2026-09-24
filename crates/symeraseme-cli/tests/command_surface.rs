@@ -937,27 +937,29 @@ fn frozen_command_surface_matches_phase_two_contract() {
             "{id} status"
         );
         #[cfg(windows)]
-        let native_go = if matches!(id, "operate-migrate" | "operate-poll-inbox")
-            || id.starts_with("operate-schedule")
-        {
-            let go = run_program_with_resources(
-                &go_binary,
-                &argv,
-                &home,
-                &case_cwd,
-                &capture,
-                index + cases.len(),
-                None,
-            );
-            assert_eq!(
-                go.status.code(),
-                output.status.code(),
-                "{id} native Go exit"
-            );
-            Some(go)
-        } else {
-            None
-        };
+        let native_migration = id == "operate-migrate" || case["category"] == "migration";
+        #[cfg(windows)]
+        let native_go =
+            if native_migration || id == "operate-poll-inbox" || id.starts_with("operate-schedule")
+            {
+                let go = run_program_with_resources(
+                    &go_binary,
+                    &argv,
+                    &home,
+                    &case_cwd,
+                    &capture,
+                    index + cases.len(),
+                    None,
+                );
+                assert_eq!(
+                    go.status.code(),
+                    output.status.code(),
+                    "{id} native Go exit"
+                );
+                Some(go)
+            } else {
+                None
+            };
         let expected_stdout = match id {
             "root-version" => {
                 format!("symeraseme version {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
@@ -984,7 +986,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
             )
             .into_bytes(),
             #[cfg(windows)]
-            "operate-migrate" => native_go.as_ref().expect("native migrate oracle").stdout.clone(),
+            _ if native_migration => {
+                native_go.as_ref().expect("native migrate oracle").stdout.clone()
+            }
             #[cfg(windows)]
             id if id.starts_with("operate-schedule") => fold_schedule_output(
                 &native_go.as_ref().expect("native schedule oracle").stdout,
