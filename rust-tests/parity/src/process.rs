@@ -224,6 +224,7 @@ fn assign_process_to_job(
 #[cfg(windows)]
 fn resume_suspended_child(process_id: u32) -> std::io::Result<()> {
     use std::mem::size_of;
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
     };
@@ -231,7 +232,7 @@ fn resume_suspended_child(process_id: u32) -> std::io::Result<()> {
 
     // SAFETY: a thread snapshot has no pointer inputs and returns an owned handle.
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
-    if snapshot.is_null() {
+    if snapshot == INVALID_HANDLE_VALUE {
         return Err(std::io::Error::last_os_error());
     }
     let mut entry = THREADENTRY32 {
