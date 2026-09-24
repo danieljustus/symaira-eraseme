@@ -276,7 +276,7 @@ func verifySchedulerSources() {
 		pinnedHash := sha256.Sum256(pinned)
 		workingHash := sha256.Sum256(working)
 		if !bytes.Equal(pinned, working) || hex.EncodeToString(workingHash[:]) != source.SHA256 || hex.EncodeToString(pinnedHash[:]) != source.SHA256 {
-			fail(fmt.Errorf("Go oracle source %s does not match pinned revision %s", source.Path, schedulerSourceRevision))
+			fail(fmt.Errorf("go oracle source %s does not match pinned revision %s", source.Path, schedulerSourceRevision))
 		}
 	}
 }
@@ -511,7 +511,7 @@ func verifyCampaignSources() {
 		pinnedHash := sha256.Sum256(pinned)
 		workingHash := sha256.Sum256(working)
 		if !bytes.Equal(pinned, working) || hex.EncodeToString(workingHash[:]) != source.SHA256 || hex.EncodeToString(pinnedHash[:]) != source.SHA256 {
-			fail(fmt.Errorf("Go oracle source %s does not match pinned revision %s", source.Path, campaignSourceRevision))
+			fail(fmt.Errorf("go oracle source %s does not match pinned revision %s", source.Path, campaignSourceRevision))
 		}
 	}
 }

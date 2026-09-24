@@ -192,9 +192,10 @@ func runCase(id, provider, model string, env map[string]string, key, _ string) (
 		}
 		fatalIf(os.Setenv(name, value))
 	}
-	if provider == "ollama" {
+	switch provider {
+	case "ollama":
 		fatalIf(os.Setenv("OLLAMA_HOST", srv.URL))
-	} else if provider == "openai" || provider == "anthropic" {
+	case "openai", "anthropic":
 		fatalIf(os.Setenv("SYMERASEME_LLM_BASE_URL", srv.URL))
 	}
 	opts := llm.CreateOptions{Provider: provider, Model: model, APIKey: key}

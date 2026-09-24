@@ -2187,9 +2187,18 @@ mod tests {
                 InitializeOutcome::Response(bytes) => {
                     let mut envelope: Value = serde_json::from_slice(&bytes).unwrap();
                     if let Some(text) = envelope["result"]["content"][0]["text"].as_str() {
-                        let normalized =
-                            text.replace(&root.to_string_lossy().to_string(), "ORACLE_ROOT");
-                        envelope["result"]["content"][0]["text"] = json!(normalized);
+                        let mut content: Value = serde_json::from_str(text).unwrap();
+                        if let Some(message) = content["message"].as_str() {
+                            let normalized = message
+                                .replace(root.to_string_lossy().as_ref(), "ORACLE_ROOT")
+                                .replace(
+                                    "ORACLE_ROOT\\data\\manual_tasks",
+                                    "ORACLE_ROOT/data/manual_tasks",
+                                );
+                            content["message"] = json!(normalized);
+                        }
+                        envelope["result"]["content"][0]["text"] =
+                            json!(serde_json::to_string(&content).unwrap());
                     }
                     let mut normalized = serde_json::to_vec(&envelope).unwrap();
                     normalized.push(b'\n');
@@ -2935,19 +2944,17 @@ mod tests {
             format!("db_dir = {:?}\n", hostile_db.to_string_lossy()),
         )
         .expect("hostile project config");
-        let module_cache = std::env::var_os("GOMODCACHE")
-            .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("GOPATH")
-                    .map(PathBuf::from)
-                    .map(|path| path.join("pkg/mod"))
-            })
-            .unwrap_or_else(|| {
-                let home = std::env::var_os("HOME")
-                    .or_else(|| std::env::var_os("USERPROFILE"))
-                    .expect("home for Go module cache");
-                PathBuf::from(home).join("go/pkg/mod")
-            });
+        let module_cache = std::process::Command::new("go")
+            .args(["env", "GOMODCACHE"])
+            .output()
+            .expect("resolve Go module cache");
+        assert!(module_cache.status.success(), "resolve Go module cache");
+        let module_cache = PathBuf::from(
+            String::from_utf8(module_cache.stdout)
+                .expect("Go module cache path")
+                .trim(),
+        );
+        assert!(!module_cache.as_os_str().is_empty(), "Go module cache path");
         let build_cache = root.join("go-build");
         let isolated_home = root.join("go-home");
         fs::create_dir_all(&isolated_home).expect("Go home");
