@@ -783,4 +783,72 @@ mod tests {
             .unwrap()
             .as_secs() as i64
     }
+
+    /// The wall-clock helper really reads the system clock, unlike the fixed
+    /// clocks the deterministic tests inject.
+    #[test]
+    fn wall_clock_helper_reads_a_real_instant() {
+        let now = _fixed_clock_is_not_wall_clock();
+        assert!(
+            now > 1_600_000_000,
+            "expected a post-2020 instant, got {now}"
+        );
+    }
+
+    /// An empty HOME counts as no HOME at all — Go never resolves a consent
+    /// directory from an empty string.
+    #[test]
+    fn consent_home_treats_an_empty_home_as_missing() {
+        use std::ffi::OsString;
+
+        assert_eq!(
+            consent_home_from_environment(Some(OsString::new()), None, false),
+            None
+        );
+        assert_eq!(
+            consent_home_from_environment(Some(OsString::from("/home/person")), None, false),
+            Some(PathBuf::from("/home/person"))
+        );
+        assert_eq!(consent_home_from_environment(None, None, false), None);
+    }
+
+    /// MkdirAll's fail-closed contract: a file obstructing the consent path
+    /// reports ENOTDIR — Rust's EEXIST at the leaf is translated, a file above
+    /// the leaf propagates the raw kernel error.
+    #[cfg(unix)]
+    #[test]
+    fn ensure_directory_reports_not_a_directory_for_file_obstructions() {
+        use std::io::ErrorKind;
+
+        let directory = tempfile::tempdir().expect("tempdir");
+
+        let leaf_file = directory.path().join("consent-as-file");
+        fs::write(&leaf_file, b"x").expect("file at the leaf");
+        let leaf_error = ConsentStore::new(&leaf_file)
+            .list_tokens()
+            .expect_err("a file at the consent path must fail closed");
+        let ConsentError::Io(error) = leaf_error else {
+            panic!("expected an I/O error, got {leaf_error:?}");
+        };
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
+        assert_eq!(
+            error.raw_os_error(),
+            None,
+            "the leaf EEXIST is translated to a synthetic NotADirectory"
+        );
+
+        let parent_file = directory.path().join("parent-as-file");
+        fs::write(&parent_file, b"x").expect("file above the leaf");
+        let nested_error = ConsentStore::new(parent_file.join("consent"))
+            .list_tokens()
+            .expect_err("a file above the consent path must fail closed");
+        let ConsentError::Io(error) = nested_error else {
+            panic!("expected an I/O error, got {nested_error:?}");
+        };
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
+        assert!(
+            error.raw_os_error().is_some(),
+            "the raw ENOTDIR from the kernel is propagated unchanged"
+        );
+    }
 }
