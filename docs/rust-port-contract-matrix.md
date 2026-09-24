@@ -245,6 +245,17 @@ passed. These runs include the real MCP
 STARTTLS poll, senderless CLI execution, provider context-overflow corpus,
 and the HTTP token-start readiness check.
 
+At `339b540a`, strict all-target/all-feature Windows x86_64 GNU cross-target
+Clippy passed (`/tmp/symeraseme-windows-cross-clippy-339b540a.log`, SHA-256
+`595bc05cc5cd510d7afc7aa8784c528dbb67dc97034bd228b315b89a6060bb12`).
+This is compile/lint evidence, not native Windows process, filesystem or TLS
+execution.
+The macOS x86_64 target under Rosetta passed the complete all-target/all-feature
+Nextest suite, 559/559 with two skipped, at the same `339b540a` source
+(`/tmp/symeraseme-macos-x86-workspace-339b540a.log`, SHA-256
+`39a62804643b78025ad7346faaa86c2cd7527b8a7d699a8aa2700115765f68d2`).
+Rosetta executes Intel code but does not prove native Intel hardware behavior.
+
 ## Native integrated-source CI readback (2026-09-24)
 
 The main-branch Rust CI run [36019186658](https://github.com/danieljustus/symaira-eraseme/actions/runs/36019186658) is bound to `3428f5bf84b2796c1544f0bf9a91d50f18f13d28`. Its six `rust-native` jobs all completed successfully: Ubuntu x64/arm64, macOS arm64/Intel and Windows x64/arm64. Windows x64 and arm64 logs each show executed passing migration JSON replay, Windows case-alias/readonly backup tests, IMAP transcript replay and source-bound CLI campaign tests. This is native evidence for those executed cases, not a blanket upgrade of all matrix rows.
