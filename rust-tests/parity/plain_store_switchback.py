@@ -29,6 +29,7 @@ RETAINED_GO_SHA256 = {
     'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22',
     'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
 }
+OFFICIAL_GO_V0121_SHA256 = 'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3'
 
 
 def require(condition, message):
@@ -137,6 +138,10 @@ def snapshot(database):
                 'integrity': db.execute('PRAGMA integrity_check').fetchall(),
                 'schema': db.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
                 'tables': state}
+
+
+def without_user_version(state):
+    return {key: value for key, value in state.items() if key != 'user_version'}
 
 
 def sandbox(root, executable, extra_reads=()):
@@ -346,7 +351,11 @@ def run(go, rust, go_tool, root, retained_go=None):
              if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
     report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
-              'required_cases': list(CASES) + (['retained-go-post-rust-refusal',
+              'required_cases': list(CASES) + (['retained-go-bridge-read-four',
+                                                'retained-go-bridge-create-fifth',
+                                                'retained-go-bridge-read-five',
+                                                'rust-bridge-read-five',
+                                                'retained-go-post-rust-refusal',
                                                 'retained-go-after-v1-restore'] if retained_go else []),
               'steps': [], 'schema_sequence': [],
               'database_restore_performed': False, 'publication_verified': False,
@@ -472,7 +481,8 @@ def run(go, rust, go_tool, root, retained_go=None):
         save(root / 'sandbox-policy.json', policy)
         missing_profile = root / 'home/absent-profile.enc'
 
-        def execute(label, args, artifact=None):
+        def execute(label, args, artifact=None, command_env=None):
+            command_env = env if command_env is None else command_env
             step = {'id': label, 'success': False}
             report['steps'].append(step)
             if artifact is not None:
@@ -484,7 +494,7 @@ def run(go, rust, go_tool, root, retained_go=None):
             step['installed'] = identity(active)
             try:
                 step['command'] = command(root, label,
-                                          sandbox_command(root, label, active, args, env), env)
+                                          sandbox_command(root, label, active, args, command_env), command_env)
             finally:
                 record = root / (label + '.json')
                 if record.exists():
@@ -542,6 +552,86 @@ def run(go, rust, go_tool, root, retained_go=None):
         require(identity(fixture) == report['fixture'], 'source fixture changed')
         report['steps'][-1]['success'] = True
         if retained_go:
+            require(identity(retained_go)['sha256'] == OFFICIAL_GO_V0121_SHA256,
+                    'rollback bridge requires the SHA-pinned official Go v0.12.1 artifact')
+            bridge_dir = root / 'rollback-bridge'
+            bridge_dir.mkdir(mode=0o700)
+            bridge_db = bridge_dir / 'symeraseme.db'
+            with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source, \
+                    closing(sqlite3.connect(bridge_db)) as clone:
+                source.backup(clone)
+            source_state = snapshot(database)
+            clone_state = snapshot(bridge_db)
+            same(clone_state, source_state, 'SQLite backup clone differs before downgrade')
+            report['rollback_bridge'] = {
+                'scope': 'disposable run root only',
+                'official_go_version': 'v0.12.1',
+                'official_go_sha256': OFFICIAL_GO_V0121_SHA256,
+                'original_database': str(database),
+                'clone_database': str(bridge_db),
+                'original_state_before_bridge': source_state,
+                'clone_before_downgrade': clone_state,
+                'rust_artifact_source_binding': 'earlier-source artifact; not exact integrated source',
+            }
+            require(source_state['user_version'] == 2
+                    and len(source_state['tables']['removal_requests']['rows']) == 4,
+                    'rollback bridge requires the intact four-request Rust schema-v2 store')
+            with closing(sqlite3.connect(bridge_db)) as clone:
+                clone.execute('PRAGMA user_version = 1')
+                clone.commit()
+            downgraded = snapshot(bridge_db)
+            same(without_user_version(downgraded), without_user_version(source_state),
+                 'user_version downgrade changed state beyond its pragma')
+            require(downgraded['user_version'] == 1 and snapshot(database) == source_state,
+                    'rollback bridge did not preserve original Rust database')
+            report['rollback_bridge']['clone_after_downgrade'] = downgraded
+            report['rollback_bridge']['downgrade_changed_only_user_version'] = True
+            bridge_env = dict(env, SYMERASEME_DATA_DIR=str(bridge_dir),
+                              SYMERASEME_DB_DIR=str(bridge_dir))
+            original_rows = execute('retained-go-bridge-read-four',
+                                    ['requests', 'list', '--output', 'json'],
+                                    retained_go, bridge_env)
+            require(original_rows['total'] == 4 and len(original_rows['requests']) == 4,
+                    'official Go v0.12.1 did not read all four Rust-era requests')
+            same(sorted(map(canonical, original_rows['requests'])),
+                 sorted(map(canonical, requests['requests'])),
+                 'official Go v0.12.1 changed or missed a Rust-era request')
+            report['steps'][-1]['success'] = True
+            unique_campaign = 'rollback-bridge-' + os.urandom(8).hex()
+            bridge_create = execute('retained-go-bridge-create-fifth',
+                                    ['plan', 'create', '--campaign', unique_campaign, '--max', '1',
+                                     '--profile', str(root / 'home/bridge-absent-profile.enc'),
+                                     '--output', 'json'], retained_go, bridge_env)
+            require(bridge_create['campaign_id'] == unique_campaign
+                    and type(bridge_create['planned']) is int and bridge_create['planned'] == 1,
+                    'official Go v0.12.1 did not create one unique fifth request')
+            report['steps'][-1]['success'] = True
+            five_from_go = execute('retained-go-bridge-read-five',
+                                   ['requests', 'list', '--output', 'json'], command_env=bridge_env)
+            require(five_from_go['total'] == 5 and len(five_from_go['requests']) == 5,
+                    'official Go v0.12.1 bridge write was not readable as five requests')
+            same(sorted(map(canonical, original_rows['requests'])),
+                 sorted(map(canonical, [row for row in five_from_go['requests']
+                                        if canonical(row) in set(map(canonical, original_rows['requests']))])),
+                 'bridge fifth request changed a Rust-era request')
+            require(sum(canonical(row) not in set(map(canonical, original_rows['requests']))
+                        for row in five_from_go['requests']) == 1,
+                    'bridge must add exactly one unique request')
+            report['steps'][-1]['success'] = True
+            report['rollback_bridge']['go_after_write'] = snapshot(bridge_db)
+            rust_five = execute('rust-bridge-read-five',
+                                ['requests', 'list', '--output', 'json'], rust, bridge_env)
+            same(rust_five, five_from_go, 'current Rust could not reopen/read all five bridge requests')
+            rust_state = snapshot(bridge_db)
+            require(rust_state['user_version'] == 2 and rust_state['integrity'] == [('ok',)],
+                    'current Rust did not migrate the rollback bridge clone back to schema v2')
+            report['steps'][-1]['success'] = True
+            report['rollback_bridge']['rust_after_reopen'] = rust_state
+            report['rollback_bridge']['rust_reopened_all_five'] = True
+            require(snapshot(database) == source_state,
+                    'rollback bridge altered the original Rust schema-v2 database')
+            require(not (root / 'home/bridge-absent-profile.enc').exists(),
+                    'bridge create unexpectedly created profile input')
             step = {'id': 'retained-go-post-rust-refusal', 'success': False,
                     'expected': 'schema-v2 refusal from the exact retained artifact'}
             report['steps'].append(step)
@@ -583,7 +673,10 @@ def run(go, rust, go_tool, root, retained_go=None):
             shutil.copyfile(go, restored)
             os.replace(restored, active)
             require(identity(active) == identity(go), 'current Go artifact restore failed')
-        expected_cases = list(CASES) + (['retained-go-post-rust-refusal',
+        expected_cases = list(CASES) + (['retained-go-bridge-read-four',
+                                        'retained-go-bridge-create-fifth',
+                                        'retained-go-bridge-read-five', 'rust-bridge-read-five',
+                                        'retained-go-post-rust-refusal',
                                         'retained-go-after-v1-restore'] if retained_go else [])
         require([step['id'] for step in report['steps']] == expected_cases
                 and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')

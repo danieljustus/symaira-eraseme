@@ -133,6 +133,26 @@ else:
                 with self.subTest(sql=sql), self.assertRaisesRegex(ValueError, 'changed state'):
                     gate.same(gate.snapshot(database), baseline, 'changed state')
 
+    def test_bridge_comparison_allows_only_user_version_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / 'bridge.db'
+            with closing(sqlite3.connect(database)) as connection:
+                connection.executescript('CREATE TABLE requests (id INTEGER, value TEXT);'
+                                         "INSERT INTO requests VALUES(1, 'kept');"
+                                         'PRAGMA user_version = 2;')
+            original = gate.snapshot(database)
+            downgraded = dict(original, user_version=1)
+            gate.same(gate.without_user_version(downgraded),
+                      gate.without_user_version(original), 'user_version-only downgrade')
+            changed = dict(downgraded)
+            changed['tables'] = dict(downgraded['tables'])
+            changed['tables']['requests'] = dict(downgraded['tables']['requests'])
+            changed['tables']['requests']['rows'] = ['[2,"changed"]']
+            with self.assertRaisesRegex(ValueError, 'changed beyond its pragma'):
+                gate.same(gate.without_user_version(changed),
+                          gate.without_user_version(original),
+                          'clone row mutation changed beyond its pragma')
+
     def test_identical_binaries_and_existing_output_fail_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
