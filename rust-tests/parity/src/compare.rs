@@ -537,3 +537,29 @@ mod tests {
         assert!(report.contains("normalizer reason: isolated runtime root"));
     }
 }
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use crate::case::{Case, Program};
+    use std::path::PathBuf;
+
+    fn dummy(text: &str) -> Program {
+        Program {
+            executable: PathBuf::from("cmd.exe"),
+            argv: vec!["/C".into(), format!("echo|set /p={text}")],
+        }
+    }
+
+    #[test]
+    fn compares_real_windows_subprocesses() {
+        let same = Case::new("windows-equal", dummy("same"), dummy("same"));
+        assert_eq!(compare_case(&same).unwrap(), Ok(()));
+
+        let different = Case::new("windows-different", dummy("oracle"), dummy("rewrite"));
+        let differences = compare_case(&different)
+            .unwrap()
+            .expect_err("mismatch must fail");
+        assert!(format_differences(&differences).contains("stdout[byte 0]"));
+    }
+}
