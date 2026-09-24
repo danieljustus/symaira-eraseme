@@ -1112,4 +1112,198 @@ mod tests {
             }
         }
     }
+
+    /// Values that are not objects are framed only if the whole value is the
+    /// request; anything the byte scanner cannot consume or with trailing
+    /// garbage is a parse error.
+    #[test]
+    fn parse_request_rejects_values_it_cannot_frame() {
+        assert!(matches!(
+            initialize(b"truX", &no_backend_handler()),
+            InitializeOutcome::ParseError
+        ));
+        assert!(matches!(
+            initialize(b"12 34", &no_backend_handler()),
+            InitializeOutcome::ParseError
+        ));
+    }
+
+    /// Raw field classification: `null` is Go's absent value, a truncated
+    /// quoted token is an error, and params objects with trailing garbage or a
+    /// non-object shape classify as `Other` (which becomes -32602).
+    #[test]
+    fn raw_field_classification_handles_null_truncated_and_trailing_tokens() {
+        assert_eq!(super::classify_raw_string(b"null"), (None, false));
+        assert_eq!(super::classify_raw_string(b"\"abc"), (None, true));
+        assert_eq!(super::classify_raw_string(b"\"a\\qb\""), (None, true));
+        assert_eq!(
+            super::classify_raw_string(b"\"ok\""),
+            (Some("ok".to_owned()), false)
+        );
+
+        assert!(matches!(
+            super::classify_raw_params(b"null"),
+            super::ParamsState::Null
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"{}"),
+            super::ParamsState::Object
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"{}x"),
+            super::ParamsState::Other
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"[1]"),
+            super::ParamsState::Other
+        ));
+    }
+
+    /// The object-field walker only accepts objects; malformed member syntax
+    /// inside one is a parse error before any dispatch happens.
+    #[test]
+    fn object_field_scanning_rejects_non_objects_and_malformed_members() {
+        assert!(super::scan_object_fields(b"[1]").is_none());
+
+        for request in [
+            &br#"{"a" 1}"#[..],  // key not followed by a colon
+            br#"{"a":1 x}"#,     // garbage after a member value
+            br#"{"a\u00zz":1}"#, // \u escape without four hex digits
+            b"{\"abc",           // truncated key string
+        ] {
+            assert!(
+                matches!(
+                    initialize(request, &no_backend_handler()),
+                    InitializeOutcome::ParseError
+                ),
+                "expected a parse error for {:?}",
+                String::from_utf8_lossy(request)
+            );
+        }
+    }
+
+    /// A lone low surrogate in the id decodes to Go's replacement character
+    /// instead of failing the request.
+    #[test]
+    fn id_decoding_renders_lone_surrogates_as_replacement_characters() {
+        let outcome = initialize(
+            br#"{"jsonrpc":"2.0","method":"initialize","id":"\udc00"}"#,
+            &no_backend_handler(),
+        );
+        let InitializeOutcome::Response(bytes) = outcome else {
+            panic!("a lone surrogate id is still a valid request");
+        };
+        let text = String::from_utf8(bytes).expect("response is UTF-8");
+        assert!(text.contains('\u{fffd}'), "{text}");
+    }
+
+    /// The catalogue dispatch hands frames the shared deserializer rejects
+    /// (serde's 128-frame recursion limit vs the scanner's 10 000) straight
+    /// back as parse errors for every catalogue method.
+    #[test]
+    fn dispatch_fails_frames_the_catalogue_deserializer_rejects() {
+        let handler = no_backend_handler();
+        let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
+
+        let tools_list = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{{"deep":{deep}}}}}"#
+        );
+        assert!(matches!(
+            initialize(tools_list.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+
+        let tools_call = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"redact_file","arguments":{{"deep":{deep}}}}}}}"#
+        );
+        assert!(matches!(
+            initialize(tools_call.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+
+        let legacy = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"redact_file","params":{{"deep":{deep}}}}}"#
+        );
+        assert!(matches!(
+            initialize(legacy.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+    }
+
+    /// Go drops `tools/call` notifications before any rejection — and its
+    /// field matcher accepts `ID` where serde does not, so the dispatch sees
+    /// an id while the catalogue validation sees a notification.
+    #[test]
+    fn tools_call_notifications_are_dropped_before_dispatch() {
+        let handler = no_backend_handler();
+
+        let no_id =
+            br#"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"redact_file","arguments":{}}}"#;
+        assert!(matches!(
+            initialize(no_id, &handler),
+            InitializeOutcome::Notification
+        ));
+
+        let upper_id = br#"{"jsonrpc":"2.0","ID":7,"method":"tools/call","params":{"name":"redact_file","arguments":{}}}"#;
+        assert!(matches!(
+            initialize(upper_id, &handler),
+            InitializeOutcome::Notification
+        ));
+    }
+
+    /// The iterative scanner enforces Go's 10,000-value nesting limit from
+    /// both sides and reports the exact byte position where framing stopped.
+    #[test]
+    fn scanner_enforces_go_depth_limit_and_reports_unframeable_positions() {
+        // Objects only frame in value position, so the chain repeats the
+        // `{"a":` opener until the 10,001st would exceed the limit; arrays
+        // walk the same needs-value path from the second element on.
+        let deep_object = "{\"a\":".repeat(10_001);
+        assert!(matches!(
+            super::scan_json_value(deep_object.as_bytes(), 0, false),
+            Err(b'{')
+        ));
+        assert!(matches!(
+            super::scan_json_value(&b"[".repeat(10_001), 0, false),
+            Err(b'[')
+        ));
+        let boundary = format!("{}1{}", "{\"a\":".repeat(10_000), "}".repeat(10_000));
+        assert!(
+            matches!(
+                super::scan_json_value(boundary.as_bytes(), 0, false),
+                Ok(Some(_))
+            ),
+            "exactly 10000 nested objects must still frame"
+        );
+
+        assert_eq!(super::scan_json_value(b"[", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(br#"{"a" 1}"#, 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(br#"{"a":1 2}"#, 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"[1 2]", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"1.", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"1e", 0, false), Ok(None));
+    }
+
+    /// The JSON-number validator rejects truncated fractions and exponents as
+    /// well as non-UTF-8 input.
+    #[test]
+    fn json_number_validator_rejects_truncated_forms_and_non_utf8() {
+        assert!(!super::is_json_number(b"1."));
+        assert!(!super::is_json_number(b"1e"));
+        assert!(!super::is_json_number(b"\xff\xfe"));
+        assert!(!super::is_json_number(b"01"));
+        assert!(super::is_json_number(b"-2.5e10"));
+        assert!(super::is_json_number(b"0"));
+    }
+
+    /// Go's float rendering: plain decimals pass through, e-notation outside
+    /// -6..=20 stays, and signed mantissas split at the decimal point.
+    #[test]
+    fn float_text_expands_decimal_and_signed_mantissas() {
+        assert_eq!(super::go_float_text("-1.2345e1"), "-12.345");
+        assert_eq!(super::go_float_text("123.45"), "123.45");
+        assert_eq!(super::go_float_text("1.5e-7"), "1.5e-7");
+        assert_eq!(super::go_float_text("2.0e3"), "2000");
+        assert_eq!(super::go_float_text("1.0"), "1");
+    }
 }

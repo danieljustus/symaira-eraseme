@@ -438,4 +438,229 @@ mod tests {
         assert_eq!(error, StreamError::UnexpectedEof);
         assert!(output.is_empty());
     }
+
+    /// Every byte Go quotes specially keeps Go's spelling in the error text.
+    #[test]
+    fn go_quoted_byte_escapes_control_characters_go_style() {
+        assert_eq!(go_quoted_byte(b'\\'), "\\\\");
+        assert_eq!(go_quoted_byte(b'\''), "\\'");
+        assert_eq!(go_quoted_byte(b'\t'), "\\t");
+        assert_eq!(go_quoted_byte(b'\n'), "\\n");
+        assert_eq!(go_quoted_byte(b'\r'), "\\r");
+        assert_eq!(go_quoted_byte(0x0b), "\\v");
+        assert_eq!(go_quoted_byte(0x0c), "\\f");
+        assert_eq!(go_quoted_byte(0x08), "\\b");
+        assert_eq!(go_quoted_byte(0x01), "\\x01");
+        assert_eq!(go_quoted_byte(b'{'), "{");
+    }
+
+    /// `expects_object_key` walks strings (including escapes), containers and
+    /// separators to decide whether the next token must be an object key.
+    #[test]
+    fn expects_object_key_tracks_escapes_containers_and_separators() {
+        // After a key, before its colon, the object still expects a key state.
+        assert!(expects_object_key(br#"{"a""#, 4));
+        // After the colon the next token is a value, not a key.
+        assert!(!expects_object_key(br#"{"a":"#, 5));
+        // After a comma inside an object a key is expected again.
+        assert!(expects_object_key(br#"{"a":1,"#, 7));
+        // Closing the object pops the frame: nothing is expected.
+        assert!(!expects_object_key(br#"{"a":1}"#, 7));
+        // An escaped quote inside the value must not end the string.
+        assert!(expects_object_key(br#"{"a":"\t","#, 10));
+        // Arrays never expect object keys.
+        assert!(!expects_object_key(b"[1]", 3));
+    }
+
+    /// Go's recorded syntax-error wording for the bytes the shared scanner
+    /// refuses to frame.
+    #[test]
+    fn serve_stream_rejects_go_syntax_errors_with_recorded_wording() {
+        let handler = no_backend_handler();
+        let mut output = Vec::new();
+
+        let error = serve_stream(br#"{"a":truX}"#, &mut output, &handler)
+            .expect_err("bad literal must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character 'X' in literal true (expecting 'e')".to_owned())
+        );
+
+        let error = serve_stream(br#"{"a":falze}"#, &mut output, &handler)
+            .expect_err("bad literal must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax(
+                "invalid character 'z' in literal false (expecting 's')".to_owned()
+            )
+        );
+
+        // A valid string escape is walked without error before the frame
+        // itself fails, so the escape loop must not fire.
+        let error = serve_stream(br#"{"a":"\n" x}"#, &mut output, &handler)
+            .expect_err("trailing garbage must abort the stream");
+        assert!(matches!(error, StreamError::Syntax(_)), "{error}");
+        assert!(
+            error.to_string().starts_with("invalid character"),
+            "{error}"
+        );
+
+        // A vertical tab where an object key belongs gets Go's key wording.
+        let error = serve_stream(b"{\x0b}", &mut output, &handler)
+            .expect_err("vertical tab must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax(
+                "invalid character '\\v' looking for beginning of object key string".to_owned()
+            )
+        );
+    }
+
+    /// Nesting past Go's 10,000-value limit aborts both transports with the
+    /// same recorded wording, and frames the deserializer rejects after the
+    /// scanner accepted them fail loudly instead of being dropped.
+    #[test]
+    fn depth_overflow_and_unreadable_frames_fail_loudly() {
+        let handler = no_backend_handler();
+
+        // Objects frame in value position only, so the chain repeats the
+        // `{"a":` opener; arrays count from their second element.
+        let deep_object = "{\"a\":".repeat(10_001);
+        let mut output = Vec::new();
+        let error = serve_stream(deep_object.as_bytes(), &mut output, &handler)
+            .expect_err("10001 nested objects exceed Go's limit");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '{' exceeded max depth".to_owned())
+        );
+
+        let deep_array = "[".repeat(10_001);
+        let mut output = Vec::new();
+        let error = serve_stream(deep_array.as_bytes(), &mut output, &handler)
+            .expect_err("10001 nested arrays exceed Go's limit");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '[' exceeded max depth".to_owned())
+        );
+
+        let mut reader = std::io::BufReader::new(deep_object.as_bytes());
+        let mut sink = Vec::new();
+        let error = serve_stdio(&mut reader, &mut sink, &handler)
+            .expect_err("stdio depth overflow must abort too");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '{' exceeded max depth".to_owned())
+        );
+
+        // 200 nested arrays: the scanner (limit 10 000) accepts them, the
+        // catalogue's serde_json (limit 128) rejects them.
+        let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
+        let request = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"redact_file","arguments":{{"deep":{deep}}}}}}}"#
+        );
+        let mut output = Vec::new();
+        let error = serve_stream(request.as_bytes(), &mut output, &handler)
+            .expect_err("an accepted-but-unreadable frame fails loudly");
+        assert_eq!(error, StreamError::UnparsableValue(0));
+
+        let mut reader = std::io::BufReader::new(request.as_bytes());
+        let mut sink = Vec::new();
+        let error = serve_stdio(&mut reader, &mut sink, &handler)
+            .expect_err("the stdio path fails loudly too");
+        assert!(
+            matches!(error, StreamError::UnparsableValue(_)),
+            "expected UnparsableValue, got {error}"
+        );
+    }
+
+    /// Every value the scanner refuses to frame aborts the stream; a value cut
+    /// off inside the container is Go's EOF, the rest are syntax errors.
+    #[test]
+    fn serve_stream_rejects_truncated_and_misaligned_values() {
+        let handler = no_backend_handler();
+
+        // Missing value after the opening bracket: Go reports EOF.
+        let mut output = Vec::new();
+        let error = serve_stream(b"[", &mut output, &handler)
+            .expect_err("an open array with no value must abort");
+        assert_eq!(error, StreamError::UnexpectedEof);
+
+        let misaligned: [&[u8]; 3] = [
+            br#"{"a" 1}"#,   // key not followed by a colon
+            br#"{"a":1 2}"#, // garbage after an object value
+            b"[1 2]",        // garbage after an array value
+        ];
+        for input in misaligned {
+            let mut output = Vec::new();
+            let error = match serve_stream(input, &mut output, &handler) {
+                Ok(()) => panic!("{} must abort", String::from_utf8_lossy(input)),
+                Err(error) => error,
+            };
+            assert!(
+                matches!(error, StreamError::Syntax(_)),
+                "expected a syntax error for {}, got {error}",
+                String::from_utf8_lossy(input)
+            );
+        }
+
+        // Number tokens cut off before their digits are complete: the scanner
+        // refuses to frame them, and the stream aborts with Go's EOF.
+        for input in [&b"1."[..], b"1e"] {
+            let mut output = Vec::new();
+            let error = match serve_stream(input, &mut output, &handler) {
+                Ok(()) => panic!("{:?} must abort", String::from_utf8_lossy(input)),
+                Err(error) => error,
+            };
+            assert_eq!(
+                error,
+                StreamError::UnexpectedEof,
+                "for {:?}",
+                String::from_utf8_lossy(input)
+            );
+        }
+    }
+
+    struct FailingWriter;
+
+    impl std::io::Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("stdout is gone"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct FailingReader;
+
+    impl std::io::Read for FailingReader {
+        fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("stdin is gone"))
+        }
+    }
+
+    impl std::io::BufRead for FailingReader {
+        fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+            Err(std::io::Error::other("stdin is gone"))
+        }
+        fn consume(&mut self, _amt: usize) {}
+    }
+
+    /// A failing stdout or stdin aborts the stdio transport with the I/O
+    /// message instead of a fabricated response.
+    #[test]
+    fn serve_stdio_reports_read_and_write_failures_loudly() {
+        let handler = no_backend_handler();
+        let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#;
+        let mut reader = std::io::BufReader::new(&request[..]);
+        let error = serve_stdio(&mut reader, &mut FailingWriter, &handler)
+            .expect_err("stdout failure must abort");
+        assert_eq!(error, StreamError::Io("stdout is gone".to_owned()));
+
+        let mut reader = FailingReader;
+        let mut sink = Vec::new();
+        let error =
+            serve_stdio(&mut reader, &mut sink, &handler).expect_err("stdin failure must abort");
+        assert_eq!(error, StreamError::Io("stdin is gone".to_owned()));
+    }
 }

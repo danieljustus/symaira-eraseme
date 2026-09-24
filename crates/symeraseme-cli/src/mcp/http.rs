@@ -457,3 +457,185 @@ mod origin_tests {
         assert!(origin_header_allowed(headers.get(header::ORIGIN)));
     }
 }
+
+#[cfg(test)]
+mod transport_tests {
+    use super::*;
+    use crate::mcp::handler::test_support::no_backend_handler;
+    use std::sync::Arc;
+
+    /// An invalid port is rejected before the auth token is written and before
+    /// the handler is built — the build callback must never run.
+    #[test]
+    fn serve_rejects_an_invalid_port_before_building_the_handler() {
+        let result = serve(
+            String::new(),
+            0,
+            false,
+            || -> Result<Arc<dyn ToolHandler>, String> {
+                panic!("the handler must not be built when the port is invalid")
+            },
+        );
+        let error = result.expect_err("port 0 must be rejected");
+        assert_eq!(error, "invalid MCP port 0: must be between 1 and 65535");
+    }
+
+    /// Go's `listen` error wording for each bind failure class.
+    #[test]
+    fn listen_error_words_each_bind_failure_like_go() {
+        let in_use = std::io::Error::from(std::io::ErrorKind::AddrInUse);
+        assert_eq!(
+            listen_error("127.0.0.1:8080", in_use),
+            "listen tcp 127.0.0.1:8080: bind: address already in use"
+        );
+
+        let unavailable = std::io::Error::from(std::io::ErrorKind::AddrNotAvailable);
+        assert_eq!(
+            listen_error("[::1]:8080", unavailable),
+            format!(
+                "listen tcp [::1]:8080: bind: {}",
+                addr_not_available_message()
+            )
+        );
+
+        let other = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+        assert_eq!(
+            listen_error("127.0.0.1:8080", other),
+            "listen tcp 127.0.0.1:8080: permission denied"
+        );
+    }
+
+    /// A shutdown that was already signalled returns without awaiting a change.
+    #[test]
+    fn wait_for_shutdown_returns_when_the_signal_already_fired() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime");
+        let (_tx, rx) = tokio::sync::watch::channel(true);
+        runtime.block_on(wait_for_shutdown(rx));
+    }
+
+    /// IPv4-mapped IPv6 loopback addresses are loopback binds.
+    #[test]
+    fn is_loopback_host_accepts_mapped_ipv6_loopback() {
+        assert!(is_loopback_host("::ffff:127.0.0.1"));
+        assert!(is_loopback_host("::1"));
+        assert!(is_loopback_host("LOCALHOST"));
+        assert!(!is_loopback_host("fe80::1"));
+        assert!(!is_loopback_host("203.0.113.7"));
+    }
+
+    /// Authorization demands exactly one `Bearer ` header whose length and
+    /// bytes match the token; every other shape is rejected.
+    #[test]
+    fn authorized_requires_one_well_formed_bearer_token() {
+        let token = "gzT0j9pExampleTokenLongEnoughToCompare43abc";
+        let mut headers = http::HeaderMap::new();
+
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_static("Basic Zm9vOmJhcg"),
+        );
+        assert!(!authorized(&headers, token), "non-Bearer scheme");
+
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_static("Bearer "),
+        );
+        assert!(!authorized(&headers, token), "empty bearer value");
+
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_static("Bearer short"),
+        );
+        assert!(!authorized(&headers, token), "length mismatch");
+
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
+        );
+        assert!(authorized(&headers, token), "exact token");
+    }
+
+    fn reply_text(reply: &HttpReply) -> String {
+        String::from_utf8(reply.body.clone()).expect("reply is UTF-8")
+    }
+
+    fn request(id: i32) -> String {
+        format!(r#"{{"jsonrpc":"2.0","id":{id},"method":"initialize"}}"#)
+    }
+
+    /// A batch joins the per-item responses into one array with the trailing
+    /// newlines stripped.
+    #[test]
+    fn protocol_reply_joins_batched_responses() {
+        let handler = no_backend_handler();
+        let body = format!("[{},{}]", request(1), request(2));
+        let reply = protocol_reply(body.as_bytes(), &handler);
+        assert_eq!(reply.status, 200);
+        let text = reply_text(&reply);
+        assert!(text.starts_with('['), "{text}");
+        assert!(text.ends_with("]\n"), "{text}");
+        assert_eq!(text.matches("\"id\":1").count(), 1, "{text}");
+        assert_eq!(text.matches("\"id\":2").count(), 1, "{text}");
+        assert!(
+            !text.contains("}\n,"),
+            "item newlines must be stripped: {text}"
+        );
+    }
+
+    /// A batch whose items are all notifications answers 204 with no body.
+    #[test]
+    fn protocol_reply_answers_204_when_no_batch_item_wants_a_response() {
+        let handler = no_backend_handler();
+        let reply = protocol_reply(br#"[{"jsonrpc":"2.0","method":"initialize"}]"#, &handler);
+        assert_eq!(reply.status, 204);
+        assert!(reply.body.is_empty());
+    }
+
+    /// Empty batches are invalid requests; unskippable items abort with a
+    /// parse error; items without a separating comma stop the loop after the
+    /// first response.
+    #[test]
+    fn protocol_reply_rejects_empty_and_malformed_batches() {
+        let handler = no_backend_handler();
+
+        let empty = protocol_reply(b"[]", &handler);
+        assert_eq!(empty.status, 200);
+        assert!(reply_text(&empty).contains("-32600"), "empty batch");
+
+        let malformed = format!("[{}, truX]", request(1));
+        let reply = protocol_reply(malformed.as_bytes(), &handler);
+        assert_eq!(reply.status, 200);
+        assert!(reply_text(&reply).contains("-32700"), "unskippable item");
+
+        let unseparated = format!("[{} {}]", request(1), request(2));
+        let joined = protocol_reply(unseparated.as_bytes(), &handler);
+        assert_eq!(joined.status, 200);
+        let text = reply_text(&joined);
+        // A missing separator aborts the whole batch — neither item answers.
+        assert!(text.contains("-32700"), "batch parse error: {text}");
+        assert!(
+            !text.contains("\"result\""),
+            "no item is dispatched: {text}"
+        );
+    }
+
+    /// The Go-compatible scanner frames 200 nested arrays, but serde_json's
+    /// recursion limit rejects the catalogue dispatch — that divergence must
+    /// surface as a JSON-RPC parse error, not a dropped request.
+    #[test]
+    fn protocol_reply_reports_a_parse_error_for_frames_serde_rejects() {
+        let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
+        let single = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{{"deep":{deep}}}}}"#
+        );
+        let handler = no_backend_handler();
+        let reply = protocol_reply(single.as_bytes(), &handler);
+        assert_eq!(reply.status, 200);
+        let text = reply_text(&reply);
+        assert!(text.contains("-32700"), "{text}");
+        assert!(text.contains("parse error"), "{text}");
+    }
+}
