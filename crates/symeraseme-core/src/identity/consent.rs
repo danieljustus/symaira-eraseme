@@ -572,12 +572,30 @@ fn close_file(file: fs::File) -> io::Result<()> {
         // or turn EINTR into success; both could conceal a close failure.
         nix::unistd::close(file).map_err(io::Error::from)
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        // A reviewed checked-close API for these targets remains an ID-005
-        // blocker. Preserve the existing drop behavior and the sync guard.
-        drop(file);
+        use std::os::windows::io::IntoRawHandle;
+
+        close_raw_handle(file.into_raw_handle())
+    }
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn close_raw_handle(handle: std::os::windows::io::RawHandle) -> io::Result<()> {
+    use std::ffi::c_void;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn CloseHandle(handle: *mut c_void) -> i32;
+    }
+
+    // `into_raw_handle` transfers the unique file handle, so CloseHandle owns
+    // the one close attempt and its native error is returned to the caller.
+    if unsafe { CloseHandle(handle.cast()) } != 0 {
         Ok(())
+    } else {
+        Err(io::Error::last_os_error())
     }
 }
 
@@ -630,6 +648,10 @@ mod filesystem_tests;
 #[cfg(test)]
 #[path = "consent_portable_tests.rs"]
 mod portable_filesystem_tests;
+
+#[cfg(all(test, windows))]
+#[path = "consent_windows_tests.rs"]
+mod windows_filesystem_tests;
 
 #[cfg(test)]
 mod tests {
