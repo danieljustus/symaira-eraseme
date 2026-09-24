@@ -2,6 +2,7 @@
 """Disposable v1 backup/restore rehearsal for the retained historical Go fallback."""
 import argparse
 from contextlib import closing
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tarfile
 
 import plain_store_switchback as gate
 
@@ -76,19 +78,65 @@ def invoke(root, label, executable, args, env, *, success, json_output=True):
     return None, record, stdout, stderr
 
 
-def source_identity():
+def harness_identity():
     head = subprocess.run(['git', '-C', str(REPO), 'rev-parse', 'HEAD'],
                           check=True, capture_output=True, text=True, timeout=5).stdout.strip()
     status = subprocess.run(
-        ['git', '-C', str(REPO), 'status', '--porcelain=v1', '--',
-         'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml',
-         'crates/symeraseme-cli', 'crates/symeraseme-core'],
+        ['git', '-C', str(REPO), 'status', '--porcelain=v1', '--untracked-files=all'],
         check=True, capture_output=True, text=True, timeout=5).stdout.splitlines()
-    require(not status, 'Rust production build inputs have uncommitted changes')
-    return {'head': head, 'production_inputs_clean': True}
+    files = ('rust-tests/parity/backup_restore_rehearsal.py',
+             'rust-tests/parity/test_plain_backup_restore.py',
+             'docs/rust-port/backup-restore-rehearsal.md')
+    committed = {}
+    for relative in files:
+        blob = subprocess.run(
+            ['git', '-C', str(REPO), 'show', 'HEAD:' + relative],
+            check=True, capture_output=True, timeout=5).stdout
+        working = (REPO / relative).read_bytes()
+        committed[relative] = {
+            'committed_sha256': hashlib.sha256(blob).hexdigest(),
+            'working_sha256': hashlib.sha256(working).hexdigest(),
+            'matches_head': blob == working,
+        }
+    runner = gate.identity(Path(__file__).resolve())
+    require(committed[files[0]]['matches_head'],
+            'rehearsal runner must be the committed candidate being measured')
+    return {
+        'committed_revision': head,
+        'worktree_dirty_status': 'dirty' if status else 'clean',
+        'tracked_dirty_path_count': sum(not line.startswith('??') for line in status),
+        'untracked_path_count': sum(line.startswith('??') for line in status),
+        'runner': {'path': str(Path(__file__).resolve()), **runner,
+                   'matches_committed_blob': committed[files[0]]['matches_head']},
+        'committed_harness_files': committed,
+    }
 
 
-def run(go, rust, go_tool, output_dir):
+def verify_go_archive(archive, binary):
+    archive = Path(archive).resolve(strict=True)
+    binary = Path(binary).resolve(strict=True)
+    archive_identity = gate.identity(archive)
+    binary_identity = gate.identity(binary)
+    with tarfile.open(archive, mode='r:*') as tar:
+        matches = [member for member in tar.getmembers() if member.name == 'symeraseme']
+        require(len(matches) == 1 and matches[0].isfile(),
+                'Go archive must contain exactly one regular symeraseme member')
+        stream = tar.extractfile(matches[0])
+        require(stream is not None, 'cannot read symeraseme member from Go archive')
+        with stream:
+            digest = hashlib.sha256()
+            size = 0
+            for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                digest.update(chunk)
+                size += len(chunk)
+    require(size == binary_identity['size'] and digest.hexdigest() == binary_identity['sha256'],
+            'Go archive symeraseme bytes differ from the supplied Go binary')
+    return {'path': str(archive), **archive_identity,
+            'member': 'symeraseme', 'member_size': size,
+            'member_sha256': digest.hexdigest(), 'matches_supplied_binary': True}
+
+
+def run(go, rust, go_tool, output_dir, go_archive=None):
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: shared switchback confinement supports macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -112,13 +160,14 @@ def run(go, rust, go_tool, output_dir):
         'rust_created_request_absent_after_restore': False,
         'negative_control_rejected': False,
         'publication_verified': False,
+        'go_archive': None,
         'go_artifact_provenance': {
             'role': 'caller-supplied retained Go fallback artifact',
             'path': str(go),
             'release_identity_asserted_by_runner': False,
             'note': 'The runner records the supplied bytes and embedded build metadata; filenames alone do not establish release identity.',
         },
-        'rust_source': source_identity(),
+        'harness': harness_identity(),
     }
     try:
         for name in ('home', 'config', 'cache', 'tmp', 'empty-path', 'bin',
@@ -140,10 +189,12 @@ def run(go, rust, go_tool, output_dir):
         report['artifacts'] = {
             'retained_go': {'supplied_path': str(go), 'identity': go_identity},
             'rust': {'supplied_path': str(rust), 'identity': rust_identity,
-                     'source': report['rust_source']},
+                     'source_binding': 'not established by this runner; binary is caller-supplied and checkout identity is recorded separately'},
         }
         require(report['artifacts']['retained_go']['identity'] !=
                 report['artifacts']['rust']['identity'], 'Go and Rust artifact bytes must differ')
+        if go_archive is not None:
+            report['go_archive'] = verify_go_archive(go_archive, go)
 
         env = {
             'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
@@ -303,26 +354,38 @@ def run(go, rust, go_tool, output_dir):
         sqlite_backup(backup, partial_db)
         python = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
         python = (python if python.is_file() else Path(sys.executable)).resolve()
-        mutation = (
-            'import json,sqlite3,sys; p=sys.argv[1]; db=sqlite3.connect(p); '
-            'row=db.execute("SELECT id,campaign_id FROM removal_requests ORDER BY id LIMIT 1").fetchone(); '
-            'assert row is not None; db.execute("UPDATE removal_requests SET campaign_id=? WHERE id=?", '
-            '("partial-restore-control",row[0])); db.commit(); '
-            'print(json.dumps({"request_id":row[0],"old_campaign_id":row[1],'
-            '"new_campaign_id":"partial-restore-control"},sort_keys=True)); db.close()'
-        )
+        mutation = '''import json,sqlite3,sys
+p=sys.argv[1]
+db=sqlite3.connect(p)
+db.execute("PRAGMA foreign_keys=ON")
+row=db.execute("SELECT id FROM removal_requests ORDER BY id LIMIT 1").fetchone()
+assert row is not None
+request_id=row[0]
+db.execute("DELETE FROM reply_drafts WHERE request_id=? OR reply_id IN (SELECT id FROM inbox_replies WHERE request_id=?)", (request_id, request_id))
+for table in ("inbox_replies", "manual_tasks", "request_state", "request_events"):
+    db.execute("DELETE FROM "+table+" WHERE request_id=?", (request_id,))
+db.execute("DELETE FROM removal_requests WHERE id=?", (request_id,))
+db.commit()
+remaining=db.execute("SELECT count(*) FROM removal_requests").fetchone()[0]
+assert remaining == 2
+print(json.dumps({"deleted_request_id": request_id, "remaining_requests": remaining}, sort_keys=True))
+db.close()
+'''
         mutation_env = dict(env, XDG_DATA_HOME=str(root / 'partial/data'),
                             SYMERASEME_DATA_DIR=str(root / 'partial/data'),
                             SYMERASEME_DB_DIR=str(root / 'partial/data'))
         changed, _, _, stderr = invoke(
             root, 'partial-restore-mutation', python,
             ['-I', '-S', '-c', mutation, str(partial_db)], mutation_env, success=True)
-        require(not stderr and changed.get('new_campaign_id') == 'partial-restore-control',
-                'partial-restore negative control mutation was not exercised')
+        require(not stderr and type(changed.get('deleted_request_id')) is int
+                and changed.get('remaining_requests') == 2,
+                'partial-restore negative control did not delete one baseline request')
         partial, _, _, stderr = invoke(root, 'partial-restore-negative-control', staged_go,
                                        ['requests', 'list', '--output', 'json'],
                                        mutation_env, success=True)
-        require(not stderr, 'partial restore Go probe unexpectedly failed before validation')
+        require(not stderr and type(partial.get('total')) is int and partial['total'] == 2
+                and len(partial.get('requests', [])) == 2,
+                'Go did not read back exactly two requests from the incomplete restore')
         try:
             validate_baseline(partial, baseline)
         except ValueError:
@@ -333,8 +396,13 @@ def run(go, rust, go_tool, output_dir):
                 after_baseline['tables']['removal_requests']['rows'],
                 'partial restore control did not change the expected SQLite state')
         report['steps'].append({'id': CASES[7], 'success': True,
+                                'deleted_request_id': changed['deleted_request_id'],
+                                'observed_go_request_count': partial['total'],
                                 'baseline_verifier_rejected': True,
-                                'mutation': changed})
+                                'mutation': changed,
+                                'go_readback_sha256': json.loads(
+                                    (root / 'partial-restore-negative-control.json').read_bytes()
+                                )['stdout']['sha256']})
 
         fixture_after = {'path': str(FIXTURE), **gate.identity(FIXTURE)}
         require(fixture_after['sha256'] == fixture_identity['sha256'],
@@ -356,6 +424,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--go', type=Path, required=True,
                         help='retained historical Go fallback artifact')
+    parser.add_argument('--go-archive', type=Path,
+                        help='optional official Go archive; its sole symeraseme member must match --go')
     parser.add_argument('--rust', type=Path, required=True,
                         help='locally built Rust CLI candidate')
     parser.add_argument('--go-tool', type=Path, required=True,
@@ -363,7 +433,7 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True,
                         help='new disposable evidence directory; it must not exist')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']),
                       'schema_versions': result['schema_versions'],

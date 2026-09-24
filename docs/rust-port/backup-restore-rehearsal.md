@@ -13,16 +13,19 @@ It does not infer release identity from a filename. The repository's retained
 `evidence/artifact/symeraseme-rollback-v0.12.1` file reports module `(devel)` and
 no source revision, so a run using it records only historical byte identity.
 For release-bound evidence, pass the unmodified binary extracted from the
-checksum-verified official archive; preserve that archive checksum alongside
-the run. Any observed schema-v2 failure is specific to the exact supplied
-artifact and this rehearsal.
+checksum-verified official archive with `--go-archive`; the runner reads the
+archive without extracting and requires exactly one regular top-level
+`symeraseme` member whose bytes match `--go`. It records the archive hash and
+the binary's embedded source metadata. Any observed schema-v2 failure is
+specific to the exact supplied artifact and this rehearsal.
 
 Run on macOS, or on the native Linux aarch64 sandbox supported by
 `plain_store_switchback.py`:
 
 ```sh
 python3 rust-tests/parity/backup_restore_rehearsal.py \
-  --go /absolute/path/to/verified-retained-go/symeraseme \
+  --go /absolute/path/to/released-symeraseme \
+  --go-archive /absolute/path/to/symeraseme_0.12.1_darwin_arm64.tar.gz \
   --rust /absolute/path/to/worktree-target/debug/symeraseme-rust \
   --go-tool "$(command -v go)" \
   --output-dir /absolute/path/to/new-disposable-evidence
@@ -31,12 +34,15 @@ python3 -m unittest discover -s rust-tests/parity \
 ```
 
 The output directory must not exist. The runner isolates HOME, XDG, temp and
-database roots; denies network and unrelated process execution; and retains a
-case inventory, raw command arguments/exit/stdout/stderr, fixture and executable
+database roots; denies network and unrelated process execution; and retains the
+committed harness revision, worktree dirty status, runner SHA-256, caller-supplied
+binary hashes, raw command arguments/exit/stdout/stderr, fixture and archive
 hashes, schema snapshots, backup and restore snapshots, and an overall report.
-The negative control changes one baseline campaign identifier in a separately
-restored copy, runs the same Go reader, and proves the exact-baseline validator
-rejects that partial restore.
+The Rust executable is caller-supplied; its build source binding is not inferred
+from the separately recorded source checkout. The negative control deletes one
+baseline request and its dependent rows from a separate restored copy, observes
+the retained Go reader return two requests, and proves the baseline verifier
+rejects that incomplete restore.
 
 All writes occur under the new disposable evidence directory. The checked-in
 fixture and historical artifact are only read. No operator data, publication,

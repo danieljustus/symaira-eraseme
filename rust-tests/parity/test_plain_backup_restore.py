@@ -1,6 +1,8 @@
 """Focused controls for the disposable historical-Go restore rehearsal."""
 from contextlib import closing
+import io
 import sqlite3
+import tarfile
 import tempfile
 from pathlib import Path
 import unittest
@@ -22,17 +24,34 @@ class BackupRestoreControls(unittest.TestCase):
                 rehearsal.sqlite_backup(source, backup)
             self.assertEqual(rehearsal.gate.snapshot(source), rehearsal.gate.snapshot(backup))
 
-    def test_baseline_gate_rejects_partial_restore_mutation(self):
+    def test_baseline_gate_rejects_missing_restored_request(self):
         baseline = {'total': 3, 'requests': [
             {'id': 1, 'campaign_id': 'old-a'},
             {'id': 2, 'campaign_id': 'old-b'},
             {'id': 3, 'campaign_id': 'old-c'},
         ]}
         rehearsal.validate_baseline(baseline, baseline)
-        partial = {'total': 3, 'requests': [dict(row) for row in baseline['requests']]}
-        partial['requests'][0]['campaign_id'] = 'partial-restore-control'
-        with self.assertRaisesRegex(ValueError, 'differs from the pre-Rust baseline'):
+        partial = {'total': 2, 'requests': baseline['requests'][1:]}
+        with self.assertRaisesRegex(ValueError, 'three baseline requests'):
             rehearsal.validate_baseline(partial, baseline)
+
+    def test_archive_must_contain_the_supplied_go_binary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / 'release.tar.gz'
+            binary = root / 'symeraseme'
+            payload = b'released Go fallback bytes'
+            binary.write_bytes(payload)
+            member = tarfile.TarInfo('symeraseme')
+            member.size = len(payload)
+            with tarfile.open(archive, mode='w:gz') as tar:
+                tar.addfile(member, io.BytesIO(payload))
+            evidence = rehearsal.verify_go_archive(archive, binary)
+            self.assertTrue(evidence['matches_supplied_binary'])
+            self.assertEqual(evidence['member_size'], len(payload))
+            binary.write_bytes(b'different executable')
+            with self.assertRaisesRegex(ValueError, 'differ from the supplied Go binary'):
+                rehearsal.verify_go_archive(archive, binary)
 
 
 if __name__ == '__main__':
