@@ -1,0 +1,20 @@
+{
+  "schema": "symeraseme.go-oracle.llm-failures-next.v1",
+  "go_module": "github.com/danieljustus/symaira-corekit v0.16.2",
+  "sources_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "go.sum": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa",
+    "internal/llm/factory.go": "8180713d346cce1f7f195fdadd0040ebe4fb96f1bf7a725170819de10f4596b4",
+    "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
+    "internal/llm/llmkit.go": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7"
+  },
+  "id": "openai-provider-error-echoed-key",
+  "path": "/chat/completions",
+  "status": 500,
+  "attempts": 3,
+  "error_kind": "provider",
+  "message": "llmkit: provider_error (status 500): upstream temporarily unavailable; key synthetic-500-key: llmkit: provider_error (status 500): upstream temporarily unavailable; key synthetic-500-key",
+  "text": "",
+  "api_key": "synthetic-500-key",
+  "body": "upstream temporarily unavailable; key synthetic-500-key"
+}
