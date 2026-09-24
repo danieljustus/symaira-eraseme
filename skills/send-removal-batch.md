@@ -5,7 +5,7 @@ Guide an AI agent or user through executing a planned removal campaign.
 ## Prerequisites
 
 - [Campaign planned](plan-removal-campaign.md) (`symeraseme plan create`)
-- [Email accounts configured](../SKILL.md) (`symeraseme accounts add`)
+- [Email accounts configured](SKILL.md) (`symeraseme accounts add`)
 - Consent token issued for destructive operations
 
 ## Step 1: Dry-run first

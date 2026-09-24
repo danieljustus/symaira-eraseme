@@ -136,7 +136,7 @@ configuration is consumed by the shared Go LLM layer.
 
 ## Development
 
-Requirements: Go 1.26.5 or newer. A full Xcode installation is required for
+Requirements: Go 1.26.6 or newer. A full Xcode installation is required for
 the macOS GUI.
 
 ```bash

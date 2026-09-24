@@ -3,7 +3,7 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Integrated continuation: the local `main` changes are on proof branch `codex/rust-integrated-proof-7fc31e5`, pushed to run GitHub Actions with user authorization. No release, cutover, Go removal or paid provider is authorized. The CLI-024, CLI-025, MCP HTTP/stdio and macOS Swift integration slices are committed; the older slice notes below are historical. Native CI is evidence only when its jobs pass on the integrated revision and the applicable matrix rows are reconciled.
+- Integrated status (2026-09-24): the proof branch landed on GitHub `main` as `3f133e75`. Its exact-head Go CI, Rust CI (including the native OS matrix), general CI and CodeQL completed successfully. No release, cutover, Go removal or paid provider is authorized. The older slice notes below are historical; a green integrated CI run does not prove a retained older Go rollback binary can read schema v2 (see #1035).
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
@@ -420,8 +420,10 @@ counters are 175/0.
 ## CI caveat
 
 `Rust / native (${{ matrix.os }})` reports **skipping** on PRs, so a green PR
-is not native multi-platform evidence. Native target results remain an open
-gate for cutover readiness.
+is not native multi-platform evidence. The Rust push-to-main CI passed on
+integrated `3f133e75`, including native OS jobs. This is not a cutover or
+prerelease approval: the retained older Go rollback binary and release
+artifact gates still require separate evidence.
 
 ## Pinned as measured, not desired
 
@@ -434,11 +436,11 @@ gate for cutover readiness.
 
 ## Remaining parity gaps
 
-- **CLI-024 native acceptance.** JSON state/completion decoding and review
-  findings are committed; the 432-test macOS candidate gate and focused
-  five-test Linux gate passed. Native Windows runtime and exact-head CI remain
-  unverified. The low-descriptor-limit registry build failure is tracked in
-  #1034; raising a test-container limit is not a production fix.
+- **CLI-024 release acceptance.** The integrated native CI matrix passed on
+  `3f133e75`, including the bounded registry build at 1024 descriptors
+  (#1034). The disposable switchbacks build Go from current source; a
+  retained older Go rollback binary reading schema v2 remains unproved
+  (#1035). Do not promote this row to cutover-ready based on CI alone.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
   truncated process cases and ten parse/size/depth mutations now match Go
   1.26.6; broader bounded fuzz/performance evidence remains open under MCP-015.
