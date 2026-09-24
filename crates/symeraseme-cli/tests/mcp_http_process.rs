@@ -148,8 +148,18 @@ fn wait_ready(child: &mut Child, port: u16) {
 
 fn token(root: &Path) -> String {
     let path = root.join("data/mcp_token");
-    let value = std::fs::read_to_string(&path).unwrap();
-    assert_eq!(value.len(), 43);
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let value = loop {
+        let value = std::fs::read_to_string(&path).unwrap();
+        if value.len() == 43 {
+            break value;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "MCP token was not rotated"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
