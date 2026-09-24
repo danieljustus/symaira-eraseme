@@ -209,6 +209,33 @@ jobs:
         shell: bash
         run: make parity
 
+  rust-pr-windows-clippy:
+    name: Rust / PR Windows clippy
+    if: github.event_name == 'pull_request'
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Cache Cargo dependencies and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy
+      - name: Check and lint Windows code
+        shell: bash
+        run: |
+          cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
+          cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
+
   rust-tools-cache:
     name: Rust / verification tools cache
     # The five verification tools are only needed on the pull_request path, but a
