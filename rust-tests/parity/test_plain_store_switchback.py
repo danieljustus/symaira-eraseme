@@ -15,6 +15,23 @@ import plain_store_switchback as gate
 
 
 class SwitchbackControls(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == 'darwin', 'macOS sandbox Go runtime control')
+    def test_go_build_info_reads_only_explicit_goroot(self):
+        go_tool = Path(subprocess.check_output(['which', 'go'], text=True).strip()).resolve()
+        goroot = subprocess.check_output([str(go_tool), 'env', 'GOROOT'], text=True).strip()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            env = {'HOME': str(root), 'PATH': '', 'GOROOT': goroot}
+            gate.command(root, 'go-build-info',
+                         gate.sandbox_command(root, 'go-build-info', go_tool,
+                                              ['version', '-m', str(go_tool)], env), env)
+            metadata = (root / 'go-build-info.stdout').read_text()
+            self.assertIn('\tpath\tcmd/go', metadata)
+            self.assertIn('\tbuild\tGOOS=darwin', metadata)
+            policy = gate.sandbox(root, go_tool, (goroot,))
+            self.assertIn('(allow file-read* (subpath ' + json.dumps(goroot) + '))', policy)
+            self.assertIn('(deny network*)', policy)
+
     def test_nested_run_allows_sqlite_but_denies_protected_data(self):
         python = Path(sys.executable).resolve()
         app = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'

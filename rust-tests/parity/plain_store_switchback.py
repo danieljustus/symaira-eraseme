@@ -110,7 +110,7 @@ def snapshot(database):
                 'tables': state}
 
 
-def sandbox(root, executable):
+def sandbox(root, executable, extra_reads=()):
     if sys.platform.startswith('linux'):
         return {
             'mechanism': 'private mount, network and PID namespaces with Landlock ABI 4',
@@ -123,10 +123,15 @@ def sandbox(root, executable):
             'exec': str(Path(executable).resolve()),
         }
     quote = lambda value: json.dumps(str(value))
+    extra_allow = [
+        '(allow file-read* (subpath ' + quote(Path(extra).resolve()) + '))'
+        for extra in extra_reads
+    ]
     return '\n'.join([
         '(version 1)', '(allow default)', '(deny network*)',
         '(deny file-read* (subpath ' + quote(Path.home().resolve()) + ') (subpath ' + quote(REPO) + '))',
         '(allow file-read* (subpath ' + quote(root) + '))',
+        *extra_allow,
         # SQLite resolves ancestors. Permit their metadata, not their contents.
         '(allow file-read-metadata ' + ' '.join('(literal ' + quote(p) + ')' for p in root.parents) + ')',
         '(deny file-write*)',
@@ -140,7 +145,8 @@ def sandbox_command(root, label, executable, args, env):
     executable = Path(executable).resolve(strict=True)
     args = list(map(str, args))
     if sys.platform == 'darwin':
-        return ['/usr/bin/sandbox-exec', '-p', sandbox(root, executable),
+        extra_reads = (env['GOROOT'],) if label == 'go-build-info' else ()
+        return ['/usr/bin/sandbox-exec', '-p', sandbox(root, executable, extra_reads),
                 str(executable), *args]
     require(sys.platform.startswith('linux'), 'unsupported sandbox platform')
     root = Path(root)
@@ -338,18 +344,22 @@ def run(go, rust, go_tool, root):
                'SYMERASEME_ENCRYPT_DB': 'false'}
         report['environment'] = env
         go_for_info, go_tool_for_info = go, go_tool
-        if sys.platform.startswith('linux'):
+        if sys.platform == 'darwin' or sys.platform.startswith('linux'):
             go_for_info = root / 'bin/go-candidate'
-            go_tool_for_info = root / 'bin/go-tool'
             shutil.copyfile(go, go_for_info)
-            shutil.copyfile(go_tool, go_tool_for_info)
             go_for_info.chmod(0o700)
+        if sys.platform.startswith('linux'):
+            go_tool_for_info = root / 'bin/go-tool'
+            shutil.copyfile(go_tool, go_tool_for_info)
             go_tool_for_info.chmod(0o700)
         go_info_env = dict(env)
         if sys.platform.startswith('linux'):
             # A trimmed Go tool binary still reads its GOROOT at runtime.
             # The helper grants this one explicit tree read-only.
             go_info_env['GOROOT'] = str(Path(go_tool).resolve().parent.parent)
+        elif sys.platform == 'darwin':
+            # Hosted Go binaries are trimmed too; scope its runtime read to GOROOT.
+            go_info_env['GOROOT'] = str(go_tool.parent.parent)
         command(root, 'go-build-info',
                 sandbox_command(root, 'go-build-info', go_tool_for_info,
                                 ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
