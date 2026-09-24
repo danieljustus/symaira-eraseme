@@ -42,7 +42,7 @@ tests/fixtures/event-store/campaign-plan-bytes-oracle.json text eol=lf
 rust-tests/parity/oracle/imap-transport/transcript_cases.json text eol=lf
 go.mod text eol=lf
 go.sum text eol=lf
-internal/templating/templates/report.html.gotmpl text eol=lf
+internal/templating/templates/** text eol=lf
 scripts/consent-oracle/** text eol=lf
 
 # Broker reply corpus bytes are pinned by triage-corpus/dom004c.json.
