@@ -19,23 +19,41 @@ from stage_rust_release_archives import TARGETS, main as stage_main
 from verify_release_archives import main as verify_archives
 
 
-def executable_header(os_name: str, arch: str, *, dll: bool = False) -> bytes:
+def executable_header(
+    os_name: str,
+    arch: str,
+    *,
+    dll: bool = False,
+    truncated_commands: bool = False,
+) -> bytes:
     if os_name == "linux":
-        data = bytearray(64)
+        data = bytearray(64 + 56 + 16)
         data[:7] = b"\x7fELF\x02\x01\x01"
         data[7] = 0
         struct.pack_into("<HH", data, 16, 3, {"amd64": 62, "arm64": 183}[arch])
         struct.pack_into("<I", data, 20, 1)
+        struct.pack_into("<Q", data, 24, 0x400040)
+        struct.pack_into("<Q", data, 32, 64)
         struct.pack_into("<H", data, 52, 64)
+        struct.pack_into("<HH", data, 54, 56, 1)
+        struct.pack_into("<IIQQQQQQ", data, 64, 1, 5, 0, 0x400000, 0x400000, len(data), len(data), 0x1000)
         return bytes(data) + b"linux payload"
     if os_name == "darwin":
         endian = "<"
         magic = b"\xcf\xfa\xed\xfe"
         header = magic + struct.pack(
-            endian + "IIIIIII", {"amd64": 0x01000007, "arm64": 0x0100000C}[arch], 3, 2, 1, 24, 0, 0
+            endian + "IIIIIII",
+            {"amd64": 0x01000007, "arm64": 0x0100000C}[arch],
+            3,
+            2,
+            2 if truncated_commands else 1,
+            40 if truncated_commands else 24,
+            0,
+            0,
         )
         build_version = struct.pack(endian + "IIIIII", 0x32, 24, 1, 0, 0, 0)
-        return header + build_version + b"darwin payload"
+        commands = build_version + (struct.pack(endian + "II", 0x80000000, 16) if truncated_commands else b"")
+        return header + commands + (b"" if truncated_commands else b"darwin payload")
 
     data = bytearray(0x80 + 4 + 20 + 0xF0)
     data[:2] = b"MZ"
@@ -102,6 +120,26 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
             (("linux", "amd64"), executable_header("linux", "arm64")),
             (("linux", "amd64"), executable_header("windows", "amd64")),
             (("windows", "amd64"), executable_header("windows", "amd64", dll=True)),
+        )
+        for target, payload in cases:
+            with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                args, _ = self._inputs(root, {target: payload})
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(stage_main(args), 1)
+                self.assertFalse((root / "staged").exists())
+
+    def test_rejects_shared_objects_and_truncated_native_headers(self) -> None:
+        elf_no_entry = bytearray(executable_header("linux", "amd64"))
+        struct.pack_into("<Q", elf_no_entry, 24, 0)
+        elf_no_exec_segment = bytearray(executable_header("linux", "amd64"))
+        struct.pack_into("<I", elf_no_exec_segment, 68, 4)
+        pe_truncated_optional = executable_header("windows", "amd64")[: 0x80 + 4 + 20 + 2]
+        cases = (
+            (("linux", "amd64"), bytes(elf_no_entry)),
+            (("linux", "amd64"), bytes(elf_no_exec_segment)),
+            (("darwin", "amd64"), executable_header("darwin", "amd64", truncated_commands=True)),
+            (("windows", "amd64"), pe_truncated_optional),
         )
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:

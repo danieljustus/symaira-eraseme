@@ -48,6 +48,8 @@ def _read_at(source, offset: int, size: int) -> bytes:
 def _validate_elf(path: Path, arch: str) -> None:
     with path.open("rb") as source:
         header = _read_at(source, 0, 64)
+        source.seek(0, 2)
+        file_size = source.tell()
     if header[:4] != b"\x7fELF" or header[4:7] != b"\x02\x01\x01":
         raise ValueError("expected a 64-bit little-endian ELF executable")
     if header[7] not in (0, 3):  # Common glibc and musl Linux binaries use these OS ABI values.
@@ -58,11 +60,40 @@ def _validate_elf(path: Path, arch: str) -> None:
         raise ValueError(f"ELF architecture does not match {arch}")
     if struct.unpack_from("<H", header, 16)[0] not in (2, 3):
         raise ValueError("ELF file is not an executable")
+    entry = struct.unpack_from("<Q", header, 24)[0]
+    program_offset = struct.unpack_from("<Q", header, 32)[0]
+    header_size, program_size, program_count = struct.unpack_from("<HHH", header, 52)
+    if header_size != 64 or program_size != 56 or not program_count:
+        raise ValueError("ELF executable program headers are missing or invalid")
+    table_size = program_size * program_count
+    if program_offset + table_size > file_size:
+        raise ValueError("truncated ELF program header table")
+    with path.open("rb") as source:
+        program_headers = _read_at(source, program_offset, table_size)
+    has_entry_segment = False
+    for index in range(program_count):
+        kind, flags, file_offset, address, _, file_bytes, _, _ = struct.unpack_from(
+            "<IIQQQQQQ", program_headers, index * program_size
+        )
+        if (
+            kind == 1
+            and flags & 1
+            and file_bytes
+            and file_offset + file_bytes <= file_size
+            and address <= entry < address + file_bytes
+        ):
+            has_entry_segment = True
+            break
+    if not entry or not has_entry_segment:
+        raise ValueError("ELF executable entrypoint is not in an executable load segment")
 
 
 def _validate_macho(path: Path, arch: str) -> None:
     with path.open("rb") as source:
         header = _read_at(source, 0, 32)
+        source.seek(0, 2)
+        file_size = source.tell()
+        source.seek(32)
         magic = header[:4]
         if magic == b"\xcf\xfa\xed\xfe":
             endian = "<"
@@ -80,6 +111,8 @@ def _validate_macho(path: Path, arch: str) -> None:
         command_bytes = struct.unpack_from(endian + "I", header, 20)[0]
         start = source.tell()
         end = start + command_bytes
+        if end > file_size:
+            raise ValueError("truncated Mach-O load command area")
         saw_macos = False
         for _ in range(commands):
             command_offset = source.tell()
@@ -114,7 +147,9 @@ def _validate_pe(path: Path, arch: str) -> None:
             raise ValueError("PE image must be an executable, not a DLL")
         optional_size = struct.unpack("<H", _read_at(source, pe_offset + 20, 2))[0]
         optional_magic = struct.unpack("<H", _read_at(source, pe_offset + 24, 2))[0]
-        if optional_size < 2 or optional_magic != 0x20B:
+        source.seek(0, 2)
+        file_size = source.tell()
+        if optional_size < 112 or pe_offset + 24 + optional_size > file_size or optional_magic != 0x20B:
             raise ValueError("PE optional header is missing or invalid")
 
 
