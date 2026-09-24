@@ -24,7 +24,11 @@ LINUX_SANDBOX = Path(__file__).with_name('linux_store_sandbox.py').resolve()
 GUEST_LOCAL_FILESYSTEMS = {'ext4', 'xfs', 'btrfs', 'tmpfs'}
 CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
          'go-plan-after-switch', 'go-requests-after-switch')
-RETAINED_GO_SHA256 = 'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22'
+RETAINED_GO_SHA256 = {
+    # Local retained artifact and the verified v0.12.1 darwin_arm64 release executable.
+    'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22',
+    'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
+}
 
 
 def require(condition, message):
@@ -100,7 +104,7 @@ def retained_go_post_rust_probe(root, active, artifact, env, args, expected_diag
     """Record the retained fallback's post-Rust refusal beside the Go positive control."""
     artifact = Path(artifact).resolve(strict=True)
     artifact_identity = identity(artifact)
-    require(artifact_identity['sha256'] == RETAINED_GO_SHA256,
+    require(artifact_identity['sha256'] in RETAINED_GO_SHA256,
             'retained Go artifact does not match the recorded rollback binary')
     stage = active.with_suffix('.next')
     shutil.copyfile(artifact, stage)
