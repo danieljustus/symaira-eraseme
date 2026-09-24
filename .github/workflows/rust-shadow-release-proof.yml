@@ -90,9 +90,18 @@ jobs:
 
           case "$RUNNER_OS" in
             Linux)
-              linkage="$(ldd "$binary")"
-              printf '%s\n' "$linkage"
-              ! grep -q 'not found' <<<"$linkage"
+              if linkage="$(ldd "$binary" 2>&1)"; then
+                printf '%s\n' "$linkage"
+                if grep -q 'not found' <<<"$linkage"; then
+                  echo "binary has a missing shared library" >&2
+                  exit 1
+                fi
+              elif grep -Eq '^(not a dynamic executable|statically linked)$' <<<"$linkage"; then
+                printf 'Self-contained binary: %s\n' "$linkage"
+              else
+                printf '%s\n' "$linkage" >&2
+                exit 1
+              fi
               ;;
             macOS)
               otool -L "$binary"
@@ -106,10 +115,10 @@ jobs:
                 if (-not $vs) { throw "Visual C++ tools were not found" }
                 $hosts = if ("${{ matrix.arch }}" -eq "arm64") { @("Hostarm64\arm64", "Hostx64\x64") } else { @("Hostx64\x64", "Hostarm64\arm64") }
                 $dumpbin = $null
-                foreach ($host in $hosts) {
+                foreach ($hostPath in $hosts) {
                   $candidate = Get-ChildItem (Join-Path $vs "VC\Tools\MSVC") -Directory |
                     Sort-Object Name -Descending |
-                    ForEach-Object { Join-Path $_.FullName ("bin\" + $host + "\dumpbin.exe") } |
+                    ForEach-Object { Join-Path $_.FullName ("bin\" + $hostPath + "\dumpbin.exe") } |
                     Where-Object { Test-Path $_ } |
                     Select-Object -First 1
                   if ($candidate) { $dumpbin = $candidate; break }
