@@ -405,6 +405,16 @@ fn run_native_migration_case(
             process["exit_code"].as_i64().map(|code| code as i32),
             "{id}: native process {index} exit code"
         );
+        for (name, stream) in [("stdout", &output.stdout), ("stderr", &output.stderr)] {
+            assert_eq!(
+                !stream.is_empty(),
+                process[format!("{name}_bytes")]
+                    .as_u64()
+                    .expect("recorded stream size")
+                    > 0,
+                "{id}: native process {index} {name} presence"
+            );
+        }
         outputs.push(output);
     }
 
@@ -417,14 +427,55 @@ fn run_native_migration_case(
             .expect("isolated recorded root");
         let path = input_path(&root, relative);
         manifests.insert(name.clone(), manifest(&path, &root));
-        if let Some(exists) = case.get("root_exists") {
-            let expected = exists[name].as_bool().expect("recorded existence");
-            assert_eq!(
-                path.try_exists().expect("native root existence"),
-                expected,
-                "{id}: {name} existence"
-            );
+        let expected: BTreeMap<_, _> = case["manifests"][name]
+            .as_array()
+            .expect("recorded manifest")
+            .iter()
+            .map(|entry| {
+                (
+                    entry["path"].as_str().expect("recorded path").to_owned(),
+                    entry["type"].as_str().expect("recorded type").to_owned(),
+                )
+            })
+            .collect();
+        let observed: BTreeMap<_, _> = manifests[name]
+            .iter()
+            .map(|(path, entry)| {
+                (
+                    path.clone(),
+                    entry["type"].as_str().expect("native type").to_owned(),
+                )
+            })
+            .collect();
+        assert_eq!(observed, expected, "{id}: {name} native manifest shape");
+        for entry in case["manifests"][name]
+            .as_array()
+            .expect("recorded manifest")
+        {
+            let relative = entry["path"].as_str().expect("recorded path");
+            if entry["type"] == "file"
+                && !matches!(relative, ".migration-state.json" | ".complete.json")
+            {
+                assert_eq!(
+                    manifests[name][relative]["size_bytes"], entry["size_bytes"],
+                    "{id}: {name}/{relative} native size"
+                );
+                assert_eq!(
+                    manifests[name][relative]["sha256"], entry["sha256"],
+                    "{id}: {name}/{relative} native hash"
+                );
+            }
         }
+        let expected_exists = case
+            .get("root_exists")
+            .map_or(!expected.is_empty(), |exists| {
+                exists[name].as_bool().expect("recorded existence")
+            });
+        assert_eq!(
+            path.try_exists().expect("native root existence"),
+            expected_exists,
+            "{id}: {name} existence"
+        );
     }
     assert_eq!(
         manifests["source"], source_before,
