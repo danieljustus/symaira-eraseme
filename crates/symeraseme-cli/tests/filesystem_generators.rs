@@ -52,6 +52,7 @@ fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
         return bytes.to_vec();
     }
     String::from_utf8_lossy(bytes)
+        .replace(&needle.replace('\\', "\\\\"), "<ORACLE_ROOT>")
         .replace(needle.as_ref(), "<ORACLE_ROOT>")
         .into_bytes()
 }

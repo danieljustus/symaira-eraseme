@@ -85,15 +85,19 @@ fn substitute_oracle_root(argv: &[&str], home: &Path) -> Vec<String> {
 /// The byte-level inverse of the capture's normalization: fold the runtime
 /// root back to `<ORACLE_ROOT>` so outputs compare against the recorded bytes.
 fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
-    let needle = root.to_string_lossy().into_owned();
-    let needle = needle.as_bytes();
-    if needle.is_empty() {
+    let literal = root.to_string_lossy().into_owned();
+    if literal.is_empty() {
         return bytes.to_vec();
     }
+    let escaped = literal.replace('\\', "\\\\");
+    let needles = [escaped.as_bytes(), literal.as_bytes()];
     let mut folded = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index..].starts_with(needle) {
+        if let Some(needle) = needles
+            .iter()
+            .find(|needle| bytes[index..].starts_with(needle))
+        {
             folded.extend_from_slice(b"<ORACLE_ROOT>");
             index += needle.len();
         } else {
@@ -104,15 +108,33 @@ fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
     folded
 }
 
+#[test]
+fn fold_root_handles_json_escaped_windows_paths() {
+    let root = Path::new(r"C:\isolated\case");
+    assert_eq!(
+        fold_root(
+            br#"{"path":"C:\\isolated\\case\\data","other":"D:\\keep"} C:\isolated\case"#,
+            root,
+        ),
+        br#"{"path":"<ORACLE_ROOT>\\data","other":"D:\\keep"} <ORACLE_ROOT>"#
+    );
+}
+
 /// Fold only a known volatile path, in raw text and in a JSON-escaped string.
 fn fold_path(value: &str, path: &Path, placeholder: &str) -> String {
     let literal = path.to_string_lossy();
     if literal.is_empty() {
         return value.to_owned();
     }
-    value
+    let mut folded = value
         .replace(&literal.replace('\\', "\\\\"), placeholder)
-        .replace(literal.as_ref(), placeholder)
+        .replace(literal.as_ref(), placeholder);
+    if let Some(ordinary) = literal.strip_prefix(r"\\?\") {
+        folded = folded
+            .replace(&ordinary.replace('\\', "\\\\"), placeholder)
+            .replace(ordinary, placeholder);
+    }
+    folded
 }
 
 #[test]
@@ -128,6 +150,14 @@ fn fold_path_only_replaces_the_recorded_root() {
     );
     assert_eq!(
         fold_path(r"C:\isolated\case\data D:\keep", root, "<CASE>"),
+        r"<CASE>\data D:\keep"
+    );
+    assert_eq!(
+        fold_path(
+            r"C:\isolated\case\data D:\keep",
+            Path::new(r"\\?\C:\isolated\case"),
+            "<CASE>"
+        ),
         r"<CASE>\data D:\keep"
     );
 }
@@ -907,7 +937,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
             "{id} status"
         );
         #[cfg(windows)]
-        let native_go = if id == "operate-migrate" || id.starts_with("operate-schedule") {
+        let native_go = if matches!(id, "operate-migrate" | "operate-poll-inbox")
+            || id.starts_with("operate-schedule")
+        {
             let go = run_program_with_resources(
                 &go_binary,
                 &argv,
