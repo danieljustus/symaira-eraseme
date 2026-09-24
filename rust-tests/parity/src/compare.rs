@@ -449,7 +449,7 @@ pub fn format_differences(differences: &[Difference]) -> String {
     output
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use crate::case::{Case, Program};
