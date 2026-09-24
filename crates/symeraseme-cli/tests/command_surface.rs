@@ -984,6 +984,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
             )
             .into_bytes(),
             #[cfg(windows)]
+            "operate-migrate" => native_go.as_ref().expect("native migrate oracle").stdout.clone(),
+            #[cfg(windows)]
             id if id.starts_with("operate-schedule") => fold_schedule_output(
                 &native_go.as_ref().expect("native schedule oracle").stdout,
                 &root,
@@ -1016,14 +1018,11 @@ fn frozen_command_surface_matches_phase_two_contract() {
             };
         assert_eq!(
             fold_root(&actual_stdout, &root),
-            expected_stdout,
+            fold_root(&expected_stdout, &root),
             "{id} stdout"
         );
         #[cfg(windows)]
         let expected_stderr = if let Some(go) = &native_go {
-            if id == "operate-migrate" {
-                assert!(go.stdout.is_empty(), "native Go migrate stdout");
-            }
             fold_root(&go.stderr, &root)
         } else {
             decode_base64(case["stderr_base64"].as_str().unwrap())

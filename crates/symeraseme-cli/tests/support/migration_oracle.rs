@@ -1,6 +1,8 @@
 //! CLI-024: replay recorded migration inputs, output bytes and filesystem state.
 
-use super::{Cleanup, binary, fold_root, hex_digest, run, unique_root};
+#[cfg(not(windows))]
+use super::run;
+use super::{Cleanup, binary, fold_root, hex_digest, unique_root};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -8,6 +10,8 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 type Manifest = BTreeMap<String, Value>;
+#[cfg(windows)]
+type RootManifests = BTreeMap<String, Manifest>;
 
 fn input_path(root: &Path, relative: &str) -> PathBuf {
     assert!(
@@ -110,6 +114,7 @@ fn migration_fixture_paths_reject_escape() {
 }
 
 #[test]
+#[cfg(not(windows))]
 fn migration_filesystem_matches_frozen_go_backup_and_state() {
     let fixture: Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -140,6 +145,7 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
     }
 }
 
+#[cfg(not(windows))]
 fn replay_filesystem(id: &str, case: &Value) {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated runtime root");
@@ -260,6 +266,7 @@ fn replay_filesystem(id: &str, case: &Value) {
 }
 
 #[test]
+#[cfg(not(windows))]
 fn migration_filesystem_rejects_corrupted_output_and_backup() {
     let fixture: Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -300,6 +307,216 @@ fn migration_filesystem_rejects_corrupted_output_and_backup() {
             .expect("assertion diagnostic");
         assert!(message.contains(reason), "unexpected rejection: {message}");
     }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct NativeProcess {
+    status: Option<i32>,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+#[cfg(windows)]
+fn native_process(output: &super::ProcessOutput, root: &Path) -> NativeProcess {
+    NativeProcess {
+        status: output.status.code(),
+        stdout: fold_root(&output.stdout, root),
+        stderr: fold_root(&output.stderr, root),
+    }
+}
+
+#[cfg(windows)]
+fn assert_native_processes_equal(id: &str, go: &NativeProcess, rust: &NativeProcess) {
+    assert_eq!(rust.status, go.status, "{id}: native Go/Rust exit code");
+    assert_eq!(rust.stdout, go.stdout, "{id}: native Go/Rust stdout");
+    assert_eq!(rust.stderr, go.stderr, "{id}: native Go/Rust stderr");
+}
+
+#[cfg(windows)]
+fn assert_native_manifests_equal(id: &str, go: &RootManifests, rust: &RootManifests) {
+    assert_eq!(rust, go, "{id}: native Go/Rust filesystem");
+}
+
+#[cfg(windows)]
+fn run_native_migration_case(
+    id: &str,
+    case: &Value,
+    program: &Path,
+) -> (Vec<NativeProcess>, RootManifests) {
+    let root = unique_root();
+    fs::create_dir_all(&root).expect("isolated native migration root");
+    let _cleanup = Cleanup(root.clone());
+    for directory in ["home", "cwd", "capture"] {
+        fs::create_dir_all(root.join(directory)).expect("native migration process directory");
+    }
+    let source = root.join("filesystem").join(id).join("legacy-source");
+    fs::create_dir_all(&source).expect("native migration source");
+    fs::create_dir_all(root.join("filesystem").join(id).join("home"))
+        .expect("native migration case home");
+    if id == "migration" {
+        write_input(&source.join("config.toml"), "data_dir = 'legacy'\n", 0o644);
+    } else {
+        for directory in case["input_directories"]
+            .as_array()
+            .expect("input directories")
+        {
+            fs::create_dir_all(input_path(&root, directory.as_str().expect("directory")))
+                .expect("native migration input directory");
+        }
+        for (relative, input) in case["input_files"].as_object().expect("input files") {
+            write_input(
+                &input_path(&root, relative),
+                input["content"].as_str().expect("input content"),
+                u32::try_from(input["mode"].as_u64().expect("input mode"))
+                    .expect("file mode fits u32"),
+            );
+        }
+    }
+    let source_before = manifest(&source, &root);
+    let mut processes: Vec<&Value> = case.get("preparation").map_or_else(Vec::new, |value| {
+        value
+            .as_array()
+            .expect("preparation processes")
+            .iter()
+            .collect()
+    });
+    processes.push(&case["process"]);
+    let mut outputs = Vec::with_capacity(processes.len());
+    for (index, process) in processes.into_iter().enumerate() {
+        let argv: Vec<_> = process["argv"]
+            .as_array()
+            .expect("operation argv")
+            .iter()
+            .map(|arg| arg.as_str().expect("string argument"))
+            .collect();
+        let output = super::run_program_with_resources(
+            program,
+            &argv,
+            &root.join("home"),
+            &root.join("cwd"),
+            &root.join("capture"),
+            index,
+            None,
+        );
+        let output = native_process(&output, &root);
+        assert_eq!(
+            output.status,
+            process["exit_code"].as_i64().map(|code| code as i32),
+            "{id}: native process {index} exit code"
+        );
+        outputs.push(output);
+    }
+
+    let mut manifests = BTreeMap::new();
+    for (name, recorded_path) in case["manifest_roots"].as_object().expect("manifest roots") {
+        let relative = recorded_path
+            .as_str()
+            .expect("recorded root")
+            .strip_prefix("<ORACLE_ROOT>/")
+            .expect("isolated recorded root");
+        let path = input_path(&root, relative);
+        manifests.insert(name.clone(), manifest(&path, &root));
+        if let Some(exists) = case.get("root_exists") {
+            let expected = exists[name].as_bool().expect("recorded existence");
+            assert_eq!(
+                path.try_exists().expect("native root existence"),
+                expected,
+                "{id}: {name} existence"
+            );
+        }
+    }
+    assert_eq!(
+        manifests["source"], source_before,
+        "{id}: native source changed"
+    );
+    (outputs, manifests)
+}
+
+#[test]
+#[cfg(windows)]
+fn migration_filesystem_matches_pinned_native_go() {
+    let fixture: Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../rust-tests/parity/cases/filesystem/manifests.json"
+    )))
+    .expect("filesystem oracle JSON");
+    assert_eq!(fixture["commit"], "4e582f28");
+    let cases: BTreeMap<_, _> = fixture["cases"]
+        .as_array()
+        .expect("filesystem cases")
+        .iter()
+        .filter_map(|case| {
+            let id = case["id"].as_str().expect("case id");
+            (id == "migration" || id.starts_with("migration-")).then_some((id, case))
+        })
+        .collect();
+    let mut expected_ids = [
+        "migration",
+        "migration-resume",
+        "migration-manual-secrets",
+        "migration-copy-secrets-rejected",
+        "migration-incomplete-backup",
+    ];
+    expected_ids.sort_unstable();
+    assert_eq!(cases.keys().copied().collect::<Vec<_>>(), expected_ids);
+
+    let oracle_root = unique_root();
+    fs::create_dir_all(&oracle_root).expect("pinned Go oracle root");
+    let _cleanup = Cleanup(oracle_root.clone());
+    let go_binary = super::pinned_go_binary(&oracle_root, "4e582f28");
+    let rust_binary = binary();
+    let mut negative_control_done = false;
+    for (id, case) in cases {
+        let (go, go_manifests) = run_native_migration_case(id, case, &go_binary);
+        let (rust, rust_manifests) = run_native_migration_case(id, case, &rust_binary);
+        assert_eq!(rust.len(), go.len(), "{id}: Go/Rust process count");
+        for (index, (go, rust)) in go.iter().zip(&rust).enumerate() {
+            assert_native_processes_equal(&format!("{id}: process {index}"), go, rust);
+        }
+        assert_native_manifests_equal(id, &go_manifests, &rust_manifests);
+        if id == "migration" {
+            let mut corrupted_output = rust[0].clone();
+            corrupted_output.stdout.push(b'!');
+            let output_rejection = std::panic::catch_unwind(|| {
+                assert_native_processes_equal(
+                    "migration stdout negative control",
+                    &go[0],
+                    &corrupted_output,
+                )
+            });
+            assert!(
+                output_rejection.is_err(),
+                "differential gate accepts changed stdout"
+            );
+
+            let mut corrupted_manifest = rust_manifests.clone();
+            corrupted_manifest
+                .get_mut("destination")
+                .expect("destination manifest")
+                .get_mut("config.toml")
+                .expect("destination config")
+                .as_object_mut()
+                .expect("file record")
+                .insert("sha256".into(), "0".repeat(64).into());
+            let filesystem_rejection = std::panic::catch_unwind(|| {
+                assert_native_manifests_equal(
+                    "migration filesystem negative control",
+                    &go_manifests,
+                    &corrupted_manifest,
+                )
+            });
+            assert!(
+                filesystem_rejection.is_err(),
+                "differential gate accepts changed file content"
+            );
+            negative_control_done = true;
+        }
+    }
+    assert!(
+        negative_control_done,
+        "migration differential negative controls ran"
+    );
 }
 
 fn write_input(path: &Path, content: &str, mode: u32) {
