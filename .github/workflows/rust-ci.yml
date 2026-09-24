@@ -306,7 +306,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked
+            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked --no-fail-fast
             cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --doc --all-features --locked
           else
             cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked

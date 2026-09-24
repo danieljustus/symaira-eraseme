@@ -543,6 +543,7 @@ fn consent_file_reader_rejects_missing_empty_and_non_regular_inputs() {
 
 const CHILD_ENV_KEYS: &[&str] = &[
     "HOME",
+    "USERPROFILE",
     "SYMERASEME_DATA_DIR",
     "SYMERASEME_CONSENT",
     "SYMERASEME_CONSENT_FILE",
@@ -562,6 +563,13 @@ fn run_child(mode: &str, environment: &[(&str, &str)]) -> Output {
     command.env("ID004_CONSENT_CHILD_MODE", mode);
     for (key, value) in environment {
         command.env(key, value);
+    }
+    // Windows resolves the platform home from USERPROFILE; mirror the test's
+    // isolated HOME fixture so inherited machine state cannot redirect it.
+    if cfg!(windows)
+        && let Some((_, home)) = environment.iter().find(|(key, _)| *key == "HOME")
+    {
+        command.env("USERPROFILE", home);
     }
     let output = command.output().unwrap();
     assert!(
