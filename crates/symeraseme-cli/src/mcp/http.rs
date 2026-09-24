@@ -551,6 +551,13 @@ mod transport_tests {
         );
         assert!(!authorized(&headers, token), "length mismatch");
 
+        let same_length_wrong_token = format!("Bearer x{}", &token[1..]);
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_str(&same_length_wrong_token).expect("header"),
+        );
+        assert!(!authorized(&headers, token), "same-length token mismatch");
+
         headers.insert(
             http::header::AUTHORIZATION,
             http::HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
