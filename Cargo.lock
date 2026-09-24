@@ -1047,6 +1047,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "symeraseme-core",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

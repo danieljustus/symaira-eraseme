@@ -11,6 +11,15 @@ rusqlite.workspace = true
 serde_json.workspace = true
 symeraseme-core = { path = "../../crates/symeraseme-core", version = "0.13.0" }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
+
 [[bin]]
 name = "parity"
 path = "src/main.rs"
