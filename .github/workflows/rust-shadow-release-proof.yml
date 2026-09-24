@@ -1,0 +1,171 @@
+name: Rust shadow release proof
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: '1.98.0'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+  RELEASE_VERSION: '0.13.0'
+
+jobs:
+  native-release-binary:
+    name: Native Rust release binary / ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            runner: macos-14
+            os: darwin
+            arch: arm64
+            target: aarch64-apple-darwin
+          - name: macOS amd64
+            runner: macos-15-intel
+            os: darwin
+            arch: amd64
+            target: x86_64-apple-darwin
+          - name: Linux arm64
+            runner: ubuntu-24.04-arm
+            os: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+          - name: Linux amd64
+            runner: ubuntu-24.04
+            os: linux
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+          - name: Windows arm64
+            runner: windows-11-arm
+            os: windows
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+          - name: Windows amd64
+            runner: windows-2025
+            os: windows
+            arch: amd64
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+
+      - name: Verify native target
+        shell: bash
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          rustc +"$RUST_TOOLCHAIN" -vV
+          test "$(rustc +"$RUST_TOOLCHAIN" -vV | sed -n 's/^host: //p')" = "$EXPECTED_TARGET"
+
+      - name: Build and smoke test native release binary
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCHIVE_OS: ${{ matrix.os }}
+          ARCHIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" build --release -p symeraseme-cli --bin symeraseme-rust --target "$TARGET" --locked
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            binary="target/$TARGET/release/symeraseme-rust.exe"
+          else
+            binary="target/$TARGET/release/symeraseme-rust"
+          fi
+          test -f "$binary"
+          test "$("$binary" --version)" = "symeraseme version $RELEASE_VERSION"
+          "$binary" --help >/dev/null
+
+          case "$RUNNER_OS" in
+            Linux)
+              linkage="$(ldd "$binary")"
+              printf '%s\n' "$linkage"
+              ! grep -q 'not found' <<<"$linkage"
+              ;;
+            macOS)
+              otool -L "$binary"
+              ;;
+            Windows)
+              # shellcheck disable=SC2016
+              BINARY_PATH="$(cygpath -aw "$binary")" powershell.exe -NoProfile -NonInteractive -Command '
+                $ErrorActionPreference = "Stop"
+                $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+                $vs = & $vswhere -latest -products * -property installationPath
+                if (-not $vs) { throw "Visual C++ tools were not found" }
+                $hosts = if ("${{ matrix.arch }}" -eq "arm64") { @("Hostarm64\arm64", "Hostx64\x64") } else { @("Hostx64\x64", "Hostarm64\arm64") }
+                $dumpbin = $null
+                foreach ($host in $hosts) {
+                  $candidate = Get-ChildItem (Join-Path $vs "VC\Tools\MSVC") -Directory |
+                    Sort-Object Name -Descending |
+                    ForEach-Object { Join-Path $_.FullName ("bin\" + $host + "\dumpbin.exe") } |
+                    Where-Object { Test-Path $_ } |
+                    Select-Object -First 1
+                  if ($candidate) { $dumpbin = $candidate; break }
+                }
+                if (-not $dumpbin) { throw "dumpbin.exe was not found" }
+                & $dumpbin /DEPENDENTS "$env:BINARY_PATH"
+                if ($LASTEXITCODE -ne 0) { throw "dumpbin /DEPENDENTS failed" }
+              '
+              ;;
+            *)
+              echo "unsupported native runner OS: $RUNNER_OS" >&2
+              exit 1
+              ;;
+          esac
+
+          staged_binary="$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
+          cp "$binary" "$staged_binary"
+
+      - name: Upload native binary for same-run archive verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rust-shadow-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/rust-binary-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  aggregate-release-archives:
+    name: Stage and verify six shadow release archives
+    needs: native-release-binary
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download same-run native binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: rust-shadow-*
+          path: ${{ runner.temp }}/rust-shadow-binaries
+          merge-multiple: true
+
+      - name: Stage and verify release archives and checksums
+        shell: bash
+        env:
+          BINARIES: ${{ runner.temp }}/rust-shadow-binaries
+        run: |
+          set -euo pipefail
+          python3 scripts/stage_rust_release_archives.py \
+            --version "$RELEASE_VERSION" \
+            --output "$RUNNER_TEMP/rust-shadow-dist" \
+            --darwin-amd64 "$BINARIES/rust-binary-darwin-amd64" \
+            --darwin-arm64 "$BINARIES/rust-binary-darwin-arm64" \
+            --linux-amd64 "$BINARIES/rust-binary-linux-amd64" \
+            --linux-arm64 "$BINARIES/rust-binary-linux-arm64" \
+            --windows-amd64 "$BINARIES/rust-binary-windows-amd64" \
+            --windows-arm64 "$BINARIES/rust-binary-windows-arm64"
+          python3 tests/verify_release_archives.py "$RUNNER_TEMP/rust-shadow-dist"
