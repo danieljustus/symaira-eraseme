@@ -1,6 +1,7 @@
 //! The actual stdio process must answer before EOF and keep stdout protocol-only.
 
 #[cfg(unix)]
+#[allow(dead_code)] // Shared IMAP fixture also supports implicit TLS.
 #[path = "../../symeraseme-core/tests/support/imap_server.rs"]
 mod imap_server;
 
