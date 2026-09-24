@@ -15,7 +15,7 @@ import plain_store_switchback as gate
 
 FIXTURE = gate.REPO / "tests/fixtures/event-store/crypto/golden-campaign-v3-legacy-go.db"
 MASTER_KEY = b"symaira-eraseme-golden-master-32"
-OFFICIAL_GO_V0121_SHA256 = gate.OFFICIAL_GO_V0121_SHA256
+OFFICIAL_GO_V0121_SHA256 = gate.OFFICIAL_GO_V0121_SHA256[("Darwin", "arm64")]
 CURRENT_GO_SHA256 = "f1dd5510150995ee99e9b8d21bbec333e27613b7f070f1a34d5cdedd2081023a"
 CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
          "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
@@ -24,20 +24,14 @@ CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
 
 
 def run(current_go, go, rust, output):
-    gate.require(os.sys.platform == "darwin" or os.sys.platform.startswith("linux"),
-                 "unsupported: switchback confinement is available on macOS and Linux")
-    if os.sys.platform.startswith("linux"):
-        gate.require(os.getuid() != 0 and os.getgid() != 0,
-                     "Linux sandbox runner must start as an unprivileged user")
-        gate.require(gate.platform.machine().lower() in ("aarch64", "arm64"),
-                     "Linux disposable switchback requires native aarch64")
+    gate.require(os.sys.platform == "darwin" and platform.machine() == "arm64",
+                 "encrypted rollback bridge is verified only on macOS arm64")
 
     output = Path(output)
     gate.require(not output.is_symlink(), "switchback output root must not be a symlink")
     output = output.resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    report = {"scope": "macos-encrypted-disposable-rollback-bridge" if os.sys.platform == "darwin"
-              else "linux-aarch64-encrypted-disposable-rollback-bridge",
+    report = {"scope": "macos-encrypted-disposable-rollback-bridge",
               "status": "failed", "platform": {"system": platform.system(),
               "machine": platform.machine()}, "required_cases": list(CASES), "steps": [],
               "production_cutover_verified": False,

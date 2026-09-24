@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""macOS plain-store Go -> Rust -> Go regression, never release acceptance.
+"""Disposable plain-store Go -> Rust -> Go regression, never release acceptance.
 
 The caller supplies independently built artifacts. No production store, old
-fallback evidence, schema guard or installed executable is changed. Linux and
-Windows need their own confinement/cleanup proof before this gate supports them.
+fallback evidence, schema guard or installed executable is changed. Windows
+needs its own confinement/cleanup proof before this gate supports it.
 """
 import argparse
 from contextlib import closing
@@ -592,7 +592,7 @@ def run(go, rust, go_tool, root, retained_go=None):
                 'clone_database': str(bridge_db),
                 'original_state_before_bridge': source_state,
                 'clone_before_downgrade': clone_state,
-                'rust_artifact_source_binding': 'earlier-source artifact; not exact integrated source',
+                'rust_artifact_source_binding': report['source_binding'],
             }
             require(source_state['user_version'] == 2
                     and len(source_state['tables']['removal_requests']['rows']) == 4,
