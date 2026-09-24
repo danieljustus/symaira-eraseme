@@ -1,10 +1,9 @@
-//! Inbox policy port (`internal/email`): UID high-water mark, UIDVALIDITY
-//! handling, the bounded FETCH window, reply correlation and the IMAP
-//! configuration contract.
+//! Email policy and deterministic outbound MIME port from `internal/email`.
 //!
-//! The transport is a trait boundary ([`ImapDialer`]/[`ImapSession`]), exactly
-//! as in Go: the policy decides which UID range is searched, which window is
-//! fetched and when the high-water mark advances. Register row DOM-006.
+//! The inbox transport uses [`ImapDialer`]/[`ImapSession`]; outbound messages
+//! use [`SmtpTransport`]. Both leave network access at an adapter boundary.
+//! The inbox policy decides which UID range is searched, which window is fetched
+//! and when the high-water mark advances (DOM-006).
 //!
 //! Parity evidence: `rust-tests/parity/oracle/email` records every answer in
 //! this module from the production Go package; `tests/email_parity.rs` replays
@@ -19,6 +18,7 @@ pub mod parse;
 pub mod policy;
 pub mod service;
 pub mod session;
+pub mod smtp;
 pub mod types;
 pub mod wire;
 
@@ -35,6 +35,9 @@ pub use policy::{
 };
 pub use service::{InboxService, ReplyStore};
 pub use session::{FetchedMessage, ImapDialer, ImapSession};
+pub use smtp::{
+    EmailMessage, SmtpError, SmtpTransport, build_mime_at, recipients, send_message_at,
+};
 pub use types::{
     ImapConfig, ImapError, MatchMethod, MatchedMessage, Message, OAuth2Token, RemovalRequest,
 };

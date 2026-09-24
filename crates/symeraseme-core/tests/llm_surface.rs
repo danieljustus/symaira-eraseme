@@ -4,9 +4,8 @@
 //! implementation with a frozen environment and frozen inputs and recorded what it
 //! answered. This replays the same cases against `symeraseme_core::llm`.
 //!
-//! The llmkit-backed transports are out of scope: `corekit` owns them and has no
-//! Rust counterpart. The fixture records that boundary, with the measured Go error
-//! text as evidence, under `boundaries`.
+//! The provider factory, local HTTP transport and response handling are replayed
+//! separately from this fixture using source-bound Go request observations.
 
 use std::time::Duration;
 
@@ -167,6 +166,13 @@ fn create_cases_match_the_recorded_resolution() {
                     case["agent_available"].as_bool().expect("availability"),
                     "{id} availability"
                 );
+                let requested_backend = options.agent_backend.as_str();
+                let requested_backend = if requested_backend.is_empty() {
+                    env("SYMERASEME_AGENT_BACKEND").unwrap_or_default()
+                } else {
+                    requested_backend.to_owned()
+                };
+                assert_eq!(client.requested_backend, requested_backend, "{id} backend");
             }
             Err(error) => {
                 assert!(
@@ -188,6 +194,23 @@ fn create_cases_match_the_recorded_resolution() {
             }
         }
     }
+}
+
+#[test]
+fn agent_backend_environment_selects_an_available_cli() {
+    let options = CreateOptions {
+        provider: "agent".to_owned(),
+        ..CreateOptions::default()
+    };
+    let client = create_with(
+        &options,
+        &|name| (name == "SYMERASEME_AGENT_BACKEND").then(|| "claude".to_owned()),
+        &|name| name == "claude",
+    )
+    .expect("agent provider");
+    assert_eq!(client.requested_backend, "claude");
+    assert_eq!(client.resolved_backend(), "claude");
+    assert!(client.is_available());
 }
 
 #[test]

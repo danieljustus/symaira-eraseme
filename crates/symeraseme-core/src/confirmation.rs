@@ -3,6 +3,23 @@
 //! This module is intentionally only the synchronous, side-effect-free part
 //! of confirmation handling. It does not click links or start a browser.
 
+use rusqlite::OptionalExtension;
+
+use crate::storage::Store;
+
+/// Reads the newest stored reply body for a removal request.
+pub fn latest_reply_body(store: &Store, request_id: i64) -> rusqlite::Result<Option<String>> {
+    store
+        .db()
+        .query_row(
+            "SELECT COALESCE(snippet, '') FROM inbox_replies WHERE request_id = ?1 \
+             ORDER BY received_at DESC, id DESC LIMIT 1",
+            [request_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+}
+
 /// The fixed broker host set used by the Go confirmation oracle.
 pub const KNOWN_BROKER_DOMAINS: &[&str] = &[
     "acxiom.com",

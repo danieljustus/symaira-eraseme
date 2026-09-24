@@ -30,6 +30,7 @@ import (
 type ContractHandlerOptions struct {
 	IMAPDialer email.IMAPDialer
 	HWMStore   email.HWMStore
+	Now        func() time.Time
 }
 
 func dataStore() (*eventstore.Store, error) {
@@ -169,6 +170,10 @@ func ContractHandler() Handler {
 }
 
 func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
 	return func(ctx context.Context, name string, args map[string]any) (result any, runErr error) {
 		switch name {
 
@@ -441,7 +446,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 				return nil, err
 			}
 			defer func() { runErr = errors.Join(runErr, store.Close()) }()
-			return reporting.GetDashboardData(ctx, store, "", time.Now().UTC())
+			return reporting.GetDashboardData(ctx, store, "", now().UTC())
 		case "list_requests":
 			store, err := dataStore()
 			if err != nil {
@@ -503,7 +508,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 				return nil, err
 			}
 			defer func() { runErr = errors.Join(runErr, store.Close()) }()
-			return reporting.GetCalendar(ctx, store, getStr(args, "campaign_id", ""), getInt(args, "weeks", 4), time.Now().UTC())
+			return reporting.GetCalendar(ctx, store, getStr(args, "campaign_id", ""), getInt(args, "weeks", 4), now().UTC())
 		case "grant":
 			listTokens := getBool(args, "list_tokens", false)
 			revokeAll := getBool(args, "revoke_all", false)

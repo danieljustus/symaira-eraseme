@@ -1,0 +1,66 @@
+{
+  "cases": [
+    {
+      "id": "generated-unreadable",
+      "observation": {
+        "backup_exists": false,
+        "destination_exists": false,
+        "error": "inspect scheduler file <ROOT>/source/schedules/symeraseme-tick.service: open <ROOT>/source/schedules/symeraseme-tick.service: permission denied",
+        "report": null,
+        "scheduler_contents": "ExecStart=python3 -m symeraseme tick\n",
+        "scheduler_is_directory": false,
+        "scheduler_mode": 0
+      }
+    },
+    {
+      "id": "native-unreadable",
+      "observation": {
+        "backup_exists": false,
+        "destination_exists": false,
+        "error": "inspect native scheduler unit <ROOT>/home/.config/systemd/user/symeraseme-tick.service: open <ROOT>/home/.config/systemd/user/symeraseme-tick.service: permission denied",
+        "report": null,
+        "scheduler_contents": "ExecStart=python3 -m symeraseme tick\n",
+        "scheduler_is_directory": false,
+        "scheduler_mode": 0
+      }
+    },
+    {
+      "id": "generated-directory",
+      "observation": {
+        "backup_exists": false,
+        "destination_exists": false,
+        "error": "inspect scheduler file <ROOT>/source/schedules/symeraseme-tick.service: read <ROOT>/source/schedules/symeraseme-tick.service: is a directory",
+        "report": null,
+        "scheduler_contents": "",
+        "scheduler_is_directory": true,
+        "scheduler_mode": 448
+      }
+    },
+    {
+      "id": "native-directory",
+      "observation": {
+        "backup_exists": false,
+        "destination_exists": false,
+        "error": "inspect native scheduler unit <ROOT>/home/.config/systemd/user/symeraseme-tick.service: read <ROOT>/home/.config/systemd/user/symeraseme-tick.service: is a directory",
+        "report": null,
+        "scheduler_contents": "",
+        "scheduler_is_directory": true,
+        "scheduler_mode": 448
+      }
+    }
+  ],
+  "generator_sha256": {
+    "generate_io.py": "2bc509eb2b632ba6719b6b93c9c255092461849d377d4cf122e9d115c002086b",
+    "io.go": "0a8c12416161a4538b53005206eec429638aa42b7dc7f299845c3a42d8a2657b"
+  },
+  "platform": "unix",
+  "reference": "4e582f284a639bdaa01260b6b8ab6000482e6c0d",
+  "source_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "go.sum": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa",
+    "internal/migration/command.go": "fdb1491e7e801d8b061145f4f5075f4bd8140cdde660f060d86254ddc244c475",
+    "internal/migration/migration.go": "d06254cb3a73907f8c20444034089542e189f8bca3411dea6bf50c844e8cc9ad",
+    "internal/scheduler/scheduler.go": "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"
+  },
+  "toolchain": "go1.26.6"
+}

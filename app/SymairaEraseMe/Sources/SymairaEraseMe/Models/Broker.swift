@@ -61,5 +61,5 @@ struct BrokerVerification: Codable {
 /// Response from `list_brokers`.
 struct BrokerListResponse: Codable {
     let brokers: [Broker]
-    let total: Int
+    let count: Int
 }

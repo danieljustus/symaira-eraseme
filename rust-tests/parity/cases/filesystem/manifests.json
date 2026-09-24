@@ -256,6 +256,106 @@
     },
     {
       "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "schedule-generate-overwrite",
+      "operation": [
+        "generate-scheduler",
+        "--platform",
+        "cron",
+        "--output-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler",
+        "--project-dir",
+        "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/project",
+        "--symeraseme-bin",
+        "<ORACLE_ROOT>/bin/symeraseme"
+      ],
+      "process": {
+        "argv": [
+          "generate-scheduler",
+          "--platform",
+          "cron",
+          "--output-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler",
+          "--project-dir",
+          "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/project",
+          "--symeraseme-bin",
+          "<ORACLE_ROOT>/bin/symeraseme"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "scheduler_dir": "isolated"
+      },
+      "manifest_roots": {
+        "scheduler_dir": "<ORACLE_ROOT>/filesystem/schedule-generate-overwrite/scheduler"
+      },
+      "manifests": {
+        "scheduler_dir": [
+          {
+            "path": "crontab.txt",
+            "mode": "0o644",
+            "size_bytes": 395,
+            "type": "file",
+            "sha256": "0ee3c889d89fa9cccaaf0659ad97a335ced5666ee72e913bbf17a519753d5c47"
+          },
+          {
+            "path": "install.sh",
+            "mode": "0o640",
+            "size_bytes": 499,
+            "type": "file",
+            "sha256": "26a8af66a1dd6837dbcf6b2e8f0fe85f76dd55cf1c92409d07672c8c3675ac6c"
+          },
+          {
+            "path": "symeraseme-poll.sh",
+            "mode": "0o755",
+            "size_bytes": 386,
+            "type": "file",
+            "sha256": "9dbb27c937e167c0961b96569a3a5fccd2e1b5b04b82e1f80fa4732818d36364"
+          },
+          {
+            "path": "symeraseme-rescan.sh",
+            "mode": "0o755",
+            "size_bytes": 299,
+            "type": "file",
+            "sha256": "140284c3c3f578a6eba659791b5fa9407549de1433f08bce3b041ad230717440"
+          },
+          {
+            "path": "symeraseme-tick.sh",
+            "mode": "0o755",
+            "size_bytes": 287,
+            "type": "file",
+            "sha256": "94ed71b34deb5654341925c6766bf7798b41bd19b24ea7f0b8c95802f13970b4"
+          },
+          {
+            "path": "uninstall.sh",
+            "mode": "0o755",
+            "size_bytes": 356,
+            "type": "file",
+            "sha256": "c3bcf49d7c97de2884fb20a88c945ebb342613eb276e549609e9a0c212ac41de"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "preconditions": [
+        {
+          "path": "scheduler/install.sh",
+          "content": "preserve existing mode\n",
+          "mode": "0o640"
+        }
+      ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
       "id": "report-generate",
       "operation": [
         "generate-report",
@@ -323,6 +423,74 @@
           {
             "path": "artifact rendered timestamps",
             "occurrences": 2,
+            "replacement": "<TIMESTAMP>"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "dashboard-generate",
+      "operation": [
+        "generate-dashboard",
+        "--output",
+        "<ORACLE_ROOT>/filesystem/dashboard-generate/reports/dashboard.html"
+      ],
+      "process": {
+        "argv": [
+          "generate-dashboard",
+          "--output",
+          "<ORACLE_ROOT>/filesystem/dashboard-generate/reports/dashboard.html"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 8,
+        "stderr_bytes": 0,
+        "stdout_sha256": "81b2bd4ea98c8db66554fbc8d7637a1a69a130f331feb732b75caab4c4868fd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "reports": "isolated"
+      },
+      "manifest_roots": {
+        "reports": "<ORACLE_ROOT>/filesystem/dashboard-generate/reports"
+      },
+      "manifests": {
+        "reports": [
+          {
+            "path": "dashboard.html",
+            "mode": "0o600",
+            "size_bytes": 16810,
+            "type": "file",
+            "content": {
+              "nondeterministic": true,
+              "reason": "operation-generated content contains wall-clock or private state; content intentionally not captured"
+            }
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        },
+        {
+          "path": "manifests.reports[dashboard.html].content",
+          "reason": "dashboard content is represented by normalized evidence below",
+          "replacement": "normalized content evidence"
+        }
+      ],
+      "artifact_evidence": {
+        "path": "reports/dashboard.html",
+        "encoding": "base64",
+        "content_base64": "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAiPgo8dGl0bGU+U3ltYWlyYSBFcmFzZU1lIERhc2hib2FyZDwvdGl0bGU+CjwhLS0gTG9hZCBSb2JvdG8gRmxleCB2YXJpYWJsZSBmb250IGZyb20gR29vZ2xlIEZvbnRzIC0tPgo8bGluayByZWw9InByZWNvbm5lY3QiIGhyZWY9Imh0dHBzOi8vZm9udHMuZ29vZ2xlYXBpcy5jb20iPgo8bGluayByZWw9InByZWNvbm5lY3QiIGhyZWY9Imh0dHBzOi8vZm9udHMuZ3N0YXRpYy5jb20iIGNyb3Nzb3JpZ2luPgo8bGluayBocmVmPSJodHRwczovL2ZvbnRzLmdvb2dsZWFwaXMuY29tL2NzczI/ZmFtaWx5PVJvYm90bytGbGV4Om9wc3osd2R0aCx3Z2h0QDguLjE0NCwyNS4uMTUxLDEwMC4uMTAwMCZkaXNwbGF5PXN3YXAiIHJlbD0ic3R5bGVzaGVldCI+CjxzdHlsZT4KLyogUmVzZXQgYW5kIEZvbnQgc3lzdGVtICovCiosICo6OmJlZm9yZSwgKjo6YWZ0ZXIgewogIGJveC1zaXppbmc6IGJvcmRlci1ib3g7CiAgbWFyZ2luOiAwOwogIHBhZGRpbmc6IDA7Cn0KCjpyb290IHsKICAvKiBTeW1haXJhIGJyYW5kIGRlc2lnbiB0b2tlbnMgKi8KICAtLWJnLWRhcms6ICMwRDBDMEE7CiAgLS1iZy1kYXJrZXI6ICMwNzA2MDU7CiAgLS1iZy1jYXJkOiByZ2JhKDE4LCAxNywgMTQsIDAuNjUpOwogIC0tYmctY2FyZC1ob3ZlcjogcmdiYSgyNiwgMjQsIDIwLCAwLjg1KTsKICAKICAtLWdvbGQtcHJpbWFyeTogI0U1QzM5NzsKICAtLWdvbGQtc2Vjb25kYXJ5OiAjRjhFNkNEOwogIC0tZ29sZC1zaGFkb3c6ICNDMjk5NjU7CiAgCiAgLS1pY2UtcHJpbWFyeTogI0VFRENDNDsKICAtLWljZS1zZWNvbmRhcnk6ICNENEIyODU7CiAgCiAgLS10ZXh0LXByaW1hcnk6ICNGNUY0RjA7CiAgLS10ZXh0LXNlY29uZGFyeTogI0I1QUVBNTsKICAtLXRleHQtbXV0ZWQ6ICM2RTY4NjA7CiAgCiAgLS1ib3JkZXItZ2xhc3M6IHJnYmEoMjU1LCAyNTUsIDI1NSwgMC4wNSk7CiAgLS1ib3JkZXItZ2xhc3MtaG92ZXI6IHJnYmEoMjI5LCAxOTUsIDE1MSwgMC4xOCk7CiAgCiAgLS1zaGFkb3c6IDAgOHB4IDMycHggMCByZ2JhKDAsIDAsIDAsIDAuNSk7CiAgLS10cmFuc2l0aW9uLXNtb290aDogYWxsIDAuM3MgY3ViaWMtYmV6aWVyKDAuMTYsIDEsIDAuMywgMSk7CiAgLS10cmFuc2l0aW9uLWZhc3Q6IGFsbCAwLjE1cyBlYXNlOwoKICAvKiBTdGF0dXMgQ29sb3JzICovCiAgLS1jb2xvci1jb25maXJtZWQ6ICNBN0YzRDA7CiAgLS1iZy1jb25maXJtZWQ6IHJnYmEoNiwgNzgsIDU5LCAwLjUpOwogIC0tYm9yZGVyLWNvbmZpcm1lZDogcmdiYSgxNiwgMTg1LCAxMjksIDAuMyk7CgogIC0tY29sb3ItcGVuZGluZzogI0ZERTY4QTsKICAtLWJnLXBlbmRpbmc6IHJnYmEoMTIwLCA1MywgMTUsIDAuNSk7CiAgLS1ib3JkZXItcGVuZGluZzogcmdiYSgyNDUsIDE1OCwgMTEsIDAuMyk7CgogIC0tY29sb3ItcmVqZWN0ZWQ6ICNGQ0E1QTU7CiAgLS1iZy1yZWplY3RlZDogcmdiYSg5MiwgMjksIDI5LCAwLjUpOwogIC0tYm9yZGVyLXJlamVjdGVkOiByZ2JhKDIzOSwgNjgsIDY4LCAwLjMpOwoKICAtLWNvbG9yLW92ZXJkdWU6ICNGRUNBQ0E7CiAgLS1iZy1vdmVyZHVlOiByZ2JhKDEyNywgMjksIDI5LCAwLjYpOwogIC0tYm9yZGVyLW92ZXJkdWU6IHJnYmEoMjM5LCA2OCwgNjgsIDAuNCk7CgogIC0tY29sb3ItcGxhbm5lZDogI0RCRUFGRTsKICAtLWJnLXBsYW5uZWQ6IHJnYmEoMzAsIDU4LCAxMzgsIDAuNCk7CiAgLS1ib3JkZXItcGxhbm5lZDogcmdiYSg1OSwgMTMwLCAyNDYsIDAuMyk7Cn0KCkBtZWRpYSAocHJlZmVycy1jb2xvci1zY2hlbWU6IGRhcmspIHsKICA6cm9vdCB7CiAgICAtLWJnLWRhcms6ICMwRDBDMEE7CiAgfQp9Cgpib2R5IHsKICBmb250LWZhbWlseTogJ1JvYm90byBGbGV4JywgLWFwcGxlLXN5c3RlbSwgQmxpbmtNYWNTeXN0ZW1Gb250LCAiU2Vnb2UgVUkiLCBzYW5zLXNlcmlmOwogIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWJnLWRhcmspOwogIGNvbG9yOiB2YXIoLS10ZXh0LXByaW1hcnkpOwogIGxpbmUtaGVpZ2h0OiAxLjY7CiAgcGFkZGluZzogNDBweCAyMHB4OwogIHBvc2l0aW9uOiByZWxhdGl2ZTsKICBtaW4taGVpZ2h0OiAxMDB2aDsKICBvdmVyZmxvdy14OiBoaWRkZW47CiAgLXdlYmtpdC1mb250LXNtb290aGluZzogYW50aWFsaWFzZWQ7CgogIC8qIEJsdWVwcmludCBHcmlkIEJhY2tncm91bmQgKi8KICBiYWNrZ3JvdW5kLWltYWdlOiByYWRpYWwtZ3JhZGllbnQocmdiYSgyMjksIDE5NSwgMTUxLCAwLjAyKSAxcHgsIHRyYW5zcGFyZW50IDFweCk7CiAgYmFja2dyb3VuZC1zaXplOiAyNHB4IDI0cHg7Cn0KCi8qIEFtYmllbnQgZ2xvdyBibG9icyAqLwouYW1iaWVudC1nbG93IHsKICBwb3NpdGlvbjogZml4ZWQ7CiAgYm9yZGVyLXJhZGl1czogNTAlOwogIGZpbHRlcjogYmx1cigxNDBweCk7CiAgei1pbmRleDogMDsKICBwb2ludGVyLWV2ZW50czogbm9uZTsKICBvcGFjaXR5OiAwLjY7Cn0KCi5nbG93LXRvcC1yaWdodCB7CiAgdG9wOiAtMTUwcHg7CiAgcmlnaHQ6IC0xMDBweDsKICB3aWR0aDogNTB2dzsKICBoZWlnaHQ6IDUwdnc7CiAgYmFja2dyb3VuZDogcmFkaWFsLWdyYWRpZW50KGNpcmNsZSwgcmdiYSgyMjksIDE5NSwgMTUxLCAwLjA2KSAwJSwgdHJhbnNwYXJlbnQgNzAlKTsKfQoKLmdsb3ctYm90dG9tLWxlZnQgewogIGJvdHRvbTogLTIwMHB4OwogIGxlZnQ6IC0xNTBweDsKICB3aWR0aDogNDV2dzsKICBoZWlnaHQ6IDQ1dnc7CiAgYmFja2dyb3VuZDogcmFkaWFsLWdyYWRpZW50KGNpcmNsZSwgcmdiYSgyMTIsIDE3OCwgMTMzLCAwLjA0KSAwJSwgdHJhbnNwYXJlbnQgNzAlKTsKfQoKLmNvbnRhaW5lciB7CiAgbWF4LXdpZHRoOiAxMjAwcHg7CiAgbWFyZ2luOiAwIGF1dG87CiAgcG9zaXRpb246IHJlbGF0aXZlOwogIHotaW5kZXg6IDE7Cn0KCi8qIEhlYWRlciBkZXNpZ24gKi8KaGVhZGVyIHsKICBtYXJnaW4tYm90dG9tOiA0MHB4OwogIGRpc3BsYXk6IGZsZXg7CiAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuOwogIGFsaWduLWl0ZW1zOiBmbGV4LWVuZDsKICBib3JkZXItYm90dG9tOiAxcHggc29saWQgdmFyKC0tYm9yZGVyLWdsYXNzKTsKICBwYWRkaW5nLWJvdHRvbTogMjRweDsKfQoKaDEgewogIGZvbnQtc2l6ZTogMi4yNXJlbTsKICBmb250LXdlaWdodDogODAwOwogIGxldHRlci1zcGFjaW5nOiAtMC4wM2VtOwogIGJhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCgxMzVkZWcsIHZhcigtLWdvbGQtc2Vjb25kYXJ5KSAzMCUsIHZhcigtLWdvbGQtcHJpbWFyeSkgMTAwJSk7CiAgLXdlYmtpdC1iYWNrZ3JvdW5kLWNsaXA6IHRleHQ7CiAgLXdlYmtpdC10ZXh0LWZpbGwtY29sb3I6IHRyYW5zcGFyZW50OwogIG1hcmdpbi1ib3R0b206IDRweDsKfQoKLnN1YnRpdGxlIHsKICBjb2xvcjogdmFyKC0tdGV4dC1zZWNvbmRhcnkpOwogIGZvbnQtc2l6ZTogMC45cmVtOwp9CgoubGFzdC11cGRhdGVkIHsKICBmb250LXNpemU6IDAuOHJlbTsKICBjb2xvcjogdmFyKC0tdGV4dC1tdXRlZCk7CiAgdGV4dC1hbGlnbjogcmlnaHQ7Cn0KCi5icmFuZC1iYWRnZSB7CiAgZGlzcGxheTogaW5saW5lLWJsb2NrOwogIGJhY2tncm91bmQ6IHJnYmEoMjI5LCAxOTUsIDE1MSwgMC4xKTsKICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1nb2xkLXByaW1hcnkpOwogIGNvbG9yOiB2YXIoLS1nb2xkLXByaW1hcnkpOwogIGZvbnQtc2l6ZTogMC42NXJlbTsKICBmb250LXdlaWdodDogNzAwOwogIHRleHQtdHJhbnNmb3JtOiB1cHBlcmNhc2U7CiAgbGV0dGVyLXNwYWNpbmc6IDAuMWVtOwogIHBhZGRpbmc6IDJweCA4cHg7CiAgYm9yZGVyLXJhZGl1czogNHB4OwogIG1hcmdpbi1ib3R0b206IDhweDsKfQoKLyogR2xhc3Ntb3JwaGlzbSBDYXJkcyAqLwouY2FyZCB7CiAgYmFja2dyb3VuZDogdmFyKC0tYmctY2FyZCk7CiAgYmFja2Ryb3AtZmlsdGVyOiBibHVyKDE2cHgpOwogIC13ZWJraXQtYmFja2Ryb3AtZmlsdGVyOiBibHVyKDE2cHgpOwogIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWJvcmRlci1nbGFzcyk7CiAgYm9yZGVyLXJhZGl1czogMTJweDsKICBwYWRkaW5nOiAyNHB4OwogIGJveC1zaGFkb3c6IHZhcigtLXNoYWRvdyk7CiAgdHJhbnNpdGlvbjogdmFyKC0tdHJhbnNpdGlvbi1zbW9vdGgpOwp9CgouY2FyZDpob3ZlciB7CiAgYm9yZGVyLWNvbG9yOiB2YXIoLS1ib3JkZXItZ2xhc3MtaG92ZXIpOwogIGJveC1zaGFkb3c6IDAgMTJweCA0MHB4IDAgcmdiYSgwLCAwLCAwLCAwLjYpOwp9CgovKiBTdW1tYXJ5IEdyaWQgc3R5bGluZyAqLwouc3VtbWFyeS1ncmlkIHsKICBkaXNwbGF5OiBncmlkOwogIGdyaWQtdGVtcGxhdGUtY29sdW1uczogcmVwZWF0KGF1dG8tZml0LCBtaW5tYXgoMTgwcHgsIDFmcikpOwogIGdhcDogMTZweDsKICBtYXJnaW4tYm90dG9tOiA0MHB4Owp9Cgouc3VtbWFyeS1jYXJkIHsKICB0ZXh0LWFsaWduOiBsZWZ0OwogIGRpc3BsYXk6IGZsZXg7CiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsKICBqdXN0aWZ5LWNvbnRlbnQ6IHNwYWNlLWJldHdlZW47CiAgbWluLWhlaWdodDogMTEwcHg7Cn0KCi5zdW1tYXJ5LWNhcmQgLmNvdW50IHsKICBmb250LXNpemU6IDIuMjVyZW07CiAgZm9udC13ZWlnaHQ6IDgwMDsKICBsaW5lLWhlaWdodDogMTsKICBsZXR0ZXItc3BhY2luZzogLTAuMDJlbTsKICBtYXJnaW4tYm90dG9tOiA4cHg7Cn0KCi5zdW1tYXJ5LWNhcmQgLmxhYmVsIHsKICBmb250LXNpemU6IDAuNzVyZW07CiAgZm9udC13ZWlnaHQ6IDcwMDsKICBjb2xvcjogdmFyKC0tdGV4dC1zZWNvbmRhcnkpOwogIHRleHQtdHJhbnNmb3JtOiB1cHBlcmNhc2U7CiAgbGV0dGVyLXNwYWNpbmc6IDAuMDhlbTsKfQoKLnN1bW1hcnktY2FyZC50b3RhbCAuY291bnQgeyBjb2xvcjogdmFyKC0tdGV4dC1wcmltYXJ5KTsgfQouc3VtbWFyeS1jYXJkLnBlbmRpbmcgLmNvdW50IHsgY29sb3I6IHZhcigtLWdvbGQtcHJpbWFyeSk7IH0KLnN1bW1hcnktY2FyZC5jb25maXJtZWQgLmNvdW50IHsgY29sb3I6IHZhcigtLWNvbG9yLWNvbmZpcm1lZCk7IH0KLnN1bW1hcnktY2FyZC5yZWplY3RlZCAuY291bnQgeyBjb2xvcjogdmFyKC0tY29sb3ItcmVqZWN0ZWQpOyB9Ci5zdW1tYXJ5LWNhcmQub3ZlcmR1ZSAuY291bnQgeyBjb2xvcjogdmFyKC0tY29sb3Itb3ZlcmR1ZSk7IH0KCi8qIFNlY3Rpb24gSGVhZGVycyAqLwouc2VjdGlvbi10aXRsZS1iYXIgewogIGRpc3BsYXk6IGZsZXg7CiAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuOwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgbWFyZ2luLWJvdHRvbTogMTZweDsKICBnYXA6IDE2cHg7CiAgZmxleC13cmFwOiB3cmFwOwp9Cgouc2VjdGlvbi10aXRsZSB7CiAgZm9udC1zaXplOiAxLjI1cmVtOwogIGZvbnQtd2VpZ2h0OiA3MDA7CiAgY29sb3I6IHZhcigtLWdvbGQtc2Vjb25kYXJ5KTsKICBsZXR0ZXItc3BhY2luZzogLTAuMDFlbTsKfQoKLnNlY3Rpb24gewogIG1hcmdpbi1ib3R0b206IDQ4cHg7Cn0KCi8qIFN0YXR1cyBCcmVha2Rvd24gQ2hhcnQgKi8KLmNoYXJ0LWNvbnRhaW5lciB7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogIGdhcDogMTJweDsKfQoKLmNoYXJ0LWJhci1yb3cgewogIGRpc3BsYXk6IGZsZXg7CiAgYWxpZ24taXRlbXM6IGNlbnRlcjsKICBnYXA6IDE2cHg7CiAgZm9udC1zaXplOiAwLjg1cmVtOwp9CgouY2hhcnQtYmFyLWxhYmVsIHsKICB3aWR0aDogMTIwcHg7CiAgY29sb3I6IHZhcigtLXRleHQtc2Vjb25kYXJ5KTsKICBmb250LXdlaWdodDogNjAwOwp9CgouY2hhcnQtYmFyLXdyYXBwZXIgewogIGZsZXgtZ3JvdzogMTsKICBiYWNrZ3JvdW5kOiByZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDIpOwogIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWJvcmRlci1nbGFzcyk7CiAgaGVpZ2h0OiAyNHB4OwogIGJvcmRlci1yYWRpdXM6IDEycHg7CiAgb3ZlcmZsb3c6IGhpZGRlbjsKICBwb3NpdGlvbjogcmVsYXRpdmU7Cn0KCi5jaGFydC1iYXItZmlsbCB7CiAgaGVpZ2h0OiAxMDAlOwogIGJvcmRlci1yYWRpdXM6IDExcHg7CiAgdHJhbnNpdGlvbjogd2lkdGggMXMgZWFzZS1vdXQ7CiAgcG9zaXRpb246IHJlbGF0aXZlOwp9CgouY2hhcnQtYmFyLWZpbGwucGxhbm5lZCB7IGJhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCg5MGRlZywgcmdiYSgzMCw1OCwxMzgsMC43KSwgcmdiYSg1OSwxMzAsMjQ2LDAuOCkpOyB9Ci5jaGFydC1iYXItZmlsbC5zZW50IHsgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDkwZGVnLCByZ2JhKDExMCwxMDQsOTYsMC41KSwgcmdiYSgxODEsMTc0LDE2NSwwLjcpKTsgfQouY2hhcnQtYmFyLWZpbGwuYXdhaXRpbmcgeyBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoOTBkZWcsIHJnYmEoMTIwLDUzLDE1LDAuNyksIHJnYmEoMjQ1LDE1OCwxMSwwLjgpKTsgfQouY2hhcnQtYmFyLWZpbGwuY29uZmlybWVkIHsgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDkwZGVnLCByZ2JhKDYsNzgsNTksMC43KSwgcmdiYSgxNiwxODUsMTI5LDAuOCkpOyB9Ci5jaGFydC1iYXItZmlsbC5yZWplY3RlZCB7IGJhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCg5MGRlZywgcmdiYSg5MiwyOSwyOSwwLjcpLCByZ2JhKDIzOSw2OCw2OCwwLjgpKTsgfQouY2hhcnQtYmFyLWZpbGwub3ZlcmR1ZSB7IGJhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCg5MGRlZywgcmdiYSgxMjcsMjksMjksMC44KSwgcmdiYSgyMzksNjgsNjgsMC45KSk7IH0KCi5jaGFydC1iYXItdmFsdWUgewogIHBvc2l0aW9uOiBhYnNvbHV0ZTsKICByaWdodDogMTJweDsKICB0b3A6IDUwJTsKICB0cmFuc2Zvcm06IHRyYW5zbGF0ZVkoLTUwJSk7CiAgZm9udC13ZWlnaHQ6IDcwMDsKICBmb250LXNpemU6IDAuNzVyZW07CiAgY29sb3I6IHZhcigtLXRleHQtcHJpbWFyeSk7Cn0KCi8qIFRhYmxlcyBzdHlsaW5nICovCi50YWJsZS13cmFwIHsKICBvdmVyZmxvdy14OiBhdXRvOwogIGJvcmRlci1yYWRpdXM6IDhweDsKICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1ib3JkZXItZ2xhc3MpOwogIGJhY2tncm91bmQ6IHJnYmEoNywgNiwgNSwgMC4zKTsKfQoKdGFibGUgewogIHdpZHRoOiAxMDAlOwogIGJvcmRlci1jb2xsYXBzZTogY29sbGFwc2U7CiAgZm9udC1zaXplOiAwLjg1cmVtOwogIHRleHQtYWxpZ246IGxlZnQ7Cn0KCnRoLCB0ZCB7CiAgcGFkZGluZzogMTRweCAxOHB4OwogIGJvcmRlci1ib3R0b206IDFweCBzb2xpZCB2YXIoLS1ib3JkZXItZ2xhc3MpOwp9Cgp0aCB7CiAgZm9udC13ZWlnaHQ6IDcwMDsKICBjb2xvcjogdmFyKC0tdGV4dC1zZWNvbmRhcnkpOwogIGZvbnQtc2l6ZTogMC43cmVtOwogIHRleHQtdHJhbnNmb3JtOiB1cHBlcmNhc2U7CiAgbGV0dGVyLXNwYWNpbmc6IDAuMDhlbTsKICBiYWNrZ3JvdW5kOiByZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDEpOwp9Cgp0cjpsYXN0LWNoaWxkIHRkIHsKICBib3JkZXItYm90dG9tOiBub25lOwp9Cgp0cjpob3ZlciB0ZCB7CiAgYmFja2dyb3VuZDogcmdiYSgyNTUsIDI1NSwgMjU1LCAwLjAxNSk7Cn0KCi8qIFN0YXR1cyBCYWRnZXMgKi8KLmJhZGdlIHsKICBkaXNwbGF5OiBpbmxpbmUtZmxleDsKICBhbGlnbi1pdGVtczogY2VudGVyOwogIHBhZGRpbmc6IDNweCAxMHB4OwogIGJvcmRlci1yYWRpdXM6IDIwcHg7CiAgZm9udC1zaXplOiAwLjdyZW07CiAgZm9udC13ZWlnaHQ6IDcwMDsKICB0ZXh0LXRyYW5zZm9ybTogdXBwZXJjYXNlOwogIGxldHRlci1zcGFjaW5nOiAwLjAzZW07CiAgYm9yZGVyOiAxcHggc29saWQgdHJhbnNwYXJlbnQ7Cn0KCi5iYWRnZS1ncmVlbiB7CiAgYmFja2dyb3VuZDogdmFyKC0tYmctY29uZmlybWVkKTsKICBjb2xvcjogdmFyKC0tY29sb3ItY29uZmlybWVkKTsKICBib3JkZXItY29sb3I6IHZhcigtLWJvcmRlci1jb25maXJtZWQpOwp9CgouYmFkZ2UteWVsbG93IHsKICBiYWNrZ3JvdW5kOiB2YXIoLS1iZy1wZW5kaW5nKTsKICBjb2xvcjogdmFyKC0tY29sb3ItcGVuZGluZyk7CiAgYm9yZGVyLWNvbG9yOiB2YXIoLS1ib3JkZXItcGVuZGluZyk7Cn0KCi5iYWRnZS1yZWQgewogIGJhY2tncm91bmQ6IHZhcigtLWJnLXJlamVjdGVkKTsKICBjb2xvcjogdmFyKC0tY29sb3ItcmVqZWN0ZWQpOwogIGJvcmRlci1jb2xvcjogdmFyKC0tYm9yZGVyLXJlamVjdGVkKTsKfQoKLmJhZGdlLWJsdWUgewogIGJhY2tncm91bmQ6IHZhcigtLWJnLXBsYW5uZWQpOwogIGNvbG9yOiB2YXIoLS1jb2xvci1wbGFubmVkKTsKICBib3JkZXItY29sb3I6IHZhcigtLWJvcmRlci1wbGFubmVkKTsKfQoKLmJhZGdlLWdyYXkgewogIGJhY2tncm91bmQ6IHJnYmEoMTEwLCAxMDQsIDk2LCAwLjI1KTsKICBjb2xvcjogdmFyKC0tdGV4dC1zZWNvbmRhcnkpOwogIGJvcmRlci1jb2xvcjogcmdiYSgyNTUsIDI1NSwgMjU1LCAwLjA1KTsKfQoKLyogSW50ZXJhY3RpdmUgU2VhcmNoICYgRmlsdGVyIENvbnRyb2xzICovCi5maWx0ZXItY29udHJvbHMgewogIGRpc3BsYXk6IGZsZXg7CiAgZ2FwOiAxMnB4OwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgZmxleC13cmFwOiB3cmFwOwp9Cgouc2VhcmNoLWlucHV0LXdyYXBwZXIgewogIHBvc2l0aW9uOiByZWxhdGl2ZTsKfQoKLnNlYXJjaC1pbnB1dCB7CiAgYmFja2dyb3VuZDogcmdiYSg3LCA2LCA1LCAwLjUpOwogIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWJvcmRlci1nbGFzcyk7CiAgY29sb3I6IHZhcigtLXRleHQtcHJpbWFyeSk7CiAgcGFkZGluZzogOHB4IDE0cHg7CiAgYm9yZGVyLXJhZGl1czogOHB4OwogIGZvbnQtc2l6ZTogMC44NXJlbTsKICBvdXRsaW5lOiBub25lOwogIHdpZHRoOiAyNDBweDsKICBmb250LWZhbWlseTogaW5oZXJpdDsKICB0cmFuc2l0aW9uOiB2YXIoLS10cmFuc2l0aW9uLWZhc3QpOwp9Cgouc2VhcmNoLWlucHV0OmZvY3VzIHsKICBib3JkZXItY29sb3I6IHZhcigtLWdvbGQtcHJpbWFyeSk7CiAgYm94LXNoYWRvdzogMCAwIDAgMnB4IHJnYmEoMjI5LCAxOTUsIDE1MSwgMC4xNSk7Cn0KCi5maWx0ZXItYnRuLWdyb3VwIHsKICBkaXNwbGF5OiBmbGV4OwogIGJhY2tncm91bmQ6IHJnYmEoNywgNiwgNSwgMC40KTsKICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1ib3JkZXItZ2xhc3MpOwogIHBhZGRpbmc6IDNweDsKICBib3JkZXItcmFkaXVzOiA4cHg7Cn0KCi5maWx0ZXItYnRuIHsKICBiYWNrZ3JvdW5kOiB0cmFuc3BhcmVudDsKICBib3JkZXI6IG5vbmU7CiAgY29sb3I6IHZhcigtLXRleHQtc2Vjb25kYXJ5KTsKICBwYWRkaW5nOiA2cHggMTJweDsKICBib3JkZXItcmFkaXVzOiA2cHg7CiAgZm9udC1zaXplOiAwLjhyZW07CiAgZm9udC13ZWlnaHQ6IDYwMDsKICBjdXJzb3I6IHBvaW50ZXI7CiAgdHJhbnNpdGlvbjogdmFyKC0tdHJhbnNpdGlvbi1mYXN0KTsKICBmb250LWZhbWlseTogaW5oZXJpdDsKfQoKLmZpbHRlci1idG46aG92ZXIgewogIGNvbG9yOiB2YXIoLS10ZXh0LXByaW1hcnkpOwp9CgouZmlsdGVyLWJ0bi5hY3RpdmUgewogIGJhY2tncm91bmQ6IHJnYmEoMjI5LCAxOTUsIDE1MSwgMC4xMik7CiAgY29sb3I6IHZhcigtLWdvbGQtcHJpbWFyeSk7Cn0KCi8qIEJyb2tlciBHcmlkIExheW91dCAqLwouYnJva2VyLWdyaWQgewogIGRpc3BsYXk6IGdyaWQ7CiAgZ3JpZC10ZW1wbGF0ZS1jb2x1bW5zOiByZXBlYXQoYXV0by1maWxsLCBtaW5tYXgoMjYwcHgsIDFmcikpOwogIGdhcDogMTJweDsKfQoKLmJyb2tlci1jYXJkIHsKICBiYWNrZ3JvdW5kOiB2YXIoLS1iZy1jYXJkKTsKICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1ib3JkZXItZ2xhc3MpOwogIGJvcmRlci1yYWRpdXM6IDEwcHg7CiAgcGFkZGluZzogMTZweDsKICBkaXNwbGF5OiBmbGV4OwogIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47CiAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuOwogIGdhcDogMTJweDsKICB0cmFuc2l0aW9uOiB2YXIoLS10cmFuc2l0aW9uLXNtb290aCk7Cn0KCi5icm9rZXItY2FyZDpob3ZlciB7CiAgYm9yZGVyLWNvbG9yOiB2YXIoLS1ib3JkZXItZ2xhc3MtaG92ZXIpOwogIHRyYW5zZm9ybTogdHJhbnNsYXRlWSgtMnB4KTsKfQoKLmJyb2tlci1jYXJkLXRvcCB7CiAgZGlzcGxheTogZmxleDsKICBqdXN0aWZ5LWNvbnRlbnQ6IHNwYWNlLWJldHdlZW47CiAgYWxpZ24taXRlbXM6IGZsZXgtc3RhcnQ7Cn0KCi5icm9rZXItbmFtZSB7CiAgZm9udC13ZWlnaHQ6IDcwMDsKICBmb250LXNpemU6IDAuOTVyZW07CiAgY29sb3I6IHZhcigtLWdvbGQtc2Vjb25kYXJ5KTsKICBsZXR0ZXItc3BhY2luZzogLTAuMDFlbTsKfQoKLmJyb2tlci1zdGF0cy1jb250YWluZXIgewogIGRpc3BsYXk6IGZsZXg7CiAgZmxleC13cmFwOiB3cmFwOwogIGdhcDogNnB4Owp9Cgouc3RhdC10YWcgewogIGZvbnQtc2l6ZTogMC42NXJlbTsKICBmb250LXdlaWdodDogNzAwOwogIHBhZGRpbmc6IDJweCA2cHg7CiAgYm9yZGVyLXJhZGl1czogNHB4OwogIGJhY2tncm91bmQ6IHJnYmEoMjU1LDI1NSwyNTUsMC4wMik7CiAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tYm9yZGVyLWdsYXNzKTsKICBjb2xvcjogdmFyKC0tdGV4dC1zZWNvbmRhcnkpOwp9Cgouc3RhdC10YWcuY29uZmlybWVkIHsgY29sb3I6IHZhcigtLWNvbG9yLWNvbmZpcm1lZCk7IH0KLnN0YXQtdGFnLnBlbmRpbmcgeyBjb2xvcjogdmFyKC0tY29sb3ItcGVuZGluZyk7IH0KLnN0YXQtdGFnLnJlamVjdGVkIHsgY29sb3I6IHZhcigtLWNvbG9yLXJlamVjdGVkKTsgfQouc3RhdC10YWcub3ZlcmR1ZSB7IGNvbG9yOiB2YXIoLS1jb2xvci1vdmVyZHVlKTsgfQoKLyogVGltZWxpbmUgZGVzaWduICovCi50aW1lbGluZSB7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogIGdhcDogMTJweDsKfQoKLnRpbWVsaW5lLWl0ZW0gewogIGRpc3BsYXk6IGZsZXg7CiAgZ2FwOiAxNnB4OwogIHBhZGRpbmc6IDEycHggMTZweDsKICBiYWNrZ3JvdW5kOiByZ2JhKDcsIDYsIDUsIDAuMjUpOwogIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWJvcmRlci1nbGFzcyk7CiAgYm9yZGVyLXJhZGl1czogOHB4OwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7Cn0KCi50aW1lbGluZS10aW1lIHsKICB3aWR0aDogMTQwcHg7CiAgY29sb3I6IHZhcigtLXRleHQtbXV0ZWQpOwogIGZvbnQtc2l6ZTogMC43NXJlbTsKICBmb250LXdlaWdodDogNjAwOwp9CgoudGltZWxpbmUtYmFkZ2Utd3JhcCB7CiAgd2lkdGg6IDEzMHB4Owp9CgoudGltZWxpbmUtY29udGVudCB7CiAgZmxleC1ncm93OiAxOwogIGZvbnQtc2l6ZTogMC44NXJlbTsKfQoKLnRpbWVsaW5lLWJyb2tlciB7CiAgY29sb3I6IHZhcigtLWdvbGQtcHJpbWFyeSk7CiAgZm9udC13ZWlnaHQ6IDYwMDsKfQoKLnRpbWVsaW5lLXNvdXJjZSB7CiAgZm9udC1zaXplOiAwLjc1cmVtOwogIGNvbG9yOiB2YXIoLS10ZXh0LW11dGVkKTsKICB0ZXh0LWFsaWduOiByaWdodDsKICB3aWR0aDogMTAwcHg7Cn0KCiNuby1yZXN1bHRzLW1zZyB7CiAgZ3JpZC1jb2x1bW46IDEgLyAtMTsKICB0ZXh0LWFsaWduOiBjZW50ZXI7CiAgcGFkZGluZzogNDBweDsKICBjb2xvcjogdmFyKC0tdGV4dC1tdXRlZCk7CiAgYmFja2dyb3VuZDogcmdiYSg3LCA2LCA1LCAwLjIpOwogIGJvcmRlcjogMXB4IGRhc2hlZCB2YXIoLS1ib3JkZXItZ2xhc3MpOwogIGJvcmRlci1yYWRpdXM6IDhweDsKICBkaXNwbGF5OiBub25lOwp9CgovKiBDdXN0b20gc2Nyb2xsYmFycyAqLwo6Oi13ZWJraXQtc2Nyb2xsYmFyIHsKICB3aWR0aDogOHB4OwogIGhlaWdodDogOHB4Owp9Cjo6LXdlYmtpdC1zY3JvbGxiYXItdHJhY2sgewogIGJhY2tncm91bmQ6IHZhcigtLWJnLWRhcmtlcik7Cn0KOjotd2Via2l0LXNjcm9sbGJhci10aHVtYiB7CiAgYmFja2dyb3VuZDogdmFyKC0tdGV4dC1tdXRlZCk7CiAgYm9yZGVyLXJhZGl1czogNHB4Owp9Cjo6LXdlYmtpdC1zY3JvbGxiYXItdGh1bWI6aG92ZXIgewogIGJhY2tncm91bmQ6IHZhcigtLXRleHQtc2Vjb25kYXJ5KTsKfQoKQG1lZGlhIChtYXgtd2lkdGg6IDc2OHB4KSB7CiAgaGVhZGVyIHsKICAgIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47CiAgICBhbGlnbi1pdGVtczogZmxleC1zdGFydDsKICAgIGdhcDogMTZweDsKICB9CiAgLmxhc3QtdXBkYXRlZCB7CiAgICB0ZXh0LWFsaWduOiBsZWZ0OwogIH0KICAudGltZWxpbmUtaXRlbSB7CiAgICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogICAgYWxpZ24taXRlbXM6IGZsZXgtc3RhcnQ7CiAgICBnYXA6IDhweDsKICAgIHBvc2l0aW9uOiByZWxhdGl2ZTsKICAgIHBhZGRpbmctYm90dG9tOiAzMHB4OwogIH0KICAudGltZWxpbmUtdGltZSB7CiAgICB3aWR0aDogYXV0bzsKICB9CiAgLnRpbWVsaW5lLXNvdXJjZSB7CiAgICBwb3NpdGlvbjogYWJzb2x1dGU7CiAgICBib3R0b206IDEwcHg7CiAgICByaWdodDogMTZweDsKICAgIHdpZHRoOiBhdXRvOwogIH0KfQo8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgoKPCEtLSBBbWJpZW50IEJhY2tkcm9wcyAtLT4KPGRpdiBjbGFzcz0iYW1iaWVudC1nbG93IGdsb3ctdG9wLXJpZ2h0Ij48L2Rpdj4KPGRpdiBjbGFzcz0iYW1iaWVudC1nbG93IGdsb3ctYm90dG9tLWxlZnQiPjwvZGl2PgoKPGRpdiBjbGFzcz0iY29udGFpbmVyIj4KICA8aGVhZGVyPgogICAgPGRpdj4KICAgICAgPGRpdiBjbGFzcz0iYnJhbmQtYmFkZ2UiPlN5bWFpcmEgRXJhc2VNZTwvZGl2PgogICAgICA8aDE+RXJhc2VNZSBEYXNoYm9hcmQ8L2gxPgogICAgICA8ZGl2IGNsYXNzPSJzdWJ0aXRsZSI+MCBSZXF1ZXN0cyBhY3Jvc3MgMCBjYW1wYWlnbihzKTwvZGl2PgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJsYXN0LXVwZGF0ZWQiPgogICAgICA8ZGl2PlJlcG9ydCBnZW5lcmF0ZWQ8L2Rpdj4KICAgICAgPHN0cm9uZyBzdHlsZT0iY29sb3I6IHZhcigtLXRleHQtcHJpbWFyeSk7Ij48VElNRVNUQU1QPjwvc3Ryb25nPgogICAgPC9kaXY+CiAgPC9oZWFkZXI+CgogIDwhLS0gU3VtbWFyeSBDYXJkcyAtLT4KICA8ZGl2IGNsYXNzPSJzdW1tYXJ5LWdyaWQiPgogICAgPGRpdiBjbGFzcz0iY2FyZCBzdW1tYXJ5LWNhcmQgdG90YWwiPgogICAgICA8ZGl2IGNsYXNzPSJsYWJlbCI+VG90YWwgUmVxdWVzdHM8L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0iY291bnQiPjA8L2Rpdj4KICAgIDwvZGl2PgogICAgPGRpdiBjbGFzcz0iY2FyZCBzdW1tYXJ5LWNhcmQgcGVuZGluZyI+CiAgICAgIDxkaXYgY2xhc3M9ImxhYmVsIj5JbiBQcm9ncmVzczwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJjb3VudCI+MDwvZGl2PgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJjYXJkIHN1bW1hcnktY2FyZCBjb25maXJtZWQiPgogICAgICA8ZGl2IGNsYXNzPSJsYWJlbCI+Q29uZmlybWVkPC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9ImNvdW50Ij4wPC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImNhcmQgc3VtbWFyeS1jYXJkIHJlamVjdGVkIj4KICAgICAgPGRpdiBjbGFzcz0ibGFiZWwiPlJlamVjdGVkPC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9ImNvdW50Ij4wPC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImNhcmQgc3VtbWFyeS1jYXJkIG92ZXJkdWUiPgogICAgICA8ZGl2IGNsYXNzPSJsYWJlbCI+T3ZlcmR1ZTwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJjb3VudCI+MDwvZGl2PgogICAgPC9kaXY+CiAgPC9kaXY+CgogIDxkaXYgc3R5bGU9ImRpc3BsYXk6IGdyaWQ7IGdyaWQtdGVtcGxhdGUtY29sdW1uczogMWZyOyBnYXA6IDMycHg7IG1hcmdpbi1ib3R0b206IDQ4cHg7Ij4KICAgIDwhLS0gU3RhdHVzIGJyZWFrZG93biBjaGFydCAtLT4KICAgIDxkaXYgY2xhc3M9ImNhcmQgc2VjdGlvbiI+CiAgICAgIDxkaXYgY2xhc3M9InNlY3Rpb24tdGl0bGUtYmFyIj4KICAgICAgICA8aDIgY2xhc3M9InNlY3Rpb24tdGl0bGUiPlN0YXR1cyBCcmVha2Rvd248L2gyPgogICAgICA8L2Rpdj4KICAgICAgPHAgc3R5bGU9ImNvbG9yOiB2YXIoLS10ZXh0LW11dGVkKTsgZm9udC1zaXplOiAwLjg1cmVtOyI+Tm8gcmVxdWVzdHMgeWV0LiBSdW4gPGNvZGU+cGxhbjwvY29kZT4gYW5kIDxjb2RlPmV4ZWN1dGU8L2NvZGU+IHRvIHBvcHVsYXRlIHRoZSBkYXNoYm9hcmQuPC9wPgogICAgPC9kaXY+CgogICAgPCEtLSBDYW1wYWlnbnMgVGFibGUgLS0+CiAgICA8ZGl2IGNsYXNzPSJjYXJkIHNlY3Rpb24iPgogICAgICA8ZGl2IGNsYXNzPSJzZWN0aW9uLXRpdGxlLWJhciI+CiAgICAgICAgPGgyIGNsYXNzPSJzZWN0aW9uLXRpdGxlIj5BY3RpdmUgQ2FtcGFpZ25zPC9oMj4KICAgICAgPC9kaXY+CiAgICAgIDxwIHN0eWxlPSJjb2xvcjogdmFyKC0tdGV4dC1tdXRlZCk7IGZvbnQtc2l6ZTogMC44NXJlbTsiPk5vIGNhbXBhaWducyBmb3VuZC48L3A+CiAgICA8L2Rpdj4KICA8L2Rpdj4KCiAgPCEtLSBCcm9rZXIgc3RhdHVzIGdyaWQgLS0+CiAgPGRpdiBjbGFzcz0ic2VjdGlvbiI+CiAgICA8ZGl2IGNsYXNzPSJzZWN0aW9uLXRpdGxlLWJhciI+CiAgICAgIDxoMiBjbGFzcz0ic2VjdGlvbi10aXRsZSI+QnJva2VyIFN0YXR1czwvaDI+CiAgICAgIAogICAgICA8ZGl2IGNsYXNzPSJmaWx0ZXItY29udHJvbHMiPgogICAgICAgIDxkaXYgY2xhc3M9InNlYXJjaC1pbnB1dC13cmFwcGVyIj4KICAgICAgICAgIDxpbnB1dCB0eXBlPSJ0ZXh0IiBjbGFzcz0ic2VhcmNoLWlucHV0IiBpZD0iYnJva2VyLXNlYXJjaCIgcGxhY2Vob2xkZXI9IlNlYXJjaCBkYXRhIGJyb2tlcnMuLi4iIG9uaW5wdXQ9ImhhbmRsZVNlYXJjaCh0aGlzLnZhbHVlKSI+CiAgICAgICAgPC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0iZmlsdGVyLWJ0bi1ncm91cCI+CiAgICAgICAgICA8YnV0dG9uIGNsYXNzPSJmaWx0ZXItYnRuIGFjdGl2ZSIgb25jbGljaz0ic2V0RmlsdGVyKCdhbGwnLCB0aGlzKSI+QWxsPC9idXR0b24+CiAgICAgICAgICA8YnV0dG9uIGNsYXNzPSJmaWx0ZXItYnRuIiBvbmNsaWNrPSJzZXRGaWx0ZXIoJ2NvbmZpcm1lZCcsIHRoaXMpIj5Db25maXJtZWQ8L2J1dHRvbj4KICAgICAgICAgIDxidXR0b24gY2xhc3M9ImZpbHRlci1idG4iIG9uY2xpY2s9InNldEZpbHRlcigncGVuZGluZycsIHRoaXMpIj5QZW5kaW5nPC9idXR0b24+CiAgICAgICAgICA8YnV0dG9uIGNsYXNzPSJmaWx0ZXItYnRuIiBvbmNsaWNrPSJzZXRGaWx0ZXIoJ292ZXJkdWUnLCB0aGlzKSI+T3ZlcmR1ZTwvYnV0dG9uPgogICAgICAgICAgPGJ1dHRvbiBjbGFzcz0iZmlsdGVyLWJ0biIgb25jbGljaz0ic2V0RmlsdGVyKCdyZWplY3RlZCcsIHRoaXMpIj5SZWplY3RlZDwvYnV0dG9uPgogICAgICAgIDwvZGl2PgogICAgICA8L2Rpdj4KICAgIDwvZGl2PgoKICAgIDxwIHN0eWxlPSJjb2xvcjogdmFyKC0tdGV4dC1tdXRlZCk7IGZvbnQtc2l6ZTogMC44NXJlbTsiPk5vIGJyb2tlciBkYXRhIGF2YWlsYWJsZS48L3A+CiAgPC9kaXY+CgogIDwhLS0gUmVjZW50IGV2ZW50cyAtLT4KICA8ZGl2IGNsYXNzPSJjYXJkIHNlY3Rpb24iPgogICAgPGRpdiBjbGFzcz0ic2VjdGlvbi10aXRsZS1iYXIiPgogICAgICA8aDIgY2xhc3M9InNlY3Rpb24tdGl0bGUiPlJlY2VudCBFdmVudHM8L2gyPgogICAgPC9kaXY+CiAgICA8cCBzdHlsZT0iY29sb3I6IHZhcigtLXRleHQtbXV0ZWQpOyBmb250LXNpemU6IDAuODVyZW07Ij5ObyBldmVudHMgcmVjb3JkZWQgeWV0LjwvcD4KICA8L2Rpdj4KPC9kaXY+Cgo8c2NyaXB0PgpsZXQgY3VycmVudEZpbHRlciA9ICdhbGwnOwpsZXQgc2VhcmNoUXVlcnkgPSAnJzsKCmZ1bmN0aW9uIHNldEZpbHRlcihzdGF0dXMsIGJ0bikgewogIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5maWx0ZXItYnRuJykuZm9yRWFjaChiID0+IGIuY2xhc3NMaXN0LnJlbW92ZSgnYWN0aXZlJykpOwogIGJ0bi5jbGFzc0xpc3QuYWRkKCdhY3RpdmUnKTsKICBjdXJyZW50RmlsdGVyID0gc3RhdHVzOwogIGFwcGx5RmlsdGVyKCk7Cn0KCmZ1bmN0aW9uIGhhbmRsZVNlYXJjaCh2YWwpIHsKICBzZWFyY2hRdWVyeSA9IHZhbC50b0xvd2VyQ2FzZSgpLnRyaW0oKTsKICBhcHBseUZpbHRlcigpOwp9CgpmdW5jdGlvbiBhcHBseUZpbHRlcigpIHsKICBjb25zdCBjYXJkcyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5icm9rZXItY2FyZCcpOwogIGxldCB2aXNpYmxlQ291bnQgPSAwOwogIAogIGNhcmRzLmZvckVhY2goY2FyZCA9PiB7CiAgICBjb25zdCBicm9rZXJJZCA9IGNhcmQuZGF0YXNldC5icm9rZXIudG9Mb3dlckNhc2UoKTsKICAgIGNvbnN0IHN0YXR1cyA9IGNhcmQuZGF0YXNldC5zdGF0dXM7CiAgICAKICAgIGNvbnN0IG1hdGNoZXNTZWFyY2ggPSBicm9rZXJJZC5pbmNsdWRlcyhzZWFyY2hRdWVyeSk7CiAgICBjb25zdCBtYXRjaGVzRmlsdGVyID0gY3VycmVudEZpbHRlciA9PT0gJ2FsbCcgfHwgc3RhdHVzID09PSBjdXJyZW50RmlsdGVyOwogICAgCiAgICBpZiAobWF0Y2hlc1NlYXJjaCAmJiBtYXRjaGVzRmlsdGVyKSB7CiAgICAgIGNhcmQuc3R5bGUuZGlzcGxheSA9ICdmbGV4JzsKICAgICAgdmlzaWJsZUNvdW50Kys7CiAgICB9IGVsc2UgewogICAgICBjYXJkLnN0eWxlLmRpc3BsYXkgPSAnbm9uZSc7CiAgICB9CiAgfSk7CiAgCiAgY29uc3Qgbm9SZXN1bHRzID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ25vLXJlc3VsdHMtbXNnJyk7CiAgaWYgKHZpc2libGVDb3VudCA9PT0gMCkgewogICAgbm9SZXN1bHRzLnN0eWxlLmRpc3BsYXkgPSAnYmxvY2snOwogIH0gZWxzZSB7CiAgICBub1Jlc3VsdHMuc3R5bGUuZGlzcGxheSA9ICdub25lJzsKICB9Cn0KPC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPg==",
+        "size_bytes": 16801,
+        "sha256": "82434318b20e0cf26e0b9a4a1e9446a6a2abc1160bd16b9cb17e035f957c6f53",
+        "normalizations": [
+          {
+            "path": "artifact rendered timestamp",
+            "occurrences": 1,
             "replacement": "<TIMESTAMP>"
           }
         ]
@@ -503,6 +671,565 @@
           "replacement": "<ORACLE_ROOT>"
         }
       ]
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-resume",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-resume/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-resume/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1151,
+        "stderr_bytes": 0,
+        "stdout_sha256": "aac6c31d6c2942ae68fef67cc580a63af9d0955dda2cd67a686745597485e3ba",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-resume/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 320,
+            "type": "file",
+            "sha256": "e196b893e62ccbffa60c14bd194a89b3657e21245e8e668b7367c9d0bd119204"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 156,
+            "type": "file",
+            "sha256": "5ef85ef2467cba1ba17cc12bae17ae65248f2e7b14f418643f5c24b071f7f30a"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 128,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "source/unrecognized",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-resume/legacy-source",
+        "filesystem/migration-resume/home"
+      ],
+      "input_files": {
+        "filesystem/migration-resume/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-resume/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        }
+      },
+      "preparation": [
+        {
+          "argv": [
+            "migrate",
+            "--source",
+            "<ORACLE_ROOT>/filesystem/migration-resume/legacy-source",
+            "--destination",
+            "<ORACLE_ROOT>/filesystem/migration-resume/go-destination",
+            "--home",
+            "<ORACLE_ROOT>/filesystem/migration-resume/home",
+            "--platform",
+            "cron",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout_bytes": 1149,
+          "stderr_bytes": 0,
+          "stdout_sha256": "a403072b82f9a4fcc3ee660ae217d2b8cd81c4332a02fce64bdde26e3357dc3a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "output_policy": "bytes_not_embedded; secrets and private state excluded"
+        }
+      ],
+      "root_exists": {
+        "source": true,
+        "destination": true,
+        "backup": true
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-manual-secrets",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-manual-secrets/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-manual-secrets/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 0,
+        "stdout_bytes": 1989,
+        "stderr_bytes": 0,
+        "stdout_sha256": "2ef0bc6fc8e3c78d6832841dad2ee49043afd1c6bd9f43cd22c3a77d29576fc7",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-manual-secrets/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [
+          {
+            "path": ".migration-state.json",
+            "mode": "0o600",
+            "size_bytes": 374,
+            "type": "file",
+            "sha256": "4a99d93569b33995f0e81968e45cf5bdee9c7ec8f47e3eb24d77effd3a214e00"
+          },
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          }
+        ],
+        "backup": [
+          {
+            "path": ".complete.json",
+            "mode": "0o600",
+            "size_bytes": 184,
+            "type": "file",
+            "sha256": "df2c570f64fa3fb7dc8f7072f629522a2b76f1102a9cf0c7164b968d3e589ae5"
+          },
+          {
+            "path": "source",
+            "mode": "0o700",
+            "size_bytes": 160,
+            "type": "directory"
+          },
+          {
+            "path": "source/config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "source/secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "source/unrecognized",
+            "mode": "0o700",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "source/unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-manual-secrets/legacy-source",
+        "filesystem/migration-manual-secrets/home"
+      ],
+      "input_files": {
+        "filesystem/migration-manual-secrets/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-manual-secrets/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-manual-secrets/legacy-source/secret-refs.json": {
+          "content": "{\"names\":[\"oracle-reference\"]}\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": true,
+        "backup": true
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-copy-secrets-rejected",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/home",
+        "--platform",
+        "cron",
+        "--json",
+        "--copy-secrets"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/home",
+          "--platform",
+          "cron",
+          "--json",
+          "--copy-secrets"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 1823,
+        "stderr_bytes": 69,
+        "stdout_sha256": "38206823ad5fdef75dbae63cb0fd29180781eea1143f9c7a4a8f8398fb572b19",
+        "stderr_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-copy-secrets-rejected/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "secret-refs.json",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [],
+        "backup": []
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-copy-secrets-rejected/legacy-source",
+        "filesystem/migration-copy-secrets-rejected/home"
+      ],
+      "input_files": {
+        "filesystem/migration-copy-secrets-rejected/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-copy-secrets-rejected/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-copy-secrets-rejected/legacy-source/secret-refs.json": {
+          "content": "{\"names\":[\"oracle-reference\"]}\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": false,
+        "backup": false
+      }
+    },
+    {
+      "schema": "symeraseme.go-oracle.filesystem.v1",
+      "id": "migration-incomplete-backup",
+      "operation": [
+        "migrate",
+        "--source",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+        "--destination",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+        "--home",
+        "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/home",
+        "--platform",
+        "cron",
+        "--json"
+      ],
+      "process": {
+        "argv": [
+          "migrate",
+          "--source",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+          "--destination",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+          "--home",
+          "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/home",
+          "--platform",
+          "cron",
+          "--json"
+        ],
+        "exit_code": 1,
+        "stdout_bytes": 1104,
+        "stderr_bytes": 76,
+        "stdout_sha256": "1babb5577ff17b9384e4a7b8f8a1d20e3dc99a58b10e2f4e71949989c80d8c05",
+        "stderr_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+        "output_policy": "bytes_not_embedded; secrets and private state excluded"
+      },
+      "roots": {
+        "source": "isolated",
+        "destination": "isolated",
+        "backup": "isolated"
+      },
+      "manifest_roots": {
+        "source": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/legacy-source",
+        "destination": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination",
+        "backup": "<ORACLE_ROOT>/filesystem/migration-incomplete-backup/go-destination.migration-backup"
+      },
+      "manifests": {
+        "source": [
+          {
+            "path": "config.toml",
+            "mode": "0o640",
+            "size_bytes": 20,
+            "type": "file",
+            "sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105"
+          },
+          {
+            "path": "unrecognized",
+            "mode": "0o755",
+            "size_bytes": 96,
+            "type": "directory"
+          },
+          {
+            "path": "unrecognized/keep.txt",
+            "mode": "0o600",
+            "size_bytes": 31,
+            "type": "file",
+            "sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497"
+          }
+        ],
+        "destination": [],
+        "backup": [
+          {
+            "path": "sentinel",
+            "mode": "0o600",
+            "size_bytes": 27,
+            "type": "file",
+            "sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732"
+          }
+        ]
+      },
+      "nondeterministic_fields": [
+        {
+          "path": "operation/process.argv/manifest_roots",
+          "reason": "only the exact unique runtime root is normalized",
+          "replacement": "<ORACLE_ROOT>"
+        }
+      ],
+      "input_directories": [
+        "filesystem/migration-incomplete-backup/legacy-source",
+        "filesystem/migration-incomplete-backup/home",
+        "filesystem/migration-incomplete-backup/go-destination.migration-backup"
+      ],
+      "input_files": {
+        "filesystem/migration-incomplete-backup/legacy-source/config.toml": {
+          "content": "data_dir = 'legacy'\n",
+          "mode": 416
+        },
+        "filesystem/migration-incomplete-backup/legacy-source/unrecognized/keep.txt": {
+          "content": "also backed up, never migrated\n",
+          "mode": 384
+        },
+        "filesystem/migration-incomplete-backup/go-destination.migration-backup/sentinel": {
+          "content": "preserve incomplete backup\n",
+          "mode": 384
+        }
+      },
+      "preparation": [],
+      "root_exists": {
+        "source": true,
+        "destination": false,
+        "backup": true
+      }
     },
     {
       "schema": "symeraseme.go-oracle.filesystem.v1",

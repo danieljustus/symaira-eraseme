@@ -1,0 +1,112 @@
+{
+  "source_revision": "29d483171195eff3c9444a538dbefb3dd06bb2c6",
+  "go_version": "go version go1.26.6 darwin/arm64",
+  "source_files": [
+    {
+      "path": "cmd/symeraseme/main.go",
+      "sha256": "f7fd95376ae587dcef1aafeba74b9d3a7aa4c47ac520cd2b82903777cefe8bf7"
+    },
+    {
+      "path": "internal/mcp/server.go",
+      "sha256": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976"
+    }
+  ],
+  "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
+  "generator_sha256": "1ac9189147ced3e2668fd4d92f17a076a919e661cbd25146395430112922c74a",
+  "cases": [
+    {
+      "name": "initialize_trailing_comma_is_parse_error",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUiLH0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ30nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "initialize_vertical_tab_is_parse_error",
+      "input_spec": {
+        "base64": "ewsianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x2JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "trailing_content_after_object_is_parse_error",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifSB4"
+      },
+      "exit_code": 1,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiB2YWx1ZQo="
+    },
+    {
+      "name": "string_id_with_invalid_escape_is_invalid_request",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiJceCIsIm1ldGhvZCI6ImluaXRpYWxpemUifQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "method_with_invalid_escape_is_invalid_request",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImFceCJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "jsonrpc_with_invalid_escape_is_invalid_request",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi5ceDAiLCJpZCI6MSwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "size-below-8k",
+      "input_spec": {
+        "kind": "padding_request",
+        "size": 8191
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "size-above-8k",
+      "input_spec": {
+        "kind": "padding_request",
+        "size": 8193
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "nesting-at-go-limit",
+      "input_spec": {
+        "kind": "nested_request",
+        "array_depth": 9999
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "nesting-over-go-limit",
+      "input_spec": {
+        "kind": "nested_request",
+        "array_depth": 10000
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1snIGV4Y2VlZGVkIG1heCBkZXB0aAo="
+    }
+  ]
+}

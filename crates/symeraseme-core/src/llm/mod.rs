@@ -4,16 +4,23 @@
 //! taxonomy, the retry loop's attempt accounting, the provider resolution order
 //! and the host-agent descriptor.
 //!
-//! The transports are **not** ported. In Go, `anthropic`, `openai`, `ollama` and
-//! `openai-compatible` all go through `corekit/llmkit`, which owns the wire
-//! dialects, the credential reference format and the `auth_failure` error text.
-//! `corekit` has no Rust counterpart, so [`create`] reports those providers as
-//! not ported instead of pretending an equivalent client exists.
+//! The non-streaming chat path used by EraseMe's classifier is implemented in
+//! [`transport`], matching Go's llmkit-backed Anthropic, OpenAI, Ollama and
+//! openai-compatible providers. Streaming, embeddings and tool calls remain
+//! outside this surface.
+
+mod transport;
+pub use transport::LlmkitClient;
 
 use std::error::Error as StdError;
+use std::ffi::OsString;
 use std::fmt;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 
 /// A single LLM usage and cost record, mirroring Go's `UsageRecord`.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -355,7 +362,7 @@ pub fn provider_spec(name: &str) -> Option<&'static ProviderSpec> {
 }
 
 /// Go's `CreateOptions`.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct CreateOptions {
     pub provider: String,
     pub model: String,
@@ -363,6 +370,20 @@ pub struct CreateOptions {
     pub base_url: String,
     pub agent_backend: String,
     pub cost_tracker: Vec<UsageRecord>,
+}
+
+impl fmt::Debug for CreateOptions {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CreateOptions")
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("has_api_key", &!self.api_key.is_empty())
+            .field("base_url", &self.base_url)
+            .field("agent_backend", &self.agent_backend)
+            .field("cost_tracker", &self.cost_tracker)
+            .finish()
+    }
 }
 
 /// A host coding-agent CLI, mirroring Go's `agentDefs` entry.
@@ -413,10 +434,19 @@ pub struct AgentClient {
     pub requested_backend: String,
     resolved_backend: String,
     available: bool,
+    provider_client: Option<LlmkitClient>,
 }
 
 /// The message Go's agent `callAPI` returns when no CLI is reachable.
 pub const NO_AGENT_CLI_MESSAGE: &str = "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND";
+const AGENT_SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
+
+struct AgentCommandConfig<'a> {
+    timeout: Duration,
+    executable_override: Option<&'a Path>,
+    environment: &'a [(OsString, OsString)],
+    inherit_environment: bool,
+}
 
 impl AgentClient {
     /// Go's `NewAgentClient`, including the empty-model fallback to `auto`. The
@@ -448,6 +478,21 @@ impl AgentClient {
             requested_backend: agent_backend,
             resolved_backend,
             available,
+            provider_client: None,
+        }
+    }
+
+    fn with_llmkit(
+        model: String,
+        provider_client: LlmkitClient,
+        cost_tracker: Vec<UsageRecord>,
+    ) -> Self {
+        Self {
+            base: BaseClient::new(model, 3, cost_tracker),
+            requested_backend: String::new(),
+            resolved_backend: String::new(),
+            available: true,
+            provider_client: Some(provider_client),
         }
     }
 
@@ -465,6 +510,256 @@ impl AgentClient {
     /// reachable CLI the shared retry loop is handed the unchanged error.
     pub fn unavailable_error(&self) -> ClientError {
         ClientError::Provider(LlmError::new(NO_AGENT_CLI_MESSAGE))
+    }
+
+    /// Go's `AgentClient.Classify`, using the shared retry loop and real host CLI.
+    pub fn classify(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        if let Some(client) = &self.provider_client {
+            return client.classify(&self.base, system_prompt, user_prompt, options);
+        }
+        self.classify_with_timeout(
+            system_prompt,
+            user_prompt,
+            options,
+            AGENT_SUBPROCESS_TIMEOUT,
+        )
+    }
+
+    fn classify_with_timeout(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        timeout: Duration,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.classify_with_command(
+            system_prompt,
+            user_prompt,
+            options,
+            AgentCommandConfig {
+                timeout,
+                executable_override: None,
+                environment: &[],
+                inherit_environment: true,
+            },
+        )
+    }
+
+    fn classify_with_command(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        command: AgentCommandConfig<'_>,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.base.classify(
+            system_prompt,
+            user_prompt,
+            options,
+            |system, user, _| {
+                if command.executable_override.is_none()
+                    && command.environment.is_empty()
+                    && command.inherit_environment
+                {
+                    self.call_api(system, user, command.timeout)
+                } else {
+                    self.call_api_with(
+                        system,
+                        user,
+                        command.timeout,
+                        command.executable_override,
+                        command.environment,
+                        command.inherit_environment,
+                    )
+                }
+            },
+            |wait| {
+                thread::sleep(wait);
+                true
+            },
+            || None,
+        )
+    }
+
+    fn call_api(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        timeout: Duration,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        self.call_api_with(system_prompt, user_prompt, timeout, None, &[], true)
+    }
+
+    fn call_api_with(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        timeout: Duration,
+        executable_override: Option<&Path>,
+        environment: &[(OsString, OsString)],
+        inherit_environment: bool,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        let Some(def) = AGENT_DEFS
+            .iter()
+            .find(|def| def.name == self.resolved_backend)
+        else {
+            return Err(self.unavailable_error());
+        };
+
+        let combined = combine_prompts(system_prompt, user_prompt);
+        let mut arguments = def
+            .invoke_template
+            .iter()
+            .skip(1)
+            .map(|part| OsString::from(part.replace("{prompt}", &combined)))
+            .collect::<Vec<_>>();
+        if !self.base.model.is_empty() && self.base.model != "auto" && def.name == "claude" {
+            arguments.push(OsString::from("--model"));
+            arguments.push(OsString::from(&self.base.model));
+        }
+
+        let executable = executable_override.unwrap_or_else(|| Path::new(def.cli));
+        let mut command = Command::new(executable);
+        command
+            .args(arguments)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if !inherit_environment {
+            command.env_clear();
+        }
+        command.envs(environment.iter().cloned());
+        // Go appends TERM=dumb to the inherited environment for every agent.
+        command.env("TERM", "dumb");
+
+        let start = Instant::now();
+        let mut child = command.spawn().map_err(|error| {
+            ClientError::Provider(LlmError::new(format!(
+                "failed to invoke host agent: {}",
+                go_spawn_error(def.cli, executable_override, &error)
+            )))
+        })?;
+        let stdout = child.stdout.take().expect("stdout was piped");
+        let stderr = child.stderr.take().expect("stderr was piped");
+        let stdout_reader = thread::spawn(move || read_pipe(stdout));
+        let stderr_reader = thread::spawn(move || read_pipe(stderr));
+
+        let mut timed_out = false;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break Some(status),
+                Ok(None) if start.elapsed() >= timeout => {
+                    timed_out = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break None;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(5)),
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(ClientError::Provider(LlmError::new(format!(
+                        "failed to invoke host agent: {}",
+                        error
+                    ))));
+                }
+            }
+        };
+        let stdout = stdout_reader
+            .join()
+            .map_err(|_| {
+                ClientError::Provider(LlmError::new(
+                    "failed to invoke host agent: stdout capture failed",
+                ))
+            })?
+            .map_err(|error| {
+                ClientError::Provider(LlmError::new(format!(
+                    "failed to invoke host agent: {}",
+                    error
+                )))
+            })?;
+        let stderr = stderr_reader
+            .join()
+            .map_err(|_| {
+                ClientError::Provider(LlmError::new(
+                    "failed to invoke host agent: stderr capture failed",
+                ))
+            })?
+            .map_err(|error| {
+                ClientError::Provider(LlmError::new(format!(
+                    "failed to invoke host agent: {}",
+                    error
+                )))
+            })?;
+
+        if timed_out {
+            return Err(ClientError::Provider(LlmError::new(format!(
+                "host agent timed out after {}m{}s",
+                AGENT_SUBPROCESS_TIMEOUT.as_secs() / 60,
+                AGENT_SUBPROCESS_TIMEOUT.as_secs() % 60
+            ))));
+        }
+
+        let status = status.expect("a completed child has an exit status");
+        if !status.success() {
+            let stderr = trim_go_space(&stderr);
+            let stderr = truncate_go_bytes(stderr, 500);
+            return Err(ClientError::Provider(LlmError::new(format!(
+                "host agent exited with code {}: {}",
+                status.code().unwrap_or(-1),
+                stderr
+            ))));
+        }
+
+        let text = String::from_utf8_lossy(&stdout).trim().to_owned();
+        if text.is_empty() {
+            return Err(ClientError::Provider(LlmError::new(
+                "host agent returned empty response",
+            )));
+        }
+        Ok((
+            text,
+            UsageRecord {
+                model: format!("agent:{}", def.name),
+                ..UsageRecord::default()
+            },
+        ))
+    }
+}
+
+fn combine_prompts(system_prompt: &str, user_prompt: &str) -> String {
+    format!("{system_prompt}\n\n---\n\n{user_prompt}")
+}
+
+fn read_pipe(mut pipe: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    pipe.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+fn trim_go_space(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).trim().to_owned()
+}
+
+fn truncate_go_bytes(text: String, limit: usize) -> String {
+    if text.len() <= limit {
+        return text;
+    }
+    String::from_utf8_lossy(&text.as_bytes()[..limit]).into_owned()
+}
+
+fn go_spawn_error(cli: &str, override_path: Option<&Path>, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::NotFound && override_path.is_none() {
+        format!("exec: {cli:?}: executable file not found in $PATH")
+    } else {
+        error.to_string()
     }
 }
 
@@ -574,15 +869,67 @@ pub fn create_with(
     };
 
     if spec.kind == ProviderKind::Agent {
+        let agent_backend = if options.agent_backend.is_empty() {
+            env("SYMERASEME_AGENT_BACKEND").unwrap_or_default()
+        } else {
+            options.agent_backend.clone()
+        };
         return Ok(AgentClient::with_probe(
             model,
-            options.agent_backend.clone(),
+            agent_backend,
             options.cost_tracker.clone(),
             on_path,
         ));
     }
 
-    Err(ClientError::TransportNotPorted {
-        provider: provider.clone(),
-    })
+    let base_url = if !options.base_url.is_empty() {
+        options.base_url.clone()
+    } else if let Some(value) = env(ENV_BASE_URL).filter(|value| !value.is_empty()) {
+        value
+    } else if provider == "ollama" {
+        env(ENV_OLLAMA_HOST)
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("{}/v1", value.trim_end_matches('/')))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if provider == "openai-compatible" && base_url.is_empty() {
+        let detail = "llmkit: provider \"custom\" requires a base URL override (WithBaseURL)";
+        return Err(ClientError::Provider(LlmError::with_source(
+            format!("llmkit client for {provider:?}: {detail}"),
+            detail,
+        )));
+    }
+    transport::validate_provider_base_url(&provider, &base_url)?;
+    let api_key = if !options.api_key.is_empty() {
+        Some(options.api_key.clone())
+    } else if !spec.env_key.is_empty() {
+        let Some(value) = env(spec.env_key).filter(|value| !value.is_empty()) else {
+            let detail = format!(
+                "llmkit: auth_failure: environment variable {} is not set (reference {})",
+                spec.env_key, spec.env_key
+            );
+            return Err(ClientError::Provider(LlmError::with_source(
+                format!("llmkit client for {provider:?}: {detail}"),
+                detail,
+            )));
+        };
+        Some(value)
+    } else {
+        None
+    };
+    let provider_client = LlmkitClient::new(&provider, model.clone(), base_url, api_key)?;
+    Ok(AgentClient::with_llmkit(
+        model,
+        provider_client,
+        options.cost_tracker.clone(),
+    ))
 }
+
+const ENV_BASE_URL: &str = "SYMERASEME_LLM_BASE_URL";
+const ENV_OLLAMA_HOST: &str = "OLLAMA_HOST";
+
+#[cfg(all(test, unix))]
+#[path = "host_agent_tests.rs"]
+mod host_agent_tests;

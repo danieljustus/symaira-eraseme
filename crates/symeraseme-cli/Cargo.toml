@@ -15,12 +15,21 @@ name = "symeraseme-rust"
 path = "src/main.rs"
 
 [dependencies]
+base64.workspace = true
 chrono.workspace = true
 clap = { version = "4.5", features = ["derive"] }
+http.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+signal-hook.workspace = true
 symeraseme-core = { path = "../symeraseme-core", version = "0.13.0" }
 symeraseme-engine = { path = "../symeraseme-engine", version = "0.13.0" }
+subtle.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true

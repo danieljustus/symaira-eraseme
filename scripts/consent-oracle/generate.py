@@ -14,11 +14,14 @@ CONTRACT = "bf53346eec234929bedf0314b99e3da85dbb991b"
 CASES = ["fresh", "nested", "existing_directory", "replacement", "rename_failure",
          "temp_failure", "mkdir_failure", "verify", "list", "wrong_command", "expired",
          "umask_000", "umask_077", "umask_777", "write_failure", "replacement_symlink"]
-FAULT_CASES = ["close_failure", "chmod_failure"]
+FAULT_CASES = ["close_failure", "chmod_failure", "chmod_failure_existing_temp"]
 # Insert calls before the original operations; never replace their result checks.
 FAULT_HOOKS = {
     '\tif err := tmp.Close(); err != nil {': '\tid005BeforeClose(tmp)\n',
     '\tif err := os.Chmod(tmpName, mode); err != nil {': '\tid005BeforeChmod(tmpName)\n',
+}
+FAULT_REPLACEMENTS = {
+    'os.Chmod(tmpName, mode)': 'id005Chmod(tmpName, mode)',
 }
 
 
@@ -28,6 +31,10 @@ def instrument(original):
         if modified.count(anchor) != 1:
             raise ValueError(f"expected exactly one pinned Go operation: {anchor!r}")
         modified = modified.replace(anchor, hook + anchor)
+    for anchor, replacement in FAULT_REPLACEMENTS.items():
+        if modified.count(anchor) != 1:
+            raise ValueError(f"expected exactly one pinned Go operation: {anchor!r}")
+        modified = modified.replace(anchor, replacement)
     return modified
 
 
@@ -85,20 +92,21 @@ def main():
             consent = source / sources[0]
             original = consent.read_text()
             modified = instrument(original)
-            # Negative control: source drift must fail before compilation.
-            try:
-                instrument(original.replace(next(iter(FAULT_HOOKS)), ""))
-            except ValueError:
-                pass
-            else:
-                raise AssertionError("instrumentation accepted missing source anchor")
+            # Negative control: every pinned source anchor must fail closed.
+            for anchor in (*FAULT_HOOKS, *FAULT_REPLACEMENTS):
+                try:
+                    instrument(original.replace(anchor, ""))
+                except ValueError:
+                    continue
+                raise AssertionError(f"instrumentation accepted missing source anchor: {anchor!r}")
             consent.write_text(modified)
             (evidence / "instrumentation.diff").write_text("".join(difflib.unified_diff(
                 original.splitlines(keepends=True), modified.splitlines(keepends=True),
                 fromfile="pinned/consent.go", tofile="probe/consent.go")))
             provenance["instrumentation"] = {
-                "kind": "state-changing hooks before unchanged checked operations",
+                "kind": "state-changing hooks before checked operations plus one test-only Chmod adapter",
                 "source_sha256": digest(modified.encode()), "hooks": FAULT_HOOKS,
+                "replacements": FAULT_REPLACEMENTS,
             }
         for helper in helpers:
             (source / "internal/identity" / helper.stem).write_bytes(helper.read_bytes())
@@ -119,7 +127,11 @@ def main():
             observation = json.loads(output.read_bytes())
             assert observation["error_class"] != "unclassified", observation["raw_error"]
             if args.fault_probes:
-                expected_class = "closed_file" if name == "close_failure" else "not_found"
+                expected_class = {
+                    "close_failure": "closed_file",
+                    "chmod_failure": "not_found",
+                    "chmod_failure_existing_temp": "permission_denied",
+                }[name]
                 assert observation["failed"] and observation["error_class"] == expected_class, observation
             # Side-effect comparison retains failure vs success. Native error text
             # (including temp paths) is preserved verbatim only in raw observations.
@@ -135,7 +147,7 @@ def main():
             generator_sha256=provenance["generator_sha256"],
             blockers={
                 "delayed_close_io": "Preclosing exercises Go os.ErrClosed, not native delayed EIO/ENOSPC; no controlled faulty filesystem is available.",
-                "chmod_existing_temp": "Unlinking exercises real Chmod ENOENT but cannot prove cleanup after chmod failure with the temporary file still present; no deterministic permission-fault hook is available.",
+                "chmod_existing_temp": "A test-only adapter injects os.ErrPermission while the temp exists and proves rollback, not native chmod failure.",
                 "sync": "Go has no sync operation. Rust retains sync_all and returns its error before publishing; no Go sync-error fixture exists.",
                 "non_unix_close": "Rust non-Unix File drop still discards close errors; a reviewed safe checked-close adapter and native proof remain required.",
             })

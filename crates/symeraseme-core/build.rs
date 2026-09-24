@@ -1,6 +1,6 @@
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
-use cap_std::fs::{Dir, File as CapFile, OpenOptions as CapOpenOptions};
+use cap_std::fs::{Dir, OpenOptions as CapOpenOptions};
 use std::env;
 use std::fs::{self, DirEntry, OpenOptions};
 use std::io::{self, Read, Write};
@@ -22,8 +22,7 @@ struct CollectionBudget {
 
 struct SelectedFile {
     relative: String,
-    source: CapFile,
-    size: u64,
+    bytes: Vec<u8>,
 }
 
 fn main() {
@@ -63,7 +62,7 @@ fn main() {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).expect("create embedded asset directory");
         }
-        copy_asset(file.source, file.size, &target).unwrap_or_else(|error| {
+        copy_asset(&file.bytes, &target).unwrap_or_else(|error| {
             panic!("copy embedded asset {}: {error}", file.relative);
         });
         let relative_literal = format!("{:#?}", file.relative);
@@ -173,7 +172,7 @@ fn collect(
             .map_err(|error| format!("inspect {relative}: {error}"))?;
         let mut options = CapOpenOptions::new();
         options.read(true).follow(FollowSymlinks::No);
-        let source = root_dir
+        let mut source = root_dir
             .open_with(Path::new(&relative), &options)
             .map_err(|error| format!("open {relative} without following symlinks: {error}"))?;
         let opened_metadata = source
@@ -206,11 +205,26 @@ fn collect(
                 "selected registry bytes exceed {MAX_SELECTED_BYTES}"
             ));
         }
-        files.push(SelectedFile {
-            relative,
-            source,
-            size,
-        });
+        // Keep validated bytes, not one open descriptor per broker. The total
+        // is capped at 16 MiB above, and the no-follow handle remains live
+        // through the bounded read and metadata recheck.
+        let mut bytes = Vec::with_capacity(size as usize);
+        let read = (&mut source)
+            .take(MAX_SELECTED_FILE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("read {relative}: {error}"))?;
+        if read as u64 != size
+            || source
+                .metadata()
+                .map_err(|error| format!("inspect opened {relative}: {error}"))?
+                .len()
+                != size
+        {
+            return Err(format!(
+                "source grew or copied size differs from metadata: {relative}"
+            ));
+        }
+        files.push(SelectedFile { relative, bytes });
     }
     Ok(())
 }
@@ -277,15 +291,7 @@ fn is_broker_file(relative: &str) -> bool {
     ) && !components[2].starts_with('_')
 }
 
-fn copy_asset(mut source: CapFile, expected_size: u64, target: &Path) -> io::Result<()> {
-    let opened_meta = source.metadata()?;
-    if !opened_meta.is_file() || opened_meta.len() != expected_size {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "source metadata changed before copy",
-        ));
-    }
-
+fn copy_asset(bytes: &[u8], target: &Path) -> io::Result<()> {
     let temp = target.with_file_name(format!(
         ".{}.tmp",
         target
@@ -299,23 +305,8 @@ fn copy_asset(mut source: CapFile, expected_size: u64, target: &Path) -> io::Res
             .write(true)
             .create_new(true)
             .open(&temp)?;
-        let copied = io::copy(
-            &mut (&mut source).take(MAX_SELECTED_FILE_BYTES + 1),
-            &mut output,
-        )?;
-        if copied > MAX_SELECTED_FILE_BYTES || copied != expected_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "source grew or copied size differs from metadata",
-            ));
-        }
+        output.write_all(bytes)?;
         output.flush()?;
-        if source.metadata()?.len() != copied {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "source size changed during copy",
-            ));
-        }
         drop(output);
         let _ = fs::remove_file(target);
         fs::rename(&temp, target)

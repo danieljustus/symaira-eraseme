@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/danieljustus/symaira-eraseme/internal/config"
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
@@ -76,18 +78,35 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
+	if _, err := store.DB().Exec(`UPDATE manual_tasks SET created_at = ? WHERE id = ?`, time.Date(2026, 8, 6, 12, 0, 0, 0, time.UTC), task.ID); err != nil {
+		fail(err)
+	}
 	if err := store.Close(); err != nil {
 		fail(err)
 	}
 
-	// Only the cases that carry no wall-clock value are recorded. `list` and the
-	// `show` detail block embed the task's `created_at`, which Go fills from
-	// `time.Now()` with no injection point, so pinning them would bake a moving
-	// value into the fixture. They are covered by shape assertions instead.
+	tasksDir, err := manualtasks.TasksDir()
+	if err != nil {
+		fail(err)
+	}
+	if err := os.MkdirAll(tasksDir, 0o700); err != nil {
+		fail(err)
+	}
+	for name, contents := range map[string]string{"evidence.png": "artifact", "keep.txt": "keep"} {
+		if err := os.WriteFile(filepath.Join(tasksDir, name), []byte(contents), 0o600); err != nil {
+			fail(err)
+		}
+	}
+
 	cases := []fixtureCase{
+		{Name: "manual_tasks_list_returns_the_populated_queue", Request: callRequest(1, "manual_tasks_list", `{}`)},
+		{Name: "manual_tasks_show_returns_the_task_details", Request: callRequest(2, "manual_tasks_show", fmt.Sprintf(`{"task_id":%d}`, task.ID))},
 		{Name: "manual_tasks_show_reports_a_missing_task", Request: callRequest(3, "manual_tasks_show", `{"task_id":999}`)},
 		{Name: "manual_tasks_complete_marks_the_task_completed", Request: callRequest(4, "manual_tasks_complete", fmt.Sprintf(`{"task_id":%d,"notes":"done by hand"}`, task.ID))},
-		{Name: "manual_tasks_cleanup_reports_a_missing_directory", Request: callRequest(5, "manual_tasks_cleanup", `{"dry_run":true}`)},
+		{Name: "manual_tasks_complete_reports_a_missing_task", Request: callRequest(5, "manual_tasks_complete", `{"task_id":999}`)},
+		{Name: "manual_tasks_cleanup_counts_artifacts_without_removing_them", Request: callRequest(6, "manual_tasks_cleanup", `{"dry_run":true}`)},
+		{Name: "manual_tasks_cleanup_removes_artifacts", Request: callRequest(7, "manual_tasks_cleanup", `{}`)},
+		{Name: "manual_tasks_cleanup_keeps_unrelated_files", Request: callRequest(8, "manual_tasks_cleanup", `{}`)},
 	}
 
 	encoder := json.NewEncoder(os.Stdout)
@@ -100,6 +119,7 @@ func main() {
 			fail(err)
 		}
 		if body := output.String(); body != "" {
+			body = strings.ReplaceAll(body, workspace, "ORACLE_ROOT")
 			cases[index].Response = &body
 		}
 	}

@@ -28,6 +28,6 @@ pub trait ImapSession {
     fn close(&mut self);
 }
 
-pub trait ImapDialer {
+pub trait ImapDialer: Send + Sync {
     fn dial(&self, config: &ImapConfig) -> Result<Box<dyn ImapSession>, String>;
 }

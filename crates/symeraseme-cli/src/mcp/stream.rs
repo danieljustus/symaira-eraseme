@@ -9,12 +9,14 @@
 //! Framing reuses the byte scanner that the shared protocol already uses for
 //! Go-compatible acceptance, so both paths accept exactly the same values.
 
-use super::protocol::{InitializeOutcome, initialize, skip_json_value, skip_whitespace};
+use super::protocol::{InitializeOutcome, initialize, scan_json_value, skip_whitespace};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum StreamError {
-    /// The stream holds no further complete JSON value but is not exhausted.
-    MalformedValue(usize),
+    /// Go's decoder reached EOF inside an otherwise valid JSON value.
+    UnexpectedEof,
+    /// Go's decoder rejected a byte before EOF.
+    Syntax(String),
     /// The scanner accepted a value the shared protocol could not parse. This
     /// is an internal inconsistency; failing loudly beats dropping a request.
     UnparsableValue(usize),
@@ -25,9 +27,8 @@ pub(crate) enum StreamError {
 impl std::fmt::Display for StreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StreamError::MalformedValue(position) => {
-                write!(f, "malformed JSON value at byte {position}")
-            }
+            StreamError::UnexpectedEof => write!(f, "unexpected EOF"),
+            StreamError::Syntax(message) => write!(f, "{message}"),
             StreamError::UnparsableValue(position) => {
                 write!(f, "unparsable JSON value at byte {position}")
             }
@@ -55,8 +56,12 @@ pub(crate) fn serve_stream(
             return Ok(());
         }
         let start = index;
-        let Some(end) = skip_json_value(input, start) else {
-            return Err(StreamError::MalformedValue(start));
+        let end = match scan_json_value(input, start, false) {
+            Ok(Some(end)) => end,
+            Err(byte) => return Err(max_depth_error(byte)),
+            Ok(None) => {
+                return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
+            }
         };
         match initialize(&input[start..end], handler) {
             InitializeOutcome::Response(bytes) => output.extend_from_slice(&bytes),
@@ -72,11 +77,6 @@ pub(crate) fn serve_stream(
 /// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
 /// a stream cut mid-value aborts.
 ///
-/// ponytail: `skip_json_value` cannot tell a truncated value from a
-/// syntactically invalid one, so a malformed value mid-stream waits for the
-/// next read where Go's decoder errors immediately, and the abort text is ours
-/// rather than `encoding/json`'s. Neither path is recorded in the corpus.
-/// Upgrade path: port the decoder's eager syntax-error detection and text.
 pub(crate) fn serve_stdio(
     input: &mut dyn std::io::BufRead,
     output: &mut dyn std::io::Write,
@@ -90,35 +90,183 @@ pub(crate) fn serve_stdio(
     let mut position = 0usize;
     loop {
         skip_whitespace(&buffer, &mut position);
-        if position < buffer.len()
-            && let Some(end) = skip_json_value(&buffer, position)
-        {
-            match initialize(&buffer[position..end], handler) {
-                InitializeOutcome::Response(bytes) => {
-                    output.write_all(&bytes).map_err(map_io)?;
-                    output.flush().map_err(map_io)?;
+        if position < buffer.len() {
+            let end = match scan_json_value(&buffer, position, false) {
+                Ok(Some(end)) => Some(end),
+                Err(byte) => return Err(max_depth_error(byte)),
+                Ok(None) => None,
+            };
+            if let Some(end) = end {
+                match initialize(&buffer[position..end], handler) {
+                    InitializeOutcome::Response(bytes) => {
+                        output.write_all(&bytes).map_err(map_io)?;
+                        output.flush().map_err(map_io)?;
+                    }
+                    InitializeOutcome::Notification => {}
+                    InitializeOutcome::ParseError => {
+                        return Err(StreamError::UnparsableValue(position));
+                    }
                 }
-                InitializeOutcome::Notification => {}
-                InitializeOutcome::ParseError => {
-                    return Err(StreamError::UnparsableValue(position));
-                }
+                buffer.drain(..end);
+                position = 0;
+                continue;
             }
-            buffer.drain(..end);
-            position = 0;
-            continue;
+        }
+        if position < buffer.len()
+            && let Some(error) = syntax_error(&buffer[position..])
+        {
+            return Err(error);
         }
         let more = input.fill_buf().map_err(map_io)?;
         if more.is_empty() {
             return if position >= buffer.len() {
                 Ok(())
             } else {
-                Err(StreamError::MalformedValue(position))
+                Err(StreamError::UnexpectedEof)
             };
         }
         buffer.extend_from_slice(more);
         let length = more.len();
         input.consume(length);
     }
+}
+
+fn max_depth_error(byte: u8) -> StreamError {
+    StreamError::Syntax(format!(
+        "invalid character '{}' exceeded max depth",
+        go_quoted_byte(byte)
+    ))
+}
+
+fn go_quoted_byte(byte: u8) -> String {
+    match byte {
+        b'\\' => "\\\\".to_owned(),
+        b'\'' => "\\'".to_owned(),
+        b'\t' => "\\t".to_owned(),
+        b'\n' => "\\n".to_owned(),
+        b'\r' => "\\r".to_owned(),
+        0x0b => "\\v".to_owned(),
+        b'\x0c' => "\\f".to_owned(),
+        b'\x08' => "\\b".to_owned(),
+        0..=0x1f => format!("\\x{byte:02x}"),
+        _ => char::from(byte).to_string(),
+    }
+}
+
+fn expects_object_key(input: &[u8], end: usize) -> bool {
+    let mut containers = Vec::<(u8, bool)>::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    for byte in input.iter().take(end).copied() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => containers.push((b'{', true)),
+            b'[' => containers.push((b'[', false)),
+            b'}' | b']' => {
+                containers.pop();
+            }
+            b':' => {
+                if let Some((b'{', expect_key)) = containers.last_mut() {
+                    *expect_key = false;
+                }
+            }
+            b',' => {
+                if let Some((b'{', expect_key)) = containers.last_mut() {
+                    *expect_key = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    matches!(containers.last(), Some((b'{', true)))
+}
+
+fn syntax_error(input: &[u8]) -> Option<StreamError> {
+    // ponytail: the recorded Go error classes are matched; port Go's
+    // full scanner if a wider malformed-input corpus requires exact wording.
+    let error = serde_json::from_slice::<serde_json::Value>(input).err()?;
+    if error.is_eof() || error.to_string().starts_with("recursion limit exceeded") {
+        return None;
+    }
+    let (mut in_string, mut escaped) = (false, false);
+    for (index, byte) in input.iter().enumerate() {
+        if escaped {
+            if !matches!(
+                *byte,
+                b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' | b'u'
+            ) {
+                return Some(StreamError::Syntax(format!(
+                    "invalid character '{}' in string escape code",
+                    go_quoted_byte(*byte)
+                )));
+            }
+            escaped = false;
+        } else if in_string && *byte == b'\\' {
+            escaped = true;
+        } else if *byte == b'"' {
+            in_string = !in_string;
+        } else if !in_string {
+            let (name, literal): (&str, &[u8]) = match *byte {
+                b'n' => ("null", b"null"),
+                b't' => ("true", b"true"),
+                b'f' => ("false", b"false"),
+                _ => continue,
+            };
+            for (offset, expected) in literal.iter().enumerate() {
+                if let Some(actual) = input.get(index + offset)
+                    && actual != expected
+                {
+                    return Some(StreamError::Syntax(format!(
+                        "invalid character '{}' in literal {name} (expecting '{}')",
+                        go_quoted_byte(*actual),
+                        go_quoted_byte(*expected)
+                    )));
+                }
+            }
+        }
+    }
+    let trimmed = input
+        .iter()
+        .copied()
+        .filter(|byte| !matches!(*byte, b' ' | b'\t' | b'\r' | b'\n'))
+        .collect::<Vec<_>>();
+    if trimmed.ends_with(b",}") {
+        return Some(StreamError::Syntax(
+            "invalid character '}' looking for beginning of object key string".to_owned(),
+        ));
+    }
+    let byte = input
+        .get(error.column().saturating_sub(1))
+        .copied()
+        .or_else(|| input.last().copied())
+        .unwrap_or_default();
+    let error_position = error.column().saturating_sub(1);
+    let preceding = input
+        .iter()
+        .take(error_position)
+        .rev()
+        .copied()
+        .find(|value| !matches!(*value, b' ' | b'\t' | b'\r' | b'\n'));
+    if byte == 0x0b && (preceding == Some(b'{') || expects_object_key(input, error_position)) {
+        return Some(StreamError::Syntax(format!(
+            "invalid character '{}' looking for beginning of object key string",
+            go_quoted_byte(byte)
+        )));
+    }
+    Some(StreamError::Syntax(format!(
+        "invalid character '{}' looking for beginning of value",
+        go_quoted_byte(byte)
+    )))
 }
 
 #[cfg(test)]
@@ -217,16 +365,13 @@ mod tests {
         let truncated: &[u8] = br#"{"jsonrpc":"2.0","#;
         let error = serve_stdio(&mut std::io::Cursor::new(truncated), &mut output, &handler)
             .expect_err("truncated stream must abort");
-        assert_eq!(error, StreamError::MalformedValue(0));
+        assert_eq!(error, StreamError::UnexpectedEof);
         assert!(output.is_empty());
     }
 
     #[test]
     fn stream_error_text_names_position_and_io_cause() {
-        assert_eq!(
-            StreamError::MalformedValue(3).to_string(),
-            "malformed JSON value at byte 3"
-        );
+        assert_eq!(StreamError::UnexpectedEof.to_string(), "unexpected EOF");
         assert_eq!(
             StreamError::UnparsableValue(7).to_string(),
             "unparsable JSON value at byte 7"
@@ -286,11 +431,236 @@ mod tests {
     }
 
     #[test]
-    fn a_truncated_stream_reports_the_offset_and_writes_nothing_extra() {
+    fn a_truncated_stream_reports_unexpected_eof_and_writes_nothing_extra() {
         let mut output = Vec::new();
         let error =
             serve_stream(br#"{"jsonrpc":"2.0","#, &mut output, &no_backend_handler()).unwrap_err();
-        assert_eq!(error, StreamError::MalformedValue(0));
+        assert_eq!(error, StreamError::UnexpectedEof);
         assert!(output.is_empty());
+    }
+
+    /// Every byte Go quotes specially keeps Go's spelling in the error text.
+    #[test]
+    fn go_quoted_byte_escapes_control_characters_go_style() {
+        assert_eq!(go_quoted_byte(b'\\'), "\\\\");
+        assert_eq!(go_quoted_byte(b'\''), "\\'");
+        assert_eq!(go_quoted_byte(b'\t'), "\\t");
+        assert_eq!(go_quoted_byte(b'\n'), "\\n");
+        assert_eq!(go_quoted_byte(b'\r'), "\\r");
+        assert_eq!(go_quoted_byte(0x0b), "\\v");
+        assert_eq!(go_quoted_byte(0x0c), "\\f");
+        assert_eq!(go_quoted_byte(0x08), "\\b");
+        assert_eq!(go_quoted_byte(0x01), "\\x01");
+        assert_eq!(go_quoted_byte(b'{'), "{");
+    }
+
+    /// `expects_object_key` walks strings (including escapes), containers and
+    /// separators to decide whether the next token must be an object key.
+    #[test]
+    fn expects_object_key_tracks_escapes_containers_and_separators() {
+        // After a key, before its colon, the object still expects a key state.
+        assert!(expects_object_key(br#"{"a""#, 4));
+        // After the colon the next token is a value, not a key.
+        assert!(!expects_object_key(br#"{"a":"#, 5));
+        // After a comma inside an object a key is expected again.
+        assert!(expects_object_key(br#"{"a":1,"#, 7));
+        // Closing the object pops the frame: nothing is expected.
+        assert!(!expects_object_key(br#"{"a":1}"#, 7));
+        // An escaped quote inside the value must not end the string.
+        assert!(expects_object_key(br#"{"a":"\t","#, 10));
+        // Arrays never expect object keys.
+        assert!(!expects_object_key(b"[1]", 3));
+    }
+
+    /// Go's recorded syntax-error wording for the bytes the shared scanner
+    /// refuses to frame.
+    #[test]
+    fn serve_stream_rejects_go_syntax_errors_with_recorded_wording() {
+        let handler = no_backend_handler();
+        let mut output = Vec::new();
+
+        let error = serve_stream(br#"{"a":truX}"#, &mut output, &handler)
+            .expect_err("bad literal must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character 'X' in literal true (expecting 'e')".to_owned())
+        );
+
+        let error = serve_stream(br#"{"a":falze}"#, &mut output, &handler)
+            .expect_err("bad literal must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax(
+                "invalid character 'z' in literal false (expecting 's')".to_owned()
+            )
+        );
+
+        // A valid string escape is walked without error before the frame
+        // itself fails, so the escape loop must not fire.
+        let error = serve_stream(br#"{"a":"\n" x}"#, &mut output, &handler)
+            .expect_err("trailing garbage must abort the stream");
+        assert!(matches!(error, StreamError::Syntax(_)), "{error}");
+        assert!(
+            error.to_string().starts_with("invalid character"),
+            "{error}"
+        );
+
+        // A vertical tab where an object key belongs gets Go's key wording.
+        let error = serve_stream(b"{\x0b}", &mut output, &handler)
+            .expect_err("vertical tab must abort the stream");
+        assert_eq!(
+            error,
+            StreamError::Syntax(
+                "invalid character '\\v' looking for beginning of object key string".to_owned()
+            )
+        );
+    }
+
+    /// Nesting past Go's 10,000-value limit aborts both transports with the
+    /// same recorded wording, and frames the deserializer rejects after the
+    /// scanner accepted them fail loudly instead of being dropped.
+    #[test]
+    fn depth_overflow_and_unreadable_frames_fail_loudly() {
+        let handler = no_backend_handler();
+
+        // Objects frame in value position only, so the chain repeats the
+        // `{"a":` opener; arrays count from their second element.
+        let deep_object = "{\"a\":".repeat(10_001);
+        let mut output = Vec::new();
+        let error = serve_stream(deep_object.as_bytes(), &mut output, &handler)
+            .expect_err("10001 nested objects exceed Go's limit");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '{' exceeded max depth".to_owned())
+        );
+
+        let deep_array = "[".repeat(10_001);
+        let mut output = Vec::new();
+        let error = serve_stream(deep_array.as_bytes(), &mut output, &handler)
+            .expect_err("10001 nested arrays exceed Go's limit");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '[' exceeded max depth".to_owned())
+        );
+
+        let mut reader = std::io::BufReader::new(deep_object.as_bytes());
+        let mut sink = Vec::new();
+        let error = serve_stdio(&mut reader, &mut sink, &handler)
+            .expect_err("stdio depth overflow must abort too");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character '{' exceeded max depth".to_owned())
+        );
+
+        // 200 nested arrays: the scanner (limit 10 000) accepts them, the
+        // catalogue's serde_json (limit 128) rejects them.
+        let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
+        let request = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"redact_file","arguments":{{"deep":{deep}}}}}}}"#
+        );
+        let mut output = Vec::new();
+        let error = serve_stream(request.as_bytes(), &mut output, &handler)
+            .expect_err("an accepted-but-unreadable frame fails loudly");
+        assert_eq!(error, StreamError::UnparsableValue(0));
+
+        let mut reader = std::io::BufReader::new(request.as_bytes());
+        let mut sink = Vec::new();
+        let error = serve_stdio(&mut reader, &mut sink, &handler)
+            .expect_err("the stdio path fails loudly too");
+        assert!(
+            matches!(error, StreamError::UnparsableValue(_)),
+            "expected UnparsableValue, got {error}"
+        );
+    }
+
+    /// Every value the scanner refuses to frame aborts the stream; a value cut
+    /// off inside the container is Go's EOF, the rest are syntax errors.
+    #[test]
+    fn serve_stream_rejects_truncated_and_misaligned_values() {
+        let handler = no_backend_handler();
+
+        // Missing value after the opening bracket: Go reports EOF.
+        let mut output = Vec::new();
+        let error = serve_stream(b"[", &mut output, &handler)
+            .expect_err("an open array with no value must abort");
+        assert_eq!(error, StreamError::UnexpectedEof);
+
+        let misaligned: [&[u8]; 3] = [
+            br#"{"a" 1}"#,   // key not followed by a colon
+            br#"{"a":1 2}"#, // garbage after an object value
+            b"[1 2]",        // garbage after an array value
+        ];
+        for input in misaligned {
+            let mut output = Vec::new();
+            let error = match serve_stream(input, &mut output, &handler) {
+                Ok(()) => panic!("{} must abort", String::from_utf8_lossy(input)),
+                Err(error) => error,
+            };
+            assert!(
+                matches!(error, StreamError::Syntax(_)),
+                "expected a syntax error for {}, got {error}",
+                String::from_utf8_lossy(input)
+            );
+        }
+
+        // Number tokens cut off before their digits are complete: the scanner
+        // refuses to frame them, and the stream aborts with Go's EOF.
+        for input in [&b"1."[..], b"1e"] {
+            let mut output = Vec::new();
+            let error = match serve_stream(input, &mut output, &handler) {
+                Ok(()) => panic!("{:?} must abort", String::from_utf8_lossy(input)),
+                Err(error) => error,
+            };
+            assert_eq!(
+                error,
+                StreamError::UnexpectedEof,
+                "for {:?}",
+                String::from_utf8_lossy(input)
+            );
+        }
+    }
+
+    struct FailingWriter;
+
+    impl std::io::Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("stdout is gone"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct FailingReader;
+
+    impl std::io::Read for FailingReader {
+        fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("stdin is gone"))
+        }
+    }
+
+    impl std::io::BufRead for FailingReader {
+        fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+            Err(std::io::Error::other("stdin is gone"))
+        }
+        fn consume(&mut self, _amt: usize) {}
+    }
+
+    /// A failing stdout or stdin aborts the stdio transport with the I/O
+    /// message instead of a fabricated response.
+    #[test]
+    fn serve_stdio_reports_read_and_write_failures_loudly() {
+        let handler = no_backend_handler();
+        let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#;
+        let mut reader = std::io::BufReader::new(&request[..]);
+        let error = serve_stdio(&mut reader, &mut FailingWriter, &handler)
+            .expect_err("stdout failure must abort");
+        assert_eq!(error, StreamError::Io("stdout is gone".to_owned()));
+
+        let mut reader = FailingReader;
+        let mut sink = Vec::new();
+        let error =
+            serve_stdio(&mut reader, &mut sink, &handler).expect_err("stdin failure must abort");
+        assert_eq!(error, StreamError::Io("stdin is gone".to_owned()));
     }
 }

@@ -20,6 +20,10 @@ pub const SUMMARY_BYTE_LIMIT: usize = 200;
 pub struct SummaryBytes(Vec<u8>);
 
 impl SummaryBytes {
+    pub(crate) fn from_text(value: &str) -> Self {
+        Self::truncated(value)
+    }
+
     /// Borrow the exact bytes retained by the parser for persistence.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0

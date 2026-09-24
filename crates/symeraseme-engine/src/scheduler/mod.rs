@@ -533,7 +533,21 @@ fn clean_relative(name: &str) -> PathBuf {
 /// its permission bits, then renames it into place — so `path` never appears
 /// at its final name with a mode other than the intended one, unlike
 /// `fs::write` followed by a separate `fs::set_permissions` call.
+/// Replacing a final-component symlink instead of following it is an intentional
+/// safety difference from Go's `os.WriteFile`.
 fn write_with_mode(path: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
+    // Go's os.WriteFile applies its mode only when creating a file. On an
+    // existing file its truncating write preserves the file's current mode.
+    // Keep that behavior while retaining the atomic replacement used here.
+    #[cfg(unix)]
+    let mode = match fs::metadata(path) {
+        Ok(metadata) => {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o777
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => mode,
+        Err(error) => return Err(error),
+    };
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty());
@@ -952,6 +966,53 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn write_files_preserves_existing_mode_when_overwriting() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out = temp.path().join("schedules");
+        fs::create_dir_all(&out).expect("create output directory");
+        let script = out.join("install.sh");
+        fs::write(&script, b"old contents\n").expect("write existing script");
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o640)).expect("set existing mode");
+
+        let mut files = BTreeMap::new();
+        files.insert("install.sh".to_string(), "new contents\n".to_string());
+        write_files(out.to_str().unwrap(), &files).expect("overwrite generated script");
+
+        assert_eq!(
+            fs::read(&script).expect("read generated script"),
+            b"new contents\n"
+        );
+        assert_eq!(
+            fs::metadata(script).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn write_files_replaces_final_symlink_without_writing_its_target() {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out = temp.path().join("schedules");
+        fs::create_dir_all(&out).expect("create output directory");
+        let target = temp.path().join("outside.txt");
+        fs::write(&target, b"private\n").expect("write link target");
+        let script = out.join("install.sh");
+        symlink(&target, &script).expect("create symlink");
+
+        let mut files = BTreeMap::new();
+        files.insert("install.sh".to_string(), "generated\n".to_string());
+        write_files(out.to_str().unwrap(), &files).expect("replace final symlink");
+
+        assert_eq!(fs::read(&target).unwrap(), b"private\n");
+        assert!(fs::symlink_metadata(&script).unwrap().file_type().is_file());
+        assert_eq!(fs::read(&script).unwrap(), b"generated\n");
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn write_with_mode_never_leaves_a_wrong_mode_window() {
         // A regression guard for the TOCTOU pattern this function replaced
         // (fs::write then a separate fs::set_permissions call): the file

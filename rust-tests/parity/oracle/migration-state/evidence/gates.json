@@ -1,0 +1,61 @@
+[
+  {
+    "name": "engine-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme/.worktrees/cli024-json/Cargo.toml",
+      "-p",
+      "symeraseme-engine",
+      "--locked",
+      "--offline",
+      "--",
+      "--nocapture"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--manifest-path",
+      "/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme/.worktrees/cli024-json/Cargo.toml",
+      "-p",
+      "symeraseme-engine",
+      "-p",
+      "symeraseme-cli",
+      "--all-targets",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/Volumes/1TB_NVMe_SN850X/Dev/Symaira_Dev/Repos/symaira-eraseme/.worktrees/cli024-json/Cargo.toml",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0
+  }
+]

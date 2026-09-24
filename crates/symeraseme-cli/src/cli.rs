@@ -1,7 +1,7 @@
 //! Clap-compatible command surface, Cobra-compatible help, and handlers.
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
-use crate::mcp::handler::{ContractHandler, ToolHandler, request_rows};
+use crate::mcp::handler::{ContractHandler, ToolHandler};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -10,20 +10,21 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use symeraseme_core::campaign;
-use symeraseme_core::config::{Config, ConfigContext, resolve_storage};
-use symeraseme_core::deadlines::{self, RunOpts};
+use symeraseme_core::config::{Config, ConfigContext};
+use symeraseme_core::deadlines::{self, RunOpts, TickAction};
 use symeraseme_core::identity::{
     ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
     init_profile, load_profile, profile_exists,
 };
 use symeraseme_core::jsonorder::go_map_order;
+use symeraseme_core::llm::{self, AgentClient, CreateOptions};
 use symeraseme_core::registry::{
     Broker, BrokerFilter, filter_brokers, load_embedded, load_from_dir,
 };
 use symeraseme_core::reporting;
 use symeraseme_core::storage::Store;
-use symeraseme_core::storage::repository::{ListRemovalRequestsOptions, Repository};
 use symeraseme_core::templating::{Address, RenderContext, list_template_names, render};
+use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, RebuttalRequest};
 use symeraseme_core::version;
 use symeraseme_engine::scheduler::install::{self, InstallOptions};
 use symeraseme_engine::scheduler::{Config as SchedulerConfig, Platform};
@@ -42,6 +43,13 @@ pub enum Outcome {
     /// Run the stdio MCP server: optional stderr notice first, then the
     /// JSON-RPC loop over stdin/stdout until EOF.
     ServeStdio(Option<Vec<u8>>),
+    /// Run the token-authenticated MCP HTTP server.
+    ServeHttp {
+        host: String,
+        port: i64,
+        allow_remote: bool,
+        notice: Option<Vec<u8>>,
+    },
 }
 
 /// Build the complete native Clap surface for debug assertions and tooling.
@@ -84,6 +92,7 @@ fn build_command(specs: &[CommandSpec], path: &[&str]) -> clap::Command {
                 .long("output")
                 .global(true)
                 .value_name("string")
+                .allow_hyphen_values(true)
                 .default_value("text")
                 .help("output format: text or json"),
         );
@@ -113,6 +122,10 @@ fn build_command(specs: &[CommandSpec], path: &[&str]) -> clap::Command {
                 .trailing_var_arg(true),
         );
     }
+    // Cobra migration flags use the last supplied value.
+    if spec.path == "migrate" {
+        command = command.args_override_self(true);
+    }
     for child in command_surface::children(specs, path) {
         let child_path = child.path.split_whitespace().collect::<Vec<_>>();
         command = command.subcommand(build_command(specs, &child_path));
@@ -124,11 +137,17 @@ fn clap_arg(flag: &FlagSpec, _shorthand: Option<char>) -> clap::Arg {
     let mut arg = clap::Arg::new(flag.name)
         .long(flag.name)
         .help(flag.usage)
-        .action(if flag.kind == "bool" {
-            clap::ArgAction::SetTrue
-        } else {
-            clap::ArgAction::Set
-        });
+        .action(clap::ArgAction::Set);
+    if flag.kind == "bool" {
+        arg = arg
+            .value_parser(clap::value_parser!(bool))
+            .default_value("false")
+            .default_missing_value("true")
+            .num_args(0..=1)
+            .require_equals(true);
+    } else {
+        arg = arg.allow_hyphen_values(true);
+    }
     if flag.name == "version" {
         arg = arg.short('v');
     }
@@ -156,7 +175,7 @@ pub fn execute(args: &[String]) -> Outcome {
             return parse_error(error, args);
         }
     };
-    if matches.get_flag("version") {
+    if matches.get_one::<bool>("version").copied().unwrap_or(false) {
         return Outcome::Stdout(
             format!("{ROOT_NAME} version {}\n", version::BUILD_VERSION).into_bytes(),
         );
@@ -268,10 +287,41 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                 } else {
                     index += 1;
                     args.get(index)
-                        .filter(|value| !value.starts_with('-'))
                         .cloned()
                         .ok_or_else(|| format!("flag needs an argument: --{name}\n"))?
                 };
+                if path == ["poll-inbox"]
+                    && matches!(name, "port" | "since" | "since-days")
+                    && let Err(error) = value.parse::<i64>()
+                {
+                    let detail = if matches!(
+                        error.kind(),
+                        std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
+                    ) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Err(format!(
+                        "invalid argument {value:?} for \"--{name}\" flag: strconv.ParseInt: parsing {value:?}: {detail}\n"
+                    ));
+                }
+                if matches!(path.as_slice(), [command] if command == "classify-reply" || command == "generate-rebuttal")
+                    && name == "request-id"
+                    && let Err(kind) = parse_go_int_flag(&value)
+                {
+                    let detail = if matches!(
+                        kind,
+                        std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
+                    ) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Err(format!(
+                        "invalid argument {value:?} for \"--{name}\" flag: strconv.ParseInt: parsing {value:?}: {detail}\n"
+                    ));
+                }
                 if name == "output" {
                     if path.is_empty() {
                         root_output = Some(value.clone());
@@ -279,7 +329,12 @@ fn parse(specs: &[CommandSpec], args: &[String]) -> Result<Parsed, String> {
                         local_output = Some(value.clone());
                     }
                 }
-                flags.insert(name.to_owned(), value);
+                if path == ["poll-inbox"] && matches!(name, "since" | "since-days") {
+                    flags.insert("since".to_owned(), value.clone());
+                    flags.insert("since-days".to_owned(), value);
+                } else {
+                    flags.insert(name.to_owned(), value);
+                }
             }
             index += 1;
             continue;
@@ -360,6 +415,71 @@ fn split_flag(raw: &str) -> (&str, Option<String>) {
     }
 }
 
+/// Parse Go's base-zero integer syntax used by `pflag.IntVar` for the reply
+/// triage `--request-id` flags. Positional IDs continue to use decimal Atoi.
+fn parse_go_int_flag(value: &str) -> Result<i64, std::num::IntErrorKind> {
+    let (negative, unsigned) = if let Some(rest) = value.strip_prefix('-') {
+        (true, rest)
+    } else if let Some(rest) = value.strip_prefix('+') {
+        (false, rest)
+    } else {
+        (false, value)
+    };
+    let (digits, base) = if let Some(rest) = unsigned
+        .strip_prefix("0x")
+        .or_else(|| unsigned.strip_prefix("0X"))
+    {
+        (rest, 16)
+    } else if let Some(rest) = unsigned
+        .strip_prefix("0b")
+        .or_else(|| unsigned.strip_prefix("0B"))
+    {
+        (rest, 2)
+    } else if let Some(rest) = unsigned
+        .strip_prefix("0o")
+        .or_else(|| unsigned.strip_prefix("0O"))
+    {
+        (rest, 8)
+    } else if unsigned.len() > 1 && unsigned.starts_with('0') {
+        (unsigned, 8)
+    } else {
+        (unsigned, 10)
+    };
+    let prefixed = unsigned.starts_with("0x")
+        || unsigned.starts_with("0X")
+        || unsigned.starts_with("0b")
+        || unsigned.starts_with("0B")
+        || unsigned.starts_with("0o")
+        || unsigned.starts_with("0O");
+    let bytes = digits.as_bytes();
+    if digits.is_empty()
+        || bytes.iter().enumerate().any(|(index, byte)| {
+            *byte == b'_'
+                && (index + 1 == bytes.len()
+                    || (index == 0 && !prefixed)
+                    || (index > 0 && bytes[index - 1] == b'_')
+                    || bytes[index + 1] == b'_')
+        })
+    {
+        return Err(std::num::IntErrorKind::InvalidDigit);
+    }
+    let magnitude =
+        u64::from_str_radix(&digits.replace('_', ""), base).map_err(|error| *error.kind())?;
+    let limit = i64::MAX as u64 + u64::from(negative);
+    if magnitude > limit {
+        return Err(if negative {
+            std::num::IntErrorKind::NegOverflow
+        } else {
+            std::num::IntErrorKind::PosOverflow
+        });
+    }
+    if negative {
+        Ok((-(magnitude as i128)) as i64)
+    } else {
+        Ok(magnitude as i64)
+    }
+}
+
 fn known_flag<'a>(specs: &'a [CommandSpec], path: &[String], name: &str) -> Option<&'a FlagSpec> {
     let name = name.strip_prefix("--").unwrap_or(name);
     if name == "output" {
@@ -430,6 +550,15 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
                     .to_vec(),
             ))
         }
+        "serve" => Outcome::ServeHttp {
+            host: string_flag_or(parsed, "host", "127.0.0.1"),
+            port: int_flag(parsed, "port", 8000),
+            allow_remote: bool_flag(parsed, "allow-remote"),
+            notice: Some(
+                b"symeraseme serve is deprecated and will be removed. Please use symeraseme mcp instead.\n"
+                    .to_vec(),
+            ),
+        },
         "mcp"
             if parsed
                 .flags
@@ -438,6 +567,12 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         {
             Outcome::ServeStdio(None)
         }
+        "mcp" => Outcome::ServeHttp {
+            host: string_flag_or(parsed, "host", "127.0.0.1"),
+            port: int_flag(parsed, "port", 8000),
+            allow_remote: bool_flag(parsed, "allow-remote"),
+            notice: None,
+        },
         "status" => {
             let campaign = parsed.flags.get("campaign").cloned().unwrap_or_default();
             campaign_status(parsed, &campaign)
@@ -496,6 +631,9 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             Err(outcome) => outcome,
         },
         "grant" => contract_command_rendered("grant", grant_arguments(parsed), parsed),
+        "poll-inbox" => poll_inbox_command(parsed),
+        "classify-reply" => classify_reply_command(parsed),
+        "generate-rebuttal" => generate_rebuttal_command(parsed),
         "generate-dashboard" => generate_dashboard_command(parsed),
         "generate-report" => generate_report_command(parsed),
         "generate-scheduler" => generate_scheduler_command(parsed),
@@ -718,16 +856,27 @@ fn process_context() -> ConfigContext {
 /// Go's `dataStore()`: resolve the storage location, create the database
 /// directory with mode `0700`, then open the event store.
 fn open_store() -> Result<Store, String> {
-    let storage = resolve_storage(&process_context()).map_err(|error| error.to_string())?;
-    std::fs::create_dir_all(&storage.db_dir)
-        .map_err(|error| format!("eventstore: create database directory: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&storage.db_dir, std::fs::Permissions::from_mode(0o700))
-            .map_err(|error| format!("eventstore: secure database directory: {error}"))?;
+    crate::store::open(&process_context())
+}
+
+fn with_store_outcome(store: Store, operation: impl FnOnce(&Store) -> Outcome) -> Outcome {
+    let (outcome, close) = crate::store::with_store(store, operation);
+    let Err(close) = close else {
+        return outcome;
+    };
+    let close = format!("eventstore: close: {close}\n").into_bytes();
+    match outcome {
+        Outcome::Stdout(stdout) => Outcome::StdoutStderr(stdout, close),
+        Outcome::StdoutStderr(stdout, mut stderr) => {
+            stderr.extend_from_slice(&close);
+            Outcome::StdoutStderr(stdout, stderr)
+        }
+        Outcome::Stderr(mut stderr) => {
+            stderr.extend_from_slice(&close);
+            Outcome::Stderr(stderr)
+        }
+        _ => Outcome::Stderr(close),
     }
-    Store::open(&storage.db_path).map_err(|error| error.to_string())
 }
 
 /// Go's `%v` rendering of a string-keyed map: sorted keys, plain values.
@@ -780,40 +929,42 @@ fn plan_create(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let options = campaign::PlanOpts {
-        campaign_id,
-        jurisdiction: string_flag(parsed, "jurisdiction"),
-        law: string_flag(parsed, "law"),
-        priority: string_flag(parsed, "priority"),
-        category: string_flag(parsed, "category"),
-        status: string_flag_or(parsed, "status", "active"),
-        include_inactive: bool_flag(parsed, "include-inactive"),
-        include_disabled: false,
-        max_brokers: int_flag(parsed, "max", 30),
-        notes: string_flag(parsed, "notes"),
-    };
-    let result =
-        match campaign::plan_campaign(&store, &brokers, &identity_hash, &options, now_utc()) {
-            Ok(result) => result,
-            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let options = campaign::PlanOpts {
+            campaign_id,
+            jurisdiction: string_flag(parsed, "jurisdiction"),
+            law: string_flag(parsed, "law"),
+            priority: string_flag(parsed, "priority"),
+            category: string_flag(parsed, "category"),
+            status: string_flag_or(parsed, "status", "active"),
+            include_inactive: bool_flag(parsed, "include-inactive"),
+            include_disabled: false,
+            max_brokers: int_flag(parsed, "max", 30),
+            notes: string_flag(parsed, "notes"),
         };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        let result =
+            match campaign::plan_campaign(store, &brokers, &identity_hash, &options, now_utc()) {
+                Ok(result) => result,
+                Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
         };
-    }
-    Outcome::Stdout(
-        format!(
-            "planned {} request(s) for campaign {}\n",
-            result.planned, result.campaign_id
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(
+            format!(
+                "planned {} request(s) for campaign {}\n",
+                result.planned, result.campaign_id
+            )
+            .into_bytes(),
         )
-        .into_bytes(),
-    )
+    })
 }
 
 /// `plan show` — Go's `campaign.GetPlan` behind the `show` subcommand.
@@ -822,39 +973,27 @@ fn plan_show(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let campaign_id = string_flag(parsed, "campaign");
-    let status = string_flag(parsed, "status");
-    let requests = match Repository::new(&store).list_removal_requests(ListRemovalRequestsOptions {
-        campaign_id: (!campaign_id.is_empty()).then(|| campaign_id.clone()),
-        status: (!status.is_empty()).then_some(status),
-        ..ListRemovalRequestsOptions::default()
-    }) {
-        Ok(requests) => requests,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let label = if campaign_id.is_empty() {
-        "all".to_owned()
-    } else {
-        campaign_id
-    };
-    let total = requests.len();
-    // Go marshals a `map[string]any`, so the keys come out sorted.
-    let result = go_map_order(json!({
-        "campaign_id": label.clone(),
-        "total": total,
-        "requests": request_rows(requests),
-    }));
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let campaign_id = string_flag(parsed, "campaign");
+        let status = string_flag(parsed, "status");
+        let result = match campaign::get_plan(store, &campaign_id, &status) {
+            Ok(result) => Value::Object(result),
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(format!("campaign {label}: {total} request(s)\n").into_bytes())
+        let label = result["campaign_id"].as_str().unwrap_or("all");
+        let total = result["total"].as_u64().unwrap_or_default();
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("campaign {label}: {total} request(s)\n").into_bytes())
+    })
 }
 
 /// `plan execute` — Go's `realPlanCommand`'s `execute`.
@@ -872,43 +1011,46 @@ fn plan_execute(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let dry_run = bool_flag(parsed, "dry-run");
-    if !dry_run && let Err(error) = consent_gate(parsed) {
-        return Outcome::Stderr(format!("{error}\n").into_bytes());
-    }
-    let brokers = match load_brokers() {
-        Ok(brokers) => brokers,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let profile = planning_profile(parsed);
-    let result = match campaign::execute_campaign(
-        &store,
-        &campaign_id,
-        &campaign::ExecuteOpts {
-            account: string_flag(parsed, "account"),
-            dry_run,
-            brokers: &brokers,
-        },
-        profile.as_ref().map(Option::as_ref).map_err(String::as_str),
-        int_flag(parsed, "batch-size", 5),
-        now_utc(),
-    ) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let dry_run = bool_flag(parsed, "dry-run");
+        if !dry_run && let Err(error) = consent_gate(parsed) {
+            return Outcome::Stderr(format!("{error}\n").into_bytes());
+        }
+        let brokers = match load_brokers() {
+            Ok(brokers) => brokers,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(
-        format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
-    )
+        let profile = planning_profile(parsed);
+        let result = match campaign::execute_campaign(
+            store,
+            &campaign_id,
+            &campaign::ExecuteOpts {
+                account: string_flag(parsed, "account"),
+                dry_run,
+                email_sender: None,
+                brokers: &brokers,
+            },
+            profile.as_ref().map(Option::as_ref).map_err(String::as_str),
+            int_flag(parsed, "batch-size", 5),
+            now_utc(),
+        ) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(
+            format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
+        )
+    })
 }
 
 /// Go's `identity.ConsentGate("execute", ...)` for the flags `execute` declares.
@@ -951,21 +1093,23 @@ fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let result = match reporting::get_campaign_status(&store, campaign_id, now_utc()) {
-        Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        return match json_line(&result) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    with_store_outcome(store, |store| {
+        let result = match reporting::get_campaign_status(store, campaign_id, now_utc()) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-    }
-    Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+    })
 }
 
 /// One string flag as the command saw it; `""` when it was not given.
@@ -1025,6 +1169,27 @@ pub(crate) fn serve_stdio(notice: Option<Vec<u8>>) -> Outcome {
     }
 }
 
+/// Starts the production MCP HTTP server after the command surface has been
+/// parsed, keeping long-running process behavior out of the parser outcome.
+pub(crate) fn serve_http(
+    host: String,
+    port: i64,
+    allow_remote: bool,
+    notice: Option<Vec<u8>>,
+) -> Outcome {
+    use std::io::Write as _;
+
+    if let Some(bytes) = notice {
+        let _ = std::io::stderr().write_all(&bytes);
+    }
+    match crate::mcp::http::serve(host, port, allow_remote, || {
+        contract_handler().map(|handler| std::sync::Arc::new(handler) as std::sync::Arc<_>)
+    }) {
+        Ok(()) => Outcome::Stdout(Vec::new()),
+        Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    }
+}
+
 /// The four CLI commands that are thin wrappers over an MCP tool share Go's
 /// body: call the tool, print its result as JSON, or `success` in text mode.
 fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) -> Outcome {
@@ -1036,6 +1201,198 @@ fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) 
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         },
     }
+}
+
+/// Go's `poll-inbox` CLI adapter: forward only explicitly supplied flags and
+/// print the handler's message in text mode.
+fn poll_inbox_command(parsed: &Parsed) -> Outcome {
+    let mut arguments = Map::new();
+    for (flag, key) in [
+        ("host", "host"),
+        ("username", "username"),
+        ("oauth2-access-token", "oauth2_access_token"),
+        ("oauth2-username", "oauth2_username"),
+        ("campaign-id", "campaign_id"),
+        ("folders", "folders"),
+    ] {
+        if let Some(value) = parsed.flags.get(flag) {
+            arguments.insert(key.to_owned(), json!(value));
+        }
+    }
+    for flag in ["port", "since", "since-days"] {
+        if let Some(value) = parsed.flags.get(flag) {
+            let number = match value.parse::<i64>() {
+                Ok(number) => number,
+                Err(_) => {
+                    let parse_error = if value.parse::<i64>().is_err_and(|error| {
+                        matches!(
+                            error.kind(),
+                            std::num::IntErrorKind::PosOverflow
+                                | std::num::IntErrorKind::NegOverflow
+                        )
+                    }) {
+                        "value out of range"
+                    } else {
+                        "invalid syntax"
+                    };
+                    return Outcome::Stderr(format!(
+                        "invalid argument {value:?} for \"--{flag}\" flag: strconv.ParseInt: parsing {value:?}: {parse_error}\n"
+                    ).into_bytes());
+                }
+            };
+            if flag == "port" {
+                arguments.insert("port".to_owned(), json!(number));
+            } else {
+                arguments.insert("since_days".to_owned(), json!(number));
+            }
+        }
+    }
+    if let Some(value) = parsed.flags.get("ssl") {
+        arguments.insert("ssl".to_owned(), json!(value == "true"));
+    }
+
+    let handler = match contract_handler() {
+        Ok(handler) => handler,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    let result = match handler.call("poll_inbox", &arguments) {
+        Ok(result) => result,
+        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+    };
+    match output_format(parsed) {
+        Err(outcome) => outcome,
+        Ok("json") => match json_line(&result) {
+            Ok(bytes) => Outcome::Stdout(bytes),
+            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+        },
+        Ok(_) => Outcome::Stdout(
+            result
+                .get("message")
+                .and_then(Value::as_str)
+                .map(|message| format!("{message}\n").into_bytes())
+                .unwrap_or_else(|| b"success\n".to_vec()),
+        ),
+    }
+}
+
+/// Build the local host-agent client selected by Go's `llm.Create`. Provider
+/// transports that Rust does not own remain explicit errors; this path never
+/// constructs an HTTP client or sends network traffic.
+fn triage_agent(parsed: &Parsed) -> Result<AgentClient, String> {
+    llm::create(
+        &CreateOptions {
+            provider: string_flag(parsed, "provider"),
+            model: string_flag(parsed, "model"),
+            ..CreateOptions::default()
+        },
+        &|name| env::var(name).ok(),
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn triage_agent_call<'a>(
+    agent: &'a AgentClient,
+) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + 'a {
+    move |system_prompt, user_prompt, cache_key| {
+        let (text, usage) = agent
+            .classify(
+                system_prompt,
+                user_prompt,
+                &llm::ClassifyOptions {
+                    cache_key: cache_key.to_owned(),
+                    ..llm::ClassifyOptions::default()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+        Ok(LlmResponse { text, usage })
+    }
+}
+
+fn classify_reply_command(parsed: &Parsed) -> Outcome {
+    let request_id = match triage_request_id(parsed) {
+        Ok(request_id) => request_id,
+        Err(outcome) => return outcome,
+    };
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    with_store_outcome(store, |store| {
+        let agent = match triage_agent(parsed) {
+            Ok(agent) => agent,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let call = triage_agent_call(&agent);
+        let outcome = match triage_service::Service::new(store).classify_reply(
+            request_id,
+            &ClassifyRequest::default(),
+            None,
+            Some(&call),
+            bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+        ) {
+            Ok(outcome) => outcome,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        if let Some(error) = outcome.error {
+            return Outcome::Stderr(format!("{error}\n").into_bytes());
+        }
+        match output_format(parsed) {
+            Ok("json") => match json_line(&outcome.result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            },
+            Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+            Err(outcome) => outcome,
+        }
+    })
+}
+
+fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
+    let request_id = match triage_request_id(parsed) {
+        Ok(request_id) => request_id,
+        Err(outcome) => return outcome,
+    };
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    with_store_outcome(store, |store| {
+        let agent = match triage_agent(parsed) {
+            Ok(agent) => agent,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let call = triage_agent_call(&agent);
+        let result = match triage_service::Service::new(store).generate_rebuttal(
+            request_id,
+            &RebuttalRequest::default(),
+            None,
+            Some(&call),
+            bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
+        ) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let result = json!({
+            "template_name": result.template_name,
+            "label": result.label,
+            "description": result.description,
+            "jurisdiction": result.jurisdiction,
+            "rejection_classification": result.rejection_classification,
+            "confidence": result.confidence,
+            "rebuttal_body": result.rebuttal_body,
+            "needs_human_review": result.needs_human_review,
+            "llm_used": result.llm_used,
+            "usage": result.usage.record(),
+        });
+        match output_format(parsed) {
+            Ok("json") => match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            },
+            Ok(_) => Outcome::Stdout(b"success\n".to_vec()),
+            Err(outcome) => outcome,
+        }
+    })
 }
 
 /// The tool result when the command asked for JSON, `None` for text mode.
@@ -1293,6 +1650,20 @@ fn int_argument(parsed: &Parsed, flag: &str, name: &str) -> Result<i64, Outcome>
         .map_err(|_| Outcome::Stderr(format!("invalid {name} {argument:?}\n").into_bytes()))
 }
 
+fn triage_request_id(parsed: &Parsed) -> Result<i64, Outcome> {
+    if let Some(argument) = parsed.positional.first() {
+        return argument.parse().map_err(|_| {
+            Outcome::Stderr(format!("invalid request ID {argument:?}\n").into_bytes())
+        });
+    }
+    match parsed.flags.get("request-id") {
+        Some(value) => parse_go_int_flag(value).map_err(|_| {
+            Outcome::Stderr(b"invalid request ID flag after successful argument parsing\n".to_vec())
+        }),
+        None => Ok(0),
+    }
+}
+
 /// `review` — Go's `realRedactFileCommand`: the positional wins over `--path`,
 /// an empty path fails before the tool runs, and the body is the
 /// `redact_file` contract handler (text mode prints only `success`).
@@ -1360,11 +1731,7 @@ fn run_web_form_command(parsed: &Parsed) -> Outcome {
     web_action_text(&result)
 }
 
-/// `migrate` — Go's `migration.NewCommand()`: the required-flag guard, home
-/// resolution, then `migration.Run`, whose first act is `validateRoots`. The
-/// recorded case pins only that validation (a missing source directory). The
-/// detection/report engine behind it has no Rust implementation yet and fails
-/// closed rather than faking a report.
+/// Render the migration report even when a per-item operation fails.
 fn migrate_command(parsed: &Parsed) -> Outcome {
     let source = string_flag(parsed, "source");
     let destination = string_flag(parsed, "destination");
@@ -1383,135 +1750,62 @@ fn migrate_command(parsed: &Parsed) -> Outcome {
             }
         };
     }
-    match validate_roots(&source, &destination) {
-        Err(message) => Outcome::Stderr(format!("{message}\n").into_bytes()),
-        Ok((source, destination)) => {
-            let _ = (home, source, destination);
-            Outcome::Stderr(
-                b"migrate's detection and report engine is not implemented in Rust\n".to_vec(),
-            )
-        }
+    let options = symeraseme_engine::migration::Options {
+        source_root: source,
+        destination_root: destination,
+        home_dir: home,
+        source_config_root: string_flag(parsed, "source-config"),
+        destination_config_root: string_flag(parsed, "destination-config"),
+        backup_dir: string_flag(parsed, "backup"),
+        platform: string_flag(parsed, "platform"),
+        binary_path: string_flag(parsed, "binary"),
+        project_dir: string_flag(parsed, "project-dir"),
+        copy_secrets: bool_flag(parsed, "copy-secrets"),
+        dry_run: bool_flag(parsed, "dry-run"),
+        ..Default::default()
+    };
+    let (report, error) = symeraseme_engine::migration::run(&options);
+    match report {
+        Some(report) => migration_output(parsed, &report, error),
+        None => Outcome::Stderr(format!("{}\n", error.unwrap_or_default()).into_bytes()),
     }
 }
 
-/// Go's `migration.validateRoots`: required flags, absolute+cleaned paths, no
-/// symlink components, a real source directory, no symlink destination, and
-/// two directories that are neither equal nor nested.
-fn validate_roots(source: &str, destination: &str) -> Result<(String, String), String> {
-    if source.is_empty() || destination.is_empty() {
-        return Err("source and destination directories are required".to_owned());
-    }
-    let source =
-        absolute_dir(source).map_err(|error| format!("resolve source directory: {error}"))?;
-    let destination = absolute_dir(destination)
-        .map_err(|error| format!("resolve destination directory: {error}"))?;
-    reject_symlink_components(&source)
-        .map_err(|error| format!("source path is unsafe: {error}"))?;
-    reject_symlink_components(&destination)
-        .map_err(|error| format!("destination path is unsafe: {error}"))?;
-    let info = std::fs::symlink_metadata(&source).map_err(|error| {
-        // Go's os.Lstat reports the Win32 operation and preserves its native
-        // error text; the Unix fixture instead records `lstat` + errno.
-        // ponytail: the recorded Windows case is a missing source. Extend the
-        // native oracle cases before mapping other Windows Lstat failures.
-        if cfg!(windows) && error.kind() == std::io::ErrorKind::NotFound {
-            let text = error.to_string();
-            let cause = text.split(" (os error").next().unwrap_or(&text);
-            format!("stat source directory: GetFileAttributesEx {source}: {cause}")
-        } else {
-            format!(
-                "stat source directory: lstat {source}: {}",
-                go_errno_text(&error)
-            )
-        }
-    })?;
-    if !info.is_dir() || info.file_type().is_symlink() {
-        return Err("source must be a real directory".to_owned());
-    }
-    if let Ok(destination_info) = std::fs::symlink_metadata(&destination)
-        && destination_info.file_type().is_symlink()
-    {
-        return Err("destination must not be a symlink".to_owned());
-    }
-    if source == destination
-        || path_within(&source, &destination)
-        || path_within(&destination, &source)
-    {
-        return Err("source and destination must be separate, non-nested directories".to_owned());
-    }
-    Ok((source, destination))
-}
-
-/// Go's `absoluteDir`: non-empty, absolute, cleaned — no symlink resolution.
-fn absolute_dir(path: &str) -> Result<String, String> {
-    if path.is_empty() {
-        return Err("path must not be empty".to_owned());
-    }
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    Ok(absolute.to_string_lossy().into_owned())
-}
-
-/// Go's `rejectSymlinkComponents`: walk every component and refuse a symlink
-/// outside the allowed darwin system roots; a missing component stops the
-/// walk without an error (the later `Lstat` reports missing paths).
-fn reject_symlink_components(path: &str) -> Result<(), String> {
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    let mut current = std::path::PathBuf::from("/");
-    let relative = absolute.strip_prefix("/").unwrap_or(&absolute);
-    for (index, component) in relative.components().enumerate() {
-        current.push(component);
-        let text = current.to_string_lossy();
-        let info = match std::fs::symlink_metadata(&current) {
-            Ok(info) => info,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(error) => return Err(error.to_string()),
-        };
-        if info.file_type().is_symlink() && (index > 0 || !is_allowed_system_symlink(&text)) {
-            return Err(format!("symlink component: {text}"));
-        }
-    }
-    Ok(())
-}
-
-/// Go's `isAllowedSystemSymlink`: only the exact system roots at the first
-/// component. Go guards this with `runtime.GOOS == "darwin"`; Rust's
-/// `target_os` for that platform is spelled `macos`.
-fn is_allowed_system_symlink(path: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        matches!(std::path::Path::new(path), p if matches!(
-            p.to_str(),
-            Some("/etc" | "/private" | "/tmp" | "/var")
-        ))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = path;
-        false
-    }
-}
-
-/// Go's `pathWithin`: whether `candidate` sits at or under `root`.
-fn path_within(root: &str, candidate: &str) -> bool {
-    Path::new(candidate).strip_prefix(Path::new(root)).is_ok()
-}
-
-/// Go's wrapped `os.Lstat` text: `lstat <path>: <errno>`. Rust attaches no
-/// path, so the op and path are formatted here; errno text is Go's lowercase
-/// spelling (ponytail: first-word lowercasing plus the recorded ENOENT case —
-/// upgrade path: a full errno table).
-fn go_errno_text(error: &std::io::Error) -> String {
-    match error.raw_os_error() {
-        Some(2) => "no such file or directory".to_owned(),
-        _ => {
-            let text = error.to_string();
-            let base = text.split(" (os error").next().unwrap_or(&text);
-            let mut characters = base.chars();
-            match characters.next() {
-                Some(first) => first.to_lowercase().collect::<String>() + characters.as_str(),
-                None => base.to_owned(),
+fn migration_output(
+    parsed: &Parsed,
+    report: &symeraseme_engine::migration::Report,
+    error: Option<String>,
+) -> Outcome {
+    let bytes = if bool_flag(parsed, "json") {
+        match serde_json::to_vec_pretty(report) {
+            Ok(mut bytes) => {
+                normalize_go_json(&mut bytes);
+                bytes.push(b'\n');
+                bytes
             }
+            Err(e) => return Outcome::Stderr(format!("{e}\n").into_bytes()),
         }
+    } else {
+        let mut text = format!("{}\n", report.detection.summary);
+        if !report.backup_dir.is_empty() {
+            text.push_str(&format!("Backup: {}\n", report.backup_dir));
+        }
+        for item in report.items.iter().flatten() {
+            text.push_str(&format!("[{}] {}\n", item.status, item.artifact.id));
+        }
+        for warning in &report.warnings {
+            text.push_str(&format!("Warning: {warning}\n"));
+        }
+        if report.dry_run {
+            text.push_str("Dry run: no files were changed.\n");
+        } else if report.complete {
+            text.push_str("Migration complete; the Python source was retained.\n");
+        }
+        text.into_bytes()
+    };
+    match error {
+        Some(error) => Outcome::StdoutStderr(bytes, format!("{error}\n").into_bytes()),
+        None => Outcome::Stdout(bytes),
     }
 }
 
@@ -1680,48 +1974,62 @@ fn plan_tick(parsed: &Parsed) -> Outcome {
         Ok(store) => store,
         Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
-    let dry_run = parsed
-        .flags
-        .get("dry-run")
-        .is_some_and(|value| value == "true");
-    let actions = match deadlines::run_tick(
-        &store,
-        &RunOpts {
-            dry_run,
-            batch_size: 0,
-        },
-        now_utc(),
-    ) {
-        Ok(actions) => actions,
-        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
-    };
-    let format = match output_format(parsed) {
-        Ok(format) => format,
-        Err(outcome) => return outcome,
-    };
-    if format == "json" {
-        // Go marshals a `map[string]any`, so the keys come out sorted, and a nil
-        // action slice stays `null` rather than becoming `[]`.
-        let serialized = match serde_json::to_value(&actions) {
-            Ok(value) => value,
+    with_store_outcome(store, |store| {
+        let dry_run = parsed
+            .flags
+            .get("dry-run")
+            .is_some_and(|value| value == "true");
+        let actions = match deadlines::run_tick(
+            store,
+            &RunOpts {
+                dry_run,
+                batch_size: 0,
+            },
+            now_utc(),
+        ) {
+            Ok(actions) => actions,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-        let actions_value = if actions.is_empty() {
-            Value::Null
-        } else {
-            serialized
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
         };
-        let payload = json!({
-            "actions": actions_value,
-            "dry_run": dry_run,
-            "success": true,
-        });
-        return match json_line(&payload) {
-            Ok(bytes) => Outcome::Stdout(bytes),
-            Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
-        };
-    }
-    Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+        if format == "json" {
+            return match tick_actions_json(&actions, dry_run) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+    })
+}
+
+fn tick_actions_json(actions: &[TickAction], dry_run: bool) -> Result<Vec<u8>, serde_json::Error> {
+    // Go's outer map sorts keys, while Action is a struct and retains its
+    // declared capitalized field order. Its Payload is a sorted Go map.
+    let actions = if actions.is_empty() {
+        Value::Null
+    } else {
+        Value::Array(
+            actions
+                .iter()
+                .map(|action| {
+                    json!({
+                        "RequestID": action.request_id,
+                        "BrokerID": action.broker_id,
+                        "CampaignID": action.campaign_id,
+                        "CurrentStatus": action.current_status,
+                        "ActionType": action.action_type,
+                        "EventType": action.event_type,
+                        "Description": action.description,
+                        "Payload": go_map_order(Value::Object(action.payload.clone())),
+                        "DryRun": action.dry_run,
+                    })
+                })
+                .collect(),
+        )
+    };
+    json_line(&json!({"actions": actions, "dry_run": dry_run, "success": true}))
 }
 
 fn output_format(parsed: &Parsed) -> Result<&str, Outcome> {
@@ -2384,7 +2692,8 @@ fn default_suffix(flag: &FlagSpec) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::clap_surface;
+    use super::{TickAction, clap_surface, tick_actions_json};
+    use serde_json::json;
 
     fn count_commands(command: &clap::Command) -> usize {
         1 + command.get_subcommands().map(count_commands).sum::<usize>()
@@ -2400,5 +2709,116 @@ mod tests {
             .find(|child| child.get_name() == "serve")
             .expect("hidden serve compatibility command");
         assert!(serve.is_hide_set());
+    }
+
+    #[test]
+    fn positive_tick_action_uses_go_struct_json_bytes() {
+        let action = TickAction {
+            request_id: 7,
+            broker_id: "broker-a".to_owned(),
+            campaign_id: "c".to_owned(),
+            current_status: "OVERDUE".to_owned(),
+            action_type: "draft_dpa_complaint".to_owned(),
+            event_type: "DPA_COMPLAINT_DRAFTED".to_owned(),
+            description: "Act <now>".to_owned(),
+            payload: json!({"z": 2, "a": 1}).as_object().unwrap().clone(),
+            dry_run: true,
+        };
+        assert_eq!(
+            tick_actions_json(&[action], true).unwrap(),
+            b"{\"actions\":[{\"RequestID\":7,\"BrokerID\":\"broker-a\",\"CampaignID\":\"c\",\"CurrentStatus\":\"OVERDUE\",\"ActionType\":\"draft_dpa_complaint\",\"EventType\":\"DPA_COMPLAINT_DRAFTED\",\"Description\":\"Act \\u003cnow\\u003e\",\"Payload\":{\"a\":1,\"z\":2},\"DryRun\":true}],\"dry_run\":true,\"success\":true}\n"
+        );
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    struct Scratch(std::path::PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let root = std::env::temp_dir().join(format!(
+                "migration-cli-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&root).unwrap();
+            Self(root)
+        }
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn migration_failed_secret_copy_emits_report_and_error() {
+        let root = Scratch::new();
+        let source = root.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("identity.enc"), b"synthetic encrypted fixture").unwrap();
+        let destination = root.path().join("destination");
+        let args = vec![
+            "migrate".into(),
+            "--source".into(),
+            source.to_string_lossy().into_owned(),
+            "--destination".into(),
+            destination.to_string_lossy().into_owned(),
+            "--home".into(),
+            root.path().to_string_lossy().into_owned(),
+            "--platform".into(),
+            "cron".into(),
+            "--copy-secrets".into(),
+            "--json".into(),
+        ];
+        let Outcome::StdoutStderr(stdout, stderr) = execute(&args) else {
+            panic!("expected report and error")
+        };
+        let report: Value = serde_json::from_slice(&stdout).unwrap();
+        assert_eq!(report["items"][0]["status"], "planned");
+        assert_eq!(
+            stderr,
+            b"secret store was detected but no migratable SecretStore was injected\n"
+        );
+        assert!(!destination.exists());
+    }
+    #[test]
+    fn migration_repeated_platform_uses_last_value() {
+        let root = Scratch::new();
+        let source = root.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        let args = vec![
+            "migrate".into(),
+            "--source".into(),
+            source.to_string_lossy().into_owned(),
+            "--destination".into(),
+            root.path()
+                .join("destination")
+                .to_string_lossy()
+                .into_owned(),
+            "--home".into(),
+            root.path().to_string_lossy().into_owned(),
+            "--platform".into(),
+            "cron".into(),
+            "--platform".into(),
+            "unsupported".into(),
+            "--dry-run".into(),
+        ];
+        let Outcome::Stderr(stderr) = execute(&args) else {
+            panic!("expected invalid platform")
+        };
+        assert_eq!(
+            stderr,
+            b"unsupported platform: unsupported (choose cron, launchd, or systemd)\n"
+        );
     }
 }

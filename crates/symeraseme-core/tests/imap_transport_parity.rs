@@ -20,9 +20,11 @@ mod imap_server;
 
 use imap_server::{FolderState, MessageState, ScriptedImapServer, TlsMode};
 use rcgen::generate_simple_self_signed;
+use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{RootCertStore, ServerConfig};
 use serde_json::{Value, json};
+use std::process::Command;
 use std::sync::Arc;
 use symeraseme_core::email::session::{FetchedMessage, ImapDialer};
 use symeraseme_core::email::types::{ImapConfig, OAuth2Token};
@@ -143,9 +145,18 @@ fn server_for(case: &Value) -> (ScriptedImapServer, Option<RootCertStore>) {
             "Missing".to_string(),
             FolderState {
                 uid_validity: 7,
-                messages,
+                messages: messages.clone(),
             },
         );
+        if case["name"] == "select_unicode_folder_uses_modified_utf7" {
+            folders.insert(
+                "&AMQ-rger &- Archiv".to_string(),
+                FolderState {
+                    uid_validity: 1,
+                    messages,
+                },
+            );
+        }
     }
     (server, roots)
 }
@@ -335,17 +346,74 @@ fn imap_transport_transcript_cases_match_the_go_oracle() {
 }
 
 #[test]
-fn the_default_root_store_rejects_an_untrusted_certificate() {
+fn the_default_platform_root_store_rejects_an_untrusted_certificate() {
     let (config, _trusted_roots) = tls_material();
     let server = ScriptedImapServer::new_tls(config, TlsMode::Implicit).expect("TLS server starts");
     let case = tls_case();
     let observed = measure(&case, &server, None);
     let error = observed
         .error
-        .expect("the bundled webpki roots must not trust a locally minted certificate");
+        .expect("the platform roots must not trust a locally minted certificate");
     assert!(
         error.contains("UnknownIssuer") || error.contains("certificate"),
         "the rejection must be a certificate failure, got: {error}"
+    );
+}
+
+#[test]
+fn the_default_platform_root_store_trusts_a_configured_platform_root() {
+    const CHILD_MODE: &str = "SYMERASEME_IMAP_TRUST_TEST_CHILD";
+    if std::env::var_os(CHILD_MODE).is_some() {
+        let cert_path = std::env::var("SYMERASEME_IMAP_TEST_CERT").expect("server cert path");
+        let key_path = std::env::var("SYMERASEME_IMAP_TEST_KEY").expect("server key path");
+        let cert = CertificateDer::from_pem_file(cert_path).expect("server cert parses");
+        let key = PrivateKeyDer::from_pem_file(key_path).expect("server key parses");
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let config = ServerConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .expect("protocol versions")
+            .with_no_client_auth()
+            .with_single_cert(vec![cert], key)
+            .expect("server certificate is usable");
+        let server = ScriptedImapServer::new_tls(Arc::new(config), TlsMode::Implicit)
+            .expect("TLS server starts");
+        let observed = measure(&tls_case(), &server, None);
+        assert_eq!(
+            observed.error, None,
+            "the default TLS roots must trust the certificate from SSL_CERT_FILE"
+        );
+        return;
+    }
+
+    let certified = generate_simple_self_signed(vec!["127.0.0.1".to_string()])
+        .expect("test certificate is minted");
+    let temp = tempfile::tempdir().expect("temporary certificate directory");
+    let cert_path = temp.path().join("server.pem");
+    let key_path = temp.path().join("server-key.pem");
+    let root_path = temp.path().join("roots.pem");
+    std::fs::write(&cert_path, certified.cert.pem()).expect("server certificate is written");
+    std::fs::write(&key_path, certified.signing_key.serialize_pem())
+        .expect("server key is written");
+    std::fs::write(&root_path, certified.cert.pem()).expect("trust root is written");
+
+    let result = Command::new(std::env::current_exe().expect("test executable path"))
+        .args([
+            "--exact",
+            "the_default_platform_root_store_trusts_a_configured_platform_root",
+            "--nocapture",
+        ])
+        .env(CHILD_MODE, "1")
+        .env("SSL_CERT_FILE", &root_path)
+        .env("SSL_CERT_DIR", "")
+        .env("SYMERASEME_IMAP_TEST_CERT", &cert_path)
+        .env("SYMERASEME_IMAP_TEST_KEY", &key_path)
+        .output()
+        .expect("child trust test runs");
+    assert!(
+        result.status.success(),
+        "default root trust child failed: {}{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
     );
 }
 

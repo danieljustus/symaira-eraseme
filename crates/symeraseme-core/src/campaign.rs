@@ -23,7 +23,7 @@ use crate::registry::{Broker, BrokerFilter, Channel, RegistryError, Template, fi
 use crate::storage::Store;
 use crate::storage::projection::ProjectionError;
 use crate::storage::repository::{ListRemovalRequestsOptions, Repository};
-use crate::storage::types::{EventType, Source};
+use crate::storage::types::{EventType, RemovalRequest, Source};
 
 /// Empty strings mean "no filter"; `status` defaults to `active`, matching the
 /// Python loader default. `max_brokers <= 0` disables the cap.
@@ -324,23 +324,92 @@ pub fn plan_campaign(
 /// The outcome of one executed request, as Go's `map[string]any`.
 pub type ExecuteResult = Map<String, Value>;
 
+/// Go's `GetPlan`: list every request matching the optional campaign/status
+/// filters. Empty campaign IDs are labeled `all` and impose no campaign filter.
+pub fn get_plan(
+    store: &Store,
+    campaign_id: &str,
+    status: &str,
+) -> Result<Map<String, Value>, rusqlite::Error> {
+    let requests = Repository::new(store).list_removal_requests(ListRemovalRequestsOptions {
+        campaign_id: (!campaign_id.is_empty()).then(|| campaign_id.to_owned()),
+        status: (!status.is_empty()).then(|| status.to_owned()),
+        ..ListRemovalRequestsOptions::default()
+    })?;
+    let rows = requests
+        .iter()
+        .map(|request| {
+            json!({
+                "id": request.id,
+                "broker_id": request.broker_id,
+                "channel": request.channel,
+                "campaign_id": request.campaign_id,
+                "created_at": go_timestamp(&request.created_at),
+                "jurisdiction": request.jurisdiction,
+                "template_id": request.template_id,
+                "identity_snapshot_hash": request.identity_snapshot_hash,
+                "current_status": request.current_status,
+                "last_event_at": request.last_event_at.as_deref().map(go_timestamp),
+                "sent_at": request.sent_at.as_deref().map(go_timestamp),
+                "acknowledged_at": request.acknowledged_at.as_deref().map(go_timestamp),
+                "resolved_at": request.resolved_at.as_deref().map(go_timestamp),
+                "deadline_at": request.deadline_at.as_deref().map(go_timestamp),
+                "next_action_at": request.next_action_at.as_deref().map(go_timestamp),
+                "reminders_sent": request.reminders_sent,
+                "escalation_level": request.escalation_level,
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut result = Map::new();
+    result.insert(
+        "campaign_id".to_owned(),
+        json!(if campaign_id.is_empty() {
+            "all"
+        } else {
+            campaign_id
+        }),
+    );
+    result.insert("total".to_owned(), json!(rows.len()));
+    result.insert(
+        "requests".to_owned(),
+        if rows.is_empty() {
+            Value::Null
+        } else {
+            Value::Array(rows)
+        },
+    );
+    let Value::Object(result) = go_map_order(Value::Object(result)) else {
+        unreachable!("go_map_order keeps objects as objects")
+    };
+    Ok(result)
+}
+
+fn go_timestamp(value: &str) -> Value {
+    match crate::timeutil::parse_timestamp(value) {
+        Ok(parsed) => Value::String(parsed.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)),
+        Err(_) => Value::String(value.to_owned()),
+    }
+}
+
 /// The resolved identity profile, or the message of the failure that resolving
 /// it produced. Go resolves the profile inside `ExecuteRequest`, so a broken
 /// profile fails one request instead of the whole batch; the caller owns the
 /// resolution here, as it does for planning, and hands the failure through.
 pub type ProfileSource<'a> = Result<Option<&'a Profile>, &'a str>;
+pub type EmailSender<'a> = dyn Fn(&str, &str, &str) -> Result<Map<String, Value>, String> + 'a;
 
-/// Go's `ExecuteOpts`, minus the injectable adapters.
+/// Go's `ExecuteOpts` without a network-capable adapter implementation.
 ///
 /// `realPlanCommand` leaves `ExecuteOpts.Email` nil and supplies a
-/// `WebFormAdapter` without a `FormExecutor`, so neither adapter can reach the
-/// network: the email branch always stops at `email_sender is required`, and the
-/// web-form branch always previews (dry run) or records a manual task. This port
-/// carries no adapter fields at all, which makes that structural.
-#[derive(Debug, Clone, Default)]
+/// `WebFormAdapter` without a `FormExecutor`. Tests may inject a local sender;
+/// the production command remains unable to reach an email provider here.
+#[derive(Clone, Default)]
 pub struct ExecuteOpts<'a> {
     pub account: String,
     pub dry_run: bool,
+    /// Injectable sender matching Go's `ExecuteOpts.Email`; callers can keep
+    /// execution offline by supplying a local stub.
+    pub email_sender: Option<&'a EmailSender<'a>>,
     /// The registry the web-form adapter previews against, as
     /// `realPlanCommand` passes `loadRegistry()` to `NewWebFormAdapter`.
     pub brokers: &'a [Broker],
@@ -352,6 +421,7 @@ pub enum ExecuteError {
     IdentityProfile(String),
     IdentityProfileNotFound,
     EmailSenderRequired,
+    EmailSend { request_id: i64, message: String },
     Database(rusqlite::Error),
     Projection(ProjectionError),
 }
@@ -371,6 +441,12 @@ impl std::fmt::Display for ExecuteError {
                 formatter,
                 "campaign: email_sender is required for email-based requests"
             ),
+            Self::EmailSend {
+                request_id,
+                message,
+            } => {
+                write!(formatter, "campaign: request {request_id}: {message}")
+            }
             Self::Database(error) => write!(formatter, "{error}"),
             Self::Projection(error) => write!(formatter, "{error}"),
         }
@@ -463,38 +539,34 @@ pub fn execute_request(
         return Err(ExecuteError::RequestNotFound(request_id));
     };
     // Go reads `req["broker_id"]` into `brokerName` and passes it on as both.
-    let broker_name = request.broker_id;
+    let broker_name = &request.broker_id;
     let channel = if request.channel.is_empty() {
         "email"
     } else {
         request.channel.as_str()
     };
     if channel == "web_form" {
-        return execute_web_form_request(store, request_id, &broker_name, opts, profile, now);
+        return execute_web_form_request(store, request_id, broker_name, opts, profile, now);
     }
     let events = repository.get_events(request_id, 0)?;
     let payload = events
         .last()
         .map(|event| event.payload.clone())
         .unwrap_or_default();
-    execute_email_request(
-        request_id,
-        &broker_name,
-        &payload,
-        &request.template_id,
-        opts,
-        profile,
-    )
+    execute_email_request(store, &request, &payload, opts, profile, now)
 }
 
 fn execute_email_request(
-    request_id: i64,
-    broker_name: &str,
+    store: &Store,
+    request: &RemovalRequest,
     payload: &Map<String, Value>,
-    template_id: &str,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
+    now: DateTime<Utc>,
 ) -> Result<ExecuteResult, ExecuteError> {
+    let request_id = request.id;
+    let broker_name = &request.broker_id;
+    let template_id = &request.template_id;
     let endpoint = payload
         .get("endpoint")
         .and_then(Value::as_str)
@@ -532,7 +604,53 @@ fn execute_email_request(
         out.insert("body".to_owned(), json!(rendered));
         return Ok(out);
     }
-    Err(ExecuteError::EmailSenderRequired)
+    let Some(sender) = opts.email_sender else {
+        return Err(ExecuteError::EmailSenderRequired);
+    };
+    let send_result = match sender(endpoint, &subject, &rendered) {
+        Ok(result) => result,
+        Err(message) => {
+            let mut payload = Map::new();
+            payload.insert("error".to_owned(), json!(message));
+            payload.insert("to".to_owned(), json!(endpoint));
+            store.append_and_project(
+                request_id,
+                &EventType::SendFailed,
+                &payload,
+                &Source::System,
+                now,
+            )?;
+            return Err(ExecuteError::EmailSend {
+                request_id,
+                message,
+            });
+        }
+    };
+
+    let expected_days = payload
+        .get("expected_response_days")
+        .and_then(Value::as_i64)
+        .filter(|days| *days > 0)
+        .unwrap_or(30);
+    let mut sent = Map::new();
+    sent.insert("to".to_owned(), json!(endpoint));
+    sent.insert("template".to_owned(), json!(template_id));
+    sent.insert("account".to_owned(), json!(opts.account));
+    sent.insert("expected_response_days".to_owned(), json!(expected_days));
+    sent.insert(
+        "message_id".to_owned(),
+        json!(send_result.get("message_id")),
+    );
+    sent.insert(
+        "identity_snapshot_hash".to_owned(),
+        json!(crate::identity::hash_profile(profile)),
+    );
+    store.append_and_project(request_id, &EventType::Sent, &sent, &Source::System, now)?;
+    let mut out = Map::new();
+    out.insert("success".to_owned(), json!(true));
+    out.insert("request_id".to_owned(), json!(request_id));
+    out.insert("result".to_owned(), json!(send_result));
+    Ok(out)
 }
 
 /// Go's `defaultRenderer`: a deterministic placeholder body. `realPlanCommand`

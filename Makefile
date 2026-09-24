@@ -85,6 +85,8 @@ release-dry-run:
 		exit 127; \
 	fi
 	$(call shell_quote,$(GORELEASER)) release --snapshot --clean
+	$(call shell_quote,$(PYTHON)) tests/test_release_archive_verifier.py
+	$(call shell_quote,$(PYTHON)) tests/verify_release_archives.py dist
 
 test:
 	CGO_ENABLED=$(call shell_quote,$(CGO_ENABLED)) GOFLAGS=$(call shell_quote,$(GOFLAGS)) $(call shell_quote,$(GO)) test -count=1 ./...

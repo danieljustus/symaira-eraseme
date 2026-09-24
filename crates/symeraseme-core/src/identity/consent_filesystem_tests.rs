@@ -285,7 +285,7 @@ const FAULT_FIXTURE: &str =
 fn fault_case(name: &str) -> Value {
     let document: Value = serde_json::from_str(FAULT_FIXTURE).unwrap();
     let cases = document["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 2);
+    assert_eq!(cases.len(), 3);
     cases
         .iter()
         .find(|case| case["name"] == name)
@@ -384,6 +384,38 @@ fn id005_atomic_chmod_matches_source_bound_go_fault() {
     let mut actual = fault_observation(root.path(), "chmod_failure", &mut held);
     actual["error_class"] = json!("not_found");
     compare(&actual, &fault_case("chmod_failure")).unwrap();
+}
+
+#[test]
+fn id005_atomic_chmod_error_cleans_existing_temp_and_matches_go_rollback() {
+    let (root, path, mut held) = fault_setup();
+    let replacement = b"replacement must not be published";
+    let mut owned_temporary = None;
+    let error = atomic_write_with(
+        &path,
+        replacement,
+        fs::File::sync_all,
+        close_file,
+        |temporary| {
+            assert_eq!(fs::read(temporary).unwrap(), replacement);
+            owned_temporary = Some(temporary.to_path_buf());
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected chmod failure",
+            ))
+        },
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    assert!(!owned_temporary.unwrap().try_exists().unwrap());
+
+    let mut actual = fault_observation(root.path(), "chmod_failure_existing_temp", &mut held);
+    actual["error_class"] = json!("permission_denied");
+    let expected = fault_case("chmod_failure_existing_temp");
+    compare(&actual, &expected).unwrap();
+    let mut tampered = expected;
+    tampered["failed"] = json!(false);
+    assert!(compare(&actual, &tampered).is_err());
 }
 
 #[test]

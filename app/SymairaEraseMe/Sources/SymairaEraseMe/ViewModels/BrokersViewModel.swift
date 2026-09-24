@@ -42,7 +42,7 @@ final class BrokersViewModel: ObservableObject {
         do {
             let response: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers", arguments: args)
             state = .loaded(response.brokers)
-            total = response.total
+            total = response.count
         } catch {
             state = .failed(error.localizedDescription)
         }

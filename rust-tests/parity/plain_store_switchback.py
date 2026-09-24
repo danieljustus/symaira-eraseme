@@ -17,8 +17,11 @@ import signal
 import sqlite3
 import subprocess
 import sys
+import tempfile
 
 REPO = Path(__file__).resolve().parents[2]
+LINUX_SANDBOX = Path(__file__).with_name('linux_store_sandbox.py').resolve()
+GUEST_LOCAL_FILESYSTEMS = {'ext4', 'xfs', 'btrfs', 'tmpfs'}
 CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
          'go-plan-after-switch', 'go-requests-after-switch')
 
@@ -76,6 +79,9 @@ def command(root, label, argv, env, timeout=30):
                 record['exit_code'] = child.wait(timeout=5)
         record['success'] = record['exit_code'] == 0 and not record['timed_out']
     finally:
+        audit = root / '.sandbox' / (label + '.audit.json')
+        if audit.is_file() and not audit.is_symlink():
+            record['sandbox'] = json.loads(audit.read_bytes())
         for stream in ('stdout', 'stderr'):
             path = root / (label + '.' + stream)
             if path.exists():
@@ -104,12 +110,28 @@ def snapshot(database):
                 'tables': state}
 
 
-def sandbox(root, executable):
+def sandbox(root, executable, extra_reads=()):
+    if sys.platform.startswith('linux'):
+        return {
+            'mechanism': 'private mount, network and PID namespaces with Landlock ABI 4',
+            'writable_root': str(Path(root).resolve()),
+            'readonly_system_runtime': ['/usr', '/lib', '/lib64', '/proc'],
+            'read_only_host_shares': 'all writable virtiofs mounts inside child namespace',
+            'child_uid': os.getuid(),
+            'child_gid': os.getgid(),
+            'network': 'private network namespace plus Landlock TCP bind/connect denial',
+            'exec': str(Path(executable).resolve()),
+        }
     quote = lambda value: json.dumps(str(value))
+    extra_allow = [
+        '(allow file-read* (subpath ' + quote(Path(extra).resolve()) + '))'
+        for extra in extra_reads
+    ]
     return '\n'.join([
         '(version 1)', '(allow default)', '(deny network*)',
         '(deny file-read* (subpath ' + quote(Path.home().resolve()) + ') (subpath ' + quote(REPO) + '))',
         '(allow file-read* (subpath ' + quote(root) + '))',
+        *extra_allow,
         # SQLite resolves ancestors. Permit their metadata, not their contents.
         '(allow file-read-metadata ' + ' '.join('(literal ' + quote(p) + ')' for p in root.parents) + ')',
         '(deny file-write*)',
@@ -117,6 +139,127 @@ def sandbox(root, executable):
         '(deny process-exec)',
         '(allow process-exec (literal ' + quote(executable) + '))',
     ])
+
+
+def sandbox_command(root, label, executable, args, env):
+    executable = Path(executable).resolve(strict=True)
+    args = list(map(str, args))
+    if sys.platform == 'darwin':
+        extra_reads = (env['GOROOT'],) if label == 'go-build-info' else ()
+        return ['/usr/bin/sandbox-exec', '-p', sandbox(root, executable, extra_reads),
+                str(executable), *args]
+    require(sys.platform.startswith('linux'), 'unsupported sandbox platform')
+    root = Path(root)
+    require(not root.is_symlink(), 'Linux run root must not be a symlink')
+    root = root.resolve(strict=True)
+    mount_type = None
+    for line in Path('/proc/self/mountinfo').read_text().splitlines():
+        fields = line.split()
+        try:
+            separator = fields.index('-')
+            mountpoint = fields[4].replace('\\040', ' ').replace('\\011', '\t')
+            filesystem = fields[separator + 1]
+        except (ValueError, IndexError):
+            continue
+        if root.as_posix() == mountpoint or root.as_posix().startswith(mountpoint.rstrip('/') + '/'):
+            if mount_type is None or len(mountpoint) > len(mount_type[0]):
+                mount_type = (mountpoint, filesystem)
+    require(mount_type is not None and mount_type[1] in GUEST_LOCAL_FILESYSTEMS,
+            'Linux switchback run root must be guest-local, not virtiofs')
+    sandbox_dir = root / '.sandbox'
+    sandbox_dir.mkdir(mode=0o700, exist_ok=True)
+    config_path = sandbox_dir / (label + '.config.json')
+    audit_path = sandbox_dir / (label + '.audit.json')
+    config = {
+        'root': str(root), 'executable': str(executable),
+        'argv': [str(executable), *args], 'env': dict(env),
+        'cwd': str(root), 'uid': os.getuid(), 'gid': os.getgid(),
+        'audit_path': str(audit_path),
+    }
+    fd = os.open(config_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+        json.dump(config, stream, sort_keys=True)
+        stream.write('\n')
+    return [sys.executable, '-I', '-S', str(LINUX_SANDBOX),
+            '--launch', str(config_path)]
+
+
+def create_write_probe(root, label, host_share):
+    """Create a harmless marker outside the writable run root for denial checks."""
+    if host_share:
+        selected = None
+        for line in Path('/proc/self/mountinfo').read_text().splitlines():
+            fields = line.split()
+            try:
+                separator = fields.index('-')
+                mountpoint = fields[4].replace('\\040', ' ').replace('\\011', '\t')
+                filesystem = fields[separator + 1]
+            except (ValueError, IndexError):
+                continue
+            if filesystem == 'virtiofs' and 'rw' in fields[5].split(','):
+                if selected is None or len(mountpoint) > len(selected):
+                    selected = mountpoint
+        require(selected is not None, 'Linux sandbox requires a writable virtiofs probe mount')
+        parent = Path(selected)
+    else:
+        parent = Path('/var/tmp')
+        require(not parent.is_symlink() and parent.is_dir(),
+                'Linux sandbox requires guest-local /var/tmp')
+    selected_mount = None
+    for line in Path('/proc/self/mountinfo').read_text().splitlines():
+        fields = line.split()
+        try:
+            separator = fields.index('-')
+            mountpoint = fields[4].replace('\\040', ' ').replace('\\011', '\t')
+            filesystem = fields[separator + 1]
+            options = fields[5].split(',')
+        except (ValueError, IndexError):
+            continue
+        if (parent.as_posix() == mountpoint or
+                parent.as_posix().startswith(mountpoint.rstrip('/') + '/')):
+            candidate = (len(mountpoint), mountpoint, filesystem, options)
+            if selected_mount is None or candidate[0] > selected_mount[0]:
+                selected_mount = candidate
+    require(selected_mount is not None and 'rw' in selected_mount[3],
+            'write probe parent must have a writable covering mount')
+    if host_share:
+        require(selected_mount[2] == 'virtiofs',
+                'host-share write probe must be on a writable virtiofs mount')
+    else:
+        require(selected_mount[2] in GUEST_LOCAL_FILESYSTEMS,
+                'Landlock write probe must be on allowlisted guest-local storage')
+    name = '.symeraseme-' + Path(root).name + '-' + label + ('-host' if host_share else '-landlock')
+    path = parent / name
+    payload = ('symeraseme disposable write-denial probe ' + name + '\n').encode()
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    return {'path': str(path), 'size': len(payload),
+            'sha256': hashlib.sha256(payload).hexdigest(), 'host_share': host_share,
+            'mountpoint': selected_mount[1], 'filesystem': selected_mount[2]}
+
+
+def verify_write_probe(probe):
+    path = Path(probe['path'])
+    payload = path.read_bytes()
+    require(len(payload) == probe['size']
+            and hashlib.sha256(payload).hexdigest() == probe['sha256'],
+            'outside-run-root write probe changed')
+    return identity(path)
+
+
+def remove_write_probe(probe):
+    after = verify_write_probe(probe)
+    path = Path(probe['path'])
+    path.unlink()
+    require(not path.exists(), 'owned outside-run-root probe was not removed')
+    return {'after': after, 'removed': True}
 
 
 PROBE = '''import errno,json,os,socket,subprocess,sys
@@ -135,6 +278,21 @@ try:
  with socket.socket() as sock: sock.connect(('127.0.0.1',9))
 except OSError as exc: result['network_denied']=exc.errno in (errno.EPERM,errno.EACCES)
 else: result['network_denied']=False
+try:
+ with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sock:
+  sock.sendto(b'probe',('198.51.100.1',9))
+except OSError as exc:
+ result['udp_network_denied']=exc.errno in (errno.EPERM,errno.EACCES,errno.ENETUNREACH,errno.EHOSTUNREACH)
+else: result['udp_network_denied']=False
+try:
+ with open(sys.argv[3],'r+b'): pass
+except OSError as exc: result['outside_write_denied']=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
+else: result['outside_write_denied']=False
+for key,path in zip(('host_share_write_denied','guest_local_write_denied'),sys.argv[4:6]):
+ try:
+  with open(path,'r+b'): pass
+ except OSError as exc: result[key]=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
+ else: result[key]=False
 try: subprocess.run(['/usr/bin/true'],check=True)
 except PermissionError: result['child_exec_denied']=True
 else: result['child_exec_denied']=False
@@ -144,10 +302,20 @@ sys.exit(0 if all(result.values()) else 1)
 
 
 def run(go, rust, go_tool, root):
-    require(sys.platform == 'darwin', 'unsupported: this gate requires macOS sandbox-exec')
+    require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
+            'unsupported: switchback confinement is available on macOS and Linux')
+    if sys.platform.startswith('linux'):
+        require(os.getuid() != 0 and os.getgid() != 0,
+                'Linux sandbox runner must start as an unprivileged user')
+        require(platform.machine().lower() in ('aarch64', 'arm64'),
+                'Linux disposable switchback requires native aarch64')
+    root = Path(root)
+    require(not root.is_symlink(), 'switchback run root must not be a symlink')
     root = root.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
-    report = {'scope': 'macos-plain-store-runtime-only', 'status': 'failed',
+    scope = ('linux-aarch64-plain-store-disposable-runtime-only'
+             if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
+    report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
               'required_cases': list(CASES), 'steps': [], 'schema_sequence': [],
               'database_restore_performed': False, 'publication_verified': False,
@@ -162,6 +330,8 @@ def run(go, rust, go_tool, root):
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
         report['fixture'] = identity(fixture)
         report['runner'] = identity(Path(__file__))
+        if sys.platform.startswith('linux'):
+            report['sandbox_helper'] = identity(LINUX_SANDBOX)
         shutil.copyfile(Path(__file__), root / 'producer.py')
         shutil.copyfile(fixture, database)  # The only database copy into the active path.
         env = {'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
@@ -173,15 +343,37 @@ def run(go, rust, go_tool, root):
                'SYMERASEME_DATA_DIR': str(database.parent), 'SYMERASEME_DB_DIR': str(database.parent),
                'SYMERASEME_ENCRYPT_DB': 'false'}
         report['environment'] = env
-        command(root, 'go-build-info', [str(go_tool), 'version', '-m', str(go)], env)
+        go_for_info, go_tool_for_info = go, go_tool
+        if sys.platform == 'darwin' or sys.platform.startswith('linux'):
+            go_for_info = root / 'bin/go-candidate'
+            shutil.copyfile(go, go_for_info)
+            go_for_info.chmod(0o700)
+        if sys.platform.startswith('linux'):
+            go_tool_for_info = root / 'bin/go-tool'
+            shutil.copyfile(go_tool, go_tool_for_info)
+            go_tool_for_info.chmod(0o700)
+        go_info_env = dict(env)
+        if sys.platform.startswith('linux'):
+            # A trimmed Go tool binary still reads its GOROOT at runtime.
+            # The helper grants this one explicit tree read-only.
+            go_info_env['GOROOT'] = str(Path(go_tool).resolve().parent.parent)
+        elif sys.platform == 'darwin':
+            # Hosted Go binaries are trimmed too; scope its runtime read to GOROOT.
+            go_info_env['GOROOT'] = str(go_tool.parent.parent)
+        command(root, 'go-build-info',
+                sandbox_command(root, 'go-build-info', go_tool_for_info,
+                                ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
         metadata = (root / 'go-build-info.stdout').read_text()
         require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
-        arch = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
+        arch = {'arm64': 'arm64', 'aarch64': 'arm64',
+                'x86_64': 'amd64'}[platform.machine().lower()]
+        goos = 'darwin' if sys.platform == 'darwin' else 'linux'
         settings = {line.strip() for line in metadata.splitlines()}
-        require({'build\tCGO_ENABLED=0', 'build\tGOOS=darwin', 'build\tGOARCH=' + arch} <= settings,
+        require({'build\tCGO_ENABLED=0', 'build\tGOOS=' + goos, 'build\tGOARCH=' + arch} <= settings,
                 'Go artifact must be CGO-free and native')
         try:
-            command(root, 'wrapper-negative', ['/usr/bin/false'], env)
+            command(root, 'wrapper-negative',
+                    sandbox_command(root, 'wrapper-negative', '/usr/bin/false', [], env), env)
         except ValueError:
             failed = json.loads((root / 'wrapper-negative.json').read_bytes())
             require(failed['exit_code'] == 1 and failed['timed_out'] is False, 'invalid wrapper control')
@@ -191,15 +383,49 @@ def run(go, rust, go_tool, root):
         python = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
         python = (python if python.is_file() else Path(sys.executable)).resolve()
         negative_policy = sandbox(root, python)
-        negative_policy += '\n(allow file-read* (subpath ' + json.dumps(str(Path(sys.base_prefix).resolve())) + '))'
+        if sys.platform == 'darwin':
+            negative_policy += '\n(allow file-read* (subpath ' + json.dumps(str(Path(sys.base_prefix).resolve())) + '))'
         save(root / 'sandbox-negative-policy.json', negative_policy)
-        # Harmless existing repository files only; never probe credential contents.
-        command(root, 'sandbox-negative', ['/usr/bin/sandbox-exec', '-p', negative_policy,
-                str(python), '-I', '-S', '-c', PROBE, str(REPO / 'Cargo.toml'), str(Path.home().resolve())], env)
-        controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
-        require(set(controls) == {'read_denied_0', 'home_directory_read_denied', 'network_denied', 'child_exec_denied'}
-                and all(value is True for value in controls.values()), 'sandbox control failed')
+        # Harmless checked-in paths only; never probe credential contents.
+        probe_args = [str(REPO / 'Cargo.toml'), str(Path.home().resolve()),
+                      str(REPO / 'Cargo.toml')]
+        expected_controls = {'read_denied_0', 'home_directory_read_denied',
+                             'network_denied', 'udp_network_denied',
+                             'outside_write_denied', 'child_exec_denied'}
+        host_write_probe = guest_write_probe = None
+        try:
+            if sys.platform.startswith('linux'):
+                host_write_probe = create_write_probe(root, 'plain', host_share=True)
+                guest_write_probe = create_write_probe(root, 'plain', host_share=False)
+                probe_args.extend((host_write_probe['path'], guest_write_probe['path']))
+                expected_controls.update(('host_share_write_denied', 'guest_local_write_denied'))
+            command(root, 'sandbox-negative',
+                    sandbox_command(root, 'sandbox-negative', python,
+                                    ['-I', '-S', '-c', PROBE, *probe_args], env), env)
+            controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
+            require(set(controls) == expected_controls
+                    and all(value is True for value in controls.values()), 'sandbox control failed')
+        finally:
+            if sys.platform.startswith('linux'):
+                report['outside_write_probes'] = {}
+                if host_write_probe is not None:
+                    report['outside_write_probes']['host_share'] = {
+                        **host_write_probe, **remove_write_probe(host_write_probe)}
+                if guest_write_probe is not None:
+                    report['outside_write_probes']['guest_local'] = {
+                        **guest_write_probe, **remove_write_probe(guest_write_probe)}
         report['sandbox_controls'] = controls
+        if sys.platform.startswith('linux'):
+            audit = json.loads((root / '.sandbox/sandbox-negative.audit.json').read_bytes())
+            required = ('mnt', 'net', 'pid')
+            require(audit['status'] == 'running' and audit['landlock_abi'] >= 4
+                    and audit['no_new_privs'] is True and audit['uid'] == os.getuid()
+                    and audit['gid'] == os.getgid()
+                    and all(audit['caller_namespace_ids'][name] !=
+                            audit['sandbox_namespace_ids'][name] for name in required)
+                    and audit['read_only_virtiofs_mounts'],
+                    'Linux namespace or filesystem boundary was not enforced')
+            report['sandbox_isolation'] = audit
         policy = sandbox(root, active)
         save(root / 'sandbox-policy.json', policy)
         missing_profile = root / 'home/absent-profile.enc'
@@ -215,7 +441,8 @@ def run(go, rust, go_tool, root):
                 os.replace(stage, active)
             step['installed'] = identity(active)
             try:
-                step['command'] = command(root, label, ['/usr/bin/sandbox-exec', '-p', policy, str(active), *args], env)
+                step['command'] = command(root, label,
+                                          sandbox_command(root, label, active, args, env), env)
             finally:
                 record = root / (label + '.json')
                 if record.exists():

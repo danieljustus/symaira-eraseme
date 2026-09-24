@@ -1,0 +1,442 @@
+{
+  "schema": "symeraseme.go-oracle.cli-triage.v1",
+  "generator_sha256": "79f408b8229241cbb3e7d87da6bb0fe187a2567be8b163573f5d8c1197e65490",
+  "fake_agent_sha256": "b09f3dcab7603e9e67639f1ba78ff408cbe6595b4114b3a912d7eceba445e20d",
+  "sources": [
+    {
+      "path": "cmd/symeraseme/extra_commands.go",
+      "sha256": "b329243eef1438feaa340c835a9abe0c1c7b782c9a1fe3d6435cc664ef79b51a"
+    },
+    {
+      "path": "internal/mcp/contract_handler.go",
+      "sha256": "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"
+    },
+    {
+      "path": "internal/replies/service.go",
+      "sha256": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281"
+    },
+    {
+      "path": "internal/replies/repository.go",
+      "sha256": "725369fd4a9527004870ab757cbfbb95b6d61e02015ff6debd7e3685cc753e7f"
+    },
+    {
+      "path": "internal/triage/classifier.go",
+      "sha256": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97"
+    },
+    {
+      "path": "internal/triage/rebuttal.go",
+      "sha256": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+    },
+    {
+      "path": "internal/llm/agent.go",
+      "sha256": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8"
+    },
+    {
+      "path": "internal/eventstore/store.go",
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    }
+  ],
+  "cases": [
+    {
+      "id": "classify-reply-json",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "generate-rebuttal-text",
+      "argv": [
+        "generate-rebuttal",
+        "1",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 0,
+      "stdout_base64": "c3VjY2Vzcwo=",
+      "stderr_base64": "",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "REBUTTAL_SENT",
+            "source": "system",
+            "payload_json": "{\"broker_message_snippet\":\"Your current address does not match our records.\",\"confidence\":0.91,\"llm_used\":true,\"rejection_classification\":\"address_mismatch\",\"template_name\":\"gdpr-rebuttal-address.md.j2\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-save-false-env-provider",
+      "argv": [
+        "classify-reply",
+        "--request-id=0x1",
+        "--save=false",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "rebuttal-save-false-env-provider",
+      "argv": [
+        "generate-rebuttal",
+        "--request-id",
+        "1",
+        "--save=false"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 0,
+      "stdout_base64": "c3VjY2Vzcwo=",
+      "stderr_base64": "",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-positional-overrides-request-id-flag",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--request-id",
+        "999",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-hex",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "0x1",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-negative",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "-1",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bm8gdW5jbGFzc2lmaWVkIGluYm94IHJlcGx5IGZvdW5kIGZvciByZXF1ZXN0ICMtMQo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-request-id-flag-underscore",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "0x_1",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoiZGVsZXRpb24gY29uZmlybWVkIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "deletion confirmed",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"deletion confirmed\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-request-id-flag-underscore-decimal",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "1_0",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bm8gdW5jbGFzc2lmaWVkIGluYm94IHJlcGx5IGZvdW5kIGZvciByZXF1ZXN0ICMxMAo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-request-id-flag-double-underscore-error",
+      "argv": [
+        "classify-reply",
+        "--request-id",
+        "1__0",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBhcmd1bWVudCAiMV9fMCIgZm9yICItLXJlcXVlc3QtaWQiIGZsYWc6IHN0cmNvbnYuUGFyc2VJbnQ6IHBhcnNpbmcgIjFfXzAiOiBpbnZhbGlkIHN5bnRheAo=",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-missing-reply-error",
+      "argv": [
+        "classify-reply",
+        "999",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "ignored-by-flag"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "bm8gdW5jbGFzc2lmaWVkIGluYm94IHJlcGx5IGZvdW5kIGZvciByZXF1ZXN0ICM5OTkK",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-invalid-provider-error",
+      "argv": [
+        "classify-reply",
+        "1"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "not-a-provider"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5rbm93biBMTE0gcHJvdmlkZXIgIm5vdC1hLXByb3ZpZGVyIi4gS25vd24gcHJvdmlkZXJzOiBhZ2VudCwgYW50aHJvcGljLCBvbGxhbWEsIG9wZW5haSwgb3BlbmFpLWNvbXBhdGlibGUK",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-invalid-request-id-flag-error",
+      "argv": [
+        "classify-reply",
+        "--request-id=bad",
+        "--provider",
+        "agent",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBhcmd1bWVudCAiYmFkIiBmb3IgIi0tcmVxdWVzdC1pZCIgZmxhZzogc3RyY29udi5QYXJzZUludDogcGFyc2luZyAiYmFkIjogaW52YWxpZCBzeW50YXgK",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
+    {
+      "id": "classify-model-env-default",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_MODEL": "oracle-env-model",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoibW9kZWwgc2VsZWN0ZWQgZnJvbSBlbnZpcm9ubWVudCIsImV4dHJhY3RlZF9maWVsZHMiOnsidGlja2V0IjoiVC00MiJ9LCJuZWVkc19odW1hbl9yZXZpZXciOmZhbHNlfQo=",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "model selected from environment",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"model selected from environment\"}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "classify-model-flag-overrides-env",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--provider",
+        "agent",
+        "--model",
+        "oracle-flag-model",
+        "--output",
+        "json"
+      ],
+      "environment": {
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_MODEL": "oracle-env-model",
+        "SYMERASEME_LLM_PROVIDER": "not-a-provider"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJjbGFzc2lmaWNhdGlvbiI6ImNvbmZpcm1lZCIsImV2ZW50X3R5cGUiOiJDT05GSVJNRUQiLCJjb25maWRlbmNlIjowLjkzLCJzdW1tYXJ5IjoibW9kZWwgc2VsZWN0ZWQgZnJvbSBmbGFnIiwiZXh0cmFjdGVkX2ZpZWxkcyI6eyJ0aWNrZXQiOiJULTQyIn0sIm5lZWRzX2h1bWFuX3JldmlldyI6ZmFsc2V9Cg==",
+      "stderr_base64": "",
+      "state": {
+        "classification": "confirmed",
+        "confidence": 0.93,
+        "summary": "model selected from flag",
+        "events": [
+          {
+            "request_id": 1,
+            "event_type": "CONFIRMED",
+            "source": "system",
+            "payload_json": "{\"classification\":\"confirmed\",\"confidence\":0.93,\"extracted_fields\":{\"ticket\":\"T-42\"},\"reply_id\":1,\"summary\":\"model selected from flag\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

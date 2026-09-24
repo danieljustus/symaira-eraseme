@@ -39,7 +39,7 @@ struct JSONRPCRequest: Codable {
 /// The inner payload spread across CliResult.to_json().
 /// Keys are spread at top level — we capture them dynamically.
 struct MCPCallResult: Codable {
-    let success: Bool
+    let success: Bool?
     let message: String?
     let error: String?
 
@@ -53,7 +53,7 @@ struct MCPCallResult: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         // Decode known fields
-        success = try container.decodeIfPresent(Bool.self, forKey: DynamicKey(stringValue: "success")) ?? false
+        success = try container.decodeIfPresent(Bool.self, forKey: DynamicKey(stringValue: "success"))
         message = try container.decodeIfPresent(String.self, forKey: DynamicKey(stringValue: "message"))
         error = try container.decodeIfPresent(String.self, forKey: DynamicKey(stringValue: "error"))
         // Capture everything as raw

@@ -251,7 +251,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -263,6 +263,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.6'
+
+      - name: Download Go oracle modules
+        run: go mod download
 
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -288,11 +291,22 @@ jobs:
           cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
           cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+      - name: Verify registry build at 1024 descriptors
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          test ! -e "$RUNNER_TEMP/registry-fd-target"
+          (
+            ulimit -n 1024
+            CARGO_TARGET_DIR="$RUNNER_TEMP/registry-fd-target" CARGO_BUILD_JOBS=2 \
+              cargo +"$RUST_TOOLCHAIN" check -p symeraseme-core --locked
+          )
+
       - name: Test and doctest
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked
+            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked --no-fail-fast
             cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --doc --all-features --locked
           else
             cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked

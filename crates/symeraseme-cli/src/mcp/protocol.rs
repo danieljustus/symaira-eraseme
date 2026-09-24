@@ -600,147 +600,201 @@ fn flush_pending_surrogate(output: &mut String, pending_high: &mut Option<u16>) 
     }
 }
 
-pub(crate) fn skip_json_value(raw: &[u8], mut index: usize) -> Option<usize> {
-    if raw.get(index) == Some(&b'"') {
-        return skip_json_string(raw, index);
-    }
-    match raw.get(index) {
-        Some(b'{') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b'}') {
-                return Some(index + 1);
-            }
-            loop {
-                let key_end = skip_json_string(raw, index)?;
-                index = key_end;
-                skip_whitespace(raw, &mut index);
-                if raw.get(index) != Some(&b':') {
-                    return None;
-                }
-                index += 1;
-                skip_whitespace(raw, &mut index);
-                index = skip_json_value(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
-                    Some(b',') => {
-                        index += 1;
-                        skip_whitespace(raw, &mut index);
-                    }
-                    Some(b'}') => return Some(index + 1),
-                    _ => return None,
-                }
-            }
-        }
-        Some(b'[') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b']') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_value(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
-                    Some(b',') => {
-                        index += 1;
-                        skip_whitespace(raw, &mut index);
-                    }
-                    Some(b']') => return Some(index + 1),
-                    _ => return None,
-                }
-            }
-        }
-        _ => {}
-    }
-    let start = index;
-    while raw
-        .get(index)
-        .is_some_and(|byte| !is_json_whitespace(*byte) && !matches!(byte, b',' | b'}' | b']'))
-    {
-        index += 1;
-    }
-    let token = &raw[start..index];
-    (is_json_primitive(token)).then_some(index)
+const GO_MAX_JSON_NESTING_DEPTH: usize = 10_000;
+
+#[derive(Clone, Copy)]
+enum JsonFrame {
+    Object(ObjectState),
+    Array(ArrayState),
 }
 
-fn skip_json_value_with_finite_numbers(raw: &[u8], mut index: usize) -> Option<usize> {
-    if raw.get(index) == Some(&b'"') {
-        return skip_json_string(raw, index);
-    }
-    match raw.get(index) {
-        Some(b'{') => {
-            index += 1;
+#[derive(Clone, Copy)]
+enum ObjectState {
+    FirstKeyOrEnd,
+    KeyAfterComma,
+    AfterValue,
+}
+
+#[derive(Clone, Copy)]
+enum ArrayState {
+    FirstValueOrEnd,
+    ValueAfterComma,
+    AfterValue,
+}
+
+/// Scans one value without recursion. Go's `encoding/json` accepts nesting up
+/// to 10,000 composite values, so keeping an explicit stack also avoids Rust
+/// stack overflow on valid Go-sized inputs.
+pub(crate) fn scan_json_value(
+    raw: &[u8],
+    mut index: usize,
+    finite_numbers_only: bool,
+) -> Result<Option<usize>, u8> {
+    let mut frames = Vec::new();
+    let mut needs_value = true;
+    loop {
+        if needs_value {
             skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b'}') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_string(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                if raw.get(index) != Some(&b':') {
-                    return None;
+            match raw.get(index) {
+                Some(b'{') => {
+                    if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
+                        return Err(b'{');
+                    }
+                    frames.push(JsonFrame::Object(ObjectState::FirstKeyOrEnd));
+                    index += 1;
+                    needs_value = false;
+                    continue;
                 }
-                index += 1;
-                skip_whitespace(raw, &mut index);
-                index = skip_json_value_with_finite_numbers(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
-                    Some(b',') => {
-                        index += 1;
-                        skip_whitespace(raw, &mut index);
-                        if raw.get(index) == Some(&b'}') {
-                            return None;
+                Some(b'[') => {
+                    if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
+                        return Err(b'[');
+                    }
+                    frames.push(JsonFrame::Array(ArrayState::FirstValueOrEnd));
+                    index += 1;
+                    needs_value = false;
+                    continue;
+                }
+                Some(b'"') => {
+                    let Some(end) = skip_json_string(raw, index) else {
+                        return Ok(None);
+                    };
+                    index = end;
+                }
+                Some(_) => {
+                    let start = index;
+                    let Some(end) = skip_json_primitive(raw, index) else {
+                        return Ok(None);
+                    };
+                    if finite_numbers_only {
+                        let token = &raw[start..end];
+                        if is_json_number(token)
+                            && std::str::from_utf8(token)
+                                .ok()
+                                .and_then(|text| text.parse::<f64>().ok())
+                                .is_none_or(|value| !value.is_finite())
+                        {
+                            return Ok(None);
                         }
                     }
-                    Some(b'}') => return Some(index + 1),
-                    _ => return None,
+                    index = end;
                 }
+                None => return Ok(None),
             }
+            needs_value = false;
         }
-        Some(b'[') => {
-            index += 1;
-            skip_whitespace(raw, &mut index);
-            if raw.get(index) == Some(&b']') {
-                return Some(index + 1);
-            }
-            loop {
-                index = skip_json_value_with_finite_numbers(raw, index)?;
-                skip_whitespace(raw, &mut index);
-                match raw.get(index) {
+
+        let Some(frame) = frames.last_mut() else {
+            return Ok(Some(index));
+        };
+        skip_whitespace(raw, &mut index);
+        match frame {
+            JsonFrame::Object(state) => match state {
+                ObjectState::FirstKeyOrEnd if raw.get(index) == Some(&b'}') => {
+                    frames.pop();
+                    index += 1;
+                }
+                ObjectState::FirstKeyOrEnd | ObjectState::KeyAfterComma => {
+                    let Some(key_end) = skip_json_string(raw, index) else {
+                        return Ok(None);
+                    };
+                    index = key_end;
+                    skip_whitespace(raw, &mut index);
+                    if raw.get(index) != Some(&b':') {
+                        return Ok(None);
+                    }
+                    index += 1;
+                    *state = ObjectState::AfterValue;
+                    needs_value = true;
+                }
+                ObjectState::AfterValue => match raw.get(index) {
                     Some(b',') => {
                         index += 1;
-                        skip_whitespace(raw, &mut index);
-                        if raw.get(index) == Some(&b']') {
-                            return None;
-                        }
+                        *state = ObjectState::KeyAfterComma;
                     }
-                    Some(b']') => return Some(index + 1),
-                    _ => return None,
+                    Some(b'}') => {
+                        frames.pop();
+                        index += 1;
+                    }
+                    _ => return Ok(None),
+                },
+            },
+            JsonFrame::Array(state) => match state {
+                ArrayState::FirstValueOrEnd if raw.get(index) == Some(&b']') => {
+                    frames.pop();
+                    index += 1;
                 }
-            }
+                ArrayState::FirstValueOrEnd | ArrayState::ValueAfterComma => {
+                    *state = ArrayState::AfterValue;
+                    needs_value = true;
+                }
+                ArrayState::AfterValue => match raw.get(index) {
+                    Some(b',') => {
+                        index += 1;
+                        *state = ArrayState::ValueAfterComma;
+                    }
+                    Some(b']') => {
+                        frames.pop();
+                        index += 1;
+                    }
+                    _ => return Ok(None),
+                },
+            },
         }
-        _ => {}
     }
-    let start = index;
-    while raw
-        .get(index)
-        .is_some_and(|byte| !is_json_whitespace(*byte) && !matches!(byte, b',' | b'}' | b']'))
-    {
+}
+
+pub(crate) fn skip_json_value(raw: &[u8], index: usize) -> Option<usize> {
+    scan_json_value(raw, index, false).ok().flatten()
+}
+
+fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
+    let tail = raw.get(index..)?;
+    for literal in [b"null".as_slice(), b"true", b"false"] {
+        if tail.starts_with(literal) {
+            return Some(index + literal.len());
+        }
+    }
+    if raw.get(index) == Some(&b'-') {
         index += 1;
     }
-    let token = &raw[start..index];
-    if is_json_number(token) {
-        let value = std::str::from_utf8(token).ok()?.parse::<f64>().ok()?;
-        if !value.is_finite() {
+    match raw.get(index)? {
+        b'0' => index += 1,
+        b'1'..=b'9' => {
+            index += 1;
+            while raw.get(index).is_some_and(u8::is_ascii_digit) {
+                index += 1;
+            }
+        }
+        _ => return None,
+    }
+    if raw.get(index) == Some(&b'.') {
+        index += 1;
+        let start = index;
+        while raw.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
             return None;
         }
     }
-    is_json_primitive(token).then_some(index)
+    if matches!(raw.get(index), Some(b'e' | b'E')) {
+        index += 1;
+        if matches!(raw.get(index), Some(b'+' | b'-')) {
+            index += 1;
+        }
+        let start = index;
+        while raw.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return None;
+        }
+    }
+    Some(index)
 }
 
-fn is_json_primitive(value: &[u8]) -> bool {
-    matches!(value, b"null" | b"true" | b"false") || is_json_number(value)
+fn skip_json_value_with_finite_numbers(raw: &[u8], index: usize) -> Option<usize> {
+    scan_json_value(raw, index, true).ok().flatten()
 }
 
 fn is_json_number(value: &[u8]) -> bool {
@@ -1057,5 +1111,199 @@ mod tests {
                 assert_eq!(actual, case.response, "{}", case.name);
             }
         }
+    }
+
+    /// Values that are not objects are framed only if the whole value is the
+    /// request; anything the byte scanner cannot consume or with trailing
+    /// garbage is a parse error.
+    #[test]
+    fn parse_request_rejects_values_it_cannot_frame() {
+        assert!(matches!(
+            initialize(b"truX", &no_backend_handler()),
+            InitializeOutcome::ParseError
+        ));
+        assert!(matches!(
+            initialize(b"12 34", &no_backend_handler()),
+            InitializeOutcome::ParseError
+        ));
+    }
+
+    /// Raw field classification: `null` is Go's absent value, a truncated
+    /// quoted token is an error, and params objects with trailing garbage or a
+    /// non-object shape classify as `Other` (which becomes -32602).
+    #[test]
+    fn raw_field_classification_handles_null_truncated_and_trailing_tokens() {
+        assert_eq!(super::classify_raw_string(b"null"), (None, false));
+        assert_eq!(super::classify_raw_string(b"\"abc"), (None, true));
+        assert_eq!(super::classify_raw_string(b"\"a\\qb\""), (None, true));
+        assert_eq!(
+            super::classify_raw_string(b"\"ok\""),
+            (Some("ok".to_owned()), false)
+        );
+
+        assert!(matches!(
+            super::classify_raw_params(b"null"),
+            super::ParamsState::Null
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"{}"),
+            super::ParamsState::Object
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"{}x"),
+            super::ParamsState::Other
+        ));
+        assert!(matches!(
+            super::classify_raw_params(b"[1]"),
+            super::ParamsState::Other
+        ));
+    }
+
+    /// The object-field walker only accepts objects; malformed member syntax
+    /// inside one is a parse error before any dispatch happens.
+    #[test]
+    fn object_field_scanning_rejects_non_objects_and_malformed_members() {
+        assert!(super::scan_object_fields(b"[1]").is_none());
+
+        for request in [
+            &br#"{"a" 1}"#[..],  // key not followed by a colon
+            br#"{"a":1 x}"#,     // garbage after a member value
+            br#"{"a\u00zz":1}"#, // \u escape without four hex digits
+            b"{\"abc",           // truncated key string
+        ] {
+            assert!(
+                matches!(
+                    initialize(request, &no_backend_handler()),
+                    InitializeOutcome::ParseError
+                ),
+                "expected a parse error for {:?}",
+                String::from_utf8_lossy(request)
+            );
+        }
+    }
+
+    /// A lone low surrogate in the id decodes to Go's replacement character
+    /// instead of failing the request.
+    #[test]
+    fn id_decoding_renders_lone_surrogates_as_replacement_characters() {
+        let outcome = initialize(
+            br#"{"jsonrpc":"2.0","method":"initialize","id":"\udc00"}"#,
+            &no_backend_handler(),
+        );
+        let InitializeOutcome::Response(bytes) = outcome else {
+            panic!("a lone surrogate id is still a valid request");
+        };
+        let text = String::from_utf8(bytes).expect("response is UTF-8");
+        assert!(text.contains('\u{fffd}'), "{text}");
+    }
+
+    /// The catalogue dispatch hands frames the shared deserializer rejects
+    /// (serde's 128-frame recursion limit vs the scanner's 10 000) straight
+    /// back as parse errors for every catalogue method.
+    #[test]
+    fn dispatch_fails_frames_the_catalogue_deserializer_rejects() {
+        let handler = no_backend_handler();
+        let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
+
+        let tools_list = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{{"deep":{deep}}}}}"#
+        );
+        assert!(matches!(
+            initialize(tools_list.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+
+        let tools_call = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"redact_file","arguments":{{"deep":{deep}}}}}}}"#
+        );
+        assert!(matches!(
+            initialize(tools_call.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+
+        let legacy = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"redact_file","params":{{"deep":{deep}}}}}"#
+        );
+        assert!(matches!(
+            initialize(legacy.as_bytes(), &handler),
+            InitializeOutcome::ParseError
+        ));
+    }
+
+    /// Go drops `tools/call` notifications before any rejection — and its
+    /// field matcher accepts `ID` where serde does not, so the dispatch sees
+    /// an id while the catalogue validation sees a notification.
+    #[test]
+    fn tools_call_notifications_are_dropped_before_dispatch() {
+        let handler = no_backend_handler();
+
+        let no_id =
+            br#"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"redact_file","arguments":{}}}"#;
+        assert!(matches!(
+            initialize(no_id, &handler),
+            InitializeOutcome::Notification
+        ));
+
+        let upper_id = br#"{"jsonrpc":"2.0","ID":7,"method":"tools/call","params":{"name":"redact_file","arguments":{}}}"#;
+        assert!(matches!(
+            initialize(upper_id, &handler),
+            InitializeOutcome::Notification
+        ));
+    }
+
+    /// The iterative scanner enforces Go's 10,000-value nesting limit from
+    /// both sides and reports the exact byte position where framing stopped.
+    #[test]
+    fn scanner_enforces_go_depth_limit_and_reports_unframeable_positions() {
+        // Objects only frame in value position, so the chain repeats the
+        // `{"a":` opener until the 10,001st would exceed the limit; arrays
+        // walk the same needs-value path from the second element on.
+        let deep_object = "{\"a\":".repeat(10_001);
+        assert!(matches!(
+            super::scan_json_value(deep_object.as_bytes(), 0, false),
+            Err(b'{')
+        ));
+        assert!(matches!(
+            super::scan_json_value(&b"[".repeat(10_001), 0, false),
+            Err(b'[')
+        ));
+        let boundary = format!("{}1{}", "{\"a\":".repeat(10_000), "}".repeat(10_000));
+        assert!(
+            matches!(
+                super::scan_json_value(boundary.as_bytes(), 0, false),
+                Ok(Some(_))
+            ),
+            "exactly 10000 nested objects must still frame"
+        );
+
+        assert_eq!(super::scan_json_value(b"[", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(br#"{"a" 1}"#, 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(br#"{"a":1 2}"#, 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"[1 2]", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"1.", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"1e", 0, false), Ok(None));
+    }
+
+    /// The JSON-number validator rejects truncated fractions and exponents as
+    /// well as non-UTF-8 input.
+    #[test]
+    fn json_number_validator_rejects_truncated_forms_and_non_utf8() {
+        assert!(!super::is_json_number(b"1."));
+        assert!(!super::is_json_number(b"1e"));
+        assert!(!super::is_json_number(b"\xff\xfe"));
+        assert!(!super::is_json_number(b"01"));
+        assert!(super::is_json_number(b"-2.5e10"));
+        assert!(super::is_json_number(b"0"));
+    }
+
+    /// Go's float rendering: plain decimals pass through, e-notation outside
+    /// -6..=20 stays, and signed mantissas split at the decimal point.
+    #[test]
+    fn float_text_expands_decimal_and_signed_mantissas() {
+        assert_eq!(super::go_float_text("-1.2345e1"), "-12.345");
+        assert_eq!(super::go_float_text("123.45"), "123.45");
+        assert_eq!(super::go_float_text("1.5e-7"), "1.5e-7");
+        assert_eq!(super::go_float_text("2.0e3"), "2000");
+        assert_eq!(super::go_float_text("1.0"), "1");
     }
 }

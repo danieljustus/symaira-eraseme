@@ -117,6 +117,20 @@ pub(crate) fn round1(value: f64) -> f64 {
     }
 }
 
+/// Go's `encoding/json` writes integral `float64` values without a decimal
+/// point. Reporting maps use integer JSON numbers for those wire values.
+fn go_json_number(value: f64) -> Value {
+    if value.is_finite()
+        && value.fract() == 0.0
+        && value >= i64::MIN as f64
+        && value < i64::MAX as f64
+    {
+        json!(value as i64)
+    } else {
+        json!(value)
+    }
+}
+
 fn load_campaigns(store: &Store, id: &str, all: bool) -> rusqlite::Result<Vec<CampaignRow>> {
     let mut query = String::from("SELECT id, created_at, kind, notes FROM campaigns");
     if !id.is_empty() && !all {
@@ -427,7 +441,7 @@ fn response_times(rows: &[RequestRow]) -> Vec<f64> {
 
 fn round1_or_null(value: Option<f64>) -> Value {
     match value {
-        Some(number) => json!(round1(number)),
+        Some(number) => go_json_number(round1(number)),
         None => Value::Null,
     }
 }
@@ -536,8 +550,8 @@ fn aggregate_campaign(
         "confirmed": count_of(&counts, "CONFIRMED"),
         "rejected": count_of(&counts, "REJECTED_FINAL"),
         "overdue": count_of(&counts, "OVERDUE"),
-        "confirmation_rate": confirmation_rate(&counts, total),
-        "rejection_rate": rejection_rate(&counts, total),
+        "confirmation_rate": go_json_number(confirmation_rate(&counts, total)),
+        "rejection_rate": go_json_number(rejection_rate(&counts, total)),
         "avg_response_time_days": round1_or_null(average),
         "total_reminders_sent": reminders,
         "requests": request_values,
@@ -644,7 +658,7 @@ fn broker_leaderboard_value(requests: &[RequestRow]) -> Vec<Value> {
                 "rejected": stat.rejected,
                 "overdue": stat.overdue,
                 "pending": stat.pending,
-                "success_rate": round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0),
+                "success_rate": go_json_number(round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0)),
                 "avg_response_time_days": round1_or_null(average),
             })
         })
@@ -727,7 +741,7 @@ fn jurisdiction_breakdown(requests: &[RequestRow]) -> Vec<Value> {
                 "confirmed": stat.confirmed,
                 "rejected": stat.rejected,
                 "overdue": stat.overdue,
-                "confirmation_rate": round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0),
+                "confirmation_rate": go_json_number(round1(stat.confirmed as f64 / stat.total.max(1) as f64 * 100.0)),
             })
         })
         .collect()
@@ -770,7 +784,7 @@ fn historical_comparison(aggregates: &[Value]) -> Value {
     let previous = &aggregates[1];
     let number = |value: &Value, key: &str| value.get(key).and_then(Value::as_f64);
     let change = |key: &str| match (number(latest, key), number(previous, key)) {
-        (Some(a), Some(b)) => json!(round1(a - b)),
+        (Some(a), Some(b)) => go_json_number(round1(a - b)),
         _ => Value::Null,
     };
     json!({
@@ -802,19 +816,19 @@ fn success_metrics(requests: &[RequestRow]) -> Value {
     let (mut average, mut median) = (Value::Null, Value::Null);
     if !times.is_empty() {
         times.sort_by(|left, right| left.partial_cmp(right).expect("no NaN durations"));
-        average = json!(round1(times.iter().sum::<f64>() / times.len() as f64));
+        average = go_json_number(round1(times.iter().sum::<f64>() / times.len() as f64));
         median = if times.len() % 2 == 1 {
-            json!(times[times.len() / 2])
+            go_json_number(times[times.len() / 2])
         } else {
-            json!((times[times.len() / 2 - 1] + times[times.len() / 2]) / 2.0)
+            go_json_number((times[times.len() / 2 - 1] + times[times.len() / 2]) / 2.0)
         };
     }
     let total = requests.len() as f64;
     json!({
         "total_requests": requests.len() as i64,
-        "overall_confirmation_rate": round1(confirmed as f64 / total * 100.0),
-        "overall_rejection_rate": round1(rejected as f64 / total * 100.0),
-        "overdue_rate": round1(overdue as f64 / total * 100.0),
+        "overall_confirmation_rate": go_json_number(round1(confirmed as f64 / total * 100.0)),
+        "overall_rejection_rate": go_json_number(round1(rejected as f64 / total * 100.0)),
+        "overdue_rate": go_json_number(round1(overdue as f64 / total * 100.0)),
         "avg_response_time_days": average,
         "median_response_time_days": median,
     })
@@ -988,7 +1002,7 @@ pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result
 /// `SetEscapeHTML(false)` behavior. `to_string_pretty` indents with two
 /// spaces and appends no trailing newline, matching Go's trimmed encoder.
 fn export_json(data: &Value) -> Result<String, String> {
-    serde_json::to_string_pretty(data).map_err(|error| error.to_string())
+    serde_json::to_string_pretty(&go_map_order(data.clone())).map_err(|error| error.to_string())
 }
 
 /// Go's `ExportCSV`: CRLF rows, the fixed twelve-column header, one row per
@@ -1082,10 +1096,126 @@ fn export_csv(data: &Value) -> String {
 
 /// Go's `ExportHTML`: the report template over the report data.
 fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
+    // Keep caller text untouched; Go and MiniJinja retain different template
+    // blank lines when there are no campaigns, one campaign, or repeated
+    // campaigns, so normalize only those template-generated boundaries below.
+    let mut template_data = data.clone();
+    let campaign_count = template_data
+        .get("campaigns")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    // Go's report template passes the timeline event-count map to a helper
+    // that only joins slices, so its Details column is empty for these maps.
+    // MiniJinja joins mapping values; replace only this template input with an
+    // empty slice to preserve the actual Go output without changing report data.
+    if let Some(Value::Array(timeline)) = template_data.get_mut("timeline") {
+        for entry in timeline {
+            if let Value::Object(fields) = entry
+                && matches!(fields.get("events"), Some(Value::Object(_)))
+            {
+                fields.insert("events".to_owned(), Value::Array(Vec::new()));
+            }
+        }
+    }
+    encode_data_newlines(&mut template_data);
     let context = RenderContext {
-        data: data.clone(),
+        data: template_data,
         now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
         ..RenderContext::default()
     };
-    render("report.html.j2", &context).map_err(|error| error.to_string())
+    let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
+    let html = if campaign_count == 0 {
+        compact_template_blank_lines(&html)
+    } else if campaign_count == 1 {
+        html.replace("\n\n\n  <h2>Campaign:", "\n\n  <h2>Campaign:")
+    } else if campaign_count > 1 {
+        html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:")
+            .replace("</p>\n  <h2>Campaign:", "</p>\n\n  <h2>Campaign:")
+    } else {
+        html
+    };
+    Ok(decode_data_newlines(&html))
+}
+
+fn compact_template_blank_lines(html: &str) -> String {
+    let mut compact = String::with_capacity(html.len());
+    let mut line_breaks = 0;
+    for character in html.chars() {
+        if character == '\n' {
+            line_breaks += 1;
+            if line_breaks <= 2 {
+                compact.push(character);
+            }
+        } else {
+            line_breaks = 0;
+            compact.push(character);
+        }
+    }
+    compact
+}
+
+const NEWLINE_MARKER: char = '\u{e001}';
+const ESCAPE_MARKER: char = '\u{e000}';
+
+fn encode_data_newlines(value: &mut Value) {
+    match value {
+        Value::String(text) => {
+            let mut encoded = String::with_capacity(text.len());
+            for character in text.chars() {
+                match character {
+                    '\n' => encoded.push(NEWLINE_MARKER),
+                    ESCAPE_MARKER => {
+                        encoded.push(ESCAPE_MARKER);
+                        encoded.push('0');
+                    }
+                    NEWLINE_MARKER => {
+                        encoded.push(ESCAPE_MARKER);
+                        encoded.push('1');
+                    }
+                    other => encoded.push(other),
+                }
+            }
+            *text = encoded;
+        }
+        Value::Array(values) => values.iter_mut().for_each(encode_data_newlines),
+        Value::Object(values) => values.values_mut().for_each(encode_data_newlines),
+        _ => {}
+    }
+}
+
+fn decode_data_newlines(text: &str) -> String {
+    let mut decoded = String::with_capacity(text.len());
+    let mut characters = text.chars();
+    while let Some(character) = characters.next() {
+        match character {
+            NEWLINE_MARKER => decoded.push('\n'),
+            ESCAPE_MARKER => match characters.next() {
+                Some('0') => decoded.push(ESCAPE_MARKER),
+                Some('1') => decoded.push(NEWLINE_MARKER),
+                Some(other) => {
+                    decoded.push(ESCAPE_MARKER);
+                    decoded.push(other);
+                }
+                None => decoded.push(ESCAPE_MARKER),
+            },
+            other => decoded.push(other),
+        }
+    }
+    decoded
+}
+
+#[cfg(test)]
+mod report_html_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn html_report_preserves_multiline_dynamic_fields() {
+        let data = json!({"campaigns": [{"campaign_id": "first\n\n\nlast\u{e000}\u{e001}"}]});
+        let now = DateTime::parse_from_rfc3339("2026-01-02T03:04:00Z")
+            .unwrap()
+            .to_utc();
+        let html = export_html(&data, now).expect("render report");
+        assert!(html.contains("Campaign: first\n\n\nlast\u{e000}\u{e001}"));
+    }
 }

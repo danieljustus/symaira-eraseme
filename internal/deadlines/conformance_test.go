@@ -294,3 +294,22 @@ func TestApplyTickActionsWritesEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestPositiveTickActionJSONWire(t *testing.T) {
+	action := Action{
+		RequestID: 7, BrokerID: "broker-a", CampaignID: "c",
+		CurrentStatus: "OVERDUE", ActionType: "draft_dpa_complaint",
+		EventType: "DPA_COMPLAINT_DRAFTED", Description: "Act <now>",
+		Payload: map[string]any{"z": 2, "a": 1}, DryRun: true,
+	}
+	got, err := json.Marshal(map[string]any{
+		"actions": []Action{action}, "dry_run": true, "success": true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"actions":[{"RequestID":7,"BrokerID":"broker-a","CampaignID":"c","CurrentStatus":"OVERDUE","ActionType":"draft_dpa_complaint","EventType":"DPA_COMPLAINT_DRAFTED","Description":"Act \u003cnow\u003e","Payload":{"a":1,"z":2},"DryRun":true}],"dry_run":true,"success":true}`
+	if string(got) != want {
+		t.Fatalf("Go tick JSON changed:\ngot:  %s\nwant: %s", got, want)
+	}
+}

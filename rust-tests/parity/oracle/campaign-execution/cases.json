@@ -1,0 +1,8 @@
+{
+  "campaign_id": "dom002-oracle",
+  "broker_id": "adventori-eu",
+  "broker_name": "ADventori SAS",
+  "endpoint": "https://www.adventori.com/en/gdpr/",
+  "email_broker_id": "oracle-email",
+  "email_endpoint": "privacy@example.invalid"
+}

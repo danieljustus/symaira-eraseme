@@ -124,6 +124,35 @@ func TestWorkspacePathConfinement(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRootOpenFailuresUseOpaqueReadError(t *testing.T) {
+	parent := t.TempDir()
+	missing := filepath.Join(parent, "missing-root")
+	regularFile := filepath.Join(parent, "root-file")
+	if err := os.WriteFile(regularFile, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, root := range []string{missing, regularFile} {
+		t.Run(filepath.Base(root), func(t *testing.T) {
+			_, err := ReadWorkspaceFile("inside.txt", root)
+			if err == nil || err.Error() != "workspace file read failed" {
+				t.Fatalf("read error = %v, want opaque workspace read failure", err)
+			}
+		})
+	}
+}
+
+func TestWorkspaceReadErrorHidesInvalidInputCause(t *testing.T) {
+	cause := &os.PathError{Op: "open", Path: "fixture", Err: os.ErrInvalid}
+	wrapped := opaqueWorkspaceError(cause)
+	if wrapped.Error() != "workspace file read failed" {
+		t.Fatalf("error = %q, want opaque workspace read failure", wrapped.Error())
+	}
+	if !errors.Is(wrapped, os.ErrInvalid) {
+		t.Fatal("opaque error lost its InvalidInput cause")
+	}
+}
+
 func TestWorkspacePathRejectsSymlinkEscape(t *testing.T) {
 	root := t.TempDir()
 	outside := filepath.Join(filepath.Dir(root), "symlink-target.txt")

@@ -1,4 +1,4 @@
-name: Rust SQLite target proof
+name: Rust native target proof
 
 on:
   push:
@@ -25,7 +25,7 @@ env:
 
 jobs:
   sqlite-native:
-    name: SQLite smoke / ${{ matrix.name }}
+    name: SQLite and release binary / ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -69,3 +69,16 @@ jobs:
       - name: Run production SQLite portability smoke
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-core --test storage_portability --target "${{ matrix.target }}" --locked
+
+      - name: Build and run native release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" build --release -p symeraseme-cli --bin symeraseme-rust --target "${{ matrix.target }}" --locked
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            binary="target/${{ matrix.target }}/release/symeraseme-rust.exe"
+          else
+            binary="target/${{ matrix.target }}/release/symeraseme-rust"
+          fi
+          test -f "$binary"
+          test "$("$binary" --version)" = "symeraseme version 0.13.0"

@@ -20,13 +20,21 @@ SWIFT_BIN_PATH="$(swift build --show-bin-path "$@")"
 PROJECT_ROOT="$(cd ../.. && pwd)"
 GO_VERSION_VALUE="${VERSION:-dev}"
 GO_BINARY="$SWIFT_BIN_PATH/symeraseme"
-echo "Building the self-contained Go MCP server..."
-(
-    cd "$PROJECT_ROOT"
-    CGO_ENABLED=0 go build -trimpath \
-        -ldflags "-s -w -X main.versionValue=$GO_VERSION_VALUE" \
-        -o "$GO_BINARY" ./cmd/symeraseme
-)
+if [ -n "${SYMERASEME_RUST_TEST_BINARY:-}" ]; then
+    if [ ! -x "$SYMERASEME_RUST_TEST_BINARY" ]; then
+        echo "SYMERASEME_RUST_TEST_BINARY is not executable: $SYMERASEME_RUST_TEST_BINARY" >&2
+        exit 1
+    fi
+    echo "Skipping the Go server build for explicit Rust backend tests: $SYMERASEME_RUST_TEST_BINARY"
+else
+    echo "Building the self-contained Go MCP server..."
+    (
+        cd "$PROJECT_ROOT"
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X main.versionValue=$GO_VERSION_VALUE" \
+            -o "$GO_BINARY" ./cmd/symeraseme
+    )
+fi
 
 echo "Build successful!"
 echo "Run with: $SWIFT_BIN_PATH/SymairaEraseMe"

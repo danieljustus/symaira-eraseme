@@ -1,3 +1,6 @@
+#[path = "support/migration_oracle.rs"]
+mod migration_oracle;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -45,6 +48,8 @@ fn binary() -> PathBuf {
         .or_else(|| std::env::var_os("CARGO_BIN_EXE_symeraseme_rust"))
         .map(PathBuf::from)
         .expect("Cargo provides the CLI binary path")
+        .canonicalize()
+        .expect("Cargo CLI binary path resolves")
 }
 
 #[derive(Debug)]
@@ -80,15 +85,19 @@ fn substitute_oracle_root(argv: &[&str], home: &Path) -> Vec<String> {
 /// The byte-level inverse of the capture's normalization: fold the runtime
 /// root back to `<ORACLE_ROOT>` so outputs compare against the recorded bytes.
 fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
-    let needle = root.to_string_lossy().into_owned();
-    let needle = needle.as_bytes();
-    if needle.is_empty() {
+    let literal = root.to_string_lossy().into_owned();
+    if literal.is_empty() {
         return bytes.to_vec();
     }
+    let escaped = literal.replace('\\', "\\\\");
+    let needles = [escaped.as_bytes(), literal.as_bytes()];
     let mut folded = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index..].starts_with(needle) {
+        if let Some(needle) = needles
+            .iter()
+            .find(|needle| bytes[index..].starts_with(needle))
+        {
             folded.extend_from_slice(b"<ORACLE_ROOT>");
             index += needle.len();
         } else {
@@ -99,15 +108,33 @@ fn fold_root(bytes: &[u8], root: &Path) -> Vec<u8> {
     folded
 }
 
+#[test]
+fn fold_root_handles_json_escaped_windows_paths() {
+    let root = Path::new(r"C:\isolated\case");
+    assert_eq!(
+        fold_root(
+            br#"{"path":"C:\\isolated\\case\\data","other":"D:\\keep"} C:\isolated\case"#,
+            root,
+        ),
+        br#"{"path":"<ORACLE_ROOT>\\data","other":"D:\\keep"} <ORACLE_ROOT>"#
+    );
+}
+
 /// Fold only a known volatile path, in raw text and in a JSON-escaped string.
 fn fold_path(value: &str, path: &Path, placeholder: &str) -> String {
     let literal = path.to_string_lossy();
     if literal.is_empty() {
         return value.to_owned();
     }
-    value
+    let mut folded = value
         .replace(&literal.replace('\\', "\\\\"), placeholder)
-        .replace(literal.as_ref(), placeholder)
+        .replace(literal.as_ref(), placeholder);
+    if let Some(ordinary) = literal.strip_prefix(r"\\?\") {
+        folded = folded
+            .replace(&ordinary.replace('\\', "\\\\"), placeholder)
+            .replace(ordinary, placeholder);
+    }
+    folded
 }
 
 #[test]
@@ -123,6 +150,14 @@ fn fold_path_only_replaces_the_recorded_root() {
     );
     assert_eq!(
         fold_path(r"C:\isolated\case\data D:\keep", root, "<CASE>"),
+        r"<CASE>\data D:\keep"
+    );
+    assert_eq!(
+        fold_path(
+            r"C:\isolated\case\data D:\keep",
+            Path::new(r"\\?\C:\isolated\case"),
+            "<CASE>"
+        ),
         r"<CASE>\data D:\keep"
     );
 }
@@ -147,6 +182,41 @@ fn run_program_with_resources(
     index: usize,
     resources: Option<&Path>,
 ) -> ProcessOutput {
+    run_program_inner(program, argv, home, cwd, capture, index, resources, None)
+}
+
+fn run_program_with_data_dir(
+    program: &Path,
+    argv: &[&str],
+    home: &Path,
+    cwd: &Path,
+    capture: &Path,
+    index: usize,
+    data_dir: &Path,
+) -> ProcessOutput {
+    run_program_inner(
+        program,
+        argv,
+        home,
+        cwd,
+        capture,
+        index,
+        None,
+        Some(data_dir),
+    )
+}
+
+#[allow(clippy::too_many_arguments)] // Test helper keeps the independent process roots explicit.
+fn run_program_inner(
+    program: &Path,
+    argv: &[&str],
+    home: &Path,
+    cwd: &Path,
+    capture: &Path,
+    index: usize,
+    resources: Option<&Path>,
+    data_dir: Option<&Path>,
+) -> ProcessOutput {
     let stdout_path = capture.join(format!("{index}.stdout"));
     let stderr_path = capture.join(format!("{index}.stderr"));
     let stdout = fs::File::create(&stdout_path).expect("create stdout capture");
@@ -167,6 +237,9 @@ fn run_program_with_resources(
         .stderr(Stdio::from(stderr));
     if let Some(resources) = resources {
         command.env("SYMERASEME_RESOURCES", resources);
+    }
+    if let Some(data_dir) = data_dir {
+        command.env("SYMERASEME_DATA_DIR", data_dir);
     }
     if let Some(profile_path) = std::env::var_os("LLVM_PROFILE_FILE") {
         command.env("LLVM_PROFILE_FILE", profile_path);
@@ -459,6 +532,91 @@ fn directory_entries(directory: &Path, context: &str) -> Vec<String> {
         .collect()
 }
 
+fn build_go_cli(root: &Path) -> PathBuf {
+    let program = root.join(if cfg!(windows) {
+        "symeraseme-go.exe"
+    } else {
+        "symeraseme-go"
+    });
+    let built = Command::new("go")
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOPROXY", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .args(["build", "-o"])
+        .arg(&program)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build source-bound Go CLI");
+    assert!(
+        built.status.success(),
+        "Go CLI build failed: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    program
+}
+
+fn replace_json_integer(text: &str, key: &str) -> String {
+    let marker = format!("\"{key}\":");
+    let mut output = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(offset) = rest.find(&marker) {
+        let (prefix, value_and_rest) = rest.split_at(offset + marker.len());
+        let digits = value_and_rest
+            .bytes()
+            .take_while(u8::is_ascii_digit)
+            .count();
+        assert!(digits > 0, "{key} is an integer");
+        output.push_str(prefix);
+        output.push_str("<TIME>");
+        rest = &value_and_rest[digits..];
+    }
+    output.push_str(rest);
+    output
+}
+
+fn normalize_grant_bytes(bytes: &[u8], tokens: &[&str]) -> Vec<u8> {
+    let mut text = String::from_utf8(bytes.to_vec()).expect("grant output is UTF-8");
+    for (index, token) in tokens.iter().enumerate() {
+        if !token.is_empty() {
+            text = text.replace(token, &format!("<TOKEN_{index}>"));
+        }
+    }
+    replace_json_integer(&replace_json_integer(&text, "issued_at"), "expires_at").into_bytes()
+}
+
+fn consent_snapshot(directory: &Path) -> Vec<Vec<u8>> {
+    use sha2::{Digest, Sha256};
+
+    let mut snapshot = Vec::new();
+    for name in directory_entries(directory, "read consent directory") {
+        assert!(
+            name.starts_with("consent_") && name.ends_with(".json"),
+            "unexpected consent entry {name}"
+        );
+        let path = directory.join(name);
+        let bytes = fs::read(&path).expect("read consent record");
+        let record: Value = serde_json::from_slice(&bytes).expect("consent JSON");
+        let token = record["token"].as_str().expect("consent token");
+        let digest = Sha256::digest(token.as_bytes());
+        let expected_name = format!("consent_{}.json", hex_digest(&digest)[..16].to_owned());
+        assert_eq!(path.file_name().unwrap().to_string_lossy(), expected_name);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        let normalized = normalize_grant_bytes(&bytes, &[token]);
+        snapshot.push(normalized);
+    }
+    snapshot.sort();
+    snapshot
+}
+
 /// Applies the frozen rows both implementations read.
 fn seed_store(database: &Path) {
     let store = symeraseme_core::storage::Store::open(database).expect("open the seeded store");
@@ -599,7 +757,7 @@ fn is_exact_case(case: &Value) -> bool {
         "completion-fish",
         "completion-powershell",
     ];
-    const SURFACE_OPERATIONS: [&str; 16] = [
+    const SURFACE_OPERATIONS: [&str; 20] = [
         "operate-brokers-list",
         "operate-plan-status",
         "operate-plan-tick",
@@ -623,6 +781,12 @@ fn is_exact_case(case: &Value) -> bool {
         "operate-schedule-status",
         "operate-schedule-uninstall",
         "operate-version",
+        // `poll-inbox` is the real MCP handler over the production IMAP dialer;
+        // this recorded CLI case pins its surfaced connection error bytes.
+        "operate-poll-inbox",
+        "operate-poll-inbox-invalid-since",
+        "operate-classify-reply",
+        "operate-generate-rebuttal",
     ];
     // `registry list`/`validate` are replayed now that cli.rs implements them.
     // They carry the registry contract that `brokers list` cannot: no status
@@ -660,6 +824,7 @@ fn is_exact_case(case: &Value) -> bool {
         || PROFILE_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || PLAN_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
         || CONTRACT_TOOL_OPERATIONS.contains(&case["id"].as_str().unwrap_or(""))
+        || case["category"] == "migration"
 }
 
 #[test]
@@ -676,7 +841,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
 
     let behavior: Value = serde_json::from_str(BEHAVIOR).expect("behavior JSON");
     let cases = behavior["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 166);
+    assert_eq!(cases.len(), 175);
     let selected = cases
         .iter()
         .filter(|case| is_exact_case(case))
@@ -685,8 +850,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
         .iter()
         .filter(|case| !is_exact_case(case))
         .collect::<Vec<_>>();
-    assert_eq!(selected.len(), 163);
-    assert_eq!(deferred.len(), 3);
+    assert_eq!(selected.len(), 175);
+    assert_eq!(deferred.len(), 0);
 
     let root = unique_root();
     let home = root.join("home");
@@ -711,6 +876,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .map(|arg| arg.as_str().expect("string argv"))
             .collect::<Vec<_>>();
         let id = case["id"].as_str().unwrap_or("");
+        let migration_before =
+            (case["category"] == "migration").then(|| migration_oracle::prepare(case, &root));
         // The store-backed operations read the event store, so they run against
         // their own data directory: the shared isolated HOME has to stay empty
         // for the assertion below.
@@ -770,25 +937,29 @@ fn frozen_command_surface_matches_phase_two_contract() {
             "{id} status"
         );
         #[cfg(windows)]
-        let native_go = if id == "operate-migrate" || id.starts_with("operate-schedule") {
-            let go = run_program_with_resources(
-                &go_binary,
-                &argv,
-                &home,
-                &case_cwd,
-                &capture,
-                index + cases.len(),
-                None,
-            );
-            assert_eq!(
-                go.status.code(),
-                output.status.code(),
-                "{id} native Go exit"
-            );
-            Some(go)
-        } else {
-            None
-        };
+        let native_migration = id == "operate-migrate" || case["category"] == "migration";
+        #[cfg(windows)]
+        let native_go =
+            if native_migration || id == "operate-poll-inbox" || id.starts_with("operate-schedule")
+            {
+                let go = run_program_with_resources(
+                    &go_binary,
+                    &argv,
+                    &home,
+                    &case_cwd,
+                    &capture,
+                    index + cases.len(),
+                    None,
+                );
+                assert_eq!(
+                    go.status.code(),
+                    output.status.code(),
+                    "{id} native Go exit"
+                );
+                Some(go)
+            } else {
+                None
+            };
         let expected_stdout = match id {
             "root-version" => {
                 format!("symeraseme version {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
@@ -814,6 +985,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 .expect("native Go filepath.Join profile path")
             )
             .into_bytes(),
+            #[cfg(windows)]
+            _ if native_migration => {
+                native_go.as_ref().expect("native migrate oracle").stdout.clone()
+            }
             #[cfg(windows)]
             id if id.starts_with("operate-schedule") => fold_schedule_output(
                 &native_go.as_ref().expect("native schedule oracle").stdout,
@@ -847,14 +1022,11 @@ fn frozen_command_surface_matches_phase_two_contract() {
             };
         assert_eq!(
             fold_root(&actual_stdout, &root),
-            expected_stdout,
+            fold_root(&expected_stdout, &root),
             "{id} stdout"
         );
         #[cfg(windows)]
         let expected_stderr = if let Some(go) = &native_go {
-            if id == "operate-migrate" {
-                assert!(go.stdout.is_empty(), "native Go migrate stdout");
-            }
             fold_root(&go.stderr, &root)
         } else {
             decode_base64(case["stderr_base64"].as_str().unwrap())
@@ -866,6 +1038,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
             expected_stderr,
             "{id} stderr"
         );
+        if let Some(before) = migration_before {
+            migration_oracle::assert_unchanged(case, &root, &before);
+        }
     }
 
     for (offset, case) in deferred.iter().enumerate() {
@@ -889,9 +1064,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
     }
 
     let home_entries = directory_entries(&home, "read isolated home");
-    assert!(
-        home_entries.is_empty(),
-        "isolated home stayed clean: {home_entries:?}"
+    assert_eq!(
+        home_entries,
+        [".local"],
+        "only the Go-compatible default event-store directory was created"
     );
     let cwd_entries = directory_entries(&cwd, "read isolated cwd");
     assert!(
@@ -1058,6 +1234,79 @@ fn brokers_json_operations_match_source_bound_goldens() {
             "{id} stderr"
         );
     }
+}
+
+#[test]
+fn review_positional_and_path_aliases_match_the_live_go_cli() {
+    let root = unique_root();
+    let home = root.join("home");
+    let cwd = root.join("cwd");
+    let capture = root.join("capture");
+    fs::create_dir_all(&home).expect("isolated home");
+    fs::create_dir_all(&cwd).expect("isolated cwd");
+    fs::create_dir_all(&capture).expect("capture directory");
+    let _cleanup = Cleanup(root.clone());
+    let input = cwd.join("review.txt");
+    let original = b"Alice Example <alice@example.invalid>\n";
+    fs::write(&input, original).expect("review input");
+
+    let go_binary = root.join(if cfg!(windows) {
+        "symeraseme-go.exe"
+    } else {
+        "symeraseme-go"
+    });
+    let build = Command::new("go")
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .args(["build", "-o"])
+        .arg(&go_binary)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build live Go CLI");
+    assert!(
+        build.status.success(),
+        "Go CLI build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let cases: &[&[&str]] = &[
+        &["review"],
+        &["review", "--path", "review.txt", "--output", "json"],
+        &[
+            "review",
+            "review.txt",
+            "--path",
+            "missing.txt",
+            "--output",
+            "json",
+        ],
+        &["review", "missing.txt", "--path", "review.txt"],
+        &["review", "review.txt"],
+        &["--output", "json", "review", "review.txt"],
+        &["review", "--path", "missing.txt", "--output", "json"],
+        &["review", "review.txt", "--output", "yaml"],
+    ];
+    for (index, argv) in cases.iter().enumerate() {
+        let go =
+            run_program_with_resources(&go_binary, argv, &home, &cwd, &capture, index * 2, None);
+        let rust =
+            run_program_with_resources(&binary(), argv, &home, &cwd, &capture, index * 2 + 1, None);
+        assert_eq!(rust.status.code(), go.status.code(), "{argv:?} status");
+        assert_eq!(rust.stdout, go.stdout, "{argv:?} stdout");
+        assert_eq!(rust.stderr, go.stderr, "{argv:?} stderr");
+        if matches!(index, 1 | 2 | 4 | 5) {
+            assert!(go.status.success(), "{argv:?} did not exercise redaction");
+            assert!(
+                !go.stdout
+                    .windows(b"alice@example.invalid".len())
+                    .any(|window| { window == b"alice@example.invalid" }),
+                "{argv:?} exposed the input address"
+            );
+        }
+    }
+    assert_eq!(fs::read(input).expect("review input remains"), original);
 }
 
 #[test]
@@ -2202,16 +2451,20 @@ fn manual_tasks_list_matches_go_on_a_populated_store() {
 /// against an isolated HOME and `SYMERASEME_DATA_DIR`: the consent tokens are
 /// files under that data directory and never reach a keychain.
 #[test]
-fn events_and_grant_populated_paths_match_the_go_bodies() {
+fn events_and_grant_populated_paths_match_live_go() {
     let root = unique_root();
     let home = root.join("home");
     let cwd = root.join("cwd");
     let capture = root.join("capture");
     let data_dir = root.join("data");
+    let rust_grant_dir = root.join("rust-grant-data");
+    let go_grant_dir = root.join("go-grant-data");
     fs::create_dir_all(&home).expect("isolated home");
     fs::create_dir_all(&cwd).expect("isolated cwd");
     fs::create_dir_all(&capture).expect("capture directory");
     fs::create_dir_all(&data_dir).expect("isolated data directory");
+    fs::create_dir_all(&rust_grant_dir).expect("Rust grant data directory");
+    fs::create_dir_all(&go_grant_dir).expect("Go grant data directory");
     let _cleanup = Cleanup(root.clone());
     seed_store(&data_dir.join("symeraseme.db"));
 
@@ -2288,93 +2541,182 @@ fn events_and_grant_populated_paths_match_the_go_bodies() {
         "invalid request ID stderr"
     );
 
-    // `grant` without `--dry-run` issues a token into the data directory.
-    let issued = go(&["grant", "--output", "json"], 926);
-    assert_eq!(issued.status.code(), Some(0), "grant issue status");
-    let issued: Value = serde_json::from_slice(&issued.stdout).expect("grant issue payload");
-    assert_eq!(issued["success"], true);
-    let first = issued["token"].as_str().expect("issued token").to_owned();
-    assert!(!first.is_empty(), "grant issues a token value");
-    let consent = directory_entries(&data_dir, "read isolated data directory")
-        .into_iter()
-        .filter(|name| name.starts_with("consent_"))
-        .count();
-    assert_eq!(consent, 1, "the token is stored in the isolated data dir");
+    // Exercise the populated state machine in two independent data roots.
+    let go_binary = build_go_cli(&root);
+    let go_grant = |argv: &[&str], index: usize| {
+        run_program_with_data_dir(
+            &go_binary,
+            argv,
+            &home,
+            &cwd,
+            &capture,
+            index,
+            &go_grant_dir,
+        )
+    };
+    let rust_grant = |argv: &[&str], index: usize| {
+        run_program_with_data_dir(
+            &binary(),
+            argv,
+            &home,
+            &cwd,
+            &capture,
+            index,
+            &rust_grant_dir,
+        )
+    };
 
-    // The positional overrides `--command`, and `--ttl` reaches the record.
-    let second = go(
-        &["grant", "send-removal", "--ttl", "60", "--output", "json"],
-        927,
-    );
-    let second: Value = serde_json::from_slice(&second.stdout).expect("grant issue payload");
-    let second = second["token"].as_str().expect("issued token").to_owned();
-
-    // `--list` is Go's second name for `--list-tokens`, and Go marshals
-    // `[]ConsentToken` itself, so its struct field order survives.
-    let listed = go(&["grant", "--list", "--output", "json"], 928);
-    let body = String::from_utf8(listed.stdout.clone()).expect("UTF-8 listing");
-    assert!(
-        body.starts_with("{\"count\":2,\"success\":true,\"tokens\":["),
-        "{body}"
-    );
-    let listed: Value = serde_json::from_slice(&listed.stdout).expect("grant list payload");
-    let tokens = listed["tokens"].as_array().expect("tokens");
-    // Both tokens are issued in the same second, and Go sorts on issued-at
-    // alone, so only the membership is contractual here.
-    let mut commands = tokens
-        .iter()
-        .map(|token| token["command"].as_str().unwrap_or_default())
-        .collect::<Vec<_>>();
-    commands.sort_unstable();
-    assert_eq!(commands, ["execute", "send-removal"], "listed commands");
-    let short = tokens
-        .iter()
-        .find(|token| token["command"] == "send-removal")
-        .expect("the positional reached the record");
+    let go_issued = go_grant(&["grant", "--output", "json"], 926);
+    let rust_issued = rust_grant(&["grant", "--output", "json"], 927);
+    assert_eq!(go_issued.status.code(), rust_issued.status.code());
+    assert_eq!(go_issued.stderr, rust_issued.stderr);
+    let go_first: Value = serde_json::from_slice(&go_issued.stdout).expect("Go issue payload");
+    let rust_first: Value =
+        serde_json::from_slice(&rust_issued.stdout).expect("Rust issue payload");
+    let go_first_token = go_first["token"].as_str().unwrap().to_owned();
+    let rust_first_token = rust_first["token"].as_str().unwrap().to_owned();
+    assert_eq!(go_first["success"], rust_first["success"]);
     assert_eq!(
-        short["expires_at"].as_i64().expect("expires_at")
-            - short["issued_at"].as_i64().expect("issued_at"),
-        60,
-        "--ttl reaches the record"
+        normalize_grant_bytes(&go_issued.stdout, &[&go_first_token]),
+        normalize_grant_bytes(&rust_issued.stdout, &[&rust_first_token]),
+        "grant issue stable bytes"
     );
-    // Text mode never renders the listing.
     assert_eq!(
-        go(&["grant", "--list-tokens"], 929).stdout,
-        b"success\n",
-        "grant list text stdout"
+        consent_snapshot(&go_grant_dir),
+        consent_snapshot(&rust_grant_dir)
     );
 
-    // A single revoke reports one removal; an unknown token fails closed with
-    // Go's own wording rather than the identity package's.
+    // `--list` and `--list-tokens` are aliases. One token avoids unstable
+    // ordering when two issue times land in the same second.
+    let go_list = go_grant(&["grant", "--list", "--output", "json"], 928);
+    let rust_list = rust_grant(&["grant", "--list-tokens", "--output", "json"], 929);
+    assert_eq!(go_list.status.code(), rust_list.status.code());
+    assert_eq!(go_list.stderr, rust_list.stderr);
     assert_eq!(
-        go(&["grant", "--revoke", &first, "--output", "json"], 930).stdout,
-        b"{\"revoked\":1,\"success\":true}\n",
-        "grant revoke stdout"
+        normalize_grant_bytes(&go_list.stdout, &[&go_first_token]),
+        normalize_grant_bytes(&rust_list.stdout, &[&rust_first_token]),
+        "grant list alias stable bytes"
     );
-    let missing = go(&["grant", "--revoke", &first, "--output", "json"], 931);
-    assert_eq!(
-        missing.status.code(),
-        Some(1),
-        "grant revoke missing status"
+    let go_listed: Value = serde_json::from_slice(&go_list.stdout).expect("Go list payload");
+    let rust_listed: Value = serde_json::from_slice(&rust_list.stdout).expect("Rust list payload");
+    for listed in [&go_listed, &rust_listed] {
+        let record = &listed["tokens"][0];
+        assert_eq!(
+            record["expires_at"].as_i64().unwrap() - record["issued_at"].as_i64().unwrap(),
+            86_400
+        );
+    }
+
+    // The positional overrides --command and --ttl reaches the record.
+    let go_second = go_grant(
+        &[
+            "grant",
+            "--command",
+            "ignored",
+            "send-removal",
+            "--ttl",
+            "60",
+            "--output",
+            "json",
+        ],
+        930,
     );
-    assert_eq!(missing.stdout, b"", "grant revoke missing stdout");
+    let rust_second = rust_grant(
+        &[
+            "grant",
+            "--command",
+            "ignored",
+            "send-removal",
+            "--ttl",
+            "60",
+            "--output",
+            "json",
+        ],
+        931,
+    );
+    assert_eq!(go_second.status.code(), rust_second.status.code());
+    assert_eq!(go_second.stderr, rust_second.stderr);
+    let go_second_payload: Value =
+        serde_json::from_slice(&go_second.stdout).expect("Go issue payload");
+    let rust_second_payload: Value =
+        serde_json::from_slice(&rust_second.stdout).expect("Rust issue payload");
     assert_eq!(
-        missing.stderr, b"consent token not found\n",
-        "grant revoke missing stderr"
+        normalize_grant_bytes(
+            &go_second.stdout,
+            &[
+                go_first_token.as_str(),
+                go_second_payload["token"].as_str().unwrap()
+            ]
+        ),
+        normalize_grant_bytes(
+            &rust_second.stdout,
+            &[
+                rust_first_token.as_str(),
+                rust_second_payload["token"].as_str().unwrap()
+            ]
+        ),
+        "grant positional issue stable bytes"
+    );
+    let go_files = consent_snapshot(&go_grant_dir);
+    let rust_files = consent_snapshot(&rust_grant_dir);
+    assert_eq!(go_files, rust_files, "consent records after TTL issue");
+    for record in [&go_listed, &rust_listed] {
+        assert_eq!(record["count"], 1);
+    }
+    for directory in [&go_grant_dir, &rust_grant_dir] {
+        let payloads = directory_entries(directory, "read consent directory");
+        assert_eq!(payloads.len(), 2, "two consent records were persisted");
+        let ttl_payload = payloads
+            .iter()
+            .map(|name| fs::read(directory.join(name)).unwrap())
+            .map(|bytes| serde_json::from_slice::<Value>(&bytes).unwrap())
+            .find(|record| record["command"] == "send-removal")
+            .expect("positional command reached the consent record");
+        assert_eq!(
+            ttl_payload["expires_at"].as_i64().unwrap()
+                - ttl_payload["issued_at"].as_i64().unwrap(),
+            60,
+            "--ttl reaches the record"
+        );
+    }
+
+    let go_revoke = go_grant(
+        &["grant", "--revoke", &go_first_token, "--output", "json"],
+        932,
+    );
+    let rust_revoke = rust_grant(
+        &["grant", "--revoke", &rust_first_token, "--output", "json"],
+        933,
+    );
+    assert_eq!(go_revoke.status.code(), rust_revoke.status.code());
+    assert_eq!(go_revoke.stdout, rust_revoke.stdout);
+    assert_eq!(go_revoke.stderr, rust_revoke.stderr);
+    assert_eq!(
+        consent_snapshot(&go_grant_dir),
+        consent_snapshot(&rust_grant_dir)
     );
 
-    // `--revoke-all` clears the rest, and the empty listing is Go's nil slice.
+    let go_revoke_all = go_grant(&["grant", "--revoke-all", "--output", "json"], 934);
+    let rust_revoke_all = rust_grant(&["grant", "--revoke-all", "--output", "json"], 935);
+    assert_eq!(go_revoke_all.status.code(), rust_revoke_all.status.code());
+    assert_eq!(go_revoke_all.stdout, rust_revoke_all.stdout);
+    assert_eq!(go_revoke_all.stderr, rust_revoke_all.stderr);
     assert_eq!(
-        go(&["grant", "--revoke-all", "--output", "json"], 932).stdout,
-        b"{\"revoke_all\":true,\"revoked\":1,\"success\":true}\n",
-        "grant revoke-all stdout"
+        go_revoke_all.stdout,
+        b"{\"revoke_all\":true,\"revoked\":1,\"success\":true}\n"
     );
+    assert!(consent_snapshot(&go_grant_dir).is_empty());
+    assert!(consent_snapshot(&rust_grant_dir).is_empty());
+
+    let go_empty = go_grant(&["grant", "--list-tokens", "--output", "json"], 936);
+    let rust_empty = rust_grant(&["grant", "--list", "--output", "json"], 937);
+    assert_eq!(go_empty.status.code(), rust_empty.status.code());
+    assert_eq!(go_empty.stdout, rust_empty.stdout);
+    assert_eq!(go_empty.stderr, rust_empty.stderr);
     assert_eq!(
-        go(&["grant", "--list-tokens", "--output", "json"], 933).stdout,
-        b"{\"count\":0,\"success\":true,\"tokens\":null}\n",
-        "grant empty list stdout"
+        go_empty.stdout,
+        b"{\"count\":0,\"success\":true,\"tokens\":null}\n"
     );
-    assert!(!second.is_empty(), "the second token was issued");
 
     let home_entries = directory_entries(&home, "read isolated home");
     assert!(

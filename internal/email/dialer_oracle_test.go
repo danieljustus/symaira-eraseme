@@ -157,6 +157,11 @@ func dialerCases(t *testing.T) []dialerCase {
 		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",
 	}, []string{"select:Missing"}, "byte")
 
+	run("select_unicode_folder_uses_modified_utf7", "plain", standard, dialerConfigWire{
+		Username: "testuser", Password: "testpass", TimeoutSeconds: 5, AllowInsecureAuth: true,
+		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",
+	}, []string{"select:Ärger & Archiv"}, "byte")
+
 	run("search_then_empty_result", "plain", nil, dialerConfigWire{
 		Username: "testuser", Password: "testpass", TimeoutSeconds: 5, AllowInsecureAuth: true,
 		RequireUserOnServer: "testuser", RequirePassOnServer: "testpass",

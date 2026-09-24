@@ -12,9 +12,12 @@
 use std::fs;
 
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use symeraseme_core::reporting::{
-    ReportOpts, get_calendar, get_campaign_status, get_dashboard_data, get_report_data,
+    ReportOpts, generate_report, get_calendar, get_campaign_status, get_dashboard_data,
+    get_report_data,
 };
 use symeraseme_core::storage::store::Store;
 use tempfile::tempdir;
@@ -23,6 +26,42 @@ const GOLDEN_REPORTING_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting.json"
 );
+const GO_REPORTING_SOURCE: &[u8] = include_bytes!("../../../internal/reporting/reporting.go");
+const GO_BYTES_ORACLE_TEST: &[u8] =
+    include_bytes!("../../../internal/reporting/reporting_json_oracle_test.go");
+const GO_REPORTING_EXPORT_TEST: &[u8] =
+    include_bytes!("../../../internal/reporting/reporting_export_oracle_test.go");
+const GO_REPORT_TEMPLATE: &[u8] =
+    include_bytes!("../../../internal/templating/templates/report.html.gotmpl");
+const GO_TEMPLATING_SOURCE: &[u8] = include_bytes!("../../../internal/templating/templating.go");
+const GO_REPORTING_BYTES_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/event-store/golden-reporting-bytes.json"
+);
+const GO_REPORTING_EXPORTS_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/event-store/golden-reporting-exports.json"
+);
+
+#[derive(Deserialize)]
+struct GoReportingBytes {
+    source_sha256: String,
+    report: String,
+    dashboard: String,
+    campaign_status: String,
+    calendar: String,
+}
+
+#[derive(Deserialize)]
+struct GoReportingExports {
+    reporting_source_sha256: String,
+    template_source_sha256: String,
+    templating_source_sha256: String,
+    json: String,
+    html: String,
+    html_single_campaign: String,
+    html_empty_campaign: String,
+}
 
 /// The seed used by Go's `fixtureStore`, copied statement for statement.
 const SEED: [&str; 4] = [
@@ -50,9 +89,210 @@ fn pinned_now() -> DateTime<Utc> {
         .with_timezone(&Utc)
 }
 
-/// Normalises a value the way the Go test does before comparing.
+/// Canonicalises integral floats the way Go's encoding/json does before the
+/// Python-authored semantic golden is compared.
 fn normalise(value: &Value) -> String {
-    serde_json::to_string(value).expect("value serialises")
+    serde_json::to_string(&normalise_go_numbers(value)).expect("value serialises")
+}
+
+fn normalise_go_numbers(value: &Value) -> Value {
+    match value {
+        Value::Number(number) if number.is_f64() => {
+            let float = number.as_f64().expect("finite JSON float");
+            if float.fract() == 0.0 && float >= i64::MIN as f64 && float < i64::MAX as f64 {
+                serde_json::json!(float as i64)
+            } else {
+                value.clone()
+            }
+        }
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, nested)| (key.clone(), normalise_go_numbers(nested)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(normalise_go_numbers).collect()),
+        _ => value.clone(),
+    }
+}
+
+fn assert_go_json_bytes(label: &str, rust_value: &Value, go_bytes: &str) {
+    let rust_bytes = serde_json::to_vec(rust_value).expect("value serialises");
+    assert_eq!(
+        rust_bytes,
+        go_bytes.as_bytes(),
+        "{label} JSON bytes differ from Go\nRust: {}\nGo:   {go_bytes}",
+        String::from_utf8_lossy(&rust_bytes),
+    );
+}
+
+#[test]
+fn reporting_surfaces_match_go_encoding_json_bytes() {
+    let fixture: GoReportingBytes = serde_json::from_str(
+        &fs::read_to_string(GO_REPORTING_BYTES_PATH).expect("Go byte fixture readable"),
+    )
+    .expect("Go byte fixture parses");
+    assert_eq!(
+        fixture.source_sha256,
+        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        "Go reporting implementation changed; regenerate and review byte fixture"
+    );
+    assert_eq!(
+        hex::encode(Sha256::digest(GO_BYTES_ORACLE_TEST)),
+        "1cf4d3929a39d5ddc11f0e1f081af4ee6bf724813ed8190cffcd8f7719e87871",
+        "Go reporting byte generator changed; review and repin it"
+    );
+    let (_tree, store) = fixture_store();
+    let now = pinned_now();
+    let report = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("report data");
+    let dashboard = get_dashboard_data(&store, "", now).expect("dashboard data");
+    let campaign_status = get_campaign_status(&store, "", now).expect("campaign status");
+    let calendar = get_calendar(&store, "", 4, now).expect("calendar");
+
+    for (label, value, go_bytes) in [
+        ("report", &report, fixture.report.as_str()),
+        ("dashboard", &dashboard, fixture.dashboard.as_str()),
+        (
+            "campaign_status",
+            &campaign_status,
+            fixture.campaign_status.as_str(),
+        ),
+        ("calendar", &calendar, fixture.calendar.as_str()),
+    ] {
+        assert_go_json_bytes(label, value, go_bytes);
+    }
+}
+
+#[test]
+fn generated_report_exports_match_go() {
+    let fixture: GoReportingExports = serde_json::from_str(
+        &fs::read_to_string(GO_REPORTING_EXPORTS_PATH).expect("Go export fixture readable"),
+    )
+    .expect("Go export fixture parses");
+    assert_eq!(
+        fixture.reporting_source_sha256,
+        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        "Go reporting implementation changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        fixture.template_source_sha256,
+        hex::encode(Sha256::digest(GO_REPORT_TEMPLATE)),
+        "Go report template changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        fixture.templating_source_sha256,
+        hex::encode(Sha256::digest(GO_TEMPLATING_SOURCE)),
+        "Go templating helpers changed; regenerate and review export fixture"
+    );
+    assert_eq!(
+        hex::encode(Sha256::digest(GO_REPORTING_EXPORT_TEST)),
+        "f4a94713c8bb36ce0cb905a7dbbe2dd25675a676285ba2481c25a51c396a10a7",
+        "Go export oracle changed; review and repin it"
+    );
+
+    let (_tree, store) = fixture_store();
+    let now = pinned_now();
+    let mut report = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("report data");
+    report["success_rate"] = serde_json::json!(42);
+    report["caller_integral"] = serde_json::json!(7);
+    assert_eq!(report["success_rate"], 42);
+    assert_eq!(report["caller_integral"], 7);
+    let assert_output = |label: &str, rust: String, go: &str| {
+        if rust != go {
+            let offset = rust
+                .bytes()
+                .zip(go.bytes())
+                .position(|(left, right)| left != right)
+                .unwrap_or(rust.len().min(go.len()));
+            let mut start = offset.saturating_sub(80);
+            let mut end_rust = rust.len().min(offset.saturating_add(120));
+            let mut end_go = go.len().min(offset.saturating_add(120));
+            while start > 0 && (!rust.is_char_boundary(start) || !go.is_char_boundary(start)) {
+                start -= 1;
+            }
+            while end_rust < rust.len() && !rust.is_char_boundary(end_rust) {
+                end_rust += 1;
+            }
+            while end_go < go.len() && !go.is_char_boundary(end_go) {
+                end_go += 1;
+            }
+            panic!(
+                "{label} export differs at byte {offset} (Rust {} bytes, Go {} bytes)\nRust: {:?}\nGo:   {:?}",
+                rust.len(),
+                go.len(),
+                &rust[start..end_rust],
+                &go[start..end_go],
+            );
+        }
+    };
+    assert_output(
+        "JSON",
+        generate_report(&report, "json", now).expect("report JSON export"),
+        &fixture.json,
+    );
+    assert_output(
+        "HTML",
+        generate_report(&report, "html", now).expect("report HTML export"),
+        &fixture.html,
+    );
+
+    let single_campaign = get_report_data(
+        &store,
+        &ReportOpts {
+            campaign_id: "new".to_owned(),
+            all_campaigns: false,
+        },
+        now,
+    )
+    .expect("single campaign report data");
+    assert_output(
+        "single campaign HTML",
+        generate_report(&single_campaign, "html", now).expect("single campaign HTML export"),
+        &fixture.html_single_campaign,
+    );
+
+    let (_empty_tree, empty_store) = fixture_store();
+    empty_store
+        .connection()
+        .execute_batch(
+            "DELETE FROM request_events WHERE request_id=3;
+             DELETE FROM request_state WHERE request_id=3;
+             DELETE FROM removal_requests WHERE id=3;
+             DELETE FROM campaigns WHERE id='old';
+             INSERT INTO campaigns(id,created_at,kind,notes)
+             VALUES ('empty','2026-08-03T08:00:00+00:00','initial','empty');",
+        )
+        .expect("seed empty-campaign report");
+    let empty_campaign_report = get_report_data(
+        &empty_store,
+        &ReportOpts {
+            campaign_id: String::new(),
+            all_campaigns: true,
+        },
+        now,
+    )
+    .expect("empty-campaign report data");
+    assert_output(
+        "two campaigns with one empty HTML",
+        generate_report(&empty_campaign_report, "html", now).expect("empty-campaign HTML export"),
+        &fixture.html_empty_campaign,
+    );
 }
 
 #[test]
@@ -110,7 +350,7 @@ fn golden_reporting_anchor_values() {
     assert_eq!(report["total_requests"], 3);
     let metrics = &report["success_metrics"];
     assert_eq!(metrics["overall_confirmation_rate"], 33.3);
-    assert_eq!(metrics["median_response_time_days"], 2.0);
+    assert_eq!(metrics["median_response_time_days"].as_f64(), Some(2.0));
     assert_eq!(report["broker_leaderboard"][0]["broker_id"], "broker-a");
     assert_eq!(report["broker_leaderboard"][0]["total"], 2);
     assert_eq!(report["jurisdiction_stats"][0]["jurisdiction"], "GDPR");

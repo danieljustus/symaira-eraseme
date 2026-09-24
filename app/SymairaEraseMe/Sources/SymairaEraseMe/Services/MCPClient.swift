@@ -228,7 +228,7 @@ actor MCPClient {
         }
 
         // Check success field
-        if !callResult.success {
+        if callResult.success == false {
             let errMsg = callResult.error ?? callResult.message ?? "Unknown error"
             throw MCPClientError.toolCallFailed(errMsg)
         }

@@ -44,7 +44,7 @@ func id005ErrorClass(err error) string {
 		return "closed_file"
 	case errors.Is(err, os.ErrNotExist):
 		return "not_found"
-	case errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
+	case errors.Is(err, os.ErrPermission), errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
 		return "permission_denied"
 	case errors.Is(err, syscall.ENOTDIR):
 		return "not_a_directory"
@@ -97,7 +97,7 @@ func TestConsentID005Capture(t *testing.T) {
 		mkdir()
 		must(os.Chmod(dir, 0500))
 		_, err = IssueTokenInDir(dir, "delete", 60)
-	case "replacement", "replacement_symlink", "rename_failure", "temp_failure", "write_failure", "close_failure", "chmod_failure":
+	case "replacement", "replacement_symlink", "rename_failure", "temp_failure", "write_failure", "close_failure", "chmod_failure", "chmod_failure_existing_temp":
 		mkdir()
 		must(os.WriteFile(filepath.Join(dir, ".consent-sentinel.tmp"), []byte("unrelated sentinel"), 0600))
 		if name == "rename_failure" {

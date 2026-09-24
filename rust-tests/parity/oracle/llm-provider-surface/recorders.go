@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -23,6 +25,34 @@ var managedEnv = []string{
 	"ANTHROPIC_API_KEY",
 	"OPENAI_API_KEY",
 	"OLLAMA_HOST",
+}
+
+type hostAgentProtocol struct {
+	Program string          `json:"program"`
+	Cases   []hostAgentCase `json:"cases"`
+}
+
+type hostAgentCase struct {
+	ID                string          `json:"id"`
+	Mode              string          `json:"mode"`
+	Model             string          `json:"model"`
+	SystemPrompt      string          `json:"system_prompt"`
+	UserPrompt        string          `json:"user_prompt"`
+	TimeoutMillis     int             `json:"timeout_millis"`
+	TestTimeoutMillis int             `json:"test_timeout_millis"`
+	Stderr            string          `json:"stderr,omitempty"`
+	ExitCode          int             `json:"exit_code,omitempty"`
+	Result            hostAgentResult `json:"result"`
+}
+
+type hostAgentResult struct {
+	Text        string            `json:"text"`
+	UsageModel  string            `json:"usage_model"`
+	Error       *string           `json:"error,omitempty"`
+	ErrorType   string            `json:"error_type,omitempty"`
+	Arguments   []string          `json:"arguments"`
+	Environment map[string]string `json:"environment"`
+	StdinEOF    bool              `json:"stdin_eof"`
 }
 
 func recordUsageRecords() []usageCase {
@@ -355,25 +385,186 @@ func recordRetryCases() []retryCase {
 	return out
 }
 
-// recordBoundaries captures what the public API shows for the llmkit-backed
-// construction path, so the port's boundary carries measured evidence.
-func recordBoundaries() []boundary {
-	clearManagedEnv()
-	if err := os.Setenv("PATH", ""); err != nil {
-		panic(err)
+// recordHostAgentProtocol measures AgentClient.Classify against a local fake
+// Claude CLI. The subprocess environment is cleared before each scenario, and
+// the fake never reaches a provider or network.
+func recordHostAgentProtocol() hostAgentProtocol {
+	program := `#!/bin/sh
+printf '%s\0' "$@" > "$AGENT_CAPTURE_DIR/arguments"
+printf '%s\0' "$TERM" "$AGENT_SENTINEL" > "$AGENT_CAPTURE_DIR/environment"
+if IFS= read -r ignored; then printf 'input' > "$AGENT_CAPTURE_DIR/stdin"; else printf 'eof' > "$AGENT_CAPTURE_DIR/stdin"; fi
+case "$AGENT_SCENARIO" in
+success)
+  printf ' \tanswer from fake agent \n'
+  printf 'ignored success stderr\n' >&2
+  ;;
+exit)
+  printf '%s' "$AGENT_STDERR" >&2
+  exit "$AGENT_EXIT_CODE"
+  ;;
+timeout)
+  exec /bin/sleep 300
+  ;;
+esac
+`
+	requests := []hostAgentCase{
+		{
+			ID:           "success-claude-arguments-and-environment",
+			Mode:         "success",
+			Model:        "test-model",
+			SystemPrompt: " system prompt ",
+			UserPrompt:   "user prompt\nwith newline",
+		},
+		{
+			ID:           "exit-code-trims-and-truncates-stderr",
+			Mode:         "exit",
+			Model:        "test-model",
+			SystemPrompt: "system",
+			UserPrompt:   "exit",
+			Stderr:       "  " + strings.Repeat("e", 510) + " \t\n",
+			ExitCode:     23,
+		},
+		{
+			ID:                "host-agent-subprocess-timeout",
+			Mode:              "timeout",
+			Model:             "test-model",
+			SystemPrompt:      "system",
+			UserPrompt:        "timeout",
+			TimeoutMillis:     120000,
+			TestTimeoutMillis: 80,
+		},
 	}
-	_, err := llm.Create(llm.CreateOptions{})
+
+	savedEnvironment := os.Environ()
+	defer restoreEnvironment(savedEnvironment)
+
+	for i := range requests {
+		request := &requests[i]
+		root, err := os.MkdirTemp("", "llm-host-agent-oracle-")
+		if err != nil {
+			panic(err)
+		}
+		requestRoot := root
+		defer os.RemoveAll(requestRoot)
+		bin := filepath.Join(root, "bin")
+		capture := filepath.Join(root, "capture")
+		home := filepath.Join(root, "home")
+		tmp := filepath.Join(root, "tmp")
+		for _, path := range []string{bin, capture, home, tmp} {
+			if err := os.Mkdir(path, 0o700); err != nil {
+				panic(err)
+			}
+		}
+		cli := filepath.Join(bin, "claude")
+		if err := os.WriteFile(cli, []byte(program), 0o700); err != nil {
+			panic(err)
+		}
+		if err := os.Chmod(cli, 0o700); err != nil {
+			panic(err)
+		}
+
+		os.Clearenv()
+		for name, value := range map[string]string{
+			"PATH":                    bin,
+			"HOME":                    home,
+			"TMPDIR":                  tmp,
+			"LC_ALL":                  "C",
+			"TZ":                      "UTC",
+			"TERM":                    "oracle-term",
+			"AGENT_CAPTURE_DIR":       capture,
+			"AGENT_SCENARIO":          request.Mode,
+			"AGENT_SENTINEL":          "environment-survived",
+			"AGENT_STDERR":            request.Stderr,
+			"AGENT_EXIT_CODE":         fmt.Sprint(request.ExitCode),
+			"SYMERASEME_LLM_PROVIDER": "agent",
+		} {
+			if err := os.Setenv(name, value); err != nil {
+				panic(err)
+			}
+		}
+
+		client, err := llm.Create(llm.CreateOptions{
+			Provider: "agent", Model: request.Model, AgentBackend: "claude",
+		})
+		if err != nil {
+			panic(err)
+		}
+		agent, ok := client.(*llm.AgentClient)
+		if !ok {
+			panic("agent provider did not return AgentClient")
+		}
+		// One real call keeps the failure transcript focused on callAPI rather
+		// than waiting through the production retry backoff.
+		agent.MaxRetries = 1
+		ctx := context.Background()
+		text, usage, callErr := agent.Classify(ctx, request.SystemPrompt, request.UserPrompt, llm.ClassifyOptions{})
+
+		result := hostAgentResult{
+			Text:       text,
+			UsageModel: usage.Model,
+			Environment: map[string]string{
+				"TERM":           "dumb",
+				"AGENT_SENTINEL": "environment-survived",
+			},
+		}
+		if callErr != nil {
+			message := callErr.Error()
+			result.Error = &message
+			result.ErrorType = errorType(callErr)
+		}
+		for name, target := range map[string]*[]string{
+			"arguments": &result.Arguments,
+		} {
+			data, err := os.ReadFile(filepath.Join(capture, name))
+			if err != nil {
+				panic(err)
+			}
+			parts := bytes.Split(data, []byte{0})
+			if len(parts) > 0 && len(parts[len(parts)-1]) == 0 {
+				parts = parts[:len(parts)-1]
+			}
+			for _, part := range parts {
+				*target = append(*target, string(part))
+			}
+		}
+		data, err := os.ReadFile(filepath.Join(capture, "environment"))
+		if err != nil {
+			panic(err)
+		}
+		environment := bytes.Split(data, []byte{0})
+		if len(environment) != 3 || len(environment[2]) != 0 {
+			panic(fmt.Sprintf("unexpected environment capture: %q", data))
+		}
+		result.Environment["TERM"] = string(environment[0])
+		result.Environment["AGENT_SENTINEL"] = string(environment[1])
+		stdinCapture, err := os.ReadFile(filepath.Join(capture, "stdin"))
+		if err != nil {
+			panic(err)
+		}
+		result.StdinEOF = string(stdinCapture) == "eof"
+		request.Result = result
+	}
+
+	return hostAgentProtocol{Program: program, Cases: requests}
+}
+
+func restoreEnvironment(environment []string) {
+	os.Clearenv()
+	for _, entry := range environment {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok {
+			if err := os.Setenv(name, value); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
+// recordBoundaries captures limits of the retry fixture. The llmkit-backed
+// construction and transport contract is recorded by the separate
+// llmkit-transport oracle.
+func recordBoundaries() []boundary {
 	return []boundary{
-		{
-			Path:     "llmkit-backed construction (anthropic, openai, ollama, openai-compatible)",
-			Evidence: fmt.Sprintf("Create(CreateOptions{}) -> %v", err),
-			Reason:   "corekit/llmkit owns the transports, the credential reference format and this error text; it has no Rust counterpart, so construction stays Go.",
-		},
-		{
-			Path:     "llmkit provider descriptor defaults (env key, default model, base URL)",
-			Evidence: "not observable: the table is unexported and an llmkit client exposes no model accessor",
-			Reason:   "the port pins the provider name set and the agent branch, which are observable; the llmkit defaults cannot be read back through the public API.",
-		},
 		{
 			Path:     "cache key jitter for the empty key",
 			Evidence: "hashCacheKey(\"\") short-circuits to 0 without hashing; the recorded value for the empty key is that 0, not fnv32a(\"\")%5",

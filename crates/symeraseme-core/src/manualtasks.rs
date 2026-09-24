@@ -90,6 +90,203 @@ pub struct CleanupResult {
     pub dry_run: bool,
 }
 
+/// Flattened response returned by the manual-task service handlers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ServiceResult {
+    pub success: bool,
+    pub data: Vec<(String, serde_json::Value)>,
+    pub error: Option<String>,
+}
+
+impl ServiceResult {
+    /// Build the same top-level JSON object as Go's manual-task `Result`.
+    pub fn into_value(self) -> serde_json::Value {
+        let has_error = self.error.is_some();
+        let mut entries = vec![("success".to_owned(), json!(self.success))];
+        if let Some(error) = self.error {
+            entries.push(("error".to_owned(), json!(error)));
+        }
+        entries.extend(
+            self.data
+                .into_iter()
+                .filter(|(key, _)| !has_error || key != "message"),
+        );
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        serde_json::Value::Object(entries.into_iter().collect())
+    }
+}
+
+/// Implements Go's `HandleList` presentation over the durable queue.
+pub fn handle_list(store: &Store, opts: &ListOpts) -> rusqlite::Result<ServiceResult> {
+    let tasks = list(store, opts)?;
+    let message = if tasks.is_empty() {
+        "No manual tasks found.".to_owned()
+    } else {
+        let mut message = format!("Manual tasks ({}):", tasks.len());
+        for task in &tasks {
+            let broker = if task.broker_name.is_empty() {
+                task.broker_id.as_str()
+            } else {
+                task.broker_name.as_str()
+            };
+            message.push_str(&format!(
+                "\n  #{} [{}] {} ({}) @ {}",
+                task.id, task.status, broker, task.reason, task.created_at
+            ));
+        }
+        message
+    };
+    Ok(ServiceResult {
+        success: true,
+        data: vec![
+            (
+                "tasks".to_owned(),
+                json!(tasks.iter().map(task_value).collect::<Vec<_>>()),
+            ),
+            ("message".to_owned(), json!(message)),
+        ],
+        error: None,
+    })
+}
+
+/// Implements Go's `HandleShow` presentation and not-found response.
+pub fn handle_show(store: &Store, task_id: i64) -> rusqlite::Result<ServiceResult> {
+    let Some(task) = get(store, task_id)? else {
+        return Ok(missing_task(task_id));
+    };
+    let mut message = format!(
+        "Manual task #{}:\n  Broker:     {} ({})\n  URL:        {}\n  Reason:     {}\n  Status:     {}\n  Created:    {}",
+        task.id,
+        task.broker_name,
+        task.broker_id,
+        task.form_url,
+        task.reason,
+        task.status,
+        task.created_at
+    );
+    if let Some(completed_at) = &task.completed_at
+        && !completed_at.is_empty()
+    {
+        message.push_str("\n  Completed:  ");
+        message.push_str(completed_at);
+    }
+    if !task.screenshot_path.is_empty() {
+        message.push_str("\n  Screenshot: ");
+        message.push_str(&task.screenshot_path);
+    }
+    if !task.html_snapshot_path.is_empty() {
+        message.push_str("\n  HTML:       ");
+        message.push_str(&task.html_snapshot_path);
+    }
+    message.push_str("\n\nInstructions:\n");
+    message.push_str(&task.instructions);
+    if !task.notes.is_empty() {
+        message.push_str("\n\nNotes: ");
+        message.push_str(&task.notes);
+    }
+    let mut data = task_value(&task).as_object().expect("task object").clone();
+    data.insert("message".to_owned(), json!(message));
+    Ok(ServiceResult {
+        success: true,
+        data: data.into_iter().collect(),
+        error: None,
+    })
+}
+
+/// Implements Go's `HandleComplete` response around the durable completion.
+pub fn handle_complete(
+    store: &Store,
+    task_id: i64,
+    notes: &str,
+    now: DateTime<Utc>,
+) -> rusqlite::Result<ServiceResult> {
+    if complete(store, task_id, notes, true, now)?.is_none() {
+        return Ok(missing_task(task_id));
+    }
+    Ok(ServiceResult {
+        success: true,
+        data: vec![
+            ("task_id".to_owned(), json!(task_id)),
+            (
+                "message".to_owned(),
+                json!(format!("Manual task #{task_id} marked as completed.")),
+            ),
+        ],
+        error: None,
+    })
+}
+
+/// Implements Go's `HandleCleanup`, including its missing-directory response.
+pub fn handle_cleanup(tasks_dir: &Path, dry_run: bool) -> io::Result<ServiceResult> {
+    match fs::metadata(tasks_dir) {
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(ServiceResult {
+                success: true,
+                data: vec![(
+                    "message".to_owned(),
+                    json!("No manual tasks directory found — nothing to clean up."),
+                )],
+                error: None,
+            });
+        }
+        Err(error) => return Err(error),
+    }
+    let outcome = cleanup(tasks_dir, dry_run)?;
+    let message = if dry_run {
+        format!(
+            "Would remove {} artifact(s) from {}. Use --yes to confirm.",
+            outcome.skipped,
+            tasks_dir.display()
+        )
+    } else {
+        format!(
+            "Removed {} artifact(s) from {}.",
+            outcome.removed,
+            tasks_dir.display()
+        )
+    };
+    Ok(ServiceResult {
+        success: true,
+        data: vec![
+            ("removed".to_owned(), json!(outcome.removed)),
+            ("skipped".to_owned(), json!(outcome.skipped)),
+            ("dry_run".to_owned(), json!(outcome.dry_run)),
+            ("message".to_owned(), json!(message)),
+        ],
+        error: None,
+    })
+}
+
+fn missing_task(task_id: i64) -> ServiceResult {
+    ServiceResult {
+        success: false,
+        data: Vec::new(),
+        error: Some(format!(
+            "Manual task #{task_id} not found. Run 'symeraseme manual-tasks list' to see available tasks."
+        )),
+    }
+}
+
+fn task_value(task: &ManualTask) -> serde_json::Value {
+    json!({
+        "id": task.id,
+        "request_id": task.request_id,
+        "broker_id": task.broker_id,
+        "broker_name": task.broker_name,
+        "form_url": task.form_url,
+        "reason": task.reason,
+        "instructions": task.instructions,
+        "screenshot_path": task.screenshot_path,
+        "html_snapshot_path": task.html_snapshot_path,
+        "form_fields_json": task.form_fields_json,
+        "status": task.status,
+        "created_at": task.created_at,
+        "completed_at": task.completed_at,
+        "notes": task.notes,
+    })
+}
+
 static EMAIL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z|a-z]{2,}\b")
         .expect("email pattern is valid")

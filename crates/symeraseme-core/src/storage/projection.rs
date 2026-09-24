@@ -277,7 +277,10 @@ fn append_event_tx(
     let payload_json = if payload.is_empty() {
         "{}".to_owned()
     } else {
-        serde_json::to_string(payload).map_err(ProjectionError::PayloadSerialization)?
+        serde_json::to_string(&crate::jsonorder::go_map_order(Value::Object(
+            payload.clone(),
+        )))
+        .map_err(ProjectionError::PayloadSerialization)?
     };
     transaction.execute(
         "INSERT INTO request_events

@@ -16,25 +16,20 @@
 //!   '<tag> STARTTLS', expect its tagged OK, handshake, then continue.
 //! - TLS configuration precedence: an injected configuration wins over the
 //!   dialer-level default; the default is MinVersion TLS 1.2 with ServerName
-//!   = config host. Roots for the product default come from bundled webpki-roots.
+//!   = config host. Roots for the product default come from the platform store.
 //!
-//! DOCUMENTED DIVERGENCE: Go uses the *platform* root store; the port uses the
-//! bundled webpki roots, so a private/enterprise CA installed in the OS store is
-//! trusted by Go and not by the port.
-
 use crate::email::policy::ERR_IMAP;
 use crate::email::session::{FetchedMessage, ImapSession};
 use crate::email::types::ImapConfig;
 use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 use chrono::{DateTime, Utc};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use webpki_roots;
 
 /// Read+Write abstraction shared between plain TCP and TLS sessions.
 pub trait ReadWrite: Read + Write + Send + Sync {}
@@ -118,12 +113,12 @@ impl Write for IoStream {
 /// Go's `imapTLSConfig` sets `MinVersion: tls.VersionTLS12` and `ServerName`
 /// to the configured host; an injected configuration wins over the default.
 /// rustls' default protocol versions are exactly "TLS 1.2 or newer", so the
-/// minimum-version semantics match. Go uses the platform root store, this port
-/// the bundled webpki roots — an enterprise CA installed in the OS store is
-/// trusted by Go and not here.
+/// minimum-version semantics match. Default roots come from the platform store.
 fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, String> {
-    let root_store =
-        root_store.unwrap_or_else(|| webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect());
+    let root_store = match root_store {
+        Some(roots) => roots,
+        None => platform_root_store()?,
+    };
     // The provider is named explicitly: relying on rustls' process-level
     // auto-detection makes the build's feature unification load-bearing.
     let provider = Arc::new(rustls::crypto::ring::default_provider());
@@ -133,6 +128,66 @@ fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, St
         .with_root_certificates(root_store)
         .with_no_client_auth();
     Ok(config)
+}
+
+fn platform_root_store() -> Result<RootCertStore, String> {
+    let loaded = rustls_native_certs::load_native_certs();
+    let mut roots = RootCertStore::empty();
+    roots.add_parsable_certificates(loaded.certs);
+    #[cfg(windows)]
+    add_windows_machine_roots(&mut roots)?;
+    if roots.is_empty() {
+        return Err(format!(
+            "{}: no platform TLS root certificates could be loaded: {:?}",
+            ERR_IMAP, loaded.errors
+        ));
+    }
+    Ok(roots)
+}
+
+#[cfg(windows)]
+fn add_windows_machine_roots(roots: &mut RootCertStore) -> Result<(), String> {
+    let custom_roots_configured = std::env::var_os("SSL_CERT_FILE").is_some()
+        || std::env::var_os("SSL_CERT_DIR").is_some_and(|dirs| {
+            std::env::split_paths(&dirs).any(|path| !path.as_os_str().is_empty())
+        });
+    if custom_roots_configured {
+        return Ok(());
+    }
+
+    use schannel::cert_context::ValidUses;
+    use schannel::cert_store::CertStore;
+
+    let store = CertStore::open_local_machine("ROOT").map_err(|error| {
+        format!(
+            "{}: failed to load Windows LocalMachine ROOT certificates: {}",
+            ERR_IMAP, error
+        )
+    })?;
+    for cert in store.certs() {
+        let server_auth = cert.valid_uses().is_ok_and(|uses| match uses {
+            ValidUses::All => true,
+            ValidUses::Oids(oids) => oids.iter().any(|oid| oid == "1.3.6.1.5.5.7.3.1"),
+        });
+        if server_auth && cert.is_time_valid().unwrap_or(false) {
+            let _ = roots.add(cert.to_der().to_vec().into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::platform_root_store;
+
+    #[test]
+    fn default_root_store_loads_platform_certificates() {
+        assert!(
+            !platform_root_store()
+                .expect("platform certificate store loads")
+                .is_empty()
+        );
+    }
 }
 
 /// Perform a TLS handshake on an already-connected TcpStream, returning a
@@ -198,18 +253,44 @@ impl crate::email::session::ImapDialer for ImapDialer {
         } else {
             143
         };
-        let addr = format!("{}:{}", config.host, port);
+        let host = config
+            .host
+            .strip_prefix('[')
+            .and_then(|host| host.strip_suffix(']'))
+            .unwrap_or(&config.host);
+        let host_port = if host.parse::<std::net::Ipv6Addr>().is_ok() {
+            format!("[{host}]:{port}")
+        } else {
+            format!("{host}:{port}")
+        };
         let timeout = Duration::from_secs(if config.timeout_seconds > 0 {
             config.timeout_seconds as u64
         } else {
             30
         });
 
-        let parsed_addr = addr
-            .parse()
-            .map_err(|e| format!("{}: connect/login failed: {}", ERR_IMAP, e))?;
-        let stream = TcpStream::connect_timeout(&parsed_addr, timeout)
-            .map_err(|e| format!("{}: connect/login failed: {}", ERR_IMAP, e))?;
+        // ponytail: std DNS lookup is blocking; use a cancellable resolver if DNS timeout bounds become required.
+        let addresses = host_port.to_socket_addrs().map_err(|_| {
+            format!(
+                "{}: connect/login failed: dial tcp: lookup {}: no such host",
+                ERR_IMAP, config.host
+            )
+        })?;
+        let stream = connect_addresses(addresses, timeout).map_err(|failure| {
+            if let Some((address, error)) = failure {
+                format!(
+                    "{}: connect/login failed: dial tcp {}: {}",
+                    ERR_IMAP,
+                    address,
+                    go_dial_cause(&error)
+                )
+            } else {
+                format!(
+                    "{}: connect/login failed: dial tcp {}: connect: no suitable address found",
+                    ERR_IMAP, host_port
+                )
+            }
+        })?;
         stream
             .set_read_timeout(Some(timeout))
             .map_err(|e| format!("{}: read timeout failed: {}", ERR_IMAP, e))?;
@@ -307,6 +388,66 @@ impl crate::email::session::ImapDialer for ImapDialer {
     }
 }
 
+/// Go reports Winsock provider initialization failures from `socket`, while
+/// Rust's timed connect returns only the OS error without that operation.
+fn go_dial_cause(error: &std::io::Error) -> String {
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(10106) {
+        return format!(
+            "socket: {}",
+            error.to_string().trim_end_matches(" (os error 10106)")
+        );
+    }
+    format!("connect: {}", go_dial_error(error))
+}
+
+/// Match Go's common dial error wording across platforms.
+fn go_dial_error(error: &std::io::Error) -> String {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => "connection refused",
+        std::io::ErrorKind::ConnectionReset => "connection reset by peer",
+        std::io::ErrorKind::ConnectionAborted => "software caused connection abort",
+        std::io::ErrorKind::NotConnected => "transport endpoint is not connected",
+        std::io::ErrorKind::AddrInUse => "address already in use",
+        std::io::ErrorKind::AddrNotAvailable => "cannot assign requested address",
+        std::io::ErrorKind::TimedOut => "i/o timeout",
+        std::io::ErrorKind::PermissionDenied => "permission denied",
+        _ => return error.to_string(),
+    }
+    .to_owned()
+}
+
+/// Attempts resolved addresses in order. A later connection may succeed, but if
+/// every address fails Go's dialSerial reports the first address's error.
+fn connect_addresses(
+    addresses: impl IntoIterator<Item = std::net::SocketAddr>,
+    timeout: Duration,
+) -> Result<TcpStream, Option<(std::net::SocketAddr, std::io::Error)>> {
+    connect_addresses_with(addresses, timeout, |address, timeout| {
+        TcpStream::connect_timeout(address, timeout)
+    })
+}
+
+fn connect_addresses_with<I, F>(
+    addresses: I,
+    timeout: Duration,
+    mut connect: F,
+) -> Result<TcpStream, Option<(std::net::SocketAddr, std::io::Error)>>
+where
+    I: IntoIterator<Item = std::net::SocketAddr>,
+    F: FnMut(&std::net::SocketAddr, Duration) -> std::io::Result<TcpStream>,
+{
+    let mut first_failure = None;
+    for address in addresses {
+        match connect(&address, timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(error) if first_failure.is_none() => first_failure = Some((address, error)),
+            Err(_) => {}
+        }
+    }
+    Err(first_failure)
+}
+
 pub struct ImapSessionImpl {
     reader: BufReader<IoStream>,
     writer: IoStream,
@@ -319,15 +460,37 @@ pub struct ImapSessionImpl {
 /// raw (servers handle a quoted INBOX badly — `imap.FormatMailboxName` special
 /// cases it, case-insensitively) and every other name is a quoted string.
 ///
-/// ponytail: names outside US-ASCII are sent as UTF-8 instead of Go's modified
-/// UTF-7 (`utf7.Encoding`). The configuration's folder comes from `IMAP_FOLDER`
-/// and is ASCII in every pinned case; upgrade by encoding the name in modified
-/// UTF-7 before quoting when a non-ASCII folder has to be supported.
 fn mailbox_argument(folder: &str) -> String {
     if folder.eq_ignore_ascii_case("INBOX") {
         return folder.to_string();
     }
-    format!("\"{}\"", folder.replace('\\', "\\\\").replace('"', "\\\""))
+    fn flush_shift(encoded: &mut String, utf16_bytes: &mut Vec<u8>) {
+        if !utf16_bytes.is_empty() {
+            encoded.push('&');
+            encoded.push_str(&STANDARD_NO_PAD.encode(&*utf16_bytes).replace('/', ","));
+            encoded.push('-');
+            utf16_bytes.clear();
+        }
+    }
+
+    let mut encoded = String::new();
+    let mut utf16_bytes = Vec::new();
+    for ch in folder.chars() {
+        if (' '..='~').contains(&ch) {
+            flush_shift(&mut encoded, &mut utf16_bytes);
+            if ch == '&' {
+                encoded.push_str("&-");
+            } else {
+                encoded.push(ch);
+            }
+        } else {
+            for unit in ch.encode_utf16(&mut [0; 2]).iter() {
+                utf16_bytes.extend_from_slice(&unit.to_be_bytes());
+            }
+        }
+    }
+    flush_shift(&mut encoded, &mut utf16_bytes);
+    format!("\"{}\"", encoded.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn read_line(reader: &mut BufReader<IoStream>) -> Result<String, String> {
@@ -798,4 +961,77 @@ fn read_bounded_body(reader: &mut BufReader<IoStream>, len: usize) -> Result<Vec
         .read_exact(&mut body)
         .map_err(|e| format!("IMAP read body failed: {}", e))?;
     Ok(body)
+}
+
+#[cfg(test)]
+mod dial_tests {
+    use super::*;
+    use crate::email::session::ImapDialer as _;
+
+    #[cfg(windows)]
+    #[test]
+    fn winsock_provider_error_uses_go_socket_wording() {
+        let cause = go_dial_cause(&std::io::Error::from_raw_os_error(10106));
+        assert!(cause.starts_with("socket: "), "{cause}");
+        assert!(!cause.contains("(os error 10106)"), "{cause}");
+    }
+
+    #[test]
+    fn resolves_hostnames_and_formats_refused_connections_like_go() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port() as i64;
+        drop(listener);
+        let expected_address = format!("localhost:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap();
+        let config = ImapConfig {
+            host: "localhost".to_owned(),
+            port,
+            ..ImapConfig::default()
+        };
+        let error = ImapDialer::new().dial(&config).err().unwrap();
+        assert_eq!(
+            error,
+            format!(
+                "email: imap error: connect/login failed: dial tcp {expected_address}: connect: connection refused"
+            )
+        );
+    }
+
+    #[test]
+    fn falls_back_after_refused_ipv6_address_to_live_ipv4_address() {
+        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let ipv4_address = listener.local_addr().unwrap();
+        let ipv6_refusal =
+            std::net::SocketAddr::new(std::net::Ipv6Addr::LOCALHOST.into(), ipv4_address.port());
+        let addresses = [ipv6_refusal, ipv4_address];
+
+        let (connected, accepted) = std::thread::scope(|scope| {
+            let accepting = scope.spawn(|| listener.accept().unwrap().0);
+            let connected = connect_addresses(addresses, Duration::from_secs(1)).unwrap();
+            (connected, accepting.join().unwrap())
+        });
+
+        assert!(connected.peer_addr().unwrap().is_ipv4());
+        assert!(accepted.peer_addr().unwrap().is_ipv4());
+    }
+
+    #[test]
+    fn reports_first_resolved_error_when_later_address_has_a_different_error() {
+        let first: std::net::SocketAddr = "[::1]:143".parse().unwrap();
+        let second: std::net::SocketAddr = "127.0.0.1:143".parse().unwrap();
+        let result =
+            connect_addresses_with([first, second], Duration::from_secs(1), |address, _| {
+                let kind = if address.is_ipv6() {
+                    std::io::ErrorKind::TimedOut
+                } else {
+                    std::io::ErrorKind::ConnectionRefused
+                };
+                Err(std::io::Error::from(kind))
+            });
+        let (_, error) = result.expect_err("all resolved addresses fail").unwrap();
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+    }
 }
