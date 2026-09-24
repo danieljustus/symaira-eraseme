@@ -162,6 +162,8 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         fixture["source_revision"],
         "29d483171195eff3c9444a538dbefb3dd06bb2c6"
     );
+    assert_eq!(fixture["mutation_seed"], 0x4D43503135u64);
+    assert_eq!(fixture["mutation_count"], 16);
 
     let initialize: Value = serde_json::from_str(INITIALIZE).unwrap();
     let expected_parse_errors: Vec<_> = initialize["cases"]
@@ -172,7 +174,11 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         .map(|case| case["name"].as_str().unwrap())
         .collect();
     let cases = fixture["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 10, "six parse cases plus four boundaries");
+    assert_eq!(
+        cases.len(),
+        26,
+        "six parse cases, four boundaries, 16 seeded mutations"
+    );
     assert_eq!(
         cases[..6]
             .iter()
@@ -184,6 +190,9 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     assert_eq!(cases[7]["name"], "size-above-8k");
     assert_eq!(cases[8]["name"], "nesting-at-go-limit");
     assert_eq!(cases[9]["name"], "nesting-over-go-limit");
+    for (index, case) in cases[10..].iter().enumerate() {
+        assert_eq!(case["name"], format!("seeded-byte-mutation-{index:02}"));
+    }
 
     for case in cases {
         let name = case["name"].as_str().unwrap();
