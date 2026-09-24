@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 use imap_server::{ScriptedImapServer, TlsMode};
 
 #[cfg(unix)]
-fn local_starttls_server() -> ScriptedImapServer {
+fn local_starttls_server() -> (ScriptedImapServer, String) {
     use rcgen::generate_simple_self_signed;
     use rustls::ServerConfig;
     use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -36,15 +36,17 @@ fn local_starttls_server() -> ScriptedImapServer {
             .with_no_client_auth()
             .with_single_cert(vec![certificate], key)
             .unwrap();
-    ScriptedImapServer::new_tls(Arc::new(config), TlsMode::StartTls).unwrap()
+    (
+        ScriptedImapServer::new_tls(Arc::new(config), TlsMode::StartTls).unwrap(),
+        certified.cert.pem(),
+    )
 }
 
 #[cfg(unix)]
-#[test]
-fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
-    // Reachability proof only: the process uses native roots, while the source
-    // Go MCP process has no equivalent local-root injection for byte parity.
-    let server = local_starttls_server();
+fn run_local_poll_inbox_process(
+    server: &ScriptedImapServer,
+    trust_certificate: Option<&str>,
+) -> (std::path::PathBuf, std::path::PathBuf, std::process::Output) {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -57,6 +59,10 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
     let data = root.join("data");
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(&data).unwrap();
+    let cert_path = root.join("imap-root.pem");
+    if let Some(pem) = trust_certificate {
+        fs::write(&cert_path, pem).unwrap();
+    }
 
     let request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -67,7 +73,8 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
             "arguments": {
                 "host": "127.0.0.1",
                 "port": server.port,
-                "username": "process-proof@example.invalid",
+                "username": "testuser",
+                "password": "testpass",
                 "since_days": 3650,
                 "ssl": false,
                 "folders": ["INBOX"]
@@ -75,7 +82,8 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
         }
     });
     // A fresh process gets the default empty in-memory HWM plus this private data dir.
-    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    command
         .args(["mcp", "--stdio"])
         .current_dir(&root)
         .env_clear()
@@ -86,7 +94,11 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
         .env("XDG_DATA_HOME", home.join("xdg-data"))
         .env("XDG_STATE_HOME", home.join("state"))
         .env("XDG_CACHE_HOME", home.join("cache"))
-        .env("SYMERASEME_DATA_DIR", &data)
+        .env("SYMERASEME_DATA_DIR", &data);
+    if trust_certificate.is_some() {
+        command.env("SSL_CERT_FILE", &cert_path);
+    }
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -110,7 +122,16 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
         }
         std::thread::sleep(Duration::from_millis(10));
     }
-    let output = child.wait_with_output().unwrap();
+    (root, data, child.wait_with_output().unwrap())
+}
+
+#[cfg(unix)]
+#[test]
+fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
+    // Reachability control: the default dialer rejects the generated cert unless
+    // the child receives it through SSL_CERT_FILE.
+    let (server, _cert_pem) = local_starttls_server();
+    let (root, data, output) = run_local_poll_inbox_process(&server, None);
     let stdout = String::from_utf8(output.stdout).unwrap();
     let response: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert_eq!(
@@ -132,6 +153,40 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
     assert!(transcript.iter().any(|line| line.contains(" CAPABILITY")));
     assert!(transcript.iter().any(|line| line.contains(" STARTTLS")));
     assert!(!transcript.iter().any(|line| line.contains(" LOGIN")));
+    assert!(data.join("symeraseme.db").is_file());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn stdio_poll_inbox_default_dialer_polls_after_local_starttls() {
+    let (server, cert_pem) = local_starttls_server();
+    let (root, data, output) = run_local_poll_inbox_process(&server, Some(&cert_pem));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let response: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(
+        stdout.lines().count(),
+        1,
+        "stdout must contain one MCP frame"
+    );
+    assert!(response["error"].is_null(), "{response}");
+    let result: serde_json::Value =
+        serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(result["total_fetched"], 0);
+    assert_eq!(result["total_matched"], 0);
+    assert!(
+        output.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.status.success());
+
+    let transcript = server.get_transcript();
+    assert!(transcript.iter().any(|line| line.contains(" CAPABILITY")));
+    assert!(transcript.iter().any(|line| line.contains(" STARTTLS")));
+    assert!(transcript.iter().any(|line| line.contains(" LOGIN")));
+    assert!(transcript.iter().any(|line| line.contains(" EXAMINE")));
+    assert!(transcript.iter().any(|line| line.contains(" UID SEARCH")));
     assert!(data.join("symeraseme.db").is_file());
     fs::remove_dir_all(root).unwrap();
 }
