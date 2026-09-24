@@ -191,9 +191,10 @@ SQLite, network transcript or process behavior.
 
 ## Integrated target verification (2026-09-23)
 
-The current production-code candidate is `92a573ba`; later commits through
-`cb21489` change fixture metadata, documentation and disposable parity runners,
-not Go/Rust product sources. These commands exercise the whole integrated
+The last Go/Rust runtime-implementation change on this local migration branch is
+`49a37214`; later commits through `e378d018` change tests (including one in a
+source-file test module), fixtures, tooling, release workflow and documentation.
+These commands exercise the whole integrated
 workspace; row-specific fixtures and side effects remain identified above.
 The final switchback runners have separate macOS and Linux evidence above.
 
@@ -230,6 +231,20 @@ The macOS arm64 all-target/all-feature Nextest run passed 553/553, two skipped
 (`/tmp/symeraseme-macos-workspace-49a37214.log`, SHA-256
 `7e616c581f85db88411c8466f8ae42dee4528f2748512e05eda5fb6da1422755`).
 
+On the exact merged candidate `e378d018`, macOS arm64 Nextest passed 559/559,
+two skipped (`/tmp/symeraseme-macos-workspace-e378d018.log`, SHA-256
+`4c0d2c5d918fd8e3113afd30745082005e1356001bc80a5f49564953b42209df`).
+Native Linux aarch64 passed 560/560, zero failed, two ignored across 56 suites
+(`/tmp/symeraseme-native-gate-host/workspace-e378d018.log`, SHA-256
+`fd69ae34673491822137b7f7b4215c4fd47a93c024c425c6f9256537982c7484`).
+Strict all-target/all-feature Clippy passed on macOS
+(`/tmp/symeraseme-clippy-e378d018.log`, SHA-256
+`f6a3640fd2fd5234714b06d28177a0238a9f2f4b847cc407cfd835b851e428d7`);
+Rust formatting, Go vet, both Cargo lockfile audits, Cargo deny and diff checks
+passed. These runs include the real MCP
+STARTTLS poll, senderless CLI execution, provider context-overflow corpus,
+and the HTTP token-start readiness check.
+
 ## Native integrated-source CI readback (2026-09-24)
 
 The main-branch Rust CI run [36019186658](https://github.com/danieljustus/symaira-eraseme/actions/runs/36019186658) is bound to `3428f5bf84b2796c1544f0bf9a91d50f18f13d28`. Its six `rust-native` jobs all completed successfully: Ubuntu x64/arm64, macOS arm64/Intel and Windows x64/arm64. Windows x64 and arm64 logs each show executed passing migration JSON replay, Windows case-alias/readonly backup tests, IMAP transcript replay and source-bound CLI campaign tests. This is native evidence for those executed cases, not a blanket upgrade of all matrix rows.
@@ -243,6 +258,18 @@ At `28af41b3`, both disposable macOS switchbacks executed eight declared cases a
 The published [v0.12.1 macOS arm64 archive](https://github.com/danieljustus/symaira-eraseme/releases/download/v0.12.1/symeraseme_0.12.1_darwin_arm64.tar.gz) matches its GitHub release asset digest `7fa696829c9bf861ba902a65576d22013e4eeeb655150143975f961078dc906b`; its extracted `symeraseme version` reports `0.12.1` and its binary SHA-256 is `b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3`. The same disposable runners executed 8/8 plain and 8/8 encrypted cases with this binary and again reported `compatibility-gap`; reports are under `/tmp/symeraseme-release-v0.12.1-proof/{plain-release-r2,encrypted-release-r2}/`. These two runs used the current-source Go binary above and an earlier Rust debug binary (`f83c6c7b…`), so they verify the released fallback identity and observed gap but do not replace the exact integrated-Rust run above.
 
 The plain-store bridge clones the intact post-Rust schema-v2 SQLite database, changes only the clone's `user_version` to 1, and proves that official Go v0.12.1 reads four requests, writes a fifth and reads all five. Rust then reopens the clone at schema v2 and reads all five; the original remains byte-for-byte unchanged. This ran 12/12 cases on macOS arm64 using the exact integrated Rust release binary (`/tmp/symeraseme-plain-bridge-integrated-82733b1/report.json`) and on native Linux arm64 using the clean `606ada8` musl binary (`/var/tmp/plain-bridge-integrated-239428ee/report.json` inside the `symaira-gate-host` VM). The [official Linux arm64 v0.12.1 archive](https://github.com/danieljustus/symaira-eraseme/releases/download/v0.12.1/symeraseme_0.12.1_linux_arm64.tar.gz) was SHA-256 checked as `02613a59bd88657c436ee8d748f33cc0910ec0cafb07cd238f3e1fd520e74dfd`; its executable hashes to `f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a`. Both reports retain `compatibility-gap`: the direct old-Go schema-v2 refusal is still observed, and restoring the old schema-v1 backup loses the Rust-era request. The bridge requires a deliberate disposable copy and does not implement production rollback.
+
+The merged `e378d018` candidate also ran the main-branch historical-Go
+backup/restore rehearsal against SHA-checked official v0.12.1 archives: 8/8
+declared cases on macOS arm64 (`/tmp/symeraseme-backup-restore-e378d018/report.json`,
+SHA-256 `eaf3ea9f57d4f61268837fd5f4d2135961e1f4781295ace276d3f32d5e75e28b`)
+and 8/8 on native Linux arm64 (`/var/tmp/symeraseme-backup-restore-e378d018/report.json`,
+SHA-256 `23d35a9f4dd4c3e71fc8637259340ba85562ecd14da49eceaa99e4304d786f82`).
+The focused Python controls passed 3/3 on each platform. Restoring the
+schema-v1 backup makes the old Go binary read its three baseline requests,
+but discards the Rust-era fourth request; the negative control rejects an
+incomplete restore. This is executable recovery evidence and a confirmed data
+loss boundary, not a safe production rollback.
 
 For ENCv3, the bridge first proves official Go v0.12.1 refuses the original encrypted envelope without changing it. Current Rust decrypts only a disposable clone through its normal store path; the clone's sole schema downgrade is `user_version` 2→1. Official Go reads four requests, writes a fifth, and reads five. Rust verifies all five, re-encrypts a separate clone as ENCv3, and reopens it. All 11 cases passed on macOS arm64 with integrated Rust release SHA-256 `46ec38b101e3f4adbfc772286ae172894779d00231cc132a29402ced2b0d3ff2` (`/tmp/symeraseme-encrypted-bridge-integrated-cross-platform/report.json`) and on native Linux arm64 with the static musl binary SHA-256 `db5ca51d09a340cd5c899d8fb6e2942fd43de0f79788355365fcbbda5f11d19a` (`/var/tmp/encrypted-bridge-integrated-linux-first/report.json` inside `symaira-gate-host`). The original four-request ENCv3 store remains unchanged on both platforms. This is a manually rehearsed recovery bridge, not direct old-Go compatibility or a cutover gate.
 
