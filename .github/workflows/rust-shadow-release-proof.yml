@@ -96,7 +96,7 @@ jobs:
                   echo "binary has a missing shared library" >&2
                   exit 1
                 fi
-              elif grep -Eq '^(not a dynamic executable|statically linked)$' <<<"$linkage"; then
+              elif grep -Eq '^[[:space:]]*(not a dynamic executable|statically linked)[[:space:]]*$' <<<"$linkage"; then
                 printf 'Self-contained binary: %s\n' "$linkage"
               else
                 printf '%s\n' "$linkage" >&2
@@ -105,6 +105,12 @@ jobs:
               ;;
             macOS)
               otool -L "$binary"
+              while IFS= read -r dependency; do
+                case "$dependency" in
+                  /System/*|/usr/lib/*) ;;
+                  *) echo "non-system macOS dependency: $dependency" >&2; exit 1 ;;
+                esac
+              done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
               ;;
             Windows)
               # shellcheck disable=SC2016
