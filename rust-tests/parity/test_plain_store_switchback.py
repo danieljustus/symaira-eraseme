@@ -15,6 +15,20 @@ import plain_store_switchback as gate
 
 
 class SwitchbackControls(unittest.TestCase):
+    def test_expected_refusal_retains_nonzero_exit_as_a_negative_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = gate.command(
+                root, 'expected-refusal',
+                [sys.executable, '-I', '-S', '-c',
+                 'import sys; print("unsupported schema", file=sys.stderr); sys.exit(1)'],
+                {'HOME': str(root), 'PATH': ''}, expected_exit_code=1)
+            self.assertFalse(result['success'])
+            self.assertTrue(result['expectation_met'])
+            self.assertEqual(result['exit_code'], 1)
+            self.assertEqual((root / 'expected-refusal.stderr').read_bytes(),
+                             b'unsupported schema\n')
+
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS sandbox Go runtime control')
     def test_go_build_info_reads_only_explicit_goroot(self):
         go_tool = Path(subprocess.check_output(['which', 'go'], text=True).strip()).resolve()

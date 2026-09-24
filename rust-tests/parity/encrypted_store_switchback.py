@@ -62,7 +62,7 @@ def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
     return record
 
 
-def run(go, rust, output):
+def run(go, rust, output, retained_go=None):
     gate.require(os.sys.platform == "darwin" or os.sys.platform.startswith("linux"),
                  "unsupported: switchback confinement is available on macOS and Linux")
     if os.sys.platform.startswith("linux"):
@@ -78,7 +78,9 @@ def run(go, rust, output):
              if os.sys.platform.startswith("linux") else "macos-encrypted-store-runtime-only")
     report = {"scope": scope, "status": "failed",
               "platform": {"system": platform.system(), "machine": platform.machine()},
-              "required_cases": list(CASES), "steps": [], "database_restore_performed": False,
+              "required_cases": list(CASES) + (["retained-go-post-rust-refusal",
+                                                "retained-go-after-envelope-restore"] if retained_go else []),
+              "steps": [], "database_restore_performed": False,
               "production_cutover_verified": False,
               "source_binding": "binary hashes identify inputs; hashes alone do not prove source identity"}
     try:
@@ -91,10 +93,17 @@ def run(go, rust, output):
         if os.sys.platform.startswith("linux"):
             report["sandbox_helper"] = gate.identity(gate.LINUX_SANDBOX)
         go, rust = (path.resolve(strict=True) for path in (go, rust))
+        retained_go = Path(retained_go).resolve(strict=True) if retained_go else None
         report["artifacts"] = {"go": gate.identity(go), "rust": gate.identity(rust)}
+        if retained_go:
+            report["retained_go_artifact"] = gate.identity(retained_go)
         gate.require(report["artifacts"]["go"]["sha256"] != report["artifacts"]["rust"]["sha256"],
                      "Go and Rust artifacts must differ")
         shutil.copyfile(FIXTURE, database)
+        pre_rust_backup = output / "rollback-backup/encrypted-v3.db"
+        pre_rust_backup.parent.mkdir(mode=0o700)
+        shutil.copyfile(database, pre_rust_backup)
+        report["pre_rust_backup"] = gate.identity(pre_rust_backup)
         active = output / "bin/symeraseme"
         key_hex = MASTER_KEY.hex()
         env = {"HOME": str(output / "home"), "USERPROFILE": str(output / "home"),
@@ -224,10 +233,62 @@ def run(go, rust, output):
         gate.same(go_after, rust_after, "Go cannot read the encrypted state after Rust write")
         gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
                      "database lost its encrypted envelope")
+        if retained_go:
+            step = {"id": "retained-go-post-rust-refusal", "success": False,
+                    "expected": "retained artifact refuses the post-Rust encrypted store"}
+            report["steps"].append(step)
+            encrypted_identity = gate.identity(database)
+            try:
+                step["observation"] = gate.retained_go_post_rust_probe(
+                    output, active, retained_go, env,
+                    ["requests", "list", "--output", "json"],
+                    b"eventstore: ping: file is not a database")
+                step["success"] = True
+                step["outcome"] = "compatibility-gap-confirmed"
+            finally:
+                restored = active.with_suffix(".restore")
+                shutil.copyfile(go, restored)
+                os.replace(restored, active)
+                gate.require(gate.identity(active) == gate.identity(go),
+                             "current Go positive-control restore failed")
+            gate.require(gate.identity(database) == encrypted_identity,
+                         "retained Go rejection changed the encrypted database")
+            restored = active.with_suffix(".restore")
+            shutil.copyfile(pre_rust_backup, output / "data/symeraseme.pre-rust")
+            os.replace(output / "data/symeraseme.pre-rust", database)
+            gate.require(gate.identity(database) == gate.identity(pre_rust_backup),
+                         "encrypted pre-Rust backup restore mismatch")
+            report["database_restore_performed"] = True
+            try:
+                step = {"id": "retained-go-after-envelope-restore", "success": False,
+                        "expected": "the retained artifact also refuses the pre-Rust encrypted envelope"}
+                report["steps"].append(step)
+                step["observation"] = gate.retained_go_post_rust_probe(
+                    output, active, retained_go, env,
+                    ["requests", "list", "--output", "json"],
+                    b"eventstore: ping: file is not a database", step["id"])
+                step["success"] = True
+                step["outcome"] = "backup-restored-but-still-unreadable"
+            finally:
+                shutil.copyfile(go, restored)
+                os.replace(restored, active)
+                gate.require(gate.identity(active) == gate.identity(go),
+                             "current Go positive-control restore failed")
+            gate.require(gate.identity(database) == gate.identity(pre_rust_backup),
+                         "retained Go changed the restored encrypted backup")
+            report["restore_boundary"] = {
+                "scope": "disposable switchback root only",
+                "restored_envelope": "SYMERASEME_ENCv3",
+                "post_rust_requests": 4,
+                "retained_go_readable_after_restore": False,
+                "rust_request_recovered": False}
         gate.require(gate.identity(FIXTURE) == fixture_identity, "source fixture changed")
-        gate.require([step["id"] for step in report["steps"]] == list(CASES),
+        expected_cases = list(CASES) + (["retained-go-post-rust-refusal",
+                                        "retained-go-after-envelope-restore"] if retained_go else [])
+        gate.require([step["id"] for step in report["steps"]] == expected_cases
+                     and all(step["success"] is True for step in report["steps"]),
                      "incomplete case inventory")
-        report["status"] = "passed"
+        report["status"] = "compatibility-gap" if retained_go else "passed"
     finally:
         gate.save(output / "report.json", report)
     return report
@@ -238,8 +299,10 @@ def main():
     parser.add_argument("--go", type=Path, required=True)
     parser.add_argument("--rust", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--retained-go", type=Path,
+                        help="execute the recorded older rollback artifact against post-Rust schema v2")
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.output_dir)
+    result = run(args.go, args.rust, args.output_dir, args.retained_go)
     print(json.dumps({"status": result["status"], "scope": result["scope"],
                       "executed_cases": len(result["steps"])}))
 

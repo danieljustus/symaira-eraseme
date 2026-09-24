@@ -24,6 +24,7 @@ LINUX_SANDBOX = Path(__file__).with_name('linux_store_sandbox.py').resolve()
 GUEST_LOCAL_FILESYSTEMS = {'ext4', 'xfs', 'btrfs', 'tmpfs'}
 CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
          'go-plan-after-switch', 'go-requests-after-switch')
+RETAINED_GO_SHA256 = 'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22'
 
 
 def require(condition, message):
@@ -50,7 +51,7 @@ def identity(path):
     return {'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
 
 
-def command(root, label, argv, env, timeout=30):
+def command(root, label, argv, env, timeout=30, expected_exit_code=0):
     """Retain failures and raw bytes; bound file growth and the owned process group."""
     import resource
 
@@ -59,7 +60,8 @@ def command(root, label, argv, env, timeout=30):
         resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
 
     record = {'argv': list(map(str, argv)), 'cwd': str(root), 'exit_code': None,
-              'timed_out': False, 'success': False}
+              'timed_out': False, 'success': False,
+              'expected_exit_code': expected_exit_code, 'expectation_met': False}
     try:
         with (root / (label + '.stdout')).open('xb') as out, \
                 (root / (label + '.stderr')).open('xb') as err:
@@ -78,6 +80,8 @@ def command(root, label, argv, env, timeout=30):
                     pass
                 record['exit_code'] = child.wait(timeout=5)
         record['success'] = record['exit_code'] == 0 and not record['timed_out']
+        record['expectation_met'] = (record['exit_code'] == expected_exit_code
+                                     and not record['timed_out'])
     finally:
         audit = root / '.sandbox' / (label + '.audit.json')
         if audit.is_file() and not audit.is_symlink():
@@ -87,8 +91,29 @@ def command(root, label, argv, env, timeout=30):
             if path.exists():
                 record[stream] = {'path': path.name, **identity(path)}
         save(root / (label + '.json'), record)
-    require(record['success'], label + ': command failed; retained raw evidence')
+    require(record['expectation_met'], label + ': command failed or differed from expected exit; retained raw evidence')
     return record
+
+
+def retained_go_post_rust_probe(root, active, artifact, env, args, expected_diagnostic,
+                                label='retained-go-post-rust-refusal'):
+    """Record the retained fallback's post-Rust refusal beside the Go positive control."""
+    artifact = Path(artifact).resolve(strict=True)
+    artifact_identity = identity(artifact)
+    require(artifact_identity['sha256'] == RETAINED_GO_SHA256,
+            'retained Go artifact does not match the recorded rollback binary')
+    stage = active.with_suffix('.next')
+    shutil.copyfile(artifact, stage)
+    stage.chmod(0o700)
+    require(identity(stage) == artifact_identity, 'retained Go staging mismatch')
+    os.replace(stage, active)
+    result = command(root, label, sandbox_command(root, label, active, args, env), env,
+                     expected_exit_code=1)
+    stderr = (root / (label + '.stderr')).read_bytes()
+    require(expected_diagnostic in stderr,
+            'retained Go did not fail at its expected post-Rust compatibility guard')
+    return {'artifact': artifact_identity, 'command': result,
+            'diagnostic': expected_diagnostic.decode('utf-8', errors='replace')}
 
 
 def snapshot(database):
@@ -301,7 +326,7 @@ sys.exit(0 if all(result.values()) else 1)
 '''
 
 
-def run(go, rust, go_tool, root):
+def run(go, rust, go_tool, root, retained_go=None):
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: switchback confinement is available on macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -317,7 +342,9 @@ def run(go, rust, go_tool, root):
              if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
     report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
-              'required_cases': list(CASES), 'steps': [], 'schema_sequence': [],
+              'required_cases': list(CASES) + (['retained-go-post-rust-refusal',
+                                                'retained-go-after-v1-restore'] if retained_go else []),
+              'steps': [], 'schema_sequence': [],
               'database_restore_performed': False, 'publication_verified': False,
               'source_binding': 'requires caller build evidence; hashes alone are not source identity'}
     try:
@@ -325,7 +352,10 @@ def run(go, rust, go_tool, root):
             (root / name).mkdir(mode=0o700)
         active, database = root / 'bin/symeraseme', root / 'data/symeraseme.db'
         go, rust, go_tool = (p.resolve(strict=True) for p in (go, rust, go_tool))
+        retained_go = Path(retained_go).resolve(strict=True) if retained_go else None
         report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
+        if retained_go:
+            report['retained_go_artifact'] = identity(retained_go)
         require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
         report['fixture'] = identity(fixture)
@@ -334,6 +364,14 @@ def run(go, rust, go_tool, root):
             report['sandbox_helper'] = identity(LINUX_SANDBOX)
         shutil.copyfile(Path(__file__), root / 'producer.py')
         shutil.copyfile(fixture, database)  # The only database copy into the active path.
+        pre_rust_backup = root / 'rollback-backup/symeraseme-v1.db'
+        pre_rust_backup.parent.mkdir(mode=0o700)
+        with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source, \
+                closing(sqlite3.connect(pre_rust_backup)) as backup:
+            source.backup(backup)
+        require(snapshot(pre_rust_backup)['user_version'] == 1,
+                'rollback rehearsal backup must preserve the original schema-v1 fixture')
+        report['pre_rust_backup'] = identity(pre_rust_backup)
         env = {'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
                'XDG_CONFIG_HOME': str(root / 'config'), 'XDG_DATA_HOME': str(root / 'data'),
                'XDG_CACHE_HOME': str(root / 'cache'), 'TMPDIR': str(root / 'tmp'),
@@ -499,9 +537,53 @@ def run(go, rust, go_tool, root):
         require(not missing_profile.exists() and identity(active) == identity(go), 'final runtime identity changed')
         require(identity(fixture) == report['fixture'], 'source fixture changed')
         report['steps'][-1]['success'] = True
-        require([step['id'] for step in report['steps']] == list(CASES)
+        if retained_go:
+            step = {'id': 'retained-go-post-rust-refusal', 'success': False,
+                    'expected': 'schema-v2 refusal from the exact retained artifact'}
+            report['steps'].append(step)
+            try:
+                step['observation'] = retained_go_post_rust_probe(
+                    root, active, retained_go, env,
+                    ['requests', 'list', '--output', 'json'],
+                    b'user_version=2, Go port supports up to 1')
+                step['success'] = True
+                step['outcome'] = 'compatibility-gap-confirmed'
+            finally:
+                restored = active.with_suffix('.restore')
+                shutil.copyfile(go, restored)
+                os.replace(restored, active)
+                require(identity(active) == identity(go), 'current Go positive-control restore failed')
+            same(snapshot(database), after, 'retained Go rejection changed the post-Rust database')
+            with closing(sqlite3.connect(pre_rust_backup.as_uri() + '?mode=ro', uri=True)) as source, \
+                    closing(sqlite3.connect(database)) as restored:
+                source.backup(restored)
+            restored_state = snapshot(database)
+            same(restored_state, initial, 'pre-Rust backup did not restore the original schema-v1 state')
+            report['database_restore_performed'] = True
+            report['restore_boundary'] = {
+                'scope': 'disposable switchback root only',
+                'restored_schema': restored_state['user_version'],
+                'restored_requests': len(baseline['requests']),
+                'post_rust_requests': len(requests['requests']),
+                'rust_request_recovered': False}
+            restored_requests = execute('retained-go-after-v1-restore',
+                                        ['requests', 'list', '--output', 'json'], retained_go)
+            same(restored_requests, baseline,
+                 'retained Go did not read all baseline requests after restoring schema v1')
+            require(restored_requests['total'] == 3
+                    and all(row['id'] != 4 for row in restored_requests['requests']),
+                    'restore boundary must expose the lost post-Rust request')
+            report['steps'][-1]['success'] = True
+            same(snapshot(database), restored_state, 'retained Go changed the restored backup')
+            restored = active.with_suffix('.restore')
+            shutil.copyfile(go, restored)
+            os.replace(restored, active)
+            require(identity(active) == identity(go), 'current Go artifact restore failed')
+        expected_cases = list(CASES) + (['retained-go-post-rust-refusal',
+                                        'retained-go-after-v1-restore'] if retained_go else [])
+        require([step['id'] for step in report['steps']] == expected_cases
                 and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')
-        report['status'] = 'passed'
+        report['status'] = 'compatibility-gap' if retained_go else 'passed'
     finally:
         save(root / 'report.json', report)
     return report
@@ -511,8 +593,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ('go', 'rust', 'go-tool', 'output-dir'):
         parser.add_argument('--' + flag, type=Path, required=True)
+    parser.add_argument('--retained-go', type=Path,
+                        help='execute the recorded older rollback artifact against post-Rust schema v2')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.retained_go)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 
