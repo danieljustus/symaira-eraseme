@@ -4,11 +4,25 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [v0.13.0] - 2026-09-22
+
 - **Release**: Notarize and staple macOS app before creating DMG, sign DMG
   container with Developer ID before notarization, staple and validate DMG with
   Gatekeeper checks, and verify published download bytes before updating release
   checksums and notes. Fail closed on missing release signing or notarization
   credentials (#794).
+- **CLI**: The remaining command surface is ported against the recorded Go
+  oracles: `status`/`tick`, `plan`, `dashboard`/`calendar`/`requests`,
+  `manual-tasks`, `registry`, `events`, `generate-*`, `review`/`run-web-form`,
+  `auto-confirm` and `migrate`'s `validateRoots` (#1013–#1024).
+- **MCP**: The stdio contract is served natively through `symeraseme mcp` (#1023).
+- **Fix**: Correct the54 legacy non-URI registry values and enforce the URI
+  rule (#843); order equal leaderboard totals by `broker_id` so results are
+  deterministic (#963); emit `manual-tasks list` task objects in Go struct
+  order (#1018).
+- **CI**: Drop the needless `return` in the windows `dirs_home` branch so the
+  windows clippy leg passes again; PR-time windows coverage tracked in #1030
+  (#1031).
 
 ## [v0.12.1] - 2026-09-01
 
