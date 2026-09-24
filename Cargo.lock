@@ -1636,6 +1636,8 @@ dependencies = [
  "hyper",
  "hyper-util",
  "rand 0.10.3",
+ "rcgen",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
