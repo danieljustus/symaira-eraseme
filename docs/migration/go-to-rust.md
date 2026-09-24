@@ -43,6 +43,17 @@ go vet ./... && gofmt -l .
   `rust-tests/parity/test_secret_sentinel.py`
   passed on macOS arm64 and native Linux arm64, scanning process stdout,
   stderr and generated files for two synthetic master keys.
+- Offline `cargo audit --no-fetch` passed both current lockfiles and
+  `cargo deny --frozen check all` passed. Local release builds of the matching
+  production source produced a macOS arm64 binary (`50dac2a`, SHA-256
+  `d9ca4aa1fb8dfd1b0b625c6c62a154d4bbc8e4386b556ece7567769a392a7cfe`)
+  and a static Linux arm64 musl binary (`c6340b11`, SHA-256
+  `0e88f4d5860f0fc8635b370b91588fb315d372766ed700ad96892ecfb5fd4fe6`).
+  Each has a local CycloneDX 1.7 inventory of 252 dependencies from a
+  co-staged binary and Cargo.lock, plus a JSON source/toolchain/hash manifest
+  under `/tmp/symeraseme-{macos,linux}-arm64-provenance-*.json`. These are
+  unsigned local manifests, not release attestations; four native release
+  targets and the six-archive workflow remain unverified.
 
 ## Contract
 
