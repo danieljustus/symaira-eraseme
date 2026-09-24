@@ -48,3 +48,10 @@ path = "fuzz_targets/email_headers.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "mcp_frames"
+path = "fuzz_targets/mcp_frames.rs"
+test = false
+doc = false
+bench = false
