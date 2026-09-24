@@ -4,6 +4,7 @@
 import base64
 import hashlib
 import json
+import random
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[4]
 SOURCE_REVISION = "29d483171195eff3c9444a538dbefb3dd06bb2c6"
 INITIALIZE = ROOT / "tests/fixtures/mcp-contract/initialize_cases.json"
 SOURCE_PATHS = ["cmd/symeraseme/main.go", "internal/mcp/server.go"]
+MUTATION_SEED = 0x4D43503135
+MUTATION_COUNT = 16
+MUTATION_BASE = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 
 
 def digest(data: bytes) -> str:
@@ -34,12 +38,32 @@ def case_specs():
             {"name": case["name"], "input_spec": {"base64": base64.b64encode(request).decode()}}
         )
     assert len(malformed) == 6, "the source initialize fixture no longer has six parse errors"
+    mutations = []
+    rng = random.Random(MUTATION_SEED)
+    for index in range(MUTATION_COUNT):
+        data = bytearray(MUTATION_BASE)
+        operation = index % 3
+        if operation == 0:
+            offset = rng.randrange(len(data))
+            data[offset] = rng.choice(b'"\\,]}x:')
+        elif operation == 1:
+            offset = rng.randrange(len(data))
+            del data[offset]
+        else:
+            offset = rng.randrange(len(data) + 1)
+            data[offset:offset] = bytes([rng.choice(b'"\\,]}x:')])
+        mutations.append(
+            {
+                "name": f"seeded-byte-mutation-{index:02d}",
+                "input_spec": {"base64": base64.b64encode(data).decode()},
+            }
+        )
     return malformed + [
         {"name": "size-below-8k", "input_spec": {"kind": "padding_request", "size": 8192 - 1}},
         {"name": "size-above-8k", "input_spec": {"kind": "padding_request", "size": 8192 + 1}},
         {"name": "nesting-at-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 9999}},
         {"name": "nesting-over-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 10000}},
-    ]
+    ] + mutations
 
 
 def materialize(spec):
@@ -95,6 +119,8 @@ def main():
             )
     fixture = {
         "source_revision": SOURCE_REVISION,
+        "mutation_seed": MUTATION_SEED,
+        "mutation_count": MUTATION_COUNT,
         "go_version": subprocess.check_output([str(go), "version"], text=True).strip(),
         "source_files": [
             {"path": path, "sha256": digest((ROOT / path).read_bytes())} for path in SOURCE_PATHS
