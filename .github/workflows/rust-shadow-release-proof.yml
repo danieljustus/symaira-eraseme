@@ -34,12 +34,12 @@ jobs:
             runner: ubuntu-24.04-arm
             os: linux
             arch: arm64
-            target: aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-musl
           - name: Linux amd64
             runner: ubuntu-24.04
             os: linux
             arch: amd64
-            target: x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-musl
           - name: Windows arm64
             runner: windows-11-arm
             os: windows
@@ -61,6 +61,17 @@ jobs:
         shell: bash
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
 
+      - name: Install native static Linux toolchain
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends musl-tools
+          rustup target add "$TARGET" --toolchain "$RUST_TOOLCHAIN"
+
       - name: Verify native target
         shell: bash
         env:
@@ -76,6 +87,10 @@ jobs:
           TARGET: ${{ matrix.target }}
           ARCHIVE_OS: ${{ matrix.os }}
           ARCHIVE_ARCH: ${{ matrix.arch }}
+          CC_aarch64_unknown_linux_musl: musl-gcc
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
         run: |
           set -euo pipefail
           cargo +"$RUST_TOOLCHAIN" build --release -p symeraseme-cli --bin symeraseme-rust --target "$TARGET" --locked
@@ -90,18 +105,12 @@ jobs:
 
           case "$RUNNER_OS" in
             Linux)
-              if linkage="$(ldd "$binary" 2>&1)"; then
-                printf '%s\n' "$linkage"
-                if grep -q 'not found' <<<"$linkage"; then
-                  echo "binary has a missing shared library" >&2
-                  exit 1
-                fi
-              elif grep -Eq '^[[:space:]]*(not a dynamic executable|statically linked)[[:space:]]*$' <<<"$linkage"; then
-                printf 'Self-contained binary: %s\n' "$linkage"
-              else
-                printf '%s\n' "$linkage" >&2
+              if readelf -lW "$binary" | grep -q ' INTERP ' ||
+                 readelf -dW "$binary" | grep -q '(NEEDED)'; then
+                echo "Linux release binary requires a dynamic loader or shared library" >&2
                 exit 1
               fi
+              readelf -h "$binary"
               ;;
             macOS)
               otool -L "$binary"
