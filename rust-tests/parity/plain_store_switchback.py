@@ -30,11 +30,18 @@ RETAINED_GO_SHA256 = {
     'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
 }
 OFFICIAL_GO_V0121_SHA256 = 'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3'
+ROLLBACK_CASES = ['retained-go-post-rust-refusal', 'retained-go-after-v1-restore']
+BRIDGE_CASES = ['retained-go-bridge-read-four', 'retained-go-bridge-create-fifth',
+                'retained-go-bridge-read-five', 'rust-bridge-read-five']
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def retained_cases(sha256):
+    return (BRIDGE_CASES if sha256 == OFFICIAL_GO_V0121_SHA256 else []) + ROLLBACK_CASES
 
 
 def canonical(value):
@@ -351,12 +358,7 @@ def run(go, rust, go_tool, root, retained_go=None):
              if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
     report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
-              'required_cases': list(CASES) + (['retained-go-bridge-read-four',
-                                                'retained-go-bridge-create-fifth',
-                                                'retained-go-bridge-read-five',
-                                                'rust-bridge-read-five',
-                                                'retained-go-post-rust-refusal',
-                                                'retained-go-after-v1-restore'] if retained_go else []),
+              'required_cases': list(CASES),
               'steps': [], 'schema_sequence': [],
               'database_restore_performed': False, 'publication_verified': False,
               'source_binding': 'requires caller build evidence; hashes alone are not source identity'}
@@ -369,6 +371,7 @@ def run(go, rust, go_tool, root, retained_go=None):
         report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
         if retained_go:
             report['retained_go_artifact'] = identity(retained_go)
+            report['required_cases'] += retained_cases(report['retained_go_artifact']['sha256'])
         require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
         report['fixture'] = identity(fixture)
@@ -551,9 +554,7 @@ def run(go, rust, go_tool, root, retained_go=None):
         require(not missing_profile.exists() and identity(active) == identity(go), 'final runtime identity changed')
         require(identity(fixture) == report['fixture'], 'source fixture changed')
         report['steps'][-1]['success'] = True
-        if retained_go:
-            require(identity(retained_go)['sha256'] == OFFICIAL_GO_V0121_SHA256,
-                    'rollback bridge requires the SHA-pinned official Go v0.12.1 artifact')
+        if retained_go and identity(retained_go)['sha256'] == OFFICIAL_GO_V0121_SHA256:
             bridge_dir = root / 'rollback-bridge'
             bridge_dir.mkdir(mode=0o700)
             bridge_db = bridge_dir / 'symeraseme.db'
@@ -632,6 +633,7 @@ def run(go, rust, go_tool, root, retained_go=None):
                     'rollback bridge altered the original Rust schema-v2 database')
             require(not (root / 'home/bridge-absent-profile.enc').exists(),
                     'bridge create unexpectedly created profile input')
+        if retained_go:
             step = {'id': 'retained-go-post-rust-refusal', 'success': False,
                     'expected': 'schema-v2 refusal from the exact retained artifact'}
             report['steps'].append(step)
@@ -673,11 +675,8 @@ def run(go, rust, go_tool, root, retained_go=None):
             shutil.copyfile(go, restored)
             os.replace(restored, active)
             require(identity(active) == identity(go), 'current Go artifact restore failed')
-        expected_cases = list(CASES) + (['retained-go-bridge-read-four',
-                                        'retained-go-bridge-create-fifth',
-                                        'retained-go-bridge-read-five', 'rust-bridge-read-five',
-                                        'retained-go-post-rust-refusal',
-                                        'retained-go-after-v1-restore'] if retained_go else [])
+        expected_cases = list(CASES) + (retained_cases(identity(retained_go)['sha256'])
+                                         if retained_go else [])
         require([step['id'] for step in report['steps']] == expected_cases
                 and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')
         report['status'] = 'compatibility-gap' if retained_go else 'passed'

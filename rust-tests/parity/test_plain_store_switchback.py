@@ -15,6 +15,13 @@ import plain_store_switchback as gate
 
 
 class SwitchbackControls(unittest.TestCase):
+    def test_bridge_cases_are_limited_to_official_release_pin(self):
+        self.assertEqual(gate.retained_cases(gate.OFFICIAL_GO_V0121_SHA256),
+                         gate.BRIDGE_CASES + gate.ROLLBACK_CASES)
+        self.assertEqual(gate.retained_cases(
+            'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22'),
+            gate.ROLLBACK_CASES)
+
     def test_expected_refusal_retains_nonzero_exit_as_a_negative_control(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
