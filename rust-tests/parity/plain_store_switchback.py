@@ -25,11 +25,16 @@ GUEST_LOCAL_FILESYSTEMS = {'ext4', 'xfs', 'btrfs', 'tmpfs'}
 CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
          'go-plan-after-switch', 'go-requests-after-switch')
 RETAINED_GO_SHA256 = {
-    # Local retained artifact and the verified v0.12.1 darwin_arm64 release executable.
+    # Local retained artifact and verified official v0.12.1 arm64 executables.
     'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22',
     'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
+    'f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a',
 }
-OFFICIAL_GO_V0121_SHA256 = 'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3'
+# Linux arm64 release archive SHA-256: 02613a59bd88657c436ee8d748f33cc0910ec0cafb07cd238f3e1fd520e74dfd.
+OFFICIAL_GO_V0121_SHA256 = {
+    ('Darwin', 'arm64'): 'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
+    ('Linux', 'aarch64'): 'f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a',
+}
 ROLLBACK_CASES = ['retained-go-post-rust-refusal', 'retained-go-after-v1-restore']
 BRIDGE_CASES = ['retained-go-bridge-read-four', 'retained-go-bridge-create-fifth',
                 'retained-go-bridge-read-five', 'rust-bridge-read-five']
@@ -40,8 +45,20 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def retained_cases(sha256):
-    return (BRIDGE_CASES if sha256 == OFFICIAL_GO_V0121_SHA256 else []) + ROLLBACK_CASES
+def official_go_sha256(system, machine):
+    return OFFICIAL_GO_V0121_SHA256.get((system, machine))
+
+
+def validate_retained_go(sha256, system, machine):
+    require(sha256 in RETAINED_GO_SHA256, 'retained Go artifact is not SHA-pinned')
+    official_hashes = set(OFFICIAL_GO_V0121_SHA256.values())
+    if sha256 in official_hashes:
+        require(sha256 == official_go_sha256(system, machine),
+                'official retained Go artifact does not match the runtime platform')
+
+
+def retained_cases(sha256, system, machine):
+    return (BRIDGE_CASES if sha256 == official_go_sha256(system, machine) else []) + ROLLBACK_CASES
 
 
 def canonical(value):
@@ -112,8 +129,7 @@ def retained_go_post_rust_probe(root, active, artifact, env, args, expected_diag
     """Record the retained fallback's post-Rust refusal beside the Go positive control."""
     artifact = Path(artifact).resolve(strict=True)
     artifact_identity = identity(artifact)
-    require(artifact_identity['sha256'] in RETAINED_GO_SHA256,
-            'retained Go artifact does not match the recorded rollback binary')
+    validate_retained_go(artifact_identity['sha256'], platform.system(), platform.machine())
     stage = active.with_suffix('.next')
     shutil.copyfile(artifact, stage)
     stage.chmod(0o700)
@@ -371,7 +387,10 @@ def run(go, rust, go_tool, root, retained_go=None):
         report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
         if retained_go:
             report['retained_go_artifact'] = identity(retained_go)
-            report['required_cases'] += retained_cases(report['retained_go_artifact']['sha256'])
+            validate_retained_go(report['retained_go_artifact']['sha256'],
+                                 platform.system(), platform.machine())
+            report['required_cases'] += retained_cases(report['retained_go_artifact']['sha256'],
+                                                       platform.system(), platform.machine())
         require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
         report['fixture'] = identity(fixture)
@@ -554,7 +573,8 @@ def run(go, rust, go_tool, root, retained_go=None):
         require(not missing_profile.exists() and identity(active) == identity(go), 'final runtime identity changed')
         require(identity(fixture) == report['fixture'], 'source fixture changed')
         report['steps'][-1]['success'] = True
-        if retained_go and identity(retained_go)['sha256'] == OFFICIAL_GO_V0121_SHA256:
+        official_sha = official_go_sha256(platform.system(), platform.machine())
+        if retained_go and identity(retained_go)['sha256'] == official_sha:
             bridge_dir = root / 'rollback-bridge'
             bridge_dir.mkdir(mode=0o700)
             bridge_db = bridge_dir / 'symeraseme.db'
@@ -567,7 +587,7 @@ def run(go, rust, go_tool, root, retained_go=None):
             report['rollback_bridge'] = {
                 'scope': 'disposable run root only',
                 'official_go_version': 'v0.12.1',
-                'official_go_sha256': OFFICIAL_GO_V0121_SHA256,
+                'official_go_sha256': official_sha,
                 'original_database': str(database),
                 'clone_database': str(bridge_db),
                 'original_state_before_bridge': source_state,
@@ -675,7 +695,8 @@ def run(go, rust, go_tool, root, retained_go=None):
             shutil.copyfile(go, restored)
             os.replace(restored, active)
             require(identity(active) == identity(go), 'current Go artifact restore failed')
-        expected_cases = list(CASES) + (retained_cases(identity(retained_go)['sha256'])
+        expected_cases = list(CASES) + (retained_cases(identity(retained_go)['sha256'],
+                                                       platform.system(), platform.machine())
                                          if retained_go else [])
         require([step['id'] for step in report['steps']] == expected_cases
                 and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')
