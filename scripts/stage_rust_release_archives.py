@@ -109,6 +109,9 @@ def _validate_pe(path: Path, arch: str) -> None:
         expected = {"amd64": 0x8664, "arm64": 0xAA64}[arch]
         if machine != expected:
             raise ValueError(f"PE architecture does not match {arch}")
+        characteristics = struct.unpack("<H", _read_at(source, pe_offset + 22, 2))[0]
+        if not characteristics & 0x0002 or characteristics & 0x2000:
+            raise ValueError("PE image must be an executable, not a DLL")
         optional_size = struct.unpack("<H", _read_at(source, pe_offset + 20, 2))[0]
         optional_magic = struct.unpack("<H", _read_at(source, pe_offset + 24, 2))[0]
         if optional_size < 2 or optional_magic != 0x20B:

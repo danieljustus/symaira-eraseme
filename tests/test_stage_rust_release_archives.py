@@ -19,7 +19,7 @@ from stage_rust_release_archives import TARGETS, main as stage_main
 from verify_release_archives import main as verify_archives
 
 
-def executable_header(os_name: str, arch: str) -> bytes:
+def executable_header(os_name: str, arch: str, *, dll: bool = False) -> bytes:
     if os_name == "linux":
         data = bytearray(64)
         data[:7] = b"\x7fELF\x02\x01\x01"
@@ -43,6 +43,7 @@ def executable_header(os_name: str, arch: str) -> bytes:
     data[0x80:0x84] = b"PE\0\0"
     struct.pack_into("<H", data, 0x84, {"amd64": 0x8664, "arm64": 0xAA64}[arch])
     struct.pack_into("<H", data, 0x84 + 16, 0xF0)
+    struct.pack_into("<H", data, 0x84 + 18, 0x0002 | (0x2000 if dll else 0))
     struct.pack_into("<H", data, 0x84 + 20, 0x20B)
     return bytes(data) + b"windows payload"
 
@@ -100,6 +101,7 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         cases = (
             (("linux", "amd64"), executable_header("linux", "arm64")),
             (("linux", "amd64"), executable_header("windows", "amd64")),
+            (("windows", "amd64"), executable_header("windows", "amd64", dll=True)),
         )
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
