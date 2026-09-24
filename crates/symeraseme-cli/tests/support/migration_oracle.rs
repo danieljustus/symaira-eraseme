@@ -571,7 +571,14 @@ fn migration_filesystem_matches_pinned_native_go() {
 }
 
 fn write_input(path: &Path, content: &str, mode: u32) {
-    fs::create_dir_all(path.parent().expect("input parent")).expect("input parent directory");
+    let parent = path.parent().expect("input parent");
+    fs::create_dir_all(parent).expect("input parent directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o755))
+            .expect("recorded input directory mode");
+    }
     fs::write(path, content.as_bytes()).expect("recorded input");
     #[cfg(unix)]
     {

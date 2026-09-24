@@ -471,10 +471,29 @@ fn install_native_units(
     for name in names {
         let path = root.join(name);
         let content = generated[name].replace(WRAPPER_DIR_PLACEHOLDER, output_dir);
-        fs::write(&path, content)
+        write_native_unit(&path, &content)
             .map_err(|source| SchedulerError::WriteNativeUnit { path, source })?;
     }
     Ok(())
+}
+
+fn write_native_unit(path: &Path, content: &str) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o644)
+            .open(path)?;
+        file.write_all(content.as_bytes())
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(path, content)
+    }
 }
 
 /// Mirrors Go's `Status`, including the launchd name mismatch of #1000.
