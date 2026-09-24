@@ -3,7 +3,7 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Integrated local continuation: `main` is ahead of `origin/main`. No push, publication, cutover, Go removal or release is authorized. The CLI-024, CLI-025, MCP HTTP/stdio and macOS Swift integration slices are committed locally; the older slice notes below are historical.
+- Integrated continuation: the local `main` changes are on proof branch `codex/rust-integrated-proof-7fc31e5`, pushed to run GitHub Actions with user authorization. No release, cutover, Go removal or paid provider is authorized. The CLI-024, CLI-025, MCP HTTP/stdio and macOS Swift integration slices are committed; the older slice notes below are historical. Native CI is evidence only when its jobs pass on the integrated revision and the applicable matrix rows are reconciled.
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
