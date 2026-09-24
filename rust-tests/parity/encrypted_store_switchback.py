@@ -15,8 +15,11 @@ import plain_store_switchback as gate
 
 FIXTURE = gate.REPO / "tests/fixtures/event-store/crypto/golden-campaign-v3-legacy-go.db"
 MASTER_KEY = b"symaira-eraseme-golden-master-32"
-OFFICIAL_GO_V0121_SHA256 = gate.OFFICIAL_GO_V0121_SHA256[("Darwin", "arm64")]
-CURRENT_GO_SHA256 = "f1dd5510150995ee99e9b8d21bbec333e27613b7f070f1a34d5cdedd2081023a"
+OFFICIAL_GO_V0121_SHA256 = gate.OFFICIAL_GO_V0121_SHA256
+CURRENT_GO_SHA256 = {
+    ("Darwin", "arm64"): "f1dd5510150995ee99e9b8d21bbec333e27613b7f070f1a34d5cdedd2081023a",
+    ("Linux", "aarch64"): "c80e8cd9ed442323f47b04802dce1fb149f6b102d9577c7983da3d35db37ae22",
+}
 CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
          "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
          "official-go-write-fifth", "official-go-read-five", "rust-verify-five",
@@ -24,14 +27,19 @@ CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
 
 
 def run(current_go, go, rust, output):
-    gate.require(os.sys.platform == "darwin" and platform.machine() == "arm64",
-                 "encrypted rollback bridge is verified only on macOS arm64")
+    target = (platform.system(), platform.machine())
+    gate.require(target in CURRENT_GO_SHA256 and target in OFFICIAL_GO_V0121_SHA256,
+                 "encrypted rollback bridge requires native macOS or Linux arm64")
+    if target[0] == "Linux":
+        gate.require(os.getuid() != 0 and os.getgid() != 0,
+                     "Linux sandbox runner must start as an unprivileged user")
 
     output = Path(output)
     gate.require(not output.is_symlink(), "switchback output root must not be a symlink")
     output = output.resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    report = {"scope": "macos-encrypted-disposable-rollback-bridge",
+    report = {"scope": ("macos" if target[0] == "Darwin" else "linux-aarch64")
+              + "-encrypted-disposable-rollback-bridge",
               "status": "failed", "platform": {"system": platform.system(),
               "machine": platform.machine()}, "required_cases": list(CASES), "steps": [],
               "production_cutover_verified": False,
@@ -47,9 +55,9 @@ def run(current_go, go, rust, output):
         report["runner_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         report["artifacts"] = {"current_go": gate.identity(current_go),
                                "official_go_v0.12.1": gate.identity(go), "rust": gate.identity(rust)}
-        gate.require(report["artifacts"]["current_go"]["sha256"] == CURRENT_GO_SHA256,
+        gate.require(report["artifacts"]["current_go"]["sha256"] == CURRENT_GO_SHA256[target],
                      "current Go artifact differs from the recorded integrated candidate")
-        gate.require(report["artifacts"]["official_go_v0.12.1"]["sha256"] == OFFICIAL_GO_V0121_SHA256,
+        gate.require(report["artifacts"]["official_go_v0.12.1"]["sha256"] == OFFICIAL_GO_V0121_SHA256[target],
                      "Go artifact is not the SHA-pinned official v0.12.1 release")
         shutil.copyfile(FIXTURE, database)
         gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
@@ -165,7 +173,7 @@ def run(current_go, go, rust, output):
                      "bridge clone did not reach schema-v1 compatibility marker")
         report["rollback_bridge"] = {
             "scope": "isolated plaintext clone only", "official_go_version": "v0.12.1",
-            "official_go_sha256": OFFICIAL_GO_V0121_SHA256,
+            "official_go_sha256": OFFICIAL_GO_V0121_SHA256[target],
             "encrypted_source": str(rollback_copy), "encrypted_source_sha256": original_identity["sha256"],
             "plaintext_clone": str(bridge_db), "state_before_downgrade": source_state,
             "state_after_downgrade": downgraded, "downgrade_changed_only_user_version": True}
