@@ -358,7 +358,8 @@ sys.exit(0 if all(result.values()) else 1)
 '''
 
 
-def run(go, rust, go_tool, root, retained_go=None):
+def run(go, rust, go_tool, root, retained_go=None, expected_go_version='go1.26.6',
+        expected_go_revision=None):
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: switchback confinement is available on macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -437,11 +438,16 @@ def run(go, rust, go_tool, root, retained_go=None):
                 sandbox_command(root, 'go-build-info', go_tool_for_info,
                                 ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
         metadata = (root / 'go-build-info.stdout').read_text()
-        require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
+        require(expected_go_version in metadata.splitlines()[0].split(),
+                'Go artifact toolchain differs from the declared version')
         arch = {'arm64': 'arm64', 'aarch64': 'arm64',
                 'x86_64': 'amd64'}[platform.machine().lower()]
         goos = 'darwin' if sys.platform == 'darwin' else 'linux'
         settings = {line.strip() for line in metadata.splitlines()}
+        if expected_go_revision:
+            require({'build\tvcs.revision=' + expected_go_revision,
+                     'build\tvcs.modified=false'} <= settings,
+                    'Go artifact is not bound to the declared clean source revision')
         require({'build\tCGO_ENABLED=0', 'build\tGOOS=' + goos, 'build\tGOARCH=' + arch} <= settings,
                 'Go artifact must be CGO-free and native')
         try:
@@ -712,8 +718,11 @@ def main():
         parser.add_argument('--' + flag, type=Path, required=True)
     parser.add_argument('--retained-go', type=Path,
                         help='execute the recorded older rollback artifact against post-Rust schema v2')
+    parser.add_argument('--expected-go-version', default='go1.26.6')
+    parser.add_argument('--expected-go-revision')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.retained_go)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.retained_go,
+                 args.expected_go_version, args.expected_go_revision)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 
