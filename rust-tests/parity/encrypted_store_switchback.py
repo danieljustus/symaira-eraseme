@@ -20,16 +20,24 @@ CURRENT_GO_SHA256 = {
     ("Darwin", "arm64"): "f1dd5510150995ee99e9b8d21bbec333e27613b7f070f1a34d5cdedd2081023a",
     ("Linux", "aarch64"): "c80e8cd9ed442323f47b04802dce1fb149f6b102d9577c7983da3d35db37ae22",
 }
+FALLBACK_GO_SHA256 = {
+    ("Darwin", "arm64"): "4db52c538b239cdc50bc7064c56761439f5d1ed3b77072c6ffb1e2f0adccd911",
+    ("Linux", "aarch64"): "55137dab794a4ff88716434f4ae4faebafd4ec499c6aaf6ca3bffd3e47cfabec",
+}
+FALLBACK_GO_REVISION = "84dea1cb112c079186dcd90c0955df524781c516"
 CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
          "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
          "official-go-write-fifth", "official-go-read-five", "rust-verify-five",
          "rust-reencrypt-encv3", "rust-reopen-encv3-five",
          "rust-verify-reopened-imap-state")
+FALLBACK_CASES = ("fallback-go-build-info", "fallback-rust-plan-write",
+                  "fallback-rust-read-five", "fallback-rust-decrypt-state",
+                  "fallback-go-read-five", "fallback-rust-verify-after-go")
 IMAP_STATE_ROW = ("rollback-bridge.invalid", "INBOX", 424242, 987654,
                   "2026-09-25 12:34:56")
 
 
-def run(current_go, go, rust, output):
+def run(current_go, go, rust, output, fallback_go=None):
     target = (platform.system(), platform.machine())
     gate.require(target in CURRENT_GO_SHA256 and target in OFFICIAL_GO_V0121_SHA256,
                  "encrypted rollback bridge requires native macOS or Linux arm64")
@@ -54,6 +62,7 @@ def run(current_go, go, rust, output):
         database = output / "data/symeraseme.db"
         fixture_identity = gate.identity(FIXTURE)
         current_go, go, rust = (Path(path).resolve(strict=True) for path in (current_go, go, rust))
+        fallback_go = Path(fallback_go).resolve(strict=True) if fallback_go else None
         report["fixture"] = fixture_identity
         report["runner_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         report["artifacts"] = {"current_go": gate.identity(current_go),
@@ -62,6 +71,10 @@ def run(current_go, go, rust, output):
                      "current Go artifact differs from the recorded integrated candidate")
         gate.require(report["artifacts"]["official_go_v0.12.1"]["sha256"] == OFFICIAL_GO_V0121_SHA256[target],
                      "Go artifact is not the SHA-pinned official v0.12.1 release")
+        if fallback_go:
+            report["artifacts"]["fallback_go"] = gate.identity(fallback_go)
+            gate.require(report["artifacts"]["fallback_go"]["sha256"] == FALLBACK_GO_SHA256.get(target),
+                         "fallback Go artifact differs from the recorded clean migration candidate")
         shutil.copyfile(FIXTURE, database)
         gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
                      "fixture is not an encrypted V3 database")
@@ -279,6 +292,98 @@ def run(current_go, go, rust, output):
                      "rollback bridge changed the original ENCv3 database bytes")
         gate.require(gate.identity(FIXTURE) == fixture_identity,
                      "source fixture changed during the rehearsal")
+        if fallback_go:
+            report["required_cases"] += list(FALLBACK_CASES)
+            go_tool = shutil.which("go")
+            gate.require(go_tool is not None, "Go tool is required to inspect fallback build metadata")
+            go_tool = Path(go_tool).resolve(strict=True)
+            fallback_env = dict(env, GOROOT=str(go_tool.parent.parent))
+            metadata_step = {"id": FALLBACK_CASES[0], "success": False}
+            report["steps"].append(metadata_step)
+            metadata_step["command"] = gate.command(
+                output, FALLBACK_CASES[0],
+                gate.sandbox_command(output, FALLBACK_CASES[0], go_tool,
+                                     ["version", "-m", str(fallback_go)], fallback_env), fallback_env)
+            metadata = (output / (FALLBACK_CASES[0] + ".stdout")).read_text()
+            settings = {line.strip() for line in metadata.splitlines()}
+            arch = "arm64" if target[1].lower() in ("arm64", "aarch64") else "amd64"
+            os_name = "darwin" if target[0] == "Darwin" else "linux"
+            gate.require("go1.27.1" in metadata.splitlines()[0].split()
+                         and {"build\tvcs.revision=" + FALLBACK_GO_REVISION,
+                              "build\tvcs.modified=false", "build\tCGO_ENABLED=0",
+                              "build\tGOOS=" + os_name, "build\tGOARCH=" + arch} <= settings,
+                         "fallback Go metadata does not match the clean native migration build")
+            metadata_step["success"] = True
+            report["fallback_go_provenance"] = {"revision": FALLBACK_GO_REVISION,
+                                                "vcs_modified": False, "go_version": "go1.27.1",
+                                                "build_metadata": metadata}
+
+            fallback_dir = output / "fallback-encrypted"
+            fallback_dir.mkdir(mode=0o700)
+            fallback_db = fallback_dir / "symeraseme.db"
+            shutil.copyfile(rollback_copy, fallback_db)
+            fallback_run_env = dict(env, SYMERASEME_DATA_DIR=str(fallback_dir),
+                                    SYMERASEME_DB_DIR=str(fallback_dir))
+            fallback_campaign = "rollback-fallback-" + os.urandom(8).hex()
+            fallback_create = execute(
+                FALLBACK_CASES[1], rust,
+                ["plan", "create", "--campaign", fallback_campaign, "--max", "1",
+                 "--profile", str(output / "home/fallback-absent-profile.enc"), "--output", "json"],
+                fallback_run_env)
+            gate.require(fallback_create.get("campaign_id") == fallback_campaign
+                         and fallback_create.get("planned") == 1,
+                         "Rust did not write one request to the fallback ENCv3 clone")
+            expected_rows = execute(FALLBACK_CASES[2], rust,
+                                    ["requests", "list", "--output", "json"], fallback_run_env)
+            gate.require(expected_rows.get("total") == 5 and len(expected_rows.get("requests", [])) == 5,
+                         "Rust fallback clone does not contain five requests")
+            fallback_envelope = gate.identity(fallback_db)
+            gate.require(fallback_db.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                         "Rust did not keep its fallback clone encrypted")
+
+            state_dir = output / "fallback-state-check"
+            state_dir.mkdir(mode=0o700)
+            state_db = state_dir / "symeraseme.db"
+            shutil.copyfile(fallback_db, state_db)
+            state_env = dict(env, SYMERASEME_DATA_DIR=str(state_dir),
+                             SYMERASEME_DB_DIR=str(state_dir), SYMERASEME_ENCRYPT_DB="false")
+            state_rows = execute(FALLBACK_CASES[3], rust,
+                                 ["requests", "list", "--output", "json"], state_env)
+            gate.same(state_rows, expected_rows,
+                      "Rust plaintext inspection clone differs from the encrypted fallback state")
+            fallback_state = gate.snapshot(state_db)
+            gate.require(fallback_state["user_version"] == 2
+                         and fallback_state["integrity"] == [("ok",)]
+                         and len(fallback_state["tables"]["request_events"]["rows"]) > 0,
+                         "Rust fallback state lacks intact request/event data")
+
+            fallback_rows = execute(FALLBACK_CASES[4], fallback_go,
+                                    ["requests", "list", "--output", "json"], fallback_run_env)
+            gate.same(fallback_rows, expected_rows,
+                      "clean migration Go changed or missed Rust-written requests")
+            fallback_after_go = gate.identity(fallback_db)
+            gate.require(fallback_db.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                         "fallback Go read left the store outside the ENCv3 envelope")
+            after_go_dir = output / "fallback-after-go-state"
+            after_go_dir.mkdir(mode=0o700)
+            after_go_db = after_go_dir / "symeraseme.db"
+            shutil.copyfile(fallback_db, after_go_db)
+            after_go_env = dict(env, SYMERASEME_DATA_DIR=str(after_go_dir),
+                                SYMERASEME_DB_DIR=str(after_go_dir), SYMERASEME_ENCRYPT_DB="false")
+            after_go_rows = execute(FALLBACK_CASES[5], rust,
+                                    ["requests", "list", "--output", "json"], after_go_env)
+            gate.same(after_go_rows, expected_rows,
+                      "Rust could not inspect the Go-read encrypted clone")
+            after_go_state = gate.snapshot(after_go_db)
+            gate.same(after_go_state, fallback_state,
+                      "fallback Go read changed request, event, or database state")
+            report["fallback_encrypted_read"] = {
+                "campaign_id": fallback_campaign, "requests": fallback_rows,
+                "state_before_go_read": fallback_state,
+                "state_after_go_read": after_go_state,
+                "encrypted_identity_before": fallback_envelope,
+                "encrypted_identity_after": fallback_after_go,
+                "envelope": "SYMERASEME_ENCv3", "request_and_event_state_unchanged": True}
         gate.require([step["id"] for step in report["steps"]] == report["required_cases"]
                      and all(step["success"] is True for step in report["steps"]),
                      "incomplete case inventory")
@@ -297,9 +402,11 @@ def main():
                         help="recorded integrated current Go executable that writes request four")
     parser.add_argument("--rust", type=Path, required=True,
                         help="existing current Rust executable; this script does not build it")
+    parser.add_argument("--fallback-go", type=Path,
+                        help="optional Go fallback candidate; requires the pinned clean 84dea1cb build")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    result = run(args.current_go, args.go, args.rust, args.output_dir)
+    result = run(args.current_go, args.go, args.rust, args.output_dir, args.fallback_go)
     print(json.dumps({"status": result["status"], "scope": result["scope"],
                       "executed_cases": len(result["steps"]),
                       "original_envelope_unchanged": result.get("original_envelope_unchanged", False)}))
