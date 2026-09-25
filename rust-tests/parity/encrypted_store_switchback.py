@@ -23,7 +23,10 @@ CURRENT_GO_SHA256 = {
 CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
          "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
          "official-go-write-fifth", "official-go-read-five", "rust-verify-five",
-         "rust-reencrypt-encv3", "rust-reopen-encv3-five")
+         "rust-reencrypt-encv3", "rust-reopen-encv3-five",
+         "rust-verify-reopened-imap-state")
+IMAP_STATE_ROW = ("rollback-bridge.invalid", "INBOX", 424242, 987654,
+                  "2026-09-25 12:34:56")
 
 
 def run(current_go, go, rust, output):
@@ -162,6 +165,15 @@ def run(current_go, go, rust, output):
                      "plaintext clone is not an intact schema-v2 database")
         gate.require(len(source_state["tables"]["removal_requests"]["rows"]) == 4,
                      "plaintext clone does not contain four requests")
+        with closing(sqlite3.connect(bridge_db)) as clone:
+            clone.execute("""INSERT INTO imap_state
+                (host, folder, uid_validity, last_uid, updated_at) VALUES (?, ?, ?, ?, ?)""",
+                IMAP_STATE_ROW)
+            clone.commit()
+        source_state = gate.snapshot(bridge_db)
+        expected_imap_row = gate.canonical(list(IMAP_STATE_ROW))
+        gate.require(source_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "disposable clone did not seed the exact synthetic IMAP row")
 
         with closing(sqlite3.connect(bridge_db)) as clone:
             clone.execute("PRAGMA user_version = 1")
@@ -180,6 +192,9 @@ def run(current_go, go, rust, output):
 
         original_rows = execute("official-go-read-four", go,
                                 ["requests", "list", "--output", "json"], plain_env)
+        go_read_state = gate.snapshot(bridge_db)
+        gate.require(go_read_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "official Go read changed or lost the synthetic IMAP row")
         gate.require(original_rows.get("total") == 4 and len(original_rows.get("requests", [])) == 4,
                      "official Go v0.12.1 did not read all four bridged requests")
         gate.same(sorted(map(gate.canonical, original_rows["requests"])),
@@ -196,6 +211,9 @@ def run(current_go, go, rust, output):
         report["steps"][-1]["success"] = True
         five = execute("official-go-read-five", go,
                        ["requests", "list", "--output", "json"], plain_env)
+        go_write_state = gate.snapshot(bridge_db)
+        gate.require(go_write_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "official Go write changed or lost the synthetic IMAP row")
         gate.require(five.get("total") == 5 and len(five.get("requests", [])) == 5,
                      "official Go v0.12.1 could not read its fifth request")
         old = set(map(gate.canonical, original_rows["requests"]))
@@ -212,8 +230,15 @@ def run(current_go, go, rust, output):
         rust_state = gate.snapshot(bridge_db)
         gate.require(rust_state["user_version"] == 2 and rust_state["integrity"] == [("ok",)],
                      "current Rust did not reopen the bridge clone as intact schema v2")
+        gate.require(rust_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "current Rust reopen changed or lost the synthetic IMAP row")
         report["steps"][-1]["success"] = True
         report["rollback_bridge"]["rust_after_five"] = rust_state
+        report["rollback_bridge"]["imap_state_preservation"] = {
+            "row": list(IMAP_STATE_ROW),
+            "after_official_go_read": go_read_state["tables"]["imap_state"]["rows"],
+            "after_official_go_write": go_write_state["tables"]["imap_state"]["rows"],
+            "after_rust_reopen": rust_state["tables"]["imap_state"]["rows"]}
 
         # Re-encrypt the same five-request clone using the production Rust path.
         encrypted_dir = output / "re-encrypted"
@@ -233,6 +258,21 @@ def run(current_go, go, rust, output):
                            ["requests", "list", "--output", "json"], encrypted_env)
         gate.same(reopened, five, "Rust could not reopen its new ENCv3 five-request artifact")
         report["steps"][-1]["success"] = True
+        verify_dir = output / "reopened-imap-check"
+        verify_dir.mkdir(mode=0o700)
+        verify_db = verify_dir / "symeraseme.db"
+        shutil.copyfile(encrypted_db, verify_db)
+        verify_env = dict(env, SYMERASEME_DATA_DIR=str(verify_dir),
+                          SYMERASEME_DB_DIR=str(verify_dir), SYMERASEME_ENCRYPT_DB="false")
+        verified = execute("rust-verify-reopened-imap-state", rust,
+                           ["requests", "list", "--output", "json"], verify_env)
+        gate.same(verified, five, "Rust could not decrypt and reopen the re-encrypted clone")
+        verify_state = gate.snapshot(verify_db)
+        gate.require(verify_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "Rust re-encryption/reopen changed or lost the synthetic IMAP row")
+        report["steps"][-1]["success"] = True
+        report["rollback_bridge"]["imap_state_preservation"]["after_rust_reencrypt_reopen"] = \
+            verify_state["tables"]["imap_state"]["rows"]
         report["new_encrypted_artifact"] = {**encrypted_identity, "envelope": "SYMERASEME_ENCv3",
                                             "requests": 5, "path": str(encrypted_db)}
         gate.require(gate.identity(database) == original_identity,
