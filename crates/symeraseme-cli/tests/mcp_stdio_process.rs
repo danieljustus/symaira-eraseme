@@ -608,6 +608,143 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     }
 }
 
+#[test]
+#[cfg(unix)]
+fn scheduler_uninstall_and_status_stdio_match_source_bound_go() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/mcp-contract/mcp-003-scheduler/cases.json"
+    ))
+    .expect("scheduler oracle fixture");
+    assert_eq!(
+        fixture["source_revision"],
+        "3b61859ff95702536a4390d0675c474c7b5077c3"
+    );
+    let source_checks = [
+        (
+            include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
+            "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2",
+        ),
+        (
+            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+            "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138",
+        ),
+    ];
+    for (index, (source, expected)) in source_checks.into_iter().enumerate() {
+        assert_eq!(fixture["source_files"][index]["sha256"], expected);
+        let digest: String = Sha256::digest(source)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(digest, expected, "Go scheduler oracle source drift");
+    }
+
+    let cases = fixture["cases"].as_array().expect("cases");
+    assert_eq!(cases.len(), 4);
+    let selected = [&cases[1], &cases[2], &cases[3]];
+    assert_eq!(
+        selected
+            .iter()
+            .map(|case| case["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        [
+            "schedule_status_reports_the_installed_cron_block",
+            "schedule_uninstall_removes_only_the_managed_cron_block",
+            "schedule_status_reports_the_uninstalled_cron_block",
+        ]
+    );
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "symeraseme-mcp-schedule-uninstall-{}-{nonce}",
+        std::process::id()
+    ));
+    let home = root.join("home");
+    let data = root.join("data");
+    let tmp = root.join("tmp");
+    let bin = root.join("bin");
+    for dir in [&home, &data, &tmp, &bin] {
+        fs::create_dir_all(dir).unwrap();
+    }
+    let state = root.join("crontab");
+    fs::write(
+        &state,
+        "# user schedule\n# Symaira EraseMe scheduled tasks\n# owned entries\n# End Symaira EraseMe scheduled tasks\n",
+    )
+    .unwrap();
+    fs::write(
+        bin.join("crontab"),
+        "#!/bin/sh\ncase \"$1\" in\n  -l)\n    [ -f \"$SCHEDULER_CRONTAB_STATE\" ] || exit 1\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\n  *)\n    while IFS= read -r line; do printf '%s\\n' \"$line\"; done < \"$1\" > \"$SCHEDULER_CRONTAB_STATE\"\n    ;;\nesac\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(bin.join("crontab"), fs::Permissions::from_mode(0o700)).unwrap();
+    }
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+        .args(["mcp", "--stdio"])
+        .current_dir(&root)
+        .env_clear()
+        .env("PATH", &bin)
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("XDG_DATA_HOME", home.join("xdg-data"))
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .env("TMPDIR", &tmp)
+        .env("SYMERASEME_DATA_DIR", &data)
+        .env("SCHEDULER_CRONTAB_STATE", &state)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        let mut input = child.stdin.take().unwrap();
+        for case in selected {
+            input
+                .write_all(case["request"].as_str().unwrap().as_bytes())
+                .unwrap();
+            input.write_all(b"\n").unwrap();
+        }
+    }
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if child.try_wait().unwrap().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            fs::remove_dir_all(&root).ok();
+            panic!("schedule uninstall/status stdio replay exceeded 15 seconds");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+    let actual = String::from_utf8(output.stdout)
+        .unwrap()
+        .replace(root.to_string_lossy().as_ref(), "<SCHEDULE_ROOT>");
+    let expected = selected
+        .iter()
+        .map(|case| case["response"].as_str().unwrap())
+        .collect::<Vec<_>>()
+        .concat();
+    assert_eq!(actual, expected);
+    assert_eq!(fs::read_to_string(state).unwrap(), "# user schedule\n");
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[cfg(unix)]
 fn run_native_scheduler_case(case: &serde_json::Value) {
     let request: serde_json::Value =
