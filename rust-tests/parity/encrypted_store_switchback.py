@@ -25,6 +25,8 @@ FALLBACK_GO_SHA256 = {
     ("Linux", "aarch64"): "55137dab794a4ff88716434f4ae4faebafd4ec499c6aaf6ca3bffd3e47cfabec",
 }
 FALLBACK_GO_REVISION = "84dea1cb112c079186dcd90c0955df524781c516"
+FALLBACK_GO_VERSION = {("Darwin", "arm64"): "go1.27.1",
+                       ("Linux", "aarch64"): "go1.26.6"}
 CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
          "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
          "official-go-write-fifth", "official-go-read-five", "rust-verify-five",
@@ -298,24 +300,32 @@ def run(current_go, go, rust, output, fallback_go=None):
             gate.require(go_tool is not None, "Go tool is required to inspect fallback build metadata")
             go_tool = Path(go_tool).resolve(strict=True)
             fallback_env = dict(env, GOROOT=str(go_tool.parent.parent))
+            go_tool_for_info = go_tool
+            fallback_for_info = output / "bin/fallback-go-candidate"
+            shutil.copyfile(fallback_go, fallback_for_info)
+            fallback_for_info.chmod(0o700)
+            if target[0] == "Linux":
+                go_tool_for_info = output / "bin/go-tool"
+                shutil.copyfile(go_tool, go_tool_for_info)
+                go_tool_for_info.chmod(0o700)
             metadata_step = {"id": FALLBACK_CASES[0], "success": False}
             report["steps"].append(metadata_step)
             metadata_step["command"] = gate.command(
                 output, FALLBACK_CASES[0],
-                gate.sandbox_command(output, FALLBACK_CASES[0], go_tool,
-                                     ["version", "-m", str(fallback_go)], fallback_env), fallback_env)
+                gate.sandbox_command(output, FALLBACK_CASES[0], go_tool_for_info,
+                                     ["version", "-m", str(fallback_for_info)], fallback_env), fallback_env)
             metadata = (output / (FALLBACK_CASES[0] + ".stdout")).read_text()
             settings = {line.strip() for line in metadata.splitlines()}
             arch = "arm64" if target[1].lower() in ("arm64", "aarch64") else "amd64"
             os_name = "darwin" if target[0] == "Darwin" else "linux"
-            gate.require("go1.27.1" in metadata.splitlines()[0].split()
+            gate.require(FALLBACK_GO_VERSION[target] in metadata.splitlines()[0].split()
                          and {"build\tvcs.revision=" + FALLBACK_GO_REVISION,
                               "build\tvcs.modified=false", "build\tCGO_ENABLED=0",
                               "build\tGOOS=" + os_name, "build\tGOARCH=" + arch} <= settings,
                          "fallback Go metadata does not match the clean native migration build")
             metadata_step["success"] = True
             report["fallback_go_provenance"] = {"revision": FALLBACK_GO_REVISION,
-                                                "vcs_modified": False, "go_version": "go1.27.1",
+                                                "vcs_modified": False, "go_version": FALLBACK_GO_VERSION[target],
                                                 "build_metadata": metadata}
 
             fallback_dir = output / "fallback-encrypted"
