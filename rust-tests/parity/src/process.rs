@@ -754,15 +754,23 @@ mod tests {
     #[test]
     fn fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes() {
         let mut case = Case::new("windows-descendant", dummy("same"), dummy("same"));
-        case.environment.values.insert(
-            "SystemRoot".into(),
-            std::env::var("SystemRoot").expect("Windows provides SystemRoot"),
-        );
+        let system_root = std::env::var("SystemRoot").expect("Windows provides SystemRoot");
+        case.environment
+            .values
+            .insert("SystemRoot".into(), system_root.clone());
         case.go = Program {
-            executable: PathBuf::from("cmd.exe"),
+            // Start-Process returns without waiting while the child inherits
+            // this process's pipes; cmd.exe's start /B kept the parent alive.
+            executable: PathBuf::from(system_root)
+                .join("System32")
+                .join("WindowsPowerShell")
+                .join("v1.0")
+                .join("powershell.exe"),
             argv: vec![
-                "/C".into(),
-                "start \"\" /B \"%SystemRoot%\\System32\\PING.EXE\" -n 10 127.0.0.1".into(),
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                "Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'System32', 'PING.EXE')) -ArgumentList '-n', '10', '127.0.0.1' -NoNewWindow; exit 0".into(),
             ],
         };
         let started = Instant::now();
