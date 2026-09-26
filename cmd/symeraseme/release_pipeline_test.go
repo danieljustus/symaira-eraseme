@@ -366,6 +366,44 @@ func TestReleaseWorkflowContract(t *testing.T) {
 	})
 }
 
+func TestRustPrereleaseFallbackProbeReportsEachFailingDispatchStage(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "rust-prerelease.yml"))
+	if err != nil {
+		t.Fatalf("read Rust prerelease workflow: %v", err)
+	}
+	var workflow workflowDoc
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatalf("parse Rust prerelease workflow: %v", err)
+	}
+	job, ok := workflow.Jobs["native-release-binary"]
+	if !ok {
+		t.Fatal("missing native-release-binary job in Rust prerelease workflow")
+	}
+	step := getWorkflowStep(t, job.Steps, "Build matching Go fallback and probe both dispatch paths")
+	for _, expected := range []string{
+		"fallback_probe_stage=%s",
+		"fallback_probe_result=%s status=passed",
+		"::error title=Fallback probe failed::stage=%s exit=%s",
+		"::error title=Fallback probe mismatch::stage=%s",
+		"go-build",
+		"stage-go-binary",
+		"stage-rust-binary",
+		"stage-go-fallback",
+		"go-version",
+		"rust-go-version",
+		"version-output",
+		"go-mcp",
+		"rust-go-mcp",
+		"mcp-output",
+		"cat \"$stdout\" >&2",
+		"cat \"$stderr\" >&2",
+	} {
+		if !strings.Contains(step.Run, expected) {
+			t.Errorf("step %q missing diagnostic or probe stage %q", step.Name, expected)
+		}
+	}
+}
+
 func TestPackageDMGMockSuite(t *testing.T) {
 	scriptPath := filepath.Join("..", "..", "tests", "test_release_dmg.sh")
 	cmd := exec.Command("bash", scriptPath)
