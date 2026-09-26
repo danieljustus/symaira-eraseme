@@ -568,12 +568,37 @@ fn slow_header_connections_are_bounded_and_backpressured() {
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
     wait_ready(&mut child, port);
+    assert_eq!(exchange(port, "GET", b"", &[]).0, 405);
 
     let mut held = Vec::with_capacity(128);
+    let fill_deadline = Instant::now() + Duration::from_secs(4);
     for _ in 0..128 {
-        held.push(TcpStream::connect(("127.0.0.1", port)).unwrap());
+        loop {
+            match TcpStream::connect(("127.0.0.1", port)) {
+                Ok(stream) => {
+                    held.push(stream);
+                    break;
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionRefused
+                    ) =>
+                {
+                    assert!(
+                        child.try_wait().unwrap().is_none(),
+                        "server exited under connection load"
+                    );
+                    assert!(
+                        Instant::now() < fill_deadline,
+                        "could not establish 128 slow-header connections: {error}"
+                    );
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => panic!("held connection failed unexpectedly: {error}"),
+            }
+        }
     }
-    thread::sleep(Duration::from_millis(150));
 
     let mut queued = match TcpStream::connect(("127.0.0.1", port)) {
         Ok(stream) => stream,
@@ -588,6 +613,14 @@ fn slow_header_connections_are_bounded_and_backpressured() {
                 "server exited under connection load"
             );
             drop(held);
+            assert_eq!(
+                exchange(port, "GET", b"", &[]).0,
+                405,
+                "server did not accept requests after overload"
+            );
+            eprintln!(
+                "OS rejected the over-capacity socket; queued-client branch was not exercised: {error}"
+            );
             signal(&mut child, "TERM");
             return;
         }
