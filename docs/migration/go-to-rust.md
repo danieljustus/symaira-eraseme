@@ -73,6 +73,14 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   root members and checksums from explicit caller-supplied binaries (`1f63e692`).
   Its placeholder-binary test passes the offline verifier; native Rust binary
   format, runtime, signing and publication are not established by that test.
+- The manual `.github/workflows/rust-prerelease.yml` gate now builds on native
+  macOS, Linux and Windows arm64/amd64 runners, checks binary startup/linkage,
+  stages the six Rust binaries with the legacy archive contract, and verifies
+  the resulting archives and checksums. Until that workflow runs successfully,
+  REL-001..004 remain partial; `release.yml` still packages Go and is unchanged.
+- Windows release builds select Rust's static CRT feature and fail if `dumpbin`
+  reports a dynamic CRT or non-system DLL dependency. The Go release contract
+  sets `CGO_ENABLED=0`; no Windows native workflow run has verified the Rust gate yet.
 - Core `GetPlan` now serves both CLI and MCP reads. The independently reviewed
   source-bound Go campaign oracle at `131fb6b4` checks all seven pinned plan
   timestamps before and after execution, plus local no-send web-form/manual
