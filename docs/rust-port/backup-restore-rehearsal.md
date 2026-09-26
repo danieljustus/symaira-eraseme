@@ -8,6 +8,38 @@ failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
 
+## Verified run — 2026-09-26
+
+The complete eight-case sequence passed on macOS arm64 at clean candidate
+`2ece12f74a3fda37c217ced14e7aceac7d4e2a7f`, using the pinned Rust 1.98.0
+toolchain. The Rust release executable was built from that checkout with
+`cargo build --locked --release -p symeraseme-cli --bin symeraseme-rust`; its
+SHA-256 was
+`ebd7221d8f27865308bffa1214c3ba72dcdd7aa0e22c938bdc046f858ae9fc26`.
+
+The historical Go executable was the actual checked-in
+`evidence/artifact/symeraseme-rollback-v0.12.1` bytes, SHA-256
+`d2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22`.
+Its embedded metadata reports Go 1.27.1 and module `(devel)` without a VCS
+revision. This identifies the tested binary by bytes; it does not establish a
+release or source identity. The checked-in v1 fixture SHA-256 was
+`595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120`.
+
+Observed data boundary: Go read 3 baseline requests from schema v1; Rust wrote
+one request and read all 4 from schema v2; the historical Go binary then refused
+v2 with `Go port supports up to 1`. Restoring the pre-Rust online backup returned
+the isolated store to v1, and the same Go bytes read all 3 baseline requests.
+The Rust-created request was absent after restore. The partial-restore negative
+control returned only 2 requests and the baseline verifier rejected it. Thus,
+restoring the backup loses every write made after that backup; operators must
+preserve or reconcile those post-backup writes before using this rollback path.
+
+Raw command records, database snapshots, and the full report were retained under
+the ignored candidate-local path
+`target/issue-1035-backup-restore-clean/`. The run recorded a clean source
+checkout, no tracked or untracked source changes, and distinct SHA-256 identities
+for the Go and Rust executables.
+
 The runner records the supplied Go binary's hash and raw `go version -m` output.
 It does not infer release identity from a filename. The repository's retained
 `evidence/artifact/symeraseme-rollback-v0.12.1` file reports module `(devel)` and
