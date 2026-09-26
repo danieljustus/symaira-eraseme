@@ -770,7 +770,7 @@ mod tests {
                 "-NoProfile".into(),
                 "-NonInteractive".into(),
                 "-Command".into(),
-                "Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'System32', 'PING.EXE')) -ArgumentList '-n', '10', '127.0.0.1' -NoNewWindow; exit 0".into(),
+                "$p = Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'System32', 'PING.EXE')) -ArgumentList '-n', '10', '127.0.0.1' -NoNewWindow -PassThru -ErrorAction Stop; if ($null -eq $p -or $p.HasExited) { exit 1 }; exit 0".into(),
             ],
         };
         let started = Instant::now();
@@ -784,6 +784,11 @@ mod tests {
             result.stderr
         );
         assert_eq!(result.status.exit_code, Some(0));
+        assert!(
+            result.stderr.is_empty(),
+            "launch failed: {:?}",
+            result.stderr
+        );
     }
 
     #[cfg(windows)]
