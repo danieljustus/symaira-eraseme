@@ -25,36 +25,42 @@ jobs:
             arch: arm64
             target: aarch64-apple-darwin
             host: aarch64-apple-darwin
+            rustflags: ''
           - name: macOS amd64
             runner: macos-15-intel
             os: darwin
             arch: amd64
             target: x86_64-apple-darwin
             host: x86_64-apple-darwin
+            rustflags: ''
           - name: Linux arm64
             runner: ubuntu-24.04-arm
             os: linux
             arch: arm64
             target: aarch64-unknown-linux-musl
             host: aarch64-unknown-linux-gnu
+            rustflags: ''
           - name: Linux amd64
             runner: ubuntu-24.04
             os: linux
             arch: amd64
             target: x86_64-unknown-linux-musl
             host: x86_64-unknown-linux-gnu
+            rustflags: ''
           - name: Windows arm64
             runner: windows-11-arm
             os: windows
             arch: arm64
             target: aarch64-pc-windows-msvc
             host: aarch64-pc-windows-msvc
+            rustflags: -C target-feature=+crt-static
           - name: Windows amd64
             runner: windows-2025
             os: windows
             arch: amd64
             target: x86_64-pc-windows-msvc
             host: x86_64-pc-windows-msvc
+            rustflags: -C target-feature=+crt-static
 
     steps:
       - name: Checkout
@@ -105,6 +111,7 @@ jobs:
           CC_x86_64_unknown_linux_musl: musl-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          RUSTFLAGS: ${{ matrix.rustflags }}
         run: |
           set -euo pipefail
           cargo +"$RUST_TOOLCHAIN" build --release -p symeraseme-cli --bin symeraseme-rust --target "$TARGET" --locked
@@ -153,8 +160,13 @@ jobs:
                   if ($candidate) { $dumpbin = $candidate; break }
                 }
                 if (-not $dumpbin) { throw "dumpbin.exe was not found" }
-                & $dumpbin /DEPENDENTS "$env:BINARY_PATH"
+                $imports = & $dumpbin /DEPENDENTS "$env:BINARY_PATH"
                 if ($LASTEXITCODE -ne 0) { throw "dumpbin /DEPENDENTS failed" }
+                $importsPath = Join-Path $env:RUNNER_TEMP "symeraseme-rust-dependencies.txt"
+                [System.IO.File]::WriteAllLines($importsPath, [string[]]$imports)
+                python "$env:GITHUB_WORKSPACE\scripts\verify_windows_dll_dependencies.py" `
+                  "$importsPath" "$env:WINDIR\System32"
+                if ($LASTEXITCODE -ne 0) { throw "Windows DLL dependency verification failed" }
               '
               ;;
             *)
