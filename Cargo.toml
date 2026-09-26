@@ -38,11 +38,12 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9.34"
 symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "27177f25f551cecefa7bd6c4524abf175b3a75c7" }
 symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "0f441fb27872da7edd65244e4fcbd0890f0b7174" }
+symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "0277afe3cf1a35c9db173d9bb29ee07ac6cd6368" }
 tar = "0.4.44"
 tempfile = "3.27.0"
 toml = "1.1.0"
 rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
-ureq = { version = "3.4.1", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.13.0"
 minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
 pbkdf2 = { version = "0.13.0", features = ["hmac"] }

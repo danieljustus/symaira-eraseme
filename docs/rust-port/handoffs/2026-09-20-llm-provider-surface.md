@@ -18,12 +18,20 @@ runs are `cmp`-identical. `crates/symeraseme-core/tests/llm_surface.rs` replays 
 | `create_cases` | 8 | resolution order (option → env → default), trim + lowercase, the `agent` model fallback to `auto`, the agent retry/tracker defaults, availability with an empty PATH, and the unknown-provider text with `%q` escaping |
 | `retry_cases` | 9 | attempt counts, the returned text/usage, the error text and Go type name, the backoff arithmetic (`2^attempt` plus the cache-key jitter for a rate limit), the foreign-error no-retry path, the cancelled context, `host-agent-unavailable` (retryable `*Error`, three attempts) and the zero-value client's `all 0 retries exhausted: %!w(<nil>)` |
 
+## Rust transport update (2026-09-26)
+
+- EraseMe's Rust LLM adapter now uses CoreKit's `symaira-core-llm` crate, pinned to merge commit
+  `0277afe3cf1a35c9db173d9bb29ee07ac6cd6368`. The MCP `classify_reply` and `generate_rebuttal`
+  handlers now construct that client through the existing `llm::create` path. Provider descriptors,
+  OpenAI/Anthropic wire dialects and HTTP error codes are owned by CoreKit; EraseMe retains its
+  existing credential-input, retry and reply-service behavior.
+- `crates/symeraseme-core/tests/llmkit_transport_contract.rs` replays the pinned Go HTTP cases, and
+  `crates/symeraseme-cli/src/mcp/handler.rs` has a local fake-provider test that exercises both MCP
+  consumers without real credentials or external network access. The Go source digests remain pinned
+  to the Oracle's CoreKit v0.16.2 behavior.
+
 ## What stays Go, and why
 
-- `anthropic`, `openai`, `ollama`, `openai-compatible`: transports, wire dialects, credential
-  reference resolution and the `auth_failure` text all live in `corekit/llmkit`, which has no Rust
-  counterpart. `llm::create` reports those providers as `TransportNotPorted` instead of pretending an
-  equivalent client exists; the fixture keeps the measured Go text of that path under `boundaries`.
 - The host-agent subprocess protocol: CLI **detection** is ported (PATH lookup with the executable
   bit, `agentDefs`, preference order), but the invocation template, the 120 s timeout and the
   exit-code wrapping need a fake CLI on PATH to pin. `AgentClient::unavailable_error` covers the one

@@ -162,6 +162,8 @@ pub struct ContractHandler {
     /// The injected HWM store for `poll_inbox`. Go uses
     /// `ContractHandlerOptions.HWMStore`; `None` means an in-memory store.
     pub hwm_store: Option<std::sync::Arc<dyn HwmStore>>,
+    #[cfg(test)]
+    llm_environment: Option<HashMap<String, String>>,
 }
 
 impl ContractHandler {
@@ -173,6 +175,8 @@ impl ContractHandler {
             data_dir: None,
             imap_dialer: None,
             hwm_store: None,
+            #[cfg(test)]
+            llm_environment: None,
         }
     }
 
@@ -199,6 +203,12 @@ impl ContractHandler {
     /// Adds the HWM store for the `poll_inbox` tool.
     pub fn with_hwm_store(mut self, store: std::sync::Arc<dyn HwmStore>) -> Self {
         self.hwm_store = Some(store);
+        self
+    }
+
+    #[cfg(test)]
+    fn with_test_llm_environment(mut self, environment: HashMap<String, String>) -> Self {
+        self.llm_environment = Some(environment);
         self
     }
 
@@ -557,7 +567,13 @@ impl ContractHandler {
                 model: get_str(arguments, "model", ""),
                 ..CreateOptions::default()
             },
-            &|name| std::env::var(name).ok(),
+            &|name| {
+                #[cfg(test)]
+                if let Some(environment) = &self.llm_environment {
+                    return environment.get(name).cloned();
+                }
+                std::env::var(name).ok()
+            },
         )
         .map_err(|error| ToolError(error.to_string()))
     }
@@ -1626,6 +1642,10 @@ mod tests {
     use crate::mcp::protocol::{InitializeOutcome, initialize};
     use serde::Deserialize;
     use std::fs;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+    use std::time::{Duration, Instant};
     use symeraseme_core::email::hwm::MemoryHwmStore;
     use symeraseme_core::email::session::{FetchedMessage, ImapSession};
     use symeraseme_core::email::types::ImapConfig;
@@ -3142,6 +3162,81 @@ mod tests {
         (root, handler)
     }
 
+    fn scripted_llm(contents: Vec<&'static str>) -> (String, thread::JoinHandle<Vec<Value>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake LLM");
+        listener
+            .set_nonblocking(true)
+            .expect("set fake LLM listener nonblocking");
+        let address = listener.local_addr().expect("fake LLM address");
+        let server = thread::spawn(move || {
+            let mut requests = Vec::new();
+            for content in contents {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                let (mut stream, _) = loop {
+                    match listener.accept() {
+                        Ok(connection) => break connection,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "timed out accepting LLM request");
+                            thread::sleep(Duration::from_millis(10));
+                        }
+                        Err(error) => panic!("accept LLM request: {error}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .expect("set fake LLM read timeout");
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 4096];
+                let (header_end, body_len) = loop {
+                    let read = stream.read(&mut buffer).expect("read LLM request");
+                    assert_ne!(read, 0, "LLM client closed before completing the request");
+                    request.extend_from_slice(&buffer[..read]);
+                    if let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let header_end = end + 4;
+                        let headers = String::from_utf8_lossy(&request[..end]);
+                        let content_length = headers
+                            .lines()
+                            .find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().ok())
+                                    .flatten()
+                            })
+                            .expect("content length");
+                        if request.len() >= header_end + content_length {
+                            break (header_end, content_length);
+                        }
+                    }
+                };
+                let headers = String::from_utf8_lossy(&request[..header_end - 4]);
+                let path = headers
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .expect("request path");
+                assert_eq!(path, "/v1/chat/completions");
+                requests.push(
+                    serde_json::from_slice::<Value>(&request[header_end..header_end + body_len])
+                        .expect("LLM request body JSON"),
+                );
+
+                let body = json!({
+                    "choices": [{"message": {"content": content}, "finish_reason": "stop"}]
+                })
+                .to_string();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .expect("write LLM response");
+            }
+            requests
+        });
+        (format!("http://{address}/v1"), server)
+    }
+
     /// A seeded or empty store behind the frozen mcp-poll mailbox.
     fn poll_handler(name: &str, seed: bool) -> (PathBuf, ContractHandler) {
         let (root, handler) = seeded_handler(name);
@@ -3405,9 +3500,89 @@ mod tests {
             .call("classify_reply", &arguments)
             .expect_err("an unreachable model must surface");
         assert!(
-            error.0.contains("provider_error"),
-            "unexpected: {}",
+            error.0.contains("transport_error"),
+            "CoreKit preserves Go llmkit's transport error class: {}",
             error.0
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn classify_and_rebuttal_mcp_tools_use_the_corekit_llm_transport() {
+        let (root, handler) = seeded_handler("llm-mcp-consumers");
+        let store = Store::open(root.join("data").join("symeraseme.db")).expect("store");
+        let request_id = Repository::new(&store)
+            .create_removal_request(
+                "broker-x",
+                "email",
+                "campaign-x",
+                "DE",
+                "gdpr-art17.de.md.j2",
+                "",
+            )
+            .expect("request");
+        store
+            .connection()
+            .execute(
+                "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (
+                    request_id,
+                    "m1",
+                    "t1",
+                    "broker@example.invalid",
+                    "Re: deletion",
+                    "We could not verify the address on your account.",
+                ),
+            )
+            .expect("reply row");
+        drop(store);
+
+        let (base_url, server) = scripted_llm(vec![
+            r#"{"classification":"rejected","confidence":0.91,"summary":"address mismatch","extracted_fields":{}}"#,
+            r#"{"classification":"address_mismatch","confidence":0.93,"summary":"address mismatch","key_points":["address"],"jurisdiction":"GDPR"}"#,
+        ]);
+        let handler = handler.with_test_llm_environment(HashMap::from([
+            ("SYMERASEME_LLM_BASE_URL".to_owned(), base_url),
+            (
+                "OPENAI_API_KEY".to_owned(),
+                "synthetic-mcp-test-key".to_owned(),
+            ),
+        ]));
+
+        let mut arguments = Map::new();
+        arguments.insert("provider".to_owned(), json!("openai"));
+        arguments.insert("model".to_owned(), json!("gpt-4o"));
+        arguments.insert("request_id".to_owned(), json!(request_id));
+        arguments.insert("save".to_owned(), json!(false));
+        let classified = handler
+            .call("classify_reply", &arguments)
+            .expect("classify reply MCP handler");
+        let classified: Value =
+            serde_json::from_str(classified.as_str().expect("Go-compatible result string"))
+                .expect("classification JSON result");
+        assert_eq!(classified["classification"], "rejected");
+
+        let rebuttal = handler
+            .call("generate_rebuttal", &arguments)
+            .expect("generate rebuttal MCP handler");
+        let rebuttal: Value =
+            serde_json::from_str(rebuttal.as_str().expect("Go-compatible result string"))
+                .expect("rebuttal JSON result");
+        assert_eq!(rebuttal["LLMUsed"], true);
+        assert_eq!(rebuttal["RejectionClassification"], "address_mismatch");
+
+        let requests = server.join().expect("fake LLM server");
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0]["model"], "gpt-4o");
+        assert_eq!(
+            requests[0]["messages"][0]["content"],
+            triage_service::CLASSIFIER_SYSTEM_PROMPT
+        );
+        assert_eq!(requests[1]["model"], "gpt-4o");
+        assert_eq!(
+            requests[1]["messages"][0]["content"],
+            triage_service::REBUTTAL_SYSTEM_PROMPT
         );
         let _ = fs::remove_dir_all(&root);
     }

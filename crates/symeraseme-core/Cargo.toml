@@ -29,6 +29,7 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 symaira-core-sqlite.workspace = true
 symaira-core-version.workspace = true
+symaira-core-llm.workspace = true
 tar.workspace = true
 tempfile.workspace = true
 toml.workspace = true
