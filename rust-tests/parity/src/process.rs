@@ -754,6 +754,7 @@ mod tests {
     #[test]
     fn fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes() {
         const HELPER: &str = "SYMERASEME_PARITY_DESCENDANT_HELPER";
+        const SPAWNED: &str = "SYMERASEME_PARITY_DESCENDANT_SPAWNED";
         if std::env::var_os(HELPER).is_some() {
             let system_root = std::env::var("SystemRoot").expect("Windows provides SystemRoot");
             let mut child =
@@ -766,6 +767,7 @@ mod tests {
                     .expect("launch long-running descendant");
             thread::sleep(Duration::from_millis(50));
             assert!(child.try_wait().expect("probe descendant").is_none());
+            println!("{SPAWNED}");
             return;
         }
         let mut case = Case::new("windows-descendant", dummy("same"), dummy("same"));
@@ -780,6 +782,7 @@ mod tests {
                 "--exact".into(),
                 "process::tests::fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes"
                     .into(),
+                "--nocapture".into(),
             ],
         };
         let started = Instant::now();
@@ -797,6 +800,14 @@ mod tests {
             result.stderr.is_empty(),
             "launch failed: {:?}",
             result.stderr
+        );
+        assert!(
+            result
+                .stdout
+                .windows(SPAWNED.len())
+                .any(|part| part == SPAWNED.as_bytes()),
+            "descendant helper did not run: {:?}",
+            result.stdout
         );
     }
 
