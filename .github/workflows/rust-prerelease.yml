@@ -193,13 +193,11 @@ jobs:
           set -euo pipefail
           export GOWORK=off GOENV=off GOTOOLCHAIN=local CGO_ENABLED=0
           go_binary="$RUNNER_TEMP/go-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
-          go_build_output="$go_binary"
           pair="$RUNNER_TEMP/fallback-probe-$ARCHIVE_OS-$ARCHIVE_ARCH"
           rust_name=symeraseme
           go_name=symeraseme-go
           mkdir -p "$pair/home" "$pair/data"
           if [[ "$RUNNER_OS" == Windows ]]; then
-            go_build_output+=".exe"
             rust_name+=".exe"
             go_name+=".exe"
           fi
@@ -241,10 +239,7 @@ jobs:
             fi
           }
 
-          probe_command go-build go build -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_build_output" ./cmd/symeraseme
-          if [[ "$go_build_output" != "$go_binary" ]]; then
-            probe_command stage-go-binary cp "$go_build_output" "$go_binary"
-          fi
+          probe_command go-build go build -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_binary" ./cmd/symeraseme
 
           rust_pair="$pair/$rust_name"
           go_pair="$pair/$go_name"
