@@ -157,8 +157,6 @@ pub enum ClientError {
         retries: i64,
         source: Option<String>,
     },
-    /// A provider whose transport lives in corekit/llmkit.
-    TransportNotPorted { provider: String },
     /// A non-retryable foreign failure, surfaced unchanged.
     Foreign(String),
 }
@@ -175,10 +173,6 @@ impl fmt::Display for ClientError {
                 // Go's fmt renders a nil error wrapped with %w this way.
                 None => write!(formatter, "all {retries} retries exhausted: %!w(<nil>)"),
             },
-            Self::TransportNotPorted { provider } => write!(
-                formatter,
-                "provider {provider:?} is served by corekit/llmkit, which is not ported to Rust"
-            ),
             Self::Foreign(message) => formatter.write_str(message),
         }
     }
@@ -894,6 +888,7 @@ pub fn create_with(
     } else {
         String::new()
     };
+    transport::validate_provider_base_url(&provider, &base_url)?;
     if provider == "openai-compatible" && base_url.is_empty() {
         let detail = "llmkit: provider \"custom\" requires a base URL override (WithBaseURL)";
         return Err(ClientError::Provider(LlmError::with_source(
@@ -901,7 +896,6 @@ pub fn create_with(
             detail,
         )));
     }
-    transport::validate_provider_base_url(&provider, &base_url)?;
     let api_key = if !options.api_key.is_empty() {
         Some(options.api_key.clone())
     } else if !spec.env_key.is_empty() {
@@ -919,7 +913,8 @@ pub fn create_with(
     } else {
         None
     };
-    let provider_client = LlmkitClient::new(&provider, model.clone(), base_url, api_key)?;
+    let provider_client =
+        LlmkitClient::new(&provider, model.clone(), base_url, api_key, String::new())?;
     Ok(AgentClient::with_llmkit(
         model,
         provider_client,

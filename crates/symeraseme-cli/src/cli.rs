@@ -1275,9 +1275,8 @@ fn poll_inbox_command(parsed: &Parsed) -> Outcome {
     }
 }
 
-/// Build the local host-agent client selected by Go's `llm.Create`. Provider
-/// transports that Rust does not own remain explicit errors; this path never
-/// constructs an HTTP client or sends network traffic.
+/// Build the provider client selected by Go's `llm.Create`, including CoreKit's
+/// shared HTTP transport for Anthropic, OpenAI, Ollama and custom endpoints.
 fn triage_agent(parsed: &Parsed) -> Result<AgentClient, String> {
     llm::create(
         &CreateOptions {

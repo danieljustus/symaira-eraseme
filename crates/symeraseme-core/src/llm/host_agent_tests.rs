@@ -41,7 +41,6 @@ fn error_type(error: &ClientError) -> &'static str {
         ClientError::UnknownProvider(_) => "ProviderError",
         ClientError::Context(_) => "context deadline exceeded",
         ClientError::RetriesExhausted { .. } => "*fmt.wrapError",
-        ClientError::TransportNotPorted { .. } => "ClientError",
         ClientError::Foreign(_) => "*errors.errorString",
     }
 }
