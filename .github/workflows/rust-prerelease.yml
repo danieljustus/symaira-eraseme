@@ -194,37 +194,75 @@ jobs:
           export GOWORK=off GOENV=off GOTOOLCHAIN=local CGO_ENABLED=0
           go_binary="$RUNNER_TEMP/go-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
           go_build_output="$go_binary"
+          pair="$RUNNER_TEMP/fallback-probe-$ARCHIVE_OS-$ARCHIVE_ARCH"
           rust_name=symeraseme
           go_name=symeraseme-go
+          mkdir -p "$pair/home" "$pair/data"
           if [[ "$RUNNER_OS" == Windows ]]; then
             go_build_output+=".exe"
             rust_name+=".exe"
             go_name+=".exe"
           fi
-          go build -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_build_output" ./cmd/symeraseme
+          probe_command() {
+            local stage="$1"
+            shift
+            local stdout="$pair/$stage.stdout"
+            local stderr="$pair/$stage.stderr"
+            printf 'fallback_probe_stage=%s\n' "$stage"
+            if "$@" >"$stdout" 2>"$stderr"; then
+              printf 'fallback_probe_result=%s status=passed\n' "$stage"
+            else
+              local status=$?
+              printf '::error title=Fallback probe failed::stage=%s exit=%s\n' "$stage" "$status"
+              printf '%s stdout:\n' "$stage" >&2
+              cat "$stdout" >&2
+              printf '%s stderr:\n' "$stage" >&2
+              cat "$stderr" >&2
+              return "$status"
+            fi
+          }
+
+          compare_probe() {
+            local stage="$1"
+            local expected="$2"
+            local actual="$3"
+            printf 'fallback_probe_stage=%s\n' "$stage"
+            if cmp -s "$expected" "$actual"; then
+              printf 'fallback_probe_result=%s status=matched\n' "$stage"
+            else
+              local diff_status=0
+              diff -u "$expected" "$actual" >"$pair/$stage.diff" || diff_status=$?
+              if [[ "$diff_status" -gt 1 ]]; then
+                printf 'fallback_probe_diff_status=%s\n' "$diff_status" >&2
+              fi
+              printf '::error title=Fallback probe mismatch::stage=%s\n' "$stage"
+              cat "$pair/$stage.diff" >&2
+              return 1
+            fi
+          }
+
+          probe_command go-build go build -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_build_output" ./cmd/symeraseme
           if [[ "$go_build_output" != "$go_binary" ]]; then
-            cp "$go_build_output" "$go_binary"
+            probe_command stage-go-binary cp "$go_build_output" "$go_binary"
           fi
 
-          pair="$RUNNER_TEMP/fallback-probe-$ARCHIVE_OS-$ARCHIVE_ARCH"
-          mkdir -p "$pair/home" "$pair/data"
           rust_pair="$pair/$rust_name"
           go_pair="$pair/$go_name"
-          cp "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH" "$rust_pair"
-          cp "$go_binary" "$go_pair"
+          probe_command stage-rust-binary cp "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH" "$rust_pair"
+          probe_command stage-go-fallback cp "$go_binary" "$go_pair"
 
-          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
-            "$go_pair" version --json > "$pair/go-version.json"
-          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
-            "$rust_pair" version --json > "$pair/fallback-version.json"
-          cmp "$pair/go-version.json" "$pair/fallback-version.json"
+          probe_command go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
+            "$go_pair" version --json
+          probe_command rust-go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
+            "$rust_pair" version --json
+          compare_probe version-output "$pair/go-version.stdout" "$pair/rust-go-version.stdout"
 
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"archive-fallback-probe","version":"1"}}}' > "$pair/initialize.json"
-          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
-            "$go_pair" mcp --stdio < "$pair/initialize.json" > "$pair/go-mcp.json"
-          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
-            "$rust_pair" mcp --stdio < "$pair/initialize.json" > "$pair/fallback-mcp.json"
-          cmp "$pair/go-mcp.json" "$pair/fallback-mcp.json"
+          probe_command go-mcp env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
+            "$go_pair" mcp --stdio < "$pair/initialize.json"
+          probe_command rust-go-mcp env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
+            "$rust_pair" mcp --stdio < "$pair/initialize.json"
+          compare_probe mcp-output "$pair/go-mcp.stdout" "$pair/rust-go-mcp.stdout"
 
       - name: Upload native binary for same-run archive verification
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
