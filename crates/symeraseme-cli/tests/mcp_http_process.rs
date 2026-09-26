@@ -1,5 +1,4 @@
 //! Exercise token-authenticated MCP over the real local process/network path.
-#![cfg(unix)]
 
 use std::collections::HashSet;
 use std::io::{Read, Write};
@@ -8,9 +7,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(unix)]
+use std::time::Instant;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 struct TestDir(PathBuf);
+#[cfg(unix)]
 type OracleCase<'a> = (&'a str, &'a [u8], Vec<(&'a str, String)>);
 
 impl TestDir {
@@ -107,6 +109,7 @@ fn startup_error(
     (status, stderr)
 }
 
+#[cfg(unix)]
 fn build_go_oracle(root: &Path) -> PathBuf {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let oracle = root.join("symeraseme-go-oracle");
@@ -145,8 +148,18 @@ fn wait_ready(child: &mut Child, port: u16) {
 
 fn token(root: &Path) -> String {
     let path = root.join("data/mcp_token");
-    let value = std::fs::read_to_string(&path).unwrap();
-    assert_eq!(value.len(), 43);
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let value = loop {
+        let value = std::fs::read_to_string(&path).unwrap();
+        if value.len() == 43 {
+            break value;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "MCP token was not rotated"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -177,6 +190,7 @@ fn exchange(
     read_response(&mut stream)
 }
 
+#[cfg(unix)]
 fn exchange_obs_text_origin(port: u16, token: &str) -> (u16, String, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
@@ -272,23 +286,6 @@ fn read_response(stream: &mut TcpStream) -> (u16, String, Vec<u8>) {
     (status, content_type, body)
 }
 
-fn stop_with_args(args: &[&str], root: &Path) -> (std::process::ExitStatus, String) {
-    let home = root.join("failed-home");
-    std::fs::create_dir_all(&home).unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
-        .args(args)
-        .env("HOME", &home)
-        .env("USERPROFILE", &home)
-        .env("SYMERASEME_DATA_DIR", root.join("failed-data"))
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let status = child.wait().unwrap();
-    let stderr = std::io::read_to_string(child.stderr.take().unwrap()).unwrap();
-    (status, stderr)
-}
-
 #[cfg(unix)]
 fn signal(child: &mut Child, name: &str) {
     send_signal(child, name);
@@ -318,10 +315,10 @@ fn send_signal(child: &mut Child, name: &str) {
 }
 
 #[test]
-#[cfg(unix)]
-fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() {
+fn http_process_enforces_loopback_origin_and_bearer_auth_and_rotates_token() {
     let root = TestDir::new();
     std::fs::create_dir_all(root.path().join("data")).unwrap();
+    std::fs::write(root.path().join("data/mcp_token"), "old-token").unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -330,7 +327,6 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
             std::fs::Permissions::from_mode(0o777),
         )
         .unwrap();
-        std::fs::write(root.path().join("data/mcp_token"), "old-token").unwrap();
         std::fs::set_permissions(
             root.path().join("data/mcp_token"),
             std::fs::Permissions::from_mode(0o666),
@@ -438,6 +434,7 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
 "#
     );
 
+    #[cfg(unix)]
     for signal_name in ["INT", "TERM"] {
         signal(&mut child, signal_name);
         if signal_name == "INT" {
@@ -451,14 +448,36 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
         }
     }
 
-    let (status, stderr) = stop_with_args(&["mcp", "--host", "0.0.0.0"], root.path());
+    #[cfg(windows)]
+    {
+        child.kill().unwrap();
+        let _ = child.wait().unwrap();
+        child = start(root.path(), port, "127.0.0.1", false);
+        wait_ready(&mut child, port);
+        let second_token = token(root.path());
+        assert_ne!(
+            first_token, second_token,
+            "MCP token was not rotated on restart"
+        );
+        child.kill().unwrap();
+        let _ = child.wait().unwrap();
+    }
+
+    let binary = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    let (status, stderr) = startup_error(binary, root.path(), free_port(), "0.0.0.0", false);
     assert!(!status.success());
     assert!(stderr.contains("refusing non-loopback MCP bind \"0.0.0.0\" without --allow-remote"));
 
     let remote_port = free_port();
     let mut remote = start(root.path(), remote_port, "0.0.0.0", true);
     wait_ready(&mut remote, remote_port);
+    #[cfg(unix)]
     signal(&mut remote, "TERM");
+    #[cfg(windows)]
+    {
+        remote.kill().unwrap();
+        let _ = remote.wait().unwrap();
+    }
 }
 
 #[test]

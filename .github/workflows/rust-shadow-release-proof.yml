@@ -1,0 +1,13 @@
+name: Rust shadow release proof (compatibility entrypoint)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dual-backend-archive-proof:
+    uses: ./.github/workflows/rust-prerelease.yml
+    permissions:
+      contents: read

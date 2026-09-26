@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""macOS plain-store Go -> Rust -> Go regression, never release acceptance.
+"""Disposable plain-store Go -> Rust -> Go regression, never release acceptance.
 
 The caller supplies independently built artifacts. No production store, old
-fallback evidence, schema guard or installed executable is changed. Linux and
-Windows need their own confinement/cleanup proof before this gate supports them.
+fallback evidence, schema guard or installed executable is changed. Windows
+needs its own confinement/cleanup proof before this gate supports it.
 """
 import argparse
 from contextlib import closing
@@ -24,11 +24,41 @@ LINUX_SANDBOX = Path(__file__).with_name('linux_store_sandbox.py').resolve()
 GUEST_LOCAL_FILESYSTEMS = {'ext4', 'xfs', 'btrfs', 'tmpfs'}
 CASES = ('go-baseline', 'rust-write', 'rust-plan', 'rust-requests',
          'go-plan-after-switch', 'go-requests-after-switch')
+RETAINED_GO_SHA256 = {
+    # Local retained artifact and verified official v0.12.1 arm64 executables.
+    'd2cafdd118ad8c81bd29f7d165949f78dc2722d0b5b043368a0db616d4838f22',
+    'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
+    'f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a',
+}
+# Linux arm64 release archive SHA-256: 02613a59bd88657c436ee8d748f33cc0910ec0cafb07cd238f3e1fd520e74dfd.
+OFFICIAL_GO_V0121_SHA256 = {
+    ('Darwin', 'arm64'): 'b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3',
+    ('Linux', 'aarch64'): 'f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a',
+}
+ROLLBACK_CASES = ['retained-go-post-rust-refusal', 'retained-go-after-v1-restore']
+BRIDGE_CASES = ['retained-go-bridge-read-four', 'retained-go-bridge-create-fifth',
+                'retained-go-bridge-read-five', 'rust-bridge-read-five']
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def official_go_sha256(system, machine):
+    return OFFICIAL_GO_V0121_SHA256.get((system, machine))
+
+
+def validate_retained_go(sha256, system, machine):
+    require(sha256 in RETAINED_GO_SHA256, 'retained Go artifact is not SHA-pinned')
+    official_hashes = set(OFFICIAL_GO_V0121_SHA256.values())
+    if sha256 in official_hashes:
+        require(sha256 == official_go_sha256(system, machine),
+                'official retained Go artifact does not match the runtime platform')
+
+
+def retained_cases(sha256, system, machine):
+    return (BRIDGE_CASES if sha256 == official_go_sha256(system, machine) else []) + ROLLBACK_CASES
 
 
 def canonical(value):
@@ -50,7 +80,7 @@ def identity(path):
     return {'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
 
 
-def command(root, label, argv, env, timeout=30):
+def command(root, label, argv, env, timeout=30, expected_exit_code=0):
     """Retain failures and raw bytes; bound file growth and the owned process group."""
     import resource
 
@@ -59,7 +89,8 @@ def command(root, label, argv, env, timeout=30):
         resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
 
     record = {'argv': list(map(str, argv)), 'cwd': str(root), 'exit_code': None,
-              'timed_out': False, 'success': False}
+              'timed_out': False, 'success': False,
+              'expected_exit_code': expected_exit_code, 'expectation_met': False}
     try:
         with (root / (label + '.stdout')).open('xb') as out, \
                 (root / (label + '.stderr')).open('xb') as err:
@@ -78,6 +109,8 @@ def command(root, label, argv, env, timeout=30):
                     pass
                 record['exit_code'] = child.wait(timeout=5)
         record['success'] = record['exit_code'] == 0 and not record['timed_out']
+        record['expectation_met'] = (record['exit_code'] == expected_exit_code
+                                     and not record['timed_out'])
     finally:
         audit = root / '.sandbox' / (label + '.audit.json')
         if audit.is_file() and not audit.is_symlink():
@@ -87,8 +120,28 @@ def command(root, label, argv, env, timeout=30):
             if path.exists():
                 record[stream] = {'path': path.name, **identity(path)}
         save(root / (label + '.json'), record)
-    require(record['success'], label + ': command failed; retained raw evidence')
+    require(record['expectation_met'], label + ': command failed or differed from expected exit; retained raw evidence')
     return record
+
+
+def retained_go_post_rust_probe(root, active, artifact, env, args, expected_diagnostic,
+                                label='retained-go-post-rust-refusal'):
+    """Record the retained fallback's post-Rust refusal beside the Go positive control."""
+    artifact = Path(artifact).resolve(strict=True)
+    artifact_identity = identity(artifact)
+    validate_retained_go(artifact_identity['sha256'], platform.system(), platform.machine())
+    stage = active.with_suffix('.next')
+    shutil.copyfile(artifact, stage)
+    stage.chmod(0o700)
+    require(identity(stage) == artifact_identity, 'retained Go staging mismatch')
+    os.replace(stage, active)
+    result = command(root, label, sandbox_command(root, label, active, args, env), env,
+                     expected_exit_code=1)
+    stderr = (root / (label + '.stderr')).read_bytes()
+    require(expected_diagnostic in stderr,
+            'retained Go did not fail at its expected post-Rust compatibility guard')
+    return {'artifact': artifact_identity, 'command': result,
+            'diagnostic': expected_diagnostic.decode('utf-8', errors='replace')}
 
 
 def snapshot(database):
@@ -108,6 +161,10 @@ def snapshot(database):
                 'integrity': db.execute('PRAGMA integrity_check').fetchall(),
                 'schema': db.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
                 'tables': state}
+
+
+def without_user_version(state):
+    return {key: value for key, value in state.items() if key != 'user_version'}
 
 
 def sandbox(root, executable, extra_reads=()):
@@ -301,7 +358,8 @@ sys.exit(0 if all(result.values()) else 1)
 '''
 
 
-def run(go, rust, go_tool, root):
+def run(go, rust, go_tool, root, retained_go=None, expected_go_version='go1.26.6',
+        expected_go_revision=None):
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: switchback confinement is available on macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -317,7 +375,8 @@ def run(go, rust, go_tool, root):
              if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
     report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
-              'required_cases': list(CASES), 'steps': [], 'schema_sequence': [],
+              'required_cases': list(CASES),
+              'steps': [], 'schema_sequence': [],
               'database_restore_performed': False, 'publication_verified': False,
               'source_binding': 'requires caller build evidence; hashes alone are not source identity'}
     try:
@@ -325,7 +384,14 @@ def run(go, rust, go_tool, root):
             (root / name).mkdir(mode=0o700)
         active, database = root / 'bin/symeraseme', root / 'data/symeraseme.db'
         go, rust, go_tool = (p.resolve(strict=True) for p in (go, rust, go_tool))
+        retained_go = Path(retained_go).resolve(strict=True) if retained_go else None
         report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
+        if retained_go:
+            report['retained_go_artifact'] = identity(retained_go)
+            validate_retained_go(report['retained_go_artifact']['sha256'],
+                                 platform.system(), platform.machine())
+            report['required_cases'] += retained_cases(report['retained_go_artifact']['sha256'],
+                                                       platform.system(), platform.machine())
         require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
         report['fixture'] = identity(fixture)
@@ -334,6 +400,14 @@ def run(go, rust, go_tool, root):
             report['sandbox_helper'] = identity(LINUX_SANDBOX)
         shutil.copyfile(Path(__file__), root / 'producer.py')
         shutil.copyfile(fixture, database)  # The only database copy into the active path.
+        pre_rust_backup = root / 'rollback-backup/symeraseme-v1.db'
+        pre_rust_backup.parent.mkdir(mode=0o700)
+        with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source, \
+                closing(sqlite3.connect(pre_rust_backup)) as backup:
+            source.backup(backup)
+        require(snapshot(pre_rust_backup)['user_version'] == 1,
+                'rollback rehearsal backup must preserve the original schema-v1 fixture')
+        report['pre_rust_backup'] = identity(pre_rust_backup)
         env = {'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
                'XDG_CONFIG_HOME': str(root / 'config'), 'XDG_DATA_HOME': str(root / 'data'),
                'XDG_CACHE_HOME': str(root / 'cache'), 'TMPDIR': str(root / 'tmp'),
@@ -364,11 +438,16 @@ def run(go, rust, go_tool, root):
                 sandbox_command(root, 'go-build-info', go_tool_for_info,
                                 ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
         metadata = (root / 'go-build-info.stdout').read_text()
-        require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
+        require(expected_go_version in metadata.splitlines()[0].split(),
+                'Go artifact toolchain differs from the declared version')
         arch = {'arm64': 'arm64', 'aarch64': 'arm64',
                 'x86_64': 'amd64'}[platform.machine().lower()]
         goos = 'darwin' if sys.platform == 'darwin' else 'linux'
         settings = {line.strip() for line in metadata.splitlines()}
+        if expected_go_revision:
+            require({'build\tvcs.revision=' + expected_go_revision,
+                     'build\tvcs.modified=false'} <= settings,
+                    'Go artifact is not bound to the declared clean source revision')
         require({'build\tCGO_ENABLED=0', 'build\tGOOS=' + goos, 'build\tGOARCH=' + arch} <= settings,
                 'Go artifact must be CGO-free and native')
         try:
@@ -430,7 +509,8 @@ def run(go, rust, go_tool, root):
         save(root / 'sandbox-policy.json', policy)
         missing_profile = root / 'home/absent-profile.enc'
 
-        def execute(label, args, artifact=None):
+        def execute(label, args, artifact=None, command_env=None):
+            command_env = env if command_env is None else command_env
             step = {'id': label, 'success': False}
             report['steps'].append(step)
             if artifact is not None:
@@ -442,7 +522,7 @@ def run(go, rust, go_tool, root):
             step['installed'] = identity(active)
             try:
                 step['command'] = command(root, label,
-                                          sandbox_command(root, label, active, args, env), env)
+                                          sandbox_command(root, label, active, args, command_env), command_env)
             finally:
                 record = root / (label + '.json')
                 if record.exists():
@@ -499,9 +579,134 @@ def run(go, rust, go_tool, root):
         require(not missing_profile.exists() and identity(active) == identity(go), 'final runtime identity changed')
         require(identity(fixture) == report['fixture'], 'source fixture changed')
         report['steps'][-1]['success'] = True
-        require([step['id'] for step in report['steps']] == list(CASES)
+        official_sha = official_go_sha256(platform.system(), platform.machine())
+        if retained_go and identity(retained_go)['sha256'] == official_sha:
+            bridge_dir = root / 'rollback-bridge'
+            bridge_dir.mkdir(mode=0o700)
+            bridge_db = bridge_dir / 'symeraseme.db'
+            with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source, \
+                    closing(sqlite3.connect(bridge_db)) as clone:
+                source.backup(clone)
+            source_state = snapshot(database)
+            clone_state = snapshot(bridge_db)
+            same(clone_state, source_state, 'SQLite backup clone differs before downgrade')
+            report['rollback_bridge'] = {
+                'scope': 'disposable run root only',
+                'official_go_version': 'v0.12.1',
+                'official_go_sha256': official_sha,
+                'original_database': str(database),
+                'clone_database': str(bridge_db),
+                'original_state_before_bridge': source_state,
+                'clone_before_downgrade': clone_state,
+                'rust_artifact_source_binding': report['source_binding'],
+            }
+            require(source_state['user_version'] == 2
+                    and len(source_state['tables']['removal_requests']['rows']) == 4,
+                    'rollback bridge requires the intact four-request Rust schema-v2 store')
+            with closing(sqlite3.connect(bridge_db)) as clone:
+                clone.execute('PRAGMA user_version = 1')
+                clone.commit()
+            downgraded = snapshot(bridge_db)
+            same(without_user_version(downgraded), without_user_version(source_state),
+                 'user_version downgrade changed state beyond its pragma')
+            require(downgraded['user_version'] == 1 and snapshot(database) == source_state,
+                    'rollback bridge did not preserve original Rust database')
+            report['rollback_bridge']['clone_after_downgrade'] = downgraded
+            report['rollback_bridge']['downgrade_changed_only_user_version'] = True
+            bridge_env = dict(env, SYMERASEME_DATA_DIR=str(bridge_dir),
+                              SYMERASEME_DB_DIR=str(bridge_dir))
+            original_rows = execute('retained-go-bridge-read-four',
+                                    ['requests', 'list', '--output', 'json'],
+                                    retained_go, bridge_env)
+            require(original_rows['total'] == 4 and len(original_rows['requests']) == 4,
+                    'official Go v0.12.1 did not read all four Rust-era requests')
+            same(sorted(map(canonical, original_rows['requests'])),
+                 sorted(map(canonical, requests['requests'])),
+                 'official Go v0.12.1 changed or missed a Rust-era request')
+            report['steps'][-1]['success'] = True
+            unique_campaign = 'rollback-bridge-' + os.urandom(8).hex()
+            bridge_create = execute('retained-go-bridge-create-fifth',
+                                    ['plan', 'create', '--campaign', unique_campaign, '--max', '1',
+                                     '--profile', str(root / 'home/bridge-absent-profile.enc'),
+                                     '--output', 'json'], retained_go, bridge_env)
+            require(bridge_create['campaign_id'] == unique_campaign
+                    and type(bridge_create['planned']) is int and bridge_create['planned'] == 1,
+                    'official Go v0.12.1 did not create one unique fifth request')
+            report['steps'][-1]['success'] = True
+            five_from_go = execute('retained-go-bridge-read-five',
+                                   ['requests', 'list', '--output', 'json'], command_env=bridge_env)
+            require(five_from_go['total'] == 5 and len(five_from_go['requests']) == 5,
+                    'official Go v0.12.1 bridge write was not readable as five requests')
+            same(sorted(map(canonical, original_rows['requests'])),
+                 sorted(map(canonical, [row for row in five_from_go['requests']
+                                        if canonical(row) in set(map(canonical, original_rows['requests']))])),
+                 'bridge fifth request changed a Rust-era request')
+            require(sum(canonical(row) not in set(map(canonical, original_rows['requests']))
+                        for row in five_from_go['requests']) == 1,
+                    'bridge must add exactly one unique request')
+            report['steps'][-1]['success'] = True
+            report['rollback_bridge']['go_after_write'] = snapshot(bridge_db)
+            rust_five = execute('rust-bridge-read-five',
+                                ['requests', 'list', '--output', 'json'], rust, bridge_env)
+            same(rust_five, five_from_go, 'current Rust could not reopen/read all five bridge requests')
+            rust_state = snapshot(bridge_db)
+            require(rust_state['user_version'] == 2 and rust_state['integrity'] == [('ok',)],
+                    'current Rust did not migrate the rollback bridge clone back to schema v2')
+            report['steps'][-1]['success'] = True
+            report['rollback_bridge']['rust_after_reopen'] = rust_state
+            report['rollback_bridge']['rust_reopened_all_five'] = True
+            require(snapshot(database) == source_state,
+                    'rollback bridge altered the original Rust schema-v2 database')
+            require(not (root / 'home/bridge-absent-profile.enc').exists(),
+                    'bridge create unexpectedly created profile input')
+        if retained_go:
+            step = {'id': 'retained-go-post-rust-refusal', 'success': False,
+                    'expected': 'schema-v2 refusal from the exact retained artifact'}
+            report['steps'].append(step)
+            try:
+                step['observation'] = retained_go_post_rust_probe(
+                    root, active, retained_go, env,
+                    ['requests', 'list', '--output', 'json'],
+                    b'user_version=2, Go port supports up to 1')
+                step['success'] = True
+                step['outcome'] = 'compatibility-gap-confirmed'
+            finally:
+                restored = active.with_suffix('.restore')
+                shutil.copyfile(go, restored)
+                os.replace(restored, active)
+                require(identity(active) == identity(go), 'current Go positive-control restore failed')
+            same(snapshot(database), after, 'retained Go rejection changed the post-Rust database')
+            with closing(sqlite3.connect(pre_rust_backup.as_uri() + '?mode=ro', uri=True)) as source, \
+                    closing(sqlite3.connect(database)) as restored:
+                source.backup(restored)
+            restored_state = snapshot(database)
+            same(restored_state, initial, 'pre-Rust backup did not restore the original schema-v1 state')
+            report['database_restore_performed'] = True
+            report['restore_boundary'] = {
+                'scope': 'disposable switchback root only',
+                'restored_schema': restored_state['user_version'],
+                'restored_requests': len(baseline['requests']),
+                'post_rust_requests': len(requests['requests']),
+                'rust_request_recovered': False}
+            restored_requests = execute('retained-go-after-v1-restore',
+                                        ['requests', 'list', '--output', 'json'], retained_go)
+            same(restored_requests, baseline,
+                 'retained Go did not read all baseline requests after restoring schema v1')
+            require(restored_requests['total'] == 3
+                    and all(row['id'] != 4 for row in restored_requests['requests']),
+                    'restore boundary must expose the lost post-Rust request')
+            report['steps'][-1]['success'] = True
+            same(snapshot(database), restored_state, 'retained Go changed the restored backup')
+            restored = active.with_suffix('.restore')
+            shutil.copyfile(go, restored)
+            os.replace(restored, active)
+            require(identity(active) == identity(go), 'current Go artifact restore failed')
+        expected_cases = list(CASES) + (retained_cases(identity(retained_go)['sha256'],
+                                                       platform.system(), platform.machine())
+                                         if retained_go else [])
+        require([step['id'] for step in report['steps']] == expected_cases
                 and all(step['success'] is True for step in report['steps']), 'incomplete case inventory')
-        report['status'] = 'passed'
+        report['status'] = 'compatibility-gap' if retained_go else 'passed'
     finally:
         save(root / 'report.json', report)
     return report
@@ -511,8 +716,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ('go', 'rust', 'go-tool', 'output-dir'):
         parser.add_argument('--' + flag, type=Path, required=True)
+    parser.add_argument('--retained-go', type=Path,
+                        help='execute the recorded older rollback artifact against post-Rust schema v2')
+    parser.add_argument('--expected-go-version', default='go1.26.6')
+    parser.add_argument('--expected-go-revision')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.retained_go,
+                 args.expected_go_version, args.expected_go_revision)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 

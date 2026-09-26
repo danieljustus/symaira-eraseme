@@ -16,6 +16,45 @@ cargo fmt --all --check
 go vet ./... && gofmt -l .
 ```
 
+## Integrated hardening evidence (2026-09-24)
+
+- At local source commit `c6340b11`, macOS arm64 `cargo +1.98.0 nextest run
+  --workspace --all-targets --all-features --locked --offline --no-fail-fast
+  -j 2` passed 554/554 (two skipped); native Linux arm64 `cargo +1.98.0
+  test --workspace --all-targets --all-features --locked --offline
+  --no-fail-fast` passed 555/555 (two ignored). Logs:
+  `/tmp/symeraseme-macos-workspace-c6340b11.log` (SHA-256 `9e0b23941d296d596f32c139b4f153e860c6d51a4df9d75a6fbfc95134fdd9f0`),
+  `/tmp/symeraseme-native-gate-host/workspace-c6340b11.log` (SHA-256 `59a03bbcc3aac98a4d18b6722fdef4c5bcbbf6eac7eccb29ca83dae8676bbbea`).
+  The suites include bounded process timeouts/signals, locked/read-only SQLite,
+  atomic-write fault rollback and interrupted migration controls.
+- `cargo +nightly miri test -p symeraseme-core --test miri_contract --locked
+  --offline` passed its pure core test at `c6340b11`. Six selected
+  `cargo-mutants` probes on that integrated tree were all caught: crypto key
+  validation, consent binding, two MCP bearer checks, error sanitization and
+  projection status. One initially surviving same-length bearer mutant led to
+  the focused regression test in `c6340b11`; rerun logs are under
+  `/tmp/eraseme-task85-integrated-*.log`.
+- Five `cargo-fuzz` targets now exercise actual Rust entrypoints: MCP stdio
+  frames, registry YAML, encrypted envelopes, workspace paths and email
+  headers. Each passed a bounded 100-input macOS arm64 smoke run; these are
+  bounded checks, not sustained fuzz coverage. The path fuzzer uses only an
+  isolated disposable root. Exact-tree smoke logs are
+  `/tmp/symeraseme-fuzz-{mcp_frames,registry_yaml,encryption_envelope,path_inputs,email_headers}-c6340b11.log`.
+  `rust-tests/parity/test_secret_sentinel.py`
+  passed on macOS arm64 and native Linux arm64, scanning process stdout,
+  stderr and generated files for two synthetic master keys.
+- Offline `cargo audit --no-fetch` passed both current lockfiles and
+  `cargo deny --frozen check all` passed. Local release builds of the matching
+  production source produced a macOS arm64 binary (`50dac2a`, SHA-256
+  `d9ca4aa1fb8dfd1b0b625c6c62a154d4bbc8e4386b556ece7567769a392a7cfe`)
+  and a static Linux arm64 musl binary (`c6340b11`, SHA-256
+  `0e88f4d5860f0fc8635b370b91588fb315d372766ed700ad96892ecfb5fd4fe6`).
+  Each has a local CycloneDX 1.7 inventory of 252 dependencies from a
+  co-staged binary and Cargo.lock, plus a JSON source/toolchain/hash manifest
+  under `/tmp/symeraseme-{macos,linux}-arm64-provenance-*.json`. These are
+  unsigned local manifests, not release attestations; four native release
+  targets and the six-archive workflow remain unverified.
+
 ## Contract
 
 The CLI corpus `rust-tests/parity/cases/cli/behavior.json` (175 recorded Go
@@ -104,7 +143,9 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   cases as adjacent JSON values (`7cc76c8a`) with bounded I/O and exact output;
   its focused integrated test passed. Ten malformed/truncated cases remain
   source-bound. Six malformed parse cases and four size/depth boundaries also
-  replay Go 1.26.6 process bytes (`6ccd1a4`); broader fuzzing remains open.
+  replay Go 1.26.6 process bytes (`6ccd1a4`). Sixteen seeded mutations now
+  extend the exact process corpus to 26 cases (`49a37214`); a bounded
+  `mcp_frames` subprocess fuzzer ran 100 inputs on macOS arm64 (`786fdb23`).
 - MCP scheduler install, status and uninstall now replay source-bound Go cases
   through the real Rust stdio process (`c485e852`). Cron runs against a private
   crontab; launchd and systemd installs use isolated HOME roots and fake service
@@ -449,12 +490,9 @@ artifact gates still require separate evidence.
   (#1034). The disposable switchbacks build Go from current source; a
   retained older Go rollback binary reading schema v2 remains unproved
   (#1035). Do not promote this row to cutover-ready based on CI alone.
-- **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
-  truncated process cases and ten parse/size/depth mutations now match Go
-  1.26.6; broader bounded fuzz/performance evidence remains open under MCP-015.
-- **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
-  explicit message where Go runs `confirmation.AutoConfirm` (browser
-  subsystem unported). The recorded case is the no-reply branch.
+- **MCP malformed-stream breadth.** The 26-case source-bound process corpus
+  matches Go 1.26.6 and `mcp_frames` passed a 100-run bounded smoke test;
+  sustained fuzz/performance and native Windows evidence remain open.
 - **`go_map_order` exemption (CLI-020).** `ToolHandler::call` sorts every
   result except `auto_confirm` (Go structs keep declaration order). Any
   future Go-struct-returning tool needs the same exemption — grep the

@@ -210,7 +210,7 @@ jobs:
         run: make parity
 
   rust-pr-windows-clippy:
-    name: Rust / PR Windows clippy
+    name: Rust / PR Windows parity and clippy
     if: github.event_name == 'pull_request'
     runs-on: windows-2025
     steps:
@@ -218,6 +218,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -235,6 +239,9 @@ jobs:
         run: |
           cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
           cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Run Windows neutral parity tests
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
 
   rust-tools-cache:
     name: Rust / verification tools cache
@@ -333,8 +340,8 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --all-features --locked --no-fail-fast
-            cargo +"$RUST_TOOLCHAIN" test --workspace --exclude parity --doc --all-features --locked
+            cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked --no-fail-fast
+            cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
           else
             cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked
             cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
@@ -344,13 +351,3 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: make parity
-
-      - name: Record Windows parity process-tree limitation
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $source = Get-Content rust-tests/parity/src/process.rs -Raw
-          if ($source -notmatch 'parity subprocess tree cleanup is unsupported on this platform') {
-            throw 'The parity harness capability guard is missing or changed.'
-          }
-          Write-Host 'Neutral parity is intentionally excluded on Windows: process-tree cleanup requires Unix process groups; the harness fails explicitly rather than claiming tree-safe coverage.'

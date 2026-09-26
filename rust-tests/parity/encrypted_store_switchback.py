@@ -1,100 +1,90 @@
 #!/usr/bin/env python3
-"""Bounded macOS encrypted-store Go -> Rust -> Go CLI interop check.
-
-This is local evidence only. It does not authorize a production cutover.
-"""
+"""Disposable encrypted-store rollback bridge; local evidence, never cutover."""
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
-import resource
 import shutil
-import signal
-import subprocess
+import sqlite3
 
 import plain_store_switchback as gate
 
 
 FIXTURE = gate.REPO / "tests/fixtures/event-store/crypto/golden-campaign-v3-legacy-go.db"
 MASTER_KEY = b"symaira-eraseme-golden-master-32"
-CASES = ("go-existing-state", "rust-existing-state", "rust-write",
-         "rust-mcp-read", "rust-readback", "go-after-rust")
+OFFICIAL_GO_V0121_SHA256 = gate.OFFICIAL_GO_V0121_SHA256
+CURRENT_GO_SHA256 = {
+    ("Darwin", "arm64"): "f1dd5510150995ee99e9b8d21bbec333e27613b7f070f1a34d5cdedd2081023a",
+    ("Linux", "aarch64"): "c80e8cd9ed442323f47b04802dce1fb149f6b102d9577c7983da3d35db37ae22",
+}
+FALLBACK_GO_SHA256 = {
+    ("Darwin", "arm64"): "4db52c538b239cdc50bc7064c56761439f5d1ed3b77072c6ffb1e2f0adccd911",
+    ("Linux", "aarch64"): "55137dab794a4ff88716434f4ae4faebafd4ec499c6aaf6ca3bffd3e47cfabec",
+}
+FALLBACK_GO_REVISION = "84dea1cb112c079186dcd90c0955df524781c516"
+FALLBACK_GO_VERSION = {("Darwin", "arm64"): "go1.27.1",
+                       ("Linux", "aarch64"): "go1.26.6"}
+CASES = ("go-refuses-encv3-negative-control", "current-go-initial-read",
+         "current-go-write-four", "rust-four-readback", "rust-decrypt-clone", "official-go-read-four",
+         "official-go-write-fifth", "official-go-read-five", "rust-verify-five",
+         "rust-reencrypt-encv3", "rust-reopen-encv3-five",
+         "rust-verify-reopened-imap-state")
+FALLBACK_CASES = ("fallback-go-build-info", "fallback-rust-plan-write",
+                  "fallback-rust-read-five", "fallback-rust-decrypt-state",
+                  "fallback-go-read-five", "fallback-rust-verify-after-go")
+IMAP_STATE_ROW = ("rollback-bridge.invalid", "INBOX", 424242, 987654,
+                  "2026-09-25 12:34:56")
 
 
-def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
-    """Run one bounded stdio MCP request while retaining protocol evidence."""
-    def bounds():
-        maximum = 4 * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
-
-    record = {"argv": list(map(str, argv)), "cwd": str(root), "exit_code": None,
-              "timed_out": False, "success": False,
-              "stdin": {"size": len(stdin_bytes),
-                        "sha256": hashlib.sha256(stdin_bytes).hexdigest()}}
-    try:
-        with (root / (label + ".stdout")).open("xb") as out, \
-                (root / (label + ".stderr")).open("xb") as err:
-            child = subprocess.Popen(argv, cwd=root, env=env, stdin=subprocess.PIPE,
-                                     stdout=out, stderr=err, start_new_session=True,
-                                     preexec_fn=bounds)
-            try:
-                child.stdin.write(stdin_bytes)
-                child.stdin.close()
-                child.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                record["timed_out"] = True
-            finally:
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                record["exit_code"] = child.wait(timeout=5)
-        record["success"] = record["exit_code"] == 0 and not record["timed_out"]
-    finally:
-        for stream in ("stdout", "stderr"):
-            path = root / (label + "." + stream)
-            if path.exists():
-                record[stream] = {"path": path.name, **gate.identity(path)}
-        gate.save(root / (label + ".json"), record)
-    gate.require(record["success"], label + ": MCP process failed; retained raw evidence")
-    return record
-
-
-def run(go, rust, output):
-    gate.require(os.sys.platform == "darwin" or os.sys.platform.startswith("linux"),
-                 "unsupported: switchback confinement is available on macOS and Linux")
-    if os.sys.platform.startswith("linux"):
+def run(current_go, go, rust, output, fallback_go=None):
+    target = (platform.system(), platform.machine())
+    gate.require(target in CURRENT_GO_SHA256 and target in OFFICIAL_GO_V0121_SHA256,
+                 "encrypted rollback bridge requires native macOS or Linux arm64")
+    if target[0] == "Linux":
         gate.require(os.getuid() != 0 and os.getgid() != 0,
                      "Linux sandbox runner must start as an unprivileged user")
-        gate.require(gate.platform.machine().lower() in ("aarch64", "arm64"),
-                     "Linux disposable switchback requires native aarch64")
+
     output = Path(output)
     gate.require(not output.is_symlink(), "switchback output root must not be a symlink")
     output = output.resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    scope = ("linux-aarch64-encrypted-store-disposable-runtime-only"
-             if os.sys.platform.startswith("linux") else "macos-encrypted-store-runtime-only")
-    report = {"scope": scope, "status": "failed",
-              "platform": {"system": platform.system(), "machine": platform.machine()},
-              "required_cases": list(CASES), "steps": [], "database_restore_performed": False,
+    report = {"scope": ("macos" if target[0] == "Darwin" else "linux-aarch64")
+              + "-encrypted-disposable-rollback-bridge",
+              "status": "failed", "platform": {"system": platform.system(),
+              "machine": platform.machine()}, "required_cases": list(CASES), "steps": [],
               "production_cutover_verified": False,
-              "source_binding": "binary hashes identify inputs; hashes alone do not prove source identity"}
+              "source_binding": "input hashes identify artifacts; no source-tree/build attestation is checked by this runner",
+              "rust_source_binding": "provided integrated release hash; hash alone does not prove source identity"}
     try:
         for name in ("data", "home", "config", "cache", "tmp", "bin", "empty-path"):
             (output / name).mkdir(mode=0o700)
         database = output / "data/symeraseme.db"
         fixture_identity = gate.identity(FIXTURE)
+        current_go, go, rust = (Path(path).resolve(strict=True) for path in (current_go, go, rust))
+        fallback_go = Path(fallback_go).resolve(strict=True) if fallback_go else None
         report["fixture"] = fixture_identity
         report["runner_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-        if os.sys.platform.startswith("linux"):
-            report["sandbox_helper"] = gate.identity(gate.LINUX_SANDBOX)
-        go, rust = (path.resolve(strict=True) for path in (go, rust))
-        report["artifacts"] = {"go": gate.identity(go), "rust": gate.identity(rust)}
-        gate.require(report["artifacts"]["go"]["sha256"] != report["artifacts"]["rust"]["sha256"],
-                     "Go and Rust artifacts must differ")
+        report["artifacts"] = {"current_go": gate.identity(current_go),
+                               "official_go_v0.12.1": gate.identity(go), "rust": gate.identity(rust)}
+        gate.require(report["artifacts"]["current_go"]["sha256"] == CURRENT_GO_SHA256[target],
+                     "current Go artifact differs from the recorded integrated candidate")
+        gate.require(report["artifacts"]["official_go_v0.12.1"]["sha256"] == OFFICIAL_GO_V0121_SHA256[target],
+                     "Go artifact is not the SHA-pinned official v0.12.1 release")
+        if fallback_go:
+            report["artifacts"]["fallback_go"] = gate.identity(fallback_go)
+            gate.require(report["artifacts"]["fallback_go"]["sha256"] == FALLBACK_GO_SHA256.get(target),
+                         "fallback Go artifact differs from the recorded clean migration candidate")
         shutil.copyfile(FIXTURE, database)
+        gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                     "fixture is not an encrypted V3 database")
+        original = output / "rollback-backup/original-encrypted-v3.db"
+        original.parent.mkdir(mode=0o700)
+        shutil.copyfile(database, original)
+        report["original_fixture_envelope"] = gate.identity(original)
+
         active = output / "bin/symeraseme"
         key_hex = MASTER_KEY.hex()
         env = {"HOME": str(output / "home"), "USERPROFILE": str(output / "home"),
@@ -102,55 +92,11 @@ def run(go, rust, output):
                "XDG_CACHE_HOME": str(output / "cache"), "TMPDIR": str(output / "tmp"),
                "TEMP": str(output / "tmp"), "TMP": str(output / "tmp"),
                "PATH": str(output / "empty-path"), "LC_ALL": "C", "TZ": "UTC",
-               "SYMERASEME_DATA_DIR": str(output / "data"),
-               "SYMERASEME_DB_DIR": str(output / "data"),
-               "SYMERASEME_ENCRYPT_DB": "true",
-               "SYMERASEME_IDENTITY_MASTER_KEY": key_hex}
-        policy = gate.sandbox(output, active.resolve())
-        gate.save(output / "sandbox-policy.json", policy)
-        if os.sys.platform.startswith("linux"):
-            python = Path(os.sys.executable).resolve()
-            host_write_probe = guest_write_probe = None
-            try:
-                host_write_probe = gate.create_write_probe(output, "encrypted", host_share=True)
-                guest_write_probe = gate.create_write_probe(output, "encrypted", host_share=False)
-                gate.command(
-                    output, "sandbox-negative",
-                    gate.sandbox_command(
-                        output, "sandbox-negative", python,
-                        ["-I", "-S", "-c", gate.PROBE,
-                         str(gate.REPO / "Cargo.toml"), str(Path.home().resolve()),
-                         str(gate.REPO / "Cargo.toml"), host_write_probe["path"],
-                         guest_write_probe["path"]], env),
-                    env)
-                controls = json.loads((output / "sandbox-negative.stdout").read_bytes())
-                gate.require(set(controls) == {
-                    "read_denied_0", "home_directory_read_denied", "network_denied",
-                    "udp_network_denied", "outside_write_denied", "host_share_write_denied",
-                    "guest_local_write_denied", "child_exec_denied"}
-                    and all(value is True for value in controls.values()),
-                    "Linux sandbox control failed")
-            finally:
-                report["outside_write_probes"] = {}
-                if host_write_probe is not None:
-                    report["outside_write_probes"]["host_share"] = {
-                        **host_write_probe, **gate.remove_write_probe(host_write_probe)}
-                if guest_write_probe is not None:
-                    report["outside_write_probes"]["guest_local"] = {
-                        **guest_write_probe, **gate.remove_write_probe(guest_write_probe)}
-            audit = json.loads((output / ".sandbox/sandbox-negative.audit.json").read_bytes())
-            required = ("mnt", "net", "pid")
-            gate.require(audit["status"] == "running" and audit["landlock_abi"] >= 4
-                         and audit["no_new_privs"] is True
-                         and audit["uid"] == os.getuid() and audit["gid"] == os.getgid()
-                         and all(audit["caller_namespace_ids"][name] !=
-                                 audit["sandbox_namespace_ids"][name] for name in required)
-                         and audit["read_only_virtiofs_mounts"],
-                         "Linux namespace or filesystem boundary was not enforced")
-            report["sandbox_controls"] = controls
-            report["sandbox_isolation"] = audit
+               "SYMERASEME_DATA_DIR": str(database.parent), "SYMERASEME_DB_DIR": str(database.parent),
+               "SYMERASEME_ENCRYPT_DB": "true", "SYMERASEME_IDENTITY_MASTER_KEY": key_hex}
 
-        def execute(label, artifact, args):
+        def execute(label, artifact, args, command_env=None, expected_exit_code=0):
+            command_env = env if command_env is None else command_env
             step = {"id": label, "success": False}
             report["steps"].append(step)
             stage = active.with_suffix(".next")
@@ -160,74 +106,299 @@ def run(go, rust, output):
             os.replace(stage, active)
             step["installed"] = gate.identity(active)
             try:
-                gate.command(output, label,
-                             gate.sandbox_command(output, label, active, args, env), env)
+                step["command"] = gate.command(
+                    output, label,
+                    gate.sandbox_command(output, label, active, args, command_env), command_env,
+                    expected_exit_code=expected_exit_code)
             finally:
                 record = output / (label + ".json")
                 if record.exists():
                     step["command"] = json.loads(record.read_bytes())
-            gate.require(not (output / (label + ".stderr")).read_bytes(), label + ": unexpected stderr")
-            step["success"] = True
-            return json.loads((output / (label + ".stdout")).read_bytes())
+            if expected_exit_code == 0:
+                step["success"] = True
+                return json.loads((output / (label + ".stdout")).read_bytes())
+            return None
 
-        gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
-                     "fixture is not an encrypted V3 database")
-        before = execute("go-existing-state", go,
-                         ["requests", "list", "--output", "json"])
-        gate.require(type(before["total"]) is int and before["total"] == 3
-                     and len(before["requests"]) == 3, "Go did not read all existing requests")
-        rust_before = execute("rust-existing-state", rust,
-                              ["requests", "list", "--output", "json"])
-        gate.same(rust_before, before, "Rust read differs from existing Go encrypted state")
-        created = execute("rust-write", rust,
-                          ["plan", "create", "--campaign", "post-rust-encrypted", "--max", "1",
+        # Prove the old release does not open an ENCv3 envelope. Only this
+        # disposable copy is presented to it; its bytes must remain unchanged.
+        negative_dir = output / "negative"
+        negative_dir.mkdir(mode=0o700)
+        negative_db = negative_dir / "symeraseme.db"
+        shutil.copyfile(original, negative_db)
+        negative_identity = gate.identity(negative_db)
+        negative_env = dict(env, SYMERASEME_DATA_DIR=str(negative_dir),
+                            SYMERASEME_DB_DIR=str(negative_dir), SYMERASEME_ENCRYPT_DB="false")
+        execute("go-refuses-encv3-negative-control", go,
+                ["requests", "list", "--output", "json"], negative_env, expected_exit_code=1)
+        stderr = (output / "go-refuses-encv3-negative-control.stderr").read_bytes()
+        gate.require(b"file is not a database" in stderr,
+                     "negative control did not show Go's plaintext SQLite rejection")
+        gate.require(gate.identity(negative_db) == negative_identity,
+                     "negative control altered its ENCv3 input")
+        report["steps"][-1]["success"] = True
+        report["negative_control"] = {
+            "result": "official Go v0.12.1 cannot read the ENCv3 envelope directly",
+            "database_unchanged": True, "identity": negative_identity}
+
+        before = execute("current-go-initial-read", current_go, ["requests", "list", "--output", "json"])
+        gate.require(before.get("total") == 3 and len(before.get("requests", [])) == 3,
+                     "current Go did not read the three fixture requests")
+        report["steps"][-1]["success"] = True
+        campaign = "rollback-bridge-current-go"
+        created = execute("current-go-write-four", current_go,
+                          ["plan", "create", "--campaign", campaign, "--max", "1",
                            "--profile", str(output / "home/absent-profile.enc"), "--output", "json"])
-        gate.require(created["campaign_id"] == "post-rust-encrypted"
-                     and type(created["planned"]) is int and created["planned"] == 1,
-                     "Rust did not create exactly one request")
-        # Exercise the same encrypted store through the Rust MCP boundary. This
-        # read also verifies the handler explicitly closes/re-encrypts its store.
-        step = {"id": "rust-mcp-read", "success": False}
-        report["steps"].append(step)
-        mcp_request = (b'{"jsonrpc":"2.0","id":"encrypted-switchback",'
-                       b'"method":"tools/call","params":{"name":"manual_tasks_list",'
-                       b'"arguments":{}}}\n')
-        try:
-            step["command"] = mcp_command(
-                output, "rust-mcp-read",
-                gate.sandbox_command(output, "rust-mcp-read", active, ["mcp", "--stdio"], env),
-                env, mcp_request)
-        finally:
-            record = output / "rust-mcp-read.json"
-            if record.exists():
-                step["command"] = json.loads(record.read_bytes())
-        gate.require(not (output / "rust-mcp-read.stderr").read_bytes(),
-                     "rust-mcp-read: unexpected stderr")
-        mcp_response = json.loads((output / "rust-mcp-read.stdout").read_bytes())
-        gate.require(mcp_response.get("id") == "encrypted-switchback"
-                     and "error" not in mcp_response,
-                     "Rust MCP did not return a successful tool call")
-        contents = mcp_response.get("result", {}).get("content", [])
-        gate.require(len(contents) == 1 and contents[0].get("type") == "text",
-                     "Rust MCP returned an unexpected tool result")
-        mcp_result = json.loads(contents[0]["text"])
-        gate.require(mcp_result.get("success") is True
-                     and isinstance(mcp_result.get("tasks"), list),
-                     "Rust MCP failed to read manual tasks from encrypted state")
-        step["success"] = True
-        rust_after = execute("rust-readback", rust,
-                             ["requests", "list", "--output", "json"])
-        gate.require(rust_after["total"] == 4 and len(rust_after["requests"]) == 4,
-                     "Rust write did not persist alongside existing requests")
-        go_after = execute("go-after-rust", go,
-                           ["requests", "list", "--output", "json"])
-        gate.same(go_after, rust_after, "Go cannot read the encrypted state after Rust write")
+        gate.require(created.get("campaign_id") == campaign and created.get("planned") == 1,
+                     "current Go did not create the fourth request")
+        report["steps"][-1]["success"] = True
+        four = execute("rust-four-readback", rust, ["requests", "list", "--output", "json"])
+        gate.require(four.get("total") == 4 and len(four.get("requests", [])) == 4,
+                     "current Rust did not verify four current-Go requests")
+        report["steps"][-1]["success"] = True
         gate.require(database.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
-                     "database lost its encrypted envelope")
-        gate.require(gate.identity(FIXTURE) == fixture_identity, "source fixture changed")
-        gate.require([step["id"] for step in report["steps"]] == list(CASES),
+                     "Rust did not leave an ENCv3 artifact after writing four requests")
+        original_identity = gate.identity(database)
+        rollback_copy = output / "rollback-backup/rust-four-encrypted-v3.db"
+        shutil.copyfile(database, rollback_copy)
+        report["post_current_go_four_envelope"] = gate.identity(rollback_copy)
+
+        # Rust's normal plain-store open decrypts an encrypted path in place
+        # when encryption is disabled. Apply it only to this clone.
+        bridge_dir = output / "bridge"
+        bridge_dir.mkdir(mode=0o700)
+        bridge_db = bridge_dir / "symeraseme.db"
+        shutil.copyfile(rollback_copy, bridge_db)
+        plain_env = dict(env, SYMERASEME_DATA_DIR=str(bridge_dir), SYMERASEME_DB_DIR=str(bridge_dir),
+                         SYMERASEME_ENCRYPT_DB="false")
+        decrypted = execute("rust-decrypt-clone", rust, ["requests", "list", "--output", "json"], plain_env)
+        gate.same(decrypted, four, "Rust plaintext clone export differs from encrypted four-request state")
+        gate.require(bridge_db.read_bytes().startswith(b"SQLite format 3\x00"),
+                     "Rust did not produce a plaintext SQLite clone")
+        report["steps"][-1]["success"] = True
+        source_state = gate.snapshot(bridge_db)
+        gate.require(source_state["user_version"] == 2 and source_state["integrity"] == [("ok",)],
+                     "plaintext clone is not an intact schema-v2 database")
+        gate.require(len(source_state["tables"]["removal_requests"]["rows"]) == 4,
+                     "plaintext clone does not contain four requests")
+        with closing(sqlite3.connect(bridge_db)) as clone:
+            clone.execute("""INSERT INTO imap_state
+                (host, folder, uid_validity, last_uid, updated_at) VALUES (?, ?, ?, ?, ?)""",
+                IMAP_STATE_ROW)
+            clone.commit()
+        source_state = gate.snapshot(bridge_db)
+        expected_imap_row = gate.canonical(list(IMAP_STATE_ROW))
+        gate.require(source_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "disposable clone did not seed the exact synthetic IMAP row")
+
+        with closing(sqlite3.connect(bridge_db)) as clone:
+            clone.execute("PRAGMA user_version = 1")
+            clone.commit()
+        downgraded = gate.snapshot(bridge_db)
+        gate.same(gate.without_user_version(downgraded), gate.without_user_version(source_state),
+                  "bridge downgrade changed state beyond user_version")
+        gate.require(downgraded["user_version"] == 1,
+                     "bridge clone did not reach schema-v1 compatibility marker")
+        report["rollback_bridge"] = {
+            "scope": "isolated plaintext clone only", "official_go_version": "v0.12.1",
+            "official_go_sha256": OFFICIAL_GO_V0121_SHA256[target],
+            "encrypted_source": str(rollback_copy), "encrypted_source_sha256": original_identity["sha256"],
+            "plaintext_clone": str(bridge_db), "state_before_downgrade": source_state,
+            "state_after_downgrade": downgraded, "downgrade_changed_only_user_version": True}
+
+        original_rows = execute("official-go-read-four", go,
+                                ["requests", "list", "--output", "json"], plain_env)
+        go_read_state = gate.snapshot(bridge_db)
+        gate.require(go_read_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "official Go read changed or lost the synthetic IMAP row")
+        gate.require(original_rows.get("total") == 4 and len(original_rows.get("requests", [])) == 4,
+                     "official Go v0.12.1 did not read all four bridged requests")
+        gate.same(sorted(map(gate.canonical, original_rows["requests"])),
+                  sorted(map(gate.canonical, four["requests"])),
+                  "official Go changed or missed a Rust-era request")
+        report["steps"][-1]["success"] = True
+        unique_campaign = "rollback-bridge-" + os.urandom(8).hex()
+        bridge_create = execute("official-go-write-fifth", go,
+                                ["plan", "create", "--campaign", unique_campaign, "--max", "1",
+                                 "--profile", str(output / "home/bridge-absent-profile.enc"),
+                                 "--output", "json"], plain_env)
+        gate.require(bridge_create.get("campaign_id") == unique_campaign and bridge_create.get("planned") == 1,
+                     "official Go v0.12.1 did not create one fifth request")
+        report["steps"][-1]["success"] = True
+        five = execute("official-go-read-five", go,
+                       ["requests", "list", "--output", "json"], plain_env)
+        go_write_state = gate.snapshot(bridge_db)
+        gate.require(go_write_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "official Go write changed or lost the synthetic IMAP row")
+        gate.require(five.get("total") == 5 and len(five.get("requests", [])) == 5,
+                     "official Go v0.12.1 could not read its fifth request")
+        old = set(map(gate.canonical, original_rows["requests"]))
+        gate.require(sum(gate.canonical(row) not in old for row in five["requests"]) == 1
+                     and all(sum(gate.canonical(row) == gate.canonical(candidate)
+                                 for candidate in five["requests"]) == 1
+                             for row in original_rows["requests"]),
+                     "Go bridge write did not preserve four old requests and add exactly one")
+        report["steps"][-1]["success"] = True
+
+        rust_five = execute("rust-verify-five", rust,
+                            ["requests", "list", "--output", "json"], plain_env)
+        gate.same(rust_five, five, "current Rust cannot verify all five plaintext bridge requests")
+        rust_state = gate.snapshot(bridge_db)
+        gate.require(rust_state["user_version"] == 2 and rust_state["integrity"] == [("ok",)],
+                     "current Rust did not reopen the bridge clone as intact schema v2")
+        gate.require(rust_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "current Rust reopen changed or lost the synthetic IMAP row")
+        report["steps"][-1]["success"] = True
+        report["rollback_bridge"]["rust_after_five"] = rust_state
+        report["rollback_bridge"]["imap_state_preservation"] = {
+            "row": list(IMAP_STATE_ROW),
+            "after_official_go_read": go_read_state["tables"]["imap_state"]["rows"],
+            "after_official_go_write": go_write_state["tables"]["imap_state"]["rows"],
+            "after_rust_reopen": rust_state["tables"]["imap_state"]["rows"]}
+
+        # Re-encrypt the same five-request clone using the production Rust path.
+        encrypted_dir = output / "re-encrypted"
+        encrypted_dir.mkdir(mode=0o700)
+        encrypted_db = encrypted_dir / "symeraseme.db"
+        shutil.copyfile(bridge_db, encrypted_db)
+        encrypted_env = dict(env, SYMERASEME_DATA_DIR=str(encrypted_dir),
+                             SYMERASEME_DB_DIR=str(encrypted_dir), SYMERASEME_ENCRYPT_DB="true")
+        encrypted_read = execute("rust-reencrypt-encv3", rust,
+                                 ["requests", "list", "--output", "json"], encrypted_env)
+        gate.same(encrypted_read, five, "Rust encrypted reopen changed the five-request state")
+        encrypted_identity = gate.identity(encrypted_db)
+        gate.require(encrypted_db.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                     "Rust did not re-encrypt the bridge state as ENCv3")
+        report["steps"][-1]["success"] = True
+        reopened = execute("rust-reopen-encv3-five", rust,
+                           ["requests", "list", "--output", "json"], encrypted_env)
+        gate.same(reopened, five, "Rust could not reopen its new ENCv3 five-request artifact")
+        report["steps"][-1]["success"] = True
+        verify_dir = output / "reopened-imap-check"
+        verify_dir.mkdir(mode=0o700)
+        verify_db = verify_dir / "symeraseme.db"
+        shutil.copyfile(encrypted_db, verify_db)
+        verify_env = dict(env, SYMERASEME_DATA_DIR=str(verify_dir),
+                          SYMERASEME_DB_DIR=str(verify_dir), SYMERASEME_ENCRYPT_DB="false")
+        verified = execute("rust-verify-reopened-imap-state", rust,
+                           ["requests", "list", "--output", "json"], verify_env)
+        gate.same(verified, five, "Rust could not decrypt and reopen the re-encrypted clone")
+        verify_state = gate.snapshot(verify_db)
+        gate.require(verify_state["tables"]["imap_state"]["rows"] == [expected_imap_row],
+                     "Rust re-encryption/reopen changed or lost the synthetic IMAP row")
+        report["steps"][-1]["success"] = True
+        report["rollback_bridge"]["imap_state_preservation"]["after_rust_reencrypt_reopen"] = \
+            verify_state["tables"]["imap_state"]["rows"]
+        report["new_encrypted_artifact"] = {**encrypted_identity, "envelope": "SYMERASEME_ENCv3",
+                                            "requests": 5, "path": str(encrypted_db)}
+        gate.require(gate.identity(database) == original_identity,
+                     "rollback bridge changed the original ENCv3 database bytes")
+        gate.require(gate.identity(FIXTURE) == fixture_identity,
+                     "source fixture changed during the rehearsal")
+        if fallback_go:
+            report["required_cases"] += list(FALLBACK_CASES)
+            go_tool = shutil.which("go")
+            gate.require(go_tool is not None, "Go tool is required to inspect fallback build metadata")
+            go_tool = Path(go_tool).resolve(strict=True)
+            fallback_env = dict(env, GOROOT=str(go_tool.parent.parent))
+            go_tool_for_info = go_tool
+            fallback_for_info = output / "bin/fallback-go-candidate"
+            shutil.copyfile(fallback_go, fallback_for_info)
+            fallback_for_info.chmod(0o700)
+            if target[0] == "Linux":
+                go_tool_for_info = output / "bin/go-tool"
+                shutil.copyfile(go_tool, go_tool_for_info)
+                go_tool_for_info.chmod(0o700)
+            metadata_step = {"id": FALLBACK_CASES[0], "success": False}
+            report["steps"].append(metadata_step)
+            metadata_step["command"] = gate.command(
+                output, FALLBACK_CASES[0],
+                gate.sandbox_command(output, FALLBACK_CASES[0], go_tool_for_info,
+                                     ["version", "-m", str(fallback_for_info)], fallback_env), fallback_env)
+            metadata = (output / (FALLBACK_CASES[0] + ".stdout")).read_text()
+            settings = {line.strip() for line in metadata.splitlines()}
+            arch = "arm64" if target[1].lower() in ("arm64", "aarch64") else "amd64"
+            os_name = "darwin" if target[0] == "Darwin" else "linux"
+            gate.require(FALLBACK_GO_VERSION[target] in metadata.splitlines()[0].split()
+                         and {"build\tvcs.revision=" + FALLBACK_GO_REVISION,
+                              "build\tvcs.modified=false", "build\tCGO_ENABLED=0",
+                              "build\tGOOS=" + os_name, "build\tGOARCH=" + arch} <= settings,
+                         "fallback Go metadata does not match the clean native migration build")
+            metadata_step["success"] = True
+            report["fallback_go_provenance"] = {"revision": FALLBACK_GO_REVISION,
+                                                "vcs_modified": False, "go_version": FALLBACK_GO_VERSION[target],
+                                                "build_metadata": metadata}
+
+            fallback_dir = output / "fallback-encrypted"
+            fallback_dir.mkdir(mode=0o700)
+            fallback_db = fallback_dir / "symeraseme.db"
+            shutil.copyfile(rollback_copy, fallback_db)
+            fallback_run_env = dict(env, SYMERASEME_DATA_DIR=str(fallback_dir),
+                                    SYMERASEME_DB_DIR=str(fallback_dir))
+            fallback_campaign = "rollback-fallback-" + os.urandom(8).hex()
+            fallback_create = execute(
+                FALLBACK_CASES[1], rust,
+                ["plan", "create", "--campaign", fallback_campaign, "--max", "1",
+                 "--profile", str(output / "home/fallback-absent-profile.enc"), "--output", "json"],
+                fallback_run_env)
+            gate.require(fallback_create.get("campaign_id") == fallback_campaign
+                         and fallback_create.get("planned") == 1,
+                         "Rust did not write one request to the fallback ENCv3 clone")
+            expected_rows = execute(FALLBACK_CASES[2], rust,
+                                    ["requests", "list", "--output", "json"], fallback_run_env)
+            gate.require(expected_rows.get("total") == 5 and len(expected_rows.get("requests", [])) == 5,
+                         "Rust fallback clone does not contain five requests")
+            fallback_envelope = gate.identity(fallback_db)
+            gate.require(fallback_db.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                         "Rust did not keep its fallback clone encrypted")
+
+            state_dir = output / "fallback-state-check"
+            state_dir.mkdir(mode=0o700)
+            state_db = state_dir / "symeraseme.db"
+            shutil.copyfile(fallback_db, state_db)
+            state_env = dict(env, SYMERASEME_DATA_DIR=str(state_dir),
+                             SYMERASEME_DB_DIR=str(state_dir), SYMERASEME_ENCRYPT_DB="false")
+            state_rows = execute(FALLBACK_CASES[3], rust,
+                                 ["requests", "list", "--output", "json"], state_env)
+            gate.same(state_rows, expected_rows,
+                      "Rust plaintext inspection clone differs from the encrypted fallback state")
+            fallback_state = gate.snapshot(state_db)
+            gate.require(fallback_state["user_version"] == 2
+                         and fallback_state["integrity"] == [("ok",)]
+                         and len(fallback_state["tables"]["request_events"]["rows"]) > 0,
+                         "Rust fallback state lacks intact request/event data")
+
+            fallback_rows = execute(FALLBACK_CASES[4], fallback_go,
+                                    ["requests", "list", "--output", "json"], fallback_run_env)
+            gate.same(fallback_rows, expected_rows,
+                      "clean migration Go changed or missed Rust-written requests")
+            fallback_after_go = gate.identity(fallback_db)
+            gate.require(fallback_db.read_bytes().startswith(b"SYMERASEME_ENCv3\n"),
+                         "fallback Go read left the store outside the ENCv3 envelope")
+            after_go_dir = output / "fallback-after-go-state"
+            after_go_dir.mkdir(mode=0o700)
+            after_go_db = after_go_dir / "symeraseme.db"
+            shutil.copyfile(fallback_db, after_go_db)
+            after_go_env = dict(env, SYMERASEME_DATA_DIR=str(after_go_dir),
+                                SYMERASEME_DB_DIR=str(after_go_dir), SYMERASEME_ENCRYPT_DB="false")
+            after_go_rows = execute(FALLBACK_CASES[5], rust,
+                                    ["requests", "list", "--output", "json"], after_go_env)
+            gate.same(after_go_rows, expected_rows,
+                      "Rust could not inspect the Go-read encrypted clone")
+            after_go_state = gate.snapshot(after_go_db)
+            gate.same(after_go_state, fallback_state,
+                      "fallback Go read changed request, event, or database state")
+            report["fallback_encrypted_read"] = {
+                "campaign_id": fallback_campaign, "requests": fallback_rows,
+                "state_before_go_read": fallback_state,
+                "state_after_go_read": after_go_state,
+                "encrypted_identity_before": fallback_envelope,
+                "encrypted_identity_after": fallback_after_go,
+                "envelope": "SYMERASEME_ENCv3", "request_and_event_state_unchanged": True}
+        gate.require([step["id"] for step in report["steps"]] == report["required_cases"]
+                     and all(step["success"] is True for step in report["steps"]),
                      "incomplete case inventory")
-        report["status"] = "passed"
+        report["original_envelope_unchanged"] = True
+        report["status"] = "rollback-bridge-passed"
     finally:
         gate.save(output / "report.json", report)
     return report
@@ -235,13 +406,20 @@ def run(go, rust, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--go", type=Path, required=True)
-    parser.add_argument("--rust", type=Path, required=True)
+    parser.add_argument("--go", type=Path, required=True,
+                        help="official SHA-pinned v0.12.1 release executable")
+    parser.add_argument("--current-go", type=Path, required=True,
+                        help="recorded integrated current Go executable that writes request four")
+    parser.add_argument("--rust", type=Path, required=True,
+                        help="existing current Rust executable; this script does not build it")
+    parser.add_argument("--fallback-go", type=Path,
+                        help="optional Go fallback candidate; requires the pinned clean 84dea1cb build")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.output_dir)
+    result = run(args.current_go, args.go, args.rust, args.output_dir, args.fallback_go)
     print(json.dumps({"status": result["status"], "scope": result["scope"],
-                      "executed_cases": len(result["steps"])}))
+                      "executed_cases": len(result["steps"]),
+                      "original_envelope_unchanged": result.get("original_envelope_unchanged", False)}))
 
 
 if __name__ == "__main__":

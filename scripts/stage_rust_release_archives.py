@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Stage local Rust binaries in the current six-archive Go release shape.
-
-This does not build, sign, publish, or inspect binary architecture. It packages
-six caller-supplied files and checks the resulting archive contract locally.
-"""
+"""Stage target-checked local Rust binaries in the six-archive Go release shape."""
 
 from __future__ import annotations
 
@@ -14,6 +10,7 @@ import json
 import re
 import shutil
 import stat
+import struct
 import sys
 import tarfile
 import zipfile
@@ -38,6 +35,134 @@ def _regular_input(path: Path, label: str) -> Path:
     if not stat.S_ISREG(mode):
         raise ValueError(f"{label} must be a regular file: {path}")
     return path
+
+
+def _read_at(source, offset: int, size: int) -> bytes:
+    source.seek(offset)
+    data = source.read(size)
+    if len(data) != size:
+        raise ValueError("truncated executable header")
+    return data
+
+
+def _validate_elf(path: Path, arch: str) -> None:
+    with path.open("rb") as source:
+        header = _read_at(source, 0, 64)
+        source.seek(0, 2)
+        file_size = source.tell()
+    if header[:4] != b"\x7fELF" or header[4:7] != b"\x02\x01\x01":
+        raise ValueError("expected a 64-bit little-endian ELF executable")
+    if header[7] not in (0, 3):  # Common glibc and musl Linux binaries use these OS ABI values.
+        raise ValueError("ELF OS ABI is not Linux-compatible")
+    machine = struct.unpack_from("<H", header, 18)[0]
+    expected = {"amd64": 62, "arm64": 183}[arch]
+    if machine != expected:
+        raise ValueError(f"ELF architecture does not match {arch}")
+    if struct.unpack_from("<H", header, 16)[0] not in (2, 3):
+        raise ValueError("ELF file is not an executable")
+    entry = struct.unpack_from("<Q", header, 24)[0]
+    program_offset = struct.unpack_from("<Q", header, 32)[0]
+    header_size, program_size, program_count = struct.unpack_from("<HHH", header, 52)
+    if header_size != 64 or program_size != 56 or not program_count:
+        raise ValueError("ELF executable program headers are missing or invalid")
+    table_size = program_size * program_count
+    if program_offset + table_size > file_size:
+        raise ValueError("truncated ELF program header table")
+    with path.open("rb") as source:
+        program_headers = _read_at(source, program_offset, table_size)
+    has_entry_segment = False
+    for index in range(program_count):
+        kind, flags, file_offset, address, _, file_bytes, _, _ = struct.unpack_from(
+            "<IIQQQQQQ", program_headers, index * program_size
+        )
+        if (
+            kind == 1
+            and flags & 1
+            and file_bytes
+            and file_offset + file_bytes <= file_size
+            and address <= entry < address + file_bytes
+        ):
+            has_entry_segment = True
+            break
+    if not entry or not has_entry_segment:
+        raise ValueError("ELF executable entrypoint is not in an executable load segment")
+
+
+def _validate_macho(path: Path, arch: str) -> None:
+    with path.open("rb") as source:
+        header = _read_at(source, 0, 32)
+        source.seek(0, 2)
+        file_size = source.tell()
+        source.seek(32)
+        magic = header[:4]
+        if magic == b"\xcf\xfa\xed\xfe":
+            endian = "<"
+        elif magic == b"\xfe\xed\xfa\xcf":
+            endian = ">"
+        else:
+            raise ValueError("expected a thin 64-bit Mach-O executable")
+        cpu = struct.unpack_from(endian + "I", header, 4)[0]
+        expected = {"amd64": 0x01000007, "arm64": 0x0100000C}[arch]
+        if cpu != expected:
+            raise ValueError(f"Mach-O architecture does not match {arch}")
+        if struct.unpack_from(endian + "I", header, 12)[0] != 2:
+            raise ValueError("Mach-O file is not an executable")
+        commands = struct.unpack_from(endian + "I", header, 16)[0]
+        command_bytes = struct.unpack_from(endian + "I", header, 20)[0]
+        start = source.tell()
+        end = start + command_bytes
+        if end > file_size:
+            raise ValueError("truncated Mach-O load command area")
+        saw_macos = False
+        for _ in range(commands):
+            command_offset = source.tell()
+            command, size = struct.unpack(endian + "II", _read_at(source, command_offset, 8))
+            if size < 8 or command_offset + size > end:
+                raise ValueError("invalid Mach-O load command")
+            if command == 0x32:  # LC_BUILD_VERSION
+                if size < 24:
+                    raise ValueError("invalid Mach-O build-version command")
+                platform = struct.unpack(endian + "I", _read_at(source, command_offset + 8, 4))[0]
+                saw_macos |= platform == 1
+            elif command == 0x24:  # LC_VERSION_MIN_MACOSX
+                saw_macos = True
+            source.seek(command_offset + size)
+        if source.tell() != end or not saw_macos:
+            raise ValueError("Mach-O does not identify the macOS target")
+
+
+def _validate_pe(path: Path, arch: str) -> None:
+    with path.open("rb") as source:
+        if _read_at(source, 0, 2) != b"MZ":
+            raise ValueError("expected a Windows PE executable")
+        pe_offset = struct.unpack("<I", _read_at(source, 0x3C, 4))[0]
+        if _read_at(source, pe_offset, 4) != b"PE\0\0":
+            raise ValueError("expected a Windows PE executable")
+        machine = struct.unpack("<H", _read_at(source, pe_offset + 4, 2))[0]
+        expected = {"amd64": 0x8664, "arm64": 0xAA64}[arch]
+        if machine != expected:
+            raise ValueError(f"PE architecture does not match {arch}")
+        characteristics = struct.unpack("<H", _read_at(source, pe_offset + 22, 2))[0]
+        if not characteristics & 0x0002 or characteristics & 0x2000:
+            raise ValueError("PE image must be an executable, not a DLL")
+        optional_size = struct.unpack("<H", _read_at(source, pe_offset + 20, 2))[0]
+        optional_magic = struct.unpack("<H", _read_at(source, pe_offset + 24, 2))[0]
+        source.seek(0, 2)
+        file_size = source.tell()
+        if optional_size < 112 or pe_offset + 24 + optional_size > file_size or optional_magic != 0x20B:
+            raise ValueError("PE optional header is missing or invalid")
+
+
+def _validate_target(path: Path, os_name: str, arch: str) -> None:
+    try:
+        if os_name == "linux":
+            _validate_elf(path, arch)
+        elif os_name == "darwin":
+            _validate_macho(path, arch)
+        else:
+            _validate_pe(path, arch)
+    except (OSError, struct.error) as error:
+        raise ValueError(f"{os_name}-{arch} binary has an invalid executable header: {error}") from error
 
 
 def _add_tar_file(archive: tarfile.TarFile, source: Path, name: str, mode: int) -> None:
@@ -83,6 +208,7 @@ def stage(
     version: str,
     output: Path,
     binaries: dict[tuple[str, str], Path],
+    go_fallbacks: dict[tuple[str, str], Path],
     license_path: Path,
     readme_path: Path,
 ) -> None:
@@ -90,11 +216,20 @@ def stage(
         raise ValueError("version must be a non-empty filename-safe release version")
     if set(binaries) != {(os_name, arch) for os_name, arch, _, _ in TARGETS}:
         raise ValueError("exactly the six darwin/linux/windows amd64/arm64 binaries are required")
+    if set(go_fallbacks) != set(binaries):
+        raise ValueError("exactly one matching Go fallback binary is required for each Rust target")
 
     inputs = {
         target: _regular_input(path, f"{target[0]}-{target[1]} binary")
         for target, path in binaries.items()
     }
+    fallback_inputs = {
+        target: _regular_input(path, f"{target[0]}-{target[1]} Go fallback binary")
+        for target, path in go_fallbacks.items()
+    }
+    for os_name, arch, _, _ in TARGETS:
+        _validate_target(inputs[(os_name, arch)], os_name, arch)
+        _validate_target(fallback_inputs[(os_name, arch)], os_name, arch)
     license_path = _regular_input(license_path, "LICENSE")
     readme_path = _regular_input(readme_path, "README.md")
     output.mkdir(parents=True, exist_ok=True)
@@ -104,8 +239,10 @@ def stage(
     archive_paths: list[Path] = []
     for os_name, arch, extension, binary_name in TARGETS:
         archive_path = output / f"symeraseme_{version}_{os_name}_{arch}.{extension}"
+        fallback_name = "symeraseme-go.exe" if extension == "zip" else "symeraseme-go"
         entries = (
             (inputs[(os_name, arch)], binary_name, 0o755 if extension == "tar.gz" else 0o755),
+            (fallback_inputs[(os_name, arch)], fallback_name, 0o755),
             (license_path, "LICENSE", 0o644),
             (readme_path, "README.md", 0o644),
         )
@@ -136,13 +273,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     for os_name, arch, _, _ in TARGETS:
         parser.add_argument(f"--{os_name}-{arch}", required=True, type=Path)
+        parser.add_argument(f"--go-{os_name}-{arch}", required=True, type=Path)
     args = parser.parse_args(argv)
     binaries = {
         (os_name, arch): getattr(args, f"{os_name}_{arch}")
         for os_name, arch, _, _ in TARGETS
     }
+    go_fallbacks = {
+        (os_name, arch): getattr(args, f"go_{os_name}_{arch}")
+        for os_name, arch, _, _ in TARGETS
+    }
     try:
-        stage(args.version, args.output, binaries, args.license, args.readme)
+        stage(args.version, args.output, binaries, go_fallbacks, args.license, args.readme)
     except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
         print(f"stage-rust-release-archives: {error}", file=sys.stderr)
         return 1

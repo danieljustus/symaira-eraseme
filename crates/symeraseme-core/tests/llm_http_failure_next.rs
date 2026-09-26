@@ -15,6 +15,19 @@ const FIXTURE_404: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/case-404.json"
 ));
+const FIXTURE_500: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/case-500.json"
+));
+const FIXTURE_400: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/case-400.json"
+));
+
+#[test]
+fn context_overflow_response_matches_go_with_retries_and_key_redaction() {
+    assert_failure_matches_go(FIXTURE_400, 400);
+}
 
 #[test]
 fn forbidden_provider_response_matches_go_with_secret_redaction() {
@@ -24,6 +37,11 @@ fn forbidden_provider_response_matches_go_with_secret_redaction() {
 #[test]
 fn missing_model_response_matches_go_with_secret_redaction() {
     assert_failure_matches_go(FIXTURE_404, 404);
+}
+
+#[test]
+fn provider_error_response_matches_go_with_secret_redaction() {
+    assert_failure_matches_go(FIXTURE_500, 500);
 }
 
 fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {

@@ -27,3 +27,31 @@ path = "fuzz_targets/encryption_envelope.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "registry_yaml"
+path = "fuzz_targets/registry_yaml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "path_inputs"
+path = "fuzz_targets/path_inputs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "email_headers"
+path = "fuzz_targets/email_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mcp_frames"
+path = "fuzz_targets/mcp_frames.rs"
+test = false
+doc = false
+bench = false

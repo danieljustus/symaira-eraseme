@@ -1,4 +1,4 @@
-// Command llm-failures-next records one credential-failure case from the real
+// Command llm-failures-next records provider-failure cases from the real
 // Go llmkit transport against a local-only HTTP server.
 package main
 
@@ -37,14 +37,18 @@ type observation struct {
 }
 
 func main() {
-	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (403 or 404)")
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 403, 404 or 500)")
 	flag.Parse()
 	var id, apiKey, body string
 	switch *status {
+	case http.StatusBadRequest:
+		id, apiKey, body = "openai-context-overflow-echoed-key", "synthetic-400-key", `context_length_exceeded: maximum context length exceeded; key synthetic-400-key`
 	case http.StatusForbidden:
 		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
 	case http.StatusNotFound:
 		id, apiKey, body = "openai-model-not-found-echoed-key", "synthetic-404-key", `model not found; key synthetic-404-key`
+	case http.StatusInternalServerError:
+		id, apiKey, body = "openai-provider-error-echoed-key", "synthetic-500-key", `upstream temporarily unavailable; key synthetic-500-key`
 	default:
 		fatalIf(fmt.Errorf("unsupported synthetic status %d", *status))
 	}
