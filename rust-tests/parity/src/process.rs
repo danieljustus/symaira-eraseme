@@ -753,24 +753,33 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes() {
+        const HELPER: &str = "SYMERASEME_PARITY_DESCENDANT_HELPER";
+        if std::env::var_os(HELPER).is_some() {
+            let system_root = std::env::var("SystemRoot").expect("Windows provides SystemRoot");
+            let mut child =
+                Command::new(PathBuf::from(system_root).join("System32").join("PING.EXE"))
+                    .args(["-n", "10", "127.0.0.1"])
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .spawn()
+                    .expect("launch long-running descendant");
+            thread::sleep(Duration::from_millis(50));
+            assert!(child.try_wait().expect("probe descendant").is_none());
+            return;
+        }
         let mut case = Case::new("windows-descendant", dummy("same"), dummy("same"));
-        let system_root = std::env::var("SystemRoot").expect("Windows provides SystemRoot");
-        case.environment
-            .values
-            .insert("SystemRoot".into(), system_root.clone());
+        case.environment.values.insert(
+            "SystemRoot".into(),
+            std::env::var("SystemRoot").expect("Windows provides SystemRoot"),
+        );
+        case.environment.values.insert(HELPER.into(), "1".into());
         case.go = Program {
-            // Start-Process returns without waiting while the child inherits
-            // this process's pipes; cmd.exe's start /B kept the parent alive.
-            executable: PathBuf::from(system_root)
-                .join("System32")
-                .join("WindowsPowerShell")
-                .join("v1.0")
-                .join("powershell.exe"),
+            executable: std::env::current_exe().expect("parity test executable"),
             argv: vec![
-                "-NoProfile".into(),
-                "-NonInteractive".into(),
-                "-Command".into(),
-                "$p = Start-Process -FilePath ([IO.Path]::Combine($env:SystemRoot, 'System32', 'PING.EXE')) -ArgumentList '-n', '10', '127.0.0.1' -NoNewWindow -PassThru -ErrorAction Stop; if ($null -eq $p -or $p.HasExited) { exit 1 }; exit 0".into(),
+                "--exact".into(),
+                "process::tests::fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes"
+                    .into(),
             ],
         };
         let started = Instant::now();
