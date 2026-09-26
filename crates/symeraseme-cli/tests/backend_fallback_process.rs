@@ -122,6 +122,17 @@ fn explicit_go_backend_matches_live_go_process_and_requires_sibling() {
         assert_eq!(actual.stderr, expected.stderr, "stderr for {args:?}");
     }
 
+    let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"parity-test","version":"1"}}}"#;
+    let args = ["mcp", "--stdio"];
+    let expected = run(&go, &project, &args, request);
+    let native = run(&rust, &project, &args, request);
+    let fallback = run_go_backend(&rust, &project, &args, request);
+    for (label, actual) in [("Rust", native), ("Rust Go fallback", fallback)] {
+        assert_eq!(actual.status, expected.status, "{label} MCP exit status");
+        assert_eq!(actual.stdout, expected.stdout, "{label} MCP stdout");
+        assert_eq!(actual.stderr, expected.stderr, "{label} MCP stderr");
+    }
+
     let missing_directory = scratch.0.join("without-fallback");
     fs::create_dir(&missing_directory).expect("create no-fallback directory");
     let missing_rust = missing_directory.join(rust.file_name().expect("Rust binary name"));
