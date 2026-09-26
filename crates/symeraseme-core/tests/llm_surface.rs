@@ -42,7 +42,6 @@ fn go_error_type(error: &ClientError) -> &'static str {
         ClientError::Context(_) => "*errors.errorString",
         ClientError::RetriesExhausted { .. } => "*fmt.wrapError",
         ClientError::Foreign(_) => "*errors.errorString",
-        ClientError::TransportNotPorted { .. } => "ClientError",
     }
 }
 
