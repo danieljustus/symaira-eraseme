@@ -547,7 +547,7 @@ mod windows_tests {
     fn dummy(text: &str) -> Program {
         Program {
             executable: PathBuf::from("cmd.exe"),
-            argv: vec!["/C".into(), format!("echo|set /p={text}")],
+            argv: vec!["/C".into(), format!("echo {text}")],
         }
     }
 

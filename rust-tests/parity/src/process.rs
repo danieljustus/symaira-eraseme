@@ -677,7 +677,9 @@ mod tests {
     fn dummy(output: &str) -> Program {
         Program {
             executable: PathBuf::from("cmd.exe"),
-            argv: vec!["/C".into(), format!("echo|set /p={output}")],
+            // `set /p` requires a variable name; the old command returned 1
+            // before it could exercise subprocess output or fast-exit behavior.
+            argv: vec!["/C".into(), format!("echo {output}")],
         }
     }
 
@@ -698,6 +700,9 @@ mod tests {
     fn isolates_home_and_cwd_and_captures_raw_bytes() {
         let case = Case::new("isolation", dummy("same"), dummy("same"));
         let result = run_program(&case, &case.go).expect("dummy program runs");
+        #[cfg(windows)]
+        assert_eq!(result.stdout, b"same\r\n");
+        #[cfg(not(windows))]
         assert_eq!(result.stdout, b"same");
         assert_ne!(result.cwd, std::env::current_dir().unwrap());
         assert!(result.home.starts_with(&result.sandbox));
@@ -762,7 +767,14 @@ mod tests {
         };
         let started = Instant::now();
         let result = run_program(&case, &case.go).expect("Job Object cleans up descendants");
-        assert!(started.elapsed() < Duration::from_secs(3));
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "descendant cleanup took {:?}; parent status={:?}, stdout={:?}, stderr={:?}",
+            started.elapsed(),
+            result.status,
+            result.stdout,
+            result.stderr
+        );
         assert_eq!(result.status.exit_code, Some(0));
     }
 
@@ -771,7 +783,7 @@ mod tests {
     fn suspended_fast_exit_is_resumed_after_job_assignment() {
         let case = Case::new("windows-fast-exit", dummy("same"), dummy("same"));
         let result = run_program(&case, &case.go).expect("assigned process resumes");
-        assert_eq!(result.stdout, b"same");
+        assert_eq!(result.stdout, b"same\r\n");
         assert_eq!(result.status.exit_code, Some(0));
     }
 
@@ -780,16 +792,12 @@ mod tests {
     fn timeout_marks_and_terminates_the_job() {
         let mut case = Case::new("windows-timeout", dummy("same"), dummy("same"));
         case.timeout = Duration::from_millis(30);
-        case.environment.values.insert(
-            "SystemRoot".into(),
-            std::env::var("SystemRoot").expect("Windows provides SystemRoot"),
-        );
+        let ping = PathBuf::from(std::env::var("SystemRoot").expect("Windows provides SystemRoot"))
+            .join("System32")
+            .join("PING.EXE");
         case.go = Program {
-            executable: PathBuf::from("cmd.exe"),
-            argv: vec![
-                "/C".into(),
-                "\"%SystemRoot%\\System32\\PING.EXE\" -n 10 127.0.0.1 >nul".into(),
-            ],
+            executable: ping,
+            argv: vec!["-n".into(), "10".into(), "127.0.0.1".into()],
         };
         let result = run_program(&case, &case.go).expect("timeout is captured");
         assert!(result.status.timed_out);
