@@ -67,28 +67,40 @@ def executable_header(
 
 
 class StageRustReleaseArchivesTests(unittest.TestCase):
-    def _inputs(self, root: Path, replacements: dict[tuple[str, str], bytes] | None = None):
+    def _inputs(
+        self,
+        root: Path,
+        replacements: dict[tuple[str, str], bytes] | None = None,
+        go_replacements: dict[tuple[str, str], bytes] | None = None,
+    ):
         inputs = root / "inputs"
         inputs.mkdir()
         args = ["--version", "0.1.0-beta.1", "--output", str(root / "staged")]
         payloads = {}
+        go_payloads = {}
         replacements = replacements or {}
+        go_replacements = go_replacements or {}
         for os_name, arch, _, _ in TARGETS:
             payload = replacements.get((os_name, arch), executable_header(os_name, arch))
             binary = inputs / f"{os_name}-{arch}.bin"
             binary.write_bytes(payload)
             payloads[(os_name, arch)] = payload
             args.extend((f"--{os_name}-{arch}", str(binary)))
-        return args, payloads
+            go_payload = go_replacements.get((os_name, arch), executable_header(os_name, arch))
+            go_binary = inputs / f"{os_name}-{arch}-go.bin"
+            go_binary.write_bytes(go_payload)
+            go_payloads[(os_name, arch)] = go_payload
+            args.extend((f"--go-{os_name}-{arch}", str(go_binary)))
+        return args, payloads, go_payloads
 
     def test_six_archive_set_matches_offline_release_validator(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            args, expected_payloads = self._inputs(root)
+            args, expected_payloads, expected_go_payloads = self._inputs(root)
             output = root / "staged"
 
             self.assertEqual(stage_main(args), 0)
-            verify_archives(output)
+            verify_archives(output, require_go_fallback=True)
 
             expected_names = {
                 f"symeraseme_0.1.0-beta.1_{os_name}_{arch}.{extension}"
@@ -104,16 +116,22 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
                 archive_path = output / f"symeraseme_0.1.0-beta.1_{os_name}_{arch}.{extension}"
                 if extension == "tar.gz":
                     with tarfile.open(archive_path, "r:gz") as archive:
-                        self.assertEqual(set(archive.getnames()), {binary_name, "LICENSE", "README.md"})
+                        self.assertEqual(set(archive.getnames()), {binary_name, "symeraseme-go", "LICENSE", "README.md"})
                         member = archive.getmember(binary_name)
                         self.assertTrue(member.mode & 0o111)
                         self.assertEqual(archive.extractfile(binary_name).read(), expected_payloads[(os_name, arch)])
+                        fallback = archive.getmember("symeraseme-go")
+                        self.assertTrue(fallback.mode & 0o111)
+                        self.assertEqual(archive.extractfile("symeraseme-go").read(), expected_go_payloads[(os_name, arch)])
                 else:
                     with zipfile.ZipFile(archive_path) as archive:
-                        self.assertEqual(set(archive.namelist()), {binary_name, "LICENSE", "README.md"})
+                        self.assertEqual(set(archive.namelist()), {binary_name, "symeraseme-go.exe", "LICENSE", "README.md"})
                         info = archive.getinfo(binary_name)
                         self.assertEqual(info.external_attr >> 16 & 0o170000, 0o100000)
                         self.assertEqual(archive.read(binary_name), expected_payloads[(os_name, arch)])
+                        fallback = archive.getinfo("symeraseme-go.exe")
+                        self.assertEqual(fallback.external_attr >> 16 & 0o170000, 0o100000)
+                        self.assertEqual(archive.read("symeraseme-go.exe"), expected_go_payloads[(os_name, arch)])
 
     def test_rejects_wrong_architecture_and_operating_system(self) -> None:
         cases = (
@@ -124,7 +142,7 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
-                args, _ = self._inputs(root, {target: payload})
+                args, _, _ = self._inputs(root, {target: payload})
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(stage_main(args), 1)
                 self.assertFalse((root / "staged").exists())
@@ -144,10 +162,21 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
-                args, _ = self._inputs(root, {target: payload})
+                args, _, _ = self._inputs(root, {target: payload})
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(stage_main(args), 1)
                 self.assertFalse((root / "staged").exists())
+
+    def test_rejects_fallback_binary_with_wrong_target_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, _, _ = self._inputs(
+                root,
+                go_replacements={("windows", "arm64"): executable_header("windows", "amd64")},
+            )
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(stage_main(args), 1)
+            self.assertFalse((root / "staged").exists())
 
 
 if __name__ == "__main__":

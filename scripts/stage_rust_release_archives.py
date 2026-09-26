@@ -208,6 +208,7 @@ def stage(
     version: str,
     output: Path,
     binaries: dict[tuple[str, str], Path],
+    go_fallbacks: dict[tuple[str, str], Path],
     license_path: Path,
     readme_path: Path,
 ) -> None:
@@ -215,13 +216,20 @@ def stage(
         raise ValueError("version must be a non-empty filename-safe release version")
     if set(binaries) != {(os_name, arch) for os_name, arch, _, _ in TARGETS}:
         raise ValueError("exactly the six darwin/linux/windows amd64/arm64 binaries are required")
+    if set(go_fallbacks) != set(binaries):
+        raise ValueError("exactly one matching Go fallback binary is required for each Rust target")
 
     inputs = {
         target: _regular_input(path, f"{target[0]}-{target[1]} binary")
         for target, path in binaries.items()
     }
+    fallback_inputs = {
+        target: _regular_input(path, f"{target[0]}-{target[1]} Go fallback binary")
+        for target, path in go_fallbacks.items()
+    }
     for os_name, arch, _, _ in TARGETS:
         _validate_target(inputs[(os_name, arch)], os_name, arch)
+        _validate_target(fallback_inputs[(os_name, arch)], os_name, arch)
     license_path = _regular_input(license_path, "LICENSE")
     readme_path = _regular_input(readme_path, "README.md")
     output.mkdir(parents=True, exist_ok=True)
@@ -231,8 +239,10 @@ def stage(
     archive_paths: list[Path] = []
     for os_name, arch, extension, binary_name in TARGETS:
         archive_path = output / f"symeraseme_{version}_{os_name}_{arch}.{extension}"
+        fallback_name = "symeraseme-go.exe" if extension == "zip" else "symeraseme-go"
         entries = (
             (inputs[(os_name, arch)], binary_name, 0o755 if extension == "tar.gz" else 0o755),
+            (fallback_inputs[(os_name, arch)], fallback_name, 0o755),
             (license_path, "LICENSE", 0o644),
             (readme_path, "README.md", 0o644),
         )
@@ -263,13 +273,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     for os_name, arch, _, _ in TARGETS:
         parser.add_argument(f"--{os_name}-{arch}", required=True, type=Path)
+        parser.add_argument(f"--go-{os_name}-{arch}", required=True, type=Path)
     args = parser.parse_args(argv)
     binaries = {
         (os_name, arch): getattr(args, f"{os_name}_{arch}")
         for os_name, arch, _, _ in TARGETS
     }
+    go_fallbacks = {
+        (os_name, arch): getattr(args, f"go_{os_name}_{arch}")
+        for os_name, arch, _, _ in TARGETS
+    }
     try:
-        stage(args.version, args.output, binaries, args.license, args.readme)
+        stage(args.version, args.output, binaries, go_fallbacks, args.license, args.readme)
     except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
         print(f"stage-rust-release-archives: {error}", file=sys.stderr)
         return 1

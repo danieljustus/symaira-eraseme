@@ -2,6 +2,7 @@ name: Rust prerelease archive proof
 
 on:
   workflow_dispatch: {}
+  workflow_call: {}
 
 permissions:
   contents: read
@@ -80,6 +81,12 @@ jobs:
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+
+      - name: Install Go oracle toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+          cache: false
 
       - name: Install static Linux linker
         if: runner.os == 'Linux'
@@ -177,11 +184,61 @@ jobs:
 
           cp "$binary" "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
 
+      - name: Build matching Go fallback and probe both dispatch paths
+        shell: bash
+        env:
+          ARCHIVE_OS: ${{ matrix.os }}
+          ARCHIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          export GOWORK=off GOENV=off GOTOOLCHAIN=local CGO_ENABLED=0
+          go_binary="$RUNNER_TEMP/go-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
+          go_build_output="$go_binary"
+          rust_name=symeraseme
+          go_name=symeraseme-go
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            go_build_output+=".exe"
+            rust_name+=".exe"
+            go_name+=".exe"
+          fi
+          go build -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_build_output" ./cmd/symeraseme
+          if [[ "$go_build_output" != "$go_binary" ]]; then
+            cp "$go_build_output" "$go_binary"
+          fi
+
+          pair="$RUNNER_TEMP/fallback-probe-$ARCHIVE_OS-$ARCHIVE_ARCH"
+          mkdir -p "$pair/home" "$pair/data"
+          rust_pair="$pair/$rust_name"
+          go_pair="$pair/$go_name"
+          cp "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH" "$rust_pair"
+          cp "$go_binary" "$go_pair"
+
+          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
+            "$go_pair" version --json > "$pair/go-version.json"
+          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
+            "$rust_pair" version --json > "$pair/fallback-version.json"
+          cmp "$pair/go-version.json" "$pair/fallback-version.json"
+
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"archive-fallback-probe","version":"1"}}}' > "$pair/initialize.json"
+          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
+            "$go_pair" mcp --stdio < "$pair/initialize.json" > "$pair/go-mcp.json"
+          HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
+            "$rust_pair" mcp --stdio < "$pair/initialize.json" > "$pair/fallback-mcp.json"
+          cmp "$pair/go-mcp.json" "$pair/fallback-mcp.json"
+
       - name: Upload native binary for same-run archive verification
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rust-prerelease-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/rust-binary-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload matching Go fallback for same-run archive verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rust-prerelease-go-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/go-binary-${{ matrix.os }}-${{ matrix.arch }}
           if-no-files-found: error
           retention-days: 1
 
@@ -226,8 +283,14 @@ jobs:
             --linux-amd64 "$BINARIES/rust-binary-linux-amd64" \
             --linux-arm64 "$BINARIES/rust-binary-linux-arm64" \
             --windows-amd64 "$BINARIES/rust-binary-windows-amd64" \
-            --windows-arm64 "$BINARIES/rust-binary-windows-arm64"
-          python3 tests/verify_release_archives.py "$DIST"
+            --windows-arm64 "$BINARIES/rust-binary-windows-arm64" \
+            --go-darwin-amd64 "$BINARIES/go-binary-darwin-amd64" \
+            --go-darwin-arm64 "$BINARIES/go-binary-darwin-arm64" \
+            --go-linux-amd64 "$BINARIES/go-binary-linux-amd64" \
+            --go-linux-arm64 "$BINARIES/go-binary-linux-arm64" \
+            --go-windows-amd64 "$BINARIES/go-binary-windows-amd64" \
+            --go-windows-arm64 "$BINARIES/go-binary-windows-arm64"
+          python3 tests/verify_release_archives.py "$DIST" --require-go-fallback
 
       - name: Upload verified shadow archives
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
