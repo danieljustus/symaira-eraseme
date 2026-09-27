@@ -4,6 +4,7 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
 - Integrated status (2026-09-24): the proof branch landed on GitHub `main` as `3f133e75`. Its exact-head Go CI, Rust CI (including the native OS matrix), general CI and CodeQL completed successfully. No release, cutover, Go removal or paid provider is authorized. The older slice notes below are historical; a green integrated CI run does not prove a retained older Go rollback binary can read schema v2 (see #1035).
+- Native shadow archive gate (2026-09-27): migration PR #1066 at `79ef6a85` passed all eight checks: six native Rust release builds, same-run archive/checksum validation, and plain-store switchback. The archives are unsigned one-day workflow artifacts. Production release routing remains Go; this result does not establish signed publication or user-data cutover. The consolidated main-based PR head needs its own exact-head CI.
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
@@ -76,11 +77,12 @@ green CLI corpus does not close JSON-state, review or native platform gates.
 - The manual `.github/workflows/rust-prerelease.yml` gate now builds on native
   macOS, Linux and Windows arm64/amd64 runners, checks binary startup/linkage,
   stages the six Rust binaries with the legacy archive contract, and verifies
-  the resulting archives and checksums. Until that workflow runs successfully,
-  REL-001..004 remain partial; `release.yml` still packages Go and is unchanged.
+  the resulting archives and checksums. The exact-head `79ef6a85` PR run passed
+  all six native builds and the archive verifier; REL-001..004 remain partial
+  because `release.yml` still packages Go and is unchanged.
 - Windows release builds select Rust's static CRT feature and fail if `dumpbin`
   reports a dynamic CRT or non-system DLL dependency. The Go release contract
-  sets `CGO_ENABLED=0`; no Windows native workflow run has verified the Rust gate yet.
+  sets `CGO_ENABLED=0`; the `79ef6a85` PR run verified both Windows native targets.
 - Core `GetPlan` now serves both CLI and MCP reads. The independently reviewed
   source-bound Go campaign oracle at `131fb6b4` checks all seven pinned plan
   timestamps before and after execution, plus local no-send web-form/manual
