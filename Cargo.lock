@@ -2250,6 +2250,7 @@ dependencies = [
  "tokio",
  "toml",
  "ureq",
+ "windows-sys 0.61.2",
  "yaml-rust2",
  "zeroize",
 ]
