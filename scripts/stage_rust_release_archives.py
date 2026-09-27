@@ -125,6 +125,8 @@ def _validate_macho(path: Path, arch: str) -> None:
                 platform = struct.unpack(endian + "I", _read_at(source, command_offset + 8, 4))[0]
                 saw_macos |= platform == 1
             elif command == 0x24:  # LC_VERSION_MIN_MACOSX
+                if size < 16:
+                    raise ValueError("invalid Mach-O macOS version command")
                 saw_macos = True
             source.seek(command_offset + size)
         if source.tell() != end or not saw_macos:
@@ -142,15 +144,32 @@ def _validate_pe(path: Path, arch: str) -> None:
         expected = {"amd64": 0x8664, "arm64": 0xAA64}[arch]
         if machine != expected:
             raise ValueError(f"PE architecture does not match {arch}")
+        section_count = struct.unpack("<H", _read_at(source, pe_offset + 6, 2))[0]
         characteristics = struct.unpack("<H", _read_at(source, pe_offset + 22, 2))[0]
         if not characteristics & 0x0002 or characteristics & 0x2000:
             raise ValueError("PE image must be an executable, not a DLL")
         optional_size = struct.unpack("<H", _read_at(source, pe_offset + 20, 2))[0]
         optional_magic = struct.unpack("<H", _read_at(source, pe_offset + 24, 2))[0]
+        entry = struct.unpack("<I", _read_at(source, pe_offset + 40, 4))[0]
         source.seek(0, 2)
         file_size = source.tell()
-        if optional_size < 112 or pe_offset + 24 + optional_size > file_size or optional_magic != 0x20B:
+        section_offset = pe_offset + 24 + optional_size
+        if optional_size < 112 or section_offset + 40 * section_count > file_size or optional_magic != 0x20B:
             raise ValueError("PE optional header is missing or invalid")
+        if not entry or not section_count:
+            raise ValueError("PE executable entrypoint or sections are missing")
+        for index in range(section_count):
+            section = _read_at(source, section_offset + 40 * index, 40)
+            virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from("<IIII", section, 8)
+            flags = struct.unpack_from("<I", section, 36)[0]
+            if (
+                flags & 0x20000000  # IMAGE_SCN_MEM_EXECUTE
+                and raw_size
+                and raw_offset + raw_size <= file_size
+                and virtual_address <= entry < virtual_address + max(virtual_size, raw_size)
+            ):
+                return
+        raise ValueError("PE executable entrypoint is not in an executable section")
 
 
 def _validate_target(path: Path, os_name: str, arch: str) -> None:

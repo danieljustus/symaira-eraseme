@@ -55,14 +55,19 @@ def executable_header(
         commands = build_version + (struct.pack(endian + "II", 0x80000000, 16) if truncated_commands else b"")
         return header + commands + (b"" if truncated_commands else b"darwin payload")
 
-    data = bytearray(0x80 + 4 + 20 + 0xF0)
+    section_offset = 0x80 + 4 + 20 + 0xF0
+    data = bytearray(section_offset + 40 + 16)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 0x3C, 0x80)
     data[0x80:0x84] = b"PE\0\0"
     struct.pack_into("<H", data, 0x84, {"amd64": 0x8664, "arm64": 0xAA64}[arch])
+    struct.pack_into("<H", data, 0x84 + 2, 1)
     struct.pack_into("<H", data, 0x84 + 16, 0xF0)
     struct.pack_into("<H", data, 0x84 + 18, 0x0002 | (0x2000 if dll else 0))
     struct.pack_into("<H", data, 0x84 + 20, 0x20B)
+    struct.pack_into("<I", data, 0x84 + 20 + 16, 0x1000)
+    struct.pack_into("<IIII", data, section_offset + 8, 16, 0x1000, 16, section_offset + 40)
+    struct.pack_into("<I", data, section_offset + 36, 0x60000020)
     return bytes(data) + b"windows payload"
 
 
@@ -135,11 +140,25 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         elf_no_exec_segment = bytearray(executable_header("linux", "amd64"))
         struct.pack_into("<I", elf_no_exec_segment, 68, 4)
         pe_truncated_optional = executable_header("windows", "amd64")[: 0x80 + 4 + 20 + 2]
+        pe_no_entry = bytearray(executable_header("windows", "amd64"))
+        struct.pack_into("<I", pe_no_entry, 0x80 + 4 + 20 + 16, 0)
+        pe_no_sections = bytearray(executable_header("windows", "amd64"))
+        struct.pack_into("<H", pe_no_sections, 0x84 + 2, 0)
+        pe_entry_outside_section = bytearray(executable_header("windows", "amd64"))
+        struct.pack_into("<I", pe_entry_outside_section, 0x80 + 4 + 20 + 16, 0x2000)
+        macho_short_version = bytearray(executable_header("darwin", "amd64"))
+        struct.pack_into("<I", macho_short_version, 32, 0x24)
+        struct.pack_into("<I", macho_short_version, 36, 8)
+        struct.pack_into("<I", macho_short_version, 20, 8)
         cases = (
             (("linux", "amd64"), bytes(elf_no_entry)),
             (("linux", "amd64"), bytes(elf_no_exec_segment)),
             (("darwin", "amd64"), executable_header("darwin", "amd64", truncated_commands=True)),
+            (("darwin", "amd64"), bytes(macho_short_version)),
             (("windows", "amd64"), pe_truncated_optional),
+            (("windows", "amd64"), bytes(pe_no_entry)),
+            (("windows", "amd64"), bytes(pe_no_sections)),
+            (("windows", "amd64"), bytes(pe_entry_outside_section)),
         )
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
