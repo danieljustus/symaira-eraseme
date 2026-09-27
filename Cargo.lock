@@ -2210,6 +2210,7 @@ dependencies = [
  "subtle",
  "symeraseme-core",
  "symeraseme-engine",
+ "tempfile",
  "tokio",
 ]
 
