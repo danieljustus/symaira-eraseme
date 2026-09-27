@@ -7,6 +7,12 @@ on:
       - Cargo.toml
       - Cargo.lock
       - crates/**
+      - cmd/**
+      - internal/**
+      - regdata.go
+      - registry/**
+      - go.mod
+      - go.sum
       - scripts/stage_rust_release_archives.py
       - scripts/verify_windows_dll_dependencies.py
       - tests/verify_release_archives.py
