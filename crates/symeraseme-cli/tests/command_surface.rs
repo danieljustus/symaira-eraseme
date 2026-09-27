@@ -1746,11 +1746,17 @@ fn init_profile_round_trips_through_show_profile() {
         &KEY,
     );
     assert_eq!(output.status.code(), Some(0));
-    let key = KEY[0].1.as_bytes();
-    assert!(!output.stdout.windows(key.len()).any(|part| part == key));
-    assert!(!output.stderr.windows(key.len()).any(|part| part == key));
+    let encoded_key = KEY[0].1.as_bytes();
+    let decoded_key: Vec<u8> = encoded_key
+        .chunks_exact(2)
+        .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+        .collect();
     let encrypted_profile = fs::read(data_dir.join("identity.encrypted")).unwrap();
-    assert!(!encrypted_profile.windows(key.len()).any(|part| part == key));
+    for artifact in [&output.stdout, &output.stderr, &encrypted_profile] {
+        for key in [encoded_key, decoded_key.as_slice()] {
+            assert!(!artifact.windows(key.len()).any(|part| part == key));
+        }
+    }
     assert_eq!(
         output.stdout,
         format!(
