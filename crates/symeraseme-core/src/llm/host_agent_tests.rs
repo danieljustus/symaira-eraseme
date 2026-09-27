@@ -304,10 +304,29 @@ fn cancelling_host_agent_kills_the_child_and_returns_context_canceled() {
     assert_eq!(fixture["go_version"], "go1.26.6");
     for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
         let source: &[u8] = match path.as_str() {
+            "cmd/symeraseme/main.go" => {
+                include_bytes!("../../../../cmd/symeraseme/main.go")
+            }
             "internal/mcp/server.go" => include_bytes!("../../../../internal/mcp/server.go"),
+            "internal/mcp/contract_handler.go" => {
+                include_bytes!("../../../../internal/mcp/contract_handler.go")
+            }
             "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
             "internal/llm/llm.go" => include_bytes!("../../../../internal/llm/llm.go"),
+            "internal/llm/factory.go" => include_bytes!("../../../../internal/llm/factory.go"),
+            "internal/triage/classifier.go" => {
+                include_bytes!("../../../../internal/triage/classifier.go")
+            }
+            "internal/replies/service.go" => {
+                include_bytes!("../../../../internal/replies/service.go")
+            }
+            "internal/eventstore/store.go" => {
+                include_bytes!("../../../../internal/eventstore/store.go")
+            }
             "go.mod" => include_bytes!("../../../../go.mod"),
+            "rust-tests/parity/oracle/agent-cancel/main.go" => {
+                include_bytes!("../../../../rust-tests/parity/oracle/agent-cancel/main.go")
+            }
             other => panic!("unexpected source {other}"),
         };
         assert_eq!(
