@@ -572,12 +572,32 @@ fn close_file(file: fs::File) -> io::Result<()> {
         // or turn EINTR into success; both could conceal a close failure.
         nix::unistd::close(file).map_err(io::Error::from)
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        // A reviewed checked-close API for these targets remains an ID-005
-        // blocker. Preserve the existing drop behavior and the sync guard.
+        close_windows_file(file)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        // A checked-close API for these targets remains an ID-005 blocker.
         drop(file);
         Ok(())
+    }
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn close_windows_file(file: fs::File) -> io::Result<()> {
+    use std::os::windows::io::IntoRawHandle;
+    use windows_sys::Win32::Foundation::CloseHandle;
+
+    let handle = file.into_raw_handle();
+    // SAFETY: `file` owns this live handle. Consuming it above transfers its
+    // sole ownership here; CloseHandle is called exactly once and no `File`
+    // drop can close or reuse the handle afterward.
+    if unsafe { CloseHandle(handle) } != 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
     }
 }
 

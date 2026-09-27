@@ -1,0 +1,21 @@
+id: fuzz-broker
+name: Example Broker
+website: https://example.test/privacy
+category: other
+jurisdictions: [US]
+laws: [CCPA]
+data_sensitivity: 1
+priority: low
+opt_out:
+  - type: email
+    endpoint: privacy@example.test
+    template: ccpa-deletion
+    locale: en
+    required_fields: [email]
+verification:
+  ack_keywords: [received]
+  rejection_keywords: [denied]
+  human_required_keywords: [verify]
+added_date: '2025-01-01'
+status: active
+source: fuzz corpus

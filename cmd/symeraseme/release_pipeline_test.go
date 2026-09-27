@@ -30,6 +30,7 @@ type workflowStep struct {
 	Run  string            `yaml:"run"`
 	If   string            `yaml:"if"`
 	Env  map[string]string `yaml:"env"`
+	With map[string]string `yaml:"with"`
 }
 
 func loadReleaseWorkflow(t *testing.T) (string, workflowDoc) {
@@ -362,6 +363,73 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		}
 		if strings.Contains(step.Run, "touch") {
 			t.Errorf("step %q contains forbidden 'touch' fallback", step.Name)
+		}
+	})
+}
+
+func TestRustPrereleaseFallbackProbeReportsEachFailingDispatchStage(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "rust-prerelease.yml"))
+	if err != nil {
+		t.Fatalf("read Rust prerelease workflow: %v", err)
+	}
+	var workflow workflowDoc
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatalf("parse Rust prerelease workflow: %v", err)
+	}
+	job, ok := workflow.Jobs["native-release-binary"]
+	if !ok {
+		t.Fatal("missing native-release-binary job in Rust prerelease workflow")
+	}
+	step := getWorkflowStep(t, job.Steps, "Build matching Go fallback and probe both dispatch paths")
+	for _, expected := range []string{
+		"fallback_probe_stage=%s",
+		"fallback_probe_result=%s status=passed",
+		"::error title=Fallback probe failed::stage=%s exit=%s",
+		"::error title=Fallback probe mismatch::stage=%s",
+		"go-build",
+		"stage-rust-binary",
+		"stage-go-fallback",
+		"go-version",
+		"rust-go-version",
+		"version-output",
+		"go-mcp",
+		"rust-go-mcp",
+		"mcp-output",
+		"cat \"$stdout\" >&2",
+		"cat \"$stderr\" >&2",
+	} {
+		if !strings.Contains(step.Run, expected) {
+			t.Errorf("step %q missing diagnostic or probe stage %q", step.Name, expected)
+		}
+	}
+	if !strings.Contains(step.Run, `-o "$go_binary"`) {
+		t.Errorf("step %q must build directly to the artifact path without a Windows .exe alias copy", step.Name)
+	}
+	for _, obsolete := range []string{`go_build_output+=".exe"`, "stage-go-binary", `cp "$go_build_output" "$go_binary"`} {
+		if strings.Contains(step.Run, obsolete) {
+			t.Errorf("step %q contains obsolete Windows alias copy %q", step.Name, obsolete)
+		}
+	}
+
+	t.Run("GoFallbackArtifactPathsStayConsistent", func(t *testing.T) {
+		upload := getWorkflowStep(t, job.Steps, "Upload matching Go fallback for same-run archive verification")
+		wantArtifactPath := `${{ runner.temp }}/go-binary-${{ matrix.os }}-${{ matrix.arch }}`
+		if got := upload.With["path"]; got != wantArtifactPath {
+			t.Errorf("Go fallback upload path: got %q, want %q", got, wantArtifactPath)
+		}
+
+		verifyJob, ok := workflow.Jobs["verify-archives"]
+		if !ok {
+			t.Fatal("missing verify-archives job")
+		}
+		verify := getWorkflowStep(t, verifyJob.Steps, "Stage and verify release archives and checksums")
+		for _, expected := range []string{
+			`--go-windows-amd64 "$BINARIES/go-binary-windows-amd64"`,
+			`--go-windows-arm64 "$BINARIES/go-binary-windows-arm64"`,
+		} {
+			if !strings.Contains(verify.Run, expected) {
+				t.Errorf("step %q does not consume uploaded Go artifact path %q", verify.Name, expected)
+			}
 		}
 	})
 }

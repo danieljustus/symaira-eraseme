@@ -115,7 +115,8 @@ native platform, verbatim errors and one executed Go test per case.
   permission fault.
 
 The Rust consumers are the `id005_atomic_*` tests in
-`consent_filesystem_tests.rs`. The `chmod_failure` case calls native chmod after
+`consent_filesystem_tests.rs` and `id005_windows_checked_close_matches_go_rollback`
+in `consent_portable_tests.rs`. The `chmod_failure` case calls native chmod after
 unlink and compares the observed error category and complete filesystem
 manifest with Go. The `chmod_failure_existing_temp` case injects the same
 permission error at Rust's chmod adapter while retaining the temp until guard
@@ -134,13 +135,19 @@ On Unix, Rust now splits the temporary file from its `TempPath` guard and
 calls the pinned `nix 0.31.3` safe `close(File)` API before chmod/rename. That API
 consumes ownership, invokes close once, and returns errors without retrying
 or treating EINTR as success. The path guard remains alive across checked
-close and chmod failures. No raw descriptors or unsafe code are introduced
-in this repository. The dependency implementation was inspected in the local
-pinned source (`nix/src/unistd.rs`); see the
+close and chmod failures. On Windows, Rust consumes the file handle and calls
+`windows-sys` `CloseHandle` once; a failed call returns `last_os_error`, and no
+`File` drop can retry closing that handle. The localized unsafe block documents
+why handle ownership transfers exactly once. The `id005_windows_checked_close_matches_go_rollback`
+test exercises a successful native close followed by an injected post-close
+error and compares rollback effects with the Go fixture. It does not simulate
+a native `CloseHandle` failure, and native Windows execution remains pending.
+The dependency implementation was inspected in the local pinned source
+(`nix/src/unistd.rs`); see the
 [upstream API and source](https://docs.rs/nix/0.31.3/nix/unistd/fn.close.html).
 The alternative `io-close 0.3.7` was rejected because it normalizes EINTR to
-success. Non-Unix retains the existing drop behavior and remains blocked on
-a reviewed checked-close adapter and native execution evidence.
+success. Targets other than Unix and Windows retain the existing drop behavior
+and remain blocked on a reviewed checked-close adapter.
 
 `sync_all` remains mandatory before checked close. Its error is returned
 unchanged, publication stops, and the owned temporary file is cleaned up.

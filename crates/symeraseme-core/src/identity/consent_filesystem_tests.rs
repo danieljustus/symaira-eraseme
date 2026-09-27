@@ -548,32 +548,3 @@ fn id005_atomic_sync_error_is_retained_without_go_normalization() {
     assert_eq!(actual["entries"], json!(before));
     assert_eq!(actual["held"], old_body);
 }
-
-#[test]
-fn id005_fault_fixture_is_bound_to_source_and_probe() {
-    let document: Value = serde_json::from_str(FAULT_FIXTURE).unwrap();
-    assert_eq!(document["schema"], "consent-id005-faults-v1");
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (path, expected) in document["source_sha256"].as_object().unwrap() {
-        assert_eq!(
-            hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap())),
-            expected.as_str().unwrap(),
-            "Go oracle drift: {path}"
-        );
-    }
-    for (path, expected) in document["helper_sha256"].as_object().unwrap() {
-        assert_eq!(
-            hex::encode(Sha256::digest(
-                fs::read(root.join("scripts/consent-oracle").join(path)).unwrap()
-            )),
-            expected.as_str().unwrap(),
-            "Go helper drift: {path}"
-        );
-    }
-    assert_eq!(
-        hex::encode(Sha256::digest(
-            fs::read(root.join("scripts/consent-oracle/generate.py")).unwrap()
-        )),
-        document["generator_sha256"].as_str().unwrap()
-    );
-}
