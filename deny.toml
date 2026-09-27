@@ -4,6 +4,13 @@ version = 2
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+skip = [
+    # CoreKit's reqwest/hyper stack and the existing CLI resolve these
+    # separately; keep the exception on the older pinned versions only.
+    { name = "base64", version = "=0.22.1" },
+    { name = "core-foundation", version = "=0.9.4" },
+    { name = "syn", version = "=2.0.119" },
+]
 skip-tree = [
     # cap-std 4.0.3 deliberately supports several Windows API generations;
     # isolate only its pinned platform graph while keeping the workspace-wide
