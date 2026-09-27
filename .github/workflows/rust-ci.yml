@@ -85,6 +85,10 @@ jobs:
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
 
+      - name: Check fuzz targets
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" check --manifest-path fuzz/Cargo.toml --bins --locked
+
       - name: Clippy with warnings denied
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings

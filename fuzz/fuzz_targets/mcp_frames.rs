@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 const MAX_INPUT: usize = 64 * 1024;
 const MAX_CAPTURE_PER_STREAM: usize = 32 * 1024;
-const CHILD_TIMEOUT: Duration = Duration::from_millis(500);
+const CHILD_TIMEOUT: Duration = Duration::from_secs(3);
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 struct TempDataDir(PathBuf);
