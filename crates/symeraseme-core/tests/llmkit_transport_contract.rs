@@ -8,7 +8,9 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use symeraseme_core::llm::{ClassifyOptions, ClientError, CreateOptions, create_with};
+use symeraseme_core::llm::{
+    CancellationToken, ClassifyOptions, ClientError, CreateOptions, create_with,
+};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -98,6 +100,78 @@ fn echoed_api_keys_are_redacted_from_provider_errors_and_debug() {
     assert!(!message.contains(api_key));
     assert!(message.contains("[REDACTED]"));
     server.join().expect("fake server thread");
+}
+
+#[test]
+fn cancelling_classification_closes_the_inflight_provider_connection() {
+    let go: Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/fixtures/agent-cancel/http.json"
+    )))
+    .expect("Go cancellation fixture parses");
+    assert_eq!(go["schema"], "symeraseme.go-oracle.agent-cancel.v1");
+    assert_eq!(go["handler_error"], "context canceled");
+    assert_eq!(go["child_exited"], true);
+
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local fake provider");
+    let address = listener.local_addr().unwrap();
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept provider request");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .expect("bound close observation");
+        let _ = read_http_request(&mut stream);
+        started_tx.send(()).expect("signal in-flight request");
+        let mut byte = [0u8; 1];
+        loop {
+            match stream.read(&mut byte) {
+                Ok(0) => return true,
+                Ok(_) => {}
+                Err(error)
+                    if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) =>
+                {
+                    return false;
+                }
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(_) => return true,
+            }
+        }
+    });
+
+    let mut client = create_with(
+        &CreateOptions {
+            provider: "openai".to_owned(),
+            base_url: format!("http://{address}"),
+            api_key: "synthetic-cancel-test-key".to_owned(),
+            ..CreateOptions::default()
+        },
+        &|_| None,
+        &|_| false,
+    )
+    .expect("local provider client");
+    client.base.max_retries = 1;
+    let cancellation = CancellationToken::default();
+    let request_cancellation = cancellation.clone();
+    let request = thread::spawn(move || {
+        client.classify_cancellable(
+            "system",
+            "user",
+            &ClassifyOptions::default(),
+            &request_cancellation,
+        )
+    });
+
+    started_rx
+        .recv_timeout(Duration::from_secs(3))
+        .expect("provider request reached the waiting response");
+    cancellation.cancel();
+    let error = request
+        .join()
+        .expect("classification worker joined")
+        .expect_err("cancelled classification must fail");
+    assert!(matches!(error, ClientError::Context(message) if message == "context canceled"));
+    assert!(server.join().expect("server close observer joined"));
 }
 
 #[test]

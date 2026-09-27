@@ -18,25 +18,14 @@ use std::fmt;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-/// Cooperative cancellation for a provider call, including child processes.
-#[derive(Clone, Debug, Default)]
-pub struct CancellationToken(Arc<AtomicBool>);
-
-impl CancellationToken {
-    pub fn cancel(&self) {
-        self.0.store(true, Ordering::Release);
-    }
-
-    pub fn is_cancelled(&self) -> bool {
-        self.0.load(Ordering::Acquire)
-    }
-}
+/// Cancellation shared with CoreKit's interruptible HTTP transport and host
+/// agent subprocesses.
+pub type CancellationToken = symaira_core_llm::CancellationToken;
 
 /// A single LLM usage and cost record, mirroring Go's `UsageRecord`.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -579,10 +568,14 @@ impl AgentClient {
         user_prompt: &str,
         options: &ClassifyOptions,
     ) -> Result<(String, UsageRecord), ClientError> {
-        self.classify_cancellable(
+        if let Some(client) = &self.provider_client {
+            return client.classify(&self.base, system_prompt, user_prompt, options);
+        }
+        self.classify_with_timeout_and_cancellation(
             system_prompt,
             user_prompt,
             options,
+            AGENT_SUBPROCESS_TIMEOUT,
             &CancellationToken::default(),
         )
     }
@@ -600,7 +593,13 @@ impl AgentClient {
             if cancellation.is_cancelled() {
                 return Err(ClientError::Context("context canceled".to_owned()));
             }
-            let result = client.classify(&self.base, system_prompt, user_prompt, options);
+            let result = client.classify_cancellable(
+                &self.base,
+                system_prompt,
+                user_prompt,
+                options,
+                cancellation,
+            );
             return if cancellation.is_cancelled() {
                 Err(ClientError::Context("context canceled".to_owned()))
             } else {
