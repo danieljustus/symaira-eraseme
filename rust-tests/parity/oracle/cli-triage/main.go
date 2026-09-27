@@ -81,12 +81,12 @@ type commandCase struct {
 
 var cases = []commandCase{
 	{
-		id: "classify-agent-invalid-utf8-stderr",
+		id:   "classify-agent-invalid-utf8-stderr",
 		argv: []string{"classify-reply", "1", "--provider", "agent"},
 		environment: map[string]string{
-			"SYMERASEME_LLM_PROVIDER": "agent",
+			"SYMERASEME_LLM_PROVIDER":  "agent",
 			"SYMERASEME_AGENT_BACKEND": "claude",
-			"AGENT_STDERR_ESCAPED":  "before\\377after",
+			"AGENT_STDERR_ESCAPED":     "before\\377after",
 		},
 	},
 	{
