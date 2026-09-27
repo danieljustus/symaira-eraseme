@@ -16,7 +16,7 @@ use std::error::Error as StdError;
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
@@ -790,16 +790,54 @@ fn detect_backend(explicit: &str, on_path: &dyn Fn(&str) -> bool) -> String {
 
 /// Go's `cliOnPath`: a PATH lookup with the executable bit.
 pub fn cli_on_path(name: &str) -> bool {
-    path_entries().iter().any(|entry| {
-        let candidate: PathBuf = entry.join(name);
-        is_executable(&candidate)
-    })
+    let path = std::env::var_os("PATH");
+    let allow_relative = std::env::var("GODEBUG")
+        .unwrap_or_default()
+        .split(',')
+        .any(|setting| setting == "execerrdot=0");
+    let cwd = std::env::current_dir().ok();
+    cli_on_path_from(name, path.as_deref(), allow_relative, cwd.as_deref())
 }
 
-fn path_entries() -> Vec<PathBuf> {
-    std::env::var_os("PATH")
-        .map(|path| std::env::split_paths(&path).collect())
-        .unwrap_or_default()
+fn cli_on_path_from(
+    name: &str,
+    path: Option<&std::ffi::OsStr>,
+    allow_relative: bool,
+    cwd: Option<&Path>,
+) -> bool {
+    let Some(path) = path.filter(|path| !path.is_empty()) else {
+        return false;
+    };
+    for entry in std::env::split_paths(path) {
+        let relative = entry.as_os_str().is_empty() || !entry.is_absolute();
+        if relative && !allow_relative {
+            let Some(cwd) = cwd else {
+                continue;
+            };
+            let directory = if entry.as_os_str().is_empty() {
+                cwd.to_path_buf()
+            } else {
+                cwd.join(&entry)
+            };
+            if is_executable(&directory.join(name)) {
+                // Go's exec.LookPath returns ErrDot when a match came from a
+                // relative PATH entry, so AgentClient treats it as unavailable.
+                return false;
+            }
+            continue;
+        }
+        let directory = if entry.as_os_str().is_empty() {
+            cwd.unwrap_or_else(|| Path::new(".")).to_path_buf()
+        } else if entry.is_absolute() {
+            entry
+        } else {
+            cwd.map_or_else(|| entry.clone(), |cwd| cwd.join(&entry))
+        };
+        if is_executable(&directory.join(name)) {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_executable(path: &Path) -> bool {
@@ -819,6 +857,10 @@ fn is_executable(path: &Path) -> bool {
         true
     }
 }
+
+#[cfg(test)]
+#[path = "agent_path_tests.rs"]
+mod agent_path_tests;
 
 /// Go's `Create`: resolve the provider, then the model, then build the client.
 ///

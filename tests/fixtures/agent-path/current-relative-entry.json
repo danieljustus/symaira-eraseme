@@ -1,0 +1,14 @@
+{
+  "schema": "symeraseme.go-oracle.agent-path.v1",
+  "go_version": "go1.27.1",
+  "generated_on": "darwin/arm64",
+  "sources_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "internal/llm/agent.go": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8"
+  },
+  "id": "relative-path-hit-is-rejected",
+  "cli": "claude",
+  "path": ".",
+  "executable_exists": true,
+  "available": false
+}
