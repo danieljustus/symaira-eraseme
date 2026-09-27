@@ -2,12 +2,12 @@
 #![cfg(unix)]
 
 use std::collections::HashSet;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symeraseme_core::storage::Store;
@@ -16,6 +16,8 @@ use symeraseme_core::storage::repository::Repository;
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GO_AGENT_CANCEL_FIXTURE: &str =
     include_str!("../../../tests/fixtures/agent-cancel/http.json");
+const GO_PROVIDER_CANCEL_FIXTURE: &str =
+    include_str!("../../../tests/fixtures/provider-cancel/http.json");
 
 struct TestDir(PathBuf);
 type OracleCase<'a> = (&'a str, &'a [u8], Vec<(&'a str, String)>);
@@ -140,11 +142,17 @@ fn seed_agent_reply(root: &Path) {
 }
 
 fn post_then_disconnect(port: u16, bearer: &str) -> TcpStream {
+    post_body_then_disconnect(
+        port,
+        bearer,
+        br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#,
+    )
+}
+
+fn post_body_then_disconnect(port: u16, bearer: &str, body: &[u8]) -> TcpStream {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    write!(stream, "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {bearer}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#.len()).unwrap();
-    stream
-        .write_all(br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#)
-        .unwrap();
+    write!(stream, "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {bearer}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", body.len()).unwrap();
+    stream.write_all(body).unwrap();
     stream
 }
 
@@ -222,6 +230,9 @@ fn build_go_oracle(root: &Path) -> PathBuf {
         .arg(&oracle)
         .arg("./cmd/symeraseme")
         .current_dir(repo)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
         .output()
         .expect("Go toolchain is required to reproduce the HTTP oracle transcript");
     assert!(
@@ -230,6 +241,155 @@ fn build_go_oracle(root: &Path) -> PathBuf {
         String::from_utf8_lossy(&build.stderr)
     );
     oracle
+}
+
+fn assert_agent_cancel_oracle_matches(root: &Path) {
+    let generated_fixture = root.join("agent-cancel.json");
+    let oracle = Command::new("go")
+        .args(["run", "./rust-tests/parity/oracle/agent-cancel", "-fixture"])
+        .arg(&generated_fixture)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("run source-pinned Go cancellation oracle");
+    assert!(
+        oracle.status.success(),
+        "Go cancellation oracle failed: {}",
+        String::from_utf8_lossy(&oracle.stderr)
+    );
+    assert_eq!(
+        std::fs::read(generated_fixture).unwrap(),
+        GO_AGENT_CANCEL_FIXTURE.as_bytes(),
+        "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
+    );
+}
+
+fn assert_provider_cancel_oracle_matches(root: &Path) {
+    let generated_fixture = root.join("provider-cancel.json");
+    let oracle = Command::new("go")
+        .args([
+            "run",
+            "./rust-tests/parity/oracle/provider-cancel",
+            "-fixture",
+        ])
+        .arg(&generated_fixture)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("run source-pinned Go provider cancellation oracle");
+    assert!(
+        oracle.status.success(),
+        "Go provider cancellation oracle failed: {}",
+        String::from_utf8_lossy(&oracle.stderr)
+    );
+    assert_eq!(
+        std::fs::read(generated_fixture).unwrap(),
+        GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
+        "Go 1.26.6 provider cancellation oracle or pinned source hashes drifted"
+    );
+}
+
+fn start_provider_server(binary: &Path, root: &Path, port: u16, provider_url: &str) -> Child {
+    let home = root.join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let mut command = Command::new(binary);
+    command
+        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("SYMERASEME_DATA_DIR", root.join("data"))
+        .env("SYMERASEME_LLM_BASE_URL", provider_url)
+        .env("OPENAI_API_KEY", "synthetic-cancel-key")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap()
+}
+
+struct CapturedProviderRequest {
+    request_line: String,
+    authorization: String,
+    body: Vec<u8>,
+}
+
+fn start_blocking_provider() -> (
+    String,
+    mpsc::Receiver<CapturedProviderRequest>,
+    thread::JoinHandle<String>,
+) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let provider_url = format!("http://{}", listener.local_addr().unwrap());
+    let (request_tx, request_rx) = mpsc::channel();
+    let server = thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let (stream, _) = loop {
+            match listener.accept() {
+                Ok(connection) => break connection,
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        && Instant::now() < deadline =>
+                {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => return format!("accept failed: {}", error.kind()),
+            }
+        };
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut request_line = String::new();
+        reader.read_line(&mut request_line).unwrap();
+        let mut content_length = 0usize;
+        let mut authorization = String::new();
+        let mut line = String::new();
+        loop {
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" || line.is_empty() {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("content-length") {
+                    content_length = value.trim().parse().unwrap();
+                } else if name.eq_ignore_ascii_case("authorization") {
+                    authorization = value.trim().to_owned();
+                }
+            }
+        }
+        let mut body = vec![0; content_length];
+        reader.read_exact(&mut body).unwrap();
+        request_tx
+            .send(CapturedProviderRequest {
+                request_line,
+                authorization,
+                body,
+            })
+            .unwrap();
+
+        let mut byte = [0; 1];
+        match reader.read(&mut byte) {
+            Ok(0) => "eof".to_owned(),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::UnexpectedEof
+                ) =>
+            {
+                format!("closed: {}", error.kind())
+            }
+            Err(error) => format!("read error: {}", error.kind()),
+            Ok(count) => format!("unexpected data: {} bytes", count),
+        }
+    });
+    (provider_url, request_rx, server)
 }
 
 fn wait_ready(child: &mut Child, port: u16) {
@@ -644,26 +804,7 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
     assert_eq!(fixture["child_exited"], true);
 
     let root = TestDir::new();
-    let generated_fixture = root.path().join("agent-cancel.json");
-    let oracle = Command::new("go")
-        .args(["run", "./rust-tests/parity/oracle/agent-cancel", "-fixture"])
-        .arg(&generated_fixture)
-        .current_dir(ROOT)
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .output()
-        .expect("run source-pinned Go cancellation oracle");
-    assert!(
-        oracle.status.success(),
-        "Go cancellation oracle failed: {}",
-        String::from_utf8_lossy(&oracle.stderr)
-    );
-    assert_eq!(
-        std::fs::read(generated_fixture).unwrap(),
-        GO_AGENT_CANCEL_FIXTURE.as_bytes(),
-        "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
-    );
+    assert_agent_cancel_oracle_matches(root.path());
 
     let go = root.path().join("symeraseme-go-oracle");
     let build = Command::new("go")
@@ -713,6 +854,75 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
             "{name} persisted a classification after cancellation"
         );
 
+        send_signal(&mut server, "TERM");
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn live_http_disconnect_cancels_provider_request_like_go() {
+    let root = TestDir::new();
+    assert_provider_cancel_oracle_matches(root.path());
+    let provider_fixture: serde_json::Value =
+        serde_json::from_str(GO_PROVIDER_CANCEL_FIXTURE).unwrap();
+    assert_eq!(
+        provider_fixture["schema"],
+        "symeraseme.go-oracle.provider-cancel.v1"
+    );
+    assert_eq!(provider_fixture["provider_canceled"], true);
+    assert_eq!(provider_fixture["client_disconnected"], true);
+    let go = build_go_oracle(root.path());
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"openai","model":"oracle-model"}}}"#;
+
+    for (name, binary) in [("go", go.as_path()), ("rust", rust)] {
+        let case = TestDir::new();
+        seed_agent_reply(case.path());
+        let (provider_url, request_rx, provider) = start_blocking_provider();
+        let port = free_port();
+        let mut server = start_provider_server(binary, case.path(), port, &provider_url);
+        wait_ready(&mut server, port);
+        let bearer = token(case.path());
+        let request = post_body_then_disconnect(port, &bearer, body);
+        let provider_request = request_rx
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap_or_else(|error| panic!("{name} did not reach the local provider: {error}"));
+        assert_eq!(
+            provider_request.request_line.trim(),
+            "POST /chat/completions HTTP/1.1",
+            "{name} provider request path"
+        );
+        assert_eq!(
+            provider_request.authorization, "Bearer synthetic-cancel-key",
+            "{name} synthetic provider credential"
+        );
+        let provider_body: serde_json::Value =
+            serde_json::from_slice(&provider_request.body).unwrap();
+        assert_eq!(provider_body["model"], "oracle-model");
+        assert_eq!(provider_body["messages"][0]["role"], "system");
+        assert_eq!(provider_body["messages"][1]["role"], "user");
+
+        drop(request);
+        let provider_result = provider.join().unwrap();
+        assert!(
+            provider_result == "eof" || provider_result.starts_with("closed:"),
+            "{name} provider read after client disconnect: {provider_result}"
+        );
+        assert!(
+            server.try_wait().unwrap().is_none(),
+            "{name} MCP server stopped after a client disconnect"
+        );
+        let store = Store::open(case.path().join("data/symeraseme.db")).unwrap();
+        let classification: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE message_id = 'cancel-message'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(classification, None, "{name} persisted after cancellation");
+        drop(store);
         send_signal(&mut server, "TERM");
     }
 }
