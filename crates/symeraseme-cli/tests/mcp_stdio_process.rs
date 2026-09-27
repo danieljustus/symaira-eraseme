@@ -1,6 +1,7 @@
 //! The actual stdio process must answer before EOF and keep stdout protocol-only.
 
 #[cfg(unix)]
+#[allow(dead_code)] // The shared IMAP fixture also supports modes unused by this process test.
 #[path = "../../symeraseme-core/tests/support/imap_server.rs"]
 mod imap_server;
 
@@ -54,6 +55,7 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
     ));
     let home = root.join("home");
     let data = root.join("data");
+    fs::create_dir(&root).unwrap();
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(&data).unwrap();
 
@@ -609,6 +611,7 @@ fn scheduler_uninstall_and_status_stdio_match_source_bound_go() {
     let data = root.join("data");
     let tmp = root.join("tmp");
     let bin = root.join("bin");
+    fs::create_dir(&root).unwrap();
     for dir in [&home, &data, &tmp, &bin] {
         fs::create_dir_all(dir).unwrap();
     }
