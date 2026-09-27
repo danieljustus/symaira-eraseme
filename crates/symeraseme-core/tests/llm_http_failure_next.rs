@@ -19,10 +19,19 @@ const FIXTURE_400: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/case-400.json"
 ));
+const FIXTURE_500: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/case-500.json"
+));
 
 #[test]
 fn context_overflow_response_matches_go_with_secret_redaction() {
     assert_failure_matches_go(FIXTURE_400, 400);
+}
+
+#[test]
+fn provider_server_error_matches_go_with_secret_redaction() {
+    assert_failure_matches_go(FIXTURE_500, 500);
 }
 
 #[test]

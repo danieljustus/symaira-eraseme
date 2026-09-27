@@ -37,7 +37,7 @@ type observation struct {
 }
 
 func main() {
-	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 403 or 404)")
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 403, 404 or 500)")
 	flag.Parse()
 	var id, apiKey, body string
 	switch *status {
@@ -47,6 +47,8 @@ func main() {
 		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
 	case http.StatusNotFound:
 		id, apiKey, body = "openai-model-not-found-echoed-key", "synthetic-404-key", `model not found; key synthetic-404-key`
+	case http.StatusInternalServerError:
+		id, apiKey, body = "openai-server-error-echoed-key", "synthetic-500-key", `provider temporarily unavailable; key synthetic-500-key`
 	default:
 		fatalIf(fmt.Errorf("unsupported synthetic status %d", *status))
 	}
