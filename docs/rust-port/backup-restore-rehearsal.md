@@ -51,6 +51,28 @@ archive without extracting and requires exactly one regular top-level
 the binary's embedded source metadata. Any observed schema-v2 failure is
 specific to the exact supplied artifact and this rehearsal.
 
+## Release-bound replay — 2026-09-27
+
+The same eight-case sequence passed on macOS arm64 at candidate
+`62e18d2efdb098854124f2d859361c4c5d07530f` with the official
+`v0.12.1` `symeraseme_0.12.1_darwin_arm64.tar.gz` archive. Its SHA-256
+`7fa696829c9bf861ba902a65576d22013e4eeeb655150143975f961078dc906b`
+matched the release `checksums.txt` and GitHub asset digest. The exact archive
+member tested had SHA-256
+`b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3`;
+its embedded Go build metadata identifies module version `v0.12.1`, source
+revision `240bf67cefa05e643e32611a02e6e7ed87a033ea`, and
+`vcs.modified=false`. The current Rust debug binary SHA-256 was
+`fa8f3be968c093abb3e00bb0b1fd8e091dd6a075d4da7ecb7fbe632ea027feeb`.
+
+The isolated report is under ignored
+`target/issue-1035-release-proof-20260927/run/`. It records all eight cases
+passing, schema versions 1 → 2 → 1, a successful restore, and rejection of an
+incomplete restore. The official Go binary refused schema v2; the restored
+schema-v1 store contained the original three requests and excluded the Rust
+write. This proves the backup path for those exact artifacts and fixture.
+Native Windows and production-data restore remain unverified.
+
 Run on macOS, or on the native Linux aarch64 sandbox supported by
 `plain_store_switchback.py`:
 
