@@ -750,15 +750,40 @@ fn read_pipe(mut pipe: impl Read) -> std::io::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn trim_go_space(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).trim().to_owned()
+fn trim_go_space(bytes: &[u8]) -> &[u8] {
+    let mut cursor = 0;
+    let mut first_non_space = None;
+    let mut last_non_space_end = 0;
+    while cursor < bytes.len() {
+        let remaining = &bytes[cursor..];
+        let probe = &remaining[..remaining.len().min(4)];
+        let (character, width) = match std::str::from_utf8(probe) {
+            Ok(valid) => {
+                let character = valid.chars().next().expect("non-empty suffix");
+                (character, character.len_utf8())
+            }
+            Err(error) if error.valid_up_to() > 0 => {
+                let valid =
+                    std::str::from_utf8(&probe[..error.valid_up_to()]).expect("valid prefix");
+                let character = valid.chars().next().expect("non-empty valid prefix");
+                (character, character.len_utf8())
+            }
+            Err(_) => (char::REPLACEMENT_CHARACTER, 1),
+        };
+        if !character.is_whitespace() {
+            first_non_space.get_or_insert(cursor);
+            last_non_space_end = cursor + width;
+        }
+        cursor += width;
+    }
+    match first_non_space {
+        Some(start) => &bytes[start..last_non_space_end],
+        None => &bytes[0..0],
+    }
 }
 
-fn truncate_go_bytes(text: String, limit: usize) -> String {
-    if text.len() <= limit {
-        return text;
-    }
-    String::from_utf8_lossy(&text.as_bytes()[..limit]).into_owned()
+fn truncate_go_bytes(bytes: &[u8], limit: usize) -> String {
+    String::from_utf8_lossy(&bytes[..bytes.len().min(limit)]).into_owned()
 }
 
 fn go_spawn_error(cli: &str, override_path: Option<&Path>, error: &std::io::Error) -> String {

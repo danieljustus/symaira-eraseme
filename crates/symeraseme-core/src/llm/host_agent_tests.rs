@@ -13,6 +13,10 @@ const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-provider-surface/cases.json"
 ));
+const INVALID_UTF8_FIXTURE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/agent-stderr/invalid-utf8.json"
+));
 
 fn fixture() -> Value {
     serde_json::from_str(FIXTURE).expect("the recorded host-agent fixture parses")
@@ -217,4 +221,71 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
 
         let _ = fs::remove_dir_all(root);
     }
+}
+
+#[test]
+fn invalid_utf8_agent_stderr_matches_go_byte_truncation() {
+    let fixture: Value =
+        serde_json::from_str(INVALID_UTF8_FIXTURE).expect("Go stderr fixture parses");
+    assert_eq!(fixture["schema"], "symeraseme.go-oracle.agent-stderr.v1");
+    for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
+        let source: &[u8] = match path.as_str() {
+            "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
+            "go.mod" => include_bytes!("../../../../go.mod"),
+            other => panic!("unexpected source {other}"),
+        };
+        assert_eq!(
+            hex::encode(Sha256::digest(source)),
+            expected.as_str().unwrap(),
+            "{path}"
+        );
+    }
+
+    let root = unique_root();
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("isolated fake-agent root");
+    let cli = root.join("claude");
+    fs::write(
+        &cli,
+        "#!/bin/sh\nprintf '%b' \"$AGENT_STDERR_ESCAPED\" >&2\nexit 23\n",
+    )
+    .expect("write fake agent");
+    fs::set_permissions(&cli, fs::Permissions::from_mode(0o700))
+        .expect("make fake agent executable");
+
+    let environment = [(
+        OsString::from("AGENT_STDERR_ESCAPED"),
+        OsString::from(
+            fixture["stderr_printf_escape"]
+                .as_str()
+                .expect("Go-recorded stderr bytes"),
+        ),
+    )];
+    let mut agent = AgentClient::with_probe("auto", "claude", Vec::new(), &|_| true);
+    agent.base.max_retries = 1;
+    let result = agent.classify_with_command(
+        "system",
+        "user",
+        &Default::default(),
+        AgentCommandConfig {
+            timeout: Duration::from_secs(2),
+            executable_override: Some(&cli),
+            environment: &environment,
+            inherit_environment: false,
+        },
+    );
+    let error = result.expect_err("fake agent exits non-zero");
+    assert_eq!(
+        error.to_string(),
+        fixture["error"].as_str().expect("Go-recorded error")
+    );
+    assert!(
+        fixture["error_type"]
+            .as_str()
+            .unwrap()
+            .ends_with("llm.Error")
+    );
+    assert_eq!(error_type(&error), "Error");
+
+    fs::remove_dir_all(root).expect("remove isolated fake-agent root");
 }
