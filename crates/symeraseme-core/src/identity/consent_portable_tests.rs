@@ -4,6 +4,13 @@ use super::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+#[cfg(windows)]
+fn fixed_store(path: &Path) -> ConsentStore {
+    ConsentStore::new(path)
+        .with_clock(|| 1000)
+        .with_random_source(|length| Ok(vec![7; length]))
+}
+
 fn fixture_case(name: &str) -> Value {
     let fixture: Value = serde_json::from_str(include_str!(
         "../../../../tests/fixtures/consent-contract/id005.json"
