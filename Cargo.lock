@@ -1550,7 +1550,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1846,7 +1846,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2128,7 +2128,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "symaira-core-exit"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=10c687888247b24371a4a40976e71f083ba6ce32#10c687888247b24371a4a40976e71f083ba6ce32"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=dc63a443f8f07e4454e329f21db936fb1bcd3ea3#dc63a443f8f07e4454e329f21db936fb1bcd3ea3"
 
 [[package]]
 name = "symaira-core-fs"
@@ -2147,7 +2147,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-llm"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=10c687888247b24371a4a40976e71f083ba6ce32#10c687888247b24371a4a40976e71f083ba6ce32"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=dc63a443f8f07e4454e329f21db936fb1bcd3ea3#dc63a443f8f07e4454e329f21db936fb1bcd3ea3"
 dependencies = [
  "reqwest",
  "serde",
@@ -2162,7 +2162,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-secretref"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=10c687888247b24371a4a40976e71f083ba6ce32#10c687888247b24371a4a40976e71f083ba6ce32"
+source = "git+https://github.com/danieljustus/symaira-corekit?rev=dc63a443f8f07e4454e329f21db936fb1bcd3ea3#dc63a443f8f07e4454e329f21db936fb1bcd3ea3"
 dependencies = [
  "rustix",
  "serde",
@@ -2358,7 +2358,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
