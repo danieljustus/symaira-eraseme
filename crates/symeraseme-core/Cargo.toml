@@ -54,6 +54,7 @@ nix = { version = "=0.30.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.29"
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation"] }
 
 [build-dependencies]
 cap-fs-ext.workspace = true

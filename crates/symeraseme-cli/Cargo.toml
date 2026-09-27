@@ -32,4 +32,6 @@ subtle.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+rcgen.workspace = true
+rustls.workspace = true
 sha2.workspace = true

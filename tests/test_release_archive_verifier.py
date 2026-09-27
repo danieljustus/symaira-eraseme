@@ -85,6 +85,13 @@ class DuplicateArchiveMemberTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "duplicate archive members"):
                 main(dist)
 
+    def test_dual_backend_mode_rejects_archives_without_go_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            create_dist(dist)
+            with self.assertRaisesRegex(SystemExit, "expected members must be regular files"):
+                main(dist, require_go_fallback=True)
+
 
 if __name__ == "__main__":
     unittest.main()

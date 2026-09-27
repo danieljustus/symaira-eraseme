@@ -1387,6 +1387,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "symeraseme-core",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2200,6 +2201,8 @@ dependencies = [
  "hyper",
  "hyper-util",
  "rand 0.10.3",
+ "rcgen",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
@@ -2250,6 +2253,7 @@ dependencies = [
  "tokio",
  "toml",
  "ureq",
+ "windows-sys 0.61.2",
  "yaml-rust2",
  "zeroize",
 ]
