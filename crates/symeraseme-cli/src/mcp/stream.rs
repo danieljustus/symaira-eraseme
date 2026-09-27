@@ -198,6 +198,39 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
     if error.is_eof() || error.to_string().starts_with("recursion limit exceeded") {
         return None;
     }
+    let error_position = error.column().saturating_sub(1);
+    if let Some(byte) = input.get(error_position).copied()
+        && input[..error_position]
+            .iter()
+            .rev()
+            .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            == Some(&b'"')
+    {
+        let prefix = &input[..error_position];
+        let separator = prefix.iter().rposition(|byte| *byte == b':');
+        let boundary = prefix.iter().rposition(|byte| matches!(*byte, b',' | b'{'));
+        if separator > boundary {
+            let prior_separator = prefix[..separator.unwrap()]
+                .iter()
+                .rposition(|byte| *byte == b':');
+            let state = if prior_separator > boundary {
+                "after object key"
+            } else {
+                "after object key:value pair"
+            };
+            return Some(StreamError::Syntax(format!(
+                "invalid character '{}' {state}",
+                go_quoted_byte(byte),
+            )));
+        }
+    }
+    if expects_object_key(input, error_position) {
+        let byte = input.get(error_position).copied().unwrap_or_default();
+        return Some(StreamError::Syntax(format!(
+            "invalid character '{}' looking for beginning of object key string",
+            go_quoted_byte(byte)
+        )));
+    }
     let (mut in_string, mut escaped) = (false, false);
     for (index, byte) in input.iter().enumerate() {
         if escaped {
@@ -250,7 +283,6 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
         .copied()
         .or_else(|| input.last().copied())
         .unwrap_or_default();
-    let error_position = error.column().saturating_sub(1);
     let preceding = input
         .iter()
         .take(error_position)
