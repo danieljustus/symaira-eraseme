@@ -159,12 +159,9 @@ fn classify_error(error: Error, api_key: &str, openai_dialect: bool) -> ClientEr
 fn structured_openai_error(body: &str) -> Option<(ErrorCode, String)> {
     let value: serde_json::Value = serde_json::from_str(body).ok()?;
     // Go unmarshals an HTTP error body into its complete `openaiChatResponse`
-    // before inspecting `error`; a present non-array `choices` field makes
-    // that decode fail and leaves the original status/body classification.
-    if value
-        .get("choices")
-        .is_some_and(|choices| !choices.is_null() && !choices.is_array())
-    {
+    // before inspecting `error`; malformed `choices` fields leave the original
+    // status/body classification instead of refining the neighboring error.
+    if !openai_choices_envelope_is_valid(value.get("choices")) {
         return None;
     }
     let error = value.get("error")?.as_object()?;
@@ -213,6 +210,29 @@ fn structured_openai_error(body: &str) -> Option<(ErrorCode, String)> {
         format!("llmkit: {} (status 400): {message}", code.as_str())
     };
     Some((code, rendered))
+}
+
+fn openai_choices_envelope_is_valid(choices: Option<&serde_json::Value>) -> bool {
+    let Some(choices) = choices else {
+        return true;
+    };
+    if choices.is_null() {
+        return true;
+    }
+    let Some(choices) = choices.as_array() else {
+        return false;
+    };
+    choices.iter().all(|choice| {
+        if choice.is_null() {
+            return true;
+        }
+        let Some(choice) = choice.as_object() else {
+            return false;
+        };
+        choice
+            .get("finish_reason")
+            .is_none_or(|reason| reason.is_null() || reason.is_string())
+    })
 }
 
 fn json_string(value: Option<&serde_json::Value>) -> Option<String> {

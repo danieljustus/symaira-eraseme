@@ -39,6 +39,7 @@ type observation struct {
 func main() {
 	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 401, 403, 404 or 500)")
 	malformedEnvelope := flag.Bool("malformed-envelope", false, "add an invalid choices field beside a valid structured OpenAI error")
+	malformedChoice := flag.Bool("malformed-choice", false, "add a choice with an invalid finish_reason type beside a valid structured OpenAI error")
 	flag.Parse()
 	var id, apiKey, body string
 	switch *status {
@@ -62,6 +63,14 @@ func main() {
 		id = "openai-malformed-error-envelope"
 		apiKey = "synthetic-envelope-key"
 		body = `{"error":{"message":"authentication failed; key synthetic-envelope-key","type":"authentication_error","code":"invalid_api_key"},"choices":"malformed"}`
+	}
+	if *malformedChoice {
+		if *status != http.StatusForbidden || *malformedEnvelope {
+			fatalIf(fmt.Errorf("--malformed-choice requires --status 403 without --malformed-envelope"))
+		}
+		id = "openai-malformed-choice-field"
+		apiKey = "synthetic-choice-key"
+		body = `{"error":{"message":"authentication failed; key synthetic-choice-key","type":"authentication_error","code":"invalid_api_key"},"choices":[{"finish_reason":false}]}`
 	}
 	_, here, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(here), "../../../.."))

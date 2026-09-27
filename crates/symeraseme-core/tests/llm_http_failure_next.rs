@@ -31,6 +31,10 @@ const FIXTURE_MALFORMED_ENVELOPE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/malformed-envelope.json"
 ));
+const FIXTURE_MALFORMED_CHOICE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/malformed-choice.json"
+));
 
 #[test]
 fn context_overflow_response_matches_go_with_secret_redaction() {
@@ -50,6 +54,11 @@ fn structured_openai_auth_error_matches_go_with_secret_redaction() {
 #[test]
 fn malformed_openai_response_envelope_keeps_go_status_error() {
     assert_failure_matches_go(FIXTURE_MALFORMED_ENVELOPE, 403);
+}
+
+#[test]
+fn malformed_openai_choice_field_keeps_go_status_error() {
+    assert_failure_matches_go(FIXTURE_MALFORMED_CHOICE, 403);
 }
 
 #[test]
