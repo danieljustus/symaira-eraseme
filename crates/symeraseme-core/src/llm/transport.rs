@@ -158,6 +158,15 @@ fn classify_error(error: Error, api_key: &str, openai_dialect: bool) -> ClientEr
 /// of the original HTTP status. Preserve that observable EraseMe contract.
 fn structured_openai_error(body: &str) -> Option<(ErrorCode, String)> {
     let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    // Go unmarshals an HTTP error body into its complete `openaiChatResponse`
+    // before inspecting `error`; a present non-array `choices` field makes
+    // that decode fail and leaves the original status/body classification.
+    if value
+        .get("choices")
+        .is_some_and(|choices| !choices.is_null() && !choices.is_array())
+    {
+        return None;
+    }
     let error = value.get("error")?.as_object()?;
     let message = json_string(error.get("message"))?;
     let kind = json_string(error.get("type"))?;
