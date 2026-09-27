@@ -20,6 +20,7 @@ const FIXTURE_PATH: &str = concat!(
 const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 const FAKE_AGENT_SCRIPT: &str = r#"#!/bin/sh
+if [ -n "$AGENT_STDERR_ESCAPED" ]; then printf '%b' "$AGENT_STDERR_ESCAPED" >&2; exit 23; fi
 case "$*" in
   *"--model oracle-env-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from environment","extracted_fields":{"ticket":"T-42"}}' ;;
   *"--model oracle-flag-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from flag","extracted_fields":{"ticket":"T-42"}}' ;;

@@ -80,10 +80,21 @@ impl UsageRecord {
 }
 
 /// Go's `*Error`: a provider failure with an optional wrapped cause.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct LlmError {
     message: String,
     source: Option<String>,
+    raw_message: Option<Vec<u8>>,
+}
+
+impl fmt::Debug for LlmError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("LlmError")
+            .field("message", &self.message)
+            .field("source", &self.source)
+            .finish()
+    }
 }
 
 impl LlmError {
@@ -91,6 +102,15 @@ impl LlmError {
         Self {
             message: message.into(),
             source: None,
+            raw_message: None,
+        }
+    }
+
+    fn with_raw_message(message: String, raw_message: Vec<u8>) -> Self {
+        Self {
+            message,
+            source: None,
+            raw_message: Some(raw_message),
         }
     }
 
@@ -98,11 +118,16 @@ impl LlmError {
         Self {
             message: message.into(),
             source: Some(source.into()),
+            raw_message: None,
         }
     }
 
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    pub fn raw_message_bytes(&self) -> Option<&[u8]> {
+        self.raw_message.as_deref()
     }
 }
 
@@ -195,6 +220,17 @@ impl fmt::Display for ClientError {
 }
 
 impl StdError for ClientError {}
+
+impl ClientError {
+    pub fn raw_message_bytes(&self) -> Option<&[u8]> {
+        match self {
+            Self::Provider(error) => error.raw_message_bytes(),
+            Self::RateLimit(error) => error.cause.raw_message_bytes(),
+            Self::UnknownProvider(error) => error.cause.raw_message_bytes(),
+            Self::Context(_) | Self::RetriesExhausted { .. } | Self::Foreign(_) => None,
+        }
+    }
+}
 
 /// Go's `ClassifyOptions`.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -777,11 +813,17 @@ impl AgentClient {
         if !status.success() {
             let stderr = trim_go_space(&stderr);
             let stderr = truncate_go_bytes(stderr, 500);
-            return Err(ClientError::Provider(LlmError::new(format!(
-                "host agent exited with code {}: {}",
-                status.code().unwrap_or(-1),
-                stderr
-            ))));
+            let prefix = format!(
+                "host agent exited with code {}: ",
+                status.code().unwrap_or(-1)
+            );
+            let mut raw_message = prefix.into_bytes();
+            raw_message.extend_from_slice(stderr);
+            let message = String::from_utf8_lossy(&raw_message).into_owned();
+            return Err(ClientError::Provider(LlmError::with_raw_message(
+                message,
+                raw_message,
+            )));
         }
 
         let text = String::from_utf8_lossy(&stdout).trim().to_owned();
@@ -856,8 +898,8 @@ fn trim_go_space(bytes: &[u8]) -> &[u8] {
     }
 }
 
-fn truncate_go_bytes(bytes: &[u8], limit: usize) -> String {
-    String::from_utf8_lossy(&bytes[..bytes.len().min(limit)]).into_owned()
+fn truncate_go_bytes(bytes: &[u8], limit: usize) -> &[u8] {
+    &bytes[..bytes.len().min(limit)]
 }
 
 fn go_spawn_error(cli: &str, override_path: Option<&Path>, error: &std::io::Error) -> String {

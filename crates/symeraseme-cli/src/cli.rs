@@ -1291,20 +1291,40 @@ fn triage_agent(parsed: &Parsed) -> Result<AgentClient, String> {
 
 fn triage_agent_call<'a>(
     agent: &'a AgentClient,
+    raw_error: &'a std::sync::Mutex<Option<Vec<u8>>>,
 ) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + 'a {
     move |system_prompt, user_prompt, cache_key| {
-        let (text, usage) = agent
-            .classify(
-                system_prompt,
-                user_prompt,
-                &llm::ClassifyOptions {
-                    cache_key: cache_key.to_owned(),
-                    ..llm::ClassifyOptions::default()
-                },
-            )
-            .map_err(|error| error.to_string())?;
+        let result = agent.classify(
+            system_prompt,
+            user_prompt,
+            &llm::ClassifyOptions {
+                cache_key: cache_key.to_owned(),
+                ..llm::ClassifyOptions::default()
+            },
+        );
+        let (text, usage) = match result {
+            Ok(result) => {
+                *raw_error.lock().expect("triage error mutex") = None;
+                result
+            }
+            Err(error) => {
+                *raw_error.lock().expect("triage error mutex") =
+                    error.raw_message_bytes().map(<[u8]>::to_vec);
+                return Err(error.to_string());
+            }
+        };
         Ok(LlmResponse { text, usage })
     }
+}
+
+fn triage_error_bytes(raw_error: &std::sync::Mutex<Option<Vec<u8>>>, message: &str) -> Vec<u8> {
+    let mut bytes = raw_error
+        .lock()
+        .expect("triage error mutex")
+        .take()
+        .unwrap_or_else(|| message.as_bytes().to_vec());
+    bytes.push(b'\n');
+    bytes
 }
 
 fn classify_reply_command(parsed: &Parsed) -> Outcome {
@@ -1321,7 +1341,8 @@ fn classify_reply_command(parsed: &Parsed) -> Outcome {
             Ok(agent) => agent,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-        let call = triage_agent_call(&agent);
+        let raw_error = std::sync::Mutex::new(None);
+        let call = triage_agent_call(&agent, &raw_error);
         let outcome = match triage_service::Service::new(store).classify_reply(
             request_id,
             &ClassifyRequest::default(),
@@ -1330,10 +1351,10 @@ fn classify_reply_command(parsed: &Parsed) -> Outcome {
             bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
         ) {
             Ok(outcome) => outcome,
-            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+            Err(error) => return Outcome::Stderr(triage_error_bytes(&raw_error, &error)),
         };
         if let Some(error) = outcome.error {
-            return Outcome::Stderr(format!("{error}\n").into_bytes());
+            return Outcome::Stderr(triage_error_bytes(&raw_error, &error));
         }
         match output_format(parsed) {
             Ok("json") => match json_line(&outcome.result) {
@@ -1360,7 +1381,8 @@ fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
             Ok(agent) => agent,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-        let call = triage_agent_call(&agent);
+        let raw_error = std::sync::Mutex::new(None);
+        let call = triage_agent_call(&agent, &raw_error);
         let result = match triage_service::Service::new(store).generate_rebuttal(
             request_id,
             &RebuttalRequest::default(),
@@ -1369,7 +1391,7 @@ fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
             bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
         ) {
             Ok(result) => result,
-            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+            Err(error) => return Outcome::Stderr(triage_error_bytes(&raw_error, &error)),
         };
         let result = json!({
             "template_name": result.template_name,
