@@ -1746,6 +1746,11 @@ fn init_profile_round_trips_through_show_profile() {
         &KEY,
     );
     assert_eq!(output.status.code(), Some(0));
+    let key = KEY[0].1.as_bytes();
+    assert!(!output.stdout.windows(key.len()).any(|part| part == key));
+    assert!(!output.stderr.windows(key.len()).any(|part| part == key));
+    let encrypted_profile = fs::read(data_dir.join("identity.encrypted")).unwrap();
+    assert!(!encrypted_profile.windows(key.len()).any(|part| part == key));
     assert_eq!(
         output.stdout,
         format!(
