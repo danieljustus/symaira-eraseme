@@ -8,7 +8,7 @@ mod imap_server;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -16,6 +16,21 @@ use sha2::{Digest, Sha256};
 
 #[cfg(unix)]
 use imap_server::{ScriptedImapServer, TlsMode};
+
+fn wait_with_output_bounded(mut child: Child, case: &str) -> Output {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if child.try_wait().unwrap().is_some() {
+            return child.wait_with_output().unwrap();
+        }
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            panic!("{case} stdio process exceeded 15 seconds");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
 
 #[cfg(unix)]
 fn local_starttls_server() -> ScriptedImapServer {
@@ -246,7 +261,7 @@ fn malformed_stdio_process_matches_go_errors() {
             .unwrap()
             .write_all(case["input"].as_str().unwrap().as_bytes())
             .unwrap();
-        let output = child.wait_with_output().unwrap();
+        let output = wait_with_output_bounded(child, name);
         assert_eq!(
             output.status.code(),
             case["exit_code"].as_i64().map(|n| n as i32),
@@ -506,7 +521,7 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
             input.write_all(b"\n").unwrap();
         }
     }
-    let output = child.wait_with_output().unwrap();
+    let output = wait_with_output_bounded(child, "scheduler install/status");
     assert!(
         output.status.success(),
         "{}",
@@ -747,7 +762,7 @@ fn run_native_scheduler_case(case: &serde_json::Value) {
         .unwrap()
         .write_all(format!("{}\n", case["request"].as_str().unwrap()).as_bytes())
         .unwrap();
-    let output = child.wait_with_output().unwrap();
+    let output = wait_with_output_bounded(child, platform);
     assert!(
         output.status.success(),
         "{}",
@@ -902,7 +917,7 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
             .unwrap()
             .write_all(format!("{request}\n").as_bytes())
             .unwrap();
-        let output = child.wait_with_output().unwrap();
+        let output = wait_with_output_bounded(child, case["name"].as_str().unwrap());
         assert!(
             output.status.success(),
             "{}: {}",
