@@ -3272,6 +3272,9 @@ mod tests {
                     }
                 };
                 stream
+                    .set_nonblocking(false)
+                    .expect("set accepted fake LLM stream blocking");
+                stream
                     .set_read_timeout(Some(Duration::from_secs(5)))
                     .expect("set fake LLM read timeout");
                 let mut request = Vec::new();
