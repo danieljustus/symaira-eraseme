@@ -3,7 +3,9 @@
 use std::time::Duration;
 use std::{net::IpAddr, str::FromStr};
 
-use symaira_core_llm::{ChatOptions, Client, ClientBuilder, Error, ErrorCode, Message, lookup};
+use symaira_core_llm::{
+    ChatOptions, Client, ClientBuilder, Error, ErrorCode, Message, WireDialect, lookup,
+};
 
 use super::{BaseClient, ClassifyOptions, ClientError, LlmError, RateLimitError, UsageRecord};
 
@@ -111,7 +113,13 @@ impl LlmkitClient {
                     ..ChatOptions::default()
                 }),
             )
-            .map_err(|error| classify_error(error, &self.api_key))?;
+            .map_err(|error| {
+                classify_error(
+                    error,
+                    &self.api_key,
+                    self.client.descriptor().dialect == WireDialect::Openai,
+                )
+            })?;
         Ok((
             choice.content.trim().to_owned(),
             UsageRecord {
@@ -130,13 +138,88 @@ fn constructor_error(provider: &str, error: Error, api_key: &str) -> ClientError
     ))
 }
 
-fn classify_error(error: Error, api_key: &str) -> ClientError {
-    let message = redact(error.to_string(), api_key);
+fn classify_error(error: Error, api_key: &str, openai_dialect: bool) -> ClientError {
+    let structured = openai_dialect
+        .then(|| structured_openai_error(&error.body))
+        .flatten();
+    let code = structured.as_ref().map_or(error.code, |(code, _)| *code);
+    let raw_message = structured.map_or_else(|| error.to_string(), |(_, message)| message);
+    let message = redact(raw_message, api_key);
     let cause = LlmError::with_source(message.clone(), message);
-    if error.code == ErrorCode::RateLimited {
+    if code == ErrorCode::RateLimited {
         ClientError::RateLimit(RateLimitError { cause })
     } else {
         ClientError::Provider(cause)
+    }
+}
+
+/// Go's `llmkit.chatOpenAI` reparses an HTTP error body's `error` object and
+/// rebuilds it as a status-400 error containing only its `message`, regardless
+/// of the original HTTP status. Preserve that observable EraseMe contract.
+fn structured_openai_error(body: &str) -> Option<(ErrorCode, String)> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let error = value.get("error")?.as_object()?;
+    let message = json_string(error.get("message"))?;
+    let kind = json_string(error.get("type"))?;
+    let classified = format!("{kind} {message}").to_lowercase();
+    let lower_message = message.to_lowercase();
+    let code = if ["authentication", "invalid api key", "permission"]
+        .iter()
+        .any(|marker| classified.contains(marker))
+    {
+        ErrorCode::AuthFailure
+    } else if ["rate limit", "overloaded"]
+        .iter()
+        .any(|marker| classified.contains(marker))
+    {
+        ErrorCode::RateLimited
+    } else if ["not_found", "no such model"]
+        .iter()
+        .any(|marker| classified.contains(marker))
+    {
+        ErrorCode::ModelNotFound
+    } else if [
+        "context_length_exceeded",
+        "maximum context length",
+        "context window",
+        "too many tokens",
+        "input length exceeds",
+    ]
+    .iter()
+    .any(|marker| lower_message.contains(marker))
+    {
+        ErrorCode::ContextOverflow
+    } else {
+        ErrorCode::ProviderError
+    };
+    // Go keeps the original status/body when its structured refinement still
+    // classifies the response as a generic provider error.
+    if code == ErrorCode::ProviderError {
+        return None;
+    }
+    let message = truncate_go_error_body(&message);
+    let rendered = if message.is_empty() {
+        format!("llmkit: {} (status 400)", code.as_str())
+    } else {
+        format!("llmkit: {} (status 400): {message}", code.as_str())
+    };
+    Some((code, rendered))
+}
+
+fn json_string(value: Option<&serde_json::Value>) -> Option<String> {
+    match value {
+        None | Some(serde_json::Value::Null) => Some(String::new()),
+        Some(serde_json::Value::String(value)) => Some(value.clone()),
+        Some(_) => None,
+    }
+}
+
+fn truncate_go_error_body(message: &str) -> String {
+    let message = message.trim();
+    if message.len() <= 512 {
+        message.to_owned()
+    } else {
+        String::from_utf8_lossy(&message.as_bytes()[..512]).into_owned()
     }
 }
 

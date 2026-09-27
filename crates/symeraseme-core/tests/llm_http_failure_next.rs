@@ -23,6 +23,10 @@ const FIXTURE_500: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/case-500.json"
 ));
+const FIXTURE_401: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/llm-failures-next/case-401.json"
+));
 
 #[test]
 fn context_overflow_response_matches_go_with_secret_redaction() {
@@ -32,6 +36,11 @@ fn context_overflow_response_matches_go_with_secret_redaction() {
 #[test]
 fn provider_server_error_matches_go_with_secret_redaction() {
     assert_failure_matches_go(FIXTURE_500, 500);
+}
+
+#[test]
+fn structured_openai_auth_error_matches_go_with_secret_redaction() {
+    assert_failure_matches_go(FIXTURE_401, 401);
 }
 
 #[test]

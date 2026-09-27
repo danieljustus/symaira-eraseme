@@ -37,12 +37,14 @@ type observation struct {
 }
 
 func main() {
-	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 403, 404 or 500)")
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 401, 403, 404 or 500)")
 	flag.Parse()
 	var id, apiKey, body string
 	switch *status {
 	case http.StatusBadRequest:
 		id, apiKey, body = "openai-context-overflow-echoed-key", "synthetic-400-key", `maximum context length exceeded; key synthetic-400-key`
+	case http.StatusUnauthorized:
+		id, apiKey, body = "openai-structured-auth-error", "synthetic-401-key", `{"error":{"message":"authentication failed; key synthetic-401-key","type":"authentication_error","code":"invalid_api_key"}}`
 	case http.StatusForbidden:
 		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
 	case http.StatusNotFound:
