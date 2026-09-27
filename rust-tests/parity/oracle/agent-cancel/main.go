@@ -96,6 +96,7 @@ func main() {
 		fatalIf(fmt.Errorf("MCP handler did not observe request cancellation"))
 	}
 	clientError := <-clientDone
+	clientError = strings.ReplaceAll(clientError, server.URL, "<server-url>")
 	pidBytes, err := os.ReadFile(started)
 	fatalIf(err)
 	pid, err := strconv.Atoi(string(pidBytes))
@@ -110,7 +111,19 @@ func main() {
 		ClientError:   clientError,
 		ChildExited:   childExited,
 	}
-	for _, source := range []string{"internal/mcp/server.go", "internal/llm/agent.go", "internal/llm/llm.go", "go.mod"} {
+	for _, source := range []string{
+		"go.mod",
+		"cmd/symeraseme/main.go",
+		"internal/mcp/server.go",
+		"internal/mcp/contract_handler.go",
+		"internal/llm/agent.go",
+		"internal/llm/llm.go",
+		"internal/llm/factory.go",
+		"internal/triage/classifier.go",
+		"internal/replies/service.go",
+		"internal/eventstore/store.go",
+		"rust-tests/parity/oracle/agent-cancel/main.go",
+	} {
 		contents, err := os.ReadFile(source)
 		fatalIf(err)
 		digest := sha256.Sum256(contents)

@@ -4,11 +4,18 @@
 use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use symeraseme_core::storage::Store;
+use symeraseme_core::storage::repository::Repository;
+
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+const GO_AGENT_CANCEL_FIXTURE: &str =
+    include_str!("../../../tests/fixtures/agent-cancel/http.json");
 
 struct TestDir(PathBuf);
 type OracleCase<'a> = (&'a str, &'a [u8], Vec<(&'a str, String)>);
@@ -77,6 +84,106 @@ fn start_binary(binary: &Path, root: &Path, port: u16, host: &str, allow_remote:
         .stderr(Stdio::piped())
         .spawn()
         .unwrap()
+}
+
+fn start_agent_server(binary: &Path, root: &Path, port: u16, started: &Path) -> Child {
+    let home = root.join("home");
+    let bin = root.join("bin");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::create_dir_all(&bin).unwrap();
+    let agent = bin.join("claude");
+    std::fs::write(
+        &agent,
+        "#!/bin/sh\nprintf '%s' \"$$\" > \"$AGENT_STARTED\"\nexec /bin/sleep 30\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&agent, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:/bin:/usr/bin", bin.display());
+    let mut command = Command::new(binary);
+    command
+        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("SYMERASEME_DATA_DIR", root.join("data"))
+        .env("SYMERASEME_LLM_PROVIDER", "agent")
+        .env("SYMERASEME_AGENT_BACKEND", "claude")
+        .env("AGENT_STARTED", started)
+        .env("PATH", path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap()
+}
+
+fn seed_agent_reply(root: &Path) {
+    let data = root.join("data");
+    std::fs::create_dir_all(&data).unwrap();
+    let store = Store::open(data.join("symeraseme.db")).unwrap();
+    let request_id = Repository::new(&store)
+        .create_removal_request(
+            "oracle-broker",
+            "email",
+            "oracle-campaign",
+            "DE",
+            "gdpr-art17.de.md.j2",
+            "",
+        )
+        .unwrap();
+    store
+        .connection()
+        .execute(
+            "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            (request_id, "cancel-message", "cancel-thread", "privacy@example.invalid", "Please verify your address", "We need your current address."),
+        )
+        .unwrap();
+}
+
+fn post_then_disconnect(port: u16, bearer: &str) -> TcpStream {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    write!(stream, "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {bearer}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#.len()).unwrap();
+    stream
+        .write_all(br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#)
+        .unwrap();
+    stream
+}
+
+fn wait_agent_started(path: &Path) -> i32 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Ok(pid) = std::fs::read_to_string(path) {
+            return pid.parse().unwrap();
+        }
+        assert!(Instant::now() < deadline, "host agent did not start");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn wait_process_exit(pid: i32, server: &mut Child) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let alive = Command::new("/bin/kill")
+            .args(["-0", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success();
+        if !alive {
+            return;
+        }
+        if Instant::now() >= deadline {
+            let _ = server.kill();
+            let _ = server.wait();
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", &pid.to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            panic!("cancelled host agent {pid} survived");
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 fn startup_error(
@@ -525,6 +632,89 @@ fn signal_stops_accepting_before_in_flight_request_drains() {
         status.success(),
         "server failed while draining in-flight request"
     );
+}
+
+#[test]
+#[cfg(unix)]
+fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
+    let fixture: serde_json::Value = serde_json::from_str(GO_AGENT_CANCEL_FIXTURE).unwrap();
+    assert_eq!(fixture["schema"], "symeraseme.go-oracle.agent-cancel.v1");
+    assert_eq!(fixture["go_version"], "go1.26.6");
+    assert_eq!(fixture["handler_error"], "context canceled");
+    assert_eq!(fixture["child_exited"], true);
+
+    let root = TestDir::new();
+    let generated_fixture = root.path().join("agent-cancel.json");
+    let oracle = Command::new("go")
+        .args(["run", "./rust-tests/parity/oracle/agent-cancel", "-fixture"])
+        .arg(&generated_fixture)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("run source-pinned Go cancellation oracle");
+    assert!(
+        oracle.status.success(),
+        "Go cancellation oracle failed: {}",
+        String::from_utf8_lossy(&oracle.stderr)
+    );
+    assert_eq!(
+        std::fs::read(generated_fixture).unwrap(),
+        GO_AGENT_CANCEL_FIXTURE.as_bytes(),
+        "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
+    );
+
+    let go = root.path().join("symeraseme-go-oracle");
+    let build = Command::new("go")
+        .args(["build", "-o"])
+        .arg(&go)
+        .arg("./cmd/symeraseme")
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("build Go 1.26.6 MCP process oracle");
+    assert!(
+        build.status.success(),
+        "Go MCP process build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    for (name, binary) in [("go", go.as_path()), ("rust", rust)] {
+        let case = TestDir::new();
+        seed_agent_reply(case.path());
+        let port = free_port();
+        let started = case.path().join("agent.started");
+        let mut server = start_agent_server(binary, case.path(), port, &started);
+        wait_ready(&mut server, port);
+        let bearer = token(case.path());
+        let request = post_then_disconnect(port, &bearer);
+        let agent_pid = wait_agent_started(&started);
+        drop(request);
+        wait_process_exit(agent_pid, &mut server);
+        assert!(
+            server.try_wait().unwrap().is_none(),
+            "{name} MCP server stopped after a client disconnect"
+        );
+
+        let store = Store::open(case.path().join("data/symeraseme.db")).unwrap();
+        let classification: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE message_id = 'cancel-message'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            classification, None,
+            "{name} persisted a classification after cancellation"
+        );
+
+        send_signal(&mut server, "TERM");
+    }
 }
 
 #[test]
