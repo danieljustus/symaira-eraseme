@@ -35,10 +35,11 @@ runs are `cmp`-identical. `crates/symeraseme-core/tests/llm_surface.rs` replays 
 The host-agent subprocess protocol is now pinned against the real Go implementation with isolated
 fake executables for Claude (`claude`), Hermes (`hermes`) and Copilot (`gh`). The replay checks each
 argv template, combined prompt, `TERM=dumb`, inherited environment, closed stdin and usage model;
-the Claude cases also cover trimmed/truncated exit stderr and the 120-second timeout mapping. The
-timeout oracle uses a real 120-second run, so regenerating the complete fixture takes about two
-minutes. Rust's focused replay passes all five recorded cases. No real agent CLI or provider is
-invoked. Native Windows process behavior remains unverified.
+the Claude cases also cover trimmed/truncated exit stderr, the 120-second timeout mapping, and a
+launch failure after backend availability was cached and its executable removed. The timeout oracle
+uses a real 120-second run, so regenerating the complete fixture takes about two minutes. Rust's
+focused replay covers all six recorded cases. No real agent CLI or provider is invoked. Native
+Windows process behavior remains unverified.
 
 ## Traps found while recording
 

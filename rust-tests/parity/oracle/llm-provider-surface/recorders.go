@@ -441,6 +441,15 @@ esac
 			UserPrompt:   "copilot prompt",
 		},
 		{
+			ID:           "spawn-error-after-path-detection",
+			Backend:      "claude",
+			CLI:          "claude",
+			Mode:         "spawn",
+			Model:        "auto",
+			SystemPrompt: "system",
+			UserPrompt:   "missing executable",
+		},
+		{
 			ID:           "exit-code-trims-and-truncates-stderr",
 			Backend:      "claude",
 			CLI:          "claude",
@@ -522,6 +531,14 @@ esac
 		if !ok {
 			panic("agent provider did not return AgentClient")
 		}
+		if request.Mode == "spawn" {
+			if !agent.IsAvailable() {
+				panic("agent backend was not detected before executable removal")
+			}
+			if err := os.Remove(cli); err != nil {
+				panic(err)
+			}
+		}
 		// One real call keeps the failure transcript focused on callAPI rather
 		// than waiting through the production retry backoff.
 		agent.MaxRetries = 1
@@ -541,36 +558,38 @@ esac
 			result.Error = &message
 			result.ErrorType = errorType(callErr)
 		}
-		for name, target := range map[string]*[]string{
-			"arguments": &result.Arguments,
-		} {
-			data, err := os.ReadFile(filepath.Join(capture, name))
+		if request.Mode != "spawn" {
+			for name, target := range map[string]*[]string{
+				"arguments": &result.Arguments,
+			} {
+				data, err := os.ReadFile(filepath.Join(capture, name))
+				if err != nil {
+					panic(err)
+				}
+				parts := bytes.Split(data, []byte{0})
+				if len(parts) > 0 && len(parts[len(parts)-1]) == 0 {
+					parts = parts[:len(parts)-1]
+				}
+				for _, part := range parts {
+					*target = append(*target, string(part))
+				}
+			}
+			data, err := os.ReadFile(filepath.Join(capture, "environment"))
 			if err != nil {
 				panic(err)
 			}
-			parts := bytes.Split(data, []byte{0})
-			if len(parts) > 0 && len(parts[len(parts)-1]) == 0 {
-				parts = parts[:len(parts)-1]
+			environment := bytes.Split(data, []byte{0})
+			if len(environment) != 3 || len(environment[2]) != 0 {
+				panic(fmt.Sprintf("unexpected environment capture: %q", data))
 			}
-			for _, part := range parts {
-				*target = append(*target, string(part))
+			result.Environment["TERM"] = string(environment[0])
+			result.Environment["AGENT_SENTINEL"] = string(environment[1])
+			stdinCapture, err := os.ReadFile(filepath.Join(capture, "stdin"))
+			if err != nil {
+				panic(err)
 			}
+			result.StdinEOF = string(stdinCapture) == "eof"
 		}
-		data, err := os.ReadFile(filepath.Join(capture, "environment"))
-		if err != nil {
-			panic(err)
-		}
-		environment := bytes.Split(data, []byte{0})
-		if len(environment) != 3 || len(environment[2]) != 0 {
-			panic(fmt.Sprintf("unexpected environment capture: %q", data))
-		}
-		result.Environment["TERM"] = string(environment[0])
-		result.Environment["AGENT_SENTINEL"] = string(environment[1])
-		stdinCapture, err := os.ReadFile(filepath.Join(capture, "stdin"))
-		if err != nil {
-			panic(err)
-		}
-		result.StdinEOF = string(stdinCapture) == "eof"
 		request.Result = result
 	}
 

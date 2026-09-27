@@ -61,8 +61,8 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
     let cases = protocol["cases"].as_array().expect("host-agent cases");
     assert_eq!(
         cases.len(),
-        5,
-        "all three backends and failure cases execute"
+        6,
+        "all three backends and process failure cases execute"
     );
 
     for case in cases {
@@ -79,6 +79,12 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
         fs::write(&cli, program).expect("write Go-oracled fake CLI");
         fs::set_permissions(&cli, fs::Permissions::from_mode(0o700))
             .expect("make fake CLI executable");
+        let spawn_error = case["mode"] == "spawn";
+        if spawn_error {
+            // The Go oracle caches availability first, then the executable
+            // disappears before Classify resolves it from PATH.
+            fs::remove_file(&cli).expect("remove fake CLI after backend detection");
+        }
 
         let environment = vec![
             (OsString::from("PATH"), bin.as_os_str().to_owned()),
@@ -132,7 +138,7 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
             &super::ClassifyOptions::default(),
             AgentCommandConfig {
                 timeout,
-                executable_override: Some(&cli),
+                executable_override: (!spawn_error).then_some(cli.as_path()),
                 environment: &environment,
                 inherit_environment: false,
             },
@@ -163,41 +169,51 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
             }
         }
 
-        let expected_args = expected["arguments"]
-            .as_array()
-            .expect("recorded arguments")
-            .iter()
-            .map(|value| value.as_str().expect("argument string").to_owned())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            nul_strings(&capture.join("arguments")),
-            expected_args,
-            "{id} argv"
-        );
+        if spawn_error {
+            assert!(expected["arguments"].is_null(), "{id} has no argv");
+            assert!(!capture.join("arguments").exists(), "{id} did not run CLI");
+            assert!(
+                !capture.join("environment").exists(),
+                "{id} did not run CLI"
+            );
+            assert!(!capture.join("stdin").exists(), "{id} did not run CLI");
+        } else {
+            let expected_args = expected["arguments"]
+                .as_array()
+                .expect("recorded arguments")
+                .iter()
+                .map(|value| value.as_str().expect("argument string").to_owned())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                nul_strings(&capture.join("arguments")),
+                expected_args,
+                "{id} argv"
+            );
 
-        let environment_capture = nul_strings(&capture.join("environment"));
-        assert_eq!(environment_capture.len(), 2, "{id} env fields");
-        assert_eq!(
-            environment_capture[0],
-            expected["environment"]["TERM"].as_str().expect("TERM"),
-            "{id} TERM"
-        );
-        assert_eq!(
-            environment_capture[1],
-            expected["environment"]["AGENT_SENTINEL"]
-                .as_str()
-                .expect("sentinel"),
-            "{id} inherited environment"
-        );
-        assert_eq!(
-            fs::read_to_string(capture.join("stdin")).expect("stdin capture"),
-            if expected["stdin_eof"].as_bool().expect("stdin contract") {
-                "eof"
-            } else {
-                "input"
-            },
-            "{id} stdin"
-        );
+            let environment_capture = nul_strings(&capture.join("environment"));
+            assert_eq!(environment_capture.len(), 2, "{id} env fields");
+            assert_eq!(
+                environment_capture[0],
+                expected["environment"]["TERM"].as_str().expect("TERM"),
+                "{id} TERM"
+            );
+            assert_eq!(
+                environment_capture[1],
+                expected["environment"]["AGENT_SENTINEL"]
+                    .as_str()
+                    .expect("sentinel"),
+                "{id} inherited environment"
+            );
+            assert_eq!(
+                fs::read_to_string(capture.join("stdin")).expect("stdin capture"),
+                if expected["stdin_eof"].as_bool().expect("stdin contract") {
+                    "eof"
+                } else {
+                    "input"
+                },
+                "{id} stdin"
+            );
+        }
 
         let _ = fs::remove_dir_all(root);
     }

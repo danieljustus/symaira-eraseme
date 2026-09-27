@@ -751,7 +751,10 @@ fn truncate_go_bytes(text: String, limit: usize) -> String {
 
 fn go_spawn_error(cli: &str, override_path: Option<&Path>, error: &std::io::Error) -> String {
     if error.kind() == std::io::ErrorKind::NotFound && override_path.is_none() {
-        format!("exec: {cli:?}: executable file not found in $PATH")
+        // Go's exec.Error renders its PATH lookup diagnostic twice through
+        // the wrapped error returned by exec.CommandContext on this path.
+        let diagnostic = format!("exec: {cli:?}: executable file not found in $PATH");
+        format!("{diagnostic}: {diagnostic}")
     } else {
         error.to_string()
     }
