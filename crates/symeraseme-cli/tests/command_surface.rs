@@ -1748,7 +1748,9 @@ fn init_profile_round_trips_through_show_profile() {
     assert_eq!(output.status.code(), Some(0));
     let encoded_key = KEY[0].1.as_bytes();
     let decoded_key: Vec<u8> = encoded_key
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
         .collect();
     let encrypted_profile = fs::read(data_dir.join("identity.encrypted")).unwrap();
