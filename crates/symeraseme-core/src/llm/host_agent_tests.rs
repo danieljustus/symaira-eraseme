@@ -228,6 +228,7 @@ fn invalid_utf8_agent_stderr_matches_go_byte_truncation() {
     let fixture: Value =
         serde_json::from_str(INVALID_UTF8_FIXTURE).expect("Go stderr fixture parses");
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.agent-stderr.v1");
+    assert_eq!(fixture["go_version"], "go1.26.6");
     for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
         let source: &[u8] = match path.as_str() {
             "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
