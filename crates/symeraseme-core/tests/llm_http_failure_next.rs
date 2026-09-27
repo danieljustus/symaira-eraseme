@@ -1,7 +1,9 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -35,6 +37,34 @@ const FIXTURE_MALFORMED_CHOICE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/llm-failures-next/malformed-choice.json"
 ));
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+#[test]
+fn llm_failure_fixtures_regenerate_from_pinned_go_oracle() {
+    let cases = [
+        (FIXTURE, &[][..]),
+        (FIXTURE_404, &["--status", "404"][..]),
+        (FIXTURE_400, &["--status", "400"][..]),
+        (FIXTURE_500, &["--status", "500"][..]),
+        (FIXTURE_401, &["--status", "401"][..]),
+        (
+            FIXTURE_MALFORMED_ENVELOPE,
+            &["--status", "403", "--malformed-envelope"][..],
+        ),
+        (
+            FIXTURE_MALFORMED_CHOICE,
+            &["--status", "403", "--malformed-choice"][..],
+        ),
+    ];
+    thread::scope(|scope| {
+        let checks = cases.map(|(fixture, args)| {
+            scope.spawn(move || assert_oracle_fixture_matches(fixture, args))
+        });
+        for check in checks {
+            check.join().expect("Go fixture comparison thread");
+        }
+    });
+}
 
 #[test]
 fn context_overflow_response_matches_go_with_secret_redaction() {
@@ -81,6 +111,7 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
         fixture["go_module"],
         "github.com/danieljustus/symaira-corekit v0.16.2"
     );
+    assert_eq!(fixture["go_version"], "go1.26.6");
     for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
         let digest = Sha256::digest(go_source(path));
         assert_eq!(hex::encode(digest), expected.as_str().unwrap(), "{path}");
@@ -137,8 +168,46 @@ fn go_source(path: &str) -> &'static [u8] {
         "internal/llm/llm.go" => include_bytes!("../../../internal/llm/llm.go"),
         "go.mod" => include_bytes!("../../../go.mod"),
         "go.sum" => include_bytes!("../../../go.sum"),
+        "rust-tests/parity/oracle/llm-failures-next/main.go" => {
+            include_bytes!("../../../rust-tests/parity/oracle/llm-failures-next/main.go")
+        }
         _ => panic!("unexpected Go source {path}"),
     }
+}
+
+fn assert_oracle_fixture_matches(fixture_json: &str, args: &[&str]) {
+    static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("wall clock after Unix epoch")
+        .as_nanos();
+    let index = NEXT_TEMP_FILE.fetch_add(1, Ordering::Relaxed);
+    let output_path = std::env::temp_dir().join(format!(
+        "symeraseme-llm-failure-oracle-{}-{nonce}-{index}.json",
+        std::process::id(),
+    ));
+    let output = Command::new("go")
+        .args(["run", "./rust-tests/parity/oracle/llm-failures-next"])
+        .args(args)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .env("LLM_FAILURES_NEXT_FIXTURE", &output_path)
+        .output()
+        .expect("run source-pinned Go LLM failure oracle");
+    assert!(
+        output.status.success(),
+        "Go LLM failure oracle failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let generated = std::fs::read(&output_path).expect("read regenerated Go fixture");
+    let _ = std::fs::remove_file(output_path);
+    assert_eq!(
+        generated,
+        fixture_json.as_bytes(),
+        "Go 1.26.6 failure oracle, source hashes or fixture drifted"
+    );
 }
 
 fn local_failure_server(

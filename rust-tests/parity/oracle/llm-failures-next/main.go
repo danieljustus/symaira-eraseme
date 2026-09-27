@@ -23,6 +23,7 @@ import (
 
 type observation struct {
 	Schema        string            `json:"schema"`
+	GoVersion     string            `json:"go_version"`
 	GoModule      string            `json:"go_module"`
 	SourcesSHA256 map[string]string `json:"sources_sha256"`
 	ID            string            `json:"id"`
@@ -75,15 +76,23 @@ func main() {
 	_, here, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(here), "../../../.."))
 	obs := observation{
-		Schema:   "symeraseme.go-oracle.llm-failures-next.v1",
-		GoModule: "github.com/danieljustus/symaira-corekit v0.16.2",
-		ID:       id,
-		Status:   *status,
-		APIKey:   apiKey,
-		Body:     body,
+		Schema:    "symeraseme.go-oracle.llm-failures-next.v1",
+		GoVersion: runtime.Version(),
+		GoModule:  "github.com/danieljustus/symaira-corekit v0.16.2",
+		ID:        id,
+		Status:    *status,
+		APIKey:    apiKey,
+		Body:      body,
 	}
 	obs.SourcesSHA256 = make(map[string]string)
-	for _, name := range []string{"internal/llm/factory.go", "internal/llm/llmkit.go", "internal/llm/llm.go", "go.mod", "go.sum"} {
+	for _, name := range []string{
+		"internal/llm/factory.go",
+		"internal/llm/llmkit.go",
+		"internal/llm/llm.go",
+		"go.mod",
+		"go.sum",
+		"rust-tests/parity/oracle/llm-failures-next/main.go",
+	} {
 		b, err := os.ReadFile(filepath.Join(root, name))
 		fatalIf(err)
 		sum := sha256.Sum256(b)
