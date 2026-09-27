@@ -18,10 +18,25 @@ use std::fmt;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
+
+/// Cooperative cancellation for a provider call, including child processes.
+#[derive(Clone, Debug, Default)]
+pub struct CancellationToken(Arc<AtomicBool>);
+
+impl CancellationToken {
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
 
 /// A single LLM usage and cost record, mirroring Go's `UsageRecord`.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -435,6 +450,7 @@ pub struct AgentClient {
 pub const NO_AGENT_CLI_MESSAGE: &str = "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND";
 const AGENT_SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
 
+#[derive(Clone, Copy)]
 struct AgentCommandConfig<'a> {
     timeout: Duration,
     executable_override: Option<&'a Path>,
@@ -527,23 +543,50 @@ impl AgentClient {
         user_prompt: &str,
         options: &ClassifyOptions,
     ) -> Result<(String, UsageRecord), ClientError> {
+        self.classify_cancellable(
+            system_prompt,
+            user_prompt,
+            options,
+            &CancellationToken::default(),
+        )
+    }
+
+    /// Classify while observing caller cancellation. Host-agent subprocesses
+    /// are killed promptly; the token also interrupts retry backoff.
+    pub fn classify_cancellable(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<(String, UsageRecord), ClientError> {
         if let Some(client) = &self.provider_client {
-            return client.classify(&self.base, system_prompt, user_prompt, options);
+            if cancellation.is_cancelled() {
+                return Err(ClientError::Context("context canceled".to_owned()));
+            }
+            let result = client.classify(&self.base, system_prompt, user_prompt, options);
+            return if cancellation.is_cancelled() {
+                Err(ClientError::Context("context canceled".to_owned()))
+            } else {
+                result
+            };
         }
-        self.classify_with_timeout(
+        self.classify_with_timeout_and_cancellation(
             system_prompt,
             user_prompt,
             options,
             AGENT_SUBPROCESS_TIMEOUT,
+            cancellation,
         )
     }
 
-    fn classify_with_timeout(
+    fn classify_with_timeout_and_cancellation(
         &self,
         system_prompt: &str,
         user_prompt: &str,
         options: &ClassifyOptions,
         timeout: Duration,
+        cancellation: &CancellationToken,
     ) -> Result<(String, UsageRecord), ClientError> {
         self.classify_with_command(
             system_prompt,
@@ -555,6 +598,7 @@ impl AgentClient {
                 environment: &[],
                 inherit_environment: true,
             },
+            cancellation,
         )
     }
 
@@ -564,6 +608,7 @@ impl AgentClient {
         user_prompt: &str,
         options: &ClassifyOptions,
         command: AgentCommandConfig<'_>,
+        cancellation: &CancellationToken,
     ) -> Result<(String, UsageRecord), ClientError> {
         self.base.classify(
             system_prompt,
@@ -574,23 +619,17 @@ impl AgentClient {
                     && command.environment.is_empty()
                     && command.inherit_environment
                 {
-                    self.call_api(system, user, command.timeout)
+                    self.call_api(system, user, command.timeout, cancellation)
                 } else {
-                    self.call_api_with(
-                        system,
-                        user,
-                        command.timeout,
-                        command.executable_override,
-                        command.environment,
-                        command.inherit_environment,
-                    )
+                    self.call_api_with(system, user, command, cancellation)
                 }
             },
-            |wait| {
-                thread::sleep(wait);
-                true
+            |wait| wait_cancellable(wait, cancellation),
+            || {
+                cancellation
+                    .is_cancelled()
+                    .then(|| "context canceled".to_owned())
             },
-            || None,
         )
     }
 
@@ -599,18 +638,27 @@ impl AgentClient {
         system_prompt: &str,
         user_prompt: &str,
         timeout: Duration,
+        cancellation: &CancellationToken,
     ) -> Result<(String, UsageRecord), ClientError> {
-        self.call_api_with(system_prompt, user_prompt, timeout, None, &[], true)
+        self.call_api_with(
+            system_prompt,
+            user_prompt,
+            AgentCommandConfig {
+                timeout,
+                executable_override: None,
+                environment: &[],
+                inherit_environment: true,
+            },
+            cancellation,
+        )
     }
 
     fn call_api_with(
         &self,
         system_prompt: &str,
         user_prompt: &str,
-        timeout: Duration,
-        executable_override: Option<&Path>,
-        environment: &[(OsString, OsString)],
-        inherit_environment: bool,
+        config: AgentCommandConfig<'_>,
+        cancellation: &CancellationToken,
     ) -> Result<(String, UsageRecord), ClientError> {
         let backend = self.resolved_backend();
         let Some(def) = AGENT_DEFS.iter().find(|def| def.name == backend) else {
@@ -629,17 +677,19 @@ impl AgentClient {
             arguments.push(OsString::from(&self.base.model));
         }
 
-        let executable = executable_override.unwrap_or_else(|| Path::new(def.cli));
+        let executable = config
+            .executable_override
+            .unwrap_or_else(|| Path::new(def.cli));
         let mut command = Command::new(executable);
         command
             .args(arguments)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if !inherit_environment {
+        if !config.inherit_environment {
             command.env_clear();
         }
-        command.envs(environment.iter().cloned());
+        command.envs(config.environment.iter().cloned());
         // Go appends TERM=dumb to the inherited environment for every agent.
         command.env("TERM", "dumb");
 
@@ -647,7 +697,7 @@ impl AgentClient {
         let mut child = command.spawn().map_err(|error| {
             ClientError::Provider(LlmError::new(format!(
                 "failed to invoke host agent: {}",
-                go_spawn_error(def.cli, executable_override, &error)
+                go_spawn_error(def.cli, config.executable_override, &error)
             )))
         })?;
         let stdout = child.stdout.take().expect("stdout was piped");
@@ -656,10 +706,17 @@ impl AgentClient {
         let stderr_reader = thread::spawn(move || read_pipe(stderr));
 
         let mut timed_out = false;
+        let mut cancelled = false;
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Some(status),
-                Ok(None) if start.elapsed() >= timeout => {
+                Ok(None) if cancellation.is_cancelled() => {
+                    cancelled = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break None;
+                }
+                Ok(None) if start.elapsed() >= config.timeout => {
                     timed_out = true;
                     let _ = child.kill();
                     let _ = child.wait();
@@ -712,6 +769,9 @@ impl AgentClient {
                 AGENT_SUBPROCESS_TIMEOUT.as_secs() % 60
             ))));
         }
+        if cancelled {
+            return Err(ClientError::Context("context canceled".to_owned()));
+        }
 
         let status = status.expect("a completed child has an exit status");
         if !status.success() {
@@ -748,6 +808,20 @@ fn read_pipe(mut pipe: impl Read) -> std::io::Result<Vec<u8>> {
     let mut output = Vec::new();
     pipe.read_to_end(&mut output)?;
     Ok(output)
+}
+
+fn wait_cancellable(wait: Duration, cancellation: &CancellationToken) -> bool {
+    let deadline = Instant::now() + wait;
+    loop {
+        if cancellation.is_cancelled() {
+            return false;
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return true;
+        }
+        thread::sleep(remaining.min(Duration::from_millis(10)));
+    }
 }
 
 fn trim_go_space(bytes: &[u8]) -> &[u8] {

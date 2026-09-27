@@ -90,6 +90,18 @@ pub(crate) fn initialize(
     raw: &[u8],
     handler: &dyn super::handler::ToolHandler,
 ) -> InitializeOutcome {
+    initialize_cancellable(
+        raw,
+        handler,
+        &symeraseme_core::llm::CancellationToken::default(),
+    )
+}
+
+pub(crate) fn initialize_cancellable(
+    raw: &[u8],
+    handler: &dyn super::handler::ToolHandler,
+    cancellation: &symeraseme_core::llm::CancellationToken,
+) -> InitializeOutcome {
     let value = match parse_request(raw) {
         RequestParse::State(state) => state,
         RequestParse::ParseError => return InitializeOutcome::ParseError,
@@ -139,7 +151,7 @@ pub(crate) fn initialize(
             if notification {
                 return InitializeOutcome::Notification;
             }
-            return match super::tools_call::tools_call(raw, handler) {
+            return match super::tools_call::tools_call_cancellable(raw, handler, cancellation) {
                 super::tools_call::ToolsCallOutcome::Response(bytes) => {
                     InitializeOutcome::Response(bytes)
                 }

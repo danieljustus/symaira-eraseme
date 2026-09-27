@@ -1,7 +1,9 @@
 //! MCP HTTP transport and process lifecycle.
 
 use super::handler::ToolHandler;
-use super::protocol::{InitializeOutcome, initialize, skip_json_value, skip_whitespace};
+use super::protocol::{
+    InitializeOutcome, initialize_cancellable, skip_json_value, skip_whitespace,
+};
 use base64::Engine;
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::body::{Bytes, Incoming};
@@ -19,6 +21,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use subtle::ConstantTimeEq;
+use symeraseme_core::llm::CancellationToken;
 use tokio::net::TcpListener;
 use tokio::sync::Semaphore;
 use tokio::sync::watch;
@@ -127,7 +130,7 @@ async fn serve_async(
                     let service = service_fn(move |request| {
                         let token = Arc::clone(&token);
                         let handler = Arc::clone(&handler);
-                        async move { Ok::<_, std::convert::Infallible>(handle_request(request, &token, handler.as_ref()).await) }
+                        async move { Ok::<_, std::convert::Infallible>(handle_request(request, &token, handler).await) }
                     });
                     let mut connection = Box::pin(builder.serve_connection(TokioIo::new(stream), service));
                     tokio::select! {
@@ -264,7 +267,7 @@ fn set_mode(_path: &Path) -> std::io::Result<()> {
 async fn handle_request(
     request: Request<Incoming>,
     token: &str,
-    handler: &dyn ToolHandler,
+    handler: Arc<dyn ToolHandler>,
 ) -> Response<Full<Bytes>> {
     let declared_too_large = request
         .headers()
@@ -287,7 +290,17 @@ async fn handle_request(
         if let Ok(body) = body {
             let body = body.to_bytes();
             if body.len() <= MAX_BODY_BYTES {
-                protocol_reply(&body, handler)
+                let cancellation = CancellationToken::default();
+                let mut cancel_on_drop = CancelOnDrop::new(cancellation.clone());
+                let result = tokio::task::spawn_blocking(move || {
+                    protocol_reply_cancellable(&body, handler.as_ref(), &cancellation)
+                })
+                .await;
+                cancel_on_drop.disarm();
+                match result {
+                    Ok(reply) => reply,
+                    Err(_) => rpc_reply(200, -32603, "Internal server error"),
+                }
             } else {
                 rpc_reply(200, -32700, "parse error")
             }
@@ -344,12 +357,24 @@ fn origin_header_allowed(origin: Option<&http::HeaderValue>) -> bool {
 }
 
 fn protocol_reply(body: &[u8], handler: &dyn ToolHandler) -> HttpReply {
+    protocol_reply_cancellable(body, handler, &CancellationToken::default())
+}
+
+fn protocol_reply_cancellable(
+    body: &[u8],
+    handler: &dyn ToolHandler,
+    cancellation: &CancellationToken,
+) -> HttpReply {
     let (start, end) = match one_json_value(body) {
         Some(span) => span,
         None => return rpc_reply(200, -32700, "parse error"),
     };
     if body[start] != b'[' {
-        return protocol_outcome(initialize(&body[start..end], handler));
+        return protocol_outcome(initialize_cancellable(
+            &body[start..end],
+            handler,
+            cancellation,
+        ));
     }
 
     let mut index = start + 1;
@@ -362,7 +387,8 @@ fn protocol_reply(body: &[u8], handler: &dyn ToolHandler) -> HttpReply {
         let Some(item_end) = skip_json_value(body, index) else {
             return rpc_reply(200, -32700, "parse error");
         };
-        if let InitializeOutcome::Response(mut bytes) = initialize(&body[index..item_end], handler)
+        if let InitializeOutcome::Response(mut bytes) =
+            initialize_cancellable(&body[index..item_end], handler, cancellation)
         {
             if bytes.last() == Some(&b'\n') {
                 bytes.pop();
@@ -395,6 +421,32 @@ fn protocol_reply(body: &[u8], handler: &dyn ToolHandler) -> HttpReply {
     HttpReply {
         status: 200,
         body: result,
+    }
+}
+
+struct CancelOnDrop {
+    cancellation: CancellationToken,
+    armed: bool,
+}
+
+impl CancelOnDrop {
+    fn new(cancellation: CancellationToken) -> Self {
+        Self {
+            cancellation,
+            armed: true,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        if self.armed {
+            self.cancellation.cancel();
+        }
     }
 }
 
@@ -463,6 +515,11 @@ mod transport_tests {
     use super::*;
     use crate::mcp::handler::test_support::no_backend_handler;
     use std::sync::Arc;
+
+    const GO_AGENT_CANCEL_FIXTURE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/fixtures/agent-cancel/http.json"
+    ));
 
     /// An invalid port is rejected before the auth token is written and before
     /// the handler is built — the build callback must never run.
@@ -637,5 +694,110 @@ mod transport_tests {
         let text = reply_text(&reply);
         assert!(text.contains("-32700"), "{text}");
         assert!(text.contains("parse error"), "{text}");
+    }
+
+    struct BlockingCancellationHandler {
+        started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+        finished: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<String>>>,
+    }
+
+    impl ToolHandler for BlockingCancellationHandler {
+        fn call(
+            &self,
+            _: &str,
+            _: &serde_json::Map<String, serde_json::Value>,
+        ) -> Result<serde_json::Value, super::super::handler::ToolError> {
+            unreachable!("cancellable dispatch is expected")
+        }
+
+        fn call_cancellable(
+            &self,
+            _: &str,
+            _: &serde_json::Map<String, serde_json::Value>,
+            cancellation: &CancellationToken,
+        ) -> Result<serde_json::Value, super::super::handler::ToolError> {
+            if let Some(started) = self.started.lock().unwrap().take() {
+                let _ = started.send(());
+            }
+            let deadline = std::time::Instant::now() + Duration::from_secs(3);
+            while !cancellation.is_cancelled() && std::time::Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let message = if cancellation.is_cancelled() {
+                "context canceled"
+            } else {
+                "cancellation timed out"
+            };
+            if let Some(finished) = self.finished.lock().unwrap().take() {
+                let _ = finished.send(message.to_owned());
+            }
+            Err(super::super::handler::ToolError(message.to_owned()))
+        }
+    }
+
+    #[test]
+    fn dropping_http_client_cancels_the_inflight_tool_handler() {
+        let go: serde_json::Value =
+            serde_json::from_str(GO_AGENT_CANCEL_FIXTURE).expect("Go cancellation oracle parses");
+        assert_eq!(go["schema"], "symeraseme.go-oracle.agent-cancel.v1");
+        assert_eq!(go["go_version"], "go1.26.6");
+        assert_eq!(go["handler_error"], "context canceled");
+        assert_eq!(go["child_exited"], true);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime");
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind local test server");
+            let address = listener.local_addr().unwrap();
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let (finished_tx, finished_rx) = tokio::sync::oneshot::channel();
+            let handler: Arc<dyn ToolHandler> = Arc::new(BlockingCancellationHandler {
+                started: std::sync::Mutex::new(Some(started_tx)),
+                finished: std::sync::Mutex::new(Some(finished_tx)),
+            });
+            let server_handler = Arc::clone(&handler);
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.expect("accept request");
+                let service = service_fn(move |request| {
+                    let handler = Arc::clone(&server_handler);
+                    async move {
+                        Ok::<_, std::convert::Infallible>(
+                            handle_request(request, "test_token", handler).await,
+                        )
+                    }
+                });
+                let _ = http1::Builder::new()
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await;
+            });
+
+            let body = r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#;
+            let mut client = std::net::TcpStream::connect(address).expect("connect test client");
+            let request = format!(
+                "POST / HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer test_token\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            client
+                .write_all(request.as_bytes())
+                .expect("send MCP tool request");
+            tokio::time::timeout(Duration::from_secs(2), started_rx)
+                .await
+                .expect("handler starts promptly")
+                .expect("handler start signal");
+            drop(client);
+            let message = tokio::time::timeout(Duration::from_secs(2), finished_rx)
+                .await
+                .expect("handler observes the HTTP disconnect")
+                .expect("handler result signal");
+            assert_eq!(message, "context canceled");
+            tokio::time::timeout(Duration::from_secs(2), server)
+                .await
+                .expect("server connection exits")
+                .expect("server task");
+        });
     }
 }

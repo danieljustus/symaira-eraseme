@@ -24,6 +24,18 @@ pub(crate) enum ToolsCallOutcome {
 
 /// Handles one JSON-RPC `tools/call` request without transport concerns.
 pub(crate) fn tools_call(raw: &[u8], handler: &dyn ToolHandler) -> ToolsCallOutcome {
+    tools_call_cancellable(
+        raw,
+        handler,
+        &symeraseme_core::llm::CancellationToken::default(),
+    )
+}
+
+pub(crate) fn tools_call_cancellable(
+    raw: &[u8],
+    handler: &dyn ToolHandler,
+    cancellation: &symeraseme_core::llm::CancellationToken,
+) -> ToolsCallOutcome {
     let Ok(request) = serde_json::from_slice::<Value>(raw) else {
         return ToolsCallOutcome::ParseError;
     };
@@ -88,14 +100,14 @@ pub(crate) fn tools_call(raw: &[u8], handler: &dyn ToolHandler) -> ToolsCallOutc
         }
         // The legacy `status` alias passes validation but has no case in Go's
         // contract handler either, so the handler answers with its default.
-        return dispatch(handler, id, name, arguments);
+        return dispatch(handler, id, name, arguments, cancellation);
     };
 
     if let Err(message) = validate_arguments(tool, arguments) {
         return response_error(id, -32602, &message);
     }
 
-    dispatch(handler, id, name, arguments)
+    dispatch(handler, id, name, arguments, cancellation)
 }
 
 /// Runs the handler and maps its outcome the way Go does: a result becomes the
@@ -105,8 +117,9 @@ fn dispatch(
     id: &Value,
     name: &str,
     arguments: &serde_json::Map<String, Value>,
+    cancellation: &symeraseme_core::llm::CancellationToken,
 ) -> ToolsCallOutcome {
-    match handler.call(name, arguments) {
+    match handler.call_cancellable(name, arguments, cancellation) {
         Ok(result) => {
             ToolsCallOutcome::Response(super::envelope::result_response(id, Some(&result)))
         }

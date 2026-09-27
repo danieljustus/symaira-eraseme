@@ -58,6 +58,15 @@ impl std::fmt::Display for ToolError {
 /// Maps a validated tool name and its arguments to a result.
 pub trait ToolHandler: Send + Sync {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError>;
+
+    fn call_cancellable(
+        &self,
+        name: &str,
+        arguments: &Map<String, Value>,
+        _cancellation: &llm::CancellationToken,
+    ) -> Result<Value, ToolError> {
+        self.call(name, arguments)
+    }
 }
 
 /// `json.Marshal` of one Go string: quoted, with the HTML characters Go escapes
@@ -78,20 +87,20 @@ fn go_struct_text(value: &impl serde::Serialize) -> Result<Value, ToolError> {
     ))
 }
 
-fn triage_agent_call(
-    agent: &AgentClient,
-) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + '_ {
+fn triage_agent_call<'a>(
+    agent: &'a AgentClient,
+    cancellation: Option<&'a llm::CancellationToken>,
+) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + 'a {
     move |system, user, cache_key| {
-        let (text, usage) = agent
-            .classify(
-                system,
-                user,
-                &llm::ClassifyOptions {
-                    cache_key: cache_key.to_owned(),
-                    ..llm::ClassifyOptions::default()
-                },
-            )
-            .map_err(|error| error.to_string())?;
+        let options = llm::ClassifyOptions {
+            cache_key: cache_key.to_owned(),
+            ..llm::ClassifyOptions::default()
+        };
+        let result = match cancellation {
+            Some(cancellation) => agent.classify_cancellable(system, user, &options, cancellation),
+            None => agent.classify(system, user, &options),
+        };
+        let (text, usage) = result.map_err(|error| error.to_string())?;
         Ok(LlmResponse { text, usage })
     }
 }
@@ -578,10 +587,14 @@ impl ContractHandler {
         .map_err(|error| ToolError(error.to_string()))
     }
 
-    fn classify_reply(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+    fn classify_reply(
+        &self,
+        arguments: &Map<String, Value>,
+        cancellation: Option<&llm::CancellationToken>,
+    ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let agent = self.triage_agent(arguments)?;
-            let call = triage_agent_call(&agent);
+            let call = triage_agent_call(&agent, cancellation);
             let outcome = triage_service::Service::new(store)
                 .classify_reply(
                     get_int(arguments, "request_id", 0),
@@ -598,10 +611,14 @@ impl ContractHandler {
         })
     }
 
-    fn generate_rebuttal(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+    fn generate_rebuttal(
+        &self,
+        arguments: &Map<String, Value>,
+        cancellation: Option<&llm::CancellationToken>,
+    ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
         let agent = self.triage_agent(arguments)?;
-        let call = triage_agent_call(&agent);
+        let call = triage_agent_call(&agent, cancellation);
         let result = triage_service::Service::new(store)
             .generate_rebuttal(
                 get_int(arguments, "request_id", 0),
@@ -1438,6 +1455,19 @@ impl ToolHandler for ContractHandler {
         }
         self.call_go_map(name, arguments).map(go_map_order)
     }
+
+    fn call_cancellable(
+        &self,
+        name: &str,
+        arguments: &Map<String, Value>,
+        cancellation: &llm::CancellationToken,
+    ) -> Result<Value, ToolError> {
+        match name {
+            "classify_reply" => self.classify_reply(arguments, Some(cancellation)),
+            "generate_rebuttal" => self.generate_rebuttal(arguments, Some(cancellation)),
+            _ => self.call(name, arguments),
+        }
+    }
 }
 
 impl ContractHandler {
@@ -1466,8 +1496,8 @@ impl ContractHandler {
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
             "auto_confirm" => self.auto_confirm(arguments),
-            "classify_reply" => self.classify_reply(arguments),
-            "generate_rebuttal" => self.generate_rebuttal(arguments),
+            "classify_reply" => self.classify_reply(arguments, None),
+            "generate_rebuttal" => self.generate_rebuttal(arguments, None),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -3457,6 +3487,64 @@ mod tests {
             error.0,
             "no unclassified inbox reply found for request #4242"
         );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cancelled_classification_flows_through_handler_service_and_agent() {
+        let (root, handler) = seeded_handler("classify-cancelled");
+        let handler = handler.with_test_llm_environment(HashMap::from([(
+            "SYMERASEME_AGENT_BACKEND".to_owned(),
+            "claude".to_owned(),
+        )]));
+        let store = Store::open(root.join("data").join("symeraseme.db")).expect("store");
+        let request_id = Repository::new(&store)
+            .create_removal_request(
+                "broker-x",
+                "email",
+                "campaign-x",
+                "DE",
+                "gdpr-art17.de.md.j2",
+                "",
+            )
+            .expect("request");
+        store
+            .connection()
+            .execute(
+                "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (
+                    request_id,
+                    "m1",
+                    "t1",
+                    "broker@example.invalid",
+                    "Re: deletion",
+                    "We need your address.",
+                ),
+            )
+            .expect("reply row");
+        drop(store);
+
+        let mut arguments = Map::new();
+        arguments.insert("provider".to_owned(), json!("agent"));
+        arguments.insert("request_id".to_owned(), json!(request_id));
+        let cancellation = llm::CancellationToken::default();
+        cancellation.cancel();
+        let error = handler
+            .call_cancellable("classify_reply", &arguments, &cancellation)
+            .expect_err("cancelled agent call must surface through the tool handler");
+        assert_eq!(error.0, "context canceled");
+
+        let store = Store::open(root.join("data").join("symeraseme.db")).expect("reopen store");
+        let classified: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE request_id = ?1",
+                [request_id],
+                |row| row.get(0),
+            )
+            .expect("read classification state");
+        assert_eq!(classified, None, "cancelled calls are not persisted");
         let _ = fs::remove_dir_all(&root);
     }
 

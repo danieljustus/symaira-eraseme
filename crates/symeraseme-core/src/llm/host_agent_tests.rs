@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use super::{AgentClient, AgentCommandConfig, ClientError};
+use super::{AgentClient, AgentCommandConfig, CancellationToken, ClientError};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -16,6 +16,10 @@ const FIXTURE: &str = include_str!(concat!(
 const INVALID_UTF8_FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/agent-stderr/invalid-utf8.json"
+));
+const CANCEL_FIXTURE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/agent-cancel/http.json"
 ));
 
 fn fixture() -> Value {
@@ -146,6 +150,7 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
                 environment: &environment,
                 inherit_environment: false,
             },
+            &CancellationToken::default(),
         );
 
         let expected = &case["result"];
@@ -274,6 +279,7 @@ fn invalid_utf8_agent_stderr_matches_go_byte_truncation() {
             environment: &environment,
             inherit_environment: false,
         },
+        &CancellationToken::default(),
     );
     let error = result.expect_err("fake agent exits non-zero");
     assert_eq!(
@@ -288,5 +294,84 @@ fn invalid_utf8_agent_stderr_matches_go_byte_truncation() {
     );
     assert_eq!(error_type(&error), "Error");
 
+    fs::remove_dir_all(root).expect("remove isolated fake-agent root");
+}
+
+#[test]
+fn cancelling_host_agent_kills_the_child_and_returns_context_canceled() {
+    let fixture: Value = serde_json::from_str(CANCEL_FIXTURE).expect("Go cancel fixture parses");
+    assert_eq!(fixture["schema"], "symeraseme.go-oracle.agent-cancel.v1");
+    assert_eq!(fixture["go_version"], "go1.26.6");
+    for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
+        let source: &[u8] = match path.as_str() {
+            "internal/mcp/server.go" => include_bytes!("../../../../internal/mcp/server.go"),
+            "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
+            "internal/llm/llm.go" => include_bytes!("../../../../internal/llm/llm.go"),
+            "go.mod" => include_bytes!("../../../../go.mod"),
+            other => panic!("unexpected source {other}"),
+        };
+        assert_eq!(
+            hex::encode(Sha256::digest(source)),
+            expected.as_str().unwrap(),
+            "{path}"
+        );
+    }
+
+    let root = unique_root();
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("isolated fake-agent root");
+    let cli = root.join("claude");
+    let started = root.join("started");
+    fs::write(
+        &cli,
+        "#!/bin/sh\nprintf '%s' \"$$\" > \"$AGENT_STARTED\"\nexec /bin/sleep 30\n",
+    )
+    .expect("write blocking fake agent");
+    fs::set_permissions(&cli, fs::Permissions::from_mode(0o700))
+        .expect("make fake agent executable");
+    let environment = [(
+        OsString::from("AGENT_STARTED"),
+        started.as_os_str().to_owned(),
+    )];
+    let cancellation = CancellationToken::default();
+    let cancel_after_start = cancellation.clone();
+    let started_by_agent = started.clone();
+    let cancel_thread = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !started_by_agent.exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        cancel_after_start.cancel();
+    });
+
+    let mut agent = AgentClient::with_probe("auto", "claude", Vec::new(), &|_| true);
+    agent.base.max_retries = 1;
+    let started_at = std::time::Instant::now();
+    let result = agent.classify_with_command(
+        "system",
+        "user",
+        &Default::default(),
+        AgentCommandConfig {
+            timeout: Duration::from_secs(30),
+            executable_override: Some(&cli),
+            environment: &environment,
+            inherit_environment: false,
+        },
+        &cancellation,
+    );
+    cancel_thread.join().expect("cancellation helper exits");
+    assert!(
+        started.exists(),
+        "fake host agent started before cancellation"
+    );
+    assert!(
+        started_at.elapsed() < Duration::from_secs(3),
+        "cancellation interrupts the process instead of waiting for its timeout"
+    );
+    assert_eq!(
+        result.expect_err("cancelled host agent returns an error"),
+        ClientError::Context(fixture["handler_error"].as_str().unwrap().to_owned())
+    );
+    assert_eq!(fixture["child_exited"], true);
     fs::remove_dir_all(root).expect("remove isolated fake-agent root");
 }

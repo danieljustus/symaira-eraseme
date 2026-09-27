@@ -1,0 +1,13 @@
+{
+  "schema": "symeraseme.go-oracle.agent-cancel.v1",
+  "go_version": "go1.26.6",
+  "sources_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "internal/llm/agent.go": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8",
+    "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
+    "internal/mcp/server.go": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976"
+  },
+  "handler_error": "context canceled",
+  "client_error": "Post \"http://127.0.0.1:51099\": context canceled",
+  "child_exited": true
+}
