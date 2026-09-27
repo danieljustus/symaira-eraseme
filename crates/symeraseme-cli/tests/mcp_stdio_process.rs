@@ -21,7 +21,12 @@ fn wait_with_output_bounded(mut child: Child, case: &str) -> Output {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
         if child.try_wait().unwrap().is_some() {
-            return child.wait_with_output().unwrap();
+            let (sender, receiver) = mpsc::channel();
+            std::thread::spawn(move || sender.send(child.wait_with_output()).ok());
+            return receiver
+                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                .unwrap_or_else(|_| panic!("{case} stdio output pipe exceeded 15 seconds"))
+                .unwrap();
         }
         if Instant::now() >= deadline {
             child.kill().ok();
