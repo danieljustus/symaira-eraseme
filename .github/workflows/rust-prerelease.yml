@@ -13,7 +13,6 @@ on:
       - README.md
       - LICENSE
   workflow_dispatch: {}
-  workflow_call: {}
 
 permissions:
   contents: read
