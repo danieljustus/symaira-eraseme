@@ -13,7 +13,7 @@
     "internal/mcp/server.go": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976",
     "internal/replies/service.go": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281",
     "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
-    "rust-tests/parity/oracle/provider-cancel/main.go": "737f6dccfa0c92ed06443af5d613dfbaa5721fbacec4b1d9c009ea3d04705dd3"
+    "rust-tests/parity/oracle/provider-cancel/main.go": "f68e6f37a2555fbec8f32ce649ab6d712f7fc8f16cff94659839372fdeab2030"
   },
   "provider_canceled": true,
   "client_disconnected": true

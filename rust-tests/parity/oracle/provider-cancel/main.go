@@ -75,12 +75,12 @@ func main() {
 	select {
 	case <-handlerCanceled:
 	case <-time.After(5 * time.Second):
-		fatalIf(fmt.Errorf("Go MCP request context did not observe client disconnect"))
+		fatalIf(fmt.Errorf("go mcp request context did not observe client disconnect"))
 	}
 	select {
 	case <-providerCanceled:
 	case <-time.After(5 * time.Second):
-		fatalIf(fmt.Errorf("llmkit provider request did not observe Go MCP cancellation"))
+		fatalIf(fmt.Errorf("llmkit provider request did not observe go mcp cancellation"))
 	}
 
 	fixture := result{
