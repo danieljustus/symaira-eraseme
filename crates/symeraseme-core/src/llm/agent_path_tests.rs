@@ -64,3 +64,42 @@ fn relative_path_hit_matches_real_go_agent_availability() {
         Some(root.path())
     ));
 }
+
+#[test]
+fn production_factory_defers_agent_resolution_until_first_availability_check() {
+    use serde_json::Value;
+    use sha2::{Digest, Sha256};
+
+    const FIXTURE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/fixtures/agent-path/current-relative-entry.json"
+    ));
+
+    let fixture: Value = serde_json::from_str(FIXTURE).expect("Go agent path fixture parses");
+    for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
+        let source: &[u8] = match path.as_str() {
+            "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
+            "go.mod" => include_bytes!("../../../../go.mod"),
+            other => panic!("unexpected source {other}"),
+        };
+        assert_eq!(
+            hex::encode(Sha256::digest(source)),
+            expected.as_str().unwrap(),
+            "{path}"
+        );
+    }
+
+    let options = super::CreateOptions {
+        provider: "agent".to_owned(),
+        agent_backend: "claude".to_owned(),
+        ..Default::default()
+    };
+    let client = super::create(&options, &|_| None).expect("create agent client");
+    assert!(client.backend_resolution.get().is_none());
+    assert_eq!(fixture["available_after_path_change"], true);
+
+    // This injected probe models the PATH that Go observes after construction.
+    // The production factory's unresolved cache must use the first probe result.
+    assert!(client.resolve_backend(&|name| name == "claude").1);
+    assert_eq!(client.resolved_backend(), "claude");
+}

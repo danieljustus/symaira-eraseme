@@ -10,5 +10,6 @@
   "cli": "claude",
   "path": ".",
   "executable_exists": true,
-  "available": false
+  "available": false,
+  "available_after_path_change": true
 }

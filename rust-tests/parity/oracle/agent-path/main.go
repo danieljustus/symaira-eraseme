@@ -15,15 +15,16 @@ import (
 )
 
 type result struct {
-	Schema           string            `json:"schema"`
-	GoVersion        string            `json:"go_version"`
-	GeneratedOn      string            `json:"generated_on"`
-	SourcesSHA256    map[string]string `json:"sources_sha256"`
-	ID               string            `json:"id"`
-	CLI              string            `json:"cli"`
-	Path             string            `json:"path"`
-	ExecutableExists bool              `json:"executable_exists"`
-	Available        bool              `json:"available"`
+	Schema                   string            `json:"schema"`
+	GoVersion                string            `json:"go_version"`
+	GeneratedOn              string            `json:"generated_on"`
+	SourcesSHA256            map[string]string `json:"sources_sha256"`
+	ID                       string            `json:"id"`
+	CLI                      string            `json:"cli"`
+	Path                     string            `json:"path"`
+	ExecutableExists         bool              `json:"executable_exists"`
+	Available                bool              `json:"available"`
+	AvailableAfterPathChange bool              `json:"available_after_path_change"`
 }
 
 func main() {
@@ -68,6 +69,21 @@ func main() {
 		ExecutableExists: true,
 		Available:        agent.IsAvailable(),
 	}
+
+	// Go resolves AgentClient's backend at the first IsAvailable call, so a
+	// client created before PATH changes sees the newly available executable.
+	laterDir := filepath.Join(root, "later")
+	fatalIf(os.Mkdir(laterDir, 0o700))
+	fatalIf(os.WriteFile(filepath.Join(laterDir, cliFile), []byte("fake"), 0o700))
+	fatalIf(os.Setenv("PATH", ""))
+	lazyClient, err := llm.Create(llm.CreateOptions{Provider: "agent", AgentBackend: "claude"})
+	fatalIf(err)
+	lazyAgent, ok := lazyClient.(*llm.AgentClient)
+	if !ok {
+		fatalIf(fmt.Errorf("agent provider returned %T", lazyClient))
+	}
+	fatalIf(os.Setenv("PATH", laterDir))
+	got.AvailableAfterPathChange = lazyAgent.IsAvailable()
 	for _, source := range []string{"internal/llm/agent.go", "go.mod"} {
 		contents, err := os.ReadFile(filepath.Join(previousDir, source))
 		fatalIf(err)
@@ -79,7 +95,7 @@ func main() {
 	fatalIf(err)
 	fatalIf(os.MkdirAll(filepath.Dir(output), 0o755))
 	fatalIf(os.WriteFile(output, append(contents, '\n'), 0o644))
-	fmt.Printf("recorded %s available=%t -> %s\n", got.ID, got.Available, output)
+	fmt.Printf("recorded %s available=%t after-path-change=%t -> %s\n", got.ID, got.Available, got.AvailableAfterPathChange, output)
 }
 
 func fatalIf(err error) {

@@ -18,6 +18,7 @@ use std::fmt;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -426,8 +427,7 @@ pub const AGENT_PREFERENCE: [&str; 3] = ["claude", "hermes", "copilot"];
 pub struct AgentClient {
     pub base: BaseClient,
     pub requested_backend: String,
-    resolved_backend: String,
-    available: bool,
+    backend_resolution: OnceLock<(String, bool)>,
     provider_client: Option<LlmkitClient>,
 }
 
@@ -450,13 +450,19 @@ impl AgentClient {
         agent_backend: impl Into<String>,
         cost_tracker: Vec<UsageRecord>,
     ) -> Self {
-        Self::with_probe(model, agent_backend, cost_tracker, &cli_on_path)
+        Self {
+            base: BaseClient::new(model_or_auto(&model.into()), 3, cost_tracker),
+            requested_backend: agent_backend.into(),
+            backend_resolution: OnceLock::new(),
+            provider_client: None,
+        }
     }
 
     /// Go's `NewAgentClient` with an injected PATH probe.
     ///
-    /// Go resolves the backend lazily on the first `IsAvailable()`; this resolves
-    /// on construction, which the public contract cannot distinguish.
+    /// This eager variant keeps deterministic factory tests independent of the
+    /// process PATH. Production construction uses [`Self::new`] and resolves on
+    /// first availability check, matching Go's lazy `IsAvailable()` behavior.
     pub fn with_probe(
         model: impl Into<String>,
         agent_backend: impl Into<String>,
@@ -467,11 +473,12 @@ impl AgentClient {
         let agent_backend = agent_backend.into();
         let resolved_backend = detect_backend(&agent_backend, on_path);
         let available = !resolved_backend.is_empty();
+        let backend_resolution = OnceLock::new();
+        let _ = backend_resolution.set((resolved_backend, available));
         Self {
             base: BaseClient::new(model_or_auto(&model), 3, cost_tracker),
             requested_backend: agent_backend,
-            resolved_backend,
-            available,
+            backend_resolution,
             provider_client: None,
         }
     }
@@ -484,20 +491,27 @@ impl AgentClient {
         Self {
             base: BaseClient::new(model, 3, cost_tracker),
             requested_backend: String::new(),
-            resolved_backend: String::new(),
-            available: true,
+            backend_resolution: OnceLock::from((String::new(), true)),
             provider_client: Some(provider_client),
         }
     }
 
     /// Go's `(*AgentClient).IsAvailable`.
     pub fn is_available(&self) -> bool {
-        self.available
+        self.resolve_backend(&cli_on_path).1
     }
 
     /// The backend the agent client resolved.
     pub fn resolved_backend(&self) -> &str {
-        &self.resolved_backend
+        &self.resolve_backend(&cli_on_path).0
+    }
+
+    fn resolve_backend(&self, on_path: &dyn Fn(&str) -> bool) -> &(String, bool) {
+        self.backend_resolution.get_or_init(|| {
+            let backend = detect_backend(&self.requested_backend, on_path);
+            let available = !backend.is_empty();
+            (backend, available)
+        })
     }
 
     /// Go's `(*AgentClient).callAPI` as far as this port reaches: without a
@@ -598,10 +612,8 @@ impl AgentClient {
         environment: &[(OsString, OsString)],
         inherit_environment: bool,
     ) -> Result<(String, UsageRecord), ClientError> {
-        let Some(def) = AGENT_DEFS
-            .iter()
-            .find(|def| def.name == self.resolved_backend)
-        else {
+        let backend = self.resolved_backend();
+        let Some(def) = AGENT_DEFS.iter().find(|def| def.name == backend) else {
             return Err(self.unavailable_error());
         };
 
@@ -870,7 +882,7 @@ pub fn create(
     options: &CreateOptions,
     env: &dyn Fn(&str) -> Option<String>,
 ) -> Result<AgentClient, ClientError> {
-    create_with(options, env, &cli_on_path)
+    create_inner(options, env, None)
 }
 
 /// Go's `Create` with an injected PATH probe.
@@ -878,6 +890,14 @@ pub fn create_with(
     options: &CreateOptions,
     env: &dyn Fn(&str) -> Option<String>,
     on_path: &dyn Fn(&str) -> bool,
+) -> Result<AgentClient, ClientError> {
+    create_inner(options, env, Some(on_path))
+}
+
+fn create_inner(
+    options: &CreateOptions,
+    env: &dyn Fn(&str) -> Option<String>,
+    on_path: Option<&dyn Fn(&str) -> bool>,
 ) -> Result<AgentClient, ClientError> {
     let mut provider = if options.provider.is_empty() {
         env("SYMERASEME_LLM_PROVIDER").unwrap_or_default()
@@ -913,12 +933,13 @@ pub fn create_with(
         } else {
             options.agent_backend.clone()
         };
-        return Ok(AgentClient::with_probe(
-            model,
-            agent_backend,
-            options.cost_tracker.clone(),
-            on_path,
-        ));
+        let client = match on_path {
+            Some(on_path) => {
+                AgentClient::with_probe(model, agent_backend, options.cost_tracker.clone(), on_path)
+            }
+            None => AgentClient::new(model, agent_backend, options.cost_tracker.clone()),
+        };
+        return Ok(client);
     }
 
     let base_url = if !options.base_url.is_empty() {
