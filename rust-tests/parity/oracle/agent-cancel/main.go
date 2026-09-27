@@ -42,7 +42,7 @@ func main() {
 	fatalIf(os.Mkdir(bin, 0o700))
 	started := filepath.Join(root, "started")
 	cli := filepath.Join(bin, "claude")
-	program := "#!/bin/sh\nprintf '%s' \"$$\" > \"$AGENT_STARTED\"\nexec /bin/sleep 30\n"
+	program := "#!/bin/sh\nprintf '%s\\n' \"$$\" > \"$AGENT_STARTED\"\nexec /bin/sleep 30\n"
 	fatalIf(os.WriteFile(cli, []byte(program), 0o700))
 	fatalIf(os.Setenv("PATH", bin))
 	fatalIf(os.Setenv("AGENT_STARTED", started))
@@ -78,12 +78,19 @@ func main() {
 	}()
 
 	deadline := time.Now().Add(5 * time.Second)
+	var pid int
 	for {
-		if _, err := os.Stat(started); err == nil {
-			break
+		if pidBytes, err := os.ReadFile(started); err == nil {
+			contents := string(pidBytes)
+			if strings.HasSuffix(contents, "\n") {
+				if value, parseErr := strconv.Atoi(strings.TrimSuffix(contents, "\n")); parseErr == nil {
+					pid = value
+					break
+				}
+			}
 		}
 		if time.Now().After(deadline) {
-			fatalIf(fmt.Errorf("fake host agent did not start"))
+			fatalIf(fmt.Errorf("fake host agent did not publish its pid"))
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
@@ -97,10 +104,6 @@ func main() {
 	}
 	clientError := <-clientDone
 	clientError = strings.ReplaceAll(clientError, server.URL, "<server-url>")
-	pidBytes, err := os.ReadFile(started)
-	fatalIf(err)
-	pid, err := strconv.Atoi(string(pidBytes))
-	fatalIf(err)
 	childExited := syscall.Kill(pid, 0) == syscall.ESRCH
 
 	fixture := result{
