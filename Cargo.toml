@@ -38,7 +38,7 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9.34"
 symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "27177f25f551cecefa7bd6c4524abf175b3a75c7" }
 symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "0f441fb27872da7edd65244e4fcbd0890f0b7174" }
-symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "1455cd0c4d168bab4dfa5f1455d94160d521a127" }
+symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "10c687888247b24371a4a40976e71f083ba6ce32" }
 tar = "0.4.44"
 tempfile = "3.27.0"
 toml = "1.1.0"
