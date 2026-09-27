@@ -22,7 +22,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::scan_legacy_python_units;
-use super::{Config, LegacyUnit, Platform, SchedulerError, WRAPPER_DIR_PLACEHOLDER, write_files};
+use super::{
+    Config, LegacyUnit, Platform, SchedulerError, WRAPPER_DIR_PLACEHOLDER, write_files,
+    write_with_mode,
+};
 
 /// Executes platform commands. Tests inject a recording runner; production uses
 /// [`ExecRunner`].
@@ -471,7 +474,7 @@ fn install_native_units(
     for name in names {
         let path = root.join(name);
         let content = generated[name].replace(WRAPPER_DIR_PLACEHOLDER, output_dir);
-        fs::write(&path, content)
+        write_with_mode(&path, content.as_bytes(), 0o644)
             .map_err(|source| SchedulerError::WriteNativeUnit { path, source })?;
     }
     Ok(())
