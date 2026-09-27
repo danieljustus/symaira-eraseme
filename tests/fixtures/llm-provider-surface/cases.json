@@ -484,9 +484,14 @@
   ],
   "host_agent_protocol": {
     "program": "#!/bin/sh\nprintf '%s\\0' \"$@\" \u003e \"$AGENT_CAPTURE_DIR/arguments\"\nprintf '%s\\0' \"$TERM\" \"$AGENT_SENTINEL\" \u003e \"$AGENT_CAPTURE_DIR/environment\"\nif IFS= read -r ignored; then printf 'input' \u003e \"$AGENT_CAPTURE_DIR/stdin\"; else printf 'eof' \u003e \"$AGENT_CAPTURE_DIR/stdin\"; fi\ncase \"$AGENT_SCENARIO\" in\nsuccess)\n  printf ' \\tanswer from fake agent \\n'\n  printf 'ignored success stderr\\n' \u003e\u00262\n  ;;\nexit)\n  printf '%s' \"$AGENT_STDERR\" \u003e\u00262\n  exit \"$AGENT_EXIT_CODE\"\n  ;;\ntimeout)\n  exec /bin/sleep 300\n  ;;\nesac\n",
+    "sources_sha256": {
+      "internal/llm/agent.go": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8"
+    },
     "cases": [
       {
         "id": "success-claude-arguments-and-environment",
+        "backend": "claude",
+        "cli": "claude",
         "mode": "success",
         "model": "test-model",
         "system_prompt": " system prompt ",
@@ -513,7 +518,59 @@
         }
       },
       {
+        "id": "success-hermes-arguments-and-environment",
+        "backend": "hermes",
+        "cli": "hermes",
+        "mode": "success",
+        "model": "auto",
+        "system_prompt": "system",
+        "user_prompt": "hermes prompt",
+        "timeout_millis": 0,
+        "test_timeout_millis": 0,
+        "result": {
+          "text": "answer from fake agent",
+          "usage_model": "agent:hermes",
+          "arguments": [
+            "-p",
+            "system\n\n---\n\nhermes prompt"
+          ],
+          "environment": {
+            "AGENT_SENTINEL": "environment-survived",
+            "TERM": "dumb"
+          },
+          "stdin_eof": true
+        }
+      },
+      {
+        "id": "success-copilot-arguments-and-environment",
+        "backend": "copilot",
+        "cli": "gh",
+        "mode": "success",
+        "model": "auto",
+        "system_prompt": "system",
+        "user_prompt": "copilot prompt",
+        "timeout_millis": 0,
+        "test_timeout_millis": 0,
+        "result": {
+          "text": "answer from fake agent",
+          "usage_model": "agent:copilot",
+          "arguments": [
+            "copilot",
+            "suggest",
+            "-p",
+            "system\n\n---\n\ncopilot prompt"
+          ],
+          "environment": {
+            "AGENT_SENTINEL": "environment-survived",
+            "TERM": "dumb"
+          },
+          "stdin_eof": true
+        }
+      },
+      {
         "id": "exit-code-trims-and-truncates-stderr",
+        "backend": "claude",
+        "cli": "claude",
         "mode": "exit",
         "model": "test-model",
         "system_prompt": "system",
@@ -545,6 +602,8 @@
       },
       {
         "id": "host-agent-subprocess-timeout",
+        "backend": "claude",
+        "cli": "claude",
         "mode": "timeout",
         "model": "test-model",
         "system_prompt": "system",

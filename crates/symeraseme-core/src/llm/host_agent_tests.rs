@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use super::{AgentClient, AgentCommandConfig, ClientError};
 
@@ -49,12 +50,19 @@ fn error_type(error: &ClientError) -> &'static str {
 fn host_agent_subprocess_protocol_matches_real_go_oracle() {
     let fixture = fixture();
     let protocol = &fixture["host_agent_protocol"];
+    let source = Sha256::digest(include_bytes!("../../../../internal/llm/agent.go"));
+    assert_eq!(
+        hex::encode(source),
+        protocol["sources_sha256"]["internal/llm/agent.go"]
+            .as_str()
+            .expect("source digest")
+    );
     let program = protocol["program"].as_str().expect("fake CLI program");
     let cases = protocol["cases"].as_array().expect("host-agent cases");
     assert_eq!(
         cases.len(),
-        3,
-        "success, exit-code, and timeout cases execute"
+        5,
+        "all three backends and failure cases execute"
     );
 
     for case in cases {
@@ -67,7 +75,7 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
         for path in [&bin, &capture, &home, &tmp] {
             fs::create_dir_all(path).expect("isolated fake-agent directory");
         }
-        let cli = bin.join("claude");
+        let cli = bin.join(case["cli"].as_str().expect("CLI executable"));
         fs::write(&cli, program).expect("write Go-oracled fake CLI");
         fs::set_permissions(&cli, fs::Permissions::from_mode(0o700))
             .expect("make fake CLI executable");
@@ -106,8 +114,10 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
         ];
 
         let model = case["model"].as_str().expect("model");
+        let backend = case["backend"].as_str().expect("backend");
+        let cli_name = case["cli"].as_str().expect("CLI executable");
         let mut agent =
-            AgentClient::with_probe(model, "claude", Vec::new(), &|name| name == "claude");
+            AgentClient::with_probe(model, backend, Vec::new(), &|name| name == cli_name);
         agent.base.max_retries = 1;
         let timeout = Duration::from_millis(
             case["test_timeout_millis"]
