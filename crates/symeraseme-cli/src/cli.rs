@@ -1257,7 +1257,7 @@ fn poll_inbox_command(parsed: &Parsed) -> Outcome {
     };
     let result = match handler.call("poll_inbox", &arguments) {
         Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
     match output_format(parsed) {
         Err(outcome) => outcome,
@@ -1439,7 +1439,7 @@ fn contract_result_with_format(
         contract_handler().map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
     let result = handler
         .call(tool, arguments)
-        .map_err(|error| Outcome::Stderr(format!("{}\n", error.0).into_bytes()))?;
+        .map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
     Ok((format? == "json").then_some(result))
 }
 
@@ -1733,7 +1733,7 @@ fn run_web_form_command(parsed: &Parsed) -> Outcome {
     };
     let result = match handler.call("run_web_form", &arguments) {
         Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
     let format = match output_format(parsed) {
         Ok(format) => format,
@@ -1853,7 +1853,7 @@ fn auto_confirm_command(parsed: &Parsed) -> Outcome {
     };
     let result = match handler.call("auto_confirm", &arguments) {
         Ok(result) => result,
-        Err(error) => return Outcome::Stderr(format!("{}\n", error.0).into_bytes()),
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
     };
     let format = match output_format(parsed) {
         Ok(format) => format,

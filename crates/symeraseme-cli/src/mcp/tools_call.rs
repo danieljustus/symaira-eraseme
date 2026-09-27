@@ -123,11 +123,18 @@ fn dispatch(
         Ok(result) => {
             ToolsCallOutcome::Response(super::envelope::result_response(id, Some(&result)))
         }
-        Err(error) => response_error(
-            id,
-            -32603,
-            &super::envelope::sanitize_error(&error.to_string()),
-        ),
+        Err(error) => {
+            let message = error.to_string();
+            let sanitized = super::envelope::sanitize_error(&message);
+            if sanitized == message
+                && let Some(raw) = error.raw_message_bytes()
+            {
+                return ToolsCallOutcome::Response(super::envelope::raw_error_response(
+                    id, -32603, raw,
+                ));
+            }
+            response_error(id, -32603, &sanitized)
+        }
     }
 }
 
