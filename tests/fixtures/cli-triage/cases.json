@@ -1,7 +1,7 @@
 {
   "schema": "symeraseme.go-oracle.cli-triage.v1",
-  "generator_sha256": "79f408b8229241cbb3e7d87da6bb0fe187a2567be8b163573f5d8c1197e65490",
-  "fake_agent_sha256": "b09f3dcab7603e9e67639f1ba78ff408cbe6595b4114b3a912d7eceba445e20d",
+  "generator_sha256": "d842c1cb606f537c7dd08c392075fe0afa30cb269b2e56b8a11c67d935afa075",
+  "fake_agent_sha256": "f163d69bd39afa51b46f607ee0e17d7d25955e6fac9f7e6086bb2c6964ec8c2a",
   "sources": [
     {
       "path": "cmd/symeraseme/extra_commands.go",
@@ -37,6 +37,29 @@
     }
   ],
   "cases": [
+    {
+      "id": "classify-agent-invalid-utf8-stderr",
+      "argv": [
+        "classify-reply",
+        "1",
+        "--provider",
+        "agent"
+      ],
+      "environment": {
+        "AGENT_STDERR_ESCAPED": "before\\377after",
+        "SYMERASEME_AGENT_BACKEND": "claude",
+        "SYMERASEME_LLM_PROVIDER": "agent"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aG9zdCBhZ2VudCBleGl0ZWQgd2l0aCBjb2RlIDIzOiBiZWZvcmX/YWZ0ZXIK",
+      "state": {
+        "classification": null,
+        "confidence": null,
+        "summary": null,
+        "events": []
+      }
+    },
     {
       "id": "classify-reply-json",
       "argv": [

@@ -119,6 +119,55 @@ pub(crate) fn error_response(id: &Value, code: i32, message: &str) -> Vec<u8> {
     })
 }
 
+/// Encodes a Go error string that may contain invalid UTF-8 bytes. Go's
+/// `encoding/json` emits one `\\ufffd` escape for each invalid byte; Rust's
+/// normal `String` path has already replaced those bytes with Unicode U+FFFD.
+#[allow(dead_code)]
+pub(crate) fn raw_error_response(id: &Value, code: i32, message: &[u8]) -> Vec<u8> {
+    let id = serde_json::to_string(id).expect("JSON-RPC id is serializable");
+    let message = go_json_string_bytes(message);
+    let mut output = format!(
+        "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":{code},\"message\":{message}}},\"id\":{id}}}\n"
+    )
+    .into_bytes();
+    output = go_escape_json_strings(&output);
+    output
+}
+
+#[allow(dead_code)]
+fn go_json_string_bytes(bytes: &[u8]) -> String {
+    let mut output = Vec::with_capacity(bytes.len() + 2);
+    output.push(b'"');
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        match std::str::from_utf8(&bytes[cursor..]) {
+            Ok(valid) => {
+                append_json_string_content(&mut output, valid);
+                cursor = bytes.len();
+            }
+            Err(error) => {
+                let valid_end = cursor + error.valid_up_to();
+                if valid_end > cursor {
+                    let valid =
+                        std::str::from_utf8(&bytes[cursor..valid_end]).expect("valid UTF-8 prefix");
+                    append_json_string_content(&mut output, valid);
+                    cursor = valid_end;
+                }
+                output.extend_from_slice(br"\ufffd");
+                cursor += 1;
+            }
+        }
+    }
+    output.push(b'"');
+    String::from_utf8(output).expect("JSON string encoding is ASCII/UTF-8")
+}
+
+#[allow(dead_code)]
+fn append_json_string_content(output: &mut Vec<u8>, value: &str) {
+    let encoded = serde_json::to_vec(value).expect("string is serializable");
+    output.extend_from_slice(&encoded[1..encoded.len() - 1]);
+}
+
 fn encode<T: Serialize>(value: &T) -> Vec<u8> {
     let mut output = serde_json::to_vec(value).expect("MCP response is serializable");
     output.push(b'\n');

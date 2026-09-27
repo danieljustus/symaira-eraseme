@@ -10,13 +10,13 @@
     "internal/llm/llmkit.go": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7",
     "rust-tests/parity/oracle/llm-failures-next/main.go": "1b54744ec94ff0ed0bdaecde3cc1a93193a7b5e8dcd475a52a3996e64ac41c98"
   },
-  "id": "openai-model-not-found-echoed-key",
+  "id": "openai-malformed-choice-field",
   "path": "/chat/completions",
-  "status": 404,
+  "status": 403,
   "attempts": 3,
   "error_kind": "provider",
-  "message": "llmkit: model_not_found (status 404): model not found; key synthetic-404-key: llmkit: model_not_found (status 404): model not found; key synthetic-404-key",
+  "message": "llmkit: auth_failure (status 403): {\"error\":{\"message\":\"authentication failed; key synthetic-choice-key\",\"type\":\"authentication_error\",\"code\":\"invalid_api_key\"},\"choices\":[{\"finish_reason\":false}]}: llmkit: auth_failure (status 403): {\"error\":{\"message\":\"authentication failed; key synthetic-choice-key\",\"type\":\"authentication_error\",\"code\":\"invalid_api_key\"},\"choices\":[{\"finish_reason\":false}]}",
   "text": "",
-  "api_key": "synthetic-404-key",
-  "body": "model not found; key synthetic-404-key"
+  "api_key": "synthetic-choice-key",
+  "body": "{\"error\":{\"message\":\"authentication failed; key synthetic-choice-key\",\"type\":\"authentication_error\",\"code\":\"invalid_api_key\"},\"choices\":[{\"finish_reason\":false}]}"
 }

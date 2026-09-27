@@ -46,18 +46,60 @@ const DEFAULT_ERROR: &str = "tool not found";
 
 /// A handler failure. The message reaches the client through
 /// [`super::envelope::sanitize_error`], exactly like a Go handler error.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ToolError(pub String);
+#[derive(PartialEq, Eq)]
+pub struct ToolError {
+    message: String,
+    raw_message: Option<Vec<u8>>,
+}
+
+impl std::fmt::Debug for ToolError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ToolError")
+            .field(&self.message)
+            .finish()
+    }
+}
+
+#[allow(non_snake_case)]
+pub fn ToolError(message: String) -> ToolError {
+    ToolError {
+        message,
+        raw_message: None,
+    }
+}
+
+impl ToolError {
+    fn with_raw_message(message: String, raw_message: Vec<u8>) -> Self {
+        Self {
+            message,
+            raw_message: Some(raw_message),
+        }
+    }
+
+    pub(crate) fn raw_message_bytes(&self) -> Option<&[u8]> {
+        self.raw_message.as_deref()
+    }
+}
 
 impl std::fmt::Display for ToolError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.message)
     }
 }
 
 /// Maps a validated tool name and its arguments to a result.
 pub trait ToolHandler: Send + Sync {
     fn call(&self, name: &str, arguments: &Map<String, Value>) -> Result<Value, ToolError>;
+
+    fn call_cancellable(
+        &self,
+        name: &str,
+        arguments: &Map<String, Value>,
+        _cancellation: &llm::CancellationToken,
+    ) -> Result<Value, ToolError> {
+        self.call(name, arguments)
+    }
 }
 
 /// `json.Marshal` of one Go string: quoted, with the HTML characters Go escapes
@@ -78,20 +120,31 @@ fn go_struct_text(value: &impl serde::Serialize) -> Result<Value, ToolError> {
     ))
 }
 
-fn triage_agent_call(
-    agent: &AgentClient,
-) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + '_ {
+fn triage_agent_call<'a>(
+    agent: &'a AgentClient,
+    cancellation: Option<&'a llm::CancellationToken>,
+    raw_error: &'a std::sync::Mutex<Option<Vec<u8>>>,
+) -> impl Fn(&str, &str, &str) -> Result<LlmResponse, String> + 'a {
     move |system, user, cache_key| {
-        let (text, usage) = agent
-            .classify(
-                system,
-                user,
-                &llm::ClassifyOptions {
-                    cache_key: cache_key.to_owned(),
-                    ..llm::ClassifyOptions::default()
-                },
-            )
-            .map_err(|error| error.to_string())?;
+        let options = llm::ClassifyOptions {
+            cache_key: cache_key.to_owned(),
+            ..llm::ClassifyOptions::default()
+        };
+        let result = match cancellation {
+            Some(cancellation) => agent.classify_cancellable(system, user, &options, cancellation),
+            None => agent.classify(system, user, &options),
+        };
+        let (text, usage) = match result {
+            Ok(result) => {
+                *raw_error.lock().expect("triage error mutex") = None;
+                result
+            }
+            Err(error) => {
+                *raw_error.lock().expect("triage error mutex") =
+                    error.raw_message_bytes().map(<[u8]>::to_vec);
+                return Err(error.to_string());
+            }
+        };
         Ok(LlmResponse { text, usage })
     }
 }
@@ -238,10 +291,17 @@ impl ContractHandler {
             (Ok(value), Ok(())) => Ok(value),
             (Err(error), Ok(())) => Err(error),
             (Ok(_), Err(close)) => Err(ToolError(format!("eventstore: close: {close}"))),
-            (Err(error), Err(close)) => Err(ToolError(format!(
-                "{}; eventstore: close: {close}",
-                error.0
-            ))),
+            (Err(error), Err(close)) => {
+                let suffix = format!("; eventstore: close: {close}");
+                let message = format!("{}{suffix}", error.message);
+                match error.raw_message {
+                    Some(mut raw) => {
+                        raw.extend_from_slice(suffix.as_bytes());
+                        Err(ToolError::with_raw_message(message, raw))
+                    }
+                    None => Err(ToolError(message)),
+                }
+            }
         }
     }
 
@@ -578,10 +638,15 @@ impl ContractHandler {
         .map_err(|error| ToolError(error.to_string()))
     }
 
-    fn classify_reply(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+    fn classify_reply(
+        &self,
+        arguments: &Map<String, Value>,
+        cancellation: Option<&llm::CancellationToken>,
+    ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let agent = self.triage_agent(arguments)?;
-            let call = triage_agent_call(&agent);
+            let raw_error = std::sync::Mutex::new(None);
+            let call = triage_agent_call(&agent, cancellation, &raw_error);
             let outcome = triage_service::Service::new(store)
                 .classify_reply(
                     get_int(arguments, "request_id", 0),
@@ -592,16 +657,24 @@ impl ContractHandler {
                 )
                 .map_err(ToolError)?;
             if let Some(error) = outcome.error {
-                return Err(ToolError(error));
+                return Err(match raw_error.lock().expect("triage error mutex").take() {
+                    Some(raw) => ToolError::with_raw_message(error, raw),
+                    None => ToolError(error),
+                });
             }
             go_struct_text(&outcome.result)
         })
     }
 
-    fn generate_rebuttal(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+    fn generate_rebuttal(
+        &self,
+        arguments: &Map<String, Value>,
+        cancellation: Option<&llm::CancellationToken>,
+    ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
         let agent = self.triage_agent(arguments)?;
-        let call = triage_agent_call(&agent);
+        let raw_error = std::sync::Mutex::new(None);
+        let call = triage_agent_call(&agent, cancellation, &raw_error);
         let result = triage_service::Service::new(store)
             .generate_rebuttal(
                 get_int(arguments, "request_id", 0),
@@ -610,7 +683,10 @@ impl ContractHandler {
                 Some(&call),
                 get_bool(arguments, "save", true),
             )
-            .map_err(ToolError)?;
+            .map_err(|error| match raw_error.lock().expect("triage error mutex").take() {
+                Some(raw) => ToolError::with_raw_message(error, raw),
+                None => ToolError(error),
+            })?;
         go_struct_text(&json!({
             "TemplateName": result.template_name,
             "Label": result.label,
@@ -1438,6 +1514,19 @@ impl ToolHandler for ContractHandler {
         }
         self.call_go_map(name, arguments).map(go_map_order)
     }
+
+    fn call_cancellable(
+        &self,
+        name: &str,
+        arguments: &Map<String, Value>,
+        cancellation: &llm::CancellationToken,
+    ) -> Result<Value, ToolError> {
+        match name {
+            "classify_reply" => self.classify_reply(arguments, Some(cancellation)),
+            "generate_rebuttal" => self.generate_rebuttal(arguments, Some(cancellation)),
+            _ => self.call(name, arguments),
+        }
+    }
 }
 
 impl ContractHandler {
@@ -1466,8 +1555,8 @@ impl ContractHandler {
             "poll_inbox" => self.poll_inbox(arguments),
             "run_web_form" => self.run_web_form(arguments),
             "auto_confirm" => self.auto_confirm(arguments),
-            "classify_reply" => self.classify_reply(arguments),
-            "generate_rebuttal" => self.generate_rebuttal(arguments),
+            "classify_reply" => self.classify_reply(arguments, None),
+            "generate_rebuttal" => self.generate_rebuttal(arguments, None),
             other if !catalogue_has_tool(other) => Err(ToolError(DEFAULT_ERROR.to_owned())),
             other => Err(ToolError(format!(
                 "tool {other} is not implemented in this slice"
@@ -3279,7 +3368,7 @@ mod tests {
             ContractHandler::close_result(Ok(serde_json::json!({"a": 1})), Err(close_failure()))
                 .expect_err("a close failure must fail the call");
         assert_eq!(
-            error.0,
+            error.message,
             "eventstore: close: eventstore I/O error: disk is gone"
         );
 
@@ -3289,7 +3378,7 @@ mod tests {
         )
         .expect_err("both failures must be reported");
         assert_eq!(
-            error.0,
+            error.message,
             "operation failed; eventstore: close: eventstore I/O error: disk is gone"
         );
     }
@@ -3375,7 +3464,7 @@ mod tests {
             .call("run_web_form", &arguments)
             .expect_err("an instant is required");
         assert_eq!(
-            error.0,
+            error.message,
             "this tool needs an injected instant and none was supplied"
         );
         let _ = fs::remove_dir_all(&root);
@@ -3396,7 +3485,7 @@ mod tests {
         let error = handler
             .call("execute", &arguments)
             .expect_err("live execution must require consent");
-        assert_eq!(error.0, "identity: consent denied");
+        assert_eq!(error.message, "identity: consent denied");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3433,12 +3522,16 @@ mod tests {
             .expect_err("unknown provider must fail");
         assert!(
             error
-                .0
+                .message
                 .contains("unknown LLM provider \"not-a-real-provider\""),
             "{}",
-            error.0
+            error.message
         );
-        assert!(error.0.contains("Known providers"), "{}", error.0);
+        assert!(
+            error.message.contains("Known providers"),
+            "{}",
+            error.message
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3454,9 +3547,67 @@ mod tests {
             .call("classify_reply", &arguments)
             .expect_err("no reply to classify");
         assert_eq!(
-            error.0,
+            error.message,
             "no unclassified inbox reply found for request #4242"
         );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cancelled_classification_flows_through_handler_service_and_agent() {
+        let (root, handler) = seeded_handler("classify-cancelled");
+        let handler = handler.with_test_llm_environment(HashMap::from([(
+            "SYMERASEME_AGENT_BACKEND".to_owned(),
+            "claude".to_owned(),
+        )]));
+        let store = Store::open(root.join("data").join("symeraseme.db")).expect("store");
+        let request_id = Repository::new(&store)
+            .create_removal_request(
+                "broker-x",
+                "email",
+                "campaign-x",
+                "DE",
+                "gdpr-art17.de.md.j2",
+                "",
+            )
+            .expect("request");
+        store
+            .connection()
+            .execute(
+                "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (
+                    request_id,
+                    "m1",
+                    "t1",
+                    "broker@example.invalid",
+                    "Re: deletion",
+                    "We need your address.",
+                ),
+            )
+            .expect("reply row");
+        drop(store);
+
+        let mut arguments = Map::new();
+        arguments.insert("provider".to_owned(), json!("agent"));
+        arguments.insert("request_id".to_owned(), json!(request_id));
+        let cancellation = llm::CancellationToken::default();
+        cancellation.cancel();
+        let error = handler
+            .call_cancellable("classify_reply", &arguments, &cancellation)
+            .expect_err("cancelled agent call must surface through the tool handler");
+        assert_eq!(error.message, "context canceled");
+
+        let store = Store::open(root.join("data").join("symeraseme.db")).expect("reopen store");
+        let classified: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE request_id = ?1",
+                [request_id],
+                |row| row.get(0),
+            )
+            .expect("read classification state");
+        assert_eq!(classified, None, "cancelled calls are not persisted");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3500,9 +3651,9 @@ mod tests {
             .call("classify_reply", &arguments)
             .expect_err("an unreachable model must surface");
         assert!(
-            error.0.contains("transport_error"),
+            error.message.contains("transport_error"),
             "CoreKit preserves Go llmkit's transport error class: {}",
-            error.0
+            error.message
         );
         let _ = fs::remove_dir_all(&root);
     }
@@ -3665,7 +3816,7 @@ mod tests {
             .call("generate_scheduler", &arguments)
             .expect_err("non-numeric hour");
         assert_eq!(
-            error.0,
+            error.message,
             "invalid poll hour \"abc\": choose values from 0 to 23"
         );
         arguments.insert("poll_hours".to_owned(), serde_json::json!("24"));
@@ -3673,7 +3824,7 @@ mod tests {
             .call("generate_scheduler", &arguments)
             .expect_err("out-of-range hour");
         assert_eq!(
-            error.0,
+            error.message,
             "invalid poll hour \"24\": choose values from 0 to 23"
         );
         let _ = fs::remove_dir_all(&root);
@@ -3753,7 +3904,7 @@ mod tests {
         let error = handler
             .call("grant", &arguments)
             .expect_err("a missing token fails");
-        assert_eq!(error.0, "consent token not found");
+        assert_eq!(error.message, "consent token not found");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3822,7 +3973,7 @@ mod tests {
         let error = handler
             .call("schedule_install", &arguments)
             .expect_err("unknown platform");
-        assert_eq!(error.0, "unsupported platform: bogus");
+        assert_eq!(error.message, "unsupported platform: bogus");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3834,7 +3985,7 @@ mod tests {
         let error = handler
             .call("schedule_uninstall", &arguments)
             .expect_err("unknown platform");
-        assert_eq!(error.0, "unsupported platform: bogus");
+        assert_eq!(error.message, "unsupported platform: bogus");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -3932,7 +4083,7 @@ mod tests {
             .call_go_map("manual_tasks_list", &Map::new())
             .expect_err("the go_map dispatch has no manual_tasks_list arm");
         assert_eq!(
-            error.0,
+            error.message,
             "tool manual_tasks_list is not implemented in this slice"
         );
         let _ = fs::remove_dir_all(&root);
@@ -4057,9 +4208,11 @@ mod tests {
             .call_go_map("poll_inbox", &arguments)
             .expect_err("an unresolvable secret must fail");
         assert!(
-            error.0.starts_with("email: cannot resolve IMAP password: "),
+            error
+                .message
+                .starts_with("email: cannot resolve IMAP password: "),
             "{}",
-            error.0
+            error.message
         );
         let _ = fs::remove_dir_all(&root);
     }

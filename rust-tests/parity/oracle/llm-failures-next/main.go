@@ -1,4 +1,4 @@
-// Command llm-failures-next records one credential-failure case from the real
+// Command llm-failures-next records one provider-failure case from the real
 // Go llmkit transport against a local-only HTTP server.
 package main
 
@@ -23,6 +23,7 @@ import (
 
 type observation struct {
 	Schema        string            `json:"schema"`
+	GoVersion     string            `json:"go_version"`
 	GoModule      string            `json:"go_module"`
 	SourcesSHA256 map[string]string `json:"sources_sha256"`
 	ID            string            `json:"id"`
@@ -37,29 +38,61 @@ type observation struct {
 }
 
 func main() {
-	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (403 or 404)")
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 401, 403, 404 or 500)")
+	malformedEnvelope := flag.Bool("malformed-envelope", false, "add an invalid choices field beside a valid structured OpenAI error")
+	malformedChoice := flag.Bool("malformed-choice", false, "add a choice with an invalid finish_reason type beside a valid structured OpenAI error")
 	flag.Parse()
 	var id, apiKey, body string
 	switch *status {
+	case http.StatusBadRequest:
+		id, apiKey, body = "openai-context-overflow-echoed-key", "synthetic-400-key", `maximum context length exceeded; key synthetic-400-key`
+	case http.StatusUnauthorized:
+		id, apiKey, body = "openai-structured-auth-error", "synthetic-401-key", `{"error":{"message":"authentication failed; key synthetic-401-key","type":"authentication_error","code":"invalid_api_key"}}`
 	case http.StatusForbidden:
 		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
 	case http.StatusNotFound:
 		id, apiKey, body = "openai-model-not-found-echoed-key", "synthetic-404-key", `model not found; key synthetic-404-key`
+	case http.StatusInternalServerError:
+		id, apiKey, body = "openai-server-error-echoed-key", "synthetic-500-key", `provider temporarily unavailable; key synthetic-500-key`
 	default:
 		fatalIf(fmt.Errorf("unsupported synthetic status %d", *status))
+	}
+	if *malformedEnvelope {
+		if *status != http.StatusForbidden {
+			fatalIf(fmt.Errorf("--malformed-envelope requires --status 403"))
+		}
+		id = "openai-malformed-error-envelope"
+		apiKey = "synthetic-envelope-key"
+		body = `{"error":{"message":"authentication failed; key synthetic-envelope-key","type":"authentication_error","code":"invalid_api_key"},"choices":"malformed"}`
+	}
+	if *malformedChoice {
+		if *status != http.StatusForbidden || *malformedEnvelope {
+			fatalIf(fmt.Errorf("--malformed-choice requires --status 403 without --malformed-envelope"))
+		}
+		id = "openai-malformed-choice-field"
+		apiKey = "synthetic-choice-key"
+		body = `{"error":{"message":"authentication failed; key synthetic-choice-key","type":"authentication_error","code":"invalid_api_key"},"choices":[{"finish_reason":false}]}`
 	}
 	_, here, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(here), "../../../.."))
 	obs := observation{
-		Schema:   "symeraseme.go-oracle.llm-failures-next.v1",
-		GoModule: "github.com/danieljustus/symaira-corekit v0.16.2",
-		ID:       id,
-		Status:   *status,
-		APIKey:   apiKey,
-		Body:     body,
+		Schema:    "symeraseme.go-oracle.llm-failures-next.v1",
+		GoVersion: runtime.Version(),
+		GoModule:  "github.com/danieljustus/symaira-corekit v0.16.2",
+		ID:        id,
+		Status:    *status,
+		APIKey:    apiKey,
+		Body:      body,
 	}
 	obs.SourcesSHA256 = make(map[string]string)
-	for _, name := range []string{"internal/llm/factory.go", "internal/llm/llmkit.go", "internal/llm/llm.go", "go.mod", "go.sum"} {
+	for _, name := range []string{
+		"internal/llm/factory.go",
+		"internal/llm/llmkit.go",
+		"internal/llm/llm.go",
+		"go.mod",
+		"go.sum",
+		"rust-tests/parity/oracle/llm-failures-next/main.go",
+	} {
 		b, err := os.ReadFile(filepath.Join(root, name))
 		fatalIf(err)
 		sum := sha256.Sum256(b)

@@ -26,6 +26,7 @@ import (
 const fixturePath = "tests/fixtures/cli-triage/cases.json"
 
 const fakeAgentScript = `#!/bin/sh
+if [ -n "$AGENT_STDERR_ESCAPED" ]; then printf '%b' "$AGENT_STDERR_ESCAPED" >&2; exit 23; fi
 case "$*" in
   *"--model oracle-env-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from environment","extracted_fields":{"ticket":"T-42"}}' ;;
   *"--model oracle-flag-model"*) printf '%s\n' '{"classification":"confirmed","confidence":0.93,"summary":"model selected from flag","extracted_fields":{"ticket":"T-42"}}' ;;
@@ -79,6 +80,15 @@ type commandCase struct {
 }
 
 var cases = []commandCase{
+	{
+		id:   "classify-agent-invalid-utf8-stderr",
+		argv: []string{"classify-reply", "1", "--provider", "agent"},
+		environment: map[string]string{
+			"SYMERASEME_LLM_PROVIDER":  "agent",
+			"SYMERASEME_AGENT_BACKEND": "claude",
+			"AGENT_STDERR_ESCAPED":     "before\\377after",
+		},
+	},
 	{
 		id: "classify-reply-json", argv: []string{"classify-reply", "1", "--provider", "agent", "--output", "json"},
 		environment: map[string]string{"SYMERASEME_LLM_PROVIDER": "ignored-by-flag", "SYMERASEME_AGENT_BACKEND": "claude"},

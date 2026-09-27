@@ -85,6 +85,7 @@ ARCHITEKTUR.md
 /symeraseme
 /symeraseme-rust
 /target/
+__pycache__/
 /coverage.out
 
 # Local agent/tool run state (not source)

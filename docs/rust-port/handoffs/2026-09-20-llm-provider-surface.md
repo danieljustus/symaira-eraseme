@@ -30,12 +30,31 @@ runs are `cmp`-identical. `crates/symeraseme-core/tests/llm_surface.rs` replays 
   consumers without real credentials or external network access. The Go source digests remain pinned
   to the Oracle's CoreKit v0.16.2 behavior.
 
-## What stays Go, and why
+## Provider error continuation (2026-09-27)
 
-- The host-agent subprocess protocol: CLI **detection** is ported (PATH lookup with the executable
-  bit, `agentDefs`, preference order), but the invocation template, the 120 s timeout and the
-  exit-code wrapping need a fake CLI on PATH to pin. `AgentClient::unavailable_error` covers the one
-  agent failure that needs no subprocess.
+`llm-failures-next` records HTTP 400 with CoreKit's `maximum context length` marker and HTTP 500
+with a generic provider failure, each carrying a synthetic echoed key. Rust consumer tests verify
+three Go retry attempts, provider error classification and exact error text after key redaction.
+All seven fixtures regenerate exactly with Go 1.26.6, the version in `go.mod`, against the pinned
+CoreKit v0.16.2 dependency; the fixture set includes 400, 401, 403, 404, 500 and malformed 403
+envelopes. The Rust gate invokes that pinned oracle and compares the complete output bytes.
+
+The separate `agent-path/current-relative-entry.json` oracle pins `AgentClient.IsAvailable()` when
+an executable exists in the working directory and `PATH=.`. Go rejects that lookup with its default
+`execerrdot` behavior; Rust now rejects the matching relative PATH hit and honors the documented
+`GODEBUG=execerrdot=0` opt-out. The Go fixture was generated on macOS arm64; native Windows behavior
+still needs a Windows run.
+
+## Host-agent continuation (2026-09-27)
+
+The host-agent subprocess protocol is now pinned against the real Go implementation with isolated
+fake executables for Claude (`claude`), Hermes (`hermes`) and Copilot (`gh`). The replay checks each
+argv template, combined prompt, `TERM=dumb`, inherited environment, closed stdin and usage model;
+the Claude cases also cover trimmed/truncated exit stderr, the 120-second timeout mapping, and a
+launch failure after backend availability was cached and its executable removed. The timeout oracle
+uses a real 120-second run, so regenerating the complete fixture takes about two minutes. Rust's
+focused replay covers all six recorded cases. No real agent CLI or provider is invoked. Native
+Windows process behavior remains unverified.
 
 ## Traps found while recording
 
@@ -48,7 +67,7 @@ runs are `cmp`-identical. `crates/symeraseme-core/tests/llm_surface.rs` replays 
 ## Resume
 
 1. `cargo nextest run -p symeraseme-core -E 'binary(llm_surface)'` — five tests, no network, no sleeps.
-2. Re-recording the fixture: `go run ./rust-tests/parity/oracle/llm-provider-surface` (takes ~9 s, the
-   retry cases really wait out their backoff). Never hand-edit the fixture.
-3. Next honest step for this row: a fake host-agent CLI on an isolated PATH, so the invocation
-   template, the timeout and the exit-code error text can be pinned too.
+2. Re-recording the fixture: `go run ./rust-tests/parity/oracle/llm-provider-surface` (about two
+   minutes because it exercises the real 120-second timeout). Never hand-edit the fixture.
+3. Remaining DOM-008 work is limited to provider failure cases and native-target coverage; the
+   host-agent commands and error paths above are already pinned.

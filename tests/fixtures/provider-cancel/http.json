@@ -1,0 +1,20 @@
+{
+  "schema": "symeraseme.go-oracle.provider-cancel.v1",
+  "go_version": "go1.26.6",
+  "sources_sha256": {
+    "cmd/symeraseme/main.go": "f7fd95376ae587dcef1aafeba74b9d3a7aa4c47ac520cd2b82903777cefe8bf7",
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "go.sum": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa",
+    "internal/eventstore/store.go": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3",
+    "internal/llm/factory.go": "8180713d346cce1f7f195fdadd0040ebe4fb96f1bf7a725170819de10f4596b4",
+    "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
+    "internal/llm/llmkit.go": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7",
+    "internal/mcp/contract_handler.go": "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2",
+    "internal/mcp/server.go": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976",
+    "internal/replies/service.go": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281",
+    "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
+    "rust-tests/parity/oracle/provider-cancel/main.go": "f68e6f37a2555fbec8f32ce649ab6d712f7fc8f16cff94659839372fdeab2030"
+  },
+  "provider_canceled": true,
+  "client_disconnected": true
+}

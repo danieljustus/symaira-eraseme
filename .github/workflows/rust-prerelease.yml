@@ -1,6 +1,17 @@
 name: Rust prerelease archive proof
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/rust-prerelease.yml
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**
+      - scripts/stage_rust_release_archives.py
+      - scripts/verify_windows_dll_dependencies.py
+      - tests/verify_release_archives.py
+      - README.md
+      - LICENSE
   workflow_dispatch: {}
 
 permissions:

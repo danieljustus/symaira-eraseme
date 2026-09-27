@@ -89,6 +89,28 @@ impl LlmkitClient {
         )
     }
 
+    pub fn classify_cancellable(
+        &self,
+        base: &BaseClient,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        cancellation: &super::CancellationToken,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        base.classify(
+            system_prompt,
+            user_prompt,
+            options,
+            |system, user, options| self.call_api_cancellable(system, user, options, cancellation),
+            |wait| super::wait_cancellable(wait, cancellation),
+            || {
+                cancellation
+                    .is_cancelled()
+                    .then(|| "context canceled".to_owned())
+            },
+        )
+    }
+
     fn call_api(
         &self,
         system_prompt: &str,
@@ -112,13 +134,48 @@ impl LlmkitClient {
                 }),
             )
             .map_err(|error| classify_error(error, &self.api_key))?;
-        Ok((
+        Ok(self.choice_usage(choice))
+    }
+
+    fn call_api_cancellable(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        options: &ClassifyOptions,
+        cancellation: &super::CancellationToken,
+    ) -> Result<(String, UsageRecord), ClientError> {
+        let max_tokens = u32::try_from(options.max_tokens).unwrap_or_default();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| ClientError::Provider(LlmError::new(error.to_string())))?;
+        let choice = runtime
+            .block_on(self.client.chat_cancellable(
+                cancellation,
+                &self.model,
+                &[Message {
+                    role: "user".to_owned(),
+                    content: user_prompt.to_owned(),
+                }],
+                Some(&ChatOptions {
+                    temperature: (options.temperature != 0.0).then_some(options.temperature),
+                    max_tokens,
+                    system: system_prompt.to_owned(),
+                    ..ChatOptions::default()
+                }),
+            ))
+            .map_err(|error| classify_error(error, &self.api_key))?;
+        Ok(self.choice_usage(choice))
+    }
+
+    fn choice_usage(&self, choice: symaira_core_llm::Choice) -> (String, UsageRecord) {
+        (
             choice.content.trim().to_owned(),
             UsageRecord {
                 model: self.model.clone(),
                 ..UsageRecord::default()
             },
-        ))
+        )
     }
 }
 
@@ -131,9 +188,10 @@ fn constructor_error(provider: &str, error: Error, api_key: &str) -> ClientError
 }
 
 fn classify_error(error: Error, api_key: &str) -> ClientError {
+    let code = error.code;
     let message = redact(error.to_string(), api_key);
     let cause = LlmError::with_source(message.clone(), message);
-    if error.code == ErrorCode::RateLimited {
+    if code == ErrorCode::RateLimited {
         ClientError::RateLimit(RateLimitError { cause })
     } else {
         ClientError::Provider(cause)

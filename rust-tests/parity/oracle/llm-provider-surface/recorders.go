@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -28,12 +30,15 @@ var managedEnv = []string{
 }
 
 type hostAgentProtocol struct {
-	Program string          `json:"program"`
-	Cases   []hostAgentCase `json:"cases"`
+	Program       string            `json:"program"`
+	SourcesSHA256 map[string]string `json:"sources_sha256"`
+	Cases         []hostAgentCase   `json:"cases"`
 }
 
 type hostAgentCase struct {
 	ID                string          `json:"id"`
+	Backend           string          `json:"backend"`
+	CLI               string          `json:"cli"`
 	Mode              string          `json:"mode"`
 	Model             string          `json:"model"`
 	SystemPrompt      string          `json:"system_prompt"`
@@ -410,13 +415,44 @@ esac
 	requests := []hostAgentCase{
 		{
 			ID:           "success-claude-arguments-and-environment",
+			Backend:      "claude",
+			CLI:          "claude",
 			Mode:         "success",
 			Model:        "test-model",
 			SystemPrompt: " system prompt ",
 			UserPrompt:   "user prompt\nwith newline",
 		},
 		{
+			ID:           "success-hermes-arguments-and-environment",
+			Backend:      "hermes",
+			CLI:          "hermes",
+			Mode:         "success",
+			Model:        "auto",
+			SystemPrompt: "system",
+			UserPrompt:   "hermes prompt",
+		},
+		{
+			ID:           "success-copilot-arguments-and-environment",
+			Backend:      "copilot",
+			CLI:          "gh",
+			Mode:         "success",
+			Model:        "auto",
+			SystemPrompt: "system",
+			UserPrompt:   "copilot prompt",
+		},
+		{
+			ID:           "spawn-error-after-path-detection",
+			Backend:      "claude",
+			CLI:          "claude",
+			Mode:         "spawn",
+			Model:        "auto",
+			SystemPrompt: "system",
+			UserPrompt:   "missing executable",
+		},
+		{
 			ID:           "exit-code-trims-and-truncates-stderr",
+			Backend:      "claude",
+			CLI:          "claude",
 			Mode:         "exit",
 			Model:        "test-model",
 			SystemPrompt: "system",
@@ -426,6 +462,8 @@ esac
 		},
 		{
 			ID:                "host-agent-subprocess-timeout",
+			Backend:           "claude",
+			CLI:               "claude",
 			Mode:              "timeout",
 			Model:             "test-model",
 			SystemPrompt:      "system",
@@ -455,7 +493,7 @@ esac
 				panic(err)
 			}
 		}
-		cli := filepath.Join(bin, "claude")
+		cli := filepath.Join(bin, request.CLI)
 		if err := os.WriteFile(cli, []byte(program), 0o700); err != nil {
 			panic(err)
 		}
@@ -484,7 +522,7 @@ esac
 		}
 
 		client, err := llm.Create(llm.CreateOptions{
-			Provider: "agent", Model: request.Model, AgentBackend: "claude",
+			Provider: "agent", Model: request.Model, AgentBackend: request.Backend,
 		})
 		if err != nil {
 			panic(err)
@@ -492,6 +530,14 @@ esac
 		agent, ok := client.(*llm.AgentClient)
 		if !ok {
 			panic("agent provider did not return AgentClient")
+		}
+		if request.Mode == "spawn" {
+			if !agent.IsAvailable() {
+				panic("agent backend was not detected before executable removal")
+			}
+			if err := os.Remove(cli); err != nil {
+				panic(err)
+			}
 		}
 		// One real call keeps the failure transcript focused on callAPI rather
 		// than waiting through the production retry backoff.
@@ -512,40 +558,51 @@ esac
 			result.Error = &message
 			result.ErrorType = errorType(callErr)
 		}
-		for name, target := range map[string]*[]string{
-			"arguments": &result.Arguments,
-		} {
-			data, err := os.ReadFile(filepath.Join(capture, name))
+		if request.Mode != "spawn" {
+			for name, target := range map[string]*[]string{
+				"arguments": &result.Arguments,
+			} {
+				data, err := os.ReadFile(filepath.Join(capture, name))
+				if err != nil {
+					panic(err)
+				}
+				parts := bytes.Split(data, []byte{0})
+				if len(parts) > 0 && len(parts[len(parts)-1]) == 0 {
+					parts = parts[:len(parts)-1]
+				}
+				for _, part := range parts {
+					*target = append(*target, string(part))
+				}
+			}
+			data, err := os.ReadFile(filepath.Join(capture, "environment"))
 			if err != nil {
 				panic(err)
 			}
-			parts := bytes.Split(data, []byte{0})
-			if len(parts) > 0 && len(parts[len(parts)-1]) == 0 {
-				parts = parts[:len(parts)-1]
+			environment := bytes.Split(data, []byte{0})
+			if len(environment) != 3 || len(environment[2]) != 0 {
+				panic(fmt.Sprintf("unexpected environment capture: %q", data))
 			}
-			for _, part := range parts {
-				*target = append(*target, string(part))
+			result.Environment["TERM"] = string(environment[0])
+			result.Environment["AGENT_SENTINEL"] = string(environment[1])
+			stdinCapture, err := os.ReadFile(filepath.Join(capture, "stdin"))
+			if err != nil {
+				panic(err)
 			}
+			result.StdinEOF = string(stdinCapture) == "eof"
 		}
-		data, err := os.ReadFile(filepath.Join(capture, "environment"))
-		if err != nil {
-			panic(err)
-		}
-		environment := bytes.Split(data, []byte{0})
-		if len(environment) != 3 || len(environment[2]) != 0 {
-			panic(fmt.Sprintf("unexpected environment capture: %q", data))
-		}
-		result.Environment["TERM"] = string(environment[0])
-		result.Environment["AGENT_SENTINEL"] = string(environment[1])
-		stdinCapture, err := os.ReadFile(filepath.Join(capture, "stdin"))
-		if err != nil {
-			panic(err)
-		}
-		result.StdinEOF = string(stdinCapture) == "eof"
 		request.Result = result
 	}
 
-	return hostAgentProtocol{Program: program, Cases: requests}
+	source, err := os.ReadFile("internal/llm/agent.go")
+	if err != nil {
+		panic(err)
+	}
+	digest := sha256.Sum256(source)
+	return hostAgentProtocol{
+		Program:       program,
+		SourcesSHA256: map[string]string{"internal/llm/agent.go": hex.EncodeToString(digest[:])},
+		Cases:         requests,
+	}
 }
 
 func restoreEnvironment(environment []string) {
