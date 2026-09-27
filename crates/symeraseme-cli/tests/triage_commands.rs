@@ -99,6 +99,7 @@ fn cli_triage_matches_source_bound_go_oracle() {
     let go = Command::new("go")
         .args(["run", "./rust-tests/parity/oracle/cli-triage"])
         .current_dir(REPO_ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
         .env("GOPROXY", "off")
         .env("GOSUMDB", "off")
         .output()
