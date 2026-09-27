@@ -5,34 +5,10 @@ use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
 use symeraseme_core::storage::{
     Repository, Store,
     types::{EventType, Source},
 };
-
-struct TempRoot(PathBuf);
-
-impl TempRoot {
-    fn new() -> Self {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock after epoch")
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "symeraseme-cli-live-plan-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir(&path).expect("temporary root");
-        Self(path)
-    }
-}
-
-impl Drop for TempRoot {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn prepare(root: &Path, email: bool) -> (PathBuf, PathBuf, PathBuf, String) {
     let home = root.join("home");
@@ -267,10 +243,10 @@ fn persisted_effects(data: &Path) -> (String, Vec<EventRow>, Vec<TaskRow>) {
 
 #[test]
 fn consented_live_plan_execute_matches_source_bound_go_process() {
-    let root = TempRoot::new();
-    let go = build_go_cli(&root.0);
-    let go_root = root.0.join("go");
-    let rust_root = root.0.join("rust");
+    let root = tempfile::tempdir().expect("temporary root");
+    let go = build_go_cli(root.path());
+    let go_root = root.path().join("go");
+    let rust_root = root.path().join("rust");
     fs::create_dir_all(&go_root).expect("Go fixture root");
     fs::create_dir_all(&rust_root).expect("Rust fixture root");
     let (go_home, go_data, go_cwd, go_token) = prepare(&go_root, false);
@@ -317,10 +293,10 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
 
 #[test]
 fn consented_live_plan_execute_without_email_sender_matches_go_process() {
-    let root = TempRoot::new();
-    let go = build_go_cli(&root.0);
-    let go_root = root.0.join("go-email");
-    let rust_root = root.0.join("rust-email");
+    let root = tempfile::tempdir().expect("temporary root");
+    let go = build_go_cli(root.path());
+    let go_root = root.path().join("go-email");
+    let rust_root = root.path().join("rust-email");
     fs::create_dir_all(&go_root).expect("Go email fixture root");
     fs::create_dir_all(&rust_root).expect("Rust email fixture root");
     let (go_home, go_data, go_cwd, go_token) = prepare(&go_root, true);
