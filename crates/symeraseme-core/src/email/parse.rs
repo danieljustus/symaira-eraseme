@@ -384,7 +384,9 @@ fn parse_zone(value: &str) -> Option<FixedOffset> {
     if bytes.len() < 5 {
         return None;
     }
-    let hours: i32 = value[1..3].parse().ok()?;
-    let minutes: i32 = value[3..5].parse().ok()?;
+    // `get` rather than indexing: a non-ASCII byte in the offset must reject
+    // the zone, not panic on a char boundary (fuzz: email_headers).
+    let hours: i32 = value.get(1..3)?.parse().ok()?;
+    let minutes: i32 = value.get(3..5)?.parse().ok()?;
     FixedOffset::east_opt(sign * (hours * 3600 + minutes * 60))
 }
