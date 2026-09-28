@@ -12,6 +12,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4.9"
+serde = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
 symeraseme-core = { path = "../crates/symeraseme-core", version = "0.13.0" }
 
 [[bin]]
@@ -45,6 +47,13 @@ bench = false
 [[bin]]
 name = "email_headers"
 path = "fuzz_targets/email_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mcp_stdio"
+path = "fuzz_targets/mcp_stdio.rs"
 test = false
 doc = false
 bench = false
