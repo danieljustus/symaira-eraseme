@@ -674,3 +674,19 @@ fn fixed_offset_dates_render_like_go() {
         "2026-07-22T09:30:00Z"
     );
 }
+
+#[test]
+fn date_zone_with_non_ascii_offset_is_rejected_without_panic() {
+    // Minimised fuzz crash (email_headers): invalid UTF-8 inside the numeric
+    // offset used to panic on a char boundary while slicing the zone.
+    let mut header = b"Date: ue, 1 Jan 2025 00:00:00 +\xcb\xcf\xcf\xcf\n".to_vec();
+    header.extend_from_slice(b"In-Reply-To: <fallback@example.test>\n");
+    let message = symeraseme_core::email::FetchedMessage {
+        uid: 1,
+        header,
+        body: Vec::new(),
+        flags: None,
+        internal_date: None,
+    };
+    let _ = symeraseme_core::email::parse_fetched_message(&message);
+}

@@ -1,0 +1,82 @@
+name: Rust hardening
+
+# Task 8.5 gates: Miri over the pure-input contract and bounded runs of every
+# cargo-fuzz target. Both need nightly, so the toolchain is pinned by date.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'fuzz/**'
+      - 'Cargo.lock'
+      - '.github/workflows/rust-hardening.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'fuzz/**'
+      - 'Cargo.lock'
+      - '.github/workflows/rust-hardening.yml'
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NIGHTLY: nightly-2026-09-20
+  CARGO_TERM_COLOR: always
+
+jobs:
+  miri:
+    name: Rust / Miri contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned nightly with Miri
+        run: rustup toolchain install "$NIGHTLY" --profile minimal --component miri,rust-src
+
+      - name: Miri
+        run: cargo +"$NIGHTLY" miri test -p symeraseme-core --test miri_contract --locked
+
+  fuzz:
+    name: Rust / fuzz (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [redaction, encryption_envelope, registry_yaml, path_inputs, email_headers, mcp_stdio]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned nightly
+        run: rustup toolchain install "$NIGHTLY" --profile minimal
+
+      - name: Install cargo-fuzz
+        run: cargo +"$NIGHTLY" install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Fuzz for 120 seconds
+        run: >
+          cargo +"$NIGHTLY" fuzz run ${{ matrix.target }} --fuzz-dir fuzz
+          -- -max_total_time=120 -rss_limit_mb=2048
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
