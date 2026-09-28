@@ -651,6 +651,10 @@ mod filesystem_tests;
 #[path = "consent_portable_tests.rs"]
 mod portable_filesystem_tests;
 
+#[cfg(all(test, windows))]
+#[path = "consent_windows_tests.rs"]
+mod windows_filesystem_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
