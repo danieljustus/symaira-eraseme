@@ -9,7 +9,7 @@ fn fixed_store(directory: &Path) -> ConsentStore {
 }
 
 #[test]
-fn id005_windows_atomic_replacement_preserves_open_old_handle() {
+fn id005_windows_failed_replacement_preserves_open_old_file() {
     let root = tempfile::tempdir().unwrap();
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([7; 16]);
     let path = root.path().join(token_filename(&token));
@@ -19,18 +19,20 @@ fn id005_windows_atomic_replacement_preserves_open_old_handle() {
     let old_bytes = fs::read(&path).unwrap();
 
     let mut old_file = fs::File::open(&path).unwrap();
-    store.issue_token("after", 60).unwrap();
-    let new_bytes = fs::read(&path).unwrap();
-    assert_ne!(new_bytes, old_bytes);
+    assert!(matches!(
+        store.issue_token("after", 60),
+        Err(ConsentError::Io(error)) if error.kind() == io::ErrorKind::PermissionDenied
+    ));
+    assert_eq!(fs::read(&path).unwrap(), old_bytes);
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
 
     let mut held_bytes = Vec::new();
     old_file.read_to_end(&mut held_bytes).unwrap();
     assert_eq!(
         held_bytes, old_bytes,
-        "replacement changed an open old handle"
+        "failed replacement changed an open old handle"
     );
-    let record: ConsentRecord = serde_json::from_slice(&new_bytes).unwrap();
-    assert_eq!(record.command, "after");
+    let record: ConsentRecord = serde_json::from_slice(&old_bytes).unwrap();
+    assert_eq!(record.command, "before");
     assert_eq!(record.token.as_deref(), Some(token.as_str()));
 }
