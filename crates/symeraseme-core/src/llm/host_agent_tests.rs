@@ -22,6 +22,23 @@ const CANCEL_FIXTURE: &str = include_str!(concat!(
     "/../../tests/fixtures/agent-cancel/http.json"
 ));
 
+/// Linux can fail `execve` of a freshly written fake agent with ETXTBSY while a
+/// concurrently forked test child still holds the inherited write descriptor
+/// (closed only at its own exec). The child never ran, so retrying is safe.
+fn retry_text_file_busy<T>(
+    mut call: impl FnMut() -> Result<T, ClientError>,
+) -> Result<T, ClientError> {
+    for _ in 0..50 {
+        match call() {
+            Err(error) if error.to_string().contains("Text file busy") => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            result => return result,
+        }
+    }
+    call()
+}
+
 fn fixture() -> Value {
     serde_json::from_str(FIXTURE).expect("the recorded host-agent fixture parses")
 }
@@ -140,18 +157,20 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
                 .unwrap_or(5000)
                 .max(1000), // Let the fake shell start even under parallel CI load.
         );
-        let result = agent.classify_with_command(
-            case["system_prompt"].as_str().expect("system prompt"),
-            case["user_prompt"].as_str().expect("user prompt"),
-            &super::ClassifyOptions::default(),
-            AgentCommandConfig {
-                timeout,
-                executable_override: (!spawn_error).then_some(cli.as_path()),
-                environment: &environment,
-                inherit_environment: false,
-            },
-            &CancellationToken::default(),
-        );
+        let result = retry_text_file_busy(|| {
+            agent.classify_with_command(
+                case["system_prompt"].as_str().expect("system prompt"),
+                case["user_prompt"].as_str().expect("user prompt"),
+                &super::ClassifyOptions::default(),
+                AgentCommandConfig {
+                    timeout,
+                    executable_override: (!spawn_error).then_some(cli.as_path()),
+                    environment: &environment,
+                    inherit_environment: false,
+                },
+                &CancellationToken::default(),
+            )
+        });
 
         let expected = &case["result"];
         match result {
@@ -269,18 +288,20 @@ fn invalid_utf8_agent_stderr_matches_go_byte_truncation() {
     )];
     let mut agent = AgentClient::with_probe("auto", "claude", Vec::new(), &|_| true);
     agent.base.max_retries = 1;
-    let result = agent.classify_with_command(
-        "system",
-        "user",
-        &Default::default(),
-        AgentCommandConfig {
-            timeout: Duration::from_secs(2),
-            executable_override: Some(&cli),
-            environment: &environment,
-            inherit_environment: false,
-        },
-        &CancellationToken::default(),
-    );
+    let result = retry_text_file_busy(|| {
+        agent.classify_with_command(
+            "system",
+            "user",
+            &Default::default(),
+            AgentCommandConfig {
+                timeout: Duration::from_secs(2),
+                executable_override: Some(&cli),
+                environment: &environment,
+                inherit_environment: false,
+            },
+            &CancellationToken::default(),
+        )
+    });
     let error = result.expect_err("fake agent exits non-zero");
     assert_eq!(
         error.to_string(),
@@ -366,18 +387,20 @@ fn cancelling_host_agent_kills_the_child_and_returns_context_canceled() {
     let mut agent = AgentClient::with_probe("auto", "claude", Vec::new(), &|_| true);
     agent.base.max_retries = 1;
     let started_at = std::time::Instant::now();
-    let result = agent.classify_with_command(
-        "system",
-        "user",
-        &Default::default(),
-        AgentCommandConfig {
-            timeout: Duration::from_secs(30),
-            executable_override: Some(&cli),
-            environment: &environment,
-            inherit_environment: false,
-        },
-        &cancellation,
-    );
+    let result = retry_text_file_busy(|| {
+        agent.classify_with_command(
+            "system",
+            "user",
+            &Default::default(),
+            AgentCommandConfig {
+                timeout: Duration::from_secs(30),
+                executable_override: Some(&cli),
+                environment: &environment,
+                inherit_environment: false,
+            },
+            &cancellation,
+        )
+    });
     cancel_thread.join().expect("cancellation helper exits");
     assert!(
         started.exists(),
