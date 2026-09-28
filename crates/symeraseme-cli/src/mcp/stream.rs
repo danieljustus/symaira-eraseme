@@ -753,4 +753,202 @@ mod tests {
             serve_stdio(&mut reader, &mut sink, &handler).expect_err("stdin failure must abort");
         assert_eq!(error, StreamError::Io("stdin is gone".to_owned()));
     }
+
+    /// Go's `encoding/json` wording for each malformed-value class the
+    /// heuristic distinguishes (keys, separators, escapes, literals, nesting).
+    #[test]
+    fn syntax_error_matches_go_wording_per_error_class() {
+        let cases: &[(&[u8], &str)] = &[
+            (br#"{"a" 1}"#, "invalid character '1' after object key"),
+            (br#"{"a" "b"}"#, "invalid character '\"' after object key"),
+            (
+                br#"{"a":1,"b" 2}"#,
+                "invalid character '2' after object key",
+            ),
+            (br#"{"a:b" 1}"#, "invalid character '1' after object key"),
+            (br#"{"a\"" 1}"#, "invalid character '1' after object key"),
+            (
+                br#"{"a":"x" 1}"#,
+                "invalid character '1' after object key:value pair",
+            ),
+            (
+                br#"{"a":"b":1}"#,
+                "invalid character ':' after object key:value pair",
+            ),
+            (
+                br#"{"a":"x","b":"y" 1}"#,
+                "invalid character '1' after object key:value pair",
+            ),
+            (
+                br#"{"a":{"b":"c" 1}}"#,
+                "invalid character '1' after object key:value pair",
+            ),
+            (
+                br#"{"a":"x,y" 1}"#,
+                "invalid character '1' after object key:value pair",
+            ),
+            (
+                br#"{"a":"}" x}"#,
+                "invalid character 'x' after object key:value pair",
+            ),
+            (
+                br#"{"a":"\"" x}"#,
+                "invalid character 'x' after object key:value pair",
+            ),
+            (
+                br#"{"a":[1] x}"#,
+                "invalid character 'x' after object key:value pair",
+            ),
+            (
+                br#"{"a":{} x}"#,
+                "invalid character 'x' after object key:value pair",
+            ),
+            (
+                br#"{"a":1 2}"#,
+                "invalid character '2' after object key:value pair",
+            ),
+            (
+                br#"{ "a" : "b" x }"#,
+                "invalid character 'x' after object key:value pair",
+            ),
+            (
+                br#"{"a":"\q"}"#,
+                "invalid character 'q' in string escape code",
+            ),
+            (
+                br#"{"a":nulx}"#,
+                "invalid character 'x' in literal null (expecting 'l')",
+            ),
+            (
+                br#"[nul]"#,
+                "invalid character ']' in literal null (expecting 'l')",
+            ),
+            (
+                br#"[1,nux]"#,
+                "invalid character 'x' in literal null (expecting 'l')",
+            ),
+            (
+                br#"[tx]"#,
+                "invalid character 'x' in literal true (expecting 'r')",
+            ),
+            (
+                br#"[fx]"#,
+                "invalid character 'x' in literal false (expecting 'a')",
+            ),
+            // A literal letter glued to a value is not a literal start.
+            (
+                br#"{"a":1t}"#,
+                "invalid character 't' after object key:value pair",
+            ),
+            // Brackets inside a string do not open or close containers.
+            (
+                br#"{"a":"]" , x}"#,
+                "invalid character 'x' looking for beginning of object key string",
+            ),
+            (
+                br#"{1}"#,
+                "invalid character '1' looking for beginning of object key string",
+            ),
+            (
+                br#"{"a":1,2}"#,
+                "invalid character '2' looking for beginning of object key string",
+            ),
+            (
+                br#"{"a":1,}"#,
+                "invalid character '}' looking for beginning of object key string",
+            ),
+            (
+                br#"{"a":1 , }"#,
+                "invalid character '}' looking for beginning of object key string",
+            ),
+            (
+                br#"{"a":"b",:1}"#,
+                "invalid character ':' looking for beginning of object key string",
+            ),
+            (
+                br#"{,"a":1}"#,
+                "invalid character ',' looking for beginning of object key string",
+            ),
+            (
+                br#"[{]"#,
+                "invalid character ']' looking for beginning of object key string",
+            ),
+            (
+                b"{\"a\":1,\x0b}",
+                "invalid character '\\v' looking for beginning of object key string",
+            ),
+            (
+                b"{\x0b}",
+                "invalid character '\\v' looking for beginning of object key string",
+            ),
+            (
+                b"[\x0b]",
+                "invalid character '\\v' looking for beginning of value",
+            ),
+            (
+                b"{\"a\":\x0b}",
+                "invalid character '\\v' looking for beginning of value",
+            ),
+            (
+                b"[1,\x0b]",
+                "invalid character '\\v' looking for beginning of value",
+            ),
+            (
+                br#"{"a":}"#,
+                "invalid character '}' looking for beginning of value",
+            ),
+            (
+                br#"{"a":[1,x]}"#,
+                "invalid character 'x' looking for beginning of value",
+            ),
+            (
+                br#"[{"a":1},x]"#,
+                "invalid character 'x' looking for beginning of value",
+            ),
+            (
+                br#"{"a":[}"#,
+                "invalid character '}' looking for beginning of value",
+            ),
+            (
+                br#"{"a"::1}"#,
+                "invalid character ':' looking for beginning of value",
+            ),
+            (
+                br#"[:]"#,
+                "invalid character ':' looking for beginning of value",
+            ),
+            (
+                br#"[1,]"#,
+                "invalid character ']' looking for beginning of value",
+            ),
+            (b"x", "invalid character 'x' looking for beginning of value"),
+            (b"]", "invalid character ']' looking for beginning of value"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                syntax_error(input),
+                Some(StreamError::Syntax((*expected).to_owned())),
+                "{}",
+                String::from_utf8_lossy(input)
+            );
+        }
+        // EOF inside a value is not a syntax error.
+        assert_eq!(syntax_error(br#"{"a":"#), None);
+    }
+
+    /// The live transport reports the syntax error itself, not a later EOF.
+    #[test]
+    fn serve_stdio_reports_syntax_errors_before_eof() {
+        let mut sink = Vec::new();
+        let error = serve_stdio(
+            &mut std::io::Cursor::new(&br#"{"a":truX}"#[..]),
+            &mut sink,
+            &no_backend_handler(),
+        )
+        .expect_err("bad literal must abort");
+        assert_eq!(
+            error,
+            StreamError::Syntax("invalid character 'X' in literal true (expecting 'e')".to_owned())
+        );
+    }
 }
