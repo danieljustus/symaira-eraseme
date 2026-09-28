@@ -76,6 +76,11 @@ def command(root, label, argv, env, timeout=30):
                     os.killpg(child.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+                except PermissionError:
+                    # Darwin reports EPERM for a group whose members are all unreaped
+                    # zombies; every member shares our uid, so nothing live remains.
+                    if sys.platform != 'darwin':
+                        raise
                 record['exit_code'] = child.wait(timeout=5)
         record['success'] = record['exit_code'] == 0 and not record['timed_out']
     finally:
