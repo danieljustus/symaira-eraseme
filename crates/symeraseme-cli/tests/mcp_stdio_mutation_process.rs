@@ -163,7 +163,7 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         "29d483171195eff3c9444a538dbefb3dd06bb2c6"
     );
     assert_eq!(fixture["mutation_seed"], 0x4D43503135u64);
-    assert_eq!(fixture["mutation_count"], 16);
+    assert_eq!(fixture["mutation_count"], 128);
 
     let initialize: Value = serde_json::from_str(INITIALIZE).unwrap();
     let expected_parse_errors: Vec<_> = initialize["cases"]
@@ -176,8 +176,8 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     let cases = fixture["cases"].as_array().unwrap();
     assert_eq!(
         cases.len(),
-        26,
-        "six parse cases, four boundaries, 16 seeded mutations"
+        138,
+        "six parse cases, four boundaries, 128 seeded mutations"
     );
     assert_eq!(
         cases[..6]

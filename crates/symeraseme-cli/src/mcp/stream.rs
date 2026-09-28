@@ -153,7 +153,7 @@ fn go_quoted_byte(byte: u8) -> String {
     }
 }
 
-fn expects_object_key(input: &[u8], end: usize) -> bool {
+fn object_key_state(input: &[u8], end: usize) -> Option<bool> {
     let mut containers = Vec::<(u8, bool)>::new();
     let mut in_string = false;
     let mut escaped = false;
@@ -188,7 +188,14 @@ fn expects_object_key(input: &[u8], end: usize) -> bool {
             _ => {}
         }
     }
-    matches!(containers.last(), Some((b'{', true)))
+    match containers.last() {
+        Some((b'{', expect_key)) => Some(*expect_key),
+        _ => None,
+    }
+}
+
+fn expects_object_key(input: &[u8], end: usize) -> bool {
+    object_key_state(input, end) == Some(true)
 }
 
 fn syntax_error(input: &[u8]) -> Option<StreamError> {
@@ -207,13 +214,41 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
             == Some(&b'"')
     {
         let prefix = &input[..error_position];
-        let separator = prefix.iter().rposition(|byte| *byte == b':');
-        let boundary = prefix.iter().rposition(|byte| matches!(*byte, b',' | b'{'));
-        if separator > boundary {
-            let prior_separator = prefix[..separator.unwrap()]
-                .iter()
-                .rposition(|byte| *byte == b':');
-            let state = if prior_separator > boundary {
+        let (mut separator, mut previous_separator, mut boundary, mut last_closed_quote) =
+            (None, None, None, None);
+        let (mut in_string, mut escaped) = (false, false);
+        for (index, byte) in prefix.iter().copied().enumerate() {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if byte == b'\\' {
+                    escaped = true;
+                } else if byte == b'"' {
+                    in_string = false;
+                    last_closed_quote = Some(index);
+                }
+                continue;
+            }
+            match byte {
+                b'"' => in_string = true,
+                b':' => {
+                    previous_separator = separator;
+                    separator = Some(index);
+                }
+                b',' | b'{' => boundary = Some(index),
+                _ => {}
+            }
+        }
+        let after_separator =
+            separator.is_some_and(|separator| boundary.is_none_or(|boundary| separator > boundary));
+        let key_without_separator = last_closed_quote
+            .is_some_and(|quote| boundary.is_none_or(|boundary| quote > boundary))
+            && !after_separator;
+        if after_separator || key_without_separator {
+            let state = if key_without_separator
+                || previous_separator
+                    .is_some_and(|separator| boundary.is_none_or(|boundary| separator > boundary))
+            {
                 "after object key"
             } else {
                 "after object key:value pair"
@@ -223,13 +258,6 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
                 go_quoted_byte(byte),
             )));
         }
-    }
-    if expects_object_key(input, error_position) {
-        let byte = input.get(error_position).copied().unwrap_or_default();
-        return Some(StreamError::Syntax(format!(
-            "invalid character '{}' looking for beginning of object key string",
-            go_quoted_byte(byte)
-        )));
     }
     let (mut in_string, mut escaped) = (false, false);
     for (index, byte) in input.iter().enumerate() {
@@ -249,6 +277,14 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
         } else if *byte == b'"' {
             in_string = !in_string;
         } else if !in_string {
+            if index > 0
+                && !matches!(
+                    input[index - 1],
+                    b' ' | b'\t' | b'\r' | b'\n' | b':' | b',' | b'[' | b'{'
+                )
+            {
+                continue;
+            }
             let (name, literal): (&str, &[u8]) = match *byte {
                 b'n' => ("null", b"null"),
                 b't' => ("true", b"true"),
@@ -267,6 +303,28 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
                 }
             }
         }
+    }
+    let byte = input.get(error_position).copied().unwrap_or_default();
+    match object_key_state(input, error_position) {
+        Some(true) => {
+            return Some(StreamError::Syntax(format!(
+                "invalid character '{}' looking for beginning of object key string",
+                go_quoted_byte(byte)
+            )));
+        }
+        Some(false)
+            if input[..error_position]
+                .iter()
+                .rev()
+                .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                != Some(&b':') =>
+        {
+            return Some(StreamError::Syntax(format!(
+                "invalid character '{}' after object key:value pair",
+                go_quoted_byte(byte)
+            )));
+        }
+        _ => {}
     }
     let trimmed = input
         .iter()
