@@ -422,6 +422,79 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
 }
 
 #[test]
+fn stdio_process_matches_go_envelope_param_and_call_id_corpus() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/mcp-contract/mcp-envelope/cases.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        fixture["source_revision"],
+        "a51c7f3c65218924ce1d505ad8389b2216f08c92"
+    );
+    assert_eq!(
+        fixture["source_path"],
+        "internal/mcp/server.go:180-251,377-389"
+    );
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 20);
+
+    let mut input = Vec::new();
+    let mut expected = Vec::new();
+    for case in cases {
+        input.extend_from_slice(case["request"].as_str().unwrap().as_bytes());
+        input.push(b'\n');
+        if let Some(response) = case["response"].as_str() {
+            expected.extend_from_slice(response.as_bytes());
+        }
+    }
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "symeraseme-mcp008-envelope-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir(&root).unwrap();
+    let home = root.join("home");
+    fs::create_dir(&home).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
+        .args(["mcp", "--stdio"])
+        .current_dir(&root)
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("XDG_DATA_HOME", home.join("data"))
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(&input).unwrap();
+    let output = wait_with_output_bounded(child, "MCP envelope corpus");
+    fs::remove_dir_all(&root).unwrap();
+
+    assert!(
+        output.status.success(),
+        "stdio exited with {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        output.stdout, expected,
+        "response bytes diverged from Go corpus"
+    );
+    assert!(
+        output.stderr.is_empty(),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 #[cfg(unix)]
 fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     let fixture: serde_json::Value = serde_json::from_str(include_str!(

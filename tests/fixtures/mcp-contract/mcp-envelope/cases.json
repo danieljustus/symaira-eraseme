@@ -68,6 +68,36 @@
       "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid parameter type: campaign_id\"},\"id\":1}\n"
     },
     {
+      "name": "tools_call_string_id_is_preserved",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":\"call-id\",\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing tool name\"},\"id\":\"call-id\"}\n"
+    },
+    {
+      "name": "tools_call_null_id_is_preserved",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing tool name\"},\"id\":null}\n"
+    },
+    {
+      "name": "tools_call_boolean_id_is_invalid",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":true,\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "tools_call_array_id_is_invalid",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":[],\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "tools_call_object_id_is_invalid",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"tools/call\",\"params\":{}}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"
+    },
+    {
+      "name": "tools_call_null_params_is_invalid",
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":null}",
+      "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"missing tool name\"},\"id\":2}\n"
+    },
+    {
       "name": "legacy_bare_status_is_not_found",
       "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"status\"}",
       "response": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"method not found\"},\"id\":1}\n"
