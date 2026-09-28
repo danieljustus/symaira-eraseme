@@ -1096,7 +1096,7 @@ fn go_oracle_http_wire_transcripts_match() {
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = token(&rust_root);
 
-    let cases: [OracleCase<'_>; 6] = [
+    let cases: [OracleCase<'_>; 10] = [
         ("GET", b"", vec![]),
         ("POST", br#"{}"#, vec![]),
         (
@@ -1126,6 +1126,26 @@ fn go_oracle_http_wire_transcripts_match() {
         (
             "POST",
             br#"{"jsonrpc":"2.0","method":"initialize"}"#,
+            vec![("Authorization", format!("Bearer {go_token}"))],
+        ),
+        (
+            "POST",
+            br#"[{"jsonrpc":"2.0","id":1,"method":"initialize"},{"jsonrpc":"2.0","method":"notifications/initialized"}]"#,
+            vec![("Authorization", format!("Bearer {go_token}"))],
+        ),
+        (
+            "POST",
+            br#"[{"jsonrpc":"2.0","method":"notifications/initialized"}]"#,
+            vec![("Authorization", format!("Bearer {go_token}"))],
+        ),
+        (
+            "POST",
+            b"[]",
+            vec![("Authorization", format!("Bearer {go_token}"))],
+        ),
+        (
+            "POST",
+            br#"[{"jsonrpc":"2.0","id":1,"method":"initialize"},7]"#,
             vec![("Authorization", format!("Bearer {go_token}"))],
         ),
     ];
