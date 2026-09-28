@@ -69,6 +69,7 @@ fn stdio_poll_inbox_default_dialer_reaches_local_starttls() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!(
         "symeraseme-mcp003-starttls-{}-{nonce}",
         std::process::id()
@@ -171,6 +172,8 @@ fn stdio_answers_each_request_before_eof_without_stdout_pollution() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root =
         std::env::temp_dir().join(format!("symeraseme-stdio-{}-{nonce}", std::process::id()));
     fs::create_dir(&root).unwrap();
@@ -340,6 +343,8 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root =
         std::env::temp_dir().join(format!("symeraseme-mcp008-{}-{nonce}", std::process::id()));
     fs::create_dir(&root).unwrap();
@@ -452,6 +457,8 @@ fn stdio_process_matches_go_envelope_param_and_call_id_corpus() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!(
         "symeraseme-mcp008-envelope-{}-{nonce}",
         std::process::id()
@@ -546,6 +553,8 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!(
         "symeraseme-mcp-scheduler-{}-{nonce}",
         std::process::id()
@@ -696,6 +705,8 @@ fn scheduler_uninstall_and_status_stdio_match_source_bound_go() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!(
         "symeraseme-mcp-schedule-uninstall-{}-{nonce}",
         std::process::id()
@@ -794,6 +805,7 @@ fn run_native_scheduler_case(case: &serde_json::Value) {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!(
         "symeraseme-mcp-scheduler-{platform}-{}-{nonce}",
         std::process::id()
@@ -932,6 +944,7 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        let nonce = format!("{nonce}-{}", unique_seq());
         let root = std::env::temp_dir().join(format!(
             "symeraseme-mcp-campaign-{}-{nonce}",
             std::process::id()
@@ -1050,4 +1063,11 @@ fn malformed_stdio_exits_before_stdin_eof() {
         std::io::read_to_string(child.stderr.take().unwrap()).unwrap(),
         "invalid character 'o' in literal null (expecting 'u')\n"
     );
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

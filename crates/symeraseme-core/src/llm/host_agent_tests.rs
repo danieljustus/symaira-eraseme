@@ -57,6 +57,7 @@ fn unique_root() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock after epoch")
         .as_nanos();
+    let nonce = format!("{nonce}-{}", unique_seq());
     std::env::temp_dir().join(format!("llm-agent-{}-{nonce}", std::process::id()))
 }
 
@@ -416,4 +417,11 @@ fn cancelling_host_agent_kills_the_child_and_returns_context_canceled() {
     );
     assert_eq!(fixture["child_exited"], true);
     fs::remove_dir_all(root).expect("remove isolated fake-agent root");
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
