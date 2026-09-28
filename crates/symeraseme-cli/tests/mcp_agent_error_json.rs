@@ -181,6 +181,7 @@ impl TestRoot {
             .duration_since(UNIX_EPOCH)
             .expect("system clock after epoch")
             .as_nanos();
+        let stamp = format!("{stamp}-{}", unique_seq());
         let path = std::env::temp_dir().join(format!(
             "mcp-agent-error-json-{}-{stamp}",
             std::process::id()
@@ -198,4 +199,11 @@ impl Drop for TestRoot {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

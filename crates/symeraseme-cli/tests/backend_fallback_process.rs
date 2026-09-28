@@ -11,6 +11,7 @@ impl Scratch {
             .duration_since(UNIX_EPOCH)
             .expect("system clock")
             .as_nanos();
+        let nonce = format!("{nonce}-{}", unique_seq());
         let path = std::env::temp_dir().join(format!(
             "symeraseme-backend-fallback-{}-{nonce}",
             std::process::id()
@@ -152,4 +153,11 @@ fn explicit_go_backend_matches_live_go_process_and_requires_sibling() {
         .expect("run invalid-backend case");
     assert_eq!(invalid.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&invalid.stderr).contains("unsupported SYMERASEME_BACKEND"));
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

@@ -83,12 +83,13 @@ const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 fn run_go_config_oracle() -> Value {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
     let temp_root = std::env::temp_dir().join(format!(
-        "symeraseme-config-oracle-{}-{}",
+        "symeraseme-config-oracle-{}-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock")
-            .as_nanos()
+            .as_nanos(),
+        unique_seq()
     ));
     fs::create_dir(&temp_root).expect("create isolated oracle build directory");
     let _cleanup = TempRootGuard(temp_root.clone());
@@ -648,4 +649,12 @@ fn cfg_006_relative_xdg_falls_back_and_temp_dir_is_user_scoped() {
         normalized_result(&tree.root, &config, &storage),
         fixture("CFG-006")
     );
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+#[cfg(unix)]
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

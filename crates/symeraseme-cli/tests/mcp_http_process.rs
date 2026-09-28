@@ -7,6 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -24,13 +25,17 @@ type OracleCase<'a> = (&'a str, &'a [u8], Vec<(&'a str, String)>);
 
 impl TestDir {
     fn new() -> Self {
+        // macOS clocks tick in microseconds, so parallel tests can read the same
+        // nanosecond value; the counter keeps each test's data dir (and token) private.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "symeraseme-mcp-http-{}-{nonce}",
-            std::process::id()
+            "symeraseme-mcp-http-{}-{nonce}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         std::fs::create_dir_all(&path).unwrap();
         Self(path)
@@ -392,14 +397,17 @@ fn start_blocking_provider() -> (
     (provider_url, request_rx, server)
 }
 
-fn wait_ready(child: &mut Child, port: u16) {
+fn wait_ready(child: &mut Child, port: u16, root: &Path) {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         if let Some(status) = child.try_wait().unwrap() {
             let stderr = std::io::read_to_string(child.stderr.take().unwrap()).unwrap();
             panic!("MCP server exited early ({status}): {stderr}");
         }
-        if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+        // A bare connect can reach a foreign listener on a port released by
+        // free_port, and the token file can still hold a previous server's
+        // token; only this server's current token authenticates.
+        if accepts_current_token(port, root) {
             return;
         }
         assert!(
@@ -408,6 +416,30 @@ fn wait_ready(child: &mut Child, port: u16) {
         );
         thread::sleep(Duration::from_millis(20));
     }
+}
+
+fn accepts_current_token(port: u16, root: &Path) -> bool {
+    let Ok(token) = std::fs::read_to_string(root.join("data/mcp_token")) else {
+        return false;
+    };
+    let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let body = br#"{"jsonrpc":"2.0","method":"initialize"}"#;
+    if write!(
+        stream,
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nAuthorization: Bearer {token}\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .and_then(|()| stream.write_all(body))
+    .is_err()
+    {
+        return false;
+    }
+    let mut reply = Vec::new();
+    let _ = stream.read_to_end(&mut reply);
+    reply.starts_with(b"HTTP/1.1 204")
 }
 
 fn token(root: &Path) -> String {
@@ -606,7 +638,7 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
     }
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
-    wait_ready(&mut child, port);
+    wait_ready(&mut child, port, root.path());
     let first_token = token(root.path());
     #[cfg(unix)]
     {
@@ -709,7 +741,7 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
         signal(&mut child, signal_name);
         if signal_name == "INT" {
             child = start(root.path(), port, "127.0.0.1", false);
-            wait_ready(&mut child, port);
+            wait_ready(&mut child, port, root.path());
             let second_token = token(root.path());
             assert_ne!(
                 first_token, second_token,
@@ -724,7 +756,7 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
 
     let remote_port = free_port();
     let mut remote = start(root.path(), remote_port, "0.0.0.0", true);
-    wait_ready(&mut remote, remote_port);
+    wait_ready(&mut remote, remote_port, root.path());
     signal(&mut remote, "TERM");
 }
 
@@ -734,7 +766,7 @@ fn signal_stops_accepting_before_in_flight_request_drains() {
     let root = TestDir::new();
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
-    wait_ready(&mut child, port);
+    wait_ready(&mut child, port, root.path());
     let bearer = token(root.path());
 
     let mut in_flight = TcpStream::connect(("127.0.0.1", port)).unwrap();
@@ -829,7 +861,7 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
         let port = free_port();
         let started = case.path().join("agent.started");
         let mut server = start_agent_server(binary, case.path(), port, &started);
-        wait_ready(&mut server, port);
+        wait_ready(&mut server, port, case.path());
         let bearer = token(case.path());
         let request = post_then_disconnect(port, &bearer);
         let agent_pid = wait_agent_started(&started);
@@ -881,7 +913,7 @@ fn live_http_disconnect_cancels_provider_request_like_go() {
         let (provider_url, request_rx, provider) = start_blocking_provider();
         let port = free_port();
         let mut server = start_provider_server(binary, case.path(), port, &provider_url);
-        wait_ready(&mut server, port);
+        wait_ready(&mut server, port, case.path());
         let bearer = token(case.path());
         let request = post_body_then_disconnect(port, &bearer, body);
         let provider_request = request_rx
@@ -933,7 +965,7 @@ fn incomplete_request_headers_expire_at_the_go_five_second_timeout() {
     let root = TestDir::new();
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
-    wait_ready(&mut child, port);
+    wait_ready(&mut child, port, root.path());
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(7)))
@@ -967,7 +999,7 @@ fn slow_header_connections_are_bounded_and_backpressured() {
     let root = TestDir::new();
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
-    wait_ready(&mut child, port);
+    wait_ready(&mut child, port, root.path());
     assert_eq!(exchange(port, "GET", b"", &[]).0, 405);
 
     let mut held = Vec::with_capacity(128);
@@ -1066,7 +1098,7 @@ fn many_sequential_http_connections_complete_cleanly() {
     let root = TestDir::new();
     let port = free_port();
     let mut child = start(root.path(), port, "127.0.0.1", false);
-    wait_ready(&mut child, port);
+    wait_ready(&mut child, port, root.path());
     for _ in 0..512 {
         let (status, content_type, _) = exchange(port, "GET", b"", &[]);
         assert_eq!(status, 405);
@@ -1091,8 +1123,8 @@ fn go_oracle_http_wire_transcripts_match() {
     std::fs::create_dir_all(&rust_root).unwrap();
     let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
     let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
-    wait_ready(&mut go, go_port);
-    wait_ready(&mut rust, rust_port);
+    wait_ready(&mut go, go_port, &go_root);
+    wait_ready(&mut rust, rust_port, &rust_root);
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = token(&rust_root);
 
@@ -1274,8 +1306,8 @@ fn obs_text_origin_rejection_matches_go_and_rust_processes() {
     std::fs::create_dir_all(&rust_root).unwrap();
     let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
     let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
-    wait_ready(&mut go, go_port);
-    wait_ready(&mut rust, rust_port);
+    wait_ready(&mut go, go_port, &go_root);
+    wait_ready(&mut rust, rust_port, &rust_root);
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = token(&rust_root);
     let go_response = exchange_obs_text_origin(go_port, &go_token);
