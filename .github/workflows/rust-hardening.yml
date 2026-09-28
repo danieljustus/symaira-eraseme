@@ -80,3 +80,45 @@ jobs:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}
           if-no-files-found: ignore
+
+  mutants:
+    name: Rust / mutants (mcp protocol)
+    # ~25 min, and exclusions in .cargo/mutants.toml are line-anchored: run
+    # weekly/on demand so unrelated edits to these files do not block PRs.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_TOOLCHAIN: '1.98.0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+
+      - name: Install cargo-mutants
+        run: cargo +"$RUST_TOOLCHAIN" install cargo-mutants --version 27.1.0 --locked
+
+      # Equivalent mutants are excluded in .cargo/mutants.toml. Exit 3 means
+      # only timeouts (a mutant that hangs is detected), so only missed (2)
+      # or a broken baseline fails the gate.
+      - name: Mutate MCP protocol core
+        run: |
+          set +e
+          cargo +"$RUST_TOOLCHAIN" mutants -p symeraseme-cli \
+            --file crates/symeraseme-cli/src/mcp/protocol.rs \
+            --file crates/symeraseme-cli/src/mcp/stream.rs \
+            --timeout 30 -- --bins -- mcp::protocol mcp::stream
+          status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
+
+      - name: Upload mutants.out
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutants-mcp-protocol
+          path: mutants.out
+          if-no-files-found: ignore

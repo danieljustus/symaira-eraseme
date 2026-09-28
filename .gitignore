@@ -109,3 +109,5 @@ examples/*/.windsurf/skills/
 CONVENTIONS.md
 .aider.conf.yml
 agents/openai.yaml
+mutants.out/
+mutants.out.old/

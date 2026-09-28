@@ -1294,6 +1294,9 @@ mod tests {
         assert_eq!(super::scan_json_value(b"[1 2]", 0, false), Ok(None));
         assert_eq!(super::scan_json_value(b"1.", 0, false), Ok(None));
         assert_eq!(super::scan_json_value(b"1e", 0, false), Ok(None));
+        // Raw control characters are not allowed inside a string.
+        assert_eq!(super::scan_json_value(b"\"a\x01\"", 0, false), Ok(None));
+        assert_eq!(super::scan_json_value(b"\"a\x7f\"", 0, false), Ok(Some(4)));
     }
 
     /// The JSON-number validator rejects truncated fractions and exponents as
