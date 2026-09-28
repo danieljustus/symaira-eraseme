@@ -1067,7 +1067,6 @@ fn malformed_stdio_exits_before_stdin_eof() {
 
 /// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
 /// collides when parallel tests create their directories at the same instant.
-#[cfg(unix)]
 fn unique_seq() -> u64 {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
