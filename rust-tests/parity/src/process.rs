@@ -368,7 +368,10 @@ impl ProcessTree {
                 let error = std::io::Error::last_os_error();
                 // ESRCH is errno 3 on the supported Unix targets; ErrorKind
                 // does not map it consistently (notably on macOS).
-                if error.raw_os_error() != Some(3) {
+                if error.raw_os_error() != Some(3)
+                    // Darwin: EPERM (1) for a group of only unreaped zombies.
+                    && !(cfg!(target_os = "macos") && error.raw_os_error() == Some(1))
+                {
                     return Err(error);
                 }
             }
