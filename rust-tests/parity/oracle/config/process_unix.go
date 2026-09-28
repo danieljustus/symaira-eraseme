@@ -4,6 +4,7 @@ package main
 
 import (
 	"os/exec"
+	"runtime"
 	"syscall"
 )
 
@@ -17,8 +18,11 @@ func killProcessTree(command *exec.Cmd) error {
 		return nil
 	}
 	pid := command.Process.Pid
-	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
-		return err
+	err := syscall.Kill(-pid, syscall.SIGKILL)
+	// Darwin's killpg reports EPERM when every member is an unreaped zombie.
+	// All group members share our uid, so EPERM there means nothing live is left.
+	if err == nil || err == syscall.ESRCH || (err == syscall.EPERM && runtime.GOOS == "darwin") {
+		return nil
 	}
-	return nil
+	return err
 }
