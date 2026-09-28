@@ -164,8 +164,13 @@ fn post_body_then_disconnect(port: u16, bearer: &str, body: &[u8]) -> TcpStream 
 fn wait_agent_started(path: &Path) -> i32 {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        if let Ok(pid) = std::fs::read_to_string(path) {
-            return pid.parse().unwrap();
+        // The shell redirect truncates before printf writes, so an empty or
+        // partial read means "not yet", not a malformed pid.
+        if let Some(pid) = std::fs::read_to_string(path)
+            .ok()
+            .and_then(|pid| pid.parse().ok())
+        {
+            return pid;
         }
         assert!(Instant::now() < deadline, "host agent did not start");
         thread::sleep(Duration::from_millis(10));
