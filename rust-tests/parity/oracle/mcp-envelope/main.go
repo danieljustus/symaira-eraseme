@@ -64,6 +64,12 @@ func writeFixture() {
 		{Name: "tools_call_non_object_arguments", Request: `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"redact_file","arguments":[]}}`},
 		{Name: "tools_call_non_object_params", Request: `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":[]}`},
 		{Name: "tools_call_invalid_parameter_type", Request: `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"plan_show","arguments":{"campaign_id":5}}}`},
+		{Name: "tools_call_string_id_is_preserved", Request: `{"jsonrpc":"2.0","id":"call-id","method":"tools/call","params":{}}`},
+		{Name: "tools_call_null_id_is_preserved", Request: `{"jsonrpc":"2.0","id":null,"method":"tools/call","params":{}}`},
+		{Name: "tools_call_boolean_id_is_invalid", Request: `{"jsonrpc":"2.0","id":true,"method":"tools/call","params":{}}`},
+		{Name: "tools_call_array_id_is_invalid", Request: `{"jsonrpc":"2.0","id":[],"method":"tools/call","params":{}}`},
+		{Name: "tools_call_object_id_is_invalid", Request: `{"jsonrpc":"2.0","id":{},"method":"tools/call","params":{}}`},
+		{Name: "tools_call_null_params_is_invalid", Request: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":null}`},
 		{Name: "legacy_bare_status_is_not_found", Request: `{"jsonrpc":"2.0","id":1,"method":"status"}`},
 	}
 	for index := range cases {
