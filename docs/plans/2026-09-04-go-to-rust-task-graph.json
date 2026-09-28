@@ -48,14 +48,15 @@
     "required_review_fields": ["reviewed_sha", "commands", "results", "findings", "verdict", "reviewer_lane"]
   },
   "execution_state": {
-    "last_completed": "4.2",
-    "active_tasks": ["4.3"],
-    "merged_tasks": ["0.1", "0.2", "0.3", "0.4", "1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "3.4", "4.1", "4.2"],
+    "last_completed": "5.4",
+    "active_tasks": ["4.7", "6.3", "6.4", "6.5", "7.1", "7.3", "7.4", "8.1", "8.2", "8.3", "8.5"],
+    "merged_tasks": ["0.1", "0.2", "0.3", "0.4", "1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "3.4", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "5.1", "5.2", "5.3", "5.4", "6.2"],
     "pending_merge_tasks": [],
     "pending_branch": null,
     "pending_head_sha": null,
     "active_worktrees": {},
-    "blocked_by": ["DB-005", "CRY-006"],
+    "blocked_by": ["ID-005 Windows ACL parity", "REL-008 signed-dmg-rc", "CLI-023 browser auto-click deferred by maintainer decision 2026-09-28"],
+    "reconciled": "2026-09-28: a task counts as merged when every contract row in its merge_gate is PASS in docs/rust-port-contract-matrix.md; native evidence Rust CI run 36467919816 at 5b5ce7c8",
     "resume_rule": "read docs/rust-port/handoffs/2026-09-09-phase4-integration.md, then read back merged PRs and origin/main; resume only at the first dependency-ready unmerged task and never trust stale session summaries"
   },
   "external_gates": {
