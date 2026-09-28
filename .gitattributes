@@ -48,3 +48,7 @@ scripts/consent-oracle/** text eol=lf
 
 # Broker reply corpus bytes are pinned by triage-corpus/dom004c.json.
 tests/fixtures/broker_replies/*.txt text eol=lf
+
+# Oracle-regenerated JSON fixtures compared byte-for-byte against live Go
+# output, which is always LF, including on Windows checkouts.
+tests/fixtures/provider-cancel/*.json text eol=lf
