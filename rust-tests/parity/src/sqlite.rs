@@ -38,6 +38,7 @@ fn unique_copy_path() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
+    let stamp = format!("{stamp}-{}", unique_seq());
     std::env::temp_dir().join(format!(
         "symeraseme-parity-db-{}-{stamp}.sqlite",
         std::process::id()
@@ -200,6 +201,13 @@ pub fn snapshot_database(
         ordered_results,
         copied_database,
     })
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 #[cfg(test)]

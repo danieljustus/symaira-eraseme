@@ -62,6 +62,7 @@ fn isolated_child() -> (Child, std::path::PathBuf) {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+    let nonce = format!("{nonce}-{}", unique_seq());
     let root = std::env::temp_dir().join(format!("mcp008-{}-{nonce}", std::process::id()));
     fs::create_dir(&root).unwrap();
     let home = root.join("home");
@@ -225,4 +226,11 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
             "{name}: stderr bytes"
         );
     }
+}
+
+/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
+/// collides when parallel tests create their directories at the same instant.
+fn unique_seq() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
