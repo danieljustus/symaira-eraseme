@@ -77,14 +77,27 @@ fn exchange(port: u16, token: Option<&str>, origin: Option<&str>) -> (u16, Vec<u
     stream.write_all(b"\r\n").unwrap();
     stream.write_all(body).unwrap();
     let mut response = Vec::new();
-    stream.read_to_end(&mut response).unwrap();
+    let read_error = stream.read_to_end(&mut response).err();
     let split = response
         .windows(4)
         .position(|bytes| bytes == b"\r\n\r\n")
         .unwrap();
     let head = std::str::from_utf8(&response[..split]).unwrap();
     let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
-    (status, response[split + 4..].to_vec())
+    let body = response[split + 4..].to_vec();
+    if let Some(error) = read_error {
+        assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
+        // Windows can report an RST after an early auth/origin rejection.
+        // Accept it only when the complete HTTP response arrived first.
+        let length = head
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+            .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+            .expect("reset response must declare Content-Length");
+        assert_eq!(body.len(), length, "reset truncated the HTTP response");
+    }
+    (status, body)
 }
 
 #[test]
