@@ -302,7 +302,10 @@ fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
         let result = unsafe { kill(-pid, SIGKILL) };
         if result != 0 {
             let error = std::io::Error::last_os_error();
-            if error.raw_os_error() != Some(3) {
+            if error.raw_os_error() != Some(3)
+                    // Darwin: EPERM (1) for a group of only unreaped zombies.
+                    && !(cfg!(target_os = "macos") && error.raw_os_error() == Some(1))
+            {
                 return Err(error);
             }
         }
