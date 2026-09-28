@@ -106,7 +106,10 @@ green CLI corpus does not close JSON-state, review or native platform gates.
   cases as adjacent JSON values (`7cc76c8a`) with bounded I/O and exact output;
   its focused integrated test passed. Ten malformed/truncated cases remain
   source-bound. Six malformed parse cases and four size/depth boundaries also
-  replay Go 1.26.6 process bytes (`6ccd1a4`); broader fuzzing remains open.
+  replay Go 1.26.6 process bytes (`6ccd1a4`). The in-process libFuzzer target
+  now includes the production protocol/stream modules directly, seeded from all
+  ten source-bound malformed-stream cases; a current-source macOS arm64 run
+  completed 330,402 executions in five seconds without a crash.
 - MCP scheduler install, status and uninstall now replay source-bound Go cases
   through the real Rust stdio process (`c485e852`). Cron runs against a private
   crontab; launchd and systemd installs use isolated HOME roots and fake service
@@ -452,8 +455,11 @@ artifact gates still require separate evidence.
   retained older Go rollback binary reading schema v2 remains unproved
   (#1035). Do not promote this row to cutover-ready based on CI alone.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
-  truncated process cases and ten parse/size/depth mutations now match Go
-  1.26.6; broader bounded fuzz/performance evidence remains open under MCP-015.
+  truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
+  16 seeded mutations replay the live Go process byte-exactly, and the new
+  production-parser fuzz target completed 330,402 bounded macOS arm64
+  executions. Longer campaigns, differential fuzzing and native target runs
+  remain open under MCP-015.
 - **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
   explicit message where Go runs `confirmation.AutoConfirm` (browser
   subsystem unported). The recorded case is the no-reply branch.

@@ -1805,6 +1805,8 @@ name = "symeraseme-redaction-fuzz"
 version = "0.1.0"
 dependencies = [
  "libfuzzer-sys",
+ "serde",
+ "serde_json",
  "symeraseme-core",
 ]
 
