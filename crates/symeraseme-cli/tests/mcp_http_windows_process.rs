@@ -1,11 +1,18 @@
 //! Native Windows Go/Rust MCP HTTP process contract.
 #![cfg(windows)]
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
 use std::time::{Duration, Instant};
+use symeraseme_core::storage::Store;
+use symeraseme_core::storage::repository::Repository;
+
+const GO_PROVIDER_CANCEL_FIXTURE: &str =
+    include_str!("../../../tests/fixtures/provider-cancel/http.json");
 
 struct Server(Child);
 
@@ -25,6 +32,10 @@ fn port() -> u16 {
 }
 
 fn start(binary: &Path, root: &Path, port: u16) -> Server {
+    start_with(binary, root, port, &[])
+}
+
+fn start_with(binary: &Path, root: &Path, port: u16, envs: &[(&str, &str)]) -> Server {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
     Server(
@@ -33,6 +44,7 @@ fn start(binary: &Path, root: &Path, port: u16) -> Server {
             .env("HOME", &home)
             .env("USERPROFILE", &home)
             .env("SYMERASEME_DATA_DIR", root.join("data"))
+            .envs(envs.iter().copied())
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -100,34 +112,43 @@ fn exchange(port: u16, token: Option<&str>, origin: Option<&str>) -> (u16, Vec<u
     (status, body)
 }
 
-#[test]
-fn native_windows_http_matches_checked_out_go() {
-    let root = tempfile::tempdir().unwrap();
-    let oracle = root.path().join("symeraseme-go-oracle.exe");
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let build = Command::new("go")
-        .args(["build", "-o"])
-        .arg(&oracle)
-        .arg("./cmd/symeraseme")
-        .current_dir(repo)
+fn repo() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// Runs `go <pre...> <path> <post...>` with the pinned offline toolchain.
+fn go(pre: &[&str], path: &Path, post: &[&str]) -> std::process::Output {
+    Command::new("go")
+        .args(pre)
+        .arg(path)
+        .args(post)
+        .current_dir(repo())
         .env("GOTOOLCHAIN", "go1.26.6")
         .env("GOPROXY", "off")
         .env("GOSUMDB", "off")
         .output()
-        .unwrap();
+        .unwrap()
+}
+
+fn build_oracle(root: &Path) -> std::path::PathBuf {
+    let oracle = root.join("symeraseme-go-oracle.exe");
+    let build = go(&["build", "-o"], &oracle, &["./cmd/symeraseme"]);
     assert!(
         build.status.success(),
         "Go oracle build: {}",
         String::from_utf8_lossy(&build.stderr)
     );
+    oracle
+}
+
+#[test]
+fn native_windows_http_matches_checked_out_go() {
+    let root = tempfile::tempdir().unwrap();
+    let oracle = build_oracle(root.path());
 
     let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
-    let go_port = port();
-    let mut rust_port = port();
-    while rust_port == go_port {
-        rust_port = port();
-    }
+    let (go_port, rust_port) = distinct_ports();
     let mut go = start(&oracle, &go_root, go_port);
     let mut rust = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
@@ -199,4 +220,229 @@ fn native_windows_http_matches_checked_out_go() {
         .read_to_string(&mut stderr)
         .unwrap();
     assert!(stderr.contains("refusing non-loopback MCP bind"));
+}
+
+fn distinct_ports() -> (u16, u16) {
+    let first = port();
+    let mut second = port();
+    while second == first {
+        second = port();
+    }
+    (first, second)
+}
+
+fn seed_reply(root: &Path) {
+    let data = root.join("data");
+    std::fs::create_dir_all(&data).unwrap();
+    let store = Store::open(data.join("symeraseme.db")).unwrap();
+    let request_id = Repository::new(&store)
+        .create_removal_request(
+            "oracle-broker",
+            "email",
+            "oracle-campaign",
+            "DE",
+            "gdpr-art17.de.md.j2",
+            "",
+        )
+        .unwrap();
+    store
+        .connection()
+        .execute(
+            "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            (request_id, "cancel-message", "cancel-thread", "privacy@example.invalid", "Please verify your address", "We need your current address."),
+        )
+        .unwrap();
+}
+
+/// Synthetic loopback OpenAI endpoint: captures one request, never answers,
+/// and reports how the MCP server's upstream connection ended.
+fn blocking_provider() -> (String, mpsc::Receiver<String>, thread::JoinHandle<String>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut request_line = String::new();
+        reader.read_line(&mut request_line).unwrap();
+        let mut length = 0usize;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" || line.is_empty() {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':')
+                && name.eq_ignore_ascii_case("content-length")
+            {
+                length = value.trim().parse().unwrap();
+            }
+        }
+        let mut body = vec![0; length];
+        reader.read_exact(&mut body).unwrap();
+        tx.send(request_line).unwrap();
+        let mut byte = [0; 1];
+        match reader.read(&mut byte) {
+            Ok(0) => "eof".to_owned(),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::ConnectionAborted
+                        | std::io::ErrorKind::UnexpectedEof
+                ) =>
+            {
+                "closed".to_owned()
+            }
+            other => format!("{other:?}"),
+        }
+    });
+    (url, rx, handle)
+}
+
+/// DOM-008A on native Windows: dropping the MCP client socket mid tools/call
+/// closes the upstream provider request in Go and Rust alike, the server keeps
+/// running, and nothing is persisted.
+#[test]
+fn native_windows_disconnect_cancels_provider_request_like_go() {
+    let root = tempfile::tempdir().unwrap();
+    let fixture = root.path().join("provider-cancel.json");
+    let oracle_run = go(
+        &[
+            "run",
+            "./rust-tests/parity/oracle/provider-cancel",
+            "-fixture",
+        ],
+        &fixture,
+        &[],
+    );
+    assert!(
+        oracle_run.status.success(),
+        "Go provider cancellation oracle: {}",
+        String::from_utf8_lossy(&oracle_run.stderr)
+    );
+    assert_eq!(
+        std::fs::read(&fixture).unwrap(),
+        GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
+        "Go provider cancellation oracle drifted"
+    );
+    let oracle = build_oracle(root.path());
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"openai","model":"oracle-model"}}}"#;
+
+    for (name, binary) in [("go", oracle.as_path()), ("rust", rust)] {
+        let case = root.path().join(name);
+        seed_reply(&case);
+        let (url, request_rx, provider) = blocking_provider();
+        let port = port();
+        let mut server = start_with(
+            binary,
+            &case,
+            port,
+            &[
+                ("SYMERASEME_LLM_BASE_URL", url.as_str()),
+                ("OPENAI_API_KEY", "synthetic-cancel-key"),
+            ],
+        );
+        ready(&mut server, port);
+        let token = std::fs::read_to_string(case.join("data/mcp_token")).unwrap();
+        let mut client = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            client,
+            "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .unwrap();
+        client.write_all(body).unwrap();
+        let request_line = request_rx
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap_or_else(|error| panic!("{name} did not reach the provider: {error}"));
+        assert_eq!(request_line.trim(), "POST /chat/completions HTTP/1.1");
+
+        drop(client);
+        let outcome = provider.join().unwrap();
+        assert!(
+            outcome == "eof" || outcome == "closed",
+            "{name} upstream after disconnect: {outcome}"
+        );
+        assert!(
+            server.0.try_wait().unwrap().is_none(),
+            "{name} MCP server stopped after a client disconnect"
+        );
+        let store = Store::open(case.join("data/symeraseme.db")).unwrap();
+        let classification: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE message_id = 'cancel-message'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(classification, None, "{name} persisted after cancellation");
+    }
+}
+
+/// MCP-013 on native Windows: Go and Rust both close a connection whose
+/// headers never complete at the five-second read-header timeout and keep
+/// serving afterwards.
+#[test]
+fn native_windows_slow_header_timeout_matches_go() {
+    let root = tempfile::tempdir().unwrap();
+    let oracle = build_oracle(root.path());
+    let (go_port, rust_port) = distinct_ports();
+    let mut go_server = start(&oracle, &root.path().join("go"), go_port);
+    let mut rust_server = start(
+        Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
+        &root.path().join("rust"),
+        rust_port,
+    );
+    ready(&mut go_server, go_port);
+    ready(&mut rust_server, rust_port);
+    let pending: Vec<_> = [("go", go_port), ("rust", rust_port)]
+        .into_iter()
+        .map(|(name, port)| {
+            thread::spawn(move || {
+                let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(8)))
+                    .unwrap();
+                stream
+                    .write_all(
+                        b"POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer partial",
+                    )
+                    .unwrap();
+                let started = Instant::now();
+                let mut response = Vec::new();
+                let result = stream.read_to_end(&mut response).map_err(|e| e.kind());
+                (name, result, started.elapsed())
+            })
+        })
+        .collect();
+    for handle in pending {
+        let (name, result, elapsed) = handle.join().unwrap();
+        assert!(
+            matches!(
+                result,
+                Ok(_)
+                    | Err(
+                        std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted
+                    )
+            ),
+            "{name} slow-header connection did not close: {result:?}"
+        );
+        assert!(
+            (Duration::from_millis(4500)..=Duration::from_secs(8)).contains(&elapsed),
+            "{name} closed the slow-header connection after {elapsed:?}"
+        );
+    }
+    assert!(go_server.0.try_wait().unwrap().is_none());
+    assert!(rust_server.0.try_wait().unwrap().is_none());
+    assert_eq!(
+        exchange(rust_port, None, None),
+        exchange(go_port, None, None)
+    );
 }
