@@ -15,7 +15,7 @@ SOURCE_REVISION = "29d483171195eff3c9444a538dbefb3dd06bb2c6"
 INITIALIZE = ROOT / "tests/fixtures/mcp-contract/initialize_cases.json"
 SOURCE_PATHS = ["cmd/symeraseme/main.go", "internal/mcp/server.go"]
 MUTATION_SEED = 0x4D43503135
-MUTATION_COUNT = 16
+MUTATION_COUNT = 128
 MUTATION_BASE = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 
 

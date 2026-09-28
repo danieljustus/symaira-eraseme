@@ -246,6 +246,9 @@ jobs:
       - name: Run Windows neutral parity tests
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
+      - name: Compare native Windows MCP HTTP against Go
+        shell: bash
+        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked
 
   rust-tools-cache:
     name: Rust / verification tools cache
