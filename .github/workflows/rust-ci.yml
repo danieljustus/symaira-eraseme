@@ -238,6 +238,8 @@ jobs:
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy
+      - name: Download Go oracle modules
+        run: go mod download
       - name: Check and lint Windows code
         shell: bash
         run: |
