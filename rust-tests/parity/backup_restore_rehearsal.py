@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Disposable v1 backup/restore rehearsal for the retained historical Go fallback."""
 import argparse
-from contextlib import closing
+from contextlib import ExitStack, closing
 import hashlib
 import json
 import os
@@ -9,9 +9,11 @@ from pathlib import Path
 import platform
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tarfile
+import zipfile
 
 import plain_store_switchback as gate
 
@@ -117,22 +119,41 @@ def verify_go_archive(archive, binary):
     binary = Path(binary).resolve(strict=True)
     archive_identity = gate.identity(archive)
     binary_identity = gate.identity(binary)
-    with tarfile.open(archive, mode='r:*') as tar:
-        matches = [member for member in tar.getmembers() if member.name == 'symeraseme']
-        require(len(matches) == 1 and matches[0].isfile(),
-                'Go archive must contain exactly one regular symeraseme member')
-        stream = tar.extractfile(matches[0])
-        require(stream is not None, 'cannot read symeraseme member from Go archive')
-        with stream:
-            digest = hashlib.sha256()
-            size = 0
-            for chunk in iter(lambda: stream.read(1024 * 1024), b''):
-                digest.update(chunk)
-                size += len(chunk)
+    with ExitStack() as opened:
+        if zipfile.is_zipfile(archive):
+            container = opened.enter_context(zipfile.ZipFile(archive))
+            member_name = 'symeraseme.exe'
+            matches = [item for item in container.infolist() if item.filename == member_name]
+            require(len(matches) == 1 and not matches[0].is_dir()
+                    and stat.S_IFMT(matches[0].external_attr >> 16) in (0, stat.S_IFREG),
+                    'Go ZIP must contain exactly one regular symeraseme.exe member')
+            member_size = matches[0].file_size
+            require(member_size == binary_identity['size'],
+                    'Go archive symeraseme bytes differ from the supplied Go binary')
+            stream = opened.enter_context(container.open(matches[0]))
+        else:
+            container = opened.enter_context(tarfile.open(archive, mode='r:*'))
+            member_name = 'symeraseme'
+            matches = [item for item in container.getmembers() if item.name == member_name]
+            require(len(matches) == 1 and matches[0].isfile(),
+                    'Go archive must contain exactly one regular symeraseme member')
+            member_size = matches[0].size
+            require(member_size == binary_identity['size'],
+                    'Go archive symeraseme bytes differ from the supplied Go binary')
+            stream = container.extractfile(matches[0])
+            require(stream is not None, 'cannot read symeraseme member from Go archive')
+            opened.enter_context(stream)
+        digest = hashlib.sha256()
+        size = 0
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+            size += len(chunk)
+            require(size <= binary_identity['size'],
+                    'Go archive member exceeds the supplied Go binary size')
     require(size == binary_identity['size'] and digest.hexdigest() == binary_identity['sha256'],
             'Go archive symeraseme bytes differ from the supplied Go binary')
     return {'path': str(archive), **archive_identity,
-            'member': 'symeraseme', 'member_size': size,
+            'member': member_name, 'member_size': size,
             'member_sha256': digest.hexdigest(), 'matches_supplied_binary': True}
 
 

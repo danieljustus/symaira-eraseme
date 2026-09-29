@@ -47,7 +47,11 @@ no source revision, so a run using it records only historical byte identity.
 For release-bound evidence, pass the unmodified binary extracted from the
 checksum-verified official archive with `--go-archive`; the runner reads the
 archive without extracting and requires exactly one regular top-level
-`symeraseme` member whose bytes match `--go`. It records the archive hash and
+`symeraseme` tar member or `symeraseme.exe` ZIP member whose bytes match `--go`.
+The declared and streamed member sizes must match the supplied executable before
+the SHA-256 comparison; duplicate and nonregular members are rejected. ZIP
+verification does not enable the Windows rehearsal: its process/filesystem/network
+confinement and native restore acceptance remain open. It records the archive hash and
 the binary's embedded source metadata. Any observed schema-v2 failure is
 specific to the exact supplied artifact and this rehearsal.
 
