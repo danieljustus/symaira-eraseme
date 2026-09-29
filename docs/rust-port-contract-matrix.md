@@ -93,7 +93,7 @@ SQLite, network transcript or process behavior.
 | CLI-002 | CLI | root `--version` | `symeraseme --version` | `rust-tests/parity/cases/cli/behavior.json` `root-version` (`root_version` category) | byte | all | PASS |
 | CLI-003 | CLI | `version` text | `symeraseme version` | `rust-tests/parity/cases/cli/behavior.json` `version` (exact group) | byte | all | PASS |
 | CLI-004 | CLI | `version --json` schema v1 | `symeraseme version --json` | `rust-tests/parity/cases/cli/behavior.json` `version-json` (exact group; `schema_version` asserted) | byte | all | PASS |
-| CLI-005 | CLI | global `--output text|json` inheritance | command corpus | `cli_output_modes.json` | byte | all | PASS |
+| CLI-005 | CLI | global `--output text|json` inheritance | command corpus | `crates/symeraseme-cli/tests/command_surface.rs`; `cmd/symeraseme/command_surface_test.go` | byte | all | PASS |
 | CLI-006 | CLI | unknown command/flag, usage and exit code | command corpus | `rust-tests/parity/cases/cli/behavior.json` `unknown_flag` (51), `unknown_command`, `missing_argument` (3) categories | byte | all | PASS |
 | CLI-007 | CLI | shell completion: bash/zsh/fish/powershell | `completion` commands | completion snapshots | byte | all | PASS |
 | CLI-008 | CLI | hidden deprecated `serve` alias and stderr notice | `serve --stdio` | alias fixture | byte | all | PASS |

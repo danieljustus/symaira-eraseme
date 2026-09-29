@@ -17,7 +17,7 @@ Vierter Cut des Tages. Interne Dokumentation, nicht veröffentlichen.
 echten `NetIMAPDialer` gegen den Fake-Server der Go-Tests erzeugt; der Generator
 ist gleichzeitig Wächter (`go test ./internal/email -run TestDialerOracle`),
 ohne `-update` schlägt er bei Drift fehl. Neun Fälle replayt
-`tests/imap_transport_parity.rs` byte-genau, inklusive Kommando-Transkript:
+`crates/symeraseme-core/tests/imap_transport_parity.rs` byte-genau, inklusive Kommando-Transkript:
 
 - `<tag> CAPABILITY`, `<tag> LOGIN "user" "pass"`, `<tag> AUTHENTICATE XOAUTH2
   <base64>` (SASL-IR), `<tag> EXAMINE INBOX` (read-only),

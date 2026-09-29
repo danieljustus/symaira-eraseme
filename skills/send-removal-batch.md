@@ -5,7 +5,7 @@ Guide an AI agent or user through executing a planned removal campaign.
 ## Prerequisites
 
 - [Campaign planned](plan-removal-campaign.md) (`symeraseme plan create`)
-- [Email accounts configured](SKILL.md) (`symeraseme accounts add`)
+- [SMTP settings configured](SKILL.md#setup--identity) for the outgoing mail provider
 - Consent token issued for destructive operations
 
 ## Step 1: Dry-run first
@@ -13,7 +13,7 @@ Guide an AI agent or user through executing a planned removal campaign.
 Always validate the plan before sending real requests:
 
 ```bash
-symeraseme execute --campaign initial --dry-run
+symeraseme plan execute --campaign initial --dry-run
 ```
 
 This simulates sending without actually dispatching emails or submitting forms.
@@ -21,7 +21,7 @@ This simulates sending without actually dispatching emails or submitting forms.
 ### JSON output
 
 ```bash
-symeraseme execute --campaign initial --dry-run --output json
+symeraseme plan execute --campaign initial --dry-run --output json
 ```
 
 ```json
@@ -43,26 +43,23 @@ symeraseme execute --campaign initial --dry-run --output json
 
 ## Step 2: Obtain consent
 
-Destructive commands require explicit consent. Choose one:
+Sending requires an explicit consent token issued after user approval. There is
+no implicit consent prompt or `--yes` bypass:
 
 ```bash
-# Option A: Interactive prompt (run without flags)
-symeraseme execute --campaign initial --batch-size 5
-# You will be prompted: "This is a destructive operation. Continue? [y/N]"
-
-# Option B: Pre-issue a consent token (for automation)
+# Issue a short-lived token after explicit user approval
 symeraseme grant execute --ttl 3600
-# Output: Consent token: <token>
-symeraseme execute --campaign initial --consent <token>
+# Supply the returned token
+symeraseme plan execute --campaign initial --consent <token>
 
-# Option C: Skip consent with --yes (interactive only)
-symeraseme execute --campaign initial --yes
+# Or supply a securely stored token file
+symeraseme plan execute --campaign initial --consent-file /path/to/token
 ```
 
 ## Step 3: Execute the campaign
 
 ```bash
-symeraseme execute --campaign initial --batch-size 5
+symeraseme plan execute --campaign initial --batch-size 5 --consent <token>
 ```
 
 ### Batch size recommendations
@@ -123,7 +120,7 @@ symeraseme grant --list --output json
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Error: Destructive command requires consent` | No consent given | Use `--yes` or issue a token via `grant` |
+| Consent required | No valid consent token supplied | Issue a token via `grant execute`, then supply `--consent` or `--consent-file` |
 | `Campaign 'X' not found` | Campaign not planned | Run `plan create` first |
-| `Error sending email` | Email account not configured | Run `accounts add <provider>` |
+| `Error sending email` | SMTP configuration or credentials unavailable | Check the provider's `SYMERASEME_SMTP_*` settings |
 | `No removal requests planned` | No matching requests | Check `plan show` for the campaign |

@@ -53,8 +53,8 @@ Use this skill when the user wants to:
 │    [review plan with user]                               │
 ├──────────────────────────────────────────────────────────┤
 │ 3. EXECUTE REMOVALS                                      │
-│    symeraseme execute --campaign <id> --batch-size 5    │
-│    [consent prompt required for destructive ops]         │
+│    symeraseme plan execute --campaign <id>               │
+│    [explicit consent token required for sending]         │
 ├──────────────────────────────────────────────────────────┤
 │ 4. TRIAGE REPLIES (daily)                                │
 │    symeraseme poll-inbox --username <email> ...         │
@@ -81,10 +81,13 @@ Use this skill when the user wants to:
 |---------|-------------|
 | `symeraseme init-profile` | Create encrypted identity profile |
 | `symeraseme show-profile` | Display current identity |
-| `symeraseme accounts add <provider>` | Configure email account (gmail/outlook) |
-| `symeraseme accounts list` | List configured email accounts |
-| `symeraseme accounts remove <email>` | Remove an email account |
-| `symeraseme db-init` | Initialize the SQLite database |
+
+Configure outgoing mail with `SYMERASEME_SMTP_HOST`, `SYMERASEME_SMTP_PORT`,
+`SYMERASEME_SMTP_USER`, `SYMERASEME_SMTP_PASSWORD`, `SYMERASEME_SMTP_TLS`, and
+`SYMERASEME_SMTP_FROM`. Inbox polling uses `IMAP_*` settings or the documented
+`poll-inbox` overrides. Keep resolved credentials out of versioned files.
+There is no account-management command group or separate database-init command;
+store-backed commands open and initialize the configured store.
 
 ### Campaign Planning
 
@@ -99,7 +102,7 @@ Use this skill when the user wants to:
 
 | Command | Description |
 |---------|-------------|
-| `symeraseme execute --campaign <id>` | Send removal requests |
+| `symeraseme plan execute --campaign <id> --consent <token>` | Send removal requests |
 | `symeraseme grant <command>` | Issue consent token for destructive ops |
 | `symeraseme render-template <name>` | Preview a template |
 
@@ -116,11 +119,14 @@ Use this skill when the user wants to:
 
 | Command | Description |
 |---------|-------------|
-| `symeraseme run-web-form <broker_id>` | Run a broker's web form opt-out |
-| `symeraseme solve-captcha` | Solve a CAPTCHA via external service |
+| `symeraseme run-web-form <broker_id>` | Preview or queue a broker's manual form opt-out |
 | `symeraseme manual-tasks list` | List manual fallback tasks |
 | `symeraseme manual-tasks show <id>` | Show manual task details |
 | `symeraseme manual-tasks complete <id>` | Mark manual task as done |
+
+Browser execution and CAPTCHA solving are not implemented by these CLI
+commands. Complete the broker form manually and record the result through the
+manual-task workflow.
 
 ### Lifecycle
 
@@ -151,16 +157,16 @@ symeraseme requests list --status PENDING --output json
 
 ## Error handling
 
-- **Consent required**: Destructive commands (`execute`) require `--yes` or a consent token.
+- **Consent required**: `plan execute` requires an explicit `execute` consent token unless `--dry-run` is set. Issue one with `grant execute`, then supply `--consent` or `--consent-file`; there is no `--yes` bypass or implicit prompt.
 - **No profile**: Run `init-profile` first if commands fail with "No identity profile found."
-- **No database**: Commands auto-init the database, but `db-init` can be run manually.
+- **No database**: Store-backed commands initialize the configured database when opening it; check the data-directory and encryption-key configuration if opening fails.
 - **API key missing**: `classify-reply` and `generate-rebuttal` need `ANTHROPIC_API_KEY`.
 - **IMAP errors**: Check credentials and app-specific password for Gmail/Outlook.
 - **Web form failures**: Use `manual-tasks list` to find fallback tasks, then complete them.
 
 ## Best practices
 
-1. **Always dry-run first**: Use `--dry-run` with `execute` and `tick` before real execution.
+1. **Always dry-run first**: Use `--dry-run` with `plan execute` and `tick` before real execution.
 2. **Batch sizes**: Start with `--batch-size 3` to avoid rate limits; increase gradually.
 3. **Consent tokens**: Issue short-lived tokens with `grant execute --ttl 3600` for automation.
 4. **Daily triage**: Run `poll-inbox` + `classify-reply` daily to catch broker responses.

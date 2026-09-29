@@ -51,7 +51,7 @@ Create `.windsurf/workflows/remove-data.md`:
 1. Run `symeraseme init-profile` to set up identity
 2. Run `symeraseme plan create --campaign initial --max 5`
 3. Review plan with user
-4. Execute with `symeraseme execute --campaign initial --batch-size 5`
+4. Execute with `symeraseme plan execute --campaign initial --batch-size 5 --consent <token>`
 5. Set up daily triage: `symeraseme poll-inbox && symeraseme tick`
 ```
 

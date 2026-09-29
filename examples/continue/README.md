@@ -39,7 +39,7 @@ Use Symaira EraseMe when the user wants to:
 ### Setup
 - `symeraseme init-profile` — Create encrypted identity
 - `symeraseme show-profile` — Display identity
-- `symeraseme db-init` — Initialize database
+
 
 ### Planning
 - `symeraseme plan create --campaign <id>` — Create campaign
@@ -47,7 +47,7 @@ Use Symaira EraseMe when the user wants to:
 - `symeraseme requests list` — List requests
 
 ### Execution
-- `symeraseme execute --campaign <id> --batch-size 5` — Send requests
+- `symeraseme plan execute --campaign <id> --batch-size 5 --consent <token>` — Send requests
 - `symeraseme grant execute --ttl 3600` — Issue consent token
 
 ### Triage
@@ -89,7 +89,7 @@ Create `.continuerc.json`:
       "commands": [
         "symeraseme init-profile",
         "symeraseme plan create --campaign initial --max 5",
-        "symeraseme execute --campaign initial --batch-size 5",
+        "symeraseme plan execute --campaign initial --batch-size 5 --dry-run",
         "symeraseme tick"
       ]
     }

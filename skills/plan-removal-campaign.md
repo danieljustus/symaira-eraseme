@@ -103,9 +103,9 @@ symeraseme plan show --output json
 
 ```bash
 symeraseme requests list
-symeraseme requests list --campaign initial
+symeraseme requests list --campaign-id initial
 symeraseme requests list --status PENDING
-symeraseme requests list --broker acxiom
+symeraseme requests list --broker-id acxiom
 ```
 
 ## Best practices
