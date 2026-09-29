@@ -84,6 +84,9 @@ pub(crate) fn serve(
     let stopping = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    signal_hook::flag::register(signal_hook::consts::SIGBREAK, Arc::clone(&stopping))
+        .map_err(|error| error.to_string())?;
     #[cfg(unix)]
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;

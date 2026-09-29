@@ -83,7 +83,7 @@ symeraseme brokers list --law GDPR
 # Plan, review, and dry-run a campaign
 symeraseme plan create --campaign initial --max 5
 symeraseme plan show --campaign initial
-symeraseme execute --campaign initial --dry-run
+symeraseme plan execute --campaign initial --dry-run
 
 # Track deadlines and view reports
 symeraseme tick --dry-run

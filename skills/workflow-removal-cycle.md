@@ -13,8 +13,8 @@ This template ties all sub-skills together into a repeatable cycle.
 │    [review with user before executing]                         │
 ├─────────────────────────────────────────────────────────────────┤
 │ 2. EXECUTE                                                     │
-│    symeraseme execute --campaign <id> --batch-size 5     │
-│    [consent required: --yes or grant token]                    │
+│    symeraseme plan execute --campaign <id>                     │
+│    [explicit grant token required before sending]              │
 ├─────────────────────────────────────────────────────────────────┤
 │ 3. WAIT                                                        │
 │    GDPR: 30 days | CCPA: 45 days | LGPD: 15 days             │
@@ -55,7 +55,7 @@ This template ties all sub-skills together into a repeatable cycle.
 ### When to execute
 
 - Plan is reviewed and approved by user
-- Consent token is available (or use `--yes` for non-interactive)
+- A valid `execute` consent token is available and supplied with `--consent` or `--consent-file`
 - Start with `--batch-size 3` to avoid rate limits
 - Increase batch size gradually after confirming no issues
 
@@ -95,21 +95,21 @@ This template ties all sub-skills together into a repeatable cycle.
 ### Consent required
 
 ```
-Error: This command requires consent. Use --yes or grant a consent token.
+Sending requires an explicit execute consent token.
 ```
 
 Fix:
 ```bash
-# Option 1: Interactive consent
-symeraseme execute --campaign initial
-
-# Option 2: Non-interactive (automation)
-symeraseme execute --campaign initial --yes
-
-# Option 3: Consent token (for CI/automation)
+# After explicit user approval, issue a short-lived token
 symeraseme grant execute --ttl 3600
-symeraseme execute --campaign initial --consent <token>
+symeraseme plan execute --campaign initial --consent <token>
+
+# Alternatively, supply a securely stored token file
+symeraseme plan execute --campaign initial --consent-file /path/to/token
 ```
+
+There is no `--yes` bypass or implicit consent prompt. Use `--dry-run` to
+preview without sending.
 
 ### No identity profile
 
@@ -131,7 +131,7 @@ IMAP error: [AUTHENTICATIONFAILED] Invalid credentials
 Fix:
 - Use app-specific password (not regular password)
 - For Gmail: enable 2FA, then create app password at https://myaccount.google.com/apppasswords
-- For Outlook: use OAuth2 via `symeraseme accounts add outlook`
+- For Outlook: obtain an OAuth2 access token and configure `IMAP_OAUTH2_ACCESS_TOKEN` (literal value or secure-store reference), or use `poll-inbox --oauth2-access-token`; the CLI does not provision an Outlook account or acquire the token for you.
 - For web.de: use `--folders INBOX,Unbekannt` (see #478)
 
 ### LLM provider not available
@@ -229,6 +229,9 @@ symeraseme plan show --campaign initial
 # Calendar view
 symeraseme calendar --weeks 4
 
-# Export for records
-symeraseme export --format json --output campaign.json
+# Export request records (not a restorable database backup)
+symeraseme requests list --campaign-id initial --output json > campaign.json
 ```
+
+`requests list` is paginated. Use `--page` and `--page-size` to retrieve all
+pages when the campaign exceeds the default page size.

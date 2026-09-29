@@ -32,9 +32,9 @@ symeraseme requests list
 
 ### Execution
 ```bash
-symeraseme execute --campaign initial --batch-size 5 --dry-run  # Always dry-run first
+symeraseme plan execute --campaign initial --batch-size 5 --dry-run  # Always dry-run first
 symeraseme grant execute --ttl 3600                             # Issue consent token
-symeraseme execute --campaign initial --batch-size 5 --consent <token>
+symeraseme plan execute --campaign initial --batch-size 5 --consent <token>
 ```
 
 ### Triage

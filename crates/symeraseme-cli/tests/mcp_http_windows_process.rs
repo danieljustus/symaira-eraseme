@@ -3,6 +3,7 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -40,6 +41,7 @@ fn start_with(binary: &Path, root: &Path, port: u16, envs: &[(&str, &str)]) -> S
     std::fs::create_dir_all(&home).unwrap();
     Server(
         Command::new(binary)
+            .creation_flags(0x0000_0200) // CREATE_NEW_PROCESS_GROUP
             .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
             .env("HOME", &home)
             .env("USERPROFILE", &home)
@@ -445,4 +447,86 @@ fn native_windows_slow_header_timeout_matches_go() {
         exchange(rust_port, None, None),
         exchange(go_port, None, None)
     );
+}
+
+/// Go maps CTRL_BREAK_EVENT to os.Interrupt. Use a private console and target
+/// each child's process group, never the test runner's console/group zero.
+/// https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent
+#[test]
+fn native_windows_ctrl_break_shutdown_matches_go() {
+    const CHILD_ROOT: &str = "SYMERASEME_CTRL_BREAK_TEST_ROOT";
+    const GO_ORACLE: &str = "SYMERASEME_CTRL_BREAK_GO_ORACLE";
+    if let Some(root) = std::env::var_os(CHILD_ROOT) {
+        let root = std::path::PathBuf::from(root);
+        let oracle = std::path::PathBuf::from(std::env::var_os(GO_ORACLE).unwrap());
+        for (name, binary) in [
+            ("go", oracle.as_path()),
+            ("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"))),
+        ] {
+            let port = port();
+            let mut server = start(binary, &root.join(name), port);
+            ready(&mut server, port);
+            #[link(name = "Kernel32")]
+            unsafe extern "system" {
+                fn GenerateConsoleCtrlEvent(event: u32, process_group: u32) -> i32;
+            }
+            // SAFETY: no pointers; the nonzero PID belongs to our live child,
+            // created as a new process group in this helper's private console.
+            let sent = unsafe { GenerateConsoleCtrlEvent(1, server.0.id()) };
+            assert_ne!(
+                sent,
+                0,
+                "send Ctrl+Break: {}",
+                std::io::Error::last_os_error()
+            );
+            let deadline = Instant::now() + Duration::from_secs(8);
+            let status = loop {
+                if let Some(status) = server.0.try_wait().unwrap() {
+                    break status;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "{name} did not handle Ctrl+Break"
+                );
+                thread::sleep(Duration::from_millis(20));
+            };
+            assert!(status.success(), "{name} Ctrl+Break exit: {status}");
+            assert!(TcpStream::connect(("127.0.0.1", port)).is_err());
+        }
+        println!("Ctrl+Break Go/Rust comparison executed both processes");
+        return;
+    }
+
+    let root = tempfile::tempdir().unwrap();
+    let oracle = build_oracle(root.path());
+    let log_path = root.path().join("console.log");
+    let log = std::fs::File::create(&log_path).unwrap();
+    let mut helper = Server(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "native_windows_ctrl_break_shutdown_matches_go",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ROOT, root.path())
+            .env(GO_ORACLE, oracle)
+            .creation_flags(0x0000_0010) // CREATE_NEW_CONSOLE
+            .stdin(Stdio::null())
+            .stdout(log.try_clone().unwrap())
+            .stderr(log)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(40);
+    let status = loop {
+        if let Some(status) = helper.0.try_wait().unwrap() {
+            break status;
+        }
+        assert!(Instant::now() < deadline, "isolated console test timed out");
+        thread::sleep(Duration::from_millis(20));
+    };
+    let log = std::fs::read_to_string(log_path).unwrap();
+    assert!(status.success(), "isolated console test failed: {log}");
+    assert!(log.contains("Ctrl+Break Go/Rust comparison executed both processes"));
 }

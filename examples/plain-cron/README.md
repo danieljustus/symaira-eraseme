@@ -52,7 +52,7 @@ Always plan and inspect a campaign before any destructive execution:
 CAMPAIGN="initial"
 symeraseme plan create --campaign "$CAMPAIGN" --max 5 --output json
 symeraseme plan show --campaign "$CAMPAIGN" --output json
-symeraseme execute --campaign "$CAMPAIGN" --dry-run --output json
+symeraseme plan execute --campaign "$CAMPAIGN" --dry-run --output json
 ```
 
 After explicit user consent, issue a short-lived token and execute the reviewed
@@ -60,7 +60,7 @@ plan:
 
 ```bash
 symeraseme grant execute --ttl 3600
-symeraseme execute --campaign "$CAMPAIGN" --consent-file /path/to/token
+symeraseme plan execute --campaign "$CAMPAIGN" --consent-file /path/to/token
 ```
 
 ## Monitoring

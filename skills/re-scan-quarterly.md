@@ -50,15 +50,15 @@ symeraseme plan create --campaign rescan-acxiom --max 1
 symeraseme plan show --campaign q3-2026-rescan
 
 # Execute (after consent)
-symeraseme execute --campaign q3-2026-rescan --batch-size 5
+symeraseme plan execute --campaign q3-2026-rescan --batch-size 5 --consent <token>
 ```
 
 ## Step 4: Compare with previous campaigns
 
 ```bash
 # View previous campaign results
-symeraseme requests list --campaign initial-2026-q1
-symeraseme requests list --campaign initial-2026-q2
+symeraseme requests list --campaign-id initial-2026-q1
+symeraseme requests list --campaign-id initial-2026-q2
 ```
 
 ## Complete quarterly workflow
@@ -72,7 +72,7 @@ symeraseme plan show --campaign q3-2026-rescan
 
 # 3. Execute (after consent)
 symeraseme grant execute --ttl 7200
-symeraseme execute --campaign q3-2026-rescan --batch-size 5 --consent <token>
+symeraseme plan execute --campaign q3-2026-rescan --batch-size 5 --consent <token>
 
 # 4. Set up daily triage
 # Remind user to run poll-inbox + classify-reply daily

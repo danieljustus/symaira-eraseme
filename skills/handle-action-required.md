@@ -63,8 +63,11 @@ symeraseme auto-confirm 1 --output json
 When a broker rejects a removal request, generate a legal rebuttal:
 
 ```bash
-symeraseme generate-rebuttal 1 --api-key "$ANTHROPIC_API_KEY"
+symeraseme generate-rebuttal 1
 ```
+
+Configure credentials through the selected LLM provider's environment or secure
+store. There is no `--api-key` CLI flag.
 
 The LLM analyzes the rejection reason and generates a targeted rebuttal
 based on the appropriate legal framework (GDPR Article 17, CCPA, etc.).

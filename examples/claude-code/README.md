@@ -54,7 +54,7 @@ Claude will use the skills to walk through:
 1. `symeraseme init-profile` — Create your identity vault
 2. `symeraseme plan create` — Scan the broker registry
 3. `symeraseme plan show` — Review the plan with you
-4. `symeraseme execute` — Send removal requests
+4. `symeraseme plan execute --campaign <id> --consent <token>` — Send removal requests after explicit consent
 
 ## Example session
 
@@ -98,10 +98,10 @@ Shall I proceed with executing these 5 requests?
 
 User: Yes, please execute them.
 
-Claude: I need your consent for this destructive operation. Please confirm:
+Claude: After your approval, issue a short-lived token and pass it explicitly:
 
-→ symeraseme execute --campaign initial --batch-size 5
-This is a destructive operation. Continue? [y/N]: y
+→ symeraseme grant execute --ttl 3600
+→ symeraseme plan execute --campaign initial --batch-size 5 --consent <returned-token>
 
 [Results:]
   #1 OK — sent via email
@@ -137,8 +137,7 @@ Set these in your shell profile or `.env`:
 ```bash
 # Required for LLM-powered features
 export ANTHROPIC_API_KEY="sk-ant-..."
-# Required for CAPTCHA solving
-export CAPSOLVER_API_KEY="CAP-..."
+# Web forms and CAPTCHAs require the manual-task workflow
 # Optional: override data directory
 export SYMERASEME_DATA_DIR="$HOME/.symeraseme"
 ```
@@ -151,8 +150,8 @@ For direct tool access (advanced), add to `.claude/mcp.json`:
 {
   "mcpServers": {
     "symeraseme": {
-      "command": "uv",
-      "args": ["run", "symeraseme"],
+      "command": "symeraseme",
+      "args": ["mcp", "--stdio"],
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
         "SYMERASEME_DATA_DIR": "${HOME}/.symeraseme"

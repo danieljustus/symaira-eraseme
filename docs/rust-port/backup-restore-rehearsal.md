@@ -8,6 +8,17 @@ failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
 
+## Archive verification preparation — 2026-09-29
+
+At clean candidate `cfdc59a0d9266b67a5541de4562a3e7b702d894c`, all five
+`test_plain_backup_restore.py` controls pass on native Darwin/arm64 and
+Linux/arm64. The ZIP controls use synthetic executable bytes and check exact
+member identity, duplicate/nested/nonregular rejection and read-only inspection
+without extraction. Existing tar, SQLite WAL backup and incomplete-restore
+controls also pass. These checks neither execute a Windows binary nor establish
+an official Windows release identity. Windows confinement and native restore
+remain open; the rehearsal still fails closed on unsupported hosts.
+
 ## Verified run — 2026-09-26
 
 The complete eight-case sequence passed on macOS arm64 at clean candidate
@@ -47,7 +58,11 @@ no source revision, so a run using it records only historical byte identity.
 For release-bound evidence, pass the unmodified binary extracted from the
 checksum-verified official archive with `--go-archive`; the runner reads the
 archive without extracting and requires exactly one regular top-level
-`symeraseme` member whose bytes match `--go`. It records the archive hash and
+`symeraseme` tar member or `symeraseme.exe` ZIP member whose bytes match `--go`.
+The declared and streamed member sizes must match the supplied executable before
+the SHA-256 comparison; duplicate and nonregular members are rejected. ZIP
+verification does not enable the Windows rehearsal: its process/filesystem/network
+confinement and native restore acceptance remain open. It records the archive hash and
 the binary's embedded source metadata. Any observed schema-v2 failure is
 specific to the exact supplied artifact and this rehearsal.
 
