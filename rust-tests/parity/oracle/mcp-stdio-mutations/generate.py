@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
-SOURCE_REVISION = "29d483171195eff3c9444a538dbefb3dd06bb2c6"
+SOURCE_REVISION = "6d175f6355a67fe0c0e539754121b6643df812bf"
 INITIALIZE = ROOT / "tests/fixtures/mcp-contract/initialize_cases.json"
 SOURCE_PATHS = ["cmd/symeraseme/main.go", "internal/mcp/server.go"]
 MUTATION_SEED = 0x4D43503135
