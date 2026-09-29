@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/danieljustus/symaira-eraseme/internal/eventstore"
 	"github.com/danieljustus/symaira-eraseme/internal/mcp"
@@ -31,6 +32,15 @@ type observation struct {
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--flood" {
+		output := os.Stdout
+		if os.Args[2] == "stderr" {
+			output = os.Stderr
+		}
+		_, _ = output.Write(bytes.Repeat([]byte{'x'}, 2*1024*1024))
+		time.Sleep(30 * time.Second)
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--oracle" {
 		if err := runOracle(); err != nil {
 			fmt.Fprintln(os.Stderr, err)

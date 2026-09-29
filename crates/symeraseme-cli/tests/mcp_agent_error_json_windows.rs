@@ -1,18 +1,17 @@
 //! Native executable parity for malformed host-agent stderr. The portable
 //! portion checks the helper and Go observation on other hosts.
 
-use std::fs::{self, File};
+use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::{Command, ExitStatus, Stdio};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use base64::Engine;
 use serde::Deserialize;
-#[cfg(windows)]
-use std::io::Write;
-#[cfg(windows)]
-use std::process::Stdio;
+
 #[cfg(windows)]
 use symeraseme_core::storage::Store;
 #[cfg(windows)]
@@ -38,32 +37,59 @@ struct Captured {
 }
 
 fn capture(mut command: Command, root: &Path, name: &str, timeout: Duration) -> Captured {
-    let stdout_path = root.join(format!("{name}.stdout"));
-    let stderr_path = root.join(format!("{name}.stderr"));
-    command
-        .stdout(File::create(&stdout_path).expect("stdout file"))
-        .stderr(File::create(&stderr_path).expect("stderr file"));
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = command.spawn().expect("spawn child");
+    let (tx, rx) = mpsc::channel();
+    let readers: Vec<Box<dyn Read + Send>> = vec![
+        Box::new(child.stdout.take().unwrap()),
+        Box::new(child.stderr.take().unwrap()),
+    ];
+    for (index, reader) in readers.into_iter().enumerate() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = reader.take(MAX_CAPTURE + 1).read_to_end(&mut bytes);
+            let _ = tx.send((index, result.map(|_| bytes)));
+        });
+    }
+    drop(tx);
     let deadline = Instant::now() + timeout;
-    let status = loop {
-        if let Some(status) = child.try_wait().expect("poll child") {
-            break status;
+    let mut output = [None, None];
+    let mut status = None;
+    loop {
+        while let Ok((index, result)) = rx.try_recv() {
+            match result {
+                Ok(bytes) if bytes.len() as u64 <= MAX_CAPTURE => output[index] = Some(bytes),
+                _ => {
+                    let _ = child.kill();
+                    child.wait().expect("reap output-rejected child");
+                    panic!("{name}: capture limit or read failure");
+                }
+            }
+        }
+        if status.is_none() {
+            status = child.try_wait().expect("poll child");
+        }
+        if status.is_some() && output.iter().all(Option::is_some) {
+            break;
         }
         if Instant::now() >= deadline {
             let _ = child.kill();
-            let _ = child.wait();
+            child.wait().expect("reap timed-out child");
             panic!("{name} exceeded {timeout:?}");
         }
         thread::sleep(Duration::from_millis(20));
-    };
-    let read = |path: &Path| {
-        assert!(fs::metadata(path).expect("capture metadata").len() <= MAX_CAPTURE);
-        fs::read(path).expect("capture bytes")
-    };
+    }
+    let [stdout, stderr] = output;
+    let status = child.wait().expect("reap completed child");
+    let stdout = stdout.unwrap();
+    let stderr = stderr.unwrap();
+    fs::write(root.join(format!("{name}.stdout")), &stdout).expect("bounded stdout log");
+    fs::write(root.join(format!("{name}.stderr")), &stderr).expect("bounded stderr log");
     Captured {
         status,
-        stdout: read(&stdout_path),
-        stderr: read(&stderr_path),
+        stdout,
+        stderr,
     }
 }
 
@@ -172,6 +198,28 @@ fn native_helper_and_go_contract_observation() {
     assert!(sanity.stdout.is_empty());
     assert_eq!(sanity.stderr, BAD_STDERR, "fake agent emitted raw bytes");
 
+    for stream in ["stdout", "stderr"] {
+        let started = Instant::now();
+        let error = std::panic::catch_unwind(|| {
+            let mut flood = Command::new(&executable);
+            flood.args(["--flood", stream]);
+            isolated(
+                &mut flood,
+                root.path(),
+                root.path(),
+                &root.path().join("sanity-data"),
+            );
+            capture(flood, root.path(), "flood", Duration::from_secs(10));
+        })
+        .expect_err("live capture rejects oversized output");
+        let text = error.downcast_ref::<String>().expect("capture error text");
+        assert!(
+            text.contains("capture limit"),
+            "must fail on size, not timeout"
+        );
+        assert!(started.elapsed() < Duration::from_secs(10));
+    }
+
     let go_root = root.path().join("go");
     let go_bin = go_root.join("bin");
     let go_data = go_root.join("data");
@@ -232,43 +280,18 @@ fn native_helper_and_go_contract_observation() {
         let mut command = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
         command.args(["mcp", "--stdio"]);
         isolated(&mut command, &rust_root, &rust_bin, &rust_data);
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(File::create(root.path().join("rust.stdout")).unwrap())
-            .stderr(File::create(root.path().join("rust.stderr")).unwrap())
-            .spawn()
-            .expect("spawn Rust MCP process");
-        child
-            .stdin
-            .take()
-            .expect("MCP stdin")
-            .write_all(&request)
-            .expect("write MCP request");
-        let deadline = Instant::now() + Duration::from_secs(30);
-        let status = loop {
-            if let Some(status) = child.try_wait().expect("poll Rust MCP") {
-                break status;
-            }
-            if Instant::now() >= deadline {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("Rust MCP exceeded 30 seconds");
-            }
-            thread::sleep(Duration::from_millis(20));
-        };
-        let read = |name: &str| {
-            let path = root.path().join(name);
-            assert!(fs::metadata(&path).unwrap().len() <= MAX_CAPTURE);
-            fs::read(path).unwrap()
-        };
-        let rust_stderr = read("rust.stderr");
+        let input_path = rust_root.join("request.json");
+        fs::write(&input_path, &request).expect("bounded request fixture");
+        command.stdin(std::fs::File::open(input_path).expect("request stdin"));
+        let rust = capture(command, root.path(), "rust", Duration::from_secs(30));
         assert!(
-            status.success(),
-            "Rust MCP status {status}: {}",
-            String::from_utf8_lossy(&rust_stderr)
+            rust.status.success(),
+            "Rust MCP status {}: {}",
+            rust.status,
+            String::from_utf8_lossy(&rust.stderr)
         );
-        assert!(rust_stderr.is_empty(), "MCP stdio stderr stays clean");
-        compare_bytes(&read("rust.stdout"), &expected).expect("native Go/Rust MCP byte parity");
+        assert!(rust.stderr.is_empty(), "MCP stdio stderr stays clean");
+        compare_bytes(&rust.stdout, &expected).expect("native Go/Rust MCP byte parity");
     }
 }
 
