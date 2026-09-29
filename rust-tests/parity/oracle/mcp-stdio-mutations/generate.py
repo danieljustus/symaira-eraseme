@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Record Go CLI process bytes for malformed and MCP stdio boundary inputs."""
 
+import argparse
 import base64
 import hashlib
 import json
 import random
+import re
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -85,29 +86,43 @@ def materialize(spec):
     raise AssertionError(f"unknown input spec: {spec}")
 
 
-def main():
-    go = Path(sys.argv[1]).resolve()
-    assert "go1.26.6" in subprocess.check_output([str(go), "version"], text=True)
+def validate_go_version(version):
+    if not isinstance(version, str) or not re.fullmatch(
+        r"go version go1\.26\.6 (darwin|linux|windows)/(amd64|arm64)", version
+    ):
+        raise ValueError("expected Go 1.26.6 with a supported native host suffix")
+
+
+def capture(go):
+    version = subprocess.check_output([str(go), "version"], text=True).strip()
+    validate_go_version(version)
     subprocess.run(
         ["git", "diff", "--exit-code", SOURCE_REVISION, "--", *SOURCE_PATHS],
         cwd=ROOT,
         check=True,
         stdout=subprocess.DEVNULL,
     )
-    target = ROOT / "rust-tests/parity/oracle/mcp-stdio-mutations/cases.json"
     recorded = []
     with tempfile.TemporaryDirectory(prefix="symeraseme-mcp008-") as directory:
-        binary = Path(directory) / "symeraseme-go"
+        binary = Path(directory) / "symeraseme-go.exe"
         subprocess.run([str(go), "build", "-o", str(binary), "./cmd/symeraseme"], cwd=ROOT, check=True)
         for case in case_specs():
-            result = subprocess.run(
-                [str(binary), "mcp", "--stdio"],
-                input=materialize(case["input_spec"]),
-                capture_output=True,
-                check=False,
-                timeout=30,
-                env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": directory, "TMPDIR": directory},
-            )
+            with tempfile.TemporaryDirectory(dir=directory, prefix="case-") as scenario:
+                result = subprocess.run(
+                    [str(binary), "mcp", "--stdio"],
+                    cwd=scenario,
+                    input=materialize(case["input_spec"]),
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                    env={
+                        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                        "HOME": scenario, "USERPROFILE": scenario,
+                        "TMPDIR": scenario, "TMP": scenario, "TEMP": scenario,
+                        **{f"XDG_{name}_HOME": str(Path(scenario) / name.lower())
+                           for name in ("CONFIG", "DATA", "STATE", "CACHE")},
+                    },
+                )
             recorded.append(
                 {
                     "name": case["name"],
@@ -117,11 +132,11 @@ def main():
                     "stderr_base64": base64.b64encode(result.stderr).decode(),
                 }
             )
-    fixture = {
+    return {
         "source_revision": SOURCE_REVISION,
         "mutation_seed": MUTATION_SEED,
         "mutation_count": MUTATION_COUNT,
-        "go_version": subprocess.check_output([str(go), "version"], text=True).strip(),
+        "go_version": version,
         "source_files": [
             {"path": path, "sha256": digest((ROOT / path).read_bytes())} for path in SOURCE_PATHS
         ],
@@ -129,7 +144,31 @@ def main():
         "generator_sha256": digest(Path(__file__).read_bytes()),
         "cases": recorded,
     }
-    target.write_text(json.dumps(fixture, indent=2) + "\n")
+
+
+def check(target, observed):
+    expected = json.loads(target.read_bytes())
+    # Only the compiler's host suffix may differ across native CI targets.
+    validate_go_version(expected["go_version"])
+    validate_go_version(observed["go_version"])
+    expected["go_version"] = observed["go_version"]
+    if json.dumps(expected, sort_keys=True) != json.dumps(observed, sort_keys=True):
+        raise ValueError("MCP stdio oracle drift; regenerate explicitly after review")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("go", type=Path, help="Go 1.26.6 executable")
+    parser.add_argument("--check", action="store_true", help="compare without writing")
+    parser.add_argument("--output", type=Path,
+                        default=Path(__file__).with_name("cases.json"))
+    args = parser.parse_args()
+    observed = capture(args.go.resolve())
+    if args.check:
+        check(args.output, observed)
+        print(f"MCP stdio oracle: {len(observed['cases'])} cases checked, no writes")
+    else:
+        args.output.write_text(json.dumps(observed, indent=2) + "\n")
 
 
 if __name__ == "__main__":

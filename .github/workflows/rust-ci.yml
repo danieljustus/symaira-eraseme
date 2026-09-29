@@ -310,6 +310,13 @@ jobs:
       - name: Download Go oracle modules
         run: go mod download
 
+      - name: Check MCP stdio oracle without rewriting fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/test_mcp_stdio_oracle_check.py
+          python3 rust-tests/parity/oracle/mcp-stdio-mutations/generate.py "$(command -v go)" --check
+
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
