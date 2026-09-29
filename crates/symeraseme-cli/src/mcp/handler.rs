@@ -3231,7 +3231,8 @@ mod tests {
     }
 
     /// Builds a handler whose store lives under an isolated data dir with a
-    /// pinned instant, so every tool that opens the store is deterministic.
+    /// pinned instant and unavailable LLM endpoint. Provider tests override
+    /// the environment explicitly instead of reaching a developer's Ollama.
     fn seeded_handler(name: &str) -> (PathBuf, ContractHandler) {
         let root = workspace(name);
         let data_dir = root.join("data");
@@ -3244,10 +3245,15 @@ mod tests {
         let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
             .expect("pinned instant")
             .with_timezone(&Utc);
-        let handler = ContractHandler::new(&root).with_store(
-            ConfigContext::new(root.clone(), root.clone(), environment),
-            now,
-        );
+        let handler = ContractHandler::new(&root)
+            .with_store(
+                ConfigContext::new(root.clone(), root.clone(), environment),
+                now,
+            )
+            .with_test_llm_environment(HashMap::from([(
+                "SYMERASEME_LLM_BASE_URL".to_owned(),
+                "http://127.0.0.1:0".to_owned(),
+            )]));
         (root, handler)
     }
 
@@ -3615,7 +3621,7 @@ mod tests {
     }
 
     /// An unresponsive model surfaces through the outcome's error slot, not a
-    /// fabricated classification: ollama with no URL fails deterministically.
+    /// fabricated classification: the isolated endpoint cannot serve a model.
     #[test]
     fn classify_reply_surfaces_model_transport_failures() {
         let (root, handler) = seeded_handler("classify-model-failure");
