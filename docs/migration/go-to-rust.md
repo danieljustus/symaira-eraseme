@@ -8,6 +8,31 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## MCP parity checkpoint (2026-09-30)
+
+- MCP-015: #1110 merged as `916bbfccedfc21ddaab28b6cf917dc1774ac4aeb`;
+  #1108 is closed. Exact-head native run `36635311862` at `96db859e`
+  passed on all six targets. Each job log confirms fresh pinned Go capture
+  of all 138 cases without writes and the Rust mutation process replay.
+  Archive proof `36635317091` passed all six native builds and archive/checksum
+  validation after retrying a Go dependency-download network timeout.
+- MCP-007 HTTP response parity: #1111 merged as
+  `fd63a368ffa660247134b41a7f44da6b32553a7b`. Both named HTTP comparator tests
+  passed on all six targets in `36632119595` at `aa882843`. #1109 remains
+  open for the broader fuzz-coverage residual; this slice does not close it.
+- MCP-005A/DOM-008: #1113 merged as
+  `726156748d886029e54509cf2181f9639d9cba0d`. Native run `36637116514` at
+  `60bb1ec4` passed all six targets. Both Windows job logs confirm the real
+  Go/Rust malformed-agent-error comparison and live stdout/stderr overflow
+  controls. #1112 remains open; merge alone does not close its remaining scope.
+- Post-merge Rust CI, native target proof, hardening, general CI and CodeQL
+  passed on both integrated commits: Rust CI runs `36673177006` (#1113)
+  and `36674636824` (#1110). Independent final reviews were PASS_STATIC;
+  local workspace, strict Clippy and formatting passed on the candidates.
+- Production behavior is unchanged. No release, cutover or Go removal is
+  authorized. Continue from the remaining contract prerequisites rather than
+  reopening these verified parity checks.
+
 ## Acceptance gates (all four required per slice)
 
 ```
