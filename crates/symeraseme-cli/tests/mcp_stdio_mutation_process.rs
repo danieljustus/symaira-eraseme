@@ -161,7 +161,7 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     assert_eq!(fixture["generator_sha256"], sha256(GENERATOR));
     assert_eq!(
         fixture["source_revision"],
-        "29d483171195eff3c9444a538dbefb3dd06bb2c6"
+        "6d175f6355a67fe0c0e539754121b6643df812bf"
     );
     assert_eq!(fixture["mutation_seed"], 0x4D43503135u64);
     assert_eq!(fixture["mutation_count"], 128);

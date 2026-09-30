@@ -1,5 +1,5 @@
 {
-  "source_revision": "29d483171195eff3c9444a538dbefb3dd06bb2c6",
+  "source_revision": "6d175f6355a67fe0c0e539754121b6643df812bf",
   "mutation_seed": 331841810741,
   "mutation_count": 128,
   "go_version": "go version go1.26.6 darwin/arm64",
@@ -14,7 +14,7 @@
     }
   ],
   "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
-  "generator_sha256": "cc6d75d2cd9e765b45c5e26f3426e24399c929a0049d000167fee1ecce462723",
+  "generator_sha256": "cbd02b192e15bcdc915efe200caf943d3811d273af6511e8e3c317525e514fcb",
   "cases": [
     {
       "name": "initialize_trailing_comma_is_parse_error",
