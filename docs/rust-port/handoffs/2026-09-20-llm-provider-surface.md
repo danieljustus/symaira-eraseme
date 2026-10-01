@@ -25,6 +25,7 @@ runs are `cmp`-identical. `crates/symeraseme-core/tests/llm_surface.rs` replays 
   handlers now construct that client through the existing `llm::create` path. Provider descriptors,
   OpenAI/Anthropic wire dialects and HTTP error codes are owned by CoreKit; EraseMe retains its
   existing credential-input, retry and reply-service behavior.
+
 - `crates/symeraseme-core/tests/llmkit_transport_contract.rs` replays the pinned Go HTTP cases, and
   `crates/symeraseme-cli/src/mcp/handler.rs` has a local fake-provider test that exercises both MCP
   consumers without real credentials or external network access. The Go source digests remain pinned
@@ -63,6 +64,12 @@ Windows process behavior remains unverified.
    entirely and the fixture claimed a successful call. The record uses `*string` now.
 3. The same `omitempty` class of bug hid the `0` values of the agent defaults (`tracker_len`,
    `max_retries` as integers, `available: false`).
+
+## CoreKit pin update (2026-10-01)
+
+EraseMe's `symaira-core-llm` dependency now pins CoreKit merge commit
+`04d1411adb57aa602b992509121011aa7666ff1a` at exact version `=0.0.0`.
+The existing MCP consumers and transport contract were checked against this pin.
 
 ## Resume
 
