@@ -146,9 +146,18 @@ fn assert_matches(candidate: &Response, oracle: &Response) {
 }
 
 #[test]
-fn reset_response_capture_preserves_bytes_and_rejects_truncation() {
+fn bounded_response_capture_preserves_fin_and_native_reset_bytes() {
     let raw = b"HTTP/1.1 200 OK\r\nDate: Tue, 29 Sep 2026 10:00:00 GMT\r\nContent-Length: 2\r\nContent-Type: application/json\r\n\r\n{}";
-    for (body, complete) in [(&raw[..], true), (&raw[..raw.len() - 1], false)] {
+    for (reset, body, complete) in [
+        (false, &raw[..], true),
+        (false, &raw[..raw.len() - 1], false),
+        // Windows can discard unread bytes on RST; buffered-after-reset bytes
+        // are a Unix control, not a portable delivery guarantee.
+        #[cfg(not(windows))]
+        (true, &raw[..], true),
+        #[cfg(not(windows))]
+        (true, &raw[..raw.len() - 1], false),
+    ] {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         client
@@ -165,10 +174,11 @@ fn reset_response_capture_preserves_bytes_and_rejects_truncation() {
             stream
                 .set_write_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
-            stream.read_exact(&mut [0; 1]).unwrap();
+            let mut request = vec![0; if reset { 1 } else { 1024 }];
+            stream.read_exact(&mut request).unwrap();
             gate.recv_timeout(Duration::from_secs(2)).unwrap();
             stream.write_all(&reply).unwrap();
-            // Closing with unread inbound bytes produces an actual TCP reset.
+            // Drain all input for FIN; leave input unread for the Unix reset.
             drop(stream);
             closed.send(()).unwrap();
         });
@@ -176,7 +186,7 @@ fn reset_response_capture_preserves_bytes_and_rejects_truncation() {
         release.send(()).unwrap();
         observed.recv_timeout(Duration::from_secs(2)).unwrap();
         #[cfg(target_vendor = "apple")]
-        {
+        if reset {
             let deadline = Instant::now() + Duration::from_secs(2);
             loop {
                 match client.set_read_timeout(Some(Duration::from_secs(1))) {
@@ -194,11 +204,14 @@ fn reset_response_capture_preserves_bytes_and_rejects_truncation() {
         let captured =
             read_bounded_response(&mut client, Instant::now() + Duration::from_secs(2)).unwrap();
         peer.join().unwrap();
-        assert_eq!(captured, body, "real peer reset preserves buffered bytes");
+        assert_eq!(
+            captured, body,
+            "preserve the native buffered response bytes"
+        );
         assert_eq!(
             std::panic::catch_unwind(|| parse_response(&captured)).is_ok(),
             complete,
-            "a reset must not hide a truncated body"
+            "the transport close must not hide a truncated body"
         );
     }
 }
