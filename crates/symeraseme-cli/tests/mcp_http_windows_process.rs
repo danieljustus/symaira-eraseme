@@ -511,7 +511,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     let oracle = build_oracle(root.path());
     let log_path = root.path().join("console.log");
     let log = std::fs::File::create(&log_path).unwrap();
-    let mut helper = Server(
+    let mut helper = Server(StartedChild::from_child(
         Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
@@ -527,7 +527,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
             .stderr(log)
             .spawn()
             .unwrap(),
-    );
+    ));
     let deadline = Instant::now() + Duration::from_secs(40);
     let status = loop {
         if let Some(status) = helper.0.try_wait().unwrap() {
