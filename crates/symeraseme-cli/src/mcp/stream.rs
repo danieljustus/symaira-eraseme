@@ -276,7 +276,9 @@ mod tests {
             b"{}",
             b"[]",
         ] {
-            for following in [b" ".as_slice(), b""] {
+            // Go's stateEndTop returns scanEnd even for non-space lookahead:
+            // the scalar response precedes rejection of the next value's byte.
+            for following in [b" ".as_slice(), b"", b"x"] {
                 let reads = Cell::new(0);
                 let mut input = Chunks {
                     bytes: token,
