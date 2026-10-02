@@ -9,7 +9,9 @@ use std::time::{Duration, Instant};
 
 #[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
-use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
+use mcp_http_port::{
+    StartedChild, accepts_token, free_port, read_bounded_response, spawn_with_handoff,
+};
 
 struct Server(StartedChild);
 
@@ -121,9 +123,6 @@ fn parse_response(raw: &[u8]) -> Response {
 fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) -> Response {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-    stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     write!(
@@ -137,32 +136,71 @@ fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) ->
     }
     stream.write_all(b"\r\n").unwrap();
     stream.write_all(body).unwrap();
-    let mut raw = Vec::new();
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let mut buffer = [0; 4096];
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        assert!(!remaining.is_zero(), "total response deadline");
-        stream.set_read_timeout(Some(remaining)).unwrap();
-        match stream.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(count) => {
-                assert!(raw.len() + count <= 64 * 1024, "bounded response capture");
-                raw.extend_from_slice(&buffer[..count]);
-            }
-            Err(error) => {
-                // Windows may reset after rejection; parsing still requires a
-                // complete response, so a reset cannot hide truncated output.
-                assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
-                break;
-            }
-        }
-    }
+    let raw = read_bounded_response(&mut stream, Instant::now() + Duration::from_secs(5))
+        .expect("capture complete bounded HTTP response");
     parse_response(&raw)
 }
 
 fn assert_matches(candidate: &Response, oracle: &Response) {
     assert_eq!(candidate, oracle, "complete HTTP response parity");
+}
+
+#[test]
+fn reset_response_capture_preserves_bytes_and_rejects_truncation() {
+    let raw = b"HTTP/1.1 200 OK\r\nDate: Tue, 29 Sep 2026 10:00:00 GMT\r\nContent-Length: 2\r\nContent-Type: application/json\r\n\r\n{}";
+    for (body, complete) in [(&raw[..], true), (&raw[..raw.len() - 1], false)] {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let (release, gate) = std::sync::mpsc::channel();
+        let (closed, observed) = std::sync::mpsc::channel();
+        let reply = body.to_vec();
+        let peer = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream.read_exact(&mut [0; 1]).unwrap();
+            gate.recv_timeout(Duration::from_secs(2)).unwrap();
+            stream.write_all(&reply).unwrap();
+            // Closing with unread inbound bytes produces an actual TCP reset.
+            drop(stream);
+            closed.send(()).unwrap();
+        });
+        client.write_all(&[b'x'; 1024]).unwrap();
+        release.send(()).unwrap();
+        observed.recv_timeout(Duration::from_secs(2)).unwrap();
+        #[cfg(target_vendor = "apple")]
+        {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                match client.set_read_timeout(Some(Duration::from_secs(1))) {
+                    Err(error) => {
+                        assert_eq!(error.raw_os_error(), Some(22), "native reset boundary");
+                        break;
+                    }
+                    Ok(()) => {
+                        assert!(Instant::now() < deadline, "peer reset not observed");
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                }
+            }
+        }
+        let captured =
+            read_bounded_response(&mut client, Instant::now() + Duration::from_secs(2)).unwrap();
+        peer.join().unwrap();
+        assert_eq!(captured, body, "real peer reset preserves buffered bytes");
+        assert_eq!(
+            std::panic::catch_unwind(|| parse_response(&captured)).is_ok(),
+            complete,
+            "a reset must not hide a truncated body"
+        );
+    }
 }
 
 #[test]
