@@ -41,10 +41,18 @@ are byte-unchanged, with 20 named syntax/EOF probes and two 256-byte sweeps
 added for object keys and escapes. Both buffered and one-byte-read streams
 consume the source-derived observations; the real CLI compares exit/stdout/
 stderr without normalization. Initial execution reproduced the array-separator
-divergence before the production fix; all 670 process cases and 30 parser/
+divergence before the production fix; all 670 process cases and 31 parser/
 stream tests pass locally afterward. Strict all-target CLI Clippy also passes.
 The handler already injects an unreachable local model endpoint; no real model
 or paid provider is used by these checks.
+
+Independent review additionally exposed a pre-existing live-pipe boundary gap:
+all top-level scalars were dispatched before Go's required lookahead/EOF.
+A readiness-synchronized probe of both actual CLIs confirmed it for strings,
+null, booleans and numbers. The stream adapter now delays only boundary-ending
+scalars; objects/arrays remain eager. `stdio_primitive_waits_for_lookahead_or_eof`
+checks exact read/write ordering without sleeps and failed before the fix.
+The same two-CLI probe matches afterward for all nine tested token forms.
 
 MCP-008/MCP-015 remain PARTIAL until the current-source six-target CI,
 120-second fuzz budget and full MCP mutation gate execute successfully.

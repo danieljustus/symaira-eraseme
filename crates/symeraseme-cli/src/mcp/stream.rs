@@ -70,10 +70,9 @@ pub(crate) fn serve_stream(
     }
 }
 
-/// Go's `ServeStdio` against a live pipe: each value is answered as soon as it
-/// completes, because an MCP client waits for the initialize response before
-/// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
-/// a stream cut mid-value aborts.
+/// Go's `ServeStdio` against a live pipe: objects/arrays complete immediately;
+/// top-level scalars need a following byte or EOF, as in Go's Decoder.readValue.
+/// Clean EOF returns `Ok(())` (Go's `io.EOF` → nil); a cut mid-value aborts.
 ///
 pub(crate) fn serve_stdio(
     input: &mut dyn std::io::BufRead,
@@ -86,13 +85,18 @@ pub(crate) fn serve_stdio(
 
     let mut buffer: Vec<u8> = Vec::new();
     let mut position = 0usize;
+    let mut eof = false;
     loop {
         skip_whitespace(&buffer, &mut position);
         if position < buffer.len() {
             let end = match scan_json_value(&buffer, position, false) {
-                Ok(Some(end)) => Some(end),
+                Ok(Some(end))
+                    if end < buffer.len() || eof || matches!(buffer[position], b'{' | b'[') =>
+                {
+                    Some(end)
+                }
                 Err(error) => return Err(StreamError::Syntax(error.0)),
-                Ok(None) => None,
+                Ok(_) => None,
             };
             if let Some(end) = end {
                 match initialize(&buffer[position..end], handler) {
@@ -110,13 +114,17 @@ pub(crate) fn serve_stdio(
                 continue;
             }
         }
-        let more = input.fill_buf().map_err(map_io)?;
-        if more.is_empty() {
+        if eof {
             return if position >= buffer.len() {
                 Ok(())
             } else {
                 Err(StreamError::UnexpectedEof)
             };
+        }
+        let more = input.fill_buf().map_err(map_io)?;
+        if more.is_empty() {
+            eof = true;
+            continue;
         }
         buffer.extend_from_slice(more);
         let length = more.len();
@@ -201,6 +209,96 @@ mod tests {
                 case.name
             );
             assert_eq!(live, buffered, "{}", case.name);
+        }
+    }
+
+    /// Go's Decoder needs lookahead/EOF for top-level scalars, but not for
+    /// objects/arrays. Observe read/write ordering directly, without sleeps.
+    #[test]
+    fn stdio_primitive_waits_for_lookahead_or_eof() {
+        use std::cell::Cell;
+        use std::io::{BufRead, Read, Write};
+
+        struct Chunks<'a> {
+            bytes: &'a [u8],
+            following: &'a [u8],
+            reads: &'a Cell<usize>,
+        }
+        impl Read for Chunks<'_> {
+            fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+                let bytes = self.fill_buf()?;
+                let length = bytes.len().min(out.len());
+                out[..length].copy_from_slice(&bytes[..length]);
+                self.consume(length);
+                Ok(length)
+            }
+        }
+        impl BufRead for Chunks<'_> {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                self.reads.set(self.reads.get() + 1);
+                Ok(self.bytes)
+            }
+            fn consume(&mut self, amount: usize) {
+                self.bytes = &self.bytes[amount..];
+                if self.bytes.is_empty() {
+                    self.bytes = std::mem::take(&mut self.following);
+                }
+            }
+        }
+        struct ObservedOutput<'a> {
+            bytes: Vec<u8>,
+            reads: &'a Cell<usize>,
+            minimum_reads: usize,
+        }
+        impl Write for ObservedOutput<'_> {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                assert_eq!(
+                    self.reads.get(),
+                    self.minimum_reads,
+                    "dispatch must occur exactly at its lookahead/EOF boundary"
+                );
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        for token in [
+            b"\"x\"".as_slice(),
+            b"null",
+            b"true",
+            b"false",
+            b"1",
+            b"-0",
+            b"1e2",
+            b"{}",
+            b"[]",
+        ] {
+            for following in [b" ".as_slice(), b""] {
+                let reads = Cell::new(0);
+                let mut input = Chunks {
+                    bytes: token,
+                    following,
+                    reads: &reads,
+                };
+                let minimum_reads = if matches!(token[0], b'{' | b'[') {
+                    1
+                } else {
+                    2
+                };
+                let mut output = ObservedOutput {
+                    bytes: Vec::new(),
+                    reads: &reads,
+                    minimum_reads,
+                };
+                let handler = no_backend_handler();
+                let mut expected = Vec::new();
+                let verdict = serve_stream(&[token, following].concat(), &mut expected, &handler);
+                assert_eq!(serve_stdio(&mut input, &mut output, &handler), verdict);
+                assert_eq!(output.bytes, expected);
+            }
         }
     }
 

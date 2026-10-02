@@ -55,9 +55,15 @@ process oracle has 670 cases, including the unchanged 138-case baseline,
 escape positions. `go_syntax_oracle_matches_buffered_and_chunked_streams`
 executes all 666 explicit-byte inputs against buffered and one-byte-read
 production streams. `malformed_and_boundary_stdio_matches_source_bound_go_process`
-executes all 670 cases through the native Rust CLI. Both checks and all 30
+executes all 670 cases through the native Rust CLI. Both checks and all 31
 parser/stream tests pass on local macOS arm64, with strict all-target CLI
 Clippy. Fixture `--check` and corruption controls are read-only.
+
+`stdio_primitive_waits_for_lookahead_or_eof` additionally pins Go's live decoder
+boundary: scalars need a following byte or EOF, while objects/arrays do not.
+Its exact read/write ordering assertions reproduce the old eager-scalar defect
+without timing assumptions. A readiness-synchronized probe of both actual
+processes confirmed the finding and matches on all nine token forms afterward.
 
 MCP-008/MCP-015 remain PARTIAL pending fresh six-target process replay,
 the configured 120-second production-parser fuzz campaign and the full
