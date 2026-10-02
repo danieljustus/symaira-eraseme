@@ -11,6 +11,22 @@
 > required row is `PASS`. `TODO` means the contract is known but its
 > differential case has not yet been implemented.
 
+## Granular issue ownership (2026-10-02)
+
+The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
+records the issue owner of every PARTIAL/TODO row in
+`execution_state.contract_issue_owners`, and owners of every unfinished task
+in `task_issues`. The current [ledger](migration/go-to-rust.md) explains the
+phase state. No row is promoted by this bookkeeping: phase 5 is complete,
+while phases 6–8 retain their documented acceptance gaps. Historical phase
+issues #807–#812 were replaced by the granular issues of #813.
+
+The CLI-023 manual-confirmation decision is an accepted deviation, not an
+unresolved browser-implementation requirement. Its remaining acceptance is
+owned by #1122. Fresh Rust signing/notarization belongs to #1129; the closed
+Go DMG fix #794 is not evidence for that gate. The executable reconciliation
+check is `python3 tests/test_rust_task_graph.py`.
+
 ## Native evidence reconciliation — 2026-09-29
 
 [Run 36495092729](https://github.com/danieljustus/symaira-eraseme/actions/runs/36495092729)
