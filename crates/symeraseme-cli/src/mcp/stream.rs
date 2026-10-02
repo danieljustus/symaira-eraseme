@@ -58,10 +58,8 @@ pub(crate) fn serve_stream(
         let start = index;
         let end = match scan_json_value(input, start, false) {
             Ok(Some(end)) => end,
-            Err(byte) => return Err(max_depth_error(byte)),
-            Ok(None) => {
-                return Err(syntax_error(&input[start..]).unwrap_or(StreamError::UnexpectedEof));
-            }
+            Err(error) => return Err(StreamError::Syntax(error.0)),
+            Ok(None) => return Err(StreamError::UnexpectedEof),
         };
         match initialize(&input[start..end], handler) {
             InitializeOutcome::Response(bytes) => output.extend_from_slice(&bytes),
@@ -72,10 +70,9 @@ pub(crate) fn serve_stream(
     }
 }
 
-/// Go's `ServeStdio` against a live pipe: each value is answered as soon as it
-/// completes, because an MCP client waits for the initialize response before
-/// it sends anything else. Clean EOF returns `Ok(())` (Go's `io.EOF` → nil);
-/// a stream cut mid-value aborts.
+/// Go's `ServeStdio` against a live pipe: objects/arrays complete immediately;
+/// top-level scalars need a following byte or EOF, as in Go's Decoder.readValue.
+/// Clean EOF returns `Ok(())` (Go's `io.EOF` → nil); a cut mid-value aborts.
 ///
 pub(crate) fn serve_stdio(
     input: &mut dyn std::io::BufRead,
@@ -88,13 +85,18 @@ pub(crate) fn serve_stdio(
 
     let mut buffer: Vec<u8> = Vec::new();
     let mut position = 0usize;
+    let mut eof = false;
     loop {
         skip_whitespace(&buffer, &mut position);
         if position < buffer.len() {
             let end = match scan_json_value(&buffer, position, false) {
-                Ok(Some(end)) => Some(end),
-                Err(byte) => return Err(max_depth_error(byte)),
-                Ok(None) => None,
+                Ok(Some(end))
+                    if end < buffer.len() || eof || matches!(buffer[position], b'{' | b'[') =>
+                {
+                    Some(end)
+                }
+                Err(error) => return Err(StreamError::Syntax(error.0)),
+                Ok(_) => None,
             };
             if let Some(end) = end {
                 match initialize(&buffer[position..end], handler) {
@@ -112,18 +114,17 @@ pub(crate) fn serve_stdio(
                 continue;
             }
         }
-        if position < buffer.len()
-            && let Some(error) = syntax_error(&buffer[position..])
-        {
-            return Err(error);
-        }
-        let more = input.fill_buf().map_err(map_io)?;
-        if more.is_empty() {
+        if eof {
             return if position >= buffer.len() {
                 Ok(())
             } else {
                 Err(StreamError::UnexpectedEof)
             };
+        }
+        let more = input.fill_buf().map_err(map_io)?;
+        if more.is_empty() {
+            eof = true;
+            continue;
         }
         buffer.extend_from_slice(more);
         let length = more.len();
@@ -131,232 +132,11 @@ pub(crate) fn serve_stdio(
     }
 }
 
-fn max_depth_error(byte: u8) -> StreamError {
-    StreamError::Syntax(format!(
-        "invalid character '{}' exceeded max depth",
-        go_quoted_byte(byte)
-    ))
-}
-
-fn go_quoted_byte(byte: u8) -> String {
-    match byte {
-        b'\\' => "\\\\".to_owned(),
-        b'\'' => "\\'".to_owned(),
-        b'\t' => "\\t".to_owned(),
-        b'\n' => "\\n".to_owned(),
-        b'\r' => "\\r".to_owned(),
-        0x0b => "\\v".to_owned(),
-        b'\x0c' => "\\f".to_owned(),
-        b'\x08' => "\\b".to_owned(),
-        0..=0x1f => format!("\\x{byte:02x}"),
-        _ => char::from(byte).to_string(),
-    }
-}
-
-fn object_key_state(input: &[u8], end: usize) -> Option<bool> {
-    let mut containers = Vec::<(u8, bool)>::new();
-    let mut in_string = false;
-    let mut escaped = false;
-    for byte in input.iter().take(end).copied() {
-        if in_string {
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == b'"' {
-                in_string = false;
-            }
-            continue;
-        }
-        match byte {
-            b'"' => in_string = true,
-            b'{' => containers.push((b'{', true)),
-            b'[' => containers.push((b'[', false)),
-            b'}' | b']' => {
-                containers.pop();
-            }
-            b':' => {
-                if let Some((b'{', expect_key)) = containers.last_mut() {
-                    *expect_key = false;
-                }
-            }
-            b',' => {
-                if let Some((b'{', expect_key)) = containers.last_mut() {
-                    *expect_key = true;
-                }
-            }
-            _ => {}
-        }
-    }
-    match containers.last() {
-        Some((b'{', expect_key)) => Some(*expect_key),
-        _ => None,
-    }
-}
-
-fn expects_object_key(input: &[u8], end: usize) -> bool {
-    object_key_state(input, end) == Some(true)
-}
-
+#[cfg(test)]
 fn syntax_error(input: &[u8]) -> Option<StreamError> {
-    // ponytail: the recorded Go error classes are matched; port Go's
-    // full scanner if a wider malformed-input corpus requires exact wording.
-    let error = serde_json::from_slice::<serde_json::Value>(input).err()?;
-    if error.is_eof() || error.to_string().starts_with("recursion limit exceeded") {
-        return None;
-    }
-    let error_position = error.column().saturating_sub(1);
-    if let Some(byte) = input.get(error_position).copied()
-        && input[..error_position]
-            .iter()
-            .rev()
-            .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
-            == Some(&b'"')
-    {
-        let prefix = &input[..error_position];
-        let (mut separator, mut previous_separator, mut boundary, mut last_closed_quote) =
-            (None, None, None, None);
-        let (mut in_string, mut escaped) = (false, false);
-        for (index, byte) in prefix.iter().copied().enumerate() {
-            if in_string {
-                if escaped {
-                    escaped = false;
-                } else if byte == b'\\' {
-                    escaped = true;
-                } else if byte == b'"' {
-                    in_string = false;
-                    last_closed_quote = Some(index);
-                }
-                continue;
-            }
-            match byte {
-                b'"' => in_string = true,
-                b':' => {
-                    previous_separator = separator;
-                    separator = Some(index);
-                }
-                b',' | b'{' => boundary = Some(index),
-                _ => {}
-            }
-        }
-        let after_separator =
-            separator.is_some_and(|separator| boundary.is_none_or(|boundary| separator > boundary));
-        let key_without_separator = last_closed_quote
-            .is_some_and(|quote| boundary.is_none_or(|boundary| quote > boundary))
-            && !after_separator;
-        if after_separator || key_without_separator {
-            let state = if key_without_separator
-                || previous_separator
-                    .is_some_and(|separator| boundary.is_none_or(|boundary| separator > boundary))
-            {
-                "after object key"
-            } else {
-                "after object key:value pair"
-            };
-            return Some(StreamError::Syntax(format!(
-                "invalid character '{}' {state}",
-                go_quoted_byte(byte),
-            )));
-        }
-    }
-    let (mut in_string, mut escaped) = (false, false);
-    for (index, byte) in input.iter().enumerate() {
-        if escaped {
-            if !matches!(
-                *byte,
-                b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' | b'u'
-            ) {
-                return Some(StreamError::Syntax(format!(
-                    "invalid character '{}' in string escape code",
-                    go_quoted_byte(*byte)
-                )));
-            }
-            escaped = false;
-        } else if in_string && *byte == b'\\' {
-            escaped = true;
-        } else if *byte == b'"' {
-            in_string = !in_string;
-        } else if !in_string {
-            if index > 0
-                && !matches!(
-                    input[index - 1],
-                    b' ' | b'\t' | b'\r' | b'\n' | b':' | b',' | b'[' | b'{'
-                )
-            {
-                continue;
-            }
-            let (name, literal): (&str, &[u8]) = match *byte {
-                b'n' => ("null", b"null"),
-                b't' => ("true", b"true"),
-                b'f' => ("false", b"false"),
-                _ => continue,
-            };
-            for (offset, expected) in literal.iter().enumerate() {
-                if let Some(actual) = input.get(index + offset)
-                    && actual != expected
-                {
-                    return Some(StreamError::Syntax(format!(
-                        "invalid character '{}' in literal {name} (expecting '{}')",
-                        go_quoted_byte(*actual),
-                        go_quoted_byte(*expected)
-                    )));
-                }
-            }
-        }
-    }
-    let byte = input.get(error_position).copied().unwrap_or_default();
-    match object_key_state(input, error_position) {
-        Some(true) => {
-            return Some(StreamError::Syntax(format!(
-                "invalid character '{}' looking for beginning of object key string",
-                go_quoted_byte(byte)
-            )));
-        }
-        Some(false)
-            if input[..error_position]
-                .iter()
-                .rev()
-                .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
-                != Some(&b':') =>
-        {
-            return Some(StreamError::Syntax(format!(
-                "invalid character '{}' after object key:value pair",
-                go_quoted_byte(byte)
-            )));
-        }
-        _ => {}
-    }
-    let trimmed = input
-        .iter()
-        .copied()
-        .filter(|byte| !matches!(*byte, b' ' | b'\t' | b'\r' | b'\n'))
-        .collect::<Vec<_>>();
-    if trimmed.ends_with(b",}") {
-        return Some(StreamError::Syntax(
-            "invalid character '}' looking for beginning of object key string".to_owned(),
-        ));
-    }
-    let byte = input
-        .get(error.column().saturating_sub(1))
-        .copied()
-        .or_else(|| input.last().copied())
-        .unwrap_or_default();
-    let preceding = input
-        .iter()
-        .take(error_position)
-        .rev()
-        .copied()
-        .find(|value| !matches!(*value, b' ' | b'\t' | b'\r' | b'\n'));
-    if byte == 0x0b && (preceding == Some(b'{') || expects_object_key(input, error_position)) {
-        return Some(StreamError::Syntax(format!(
-            "invalid character '{}' looking for beginning of object key string",
-            go_quoted_byte(byte)
-        )));
-    }
-    Some(StreamError::Syntax(format!(
-        "invalid character '{}' looking for beginning of value",
-        go_quoted_byte(byte)
-    )))
+    scan_json_value(input, 0, false)
+        .err()
+        .map(|error| StreamError::Syntax(error.0))
 }
 
 #[cfg(test)]
@@ -429,6 +209,98 @@ mod tests {
                 case.name
             );
             assert_eq!(live, buffered, "{}", case.name);
+        }
+    }
+
+    /// Go's Decoder needs lookahead/EOF for top-level scalars, but not for
+    /// objects/arrays. Observe read/write ordering directly, without sleeps.
+    #[test]
+    fn stdio_primitive_waits_for_lookahead_or_eof() {
+        use std::cell::Cell;
+        use std::io::{BufRead, Read, Write};
+
+        struct Chunks<'a> {
+            bytes: &'a [u8],
+            following: &'a [u8],
+            reads: &'a Cell<usize>,
+        }
+        impl Read for Chunks<'_> {
+            fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+                let bytes = self.fill_buf()?;
+                let length = bytes.len().min(out.len());
+                out[..length].copy_from_slice(&bytes[..length]);
+                self.consume(length);
+                Ok(length)
+            }
+        }
+        impl BufRead for Chunks<'_> {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                self.reads.set(self.reads.get() + 1);
+                Ok(self.bytes)
+            }
+            fn consume(&mut self, amount: usize) {
+                self.bytes = &self.bytes[amount..];
+                if self.bytes.is_empty() {
+                    self.bytes = std::mem::take(&mut self.following);
+                }
+            }
+        }
+        struct ObservedOutput<'a> {
+            bytes: Vec<u8>,
+            reads: &'a Cell<usize>,
+            minimum_reads: usize,
+        }
+        impl Write for ObservedOutput<'_> {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                assert_eq!(
+                    self.reads.get(),
+                    self.minimum_reads,
+                    "dispatch must occur exactly at its lookahead/EOF boundary"
+                );
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        for token in [
+            b"\"x\"".as_slice(),
+            b"null",
+            b"true",
+            b"false",
+            b"1",
+            b"-0",
+            b"1e2",
+            b"{}",
+            b"[]",
+        ] {
+            // Go's stateEndTop returns scanEnd even for non-space lookahead:
+            // the scalar response precedes rejection of the next value's byte.
+            for following in [b" ".as_slice(), b"", b"x"] {
+                let reads = Cell::new(0);
+                let mut input = Chunks {
+                    bytes: token,
+                    following,
+                    reads: &reads,
+                };
+                let minimum_reads = if matches!(token[0], b'{' | b'[') {
+                    1
+                } else {
+                    2
+                };
+                let mut output = ObservedOutput {
+                    bytes: Vec::new(),
+                    reads: &reads,
+                    minimum_reads,
+                };
+                let handler = no_backend_handler();
+                let mut expected = Vec::new();
+                let verdict = serve_stream(&[token, following].concat(), &mut expected, &handler);
+                assert_eq!(serve_stdio(&mut input, &mut output, &handler), verdict);
+                assert_eq!(output.bytes, expected);
+            }
         }
     }
 
@@ -529,37 +401,49 @@ mod tests {
         assert!(output.is_empty());
     }
 
-    /// Every byte Go quotes specially keeps Go's spelling in the error text.
+    /// Run source-generated Go diagnostics through both production stream
+    /// paths, including one-byte reads and every possible offending byte.
     #[test]
-    fn go_quoted_byte_escapes_control_characters_go_style() {
-        assert_eq!(go_quoted_byte(b'\\'), "\\\\");
-        assert_eq!(go_quoted_byte(b'\''), "\\'");
-        assert_eq!(go_quoted_byte(b'\t'), "\\t");
-        assert_eq!(go_quoted_byte(b'\n'), "\\n");
-        assert_eq!(go_quoted_byte(b'\r'), "\\r");
-        assert_eq!(go_quoted_byte(0x0b), "\\v");
-        assert_eq!(go_quoted_byte(0x0c), "\\f");
-        assert_eq!(go_quoted_byte(0x08), "\\b");
-        assert_eq!(go_quoted_byte(0x01), "\\x01");
-        assert_eq!(go_quoted_byte(b'{'), "{");
-    }
-
-    /// `expects_object_key` walks strings (including escapes), containers and
-    /// separators to decide whether the next token must be an object key.
-    #[test]
-    fn expects_object_key_tracks_escapes_containers_and_separators() {
-        // After a key, before its colon, the object still expects a key state.
-        assert!(expects_object_key(br#"{"a""#, 4));
-        // After the colon the next token is a value, not a key.
-        assert!(!expects_object_key(br#"{"a":"#, 5));
-        // After a comma inside an object a key is expected again.
-        assert!(expects_object_key(br#"{"a":1,"#, 7));
-        // Closing the object pops the frame: nothing is expected.
-        assert!(!expects_object_key(br#"{"a":1}"#, 7));
-        // An escaped quote inside the value must not end the string.
-        assert!(expects_object_key(br#"{"a":"\t","#, 10));
-        // Arrays never expect object keys.
-        assert!(!expects_object_key(b"[1]", 3));
+    fn go_syntax_oracle_matches_buffered_and_chunked_streams() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../rust-tests/parity/oracle/mcp-stdio-mutations/cases.json"
+        ))
+        .unwrap();
+        let mut executed = 0;
+        for case in fixture["cases"].as_array().unwrap() {
+            let Some(encoded) = case["input_spec"]["base64"].as_str() else {
+                continue;
+            };
+            let input = STANDARD.decode(encoded).unwrap();
+            let expected_out = STANDARD
+                .decode(case["stdout_base64"].as_str().unwrap())
+                .unwrap();
+            let expected_err = STANDARD
+                .decode(case["stderr_base64"].as_str().unwrap())
+                .unwrap();
+            let handler = no_backend_handler();
+            for live in [false, true] {
+                let mut output = Vec::new();
+                let result = if live {
+                    serve_stdio(
+                        &mut std::io::BufReader::with_capacity(1, &input[..]),
+                        &mut output,
+                        &handler,
+                    )
+                } else {
+                    serve_stream(&input, &mut output, &handler)
+                };
+                let error = result
+                    .err()
+                    .map(|e| format!("{e}\n").into_bytes())
+                    .unwrap_or_default();
+                assert_eq!(output, expected_out, "{} live={live}", case["name"]);
+                assert_eq!(error, expected_err, "{} live={live}", case["name"]);
+            }
+            executed += 1;
+        }
+        assert_eq!(executed, 666);
     }
 
     /// Go's recorded syntax-error wording for the bytes the shared scanner
@@ -755,7 +639,7 @@ mod tests {
     }
 
     /// Go's `encoding/json` wording for each malformed-value class the
-    /// heuristic distinguishes (keys, separators, escapes, literals, nesting).
+    /// scanner distinguishes (keys, separators, escapes, literals, nesting).
     #[test]
     fn syntax_error_matches_go_wording_per_error_class() {
         let cases: &[(&[u8], &str)] = &[

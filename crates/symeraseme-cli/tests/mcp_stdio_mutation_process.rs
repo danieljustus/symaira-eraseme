@@ -177,8 +177,8 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     let cases = fixture["cases"].as_array().unwrap();
     assert_eq!(
         cases.len(),
-        138,
-        "six parse cases, four boundaries, 128 seeded mutations"
+        670,
+        "six parse cases, four boundaries, 128 seeded mutations, 532 syntax probes"
     );
     assert_eq!(
         cases[..6]
@@ -191,9 +191,14 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     assert_eq!(cases[7]["name"], "size-above-8k");
     assert_eq!(cases[8]["name"], "nesting-at-go-limit");
     assert_eq!(cases[9]["name"], "nesting-over-go-limit");
-    for (index, case) in cases[10..].iter().enumerate() {
+    for (index, case) in cases[10..138].iter().enumerate() {
         assert_eq!(case["name"], format!("seeded-byte-mutation-{index:02}"));
     }
+    assert!(
+        cases[138..]
+            .iter()
+            .all(|case| case["name"].as_str().unwrap().starts_with("syntax-"))
+    );
 
     for case in cases {
         let name = case["name"].as_str().unwrap();

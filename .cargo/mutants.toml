@@ -5,27 +5,12 @@
 exclude_re = [
     # `x *= 1` on these digit-branch increments is the identity, and the
     # following digit loop consumes the same byte either way.
-    'protocol\.rs:775:19: replace \+= with \*= in skip_json_primitive',
-    'protocol\.rs:824:19: replace \+= with \*= in is_json_number',
+    'protocol\.rs:832:19: replace \+= with \*= in skip_json_primitive',
+    'protocol\.rs:881:19: replace \+= with \*= in is_json_number',
     # `<=` only adds a pass over an empty tail: from_utf8(&[]) pushes "" and breaks.
-    'protocol\.rs:575:27: replace < with <= in decode_json_string',
+    'protocol\.rs:583:27: replace < with <= in decode_json_string',
     # `>=` only adds a push_str of the empty valid prefix.
-    'protocol\.rs:583:30: replace > with >= in decode_json_string',
+    'protocol\.rs:591:30: replace > with >= in decode_json_string',
     # With position == len the scan sees an empty slice and returns Ok(None).
-    'stream\.rs:93:21: replace < with <= in serve_stdio',
-    # With position == len syntax_error gets an empty slice, which is EOF -> None.
-    'stream\.rs:115:21: replace < with <= in serve_stdio',
-    # Separator, quote and boundary indices point at different bytes, so > and >= agree.
-    'stream\.rs:243:88: replace > with >= in syntax_error',
-    'stream\.rs:245:71: replace > with >= in syntax_error',
-    # A second ':' after the boundary is rejected by serde before the error byte,
-    # so previous_separator > boundary is never true.
-    'stream\.rs:250:87: replace > with (==|>=) in syntax_error',
-    # Trailing ",}" always hits the Some(true) object-key arm first.
-    'stream\.rs:332:24: delete ! in syntax_error',
-    # A \v after '{' or where a key is expected already returned via the
-    # Some(true) object-key arm, so this branch is unreachable.
-    'stream\.rs:349:23: delete ! in syntax_error',
-    'stream\.rs:350:13: replace == with != in syntax_error',
-    'stream\.rs:350:49: replace \|\| with && in syntax_error',
+    'stream\.rs:91:21: replace < with <= in serve_stdio',
 ]
