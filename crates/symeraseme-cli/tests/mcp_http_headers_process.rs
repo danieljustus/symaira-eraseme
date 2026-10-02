@@ -183,6 +183,8 @@ fn readiness_probe_is_bounded_when_peer_dribbles_bytes() {
                 Err(error) => panic!("accept probe: {error}"),
             }
         };
+        // Windows inherits the listener's nonblocking mode.
+        stream.set_nonblocking(false).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(1)))
             .unwrap();
