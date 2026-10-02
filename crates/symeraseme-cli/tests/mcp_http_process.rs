@@ -1,18 +1,21 @@
 //! Exercise token-authenticated MCP over the real local process/network path.
 #![cfg(unix)]
 
-use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, OnceLock, mpsc};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
+
+#[path = "mcp_http_port.rs"]
+mod mcp_http_port;
+use mcp_http_port::{StartedChild, free_port, spawn_with_handoff};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GO_AGENT_CANCEL_FIXTURE: &str =
@@ -52,19 +55,7 @@ impl Drop for TestDir {
     }
 }
 
-fn free_port() -> u16 {
-    static ALLOCATED: OnceLock<Mutex<HashSet<u16>>> = OnceLock::new();
-    let allocated = ALLOCATED.get_or_init(|| Mutex::new(HashSet::new()));
-    loop {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        if allocated.lock().unwrap().insert(port) {
-            return port;
-        }
-    }
-}
-
-fn start(root: &Path, port: u16, host: &str, allow_remote: bool) -> Child {
+fn start(root: &Path, port: &mut u16, host: &str, allow_remote: bool) -> StartedChild {
     start_binary(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         root,
@@ -74,26 +65,38 @@ fn start(root: &Path, port: u16, host: &str, allow_remote: bool) -> Child {
     )
 }
 
-fn start_binary(binary: &Path, root: &Path, port: u16, host: &str, allow_remote: bool) -> Child {
+fn start_binary(
+    binary: &Path,
+    root: &Path,
+    port: &mut u16,
+    host: &str,
+    allow_remote: bool,
+) -> StartedChild {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    let mut command = Command::new(binary);
-    command.args(["mcp", "--host", host, "--port", &port.to_string()]);
-    if allow_remote {
-        command.arg("--allow-remote");
-    }
-    command
-        .env("HOME", &home)
-        .env("USERPROFILE", &home)
-        .env("SYMERASEME_DATA_DIR", root.join("data"))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap()
+    spawn_with_handoff(
+        port,
+        &root.join("data/mcp_token"),
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command.args(["mcp", "--host", host, "--port", &candidate.to_string()]);
+            if allow_remote {
+                command.arg("--allow-remote");
+            }
+            command
+                .env("HOME", &home)
+                .env("USERPROFILE", &home)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr)
+                .spawn()
+        },
+        |candidate, _token| accepts_current_token(candidate, root),
+    )
 }
 
-fn start_agent_server(binary: &Path, root: &Path, port: u16, started: &Path) -> Child {
+fn start_agent_server(binary: &Path, root: &Path, port: &mut u16, started: &Path) -> StartedChild {
     let home = root.join("home");
     let bin = root.join("bin");
     std::fs::create_dir_all(&home).unwrap();
@@ -106,21 +109,33 @@ fn start_agent_server(binary: &Path, root: &Path, port: u16, started: &Path) -> 
     .unwrap();
     std::fs::set_permissions(&agent, std::fs::Permissions::from_mode(0o700)).unwrap();
     let path = format!("{}:/bin:/usr/bin", bin.display());
-    let mut command = Command::new(binary);
-    command
-        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
-        .env("HOME", &home)
-        .env("USERPROFILE", &home)
-        .env("SYMERASEME_DATA_DIR", root.join("data"))
-        .env("SYMERASEME_LLM_PROVIDER", "agent")
-        .env("SYMERASEME_AGENT_BACKEND", "claude")
-        .env("AGENT_STARTED", started)
-        .env("PATH", path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap()
+    spawn_with_handoff(
+        port,
+        &root.join("data/mcp_token"),
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command
+                .args([
+                    "mcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &candidate.to_string(),
+                ])
+                .env("HOME", &home)
+                .env("USERPROFILE", &home)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("SYMERASEME_LLM_PROVIDER", "agent")
+                .env("SYMERASEME_AGENT_BACKEND", "claude")
+                .env("AGENT_STARTED", started)
+                .env("PATH", &path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr)
+                .spawn()
+        },
+        |candidate, _token| accepts_current_token(candidate, root),
+    )
 }
 
 fn seed_agent_reply(root: &Path) {
@@ -303,22 +318,39 @@ fn assert_provider_cancel_oracle_matches(root: &Path) {
     );
 }
 
-fn start_provider_server(binary: &Path, root: &Path, port: u16, provider_url: &str) -> Child {
+fn start_provider_server(
+    binary: &Path,
+    root: &Path,
+    port: &mut u16,
+    provider_url: &str,
+) -> StartedChild {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    let mut command = Command::new(binary);
-    command
-        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
-        .env("HOME", &home)
-        .env("USERPROFILE", &home)
-        .env("SYMERASEME_DATA_DIR", root.join("data"))
-        .env("SYMERASEME_LLM_BASE_URL", provider_url)
-        .env("OPENAI_API_KEY", "synthetic-cancel-key")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap()
+    spawn_with_handoff(
+        port,
+        &root.join("data/mcp_token"),
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command
+                .args([
+                    "mcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &candidate.to_string(),
+                ])
+                .env("HOME", &home)
+                .env("USERPROFILE", &home)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("SYMERASEME_LLM_BASE_URL", provider_url)
+                .env("OPENAI_API_KEY", "synthetic-cancel-key")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr)
+                .spawn()
+        },
+        |candidate, _token| accepts_current_token(candidate, root),
+    )
 }
 
 struct CapturedProviderRequest {
@@ -402,11 +434,11 @@ fn start_blocking_provider() -> (
     (provider_url, request_rx, server)
 }
 
-fn wait_ready(child: &mut Child, port: u16, root: &Path) {
+fn wait_ready(child: &mut StartedChild, port: u16, root: &Path) {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         if let Some(status) = child.try_wait().unwrap() {
-            let stderr = std::io::read_to_string(child.stderr.take().unwrap()).unwrap();
+            let stderr = child.stderr_text();
             panic!("MCP server exited early ({status}): {stderr}");
         }
         // A bare connect can reach a foreign listener on a port released by
@@ -641,8 +673,8 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
         )
         .unwrap();
     }
-    let port = free_port();
-    let mut child = start(root.path(), port, "127.0.0.1", false);
+    let mut port = free_port();
+    let mut child = start(root.path(), &mut port, "127.0.0.1", false);
     wait_ready(&mut child, port, root.path());
     let first_token = token(root.path());
     #[cfg(unix)]
@@ -745,7 +777,7 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
     for signal_name in ["INT", "TERM"] {
         signal(&mut child, signal_name);
         if signal_name == "INT" {
-            child = start(root.path(), port, "127.0.0.1", false);
+            child = start(root.path(), &mut port, "127.0.0.1", false);
             wait_ready(&mut child, port, root.path());
             let second_token = token(root.path());
             assert_ne!(
@@ -759,8 +791,8 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
     assert!(!status.success());
     assert!(stderr.contains("refusing non-loopback MCP bind \"0.0.0.0\" without --allow-remote"));
 
-    let remote_port = free_port();
-    let mut remote = start(root.path(), remote_port, "0.0.0.0", true);
+    let mut remote_port = free_port();
+    let mut remote = start(root.path(), &mut remote_port, "0.0.0.0", true);
     wait_ready(&mut remote, remote_port, root.path());
     signal(&mut remote, "TERM");
 }
@@ -769,8 +801,8 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
 #[cfg(unix)]
 fn signal_stops_accepting_before_in_flight_request_drains() {
     let root = TestDir::new();
-    let port = free_port();
-    let mut child = start(root.path(), port, "127.0.0.1", false);
+    let mut port = free_port();
+    let mut child = start(root.path(), &mut port, "127.0.0.1", false);
     wait_ready(&mut child, port, root.path());
     let bearer = token(root.path());
 
@@ -863,9 +895,9 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
     for (name, binary) in [("go", go.as_path()), ("rust", rust)] {
         let case = TestDir::new();
         seed_agent_reply(case.path());
-        let port = free_port();
+        let mut port = free_port();
         let started = case.path().join("agent.started");
-        let mut server = start_agent_server(binary, case.path(), port, &started);
+        let mut server = start_agent_server(binary, case.path(), &mut port, &started);
         wait_ready(&mut server, port, case.path());
         let bearer = token(case.path());
         let request = post_then_disconnect(port, &bearer);
@@ -916,8 +948,8 @@ fn live_http_disconnect_cancels_provider_request_like_go() {
         let case = TestDir::new();
         seed_agent_reply(case.path());
         let (provider_url, request_rx, provider) = start_blocking_provider();
-        let port = free_port();
-        let mut server = start_provider_server(binary, case.path(), port, &provider_url);
+        let mut port = free_port();
+        let mut server = start_provider_server(binary, case.path(), &mut port, &provider_url);
         wait_ready(&mut server, port, case.path());
         let bearer = token(case.path());
         let request = post_body_then_disconnect(port, &bearer, body);
@@ -968,8 +1000,8 @@ fn live_http_disconnect_cancels_provider_request_like_go() {
 #[cfg(unix)]
 fn incomplete_request_headers_expire_at_the_go_five_second_timeout() {
     let root = TestDir::new();
-    let port = free_port();
-    let mut child = start(root.path(), port, "127.0.0.1", false);
+    let mut port = free_port();
+    let mut child = start(root.path(), &mut port, "127.0.0.1", false);
     wait_ready(&mut child, port, root.path());
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
@@ -1002,8 +1034,8 @@ fn incomplete_request_headers_expire_at_the_go_five_second_timeout() {
 #[cfg(unix)]
 fn slow_header_connections_are_bounded_and_backpressured() {
     let root = TestDir::new();
-    let port = free_port();
-    let mut child = start(root.path(), port, "127.0.0.1", false);
+    let mut port = free_port();
+    let mut child = start(root.path(), &mut port, "127.0.0.1", false);
     wait_ready(&mut child, port, root.path());
     assert_eq!(exchange(port, "GET", b"", &[]).0, 405);
 
@@ -1101,8 +1133,8 @@ fn slow_header_connections_are_bounded_and_backpressured() {
 #[cfg(unix)]
 fn many_sequential_http_connections_complete_cleanly() {
     let root = TestDir::new();
-    let port = free_port();
-    let mut child = start(root.path(), port, "127.0.0.1", false);
+    let mut port = free_port();
+    let mut child = start(root.path(), &mut port, "127.0.0.1", false);
     wait_ready(&mut child, port, root.path());
     for _ in 0..512 {
         let (status, content_type, _) = exchange(port, "GET", b"", &[]);
@@ -1120,14 +1152,14 @@ fn go_oracle_http_wire_transcripts_match() {
     let root = TestDir::new();
     let oracle = build_go_oracle(root.path());
 
-    let go_port = free_port();
-    let rust_port = free_port();
+    let mut go_port = free_port();
+    let mut rust_port = free_port();
     let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
     std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
-    let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
-    let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
+    let mut go = start_binary(&oracle, &go_root, &mut go_port, "127.0.0.1", false);
+    let mut rust = start(&rust_root, &mut rust_port, "127.0.0.1", false);
     wait_ready(&mut go, go_port, &go_root);
     wait_ready(&mut rust, rust_port, &rust_root);
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
@@ -1219,6 +1251,107 @@ fn go_oracle_http_wire_transcripts_match() {
     signal(&mut rust, "TERM");
 }
 
+struct StaleTokenListener {
+    stop: mpsc::Sender<()>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl Drop for StaleTokenListener {
+    fn drop(&mut self) {
+        let _ = self.stop.send(());
+        if let Some(worker) = self.worker.take() {
+            worker.join().unwrap();
+        }
+    }
+}
+
+fn start_stale_token_listener(listener: TcpListener) -> StaleTokenListener {
+    listener.set_nonblocking(true).unwrap();
+    let (stop, stop_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        loop {
+            if stop_rx.try_recv().is_ok() {
+                return;
+            }
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+                    let mut reader = BufReader::new(stream);
+                    let mut authorization = String::new();
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).is_err() || line.is_empty() || line == "\r\n"
+                        {
+                            break;
+                        }
+                        if let Some((name, value)) = line.split_once(':')
+                            && name.eq_ignore_ascii_case("authorization")
+                        {
+                            authorization = value.trim().to_owned();
+                        }
+                    }
+                    let stale = authorization == "Bearer stale-token";
+                    let response = if stale {
+                        "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    } else {
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    };
+                    let _ = reader.into_inner().write_all(response.as_bytes());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => panic!("foreign listener accept failed: {error}"),
+            }
+        }
+    });
+    StaleTokenListener {
+        stop,
+        worker: Some(worker),
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness() {
+    let root = TestDir::new();
+    let oracle = build_go_oracle(root.path());
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+
+    for (name, binary) in [("go", oracle.as_path()), ("rust", rust)] {
+        let case = TestDir::new();
+        let data = case.path().join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(data.join("mcp_token"), "stale-token").unwrap();
+
+        let mut port = free_port();
+        let occupied = TcpListener::bind(("127.0.0.1", port)).unwrap();
+        let occupied_port = occupied.local_addr().unwrap().port();
+        let foreign = start_stale_token_listener(occupied);
+        let stale_probe_deadline = Instant::now() + Duration::from_secs(5);
+        while !accepts_current_token(port, case.path()) {
+            assert!(
+                Instant::now() < stale_probe_deadline,
+                "the foreign listener did not respond with its stale-token success"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        let mut server = start_binary(binary, case.path(), &mut port, "127.0.0.1", false);
+        assert_ne!(
+            port, occupied_port,
+            "{name} did not reselect the stolen port"
+        );
+        wait_ready(&mut server, port, case.path());
+        assert_ne!(token(case.path()), "stale-token");
+        assert!(server.try_wait().unwrap().is_none());
+        eprintln!("{name} startup reselected {occupied_port} -> {port}");
+        signal(&mut server, "TERM");
+        drop(foreign);
+    }
+}
+
 #[test]
 #[cfg(unix)]
 fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
@@ -1303,14 +1436,14 @@ fn unavailable_local_address_error_matches_go() {
 fn obs_text_origin_rejection_matches_go_and_rust_processes() {
     let root = TestDir::new();
     let oracle = build_go_oracle(root.path());
-    let go_port = free_port();
-    let rust_port = free_port();
+    let mut go_port = free_port();
+    let mut rust_port = free_port();
     let go_root = root.path().join("go-obs-text");
     let rust_root = root.path().join("rust-obs-text");
     std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
-    let mut go = start_binary(&oracle, &go_root, go_port, "127.0.0.1", false);
-    let mut rust = start(&rust_root, rust_port, "127.0.0.1", false);
+    let mut go = start_binary(&oracle, &go_root, &mut go_port, "127.0.0.1", false);
+    let mut rust = start(&rust_root, &mut rust_port, "127.0.0.1", false);
     wait_ready(&mut go, go_port, &go_root);
     wait_ready(&mut rust, rust_port, &rust_root);
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();

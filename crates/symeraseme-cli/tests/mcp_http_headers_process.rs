@@ -2,12 +2,16 @@
 //! Header names/order are HTTP-insensitive; only the validated Date value varies.
 
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-struct Server(Child);
+#[path = "mcp_http_port.rs"]
+mod mcp_http_port;
+use mcp_http_port::{StartedChild, free_port, spawn_with_handoff};
+
+struct Server(StartedChild);
 
 impl Drop for Server {
     fn drop(&mut self) {
@@ -20,60 +24,45 @@ impl Drop for Server {
 
 fn start(binary: &Path, root: &Path) -> (Server, u16, String) {
     std::fs::create_dir_all(root).unwrap();
-    let port = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    let mut command = Command::new(binary);
-    command
-        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
-        .current_dir(root)
-        .env_clear()
-        .env("HOME", root)
-        .env("USERPROFILE", root)
-        .env("SYMERASEME_DATA_DIR", root.join("data"))
-        .env("TMPDIR", root)
-        .env("TMP", root)
-        .env("TEMP", root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    for name in ["CONFIG", "DATA", "STATE", "CACHE"] {
-        command.env(format!("XDG_{name}_HOME"), root.join(name.to_lowercase()));
-    }
-    // Windows system APIs need the OS directory, not operator credentials/config.
-    if let Some(system_root) = std::env::var_os("SystemRoot") {
-        command.env("SystemRoot", system_root);
-    }
-    let mut server = Server(command.spawn().unwrap());
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut port = free_port();
     let token_path = root.join("data/mcp_token");
-    loop {
-        assert!(
-            server.0.try_wait().unwrap().is_none(),
-            "server exited early"
-        );
-        if let Ok(token) = std::fs::read_to_string(&token_path)
-            && TcpStream::connect(("127.0.0.1", port)).is_ok()
-        {
-            let response = exchange(
-                port,
-                "POST",
-                br#"{"jsonrpc":"2.0","id":0,"method":"initialize"}"#,
-                &[("Authorization", format!("Bearer {token}"))],
-            );
-            assert_eq!(
-                response.status_line, "HTTP/1.1 200 OK",
-                "token authenticates this server"
-            );
-            let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
-            assert_eq!(body["result"]["serverInfo"]["name"], "symeraseme");
-            return (server, port, token);
-        }
-        assert!(Instant::now() < deadline, "server readiness deadline");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    let server = spawn_with_handoff(
+        &mut port,
+        &token_path,
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command
+                .args([
+                    "mcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &candidate.to_string(),
+                ])
+                .current_dir(root)
+                .env_clear()
+                .env("HOME", root)
+                .env("USERPROFILE", root)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("TMPDIR", root)
+                .env("TMP", root)
+                .env("TEMP", root)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr);
+            for name in ["CONFIG", "DATA", "STATE", "CACHE"] {
+                command.env(format!("XDG_{name}_HOME"), root.join(name.to_lowercase()));
+            }
+            // Windows system APIs need the OS directory, not operator credentials/config.
+            if let Some(system_root) = std::env::var_os("SystemRoot") {
+                command.env("SystemRoot", system_root);
+            }
+            command.spawn()
+        },
+        accepts_token,
+    );
+    let token = std::fs::read_to_string(token_path).unwrap();
+    (Server(server), port, token)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -170,6 +159,45 @@ fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) ->
         }
     }
     parse_response(&raw)
+}
+
+fn accepts_token(port: u16, token: &str) -> bool {
+    let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) else {
+        return false;
+    };
+    if stream
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .is_err()
+        || stream
+            .set_write_timeout(Some(Duration::from_millis(500)))
+            .is_err()
+    {
+        return false;
+    }
+    let body = br#"{"jsonrpc":"2.0","id":0,"method":"initialize"}"#;
+    let mut request =
+        b"POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nAuthorization: Bearer "
+            .to_vec();
+    request.extend_from_slice(token.as_bytes());
+    request.extend_from_slice(format!("\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes());
+    if stream.write_all(&request).is_err() || stream.write_all(body).is_err() {
+        return false;
+    }
+
+    let mut raw = Vec::new();
+    let _ = stream.read_to_end(&mut raw);
+    let Some(split) = raw.windows(4).position(|bytes| bytes == b"\r\n\r\n") else {
+        return false;
+    };
+    let Ok(head) = std::str::from_utf8(&raw[..split]) else {
+        return false;
+    };
+    if head.lines().next() != Some("HTTP/1.1 200 OK") {
+        return false;
+    }
+    serde_json::from_slice::<serde_json::Value>(&raw[split + 4..])
+        .ok()
+        .is_some_and(|body| body["result"]["serverInfo"]["name"] == "symeraseme")
 }
 
 fn assert_matches(candidate: &Response, oracle: &Response) {
