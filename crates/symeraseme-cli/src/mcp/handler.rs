@@ -3078,6 +3078,10 @@ mod tests {
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .env("GOMODCACHE", &module_cache)
             .env("GOCACHE", &build_cache)
+            .env("GOTMPDIR", &root)
+            .env("TMPDIR", &root)
+            .env("TEMP", &root)
+            .env("TMP", &root)
             .env("GOENV", "off")
             .env("GOWORK", "off")
             .env("GOTOOLCHAIN", "local")
@@ -3089,6 +3093,37 @@ mod tests {
             .env("XDG_DATA_HOME", isolated_home.join("data"))
             .env("XDG_STATE_HOME", isolated_home.join("state"))
             .env("XDG_CACHE_HOME", isolated_home.join("cache"));
+        // Verify the compiler's actual environment, including overrides of
+        // hostile caller paths, before it creates any build temporary files.
+        let caller_temp = root.with_extension("caller-temp");
+        let temporary = std::process::Command::new(build.get_program())
+            .args(["env", "GOTMPDIR"])
+            .current_dir(&repository_root)
+            .env_clear()
+            .env("GOTMPDIR", &caller_temp)
+            .env("TMPDIR", &caller_temp)
+            .env("TEMP", &caller_temp)
+            .env("TMP", &caller_temp)
+            .envs(
+                build
+                    .get_envs()
+                    .filter_map(|(name, value)| value.map(|value| (name, value))),
+            )
+            .output()
+            .expect("resolve isolated compiler temporary directory");
+        assert!(
+            temporary.status.success(),
+            "resolve compiler temporary directory"
+        );
+        assert_eq!(
+            PathBuf::from(
+                String::from_utf8(temporary.stdout)
+                    .expect("Go temporary path")
+                    .trim()
+            ),
+            root,
+            "Go compiler temporary files escaped the owned root"
+        );
         let build = build.output().expect("build current Go MCP clock oracle");
         assert!(
             build.status.success(),
