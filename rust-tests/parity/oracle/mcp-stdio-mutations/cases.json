@@ -14,7 +14,7 @@
     }
   ],
   "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
-  "generator_sha256": "cbd02b192e15bcdc915efe200caf943d3811d273af6511e8e3c317525e514fcb",
+  "generator_sha256": "f0105e665807547baf438aa0266748d506a301df3f5a3a74da8e80baad9062fb",
   "cases": [
     {
       "name": "initialize_trailing_comma_is_parse_error",
@@ -1261,6 +1261,4794 @@
       "exit_code": 0,
       "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAxLCJtZXNzYWdlIjoibWV0aG9kIG5vdCBmb3VuZCJ9LCJpZCI6MX0K",
       "stderr_base64": ""
+    },
+    {
+      "name": "syntax-array-string-separator",
+      "input_spec": {
+        "base64": "WyJhIiAxXQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzEnIGFmdGVyIGFycmF5IGVsZW1lbnQK"
+    },
+    {
+      "name": "syntax-array-number-separator",
+      "input_spec": {
+        "base64": "WzFuXQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ24nIGFmdGVyIGFycmF5IGVsZW1lbnQK"
+    },
+    {
+      "name": "syntax-key-hex-escape",
+      "input_spec": {
+        "base64": "eyJcdTAwenoiOjF9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3onIGluIFx1IGhleGFkZWNpbWFsIGNoYXJhY3RlciBlc2NhcGUK"
+    },
+    {
+      "name": "syntax-value-hex-escape",
+      "input_spec": {
+        "base64": "eyJhIjoiXHUwMHp6In0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3onIGluIFx1IGhleGFkZWNpbWFsIGNoYXJhY3RlciBlc2NhcGUK"
+    },
+    {
+      "name": "syntax-multiline-key-separator",
+      "input_spec": {
+        "base64": "ewoiYSIKMX0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzEnIGFmdGVyIG9iamVjdCBrZXkK"
+    },
+    {
+      "name": "syntax-multiline-array-separator",
+      "input_spec": {
+        "base64": "WwoxCjJd"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzInIGFmdGVyIGFycmF5IGVsZW1lbnQK"
+    },
+    {
+      "name": "syntax-multiline-value-separator",
+      "input_spec": {
+        "base64": "ewoiYSI6MQoyfQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzInIGFmdGVyIG9iamVjdCBrZXk6dmFsdWUgcGFpcgo="
+    },
+    {
+      "name": "syntax-numeric-minus",
+      "input_spec": {
+        "base64": "Wy14XQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIG51bWVyaWMgbGl0ZXJhbAo="
+    },
+    {
+      "name": "syntax-numeric-fraction",
+      "input_spec": {
+        "base64": "WzEueF0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGFmdGVyIGRlY2ltYWwgcG9pbnQgaW4gbnVtZXJpYyBsaXRlcmFsCg=="
+    },
+    {
+      "name": "syntax-numeric-exponent",
+      "input_spec": {
+        "base64": "WzFleF0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIGV4cG9uZW50IG9mIG51bWVyaWMgbGl0ZXJhbAo="
+    },
+    {
+      "name": "syntax-numeric-signed-exponent",
+      "input_spec": {
+        "base64": "WzFlK3hd"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIGV4cG9uZW50IG9mIG51bWVyaWMgbGl0ZXJhbAo="
+    },
+    {
+      "name": "syntax-nested-array-separator",
+      "input_spec": {
+        "base64": "eyJhIjpbWzEgMl1dfQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzInIGFmdGVyIGFycmF5IGVsZW1lbnQK"
+    },
+    {
+      "name": "syntax-earliest-error-before-escape",
+      "input_spec": {
+        "base64": "W3gsIlxxIl0="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiB2YWx1ZQo="
+    },
+    {
+      "name": "syntax-earliest-error-before-literal",
+      "input_spec": {
+        "base64": "eyJhIiAxLCJiIjp0cnVYfQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzEnIGFmdGVyIG9iamVjdCBrZXkK"
+    },
+    {
+      "name": "syntax-truncated-escape",
+      "input_spec": {
+        "base64": "ImFc"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-truncated-hex-escape",
+      "input_spec": {
+        "base64": "Ilx1MDA="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-truncated-literal",
+      "input_spec": {
+        "base64": "W3RydQ=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-truncated-fraction",
+      "input_spec": {
+        "base64": "WzEu"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-truncated-exponent",
+      "input_spec": {
+        "base64": "WzFlKw=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-truncated-string",
+      "input_spec": {
+        "base64": "ImFiYw=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-key-byte-00",
+      "input_spec": {
+        "base64": "ewB9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDAnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-01",
+      "input_spec": {
+        "base64": "ewF9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDEnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-02",
+      "input_spec": {
+        "base64": "ewJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDInIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-03",
+      "input_spec": {
+        "base64": "ewN9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDMnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-04",
+      "input_spec": {
+        "base64": "ewR9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDQnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-05",
+      "input_spec": {
+        "base64": "ewV9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-06",
+      "input_spec": {
+        "base64": "ewZ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-07",
+      "input_spec": {
+        "base64": "ewd9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xhJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-08",
+      "input_spec": {
+        "base64": "ewh9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xiJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-09",
+      "input_spec": {
+        "base64": "ewl9"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-key-byte-0a",
+      "input_spec": {
+        "base64": "ewp9"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-key-byte-0b",
+      "input_spec": {
+        "base64": "ewt9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x2JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-0c",
+      "input_spec": {
+        "base64": "ewx9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xmJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-0d",
+      "input_spec": {
+        "base64": "ew19"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-key-byte-0e",
+      "input_spec": {
+        "base64": "ew59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MGUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-0f",
+      "input_spec": {
+        "base64": "ew99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MGYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-10",
+      "input_spec": {
+        "base64": "exB9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTAnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-11",
+      "input_spec": {
+        "base64": "exF9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTEnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-12",
+      "input_spec": {
+        "base64": "exJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTInIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-13",
+      "input_spec": {
+        "base64": "exN9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTMnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-14",
+      "input_spec": {
+        "base64": "exR9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTQnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-15",
+      "input_spec": {
+        "base64": "exV9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-16",
+      "input_spec": {
+        "base64": "exZ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-17",
+      "input_spec": {
+        "base64": "exd9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTcnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-18",
+      "input_spec": {
+        "base64": "exh9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTgnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-19",
+      "input_spec": {
+        "base64": "exl9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTknIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1a",
+      "input_spec": {
+        "base64": "exp9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWEnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1b",
+      "input_spec": {
+        "base64": "ext9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWInIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1c",
+      "input_spec": {
+        "base64": "exx9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWMnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1d",
+      "input_spec": {
+        "base64": "ex19"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWQnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1e",
+      "input_spec": {
+        "base64": "ex59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-1f",
+      "input_spec": {
+        "base64": "ex99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-20",
+      "input_spec": {
+        "base64": "eyB9"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-key-byte-21",
+      "input_spec": {
+        "base64": "eyF9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyEnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-22",
+      "input_spec": {
+        "base64": "eyJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "dW5leHBlY3RlZCBFT0YK"
+    },
+    {
+      "name": "syntax-key-byte-23",
+      "input_spec": {
+        "base64": "eyN9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyMnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-24",
+      "input_spec": {
+        "base64": "eyR9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyQnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-25",
+      "input_spec": {
+        "base64": "eyV9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-26",
+      "input_spec": {
+        "base64": "eyZ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-27",
+      "input_spec": {
+        "base64": "eyd9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1wnJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-28",
+      "input_spec": {
+        "base64": "eyh9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJygnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-29",
+      "input_spec": {
+        "base64": "eyl9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyknIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2a",
+      "input_spec": {
+        "base64": "eyp9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyonIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2b",
+      "input_spec": {
+        "base64": "eyt9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJysnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2c",
+      "input_spec": {
+        "base64": "eyx9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJywnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2d",
+      "input_spec": {
+        "base64": "ey19"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJy0nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2e",
+      "input_spec": {
+        "base64": "ey59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJy4nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-2f",
+      "input_spec": {
+        "base64": "ey99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJy8nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-30",
+      "input_spec": {
+        "base64": "ezB9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzAnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-31",
+      "input_spec": {
+        "base64": "ezF9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzEnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-32",
+      "input_spec": {
+        "base64": "ezJ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzInIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-33",
+      "input_spec": {
+        "base64": "ezN9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzMnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-34",
+      "input_spec": {
+        "base64": "ezR9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzQnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-35",
+      "input_spec": {
+        "base64": "ezV9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzUnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-36",
+      "input_spec": {
+        "base64": "ezZ9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzYnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-37",
+      "input_spec": {
+        "base64": "ezd9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzcnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-38",
+      "input_spec": {
+        "base64": "ezh9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzgnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-39",
+      "input_spec": {
+        "base64": "ezl9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzknIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3a",
+      "input_spec": {
+        "base64": "ezp9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzonIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3b",
+      "input_spec": {
+        "base64": "ezt9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzsnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3c",
+      "input_spec": {
+        "base64": "ezx9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzwnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3d",
+      "input_spec": {
+        "base64": "ez19"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz0nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3e",
+      "input_spec": {
+        "base64": "ez59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz4nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-3f",
+      "input_spec": {
+        "base64": "ez99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz8nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-40",
+      "input_spec": {
+        "base64": "e0B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0AnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-41",
+      "input_spec": {
+        "base64": "e0F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0EnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-42",
+      "input_spec": {
+        "base64": "e0J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0InIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-43",
+      "input_spec": {
+        "base64": "e0N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0MnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-44",
+      "input_spec": {
+        "base64": "e0R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0QnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-45",
+      "input_spec": {
+        "base64": "e0V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0UnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-46",
+      "input_spec": {
+        "base64": "e0Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0YnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-47",
+      "input_spec": {
+        "base64": "e0d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0cnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-48",
+      "input_spec": {
+        "base64": "e0h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-49",
+      "input_spec": {
+        "base64": "e0l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0knIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4a",
+      "input_spec": {
+        "base64": "e0p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0onIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4b",
+      "input_spec": {
+        "base64": "e0t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0snIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4c",
+      "input_spec": {
+        "base64": "e0x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0wnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4d",
+      "input_spec": {
+        "base64": "e019"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ00nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4e",
+      "input_spec": {
+        "base64": "e059"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ04nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-4f",
+      "input_spec": {
+        "base64": "e099"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ08nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-50",
+      "input_spec": {
+        "base64": "e1B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1AnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-51",
+      "input_spec": {
+        "base64": "e1F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1EnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-52",
+      "input_spec": {
+        "base64": "e1J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1InIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-53",
+      "input_spec": {
+        "base64": "e1N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1MnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-54",
+      "input_spec": {
+        "base64": "e1R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1QnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-55",
+      "input_spec": {
+        "base64": "e1V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1UnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-56",
+      "input_spec": {
+        "base64": "e1Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1YnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-57",
+      "input_spec": {
+        "base64": "e1d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1cnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-58",
+      "input_spec": {
+        "base64": "e1h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-59",
+      "input_spec": {
+        "base64": "e1l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1knIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-5a",
+      "input_spec": {
+        "base64": "e1p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1onIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-5b",
+      "input_spec": {
+        "base64": "e1t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1snIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-5c",
+      "input_spec": {
+        "base64": "e1x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xcJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-5d",
+      "input_spec": {
+        "base64": "e119"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ10nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-5e",
+      "input_spec": {
+        "base64": "e159"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ14nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-5f",
+      "input_spec": {
+        "base64": "e199"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ18nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-60",
+      "input_spec": {
+        "base64": "e2B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2AnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-61",
+      "input_spec": {
+        "base64": "e2F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2EnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-62",
+      "input_spec": {
+        "base64": "e2J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2InIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-63",
+      "input_spec": {
+        "base64": "e2N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2MnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-64",
+      "input_spec": {
+        "base64": "e2R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2QnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-65",
+      "input_spec": {
+        "base64": "e2V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2UnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-66",
+      "input_spec": {
+        "base64": "e2Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2YnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-67",
+      "input_spec": {
+        "base64": "e2d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2cnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-68",
+      "input_spec": {
+        "base64": "e2h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-69",
+      "input_spec": {
+        "base64": "e2l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2knIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6a",
+      "input_spec": {
+        "base64": "e2p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2onIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6b",
+      "input_spec": {
+        "base64": "e2t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2snIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6c",
+      "input_spec": {
+        "base64": "e2x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2wnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6d",
+      "input_spec": {
+        "base64": "e219"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ20nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6e",
+      "input_spec": {
+        "base64": "e259"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ24nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-6f",
+      "input_spec": {
+        "base64": "e299"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ28nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-70",
+      "input_spec": {
+        "base64": "e3B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3AnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-71",
+      "input_spec": {
+        "base64": "e3F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3EnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-72",
+      "input_spec": {
+        "base64": "e3J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3InIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-73",
+      "input_spec": {
+        "base64": "e3N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3MnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-74",
+      "input_spec": {
+        "base64": "e3R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3QnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-75",
+      "input_spec": {
+        "base64": "e3V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3UnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-76",
+      "input_spec": {
+        "base64": "e3Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3YnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-77",
+      "input_spec": {
+        "base64": "e3d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3cnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-78",
+      "input_spec": {
+        "base64": "e3h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-79",
+      "input_spec": {
+        "base64": "e3l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3knIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-7a",
+      "input_spec": {
+        "base64": "e3p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3onIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-7b",
+      "input_spec": {
+        "base64": "e3t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3snIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-7c",
+      "input_spec": {
+        "base64": "e3x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3wnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-7d",
+      "input_spec": {
+        "base64": "e319"
+      },
+      "exit_code": 1,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ30nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiB2YWx1ZQo="
+    },
+    {
+      "name": "syntax-key-byte-7e",
+      "input_spec": {
+        "base64": "e359"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ34nIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-7f",
+      "input_spec": {
+        "base64": "e399"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4N2YnIGxvb2tpbmcgZm9yIGJlZ2lubmluZyBvZiBvYmplY3Qga2V5IHN0cmluZwo="
+    },
+    {
+      "name": "syntax-key-byte-80",
+      "input_spec": {
+        "base64": "e4B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-81",
+      "input_spec": {
+        "base64": "e4F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-82",
+      "input_spec": {
+        "base64": "e4J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-83",
+      "input_spec": {
+        "base64": "e4N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-84",
+      "input_spec": {
+        "base64": "e4R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-85",
+      "input_spec": {
+        "base64": "e4V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-86",
+      "input_spec": {
+        "base64": "e4Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-87",
+      "input_spec": {
+        "base64": "e4d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-88",
+      "input_spec": {
+        "base64": "e4h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4OCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-89",
+      "input_spec": {
+        "base64": "e4l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4OScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8a",
+      "input_spec": {
+        "base64": "e4p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8b",
+      "input_spec": {
+        "base64": "e4t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8c",
+      "input_spec": {
+        "base64": "e4x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8d",
+      "input_spec": {
+        "base64": "e419"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8e",
+      "input_spec": {
+        "base64": "e459"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-8f",
+      "input_spec": {
+        "base64": "e499"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-90",
+      "input_spec": {
+        "base64": "e5B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-91",
+      "input_spec": {
+        "base64": "e5F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-92",
+      "input_spec": {
+        "base64": "e5J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-93",
+      "input_spec": {
+        "base64": "e5N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-94",
+      "input_spec": {
+        "base64": "e5R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-95",
+      "input_spec": {
+        "base64": "e5V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-96",
+      "input_spec": {
+        "base64": "e5Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-97",
+      "input_spec": {
+        "base64": "e5d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-98",
+      "input_spec": {
+        "base64": "e5h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5OCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-99",
+      "input_spec": {
+        "base64": "e5l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5OScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9a",
+      "input_spec": {
+        "base64": "e5p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9b",
+      "input_spec": {
+        "base64": "e5t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9c",
+      "input_spec": {
+        "base64": "e5x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YycgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9d",
+      "input_spec": {
+        "base64": "e519"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9e",
+      "input_spec": {
+        "base64": "e559"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZScgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-9f",
+      "input_spec": {
+        "base64": "e599"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZicgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-a0",
+      "input_spec": {
+        "base64": "e6B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDBhMCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-a1",
+      "input_spec": {
+        "base64": "e6F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KhJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a2",
+      "input_spec": {
+        "base64": "e6J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KiJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a3",
+      "input_spec": {
+        "base64": "e6N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KjJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a4",
+      "input_spec": {
+        "base64": "e6R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KkJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a5",
+      "input_spec": {
+        "base64": "e6V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KlJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a6",
+      "input_spec": {
+        "base64": "e6Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KmJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a7",
+      "input_spec": {
+        "base64": "e6d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KnJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a8",
+      "input_spec": {
+        "base64": "e6h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KoJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-a9",
+      "input_spec": {
+        "base64": "e6l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KpJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-aa",
+      "input_spec": {
+        "base64": "e6p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KqJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ab",
+      "input_spec": {
+        "base64": "e6t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KrJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ac",
+      "input_spec": {
+        "base64": "e6x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KsJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ad",
+      "input_spec": {
+        "base64": "e619"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDBhZCcgbG9va2luZyBmb3IgYmVnaW5uaW5nIG9mIG9iamVjdCBrZXkgc3RyaW5nCg=="
+    },
+    {
+      "name": "syntax-key-byte-ae",
+      "input_spec": {
+        "base64": "e659"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KuJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-af",
+      "input_spec": {
+        "base64": "e699"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KvJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b0",
+      "input_spec": {
+        "base64": "e7B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KwJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b1",
+      "input_spec": {
+        "base64": "e7F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KxJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b2",
+      "input_spec": {
+        "base64": "e7J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KyJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b3",
+      "input_spec": {
+        "base64": "e7N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KzJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b4",
+      "input_spec": {
+        "base64": "e7R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K0JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b5",
+      "input_spec": {
+        "base64": "e7V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K1JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b6",
+      "input_spec": {
+        "base64": "e7Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K2JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b7",
+      "input_spec": {
+        "base64": "e7d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K3JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b8",
+      "input_spec": {
+        "base64": "e7h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K4JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-b9",
+      "input_spec": {
+        "base64": "e7l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K5JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ba",
+      "input_spec": {
+        "base64": "e7p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K6JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-bb",
+      "input_spec": {
+        "base64": "e7t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K7JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-bc",
+      "input_spec": {
+        "base64": "e7x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K8JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-bd",
+      "input_spec": {
+        "base64": "e719"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K9JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-be",
+      "input_spec": {
+        "base64": "e759"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K+JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-bf",
+      "input_spec": {
+        "base64": "e799"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K/JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c0",
+      "input_spec": {
+        "base64": "e8B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OAJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c1",
+      "input_spec": {
+        "base64": "e8F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OBJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c2",
+      "input_spec": {
+        "base64": "e8J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OCJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c3",
+      "input_spec": {
+        "base64": "e8N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ODJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c4",
+      "input_spec": {
+        "base64": "e8R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OEJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c5",
+      "input_spec": {
+        "base64": "e8V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OFJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c6",
+      "input_spec": {
+        "base64": "e8Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OGJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c7",
+      "input_spec": {
+        "base64": "e8d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OHJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c8",
+      "input_spec": {
+        "base64": "e8h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OIJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-c9",
+      "input_spec": {
+        "base64": "e8l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OJJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ca",
+      "input_spec": {
+        "base64": "e8p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OKJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-cb",
+      "input_spec": {
+        "base64": "e8t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OLJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-cc",
+      "input_spec": {
+        "base64": "e8x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OMJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-cd",
+      "input_spec": {
+        "base64": "e819"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ONJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ce",
+      "input_spec": {
+        "base64": "e859"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OOJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-cf",
+      "input_spec": {
+        "base64": "e899"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OPJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d0",
+      "input_spec": {
+        "base64": "e9B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OQJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d1",
+      "input_spec": {
+        "base64": "e9F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ORJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d2",
+      "input_spec": {
+        "base64": "e9J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OSJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d3",
+      "input_spec": {
+        "base64": "e9N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OTJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d4",
+      "input_spec": {
+        "base64": "e9R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OUJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d5",
+      "input_spec": {
+        "base64": "e9V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OVJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d6",
+      "input_spec": {
+        "base64": "e9Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OWJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d7",
+      "input_spec": {
+        "base64": "e9d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OXJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d8",
+      "input_spec": {
+        "base64": "e9h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OYJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-d9",
+      "input_spec": {
+        "base64": "e9l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OZJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-da",
+      "input_spec": {
+        "base64": "e9p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OaJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-db",
+      "input_spec": {
+        "base64": "e9t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ObJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-dc",
+      "input_spec": {
+        "base64": "e9x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OcJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-dd",
+      "input_spec": {
+        "base64": "e919"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OdJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-de",
+      "input_spec": {
+        "base64": "e959"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OeJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-df",
+      "input_spec": {
+        "base64": "e999"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OfJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e0",
+      "input_spec": {
+        "base64": "e+B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OgJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e1",
+      "input_spec": {
+        "base64": "e+F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OhJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e2",
+      "input_spec": {
+        "base64": "e+J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OiJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e3",
+      "input_spec": {
+        "base64": "e+N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OjJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e4",
+      "input_spec": {
+        "base64": "e+R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OkJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e5",
+      "input_spec": {
+        "base64": "e+V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OlJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e6",
+      "input_spec": {
+        "base64": "e+Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OmJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e7",
+      "input_spec": {
+        "base64": "e+d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OnJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e8",
+      "input_spec": {
+        "base64": "e+h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OoJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-e9",
+      "input_spec": {
+        "base64": "e+l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OpJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ea",
+      "input_spec": {
+        "base64": "e+p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OqJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-eb",
+      "input_spec": {
+        "base64": "e+t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OrJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ec",
+      "input_spec": {
+        "base64": "e+x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OsJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ed",
+      "input_spec": {
+        "base64": "e+19"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OtJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ee",
+      "input_spec": {
+        "base64": "e+59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OuJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ef",
+      "input_spec": {
+        "base64": "e+99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OvJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f0",
+      "input_spec": {
+        "base64": "e/B9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OwJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f1",
+      "input_spec": {
+        "base64": "e/F9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OxJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f2",
+      "input_spec": {
+        "base64": "e/J9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OyJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f3",
+      "input_spec": {
+        "base64": "e/N9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OzJyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f4",
+      "input_spec": {
+        "base64": "e/R9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O0JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f5",
+      "input_spec": {
+        "base64": "e/V9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O1JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f6",
+      "input_spec": {
+        "base64": "e/Z9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O2JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f7",
+      "input_spec": {
+        "base64": "e/d9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O3JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f8",
+      "input_spec": {
+        "base64": "e/h9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O4JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-f9",
+      "input_spec": {
+        "base64": "e/l9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O5JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-fa",
+      "input_spec": {
+        "base64": "e/p9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O6JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-fb",
+      "input_spec": {
+        "base64": "e/t9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O7JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-fc",
+      "input_spec": {
+        "base64": "e/x9"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O8JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-fd",
+      "input_spec": {
+        "base64": "e/19"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O9JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-fe",
+      "input_spec": {
+        "base64": "e/59"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O+JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-key-byte-ff",
+      "input_spec": {
+        "base64": "e/99"
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O/JyBsb29raW5nIGZvciBiZWdpbm5pbmcgb2Ygb2JqZWN0IGtleSBzdHJpbmcK"
+    },
+    {
+      "name": "syntax-escape-byte-00",
+      "input_spec": {
+        "base64": "IlwAIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDAnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-01",
+      "input_spec": {
+        "base64": "IlwBIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDEnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-02",
+      "input_spec": {
+        "base64": "IlwCIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDInIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-03",
+      "input_spec": {
+        "base64": "IlwDIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDMnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-04",
+      "input_spec": {
+        "base64": "IlwEIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDQnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-05",
+      "input_spec": {
+        "base64": "IlwFIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-06",
+      "input_spec": {
+        "base64": "IlwGIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MDYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-07",
+      "input_spec": {
+        "base64": "IlwHIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xhJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-08",
+      "input_spec": {
+        "base64": "IlwIIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xiJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-09",
+      "input_spec": {
+        "base64": "IlwJIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x0JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-0a",
+      "input_spec": {
+        "base64": "IlwKIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xuJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-0b",
+      "input_spec": {
+        "base64": "IlwLIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x2JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-0c",
+      "input_spec": {
+        "base64": "IlwMIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xmJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-0d",
+      "input_spec": {
+        "base64": "IlwNIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1xyJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-0e",
+      "input_spec": {
+        "base64": "IlwOIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MGUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-0f",
+      "input_spec": {
+        "base64": "IlwPIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MGYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-10",
+      "input_spec": {
+        "base64": "IlwQIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTAnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-11",
+      "input_spec": {
+        "base64": "IlwRIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTEnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-12",
+      "input_spec": {
+        "base64": "IlwSIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTInIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-13",
+      "input_spec": {
+        "base64": "IlwTIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTMnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-14",
+      "input_spec": {
+        "base64": "IlwUIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTQnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-15",
+      "input_spec": {
+        "base64": "IlwVIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-16",
+      "input_spec": {
+        "base64": "IlwWIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-17",
+      "input_spec": {
+        "base64": "IlwXIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTcnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-18",
+      "input_spec": {
+        "base64": "IlwYIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTgnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-19",
+      "input_spec": {
+        "base64": "IlwZIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MTknIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1a",
+      "input_spec": {
+        "base64": "IlwaIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWEnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1b",
+      "input_spec": {
+        "base64": "IlwbIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWInIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1c",
+      "input_spec": {
+        "base64": "IlwcIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWMnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1d",
+      "input_spec": {
+        "base64": "IlwdIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWQnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1e",
+      "input_spec": {
+        "base64": "IlweIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-1f",
+      "input_spec": {
+        "base64": "IlwfIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4MWYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-20",
+      "input_spec": {
+        "base64": "IlwgIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyAnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-21",
+      "input_spec": {
+        "base64": "IlwhIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyEnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-22",
+      "input_spec": {
+        "base64": "IlwiIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-23",
+      "input_spec": {
+        "base64": "IlwjIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyMnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-24",
+      "input_spec": {
+        "base64": "IlwkIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyQnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-25",
+      "input_spec": {
+        "base64": "IlwlIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-26",
+      "input_spec": {
+        "base64": "IlwmIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-27",
+      "input_spec": {
+        "base64": "IlwnIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1wnJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-28",
+      "input_spec": {
+        "base64": "IlwoIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJygnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-29",
+      "input_spec": {
+        "base64": "IlwpIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyknIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2a",
+      "input_spec": {
+        "base64": "IlwqIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyonIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2b",
+      "input_spec": {
+        "base64": "IlwrIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJysnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2c",
+      "input_spec": {
+        "base64": "IlwsIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJywnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2d",
+      "input_spec": {
+        "base64": "IlwtIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJy0nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2e",
+      "input_spec": {
+        "base64": "IlwuIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJy4nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-2f",
+      "input_spec": {
+        "base64": "IlwvIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-30",
+      "input_spec": {
+        "base64": "IlwwIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzAnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-31",
+      "input_spec": {
+        "base64": "IlwxIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzEnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-32",
+      "input_spec": {
+        "base64": "IlwyIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzInIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-33",
+      "input_spec": {
+        "base64": "IlwzIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzMnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-34",
+      "input_spec": {
+        "base64": "Ilw0Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzQnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-35",
+      "input_spec": {
+        "base64": "Ilw1Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzUnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-36",
+      "input_spec": {
+        "base64": "Ilw2Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzYnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-37",
+      "input_spec": {
+        "base64": "Ilw3Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzcnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-38",
+      "input_spec": {
+        "base64": "Ilw4Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzgnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-39",
+      "input_spec": {
+        "base64": "Ilw5Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzknIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3a",
+      "input_spec": {
+        "base64": "Ilw6Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzonIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3b",
+      "input_spec": {
+        "base64": "Ilw7Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzsnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3c",
+      "input_spec": {
+        "base64": "Ilw8Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJzwnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3d",
+      "input_spec": {
+        "base64": "Ilw9Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz0nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3e",
+      "input_spec": {
+        "base64": "Ilw+Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz4nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-3f",
+      "input_spec": {
+        "base64": "Ilw/Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJz8nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-40",
+      "input_spec": {
+        "base64": "IlxAIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0AnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-41",
+      "input_spec": {
+        "base64": "IlxBIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0EnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-42",
+      "input_spec": {
+        "base64": "IlxCIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0InIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-43",
+      "input_spec": {
+        "base64": "IlxDIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0MnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-44",
+      "input_spec": {
+        "base64": "IlxEIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0QnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-45",
+      "input_spec": {
+        "base64": "IlxFIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0UnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-46",
+      "input_spec": {
+        "base64": "IlxGIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0YnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-47",
+      "input_spec": {
+        "base64": "IlxHIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0cnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-48",
+      "input_spec": {
+        "base64": "IlxIIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-49",
+      "input_spec": {
+        "base64": "IlxJIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0knIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4a",
+      "input_spec": {
+        "base64": "IlxKIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0onIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4b",
+      "input_spec": {
+        "base64": "IlxLIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0snIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4c",
+      "input_spec": {
+        "base64": "IlxMIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ0wnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4d",
+      "input_spec": {
+        "base64": "IlxNIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ00nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4e",
+      "input_spec": {
+        "base64": "IlxOIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ04nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-4f",
+      "input_spec": {
+        "base64": "IlxPIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ08nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-50",
+      "input_spec": {
+        "base64": "IlxQIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1AnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-51",
+      "input_spec": {
+        "base64": "IlxRIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1EnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-52",
+      "input_spec": {
+        "base64": "IlxSIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1InIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-53",
+      "input_spec": {
+        "base64": "IlxTIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1MnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-54",
+      "input_spec": {
+        "base64": "IlxUIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1QnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-55",
+      "input_spec": {
+        "base64": "IlxVIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1UnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-56",
+      "input_spec": {
+        "base64": "IlxWIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1YnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-57",
+      "input_spec": {
+        "base64": "IlxXIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1cnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-58",
+      "input_spec": {
+        "base64": "IlxYIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-59",
+      "input_spec": {
+        "base64": "IlxZIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1knIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-5a",
+      "input_spec": {
+        "base64": "IlxaIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1onIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-5b",
+      "input_spec": {
+        "base64": "IlxbIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1snIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-5c",
+      "input_spec": {
+        "base64": "IlxcIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-5d",
+      "input_spec": {
+        "base64": "IlxdIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ10nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-5e",
+      "input_spec": {
+        "base64": "IlxeIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ14nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-5f",
+      "input_spec": {
+        "base64": "IlxfIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ18nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-60",
+      "input_spec": {
+        "base64": "IlxgIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2AnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-61",
+      "input_spec": {
+        "base64": "IlxhIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2EnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-62",
+      "input_spec": {
+        "base64": "IlxiIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-63",
+      "input_spec": {
+        "base64": "IlxjIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2MnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-64",
+      "input_spec": {
+        "base64": "IlxkIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2QnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-65",
+      "input_spec": {
+        "base64": "IlxlIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2UnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-66",
+      "input_spec": {
+        "base64": "IlxmIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-67",
+      "input_spec": {
+        "base64": "IlxnIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2cnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-68",
+      "input_spec": {
+        "base64": "IlxoIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-69",
+      "input_spec": {
+        "base64": "IlxpIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2knIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-6a",
+      "input_spec": {
+        "base64": "IlxqIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2onIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-6b",
+      "input_spec": {
+        "base64": "IlxrIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2snIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-6c",
+      "input_spec": {
+        "base64": "IlxsIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ2wnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-6d",
+      "input_spec": {
+        "base64": "IlxtIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ20nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-6e",
+      "input_spec": {
+        "base64": "IlxuIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-6f",
+      "input_spec": {
+        "base64": "IlxvIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ28nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-70",
+      "input_spec": {
+        "base64": "IlxwIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3AnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-71",
+      "input_spec": {
+        "base64": "IlxxIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3EnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-72",
+      "input_spec": {
+        "base64": "IlxyIg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-73",
+      "input_spec": {
+        "base64": "IlxzIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3MnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-74",
+      "input_spec": {
+        "base64": "Ilx0Ig=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "syntax-escape-byte-75",
+      "input_spec": {
+        "base64": "Ilx1Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJyInIGluIFx1IGhleGFkZWNpbWFsIGNoYXJhY3RlciBlc2NhcGUK"
+    },
+    {
+      "name": "syntax-escape-byte-76",
+      "input_spec": {
+        "base64": "Ilx2Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3YnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-77",
+      "input_spec": {
+        "base64": "Ilx3Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3cnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-78",
+      "input_spec": {
+        "base64": "Ilx4Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3gnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-79",
+      "input_spec": {
+        "base64": "Ilx5Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3knIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7a",
+      "input_spec": {
+        "base64": "Ilx6Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3onIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7b",
+      "input_spec": {
+        "base64": "Ilx7Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3snIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7c",
+      "input_spec": {
+        "base64": "Ilx8Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ3wnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7d",
+      "input_spec": {
+        "base64": "Ilx9Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ30nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7e",
+      "input_spec": {
+        "base64": "Ilx+Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ34nIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-7f",
+      "input_spec": {
+        "base64": "Ilx/Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x4N2YnIGluIHN0cmluZyBlc2NhcGUgY29kZQo="
+    },
+    {
+      "name": "syntax-escape-byte-80",
+      "input_spec": {
+        "base64": "IlyAIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-81",
+      "input_spec": {
+        "base64": "IlyBIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-82",
+      "input_spec": {
+        "base64": "IlyCIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-83",
+      "input_spec": {
+        "base64": "IlyDIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4MycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-84",
+      "input_spec": {
+        "base64": "IlyEIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-85",
+      "input_spec": {
+        "base64": "IlyFIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-86",
+      "input_spec": {
+        "base64": "IlyGIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-87",
+      "input_spec": {
+        "base64": "IlyHIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4NycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-88",
+      "input_spec": {
+        "base64": "IlyIIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4OCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-89",
+      "input_spec": {
+        "base64": "IlyJIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4OScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8a",
+      "input_spec": {
+        "base64": "IlyKIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8b",
+      "input_spec": {
+        "base64": "IlyLIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8c",
+      "input_spec": {
+        "base64": "IlyMIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4YycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8d",
+      "input_spec": {
+        "base64": "IlyNIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8e",
+      "input_spec": {
+        "base64": "IlyOIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-8f",
+      "input_spec": {
+        "base64": "IlyPIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA4ZicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-90",
+      "input_spec": {
+        "base64": "IlyQIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-91",
+      "input_spec": {
+        "base64": "IlyRIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-92",
+      "input_spec": {
+        "base64": "IlySIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-93",
+      "input_spec": {
+        "base64": "IlyTIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5MycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-94",
+      "input_spec": {
+        "base64": "IlyUIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-95",
+      "input_spec": {
+        "base64": "IlyVIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-96",
+      "input_spec": {
+        "base64": "IlyWIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-97",
+      "input_spec": {
+        "base64": "IlyXIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5NycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-98",
+      "input_spec": {
+        "base64": "IlyYIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5OCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-99",
+      "input_spec": {
+        "base64": "IlyZIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5OScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9a",
+      "input_spec": {
+        "base64": "IlyaIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9b",
+      "input_spec": {
+        "base64": "IlybIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9c",
+      "input_spec": {
+        "base64": "IlycIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5YycgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9d",
+      "input_spec": {
+        "base64": "IlydIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9e",
+      "input_spec": {
+        "base64": "IlyeIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZScgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-9f",
+      "input_spec": {
+        "base64": "IlyfIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDA5ZicgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-a0",
+      "input_spec": {
+        "base64": "IlygIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDBhMCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-a1",
+      "input_spec": {
+        "base64": "IlyhIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KhJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a2",
+      "input_spec": {
+        "base64": "IlyiIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KiJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a3",
+      "input_spec": {
+        "base64": "IlyjIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KjJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a4",
+      "input_spec": {
+        "base64": "IlykIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KkJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a5",
+      "input_spec": {
+        "base64": "IlylIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KlJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a6",
+      "input_spec": {
+        "base64": "IlymIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KmJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a7",
+      "input_spec": {
+        "base64": "IlynIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KnJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a8",
+      "input_spec": {
+        "base64": "IlyoIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KoJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-a9",
+      "input_spec": {
+        "base64": "IlypIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KpJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-aa",
+      "input_spec": {
+        "base64": "IlyqIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KqJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ab",
+      "input_spec": {
+        "base64": "IlyrIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KrJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ac",
+      "input_spec": {
+        "base64": "IlysIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KsJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ad",
+      "input_spec": {
+        "base64": "IlytIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ1x1MDBhZCcgaW4gc3RyaW5nIGVzY2FwZSBjb2RlCg=="
+    },
+    {
+      "name": "syntax-escape-byte-ae",
+      "input_spec": {
+        "base64": "IlyuIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KuJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-af",
+      "input_spec": {
+        "base64": "IlyvIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KvJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b0",
+      "input_spec": {
+        "base64": "IlywIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KwJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b1",
+      "input_spec": {
+        "base64": "IlyxIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KxJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b2",
+      "input_spec": {
+        "base64": "IlyyIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KyJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b3",
+      "input_spec": {
+        "base64": "IlyzIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8KzJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b4",
+      "input_spec": {
+        "base64": "Ily0Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K0JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b5",
+      "input_spec": {
+        "base64": "Ily1Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K1JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b6",
+      "input_spec": {
+        "base64": "Ily2Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K2JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b7",
+      "input_spec": {
+        "base64": "Ily3Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K3JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b8",
+      "input_spec": {
+        "base64": "Ily4Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K4JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-b9",
+      "input_spec": {
+        "base64": "Ily5Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K5JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ba",
+      "input_spec": {
+        "base64": "Ily6Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K6JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-bb",
+      "input_spec": {
+        "base64": "Ily7Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K7JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-bc",
+      "input_spec": {
+        "base64": "Ily8Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K8JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-bd",
+      "input_spec": {
+        "base64": "Ily9Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K9JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-be",
+      "input_spec": {
+        "base64": "Ily+Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K+JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-bf",
+      "input_spec": {
+        "base64": "Ily/Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8K/JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c0",
+      "input_spec": {
+        "base64": "IlzAIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OAJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c1",
+      "input_spec": {
+        "base64": "IlzBIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OBJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c2",
+      "input_spec": {
+        "base64": "IlzCIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OCJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c3",
+      "input_spec": {
+        "base64": "IlzDIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ODJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c4",
+      "input_spec": {
+        "base64": "IlzEIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OEJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c5",
+      "input_spec": {
+        "base64": "IlzFIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OFJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c6",
+      "input_spec": {
+        "base64": "IlzGIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OGJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c7",
+      "input_spec": {
+        "base64": "IlzHIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OHJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c8",
+      "input_spec": {
+        "base64": "IlzIIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OIJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-c9",
+      "input_spec": {
+        "base64": "IlzJIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OJJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ca",
+      "input_spec": {
+        "base64": "IlzKIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OKJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-cb",
+      "input_spec": {
+        "base64": "IlzLIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OLJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-cc",
+      "input_spec": {
+        "base64": "IlzMIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OMJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-cd",
+      "input_spec": {
+        "base64": "IlzNIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ONJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ce",
+      "input_spec": {
+        "base64": "IlzOIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OOJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-cf",
+      "input_spec": {
+        "base64": "IlzPIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OPJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d0",
+      "input_spec": {
+        "base64": "IlzQIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OQJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d1",
+      "input_spec": {
+        "base64": "IlzRIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ORJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d2",
+      "input_spec": {
+        "base64": "IlzSIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OSJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d3",
+      "input_spec": {
+        "base64": "IlzTIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OTJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d4",
+      "input_spec": {
+        "base64": "IlzUIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OUJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d5",
+      "input_spec": {
+        "base64": "IlzVIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OVJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d6",
+      "input_spec": {
+        "base64": "IlzWIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OWJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d7",
+      "input_spec": {
+        "base64": "IlzXIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OXJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d8",
+      "input_spec": {
+        "base64": "IlzYIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OYJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-d9",
+      "input_spec": {
+        "base64": "IlzZIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OZJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-da",
+      "input_spec": {
+        "base64": "IlzaIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OaJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-db",
+      "input_spec": {
+        "base64": "IlzbIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8ObJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-dc",
+      "input_spec": {
+        "base64": "IlzcIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OcJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-dd",
+      "input_spec": {
+        "base64": "IlzdIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OdJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-de",
+      "input_spec": {
+        "base64": "IlzeIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OeJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-df",
+      "input_spec": {
+        "base64": "IlzfIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OfJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e0",
+      "input_spec": {
+        "base64": "IlzgIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OgJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e1",
+      "input_spec": {
+        "base64": "IlzhIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OhJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e2",
+      "input_spec": {
+        "base64": "IlziIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OiJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e3",
+      "input_spec": {
+        "base64": "IlzjIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OjJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e4",
+      "input_spec": {
+        "base64": "IlzkIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OkJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e5",
+      "input_spec": {
+        "base64": "IlzlIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OlJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e6",
+      "input_spec": {
+        "base64": "IlzmIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OmJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e7",
+      "input_spec": {
+        "base64": "IlznIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OnJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e8",
+      "input_spec": {
+        "base64": "IlzoIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OoJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-e9",
+      "input_spec": {
+        "base64": "IlzpIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OpJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ea",
+      "input_spec": {
+        "base64": "IlzqIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OqJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-eb",
+      "input_spec": {
+        "base64": "IlzrIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OrJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ec",
+      "input_spec": {
+        "base64": "IlzsIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OsJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ed",
+      "input_spec": {
+        "base64": "IlztIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OtJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ee",
+      "input_spec": {
+        "base64": "IlzuIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OuJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ef",
+      "input_spec": {
+        "base64": "IlzvIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OvJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f0",
+      "input_spec": {
+        "base64": "IlzwIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OwJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f1",
+      "input_spec": {
+        "base64": "IlzxIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OxJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f2",
+      "input_spec": {
+        "base64": "IlzyIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OyJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f3",
+      "input_spec": {
+        "base64": "IlzzIg=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8OzJyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f4",
+      "input_spec": {
+        "base64": "Ilz0Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O0JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f5",
+      "input_spec": {
+        "base64": "Ilz1Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O1JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f6",
+      "input_spec": {
+        "base64": "Ilz2Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O2JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f7",
+      "input_spec": {
+        "base64": "Ilz3Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O3JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f8",
+      "input_spec": {
+        "base64": "Ilz4Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O4JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-f9",
+      "input_spec": {
+        "base64": "Ilz5Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O5JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-fa",
+      "input_spec": {
+        "base64": "Ilz6Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O6JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-fb",
+      "input_spec": {
+        "base64": "Ilz7Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O7JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-fc",
+      "input_spec": {
+        "base64": "Ilz8Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O8JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-fd",
+      "input_spec": {
+        "base64": "Ilz9Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O9JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-fe",
+      "input_spec": {
+        "base64": "Ilz+Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O+JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "syntax-escape-byte-ff",
+      "input_spec": {
+        "base64": "Ilz/Ig=="
+      },
+      "exit_code": 1,
+      "stdout_base64": "",
+      "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O/JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
     }
   ]
 }

@@ -18,8 +18,8 @@ spec.loader.exec_module(oracle)
 class OracleCheckTests(unittest.TestCase):
     def test_check_accepts_only_matching_observations_without_writing(self):
         observed = json.loads(GENERATOR.with_name("cases.json").read_bytes())
-        self.assertEqual(len(observed["cases"]), 138)
-        self.assertEqual(len({c["name"] for c in observed["cases"]}), 138)
+        self.assertEqual(len(observed["cases"]), 670)
+        self.assertEqual(len({c["name"] for c in observed["cases"]}), 670)
         self.assertEqual([c["name"] for c in oracle.case_specs()],
                          [c["name"] for c in observed["cases"]])
         variants = [("valid", copy.deepcopy(observed), False)]

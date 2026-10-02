@@ -483,9 +483,13 @@ fn is_json_whitespace(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
 }
 
-fn skip_json_string(raw: &[u8], mut index: usize) -> Option<usize> {
+fn skip_json_string(raw: &[u8], index: usize) -> Option<usize> {
+    scan_json_string(raw, index).ok().flatten()
+}
+
+fn scan_json_string(raw: &[u8], mut index: usize) -> Result<Option<usize>, JsonScanError> {
     if raw.get(index) != Some(&b'"') {
-        return None;
+        return json_scan_error(raw, index, "looking for beginning of object key string");
     }
     index += 1;
     while let Some(byte) = raw.get(index) {
@@ -499,7 +503,11 @@ fn skip_json_string(raw: &[u8], mut index: usize) -> Option<usize> {
                                 .get(index + offset)
                                 .is_some_and(|byte| byte.is_ascii_hexdigit())
                             {
-                                return None;
+                                return json_scan_error(
+                                    raw,
+                                    index + offset,
+                                    "in \\u hexadecimal character escape",
+                                );
                             }
                         }
                         index += 5;
@@ -507,15 +515,15 @@ fn skip_json_string(raw: &[u8], mut index: usize) -> Option<usize> {
                     Some(b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't') => {
                         index += 1;
                     }
-                    _ => return None,
+                    _ => return json_scan_error(raw, index, "in string escape code"),
                 }
             }
-            b'"' => return Some(index + 1),
-            byte if *byte < 0x20 => return None,
+            b'"' => return Ok(Some(index + 1)),
+            byte if *byte < 0x20 => return json_scan_error(raw, index, "in string literal"),
             _ => index += 1,
         }
     }
-    None
+    Ok(None)
 }
 
 fn decode_json_string(raw: &[u8]) -> Option<String> {
@@ -614,6 +622,38 @@ fn flush_pending_surrogate(output: &mut String, pending_high: &mut Option<u16>) 
 
 const GO_MAX_JSON_NESTING_DEPTH: usize = 10_000;
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct JsonScanError(pub(crate) String);
+
+/// EOF is incomplete, not malformed. Quote an offending byte as Go's
+/// encoding/json quoteChar does: a Latin-1 rune, not a UTF-8 character.
+fn json_scan_error(
+    raw: &[u8],
+    index: usize,
+    context: &str,
+) -> Result<Option<usize>, JsonScanError> {
+    let Some(&byte) = raw.get(index) else {
+        return Ok(None);
+    };
+    let quoted = match byte {
+        b'\'' => "\\'".to_owned(),
+        b'\\' => "\\\\".to_owned(),
+        7 => "\\a".to_owned(),
+        8 => "\\b".to_owned(),
+        12 => "\\f".to_owned(),
+        b'\n' => "\\n".to_owned(),
+        b'\r' => "\\r".to_owned(),
+        b'\t' => "\\t".to_owned(),
+        11 => "\\v".to_owned(),
+        0..=31 | 127 => format!("\\x{byte:02x}"),
+        128..=160 | 173 => format!("\\u{byte:04x}"),
+        _ => char::from(byte).to_string(),
+    };
+    Err(JsonScanError(format!(
+        "invalid character '{quoted}' {context}"
+    )))
+}
+
 #[derive(Clone, Copy)]
 enum JsonFrame {
     Object(ObjectState),
@@ -641,7 +681,7 @@ pub(crate) fn scan_json_value(
     raw: &[u8],
     mut index: usize,
     finite_numbers_only: bool,
-) -> Result<Option<usize>, u8> {
+) -> Result<Option<usize>, JsonScanError> {
     let mut frames = Vec::new();
     let mut needs_value = true;
     loop {
@@ -650,7 +690,7 @@ pub(crate) fn scan_json_value(
             match raw.get(index) {
                 Some(b'{') => {
                     if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
-                        return Err(b'{');
+                        return json_scan_error(raw, index, "exceeded max depth");
                     }
                     frames.push(JsonFrame::Object(ObjectState::FirstKeyOrEnd));
                     index += 1;
@@ -659,7 +699,7 @@ pub(crate) fn scan_json_value(
                 }
                 Some(b'[') => {
                     if frames.len() == GO_MAX_JSON_NESTING_DEPTH {
-                        return Err(b'[');
+                        return json_scan_error(raw, index, "exceeded max depth");
                     }
                     frames.push(JsonFrame::Array(ArrayState::FirstValueOrEnd));
                     index += 1;
@@ -667,14 +707,14 @@ pub(crate) fn scan_json_value(
                     continue;
                 }
                 Some(b'"') => {
-                    let Some(end) = skip_json_string(raw, index) else {
+                    let Some(end) = scan_json_string(raw, index)? else {
                         return Ok(None);
                     };
                     index = end;
                 }
                 Some(_) => {
                     let start = index;
-                    let Some(end) = skip_json_primitive(raw, index) else {
+                    let Some(end) = skip_json_primitive(raw, index)? else {
                         return Ok(None);
                     };
                     if finite_numbers_only {
@@ -706,13 +746,13 @@ pub(crate) fn scan_json_value(
                     index += 1;
                 }
                 ObjectState::FirstKeyOrEnd | ObjectState::KeyAfterComma => {
-                    let Some(key_end) = skip_json_string(raw, index) else {
+                    let Some(key_end) = scan_json_string(raw, index)? else {
                         return Ok(None);
                     };
                     index = key_end;
                     skip_whitespace(raw, &mut index);
                     if raw.get(index) != Some(&b':') {
-                        return Ok(None);
+                        return json_scan_error(raw, index, "after object key");
                     }
                     index += 1;
                     *state = ObjectState::AfterValue;
@@ -727,7 +767,7 @@ pub(crate) fn scan_json_value(
                         frames.pop();
                         index += 1;
                     }
-                    _ => return Ok(None),
+                    _ => return json_scan_error(raw, index, "after object key:value pair"),
                 },
             },
             JsonFrame::Array(state) => match state {
@@ -748,7 +788,7 @@ pub(crate) fn scan_json_value(
                         frames.pop();
                         index += 1;
                     }
-                    _ => return Ok(None),
+                    _ => return json_scan_error(raw, index, "after array element"),
                 },
             },
         }
@@ -759,25 +799,42 @@ pub(crate) fn skip_json_value(raw: &[u8], index: usize) -> Option<usize> {
     scan_json_value(raw, index, false).ok().flatten()
 }
 
-fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
-    let tail = raw.get(index..)?;
-    for literal in [b"null".as_slice(), b"true", b"false"] {
-        if tail.starts_with(literal) {
-            return Some(index + literal.len());
+fn skip_json_primitive(raw: &[u8], mut index: usize) -> Result<Option<usize>, JsonScanError> {
+    let literal = match raw.get(index) {
+        Some(b'n') => Some("null"),
+        Some(b't') => Some("true"),
+        Some(b'f') => Some("false"),
+        Some(b'-' | b'0'..=b'9') => None,
+        _ => return json_scan_error(raw, index, "looking for beginning of value"),
+    };
+    if let Some(literal) = literal {
+        for expected in literal.bytes() {
+            if raw.get(index) != Some(&expected) {
+                return json_scan_error(
+                    raw,
+                    index,
+                    &format!(
+                        "in literal {literal} (expecting '{}')",
+                        char::from(expected)
+                    ),
+                );
+            }
+            index += 1;
         }
+        return Ok(Some(index));
     }
     if raw.get(index) == Some(&b'-') {
         index += 1;
     }
-    match raw.get(index)? {
-        b'0' => index += 1,
-        b'1'..=b'9' => {
+    match raw.get(index) {
+        Some(b'0') => index += 1,
+        Some(b'1'..=b'9') => {
             index += 1;
             while raw.get(index).is_some_and(u8::is_ascii_digit) {
                 index += 1;
             }
         }
-        _ => return None,
+        _ => return json_scan_error(raw, index, "in numeric literal"),
     }
     if raw.get(index) == Some(&b'.') {
         index += 1;
@@ -786,7 +843,7 @@ fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
             index += 1;
         }
         if index == start {
-            return None;
+            return json_scan_error(raw, index, "after decimal point in numeric literal");
         }
     }
     if matches!(raw.get(index), Some(b'e' | b'E')) {
@@ -799,10 +856,10 @@ fn skip_json_primitive(raw: &[u8], mut index: usize) -> Option<usize> {
             index += 1;
         }
         if index == start {
-            return None;
+            return json_scan_error(raw, index, "in exponent of numeric literal");
         }
     }
-    Some(index)
+    Ok(Some(index))
 }
 
 fn skip_json_value_with_finite_numbers(raw: &[u8], index: usize) -> Option<usize> {
@@ -1271,14 +1328,18 @@ mod tests {
         // `{"a":` opener until the 10,001st would exceed the limit; arrays
         // walk the same needs-value path from the second element on.
         let deep_object = "{\"a\":".repeat(10_001);
-        assert!(matches!(
-            super::scan_json_value(deep_object.as_bytes(), 0, false),
-            Err(b'{')
-        ));
-        assert!(matches!(
-            super::scan_json_value(&b"[".repeat(10_001), 0, false),
-            Err(b'[')
-        ));
+        assert_eq!(
+            super::scan_json_value(deep_object.as_bytes(), 0, false)
+                .unwrap_err()
+                .0,
+            "invalid character '{' exceeded max depth"
+        );
+        assert_eq!(
+            super::scan_json_value(&b"[".repeat(10_001), 0, false)
+                .unwrap_err()
+                .0,
+            "invalid character '[' exceeded max depth"
+        );
         let boundary = format!("{}1{}", "{\"a\":".repeat(10_000), "}".repeat(10_000));
         assert!(
             matches!(
@@ -1289,13 +1350,13 @@ mod tests {
         );
 
         assert_eq!(super::scan_json_value(b"[", 0, false), Ok(None));
-        assert_eq!(super::scan_json_value(br#"{"a" 1}"#, 0, false), Ok(None));
-        assert_eq!(super::scan_json_value(br#"{"a":1 2}"#, 0, false), Ok(None));
-        assert_eq!(super::scan_json_value(b"[1 2]", 0, false), Ok(None));
+        assert!(super::scan_json_value(br#"{"a" 1}"#, 0, false).is_err());
+        assert!(super::scan_json_value(br#"{"a":1 2}"#, 0, false).is_err());
+        assert!(super::scan_json_value(b"[1 2]", 0, false).is_err());
         assert_eq!(super::scan_json_value(b"1.", 0, false), Ok(None));
         assert_eq!(super::scan_json_value(b"1e", 0, false), Ok(None));
         // Raw control characters are not allowed inside a string.
-        assert_eq!(super::scan_json_value(b"\"a\x01\"", 0, false), Ok(None));
+        assert!(super::scan_json_value(b"\"a\x01\"", 0, false).is_err());
         assert_eq!(super::scan_json_value(b"\"a\x7f\"", 0, false), Ok(Some(4)));
     }
 

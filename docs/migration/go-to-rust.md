@@ -31,6 +31,25 @@ open and blocks the full provider acceptance in #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## MCP parser diagnostic hardening (2026-10-02, #1125)
+
+The shared iterative protocol scanner now reports Go-compatible diagnostic
+context directly. The removed serde-based heuristic confused array separators,
+hex escapes, multiline positions and the first error in a malformed value.
+The pinned Go 1.26.6 process oracle now has 670 cases: the existing 138 cases
+are byte-unchanged, with 20 named syntax/EOF probes and two 256-byte sweeps
+added for object keys and escapes. Both buffered and one-byte-read streams
+consume the source-derived observations; the real CLI compares exit/stdout/
+stderr without normalization. Initial execution reproduced the array-separator
+divergence before the production fix; all 670 process cases and 30 parser/
+stream tests pass locally afterward. Strict all-target CLI Clippy also passes.
+The handler already injects an unreachable local model endpoint; no real model
+or paid provider is used by these checks.
+
+MCP-008/MCP-015 remain PARTIAL until the current-source six-target CI,
+120-second fuzz budget and full MCP mutation gate execute successfully.
+Historical 138-case runs below remain valid for their recorded revisions.
+
 ## MCP parity checkpoint (2026-09-30)
 
 - MCP-015: #1110 merged as `916bbfccedfc21ddaab28b6cf917dc1774ac4aeb`;
@@ -504,7 +523,7 @@ artifact gates still require separate evidence.
   (#1035). Do not promote this row to cutover-ready based on CI alone.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
   truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
-  16 seeded mutations replay the live Go process byte-exactly, and the new
+  128 seeded mutations replay the live Go process byte-exactly, and the new
   production-parser fuzz target completed 330,402 bounded macOS arm64
   executions. Longer campaigns, differential fuzzing and native target runs
   remain open under MCP-015.

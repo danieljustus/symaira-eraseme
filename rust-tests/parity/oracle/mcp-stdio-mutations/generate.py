@@ -59,12 +59,46 @@ def case_specs():
                 "input_spec": {"base64": base64.b64encode(data).decode()},
             }
         )
+    # Source-derived diagnostics beyond the initialize-shaped mutation seed.
+    syntax = [
+        ("array-string-separator", b'["a" 1]'),
+        ("array-number-separator", b'[1n]'),
+        ("key-hex-escape", b'{"\\u00zz":1}'),
+        ("value-hex-escape", b'{"a":"\\u00zz"}'),
+        ("multiline-key-separator", b'{\n"a"\n1}'),
+        ("multiline-array-separator", b'[\n1\n2]'),
+        ("multiline-value-separator", b'{\n"a":1\n2}'),
+        ("numeric-minus", b'[-x]'),
+        ("numeric-fraction", b'[1.x]'),
+        ("numeric-exponent", b'[1ex]'),
+        ("numeric-signed-exponent", b'[1e+x]'),
+        ("nested-array-separator", b'{"a":[[1 2]]}'),
+        ("earliest-error-before-escape", b'[x,"\\q"]'),
+        ("earliest-error-before-literal", b'{"a" 1,"b":truX}'),
+        ("truncated-escape", b'"a\\'),
+        ("truncated-hex-escape", b'"\\u00'),
+        ("truncated-literal", b'[tru'),
+        ("truncated-fraction", b'[1.'),
+        ("truncated-exponent", b'[1e+'),
+        ("truncated-string", b'"abc'),
+    ]
+    # Every possible offending byte covers Go quoteChar's Latin-1/control
+    # spelling and every legal/illegal escape, not Rust-authored expectations.
+    syntax += [(f"key-byte-{byte:02x}", b'{' + bytes([byte]) + b'}')
+               for byte in range(256)]
+    syntax += [(f"escape-byte-{byte:02x}", b'"\\' + bytes([byte]) + b'"')
+               for byte in range(256)]
+    diagnostics = [
+        {"name": "syntax-" + name,
+         "input_spec": {"base64": base64.b64encode(data).decode()}}
+        for name, data in syntax
+    ]
     return malformed + [
         {"name": "size-below-8k", "input_spec": {"kind": "padding_request", "size": 8192 - 1}},
         {"name": "size-above-8k", "input_spec": {"kind": "padding_request", "size": 8192 + 1}},
         {"name": "nesting-at-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 9999}},
         {"name": "nesting-over-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 10000}},
-    ] + mutations
+    ] + mutations + diagnostics
 
 
 def materialize(spec):
