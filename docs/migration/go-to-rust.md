@@ -54,9 +54,22 @@ scalars; objects/arrays remain eager. `stdio_primitive_waits_for_lookahead_or_eo
 checks exact read/write ordering without sleeps and failed before the fix.
 The same two-CLI probe matches afterward for all nine tested token forms.
 
-MCP-008/MCP-015 remain PARTIAL until the current-source six-target CI,
-120-second fuzz budget and full MCP mutation gate execute successfully.
-Historical 138-case runs below remain valid for their recorded revisions.
+MCP-008/MCP-015 are PASS on source
+`91af942ac72449771871771e02aa5eaae64e9c6e`, merged by #1135 as
+`adeb6b12341a38873a40fefec25621e845d7756a`. [Native run 37007678845,
+attempt 2](https://github.com/danieljustus/symaira-eraseme/actions/runs/37007678845)
+executed the named stdio process corpora successfully on all six targets.
+The original Intel HTTP fixture port collision remains separately tracked in
+#1136. [Hardening run 37007682140](https://github.com/danieljustus/symaira-eraseme/actions/runs/37007682140)
+passed Miri, all six configured fuzz targets and MCP mutation testing:
+4,536,509 MCP-parser fuzz executions in 121 seconds (120-second budget);
+331 mutants tested, 298 caught, 12 unviable, 21 timeouts, zero misses.
+Timeouts are not killed mutants; bounded fuzzing is not exhaustive differential
+fuzzing. The injected handler endpoint remains hermetic. Historical captures
+remain valid only for their recorded revisions. Release/cutover and unrelated
+MCP tool/Windows contracts are not promoted. Task 8.2 has its merge-gate
+evidence; the handler-wide hardening task 8.5 remains owned by #1124 until
+that remaining tool/error-path scope is complete.
 
 ## MCP parity checkpoint (2026-09-30)
 
@@ -533,8 +546,9 @@ artifact gates still require separate evidence.
   truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
   128 seeded mutations replay the live Go process byte-exactly, and the new
   production-parser fuzz target completed 330,402 bounded macOS arm64
-  executions. Longer campaigns, differential fuzzing and native target runs
-  remain open under MCP-015.
+  executions historically. The current-source six-target replay and the
+  configured 120-second fuzz/mutation campaign now pass (checkpoint above).
+  Exhaustive or differential fuzzing is not claimed by these bounded gates.
 - **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
   explicit message where Go runs `confirmation.AutoConfirm` (browser
   subsystem unported). The recorded case is the no-reply branch.
