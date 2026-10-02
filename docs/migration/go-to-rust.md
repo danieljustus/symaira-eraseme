@@ -8,6 +8,29 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Current task ownership (2026-10-02)
+
+The task graph is reconciled against integrated `28e32a1c` and the current
+matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
+evidence. Phases 6–8 are not complete. Closed historical phase issues
+#807–#812 do not establish their remaining acceptance gates.
+
+`execution_state.task_issues` maps every unfinished task to the granular
+issues of #813; `contract_issue_owners` maps every PARTIAL/TODO row. The
+matrix's row status remains authoritative. `active_tasks` means unfinished
+implementation/evidence, not a live writer claim. Task 6.1 remains unfinished
+because its planned crate-decision artifact is absent; #1119 owns that gap.
+`python3 tests/test_rust_task_graph.py` checks this reconciliation without Go,
+network calls or fixture regeneration; CI runs the same check.
+
+The accepted CLI-023 manual-confirmation deviation (#809, 2026-09-28) is not
+a browser-implementation blocker. #1122 owns its remaining native evidence
+and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
+#1129, not the closed historical Go signing fix #794. CoreKit #366 remains
+open and blocks the full provider acceptance in #1121. Publication, production
+cutover and Go retirement remain separately gated; #1132 requires an actual
+stable release and seven days of observation before #1133.
+
 ## MCP parity checkpoint (2026-09-30)
 
 - MCP-015: #1110 merged as `916bbfccedfc21ddaab28b6cf917dc1774ac4aeb`;

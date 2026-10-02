@@ -90,6 +90,8 @@ jobs:
         run: |
           make build
           ./symeraseme registry validate
+      - name: Validate Rust migration task ownership
+        run: python3 tests/test_rust_task_graph.py
 
   vuln-scan:
     name: vuln-scan
