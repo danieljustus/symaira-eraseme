@@ -13,9 +13,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
 
-#[path = "mcp_http_port.rs"]
+#[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
-use mcp_http_port::{StartedChild, free_port, spawn_with_handoff};
+use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GO_AGENT_CANCEL_FIXTURE: &str =
@@ -77,6 +77,7 @@ fn start_binary(
     spawn_with_handoff(
         port,
         &root.join("data/mcp_token"),
+        Duration::from_secs(5),
         |candidate, stderr| {
             let mut command = Command::new(binary);
             command.args(["mcp", "--host", host, "--port", &candidate.to_string()]);
@@ -92,7 +93,6 @@ fn start_binary(
                 .stderr(stderr)
                 .spawn()
         },
-        |candidate, _token| accepts_current_token(candidate, root),
     )
 }
 
@@ -112,6 +112,7 @@ fn start_agent_server(binary: &Path, root: &Path, port: &mut u16, started: &Path
     spawn_with_handoff(
         port,
         &root.join("data/mcp_token"),
+        Duration::from_secs(5),
         |candidate, stderr| {
             let mut command = Command::new(binary);
             command
@@ -134,7 +135,6 @@ fn start_agent_server(binary: &Path, root: &Path, port: &mut u16, started: &Path
                 .stderr(stderr)
                 .spawn()
         },
-        |candidate, _token| accepts_current_token(candidate, root),
     )
 }
 
@@ -329,6 +329,7 @@ fn start_provider_server(
     spawn_with_handoff(
         port,
         &root.join("data/mcp_token"),
+        Duration::from_secs(5),
         |candidate, stderr| {
             let mut command = Command::new(binary);
             command
@@ -349,7 +350,6 @@ fn start_provider_server(
                 .stderr(stderr)
                 .spawn()
         },
-        |candidate, _token| accepts_current_token(candidate, root),
     )
 }
 
@@ -459,24 +459,7 @@ fn accepts_current_token(port: u16, root: &Path) -> bool {
     let Ok(token) = std::fs::read_to_string(root.join("data/mcp_token")) else {
         return false;
     };
-    let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) else {
-        return false;
-    };
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
-    let body = br#"{"jsonrpc":"2.0","method":"initialize"}"#;
-    if write!(
-        stream,
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nAuthorization: Bearer {token}\r\nContent-Length: {}\r\n\r\n",
-        body.len()
-    )
-    .and_then(|()| stream.write_all(body))
-    .is_err()
-    {
-        return false;
-    }
-    let mut reply = Vec::new();
-    let _ = stream.read_to_end(&mut reply);
-    reply.starts_with(b"HTTP/1.1 204")
+    accepts_token(port, &token, Instant::now() + Duration::from_millis(500))
 }
 
 fn token(root: &Path) -> String {
@@ -1293,9 +1276,13 @@ fn start_stale_token_listener(listener: TcpListener) -> StaleTokenListener {
                     }
                     let stale = authorization == "Bearer stale-token";
                     let response = if stale {
-                        "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        let body = r#"{"result":{"serverInfo":{"name":"symeraseme"}}}"#;
+                        format!(
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                            body.len()
+                        )
                     } else {
-                        "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned()
                     };
                     let _ = reader.into_inner().write_all(response.as_bytes());
                 }

@@ -12,9 +12,9 @@ use std::time::{Duration, Instant};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
 
-#[path = "mcp_http_port.rs"]
+#[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
-use mcp_http_port::{StartedChild, free_port, spawn_with_handoff};
+use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 
 const GO_PROVIDER_CANCEL_FIXTURE: &str =
     include_str!("../../../tests/fixtures/provider-cancel/http.json");
@@ -42,6 +42,7 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
     let process = spawn_with_handoff(
         port,
         &root.join("data/mcp_token"),
+        Duration::from_secs(10),
         |candidate, stderr| {
             let mut command = Command::new(binary);
             command
@@ -62,7 +63,6 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
                 .stderr(stderr);
             command.spawn()
         },
-        accepts_token,
     );
     Server(process)
 }
@@ -75,49 +75,13 @@ fn ready(server: &mut Server, port: u16, root: &Path) {
             panic!("MCP server exited early ({status}): {stderr}");
         }
         if let Ok(token) = std::fs::read_to_string(root.join("data/mcp_token"))
-            && accepts_token(port, &token)
+            && accepts_token(port, &token, deadline)
         {
             return;
         }
         assert!(Instant::now() < deadline, "MCP server did not authenticate");
         std::thread::sleep(Duration::from_millis(20));
     }
-}
-
-fn accepts_token(port: u16, token: &str) -> bool {
-    let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) else {
-        return false;
-    };
-    if stream
-        .set_read_timeout(Some(Duration::from_millis(500)))
-        .is_err()
-        || stream
-            .set_write_timeout(Some(Duration::from_millis(500)))
-            .is_err()
-    {
-        return false;
-    }
-    let body = br#"{"jsonrpc":"2.0","id":0,"method":"initialize"}"#;
-    let mut request =
-        b"POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nAuthorization: Bearer "
-            .to_vec();
-    request.extend_from_slice(token.as_bytes());
-    request.extend_from_slice(format!("\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes());
-    if stream.write_all(&request).is_err() || stream.write_all(body).is_err() {
-        return false;
-    }
-    let mut response = Vec::new();
-    let _ = stream.read_to_end(&mut response);
-    let Some(split) = response.windows(4).position(|bytes| bytes == b"\r\n\r\n") else {
-        return false;
-    };
-    let Ok(head) = std::str::from_utf8(&response[..split]) else {
-        return false;
-    };
-    head.lines().next() == Some("HTTP/1.1 200 OK")
-        && serde_json::from_slice::<serde_json::Value>(&response[split + 4..])
-            .ok()
-            .is_some_and(|body| body["result"]["serverInfo"]["name"] == "symeraseme")
 }
 
 fn exchange(port: u16, token: Option<&str>, origin: Option<&str>) -> (u16, Vec<u8>) {
