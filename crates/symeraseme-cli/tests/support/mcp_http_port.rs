@@ -175,7 +175,14 @@ pub fn read_bounded_response(
             ));
         }
         match stream.read(&mut buffer) {
-            Ok(0) => return Ok(response),
+            Ok(0) => {
+                eprintln!(
+                    "http_capture thread={:?} close=eof bytes={}",
+                    thread::current().id(),
+                    response.len()
+                );
+                return Ok(response);
+            }
             Ok(count) if response.len() + count <= 64 * 1024 => {
                 response.extend_from_slice(&buffer[..count]);
             }
@@ -186,6 +193,11 @@ pub fn read_bounded_response(
                 ));
             }
             Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                eprintln!(
+                    "http_capture thread={:?} close=reset bytes={}",
+                    thread::current().id(),
+                    response.len()
+                );
                 return Ok(response);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {

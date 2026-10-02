@@ -120,7 +120,19 @@ fn parse_response(raw: &[u8]) -> Response {
     }
 }
 
-fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) -> Response {
+fn exchange(
+    implementation: &str,
+    case: usize,
+    port: u16,
+    method: &str,
+    body: &[u8],
+    headers: &[(&str, String)],
+) -> Response {
+    let started = Instant::now();
+    eprintln!(
+        "http_exchange thread={:?} implementation={implementation} case={case} start",
+        std::thread::current().id()
+    );
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
@@ -138,6 +150,13 @@ fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) ->
     stream.write_all(body).unwrap();
     let raw = read_bounded_response(&mut stream, Instant::now() + Duration::from_secs(5))
         .expect("capture complete bounded HTTP response");
+    eprintln!(
+        "http_exchange thread={:?} implementation={implementation} case={case} bytes={} headers_complete={} elapsed_ms={}",
+        std::thread::current().id(),
+        raw.len(),
+        raw.windows(4).any(|bytes| bytes == b"\r\n\r\n"),
+        started.elapsed().as_millis()
+    );
     parse_response(&raw)
 }
 
@@ -350,8 +369,15 @@ fn native_http_complete_headers_and_bodies_match_go() {
             }
             headers
         };
-        let rust = exchange(rust_port, method, body, &headers(&rust_token));
-        let go = exchange(go_port, method, body, &headers(&go_token));
+        let rust = exchange(
+            "rust",
+            index,
+            rust_port,
+            method,
+            body,
+            &headers(&rust_token),
+        );
+        let go = exchange("go", index, go_port, method, body, &headers(&go_token));
         let expected_status = [405, 401, 403, 200, 200, 204, 200, 204, 200, 200][index];
         for reply in [&rust, &go] {
             assert_eq!(
