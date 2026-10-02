@@ -2,12 +2,16 @@
 //! Header names/order are HTTP-insensitive; only the validated Date value varies.
 
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-struct Server(Child);
+#[path = "support/mcp_http_port.rs"]
+mod mcp_http_port;
+use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
+
+struct Server(StartedChild);
 
 impl Drop for Server {
     fn drop(&mut self) {
@@ -20,60 +24,45 @@ impl Drop for Server {
 
 fn start(binary: &Path, root: &Path) -> (Server, u16, String) {
     std::fs::create_dir_all(root).unwrap();
-    let port = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    let mut command = Command::new(binary);
-    command
-        .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
-        .current_dir(root)
-        .env_clear()
-        .env("HOME", root)
-        .env("USERPROFILE", root)
-        .env("SYMERASEME_DATA_DIR", root.join("data"))
-        .env("TMPDIR", root)
-        .env("TMP", root)
-        .env("TEMP", root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    for name in ["CONFIG", "DATA", "STATE", "CACHE"] {
-        command.env(format!("XDG_{name}_HOME"), root.join(name.to_lowercase()));
-    }
-    // Windows system APIs need the OS directory, not operator credentials/config.
-    if let Some(system_root) = std::env::var_os("SystemRoot") {
-        command.env("SystemRoot", system_root);
-    }
-    let mut server = Server(command.spawn().unwrap());
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut port = free_port();
     let token_path = root.join("data/mcp_token");
-    loop {
-        assert!(
-            server.0.try_wait().unwrap().is_none(),
-            "server exited early"
-        );
-        if let Ok(token) = std::fs::read_to_string(&token_path)
-            && TcpStream::connect(("127.0.0.1", port)).is_ok()
-        {
-            let response = exchange(
-                port,
-                "POST",
-                br#"{"jsonrpc":"2.0","id":0,"method":"initialize"}"#,
-                &[("Authorization", format!("Bearer {token}"))],
-            );
-            assert_eq!(
-                response.status_line, "HTTP/1.1 200 OK",
-                "token authenticates this server"
-            );
-            let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
-            assert_eq!(body["result"]["serverInfo"]["name"], "symeraseme");
-            return (server, port, token);
-        }
-        assert!(Instant::now() < deadline, "server readiness deadline");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    let server = spawn_with_handoff(
+        &mut port,
+        &token_path,
+        Duration::from_secs(10),
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command
+                .args([
+                    "mcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &candidate.to_string(),
+                ])
+                .current_dir(root)
+                .env_clear()
+                .env("HOME", root)
+                .env("USERPROFILE", root)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("TMPDIR", root)
+                .env("TMP", root)
+                .env("TEMP", root)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr);
+            for name in ["CONFIG", "DATA", "STATE", "CACHE"] {
+                command.env(format!("XDG_{name}_HOME"), root.join(name.to_lowercase()));
+            }
+            // Windows system APIs need the OS directory, not operator credentials/config.
+            if let Some(system_root) = std::env::var_os("SystemRoot") {
+                command.env("SystemRoot", system_root);
+            }
+            command.spawn()
+        },
+    );
+    let token = std::fs::read_to_string(token_path).unwrap();
+    (Server(server), port, token)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,6 +163,55 @@ fn exchange(port: u16, method: &str, body: &[u8], headers: &[(&str, String)]) ->
 
 fn assert_matches(candidate: &Response, oracle: &Response) {
     assert_eq!(candidate, oracle, "complete HTTP response parity");
+}
+
+#[test]
+fn readiness_probe_is_bounded_when_peer_dribbles_bytes() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    listener.set_nonblocking(true).unwrap();
+    let (started, observed) = std::sync::mpsc::channel();
+    let peer = std::thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(Instant::now() < deadline, "probe never connected");
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => panic!("accept probe: {error}"),
+            }
+        };
+        // Windows inherits the listener's nonblocking mode.
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        let mut request = [0; 4096];
+        assert!(stream.read(&mut request).unwrap() > 0);
+        started.send(()).unwrap();
+        for _ in 0..32 {
+            if stream.write_all(b"x").is_err() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    });
+    let start = Instant::now();
+    let authenticated = accepts_token(port, "probe-token", start + Duration::from_millis(200));
+    let elapsed = start.elapsed();
+    observed.recv_timeout(Duration::from_secs(2)).unwrap();
+    peer.join().unwrap();
+    assert!(!authenticated, "an incomplete response is not readiness");
+    eprintln!("readiness probe elapsed: {elapsed:?}");
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "readiness ignored its total bound: {elapsed:?}"
+    );
 }
 
 #[test]

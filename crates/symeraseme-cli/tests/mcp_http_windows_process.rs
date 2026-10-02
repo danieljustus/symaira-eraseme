@@ -5,17 +5,21 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
 
+#[path = "support/mcp_http_port.rs"]
+mod mcp_http_port;
+use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
+
 const GO_PROVIDER_CANCEL_FIXTURE: &str =
     include_str!("../../../tests/fixtures/provider-cancel/http.json");
 
-struct Server(Child);
+struct Server(StartedChild);
 
 impl Drop for Server {
     fn drop(&mut self) {
@@ -25,47 +29,57 @@ impl Drop for Server {
 }
 
 fn port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
+    free_port()
 }
 
-fn start(binary: &Path, root: &Path, port: u16) -> Server {
+fn start(binary: &Path, root: &Path, port: &mut u16) -> Server {
     start_with(binary, root, port, &[])
 }
 
-fn start_with(binary: &Path, root: &Path, port: u16, envs: &[(&str, &str)]) -> Server {
+fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)]) -> Server {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    Server(
-        Command::new(binary)
-            .creation_flags(0x0000_0200) // CREATE_NEW_PROCESS_GROUP
-            .args(["mcp", "--host", "127.0.0.1", "--port", &port.to_string()])
-            .env("HOME", &home)
-            .env("USERPROFILE", &home)
-            .env("SYMERASEME_DATA_DIR", root.join("data"))
-            .envs(envs.iter().copied())
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap(),
-    )
+    let process = spawn_with_handoff(
+        port,
+        &root.join("data/mcp_token"),
+        Duration::from_secs(10),
+        |candidate, stderr| {
+            let mut command = Command::new(binary);
+            command
+                .creation_flags(0x0000_0200) // CREATE_NEW_PROCESS_GROUP
+                .args([
+                    "mcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &candidate.to_string(),
+                ])
+                .env("HOME", &home)
+                .env("USERPROFILE", &home)
+                .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .envs(envs.iter().copied())
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(stderr);
+            command.spawn()
+        },
+    );
+    Server(process)
 }
 
-fn ready(server: &mut Server, port: u16) {
+fn ready(server: &mut Server, port: u16, root: &Path) {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
-        assert!(
-            server.0.try_wait().unwrap().is_none(),
-            "MCP server exited early"
-        );
-        if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+        if let Some(status) = server.0.try_wait().unwrap() {
+            let stderr = server.0.stderr_text();
+            panic!("MCP server exited early ({status}): {stderr}");
+        }
+        if let Ok(token) = std::fs::read_to_string(root.join("data/mcp_token"))
+            && accepts_token(port, &token, deadline)
+        {
             return;
         }
-        assert!(Instant::now() < deadline, "MCP server did not listen");
+        assert!(Instant::now() < deadline, "MCP server did not authenticate");
         std::thread::sleep(Duration::from_millis(20));
     }
 }
@@ -150,15 +164,15 @@ fn native_windows_http_matches_checked_out_go() {
 
     let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
-    let (go_port, rust_port) = distinct_ports();
-    let mut go = start(&oracle, &go_root, go_port);
+    let (mut go_port, mut rust_port) = distinct_ports();
+    let mut go = start(&oracle, &go_root, &mut go_port);
     let mut rust = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_root,
-        rust_port,
+        &mut rust_port,
     );
-    ready(&mut go, go_port);
-    ready(&mut rust, rust_port);
+    ready(&mut go, go_port, &go_root);
+    ready(&mut rust, rust_port, &rust_root);
     let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = std::fs::read_to_string(rust_root.join("data/mcp_token")).unwrap();
     assert_eq!(go_token.len(), 43);
@@ -182,15 +196,15 @@ fn native_windows_http_matches_checked_out_go() {
     let mut restarted = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_root,
-        rust_port,
+        &mut rust_port,
     );
-    ready(&mut restarted, rust_port);
+    ready(&mut restarted, rust_port, &rust_root);
     assert_ne!(
         std::fs::read_to_string(rust_root.join("data/mcp_token")).unwrap(),
         rust_token
     );
 
-    let mut refused = Server(
+    let mut refused = Server(StartedChild::from_child(
         Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"))
             .args(["mcp", "--host", "0.0.0.0", "--port", &port().to_string()])
             .env("HOME", rust_root.join("home"))
@@ -200,7 +214,7 @@ fn native_windows_http_matches_checked_out_go() {
             .stderr(Stdio::piped())
             .spawn()
             .unwrap(),
-    );
+    ));
     let deadline = Instant::now() + Duration::from_secs(5);
     let status = loop {
         if let Some(status) = refused.0.try_wait().unwrap() {
@@ -213,14 +227,7 @@ fn native_windows_http_matches_checked_out_go() {
         std::thread::sleep(Duration::from_millis(20));
     };
     assert!(!status.success());
-    let mut stderr = String::new();
-    refused
-        .0
-        .stderr
-        .take()
-        .unwrap()
-        .read_to_string(&mut stderr)
-        .unwrap();
+    let stderr = refused.0.stderr_text();
     assert!(stderr.contains("refusing non-loopback MCP bind"));
 }
 
@@ -340,17 +347,17 @@ fn native_windows_disconnect_cancels_provider_request_like_go() {
         let case = root.path().join(name);
         seed_reply(&case);
         let (url, request_rx, provider) = blocking_provider();
-        let port = port();
+        let mut port = port();
         let mut server = start_with(
             binary,
             &case,
-            port,
+            &mut port,
             &[
                 ("SYMERASEME_LLM_BASE_URL", url.as_str()),
                 ("OPENAI_API_KEY", "synthetic-cancel-key"),
             ],
         );
-        ready(&mut server, port);
+        ready(&mut server, port, &case);
         let token = std::fs::read_to_string(case.join("data/mcp_token")).unwrap();
         let mut client = TcpStream::connect(("127.0.0.1", port)).unwrap();
         write!(
@@ -395,15 +402,17 @@ fn native_windows_disconnect_cancels_provider_request_like_go() {
 fn native_windows_slow_header_timeout_matches_go() {
     let root = tempfile::tempdir().unwrap();
     let oracle = build_oracle(root.path());
-    let (go_port, rust_port) = distinct_ports();
-    let mut go_server = start(&oracle, &root.path().join("go"), go_port);
+    let (mut go_port, mut rust_port) = distinct_ports();
+    let go_root = root.path().join("go");
+    let rust_root = root.path().join("rust");
+    let mut go_server = start(&oracle, &go_root, &mut go_port);
     let mut rust_server = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
-        &root.path().join("rust"),
-        rust_port,
+        &rust_root,
+        &mut rust_port,
     );
-    ready(&mut go_server, go_port);
-    ready(&mut rust_server, rust_port);
+    ready(&mut go_server, go_port, &go_root);
+    ready(&mut rust_server, rust_port, &rust_root);
     let pending: Vec<_> = [("go", go_port), ("rust", rust_port)]
         .into_iter()
         .map(|(name, port)| {
@@ -463,9 +472,10 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
             ("go", oracle.as_path()),
             ("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"))),
         ] {
-            let port = port();
-            let mut server = start(binary, &root.join(name), port);
-            ready(&mut server, port);
+            let mut port = port();
+            let server_root = root.join(name);
+            let mut server = start(binary, &server_root, &mut port);
+            ready(&mut server, port, &server_root);
             #[link(name = "Kernel32")]
             unsafe extern "system" {
                 fn GenerateConsoleCtrlEvent(event: u32, process_group: u32) -> i32;
@@ -501,7 +511,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     let oracle = build_oracle(root.path());
     let log_path = root.path().join("console.log");
     let log = std::fs::File::create(&log_path).unwrap();
-    let mut helper = Server(
+    let mut helper = Server(StartedChild::from_child(
         Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
@@ -517,7 +527,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
             .stderr(log)
             .spawn()
             .unwrap(),
-    );
+    ));
     let deadline = Instant::now() + Duration::from_secs(40);
     let status = loop {
         if let Some(status) = helper.0.try_wait().unwrap() {
