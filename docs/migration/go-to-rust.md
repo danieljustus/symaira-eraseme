@@ -95,6 +95,18 @@ adds byte-change/missing-boundary controls. Both local default tests pass
 without Go, with strict core Clippy. Native Mac captures, corrected Windows
 suite acceptance and the other runtime-oracle families remain open.
 
+Scheduler generation/legacy detection now also defaults to an actual Go
+1.26.6 capture at clean `3a3e25079cc2ebcd1564cadc9ae78e6e85c51168`: six
+generator configurations and twelve legacy inputs produce a complete
+24,694-byte document (`1e8f3cf39b0ee3de4d9ba8381f1541aa9def47586a6e8ca430146101c59c0b64`).
+The parsed result matches the existing fixture without changes. All six
+original Rust tests remain selected; one added corruption test rejects a
+changed byte and a missing generator case. Seven default tests pass with
+Go absent, and strict engine Clippy passes. Explicit live mode uses the
+shared bounded runner instead of the former unbounded compiler/background
+wait. Scheduler install/config and other families remain open; this local
+Linux capture is not new six-target or integrated phase acceptance.
+
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime
 Go helpers, command-line live interface and switchback runners remain open

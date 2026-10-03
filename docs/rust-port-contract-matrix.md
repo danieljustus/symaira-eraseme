@@ -46,6 +46,11 @@ the architecture-specific seven-case outputs at clean `6ab9537`; only
 test retains all seven rows, choosing the actual recorded architecture, and
 adds two corruption controls. Corrected Windows checkout and Mac/native
 acceptance remain pending. No DB or cutover row is promoted by this freeze.
+The scheduler-generator family also replays actual source-bound Go 1.26.6
+output for its six configurations and twelve legacy inputs at clean
+`3a3e250`. All six original Rust tests and a new two-mutation control pass
+locally without Go. Scheduler install/config, complete engine/native freeze
+and cutover remain open; existing scheduler contract statuses are unchanged.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

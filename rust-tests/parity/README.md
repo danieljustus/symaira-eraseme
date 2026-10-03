@@ -72,6 +72,14 @@ attributes; input JSON uses LF. This retains the strict hashes on Windows.
 The original 6ab9537 Windows CRLF failures and actual Git/Rust negative control
 remain documented rather than normalized away.
 
+The engine `scheduler_parity` integration likewise defaults to actual
+source-bound Go output in `tests/fixtures/go-frozen/scheduler/`, preserving
+six generator configurations, twelve legacy inputs and all six original
+Rust tests. An added byte-change/missing-case control checks integrity.
+Explicit live mode retains the real Go comparison through the shared
+bounded runner. Scheduler install/config and the complete engine suite
+are not covered by this family's Go-free claim.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual
