@@ -8,6 +8,8 @@ on:
       - crates/symeraseme-cli/tests/support/mcp_*
       - cmd/symeraseme/**
       - internal/mcp/**
+      - scripts/check-mcp-conformance.py
+      - scripts/mcp-conformance-auth.mjs
       - go.mod
       - go.sum
       - Cargo.toml
@@ -23,6 +25,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  official-core:
+    name: Official MCP core / Go and Rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: product
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: modelcontextprotocol/conformance
+          ref: 21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0 # 0.1.16, immutable upstream source
+          path: official-conformance
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.19.0'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Build pinned official conformance CLI
+        working-directory: official-conformance
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Build actual product backends
+        working-directory: product
+        shell: bash
+        run: |
+          GOTOOLCHAIN=go1.26.6 go mod download
+          rustup toolchain install 1.98.0 --profile minimal
+          CARGO_TARGET_DIR="$RUNNER_TEMP/mcp-conformance-target" cargo +1.98.0 build -p symeraseme-cli --bin symeraseme-rust --locked
+      - name: Official applicable core scenarios with private authenticated servers
+        working-directory: product
+        shell: bash
+        run: |
+          python3 scripts/check-mcp-conformance.py \
+            --conformance ../official-conformance \
+            --rust "$RUNNER_TEMP/mcp-conformance-target/debug/symeraseme-rust" \
+            --output "$RUNNER_TEMP/mcp-conformance-result"
+      - name: Retain source-bound official check receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: official-mcp-core
+          path: ${{ runner.temp }}/mcp-conformance-result/manifest.json
+          if-no-files-found: warn
+          retention-days: 7
   native-mcp:
     name: MCP HTTP / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
