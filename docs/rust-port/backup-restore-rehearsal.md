@@ -44,6 +44,16 @@ CLI-023/024 remain PARTIAL until these native observations are accepted.
 Local archive/SQLite controls and syntax/Go vet checks pass, but the new
 Windows confinement and full Linux restore are not yet observed.
 
+At candidate `b88e3d0`, native Linux arm64 job `111230070745` and Linux amd64
+job `111230070780` in run `37132442133` passed all eight actual restore cases,
+with the required native namespace/Landlock controls and source-bound official
+release artifact. The first Windows amd64 job `111230070798` stopped at the
+committed-harness byte check: its default Git checkout converted Python files
+to CRLF, before any AppContainer or migration execution. The measured Python,
+documentation and workflow files now require LF through `.gitattributes`;
+hash validation remains exact. The original failure is retained and does not
+count as Windows confinement or restore evidence.
+
 ## Archive verification preparation — 2026-09-29
 
 At clean candidate `cfdc59a0d9266b67a5541de4562a3e7b702d894c`, all five

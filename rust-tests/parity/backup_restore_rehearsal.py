@@ -88,6 +88,7 @@ def harness_identity():
         ['git', '-C', str(REPO), 'status', '--porcelain=v1', '--untracked-files=all'],
         check=True, capture_output=True, text=True, timeout=5).stdout.splitlines()
     files = ('rust-tests/parity/backup_restore_rehearsal.py',
+             '.github/workflows/backup-restore-native.yml',
              'rust-tests/parity/plain_store_switchback.py',
              'rust-tests/parity/linux_store_sandbox.py',
              'rust-tests/parity/windows_store_sandbox.py',
