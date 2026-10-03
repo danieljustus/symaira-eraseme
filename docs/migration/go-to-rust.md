@@ -18,8 +18,9 @@ evidence. Phases 6–8 are not complete. Closed historical phase issues
 `execution_state.task_issues` maps every unfinished task to the granular
 issues of #813; `contract_issue_owners` maps every PARTIAL/TODO row. The
 matrix's row status remains authoritative. `active_tasks` means unfinished
-implementation/evidence, not a live writer claim. Task 6.1 remains unfinished
-because its planned crate-decision artifact is absent; #1119 owns that gap.
+implementation/evidence, not a live writer claim. Task 6.1 remains unfinished pending native trust acceptance; its crate-decision
+artifact is now recorded in `docs/rust-email-crate-decision.md`, and #1119 owns
+the remaining gate.
 `python3 tests/test_rust_task_graph.py` checks this reconciliation without Go,
 network calls or fixture regeneration; CI runs the same check.
 
