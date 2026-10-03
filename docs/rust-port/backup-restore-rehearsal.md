@@ -1,12 +1,57 @@
 # Historical Go fallback backup and restore rehearsal
 
+## Six-target native acceptance — 2026-10-03 (#1122)
+
+At branch source `28f13ac1b09caf3b930c89714de27718ef3cdad0`,
+[run 37137670878](https://github.com/danieljustus/symaira-eraseme/actions/runs/37137670878)
+passed all six native targets. Checkout/build observations identify the clean
+PR merge source `69c5724c32d64a66ffa71a7f91ddabb5ac1335e2`; the workflow
+builds the Rust executable in its own target directory from that checkout.
+The runner separately records the supplied executable hash and does not infer
+its source identity from its filename.
+
+| Native target | Successful job |
+|---|---|
+| Linux amd64 | 111245403685 |
+| Linux arm64 | 111245403653 |
+| Windows amd64 | 111245403681 |
+| Windows arm64 | 111245403673 |
+| macOS amd64 | 111245403771 |
+| macOS arm64 | 111245403432 |
+
+Each job executes the migration-engine, command-surface and consented manual
+fallback tests, then all eight real backup/restore cases with the verified
+official native Go v0.12.1 archive. The actual result is schema 1 → 2 → 1:
+Go reads three baseline requests, Rust creates request 4, the retained Go
+refuses schema 2, and the separate restored schema-1 root contains exactly
+the original three requests. A deliberately incomplete two-request restore
+is rejected. This covers synthetic disposable data; every post-backup write
+is lost by this rollback path and must be preserved or reconciled separately.
+
+Windows amd64 artifact `11279253544` was independently downloaded and read
+back. Every recorded stdout/stderr length and SHA-256 matches its raw stream.
+The seven native denial/access controls pass: TCP/UDP return error 10013,
+child creation returns error 5, outside-root reads/writes are denied, and
+owned-root writes/removal succeed. The deliberate stall returns timeout 124.
+All command records, including timeout, require zero active Job processes,
+four absent WFP filter IDs, removed root SID permissions and a deleted owned
+UUID profile. The nine measured harness files match their committed bytes;
+the checkout remains clean before and after execution.
+
+CLI-023/024 meet their native evidence scope, including the accepted #809
+manual-confirmation deviation. Required final PR checks and integration remain
+separate gates. Publication, production-data restore, default cutover and Go
+retirement are not established by this rehearsal.
+
+## Retained native failure history
+
 The SID-scoped WFP probe at `6a4cf8fe60afbd14047586cb593caa2ea668a24b`
 executed on both native Windows targets in run `37134021246`. Its amd64 raw
 record proves TCP permission denial, outside-root read/write denial, owned
 write/remove access, child-creation denial, zero remaining Job processes,
 removed profile/root SID, and both dynamic filters absent after session close.
-UDP did not report permission denial, so Windows acceptance remains open. The
-next candidate adds the same exact-package-SID block at IPv4/IPv6 socket
+UDP did not report permission denial, so that candidate was not accepted. The
+subsequent candidate adds the same exact-package-SID block at IPv4/IPv6 socket
 assignment and records native TCP/UDP error numbers. Neither timeout nor
 connection refusal counts as network-denial evidence.
 
@@ -27,7 +72,7 @@ failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
 
-## Native Linux/Windows candidate — 2026-10-03 (#1122)
+## Native Linux/Windows implementation — 2026-10-03 (#1122)
 
 `backup-restore-native.yml` selects all six native OS/architecture targets and
 checks the Rust compiler host before building and executing the candidate.
@@ -52,16 +97,17 @@ allowed owned-root writes, blocked child creation, exact nonzero exit 23 and a
 250 ms stalled-process deadline. Cleanup checks the actual Job active-process
 count, removes the owned SID ACL and deletes only the UUID profile it created.
 Raw stdout/stderr and failure records remain available if any assertion fails.
-No administrator trust/network policy, existing profile or operator data changes.
+Four dynamic WFP socket-assignment/connect filters match only this generated
+AppContainer SID; their absence is checked after the owned session closes.
+No unrelated firewall rule, trust setting, existing profile or operator data changes.
 The parent creates SQLite backup/restore and deliberately partial fixture states;
 the Windows CLI receives no access to the parent Python runtime.
 
 The workflow also executes the real migration-engine, command-surface and
 consented live manual-fallback cases. The accepted #809 deviation remains:
 automatic browser clicking is deferred; confirmation is a manual task.
-CLI-023/024 remain PARTIAL until these native observations are accepted.
-Local archive/SQLite controls and syntax/Go vet checks pass, but the new
-Windows confinement and full Linux restore are not yet observed.
+The six-target acceptance above supersedes the earlier pending Windows/Linux
+scope. Local archive/SQLite controls and syntax/Go vet checks also pass.
 
 At candidate `b88e3d0`, native Linux arm64 job `111230070745` and Linux amd64
 job `111230070780` in run `37132442133` passed all eight actual restore cases,
@@ -82,7 +128,8 @@ there. The driver now adds two dynamic native WFP connect-denial filters that
 match only the unique package SID (IPv4/IPv6). Session close removes them even
 after a parent crash; normal cleanup independently queries their actual IDs
 and requires `FWP_E_FILTER_NOT_FOUND`. The existing strict TCP/UDP permission
-checks are unchanged. New Windows network and full restore proof remain pending.
+checks are unchanged. The six-target acceptance above uses four filters and
+supersedes this earlier pending network/restore scope.
 
 ## Archive verification preparation — 2026-09-29
 

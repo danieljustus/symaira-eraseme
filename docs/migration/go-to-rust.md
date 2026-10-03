@@ -31,15 +31,21 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
-## Native migration backup/restore candidate (2026-10-03, #1122)
+## Native migration backup/restore acceptance (2026-10-03, #1122)
 
 The new six-target `backup-restore-native.yml` binds historical Go v0.12.1
 archive bytes to release checksums/digests and executes the eight retained
 schema-v1 → Rust-v2 → restored-v1 cases. Linux amd64 uses the existing
 namespace/Landlock driver; Windows adds a no-capability AppContainer,
 child-creation restriction and owned suspended-start Job with native denial,
-exit and timeout controls. Actual native observations are pending; CLI-023/024
-and task 7.4 remain PARTIAL. The accepted manual-confirmation deviation (#809)
+exit and timeout controls, plus four dynamic package-SID-scoped WFP filters.
+Run `37137670878` at branch source
+`28f13ac1b09caf3b930c89714de27718ef3cdad0` passed all six targets with
+clean PR merge source `69c5724c32d64a66ffa71a7f91ddabb5ac1335e2`.
+Windows amd64 artifact `11279253544` additionally passed independent raw
+stream-hash and every-command Job/WFP/SID/profile cleanup readback.
+CLI-023/024 are PASS for their scoped native contracts; tasks 7.2/7.4 await
+final PR checks and verified integration. The accepted manual-confirmation deviation (#809)
 is now explicit in the release notes; no automatic browser executor is added.
 See `docs/rust-port/backup-restore-rehearsal.md` for the boundary and controls.
 
@@ -610,9 +616,11 @@ artifact gates still require separate evidence.
 
 - **CLI-024 release acceptance.** The integrated native CI matrix passed on
   `3f133e75`, including the bounded registry build at 1024 descriptors
-  (#1034). The disposable switchbacks build Go from current source; a
-  retained older Go rollback binary reading schema v2 remains unproved
-  (#1035). Do not promote this row to cutover-ready based on CI alone.
+  (#1034). Run `37137670878` now establishes the separate official-Go
+  backup/restore boundary on all six native targets: v0.12.1 refuses schema
+  v2 and reads the original three requests only after restoring the pre-Rust
+  schema-v1 backup into a separate root. This loses post-backup writes and
+  does not establish in-place backward compatibility or production-data restore.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
   truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
   128 seeded mutations replay the live Go process byte-exactly, and the new
@@ -620,9 +628,11 @@ artifact gates still require separate evidence.
   executions historically. The current-source six-target replay and the
   configured 120-second fuzz/mutation campaign now pass (checkpoint above).
   Exhaustive or differential fuzzing is not claimed by these bounded gates.
-- **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
-  explicit message where Go runs `confirmation.AutoConfirm` (browser
-  subsystem unported). The recorded case is the no-reply branch.
+- **Manual confirmation (CLI-023).** The accepted #809 deviation keeps browser
+  clicks as durable manual tasks. Retained stored-reply MCP fixtures cover
+  preview, manual fallback and no-link effects; the six-target #1122 gate
+  executes the actual CLI and consented manual-fallback contracts. This does
+  not claim an automated browser executor.
 - **`go_map_order` exemption (CLI-020).** `ToolHandler::call` sorts every
   result except `auto_confirm` (Go structs keep declaration order). Any
   future Go-struct-returning tool needs the same exemption — grep the
