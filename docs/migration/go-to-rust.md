@@ -76,7 +76,7 @@ complete-header comparator. Task 8.3 remains pending integration of its
 recorded task 8.1 and 4.7 predecessors; no dependency is inferred from these
 individual row results.
 
-## LLM fixture lifecycle candidate (2026-10-03, #1142)
+## Integrated LLM fixture lifecycle acceptance (2026-10-03, #1142)
 
 The original `b2d282e` Windows amd64 failure in run `37045269185`, job
 `110965028842`, remains retained. Diagnostics merged by #1143 proved request
@@ -101,9 +101,15 @@ control sends one of three requests and must fail with an exact one-request
 count within its short deadline, with the thread joined. The seven retained
 provider cases still require all three actual production attempts, exact path,
 Go error class/message after required credential redaction, and unchanged Go
-fixture regeneration. All ten local tests pass. Current native six-target proof,
-including both Windows architectures, is pending. This proves the mechanism and
-repair; it does not fabricate a timestamp for the historical client setup.
+fixture regeneration. All ten local tests pass. Source
+`71f36604856f49ebc249fd1088d2c014e36df200` passed all six targets in targeted
+run `37137392379` and full native workspace run `37137564400`. Archive run
+`37137392415` passed all six native binaries and same-run six-archive verification
+job `111275349421`; all 46 final PR checks are accepted. PR #1152 merged as
+`c797d217b97197d0dbfb56741ecc95c5be001a77`, and #1142 is closed by readback.
+This proves the mechanism and repair; it does not fabricate a timestamp for
+historical client setup. Following candidates include this verified main
+predecessor and require their own current-head checks before integration.
 
 ## Native Windows consent gate (2026-10-03, #1123)
 
