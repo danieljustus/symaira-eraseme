@@ -325,7 +325,8 @@ mod windows_acl {
                 );
                 // A read-only existing file rejects replacement, retaining
                 // both the old token bytes and its complete security descriptor.
-                let mut permissions = fs::metadata(&token_file).unwrap().permissions();
+                let original_permissions = fs::metadata(&token_file).unwrap().permissions();
+                let mut permissions = original_permissions.clone();
                 permissions.set_readonly(true);
                 fs::set_permissions(&token_file, permissions).unwrap();
                 let readonly_acl = acl(
@@ -358,9 +359,7 @@ mod windows_acl {
                     readonly_acl
                 );
                 observations.push((before, directory_acl, readonly_acl));
-                let mut permissions = fs::metadata(&token_file).unwrap().permissions();
-                permissions.set_readonly(false);
-                fs::set_permissions(&token_file, permissions).unwrap();
+                fs::set_permissions(&token_file, original_permissions).unwrap();
             }
             assert_eq!(
                 observations[0], observations[1],
