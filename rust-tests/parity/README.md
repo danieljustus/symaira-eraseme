@@ -90,6 +90,16 @@ Windows observation. Explicit live mode uses the existing bounded oracle
 runner. Native capture now records these twenty cases in addition to the
 eleven service/projection observations, including the complete JSON file.
 
+The Linux `config_parity` default also reads an actual six-case Go 1.26.6
+capture from clean `b4b5a56`. All eleven original tests remain selected,
+including subprocess output/timeout cleanup controls; an added corruption
+control rejects changed raw bytes and a missing configuration case. The
+existing provenance at `119ee9f` and original six Rust configuration
+comparisons remain unchanged. Mac retains live Go and Windows retains its
+original capability gate. Native capture now additionally collects these
+six configuration observations (37 total service/projection/install/config
+cases). These Linux family additions do not make the whole workspace Go-free.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

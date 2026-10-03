@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Capture actual native Go service/projection/install observations for freezing.
+"""Capture actual native Go service/projection/install/config observations.
 
 Never synthesizes an output or changes a committed fixture. The output directory
-must be new, and a manifest is written only after all three real oracles succeed.
+must be new, and a manifest is written only after all four real oracles succeed.
 """
 
 import argparse
@@ -98,19 +98,20 @@ def main():
     }
     sources = [source / "go.mod", source / "go.sum"]
     for directory in ("internal/eventstore", "internal/triage", "internal/replies", "internal/llm",
-                      "internal/timeutil", "internal/scheduler", "rust-tests/parity/oracle/triage-service",
-                      "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install"):
+                      "internal/timeutil", "internal/scheduler", "internal/config", "rust-tests/parity/oracle/triage-service",
+                      "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install", "rust-tests/parity/oracle/config"):
         sources.extend(sorted((source / directory).rglob("*.go")))
     cases_path = source / "rust-tests/parity/oracle/projection/cases.json"
     sources.append(cases_path)
+    sources += [source / "rust-tests/parity/oracle/config/inputs.json", source / "rust-tests/parity/oracle/config/config_cases.json"]
     for path in sources:
         manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
-    for package in ("triage-service", "projection", "scheduler-install"):
-        binary = output_root / (package + (".exe" if info["GOHOSTOS"] == "windows" else ""))
+    for package in ("triage-service", "projection", "scheduler-install", "config"):
+        binary = output_root / (package + "-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
         # runtime.Caller locates projection/cases.json: do not trim its path.
         capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(binary),
                  "./rust-tests/parity/oracle/" + package], source, environment,
-                output_root / (package + "-build"), 120)
+                output_root / (package + "-build"), 30 if package == "config" else 120)
         build_info = subprocess.check_output([go, "version", "-m", str(binary)], env=environment, timeout=10)
         assert ("vcs.revision=" + revision).encode() in build_info and b"vcs.modified=false" in build_info
         command = [str(binary)]
@@ -130,6 +131,11 @@ def main():
             observed = json.loads(output)
             names = [case["name"] for case in json.loads(cases_path.read_bytes())]
             assert set(observed["cases"]) == set(names) and len(names) == 7
+        elif package == "config":
+            observed = json.loads(output)
+            names = [f"CFG-{number:03}" for number in range(1, 7)]
+            assert set(observed["cases"]) == set(names)
+            assert observed["provenance"]["source_sha256"] == manifest["source_files"]["internal/config/config.go"]["sha256"]
         else:
             observed = json.loads(output)
             names = ["classify", "rebuttal", "fallback", "llm_error"]
@@ -143,7 +149,7 @@ def main():
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 31, "status": "actual observations captured"}))
+                      "operations": 37, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

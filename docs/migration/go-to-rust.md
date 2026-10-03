@@ -775,6 +775,17 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — #1131's clean `b4b5a56` checkpoint passed exactly 68 selected
+  tests with Go absent from PATH, six explicit live scheduler-install tests,
+  and a native Linux capture of all 31 service/projection/install cases.
+  The next Linux config preparation uses six actual source-bound Go cases
+  (2,764 stdout bytes) from that source, retains its eleven original tests
+  and adds one corruption control. Original provenance, process-output and
+  timeout-cleanup checks remain selected. Mac config retains live Go and
+  Windows's existing capability gate is unchanged. The native capture
+  pipeline now also collects all six config cases; no all-target acceptance
+  or complete Go-free workspace claim follows from these local checks.
+
 - 2026-10-03 — #1131 preparation adds the actual native Linux Go scheduler
   installation capture at clean `7ba198d` (20 cases, 62,849 JSON bytes,
   umask 022). The first local capture under a restrictive inherited umask

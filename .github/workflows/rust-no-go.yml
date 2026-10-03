@@ -12,6 +12,7 @@ on:
       - crates/symeraseme-core/tests/encryption_parity.rs
       - crates/symeraseme-core/tests/triage_service.rs
       - crates/symeraseme-core/tests/projection_oversized_parity.rs
+      - crates/symeraseme-core/tests/config_parity.rs
       - crates/symeraseme-core/tests/support/frozen_go_oracle.rs
       - tests/fixtures/go-frozen/**
       - crates/symeraseme-engine/tests/scheduler_parity.rs
@@ -84,5 +85,7 @@ jobs:
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-engine", "--test", "scheduler_parity",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-engine", "--test", "scheduler_install_parity",
+                              "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "config_parity",
                               "--locked", "--offline"], env=environment, check=True)
           PY

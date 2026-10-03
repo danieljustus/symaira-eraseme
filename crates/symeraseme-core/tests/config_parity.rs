@@ -81,6 +81,17 @@ const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[cfg(unix)]
 fn run_go_config_oracle() -> Value {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => {}
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            if cfg!(target_os = "linux") {
+                return verified_frozen_config(include_bytes!(
+                    "../../../tests/fixtures/go-frozen/config/config.stdout"
+                ));
+            }
+        }
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
     let temp_root = std::env::temp_dir().join(format!(
         "symeraseme-config-oracle-{}-{}-{}",
@@ -132,6 +143,76 @@ fn run_go_config_oracle() -> Value {
         "Go config oracle exited unsuccessfully"
     );
     serde_json::from_slice(&output.stdout).expect("Go config oracle must emit valid JSON")
+}
+
+#[cfg(unix)]
+fn verified_frozen_config(bytes: &[u8]) -> Value {
+    use sha2::{Digest, Sha256};
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/config/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "b4b5a56b26a2e0ecdeb7c1c0a84641ae2f967ae4"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        manifest["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    let stderr = include_bytes!("../../../tests/fixtures/go-frozen/config/config.stderr");
+    assert!(stderr.is_empty());
+    assert_eq!(manifest["stderr"]["bytes"], stderr.len());
+    assert_eq!(
+        manifest["stderr"]["sha256"],
+        hex::encode(Sha256::digest(stderr))
+    );
+    for (path, source) in [
+        (
+            "internal/config/config.go",
+            include_bytes!("../../../internal/config/config.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/config/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/config/main.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/config/inputs.json",
+            include_bytes!("../../../rust-tests/parity/oracle/config/inputs.json").as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["cases"].as_object().unwrap().len(), 6);
+    document
+}
+
+#[cfg(unix)]
+#[test]
+fn frozen_config_rejects_changed_bytes_and_missing_storage_effects() {
+    let bytes = include_bytes!("../../../tests/fixtures/go-frozen/config/config.stdout");
+    let mut changed = bytes.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_config(&changed)).is_err());
+    let mut missing: Value = serde_json::from_slice(bytes).unwrap();
+    missing["cases"]
+        .as_object_mut()
+        .unwrap()
+        .remove("CFG-001")
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| verified_frozen_config(&serde_json::to_vec(&missing).unwrap()))
+            .is_err()
+    );
 }
 
 #[cfg(unix)]

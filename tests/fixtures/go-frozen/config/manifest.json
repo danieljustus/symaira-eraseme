@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "source_revision": "b4b5a56b26a2e0ecdeb7c1c0a84641ae2f967ae4",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "captured_at_utc": "2026-10-03T21:09:08.322625+00:00",
+  "exit_status": 0,
+  "cases": [
+    "CFG-001",
+    "CFG-002",
+    "CFG-003",
+    "CFG-004",
+    "CFG-005",
+    "CFG-006"
+  ],
+  "source_files": {
+    "internal/config/config.go": {
+      "bytes": 8468,
+      "sha256": "d197afc83776a85880428994e32b0c1585c245ed52d86f9a31fe51889cbce32c"
+    },
+    "rust-tests/parity/oracle/config/main.go": {
+      "bytes": 15951,
+      "sha256": "1401e3cb018508a3f5ebfe02b7fed35ba8168a8bb982e621fa32d248ea0a3ca9"
+    },
+    "rust-tests/parity/oracle/config/inputs.json": {
+      "bytes": 2739,
+      "sha256": "b2b4d98bed017f1db353397e7bebdfc02f52d73a2d300acbb9776429aa40dfdb"
+    },
+    "rust-tests/parity/oracle/config/config_cases.json": {
+      "bytes": 2295,
+      "sha256": "14d353b118a6f9c061f3804c04ae0391d9faa9be4d8ea0644355fa261c65734f"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "embedded_build_info": "/workspace/scratch/frozen-go-config-b4b5a56-v2/config-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/config\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003210657-b4b5a56b26a2\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=b4b5a56b26a2e0ecdeb7c1c0a84641ae2f967ae4\n\tbuild\tvcs.time=2026-10-03T21:06:57Z\n\tbuild\tvcs.modified=false\n",
+  "stdin": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 2764,
+    "sha256": "bf69171972d18f9bb183a4c2257715ade6d45eecd9b9b06d3f7a47c456a9da9f"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary": {
+    "bytes": 4154549,
+    "sha256": "b134d0fbb91f5c3348c1f15e0bcce87de26c04d0e6e00939da2a715ed73f77b3"
+  },
+  "limits": "Actual native Linux six-case config capture. Existing provenance source119ee9f remains unchanged; no all-native acceptance."
+}

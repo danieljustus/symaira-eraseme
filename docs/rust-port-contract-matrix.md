@@ -61,6 +61,12 @@ on Linux and Windows AMD64/ARM64. All four new artifacts have 49 matching
 source-file hashes, LF JSON inputs and unchanged whole Go product outputs;
 the earlier Windows CRLF failures remain recorded. Both Mac jobs and the
 subsequent scheduler changes are outside that four-target acceptance.
+The Linux config family replays six actual Go observations at clean
+`b4b5a56`, retaining all eleven original tests and adding one corruption
+control. Whole-output/source/input hashes and original `119ee9f` provenance
+remain strict. Mac live execution, Windows's existing capability gate and
+other runtime families retain their previous scope; no CFG or cutover row
+is promoted. Native capture now collects 37 observations per actual host.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

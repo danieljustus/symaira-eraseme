@@ -57,5 +57,7 @@ tests/fixtures/provider-cancel/*.json text eol=lf
 tests/fixtures/go-frozen/** -text
 tests/fixtures/go-frozen/**/manifest.json text eol=lf
 rust-tests/parity/oracle/projection/cases.json text eol=lf
+rust-tests/parity/oracle/config/inputs.json text eol=lf
+rust-tests/parity/oracle/config/config_cases.json text eol=lf
 rust-tests/parity/fixtures/frozen/** -text
 rust-tests/parity/oracle/cases.json text eol=lf
