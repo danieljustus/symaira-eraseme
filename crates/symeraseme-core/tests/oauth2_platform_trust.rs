@@ -102,6 +102,8 @@ struct InstalledRoot {
     path: PathBuf,
     #[cfg(target_vendor = "apple")]
     source: PathBuf,
+    #[cfg(target_vendor = "apple")]
+    keychain: PathBuf,
     installed: bool,
 }
 
@@ -232,6 +234,22 @@ fn native_command_control_bounds_children_and_reports_real_exit_failure() {
 
 impl InstalledRoot {
     fn install(source: &Path, name: String) -> Self {
+        #[cfg(target_vendor = "apple")]
+        let keychain = {
+            let raw = command_output_with_budget(
+                Command::new("security").args(["default-keychain", "-d", "user"]),
+                Duration::from_secs(30),
+                Stdio::null(),
+            )
+            .unwrap();
+            let path = PathBuf::from(String::from_utf8(raw).unwrap().trim().trim_matches('"'));
+            let home = PathBuf::from(std::env::var_os("HOME").expect("hosted runner home"));
+            assert!(
+                path.is_absolute() && path.is_file() && path.starts_with(home),
+                "native trust must use the hosted runner's own default keychain"
+            );
+            path
+        };
         let mut root = Self {
             #[cfg(not(target_os = "linux"))]
             name: name.clone(),
@@ -239,6 +257,8 @@ impl InstalledRoot {
             path: PathBuf::from(format!("/usr/local/share/ca-certificates/{name}.crt")),
             #[cfg(target_vendor = "apple")]
             source: source.to_path_buf(),
+            #[cfg(target_vendor = "apple")]
+            keychain,
             installed: false,
         };
         #[cfg(target_os = "linux")]
@@ -255,18 +275,13 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
+            // Native roots include the current user's trust domain. Use the
+            // disposable runner's own keychain and user authorization right;
+            // the admin-domain removal/import paths stalled headlessly.
             checked(
-                Command::new("sudo")
-                    .args([
-                        "-n",
-                        "security",
-                        "add-trusted-cert",
-                        "-d",
-                        "-r",
-                        "trustRoot",
-                        "-k",
-                        "/Library/Keychains/System.keychain",
-                    ])
+                Command::new("security")
+                    .args(["add-trusted-cert", "-r", "trustRoot", "-k"])
+                    .arg(&root.keychain)
                     .arg(source),
             )
             .unwrap();
@@ -300,44 +315,55 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
-            // Both login/root remove-trusted-cert stall on hosted macOS.
-            // Edit only this certificate's entry through the external trust
-            // representation API, then prove every unrelated entry survived.
             let files = tempfile::tempdir().map_err(|error| error.to_string())?;
             let before = files.path().join("before.plist");
             let removed = files.path().join("removed.plist");
-            let after = files.path().join("after.plist");
             checked(
                 Command::new("security")
-                    .args(["trust-settings-export", "-d"])
+                    .arg("trust-settings-export")
                     .arg(&before),
             )?;
             checked(Command::new("python3").args([
                 "-c",
-                "import hashlib,plistlib,ssl,sys; source,before,out=sys.argv[1:]; digest=hashlib.sha1(ssl.PEM_cert_to_DER_cert(open(source).read())).hexdigest().upper(); data=plistlib.load(open(before,'rb')); entries=data['trustList']; owned=[k for k in entries if k.upper()==digest]; assert len(owned)==1, 'owned CI CA trust entry missing or ambiguous'; del entries[owned[0]]; plistlib.dump(data,open(out,'wb')); print('removed exactly one owned CI CA trust entry')",
+                "import hashlib,plistlib,ssl,sys; source,before,out=sys.argv[1:]; digest=hashlib.sha1(ssl.PEM_cert_to_DER_cert(open(source).read())).hexdigest().upper(); data=plistlib.load(open(before,'rb')); entries=data['trustList']; owned=[k for k in entries if k.upper()==digest]; assert len(owned)==1, 'owned CI CA trust entry missing or ambiguous'; del entries[owned[0]]; plistlib.dump(data,open(out,'wb')); print('expected settings remove exactly one owned CI CA trust entry')",
             ]).arg(&self.source).arg(&before).arg(&removed))?;
             checked(
-                Command::new("sudo")
-                    .args(["-n", "security", "trust-settings-import", "-d"])
-                    .arg(&removed),
+                Command::new("security")
+                    .arg("remove-trusted-cert")
+                    .arg(&self.source),
             )?;
             checked(
                 Command::new("security")
-                    .args(["trust-settings-export", "-d"])
-                    .arg(&after),
+                    .args(["delete-certificate", "-c", &self.name])
+                    .arg(&self.keychain),
             )?;
+            // Read the real user trust domain through Security.framework. The
+            // specific native errSecNoTrustSettings status is valid only if
+            // removing this CA left no unrelated entries in the expected set.
             checked(Command::new("python3").args([
                 "-c",
-                "import plistlib,sys; expected,actual=[plistlib.load(open(p,'rb')) for p in sys.argv[1:]]; assert expected==actual, 'CI CA trust removal changed unrelated settings'; print('owned CA trust entry absent; unrelated trust settings unchanged')",
-            ]).arg(&removed).arg(&after))?;
-            checked(Command::new("sudo").args([
-                "-n",
-                "security",
-                "delete-certificate",
-                "-c",
-                &self.name,
-                "/Library/Keychains/System.keychain",
-            ]))?;
+                r#"import ctypes,plistlib,sys
+expected=plistlib.load(open(sys.argv[1],'rb'))
+security=ctypes.CDLL('/System/Library/Frameworks/Security.framework/Security')
+cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+security.SecTrustSettingsCopyExternalRepresentation.argtypes=[ctypes.c_uint32,ctypes.POINTER(ctypes.c_void_p)]
+security.SecTrustSettingsCopyExternalRepresentation.restype=ctypes.c_int32
+data=ctypes.c_void_p()
+status=security.SecTrustSettingsCopyExternalRepresentation(1,ctypes.byref(data))
+if status == -25263:
+    assert not expected['trustList'], 'native empty domain lost unrelated user trust settings'
+else:
+    assert status == 0 and data.value, 'native user trust read failed: %s' % status
+    cf.CFDataGetLength.argtypes=[ctypes.c_void_p]; cf.CFDataGetLength.restype=ctypes.c_long
+    cf.CFDataGetBytePtr.argtypes=[ctypes.c_void_p]; cf.CFDataGetBytePtr.restype=ctypes.c_void_p
+    cf.CFRelease.argtypes=[ctypes.c_void_p]
+    try:
+        actual=plistlib.loads(ctypes.string_at(cf.CFDataGetBytePtr(data),cf.CFDataGetLength(data)))
+    finally:
+        cf.CFRelease(data)
+    assert expected == actual, 'owned CA removal changed unrelated user trust settings'
+print('owned CA user trust absent; unrelated trust settings unchanged')"#,
+            ]).arg(&removed))?;
         }
         #[cfg(windows)]
         checked(Command::new("certutil").args(["-delstore", "Root", &self.name]))?;
@@ -563,6 +589,28 @@ fn exercise_certificates(native: bool) {
     }
     if let Some(installation) = &mut installation {
         installation.remove().unwrap();
+    }
+    if native {
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
+            .args(["--exact", TEST, "--nocapture"])
+            .env(CHILD, "removed")
+            .env(
+                "SYMERASEME_OAUTH_TEST_CERT",
+                directory.path().join("trusted.pem"),
+            )
+            .env(
+                "SYMERASEME_OAUTH_TEST_KEY",
+                directory.path().join("trusted-key.pem"),
+            )
+            .env_remove("SSL_CERT_FILE")
+            .env_remove("SSL_CERT_DIR")
+            .env("SYMERASEME_NATIVE_TRUST_CHILD", "1")
+            .env("SYMERASEME_OAUTH_TEST_ROOT", &roots);
+        checked(&mut command).unwrap();
+        eprintln!(
+            "native trust removed: previously accepted owned CA now rejected by OAuth2 HTTPS, IMAP TLS and STARTTLS"
+        );
     }
     for (case, output) in outcomes {
         assert!(

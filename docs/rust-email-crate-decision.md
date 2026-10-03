@@ -77,3 +77,21 @@ representation with exactly the owned entry removed, re-exports to verify all
 unrelated settings and then deletes the owned certificate. Native results for
 this direct route are pending. No authorization database is modified by the
 current candidate; Linux/Windows production trust logic is unchanged.
+
+Direct admin import at `2a514352` in run `37126123832` also exceeds the
+30-second bound on macOS ARM job `111211644787` and Intel job `111211644710`,
+after all nine native TLS controls pass. Exporting/removing only the owned
+entry succeeds; the privileged import stalls. No cleanup success is claimed.
+
+The next candidate uses the disposable hosted runner's existing default user
+keychain and native user trust domain. Apple trustd distinguishes the user
+and admin authorization rights; no authorization database override is used.
+The fixture requires the keychain to be an existing absolute file under the
+runner's HOME, imports only the uniquely generated CA, and removes its trust
+and certificate with user-domain native APIs. A Security.framework read then
+compares complete remaining trust settings. Native errSecNoTrustSettings is
+accepted only when the expected unrelated-entry set is empty. All platforms
+add a fresh-process post-cleanup control that requires the formerly trusted
+CA to fail OAuth2 HTTPS, IMAP TLS and STARTTLS without transmitting credentials.
+This route and cleanup control require actual native validation; the existing
+failed probes remain retained and the matrix stays PARTIAL.
