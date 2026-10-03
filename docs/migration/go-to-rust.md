@@ -38,6 +38,17 @@ Executing the exact workflow script locally with Go absent from PATH passed
 tests, with zero failures or ignores. Strict core all-target/all-feature
 Clippy, workspace formatting and task-graph checks pass. Native CI remains
 pending; these local results do not establish all-six-target acceptance.
+The same identity/crypto integrations also pass in explicitly selected live
+Go 1.26.6 mode at clean `812cc7ee7c7d6b4021c7259f9cda6923efa2fd98`, with private
+HOME/USERPROFILE/XDG/temp/data roots and no operator credentials inherited.
+
+An actual Go 1.26.6 Triage-Service capture at that clean revision records its
+four complete classify/rebuttal/fallback/error results and persisted effects
+in a 7,986-byte output (`dc632eaa6a15cac34a390d6d3472f22ca0223b628fafcac32adeff29edc02e1f`).
+Default service tests verify the raw output manifest and retain the original
+eight Go source pins and all four effect comparisons. The five original
+tests and one added byte-change/missing-operation control pass with Go absent
+from PATH, with strict core Clippy. Explicit live Go mode remains available.
 
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime

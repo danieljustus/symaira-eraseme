@@ -34,15 +34,66 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
+const FROZEN_GO_STDOUT: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/triage-service/triage-service.stdout");
+
+fn verified_frozen_output(output: &[u8]) -> &[u8] {
+    let manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/triage-service/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["package"], "triage-service");
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["stdin"]["bytes"], 0);
+    assert_eq!(manifest["stdin"]["sha256"], sha256_hex(b""));
+    let stderr =
+        include_bytes!("../../../tests/fixtures/go-frozen/triage-service/triage-service.stderr");
+    assert!(stderr.is_empty());
+    assert_eq!(manifest["stderr"]["bytes"], stderr.len());
+    assert_eq!(manifest["stderr"]["sha256"], sha256_hex(stderr));
+    assert_eq!(manifest["stdout"]["bytes"], output.len());
+    assert_eq!(manifest["stdout"]["sha256"], sha256_hex(output));
+    output
+}
+
+fn go_output() -> Vec<u8> {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => {
+            let run = go_oracle::run_oracle("triage-service", None);
+            assert!(
+                run.status.success(),
+                "Go service oracle failed: {}",
+                String::from_utf8_lossy(&run.stderr)
+            );
+            run.stdout
+        }
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            verified_frozen_output(FROZEN_GO_STDOUT).to_vec()
+        }
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
+}
+
+#[test]
+fn frozen_service_output_rejects_byte_changes_and_missing_operations() {
+    let mut changed = FROZEN_GO_STDOUT.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_output(&changed)).is_err());
+    let mut shortened: serde_json::Value = serde_json::from_slice(FROZEN_GO_STDOUT).unwrap();
+    shortened
+        .as_object_mut()
+        .unwrap()
+        .remove("fallback")
+        .unwrap();
+    let shortened = serde_json::to_vec(&shortened).unwrap();
+    assert!(std::panic::catch_unwind(|| verified_frozen_output(&shortened)).is_err());
+}
+
 #[test]
 fn go_executable_is_source_bound_and_records_persisted_service_effects() {
-    let run = go_oracle::run_oracle("triage-service", None);
-    assert!(
-        run.status.success(),
-        "Go service oracle failed: {}",
-        String::from_utf8_lossy(&run.stderr)
-    );
-    let oracle: GoOracle = serde_json::from_slice(&run.stdout).expect("valid Go oracle output");
+    let output = go_output();
+    let oracle: GoOracle = serde_json::from_slice(&output).expect("valid Go oracle output");
     for (name, source, expected_digest) in [
         (
             "internal/triage/classifier.go",

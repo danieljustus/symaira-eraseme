@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "source_revision": "812cc7ee7c7d6b4021c7259f9cda6923efa2fd98",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "captured_at_utc": "2026-10-03T19:55:33.428711+00:00",
+  "package": "triage-service",
+  "exit_status": 0,
+  "stdout": {
+    "bytes": 7986,
+    "sha256": "dc632eaa6a15cac34a390d6d3472f22ca0223b628fafcac32adeff29edc02e1f"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdin": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary": {
+    "bytes": 16011453,
+    "sha256": "03d7441cadb6c68d45f574ec7c1b51f9bcf3343d2d3b1d85c96196f3fcad2ec3"
+  },
+  "embedded_build_info": "/workspace/scratch/go-freeze-service-812cc7e/go-triage-service: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/triage-service\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003195256-812cc7ee7c7d\t\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/godbus/dbus/v5\tv5.2.2\th1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=812cc7ee7c7d6b4021c7259f9cda6923efa2fd98\n\tbuild\tvcs.time=2026-10-03T19:52:56Z\n\tbuild\tvcs.modified=false\n",
+  "source_files": {
+    "internal/eventstore/projection.go": {
+      "bytes": 11610,
+      "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+    },
+    "internal/eventstore/store.go": {
+      "bytes": 20876,
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    },
+    "internal/llm/llm.go": {
+      "bytes": 5574,
+      "sha256": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717"
+    },
+    "internal/replies/repository.go": {
+      "bytes": 8049,
+      "sha256": "725369fd4a9527004870ab757cbfbb95b6d61e02015ff6debd7e3685cc753e7f"
+    },
+    "internal/replies/service.go": {
+      "bytes": 8216,
+      "sha256": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281"
+    },
+    "internal/triage/classifier.go": {
+      "bytes": 6961,
+      "sha256": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97"
+    },
+    "internal/triage/rebuttal.go": {
+      "bytes": 7102,
+      "sha256": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+    },
+    "rust-tests/parity/oracle/triage-service/main.go": {
+      "bytes": 7854,
+      "sha256": "05f8e0ae89644c4dfd420b3b37afb950f19e1dea94b3160d484bb8c21c2b8810"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  }
+}

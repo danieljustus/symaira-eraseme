@@ -30,6 +30,11 @@ integration tests remain selected; one added control checks the complete
 complete writer bytes with existing deterministic helpers. Production
 randomness and existing ID/CRY acceptance are unchanged. These selected
 tests, rather than the complete core suite, are covered by the Go-free job.
+The Triage-Service family also defaults to an actual four-operation whole
+Go output captured at clean `812cc7ee7c7d6b4021c7259f9cda6923efa2fd98`. Its
+original source pins and persisted-effect comparisons remain unchanged;
+five original tests plus a two-mutation control pass locally without Go.
+This preparation does not promote DOM-004/CLI-022 or their prerequisites.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

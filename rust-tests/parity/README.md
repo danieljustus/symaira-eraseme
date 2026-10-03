@@ -44,6 +44,13 @@ for these integrations. The Go-free workflow executes both integration files
 and the two writer tests as well as the neutral package; other core tests
 remain outside this preparation's Go-free claim.
 
+The core `triage_service` integration also defaults to the actual complete
+Go classify/rebuttal/fallback/error output in
+`tests/fixtures/go-frozen/triage-service/`. It verifies the captured raw
+length/digest and retains all original source hashes and persisted-effect
+comparisons. Five original tests and a byte-change/missing-operation control
+remain selected; explicit live mode runs the original Go service oracle.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual
