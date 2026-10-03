@@ -67,8 +67,14 @@ only broadcast inside that private console, after the controller enables the
 child's inherited signal flag and then ignores the signal itself. The runner's
 console is never targeted. Exit success and listener closure are required for
 each real child. Existing bearer, Origin, timeout and disconnect gates remain.
-These newly added platform controls are candidates, not native PASS evidence;
-MCP-007/011/012/013 and task 8.3 remain PARTIAL until actual six-target results.
+MCP-007/011/012/013 are PASS on source
+`53a0e3684652f0676f02e2994bcd46fbeb9d83b2`: targeted run `37128540191`
+and full Rust run `37128575147` passed all six native targets. Both Windows
+jobs executed complete DACL/read-only retention and private-console Ctrl+C/
+Ctrl+Break; every target executed all three mandatory bind errors and the
+complete-header comparator. Task 8.3 remains pending integration of its
+recorded task 8.1 and 4.7 predecessors; no dependency is inferred from these
+individual row results.
 
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
