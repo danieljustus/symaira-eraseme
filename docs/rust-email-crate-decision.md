@@ -59,3 +59,10 @@ the owned certificate SHA-1 entry, import, re-export and compare the complete
 remaining settings before deleting its unique Keychain certificate. Every
 command retains the 30-second bound. No unrelated trust entry may change;
 this cleanup route still requires native validation.
+
+The first external-representation probe (`37122245131`, `2d661295`)
+exports successfully, then fails because sudo creates a root-owned 0600
+plist that the runner cannot read. Exports now run as the runner; only
+the actual admin import remains privileged. This preserves private file
+ownership and the complete remaining-trust comparison. Native import/removal
+acceptance is still pending.

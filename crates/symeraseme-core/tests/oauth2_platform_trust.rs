@@ -387,8 +387,8 @@ impl InstalledRoot {
             let removed = files.path().join("removed.plist");
             let after = files.path().join("after.plist");
             checked(
-                Command::new("sudo")
-                    .args(["-n", "security", "trust-settings-export", "-d"])
+                Command::new("security")
+                    .args(["trust-settings-export", "-d"])
                     .arg(&before),
             )?;
             checked(Command::new("python3").args([
@@ -401,8 +401,8 @@ impl InstalledRoot {
                     .arg(&removed),
             )?;
             checked(
-                Command::new("sudo")
-                    .args(["-n", "security", "trust-settings-export", "-d"])
+                Command::new("security")
+                    .args(["trust-settings-export", "-d"])
                     .arg(&after),
             )?;
             checked(Command::new("python3").args([
