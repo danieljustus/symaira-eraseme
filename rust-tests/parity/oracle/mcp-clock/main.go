@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,8 @@ type fixtureCase struct {
 	Tool      string          `json:"tool"`
 	Arguments map[string]any  `json:"arguments"`
 	Result    json.RawMessage `json:"result"`
+	Request   string          `json:"request"`
+	Response  string          `json:"response"`
 }
 
 func main() {
@@ -79,7 +82,15 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		cases = append(cases, fixtureCase{Name: name, State: state, Tool: tool, Arguments: arguments, Result: encoded})
+		request, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": tool, "arguments": arguments}})
+		if err != nil {
+			fail(err)
+		}
+		var response bytes.Buffer
+		if err := mcp.NewServer(handler).ServeStdio(context.Background(), bytes.NewReader(append(request, '\n')), &response); err != nil {
+			fail(err)
+		}
+		cases = append(cases, fixtureCase{Name: name, State: state, Tool: tool, Arguments: arguments, Result: encoded, Request: string(request), Response: response.String()})
 	}
 
 	call("empty_dashboard", "empty", "get_dashboard_data", map[string]any{})
