@@ -261,6 +261,7 @@ fn transport_failures_match_go_retry_counts_and_error_classes() {
     for case in cases {
         let id = case["id"].as_str().unwrap();
         let attempts = case["attempts"].as_u64().unwrap() as usize;
+        let started = Instant::now();
         let (base_url, server) = local_failure_server(id, attempts);
         let client = create_with(
             &CreateOptions {
@@ -282,6 +283,13 @@ fn transport_failures_match_go_retry_counts_and_error_classes() {
                 cache_key: String::new(),
             },
         );
+        writeln!(
+            std::io::stderr(),
+            "LLMKIT_FAILURE id={id} outcome_success={} elapsed_ms={}",
+            result.is_ok(),
+            started.elapsed().as_millis()
+        )
+        .expect("write local transport outcome diagnostics");
         let paths = server.join().expect("local failure server thread");
         assert_eq!(paths.len(), attempts, "{id} attempts");
         assert!(
@@ -335,7 +343,8 @@ fn local_failure_server(id: &str, attempts: usize) -> (String, thread::JoinHandl
     let base_url = format!("http://{}", listener.local_addr().unwrap());
     let server = thread::spawn(move || {
         let mut paths = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(15);
+        let started = Instant::now();
+        let deadline = started + Duration::from_secs(15);
         while paths.len() < attempts {
             let (mut stream, _) = match listener.accept() {
                 Ok(connection) => connection,
@@ -345,13 +354,26 @@ fn local_failure_server(id: &str, attempts: usize) -> (String, thread::JoinHandl
                     thread::sleep(Duration::from_millis(10));
                     continue;
                 }
-                Err(error) => panic!("accept provider request: {error}"),
+                Err(error) => panic!(
+                    "accept provider request: {error}; status={status} received={}/{} elapsed_ms={} accept_limit_ms=15000",
+                    paths.len(),
+                    attempts,
+                    started.elapsed().as_millis()
+                ),
             };
             stream
                 .set_nonblocking(false)
                 .expect("set failure stream blocking");
             let (path, _, _) = read_http_request(&mut stream);
             paths.push(path);
+            writeln!(
+                std::io::stderr(),
+                "LLMKIT_FAILURE status={status} received={}/{} elapsed_ms={}",
+                paths.len(),
+                attempts,
+                started.elapsed().as_millis()
+            )
+            .expect("write local transport progress diagnostics");
             let reason = if status == 429 {
                 "Too Many Requests"
             } else {
