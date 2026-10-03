@@ -1,0 +1,8 @@
+{"Time":"2026-10-03T21:19:34.254724449Z","Action":"start","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign"}
+{"Time":"2026-10-03T21:19:34.259339516Z","Action":"run","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Test":"TestCampaignPlanBytesOracle"}
+{"Time":"2026-10-03T21:19:34.25937538Z","Action":"output","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Test":"TestCampaignPlanBytesOracle","Output":"=== RUN   TestCampaignPlanBytesOracle\n"}
+{"Time":"2026-10-03T21:19:34.303394097Z","Action":"output","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Test":"TestCampaignPlanBytesOracle","Output":"--- PASS: TestCampaignPlanBytesOracle (0.04s)\n"}
+{"Time":"2026-10-03T21:19:34.303425831Z","Action":"pass","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Test":"TestCampaignPlanBytesOracle","Elapsed":0.04}
+{"Time":"2026-10-03T21:19:34.303504177Z","Action":"output","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Output":"PASS\n"}
+{"Time":"2026-10-03T21:19:34.304282581Z","Action":"output","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Output":"ok  \tgithub.com/danieljustus/symaira-eraseme/internal/campaign\t0.049s\n"}
+{"Time":"2026-10-03T21:19:34.304563468Z","Action":"pass","Package":"github.com/danieljustus/symaira-eraseme/internal/campaign","Elapsed":0.05}

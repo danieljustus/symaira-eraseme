@@ -775,6 +775,15 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — #1131 campaign preparation uses actual clean `30eeb38`
+  native Linux Go execution output (6,341 bytes, nine result areas, eight
+  stored events) and an actual `TestCampaignPlanBytesOracle` PASS verifying
+  the unchanged full plan fixture. The raw test log, status, fixture hash
+  and 86 source-file digests are retained. All four original Rust tests
+  keep their full equality/source/SQL checks; two corruption controls are
+  added. Other OS defaults and explicit live mode retain bounded Go. This
+  prepares selected families without promoting DOM-002 or cutover status.
+
 - 2026-10-03 — #1131's clean `b4b5a56` checkpoint passed exactly 68 selected
   tests with Go absent from PATH, six explicit live scheduler-install tests,
   and a native Linux capture of all 31 service/projection/install cases.

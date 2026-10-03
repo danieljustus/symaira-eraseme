@@ -67,6 +67,11 @@ control. Whole-output/source/input hashes and original `119ee9f` provenance
 remain strict. Mac live execution, Windows's existing capability gate and
 other runtime families retain their previous scope; no CFG or cutover row
 is promoted. Native capture now collects 37 observations per actual host.
+The Linux campaign plan/execution preparation records actual Go output and
+an actually executed source-bound plan-generator test at clean `30eeb38`.
+All four existing Rust tests retain complete serialized/persisted-effect
+comparisons, with two added integrity controls. Other OS live execution,
+native campaign capture and all domain/cutover acceptance remain separate.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

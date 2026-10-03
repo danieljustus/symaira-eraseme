@@ -8,7 +8,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -33,6 +32,28 @@ const BYTES_ORACLE_PATH: &str = concat!(
     "/../../tests/fixtures/event-store/campaign-plan-bytes-oracle.json"
 );
 const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+#[path = "support/frozen_campaign_oracle.rs"]
+mod frozen_campaign_oracle;
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
+
+#[test]
+fn frozen_campaign_plan_rejects_changed_bytes_and_missing_persisted_events() {
+    let bytes = fs::read(BYTES_ORACLE_PATH).unwrap();
+    let mut changed = bytes.clone();
+    changed[0] ^= 1;
+    assert!(
+        std::panic::catch_unwind(|| frozen_campaign_oracle::verify_plan_capture(&changed)).is_err()
+    );
+    let mut missing: Value = serde_json::from_slice(&bytes).unwrap();
+    missing["events"].as_array_mut().unwrap().pop().unwrap();
+    assert!(
+        std::panic::catch_unwind(|| frozen_campaign_oracle::verify_plan_capture(
+            &serde_json::to_vec(&missing).unwrap()
+        ))
+        .is_err()
+    );
+}
 
 #[derive(Debug, Deserialize)]
 struct BytesOracle {
@@ -275,23 +296,35 @@ fn go_campaign_plan_bytes_oracle() {
             source.path
         );
     }
-    let go = Command::new("go")
-        .args([
-            "test",
-            "./internal/campaign",
-            "-run",
-            "^TestCampaignPlanBytesOracle$",
-            "-count=1",
-        ])
-        .current_dir(REPO_ROOT)
-        .output()
-        .expect("run source-bound Go campaign oracle");
-    assert!(
-        go.status.success(),
-        "Go oracle failed:\n{}\n{}",
-        String::from_utf8_lossy(&go.stdout),
-        String::from_utf8_lossy(&go.stderr)
-    );
+    if frozen_campaign_oracle::live_go_required() {
+        let scratch = tempdir().unwrap();
+        let mut command = std::process::Command::new("go");
+        command
+            .args([
+                "test",
+                "./internal/campaign",
+                "-run",
+                "^TestCampaignPlanBytesOracle$",
+                "-count=1",
+            ])
+            .current_dir(REPO_ROOT);
+        let go = go_oracle::run_bounded(
+            command,
+            None,
+            &scratch.path().join("go-test.stdout"),
+            &scratch.path().join("go-test.stderr"),
+            go_oracle::ORACLE_BUILD_TIMEOUT,
+        )
+        .unwrap();
+        assert!(
+            go.status.success(),
+            "Go oracle failed:\n{}\n{}",
+            String::from_utf8_lossy(&go.stdout),
+            String::from_utf8_lossy(&go.stderr)
+        );
+    } else {
+        frozen_campaign_oracle::verify_plan_capture(&raw_fixture);
+    }
 
     let registry_tree = mini_registry();
     let brokers = load_from_dir(registry_tree.path()).expect("load mini registry");

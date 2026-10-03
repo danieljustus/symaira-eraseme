@@ -100,6 +100,16 @@ original capability gate. Native capture now additionally collects these
 six configuration observations (37 total service/projection/install/config
 cases). These Linux family additions do not make the whole workspace Go-free.
 
+Linux campaign plan/execution tests also use real observations from clean
+`30eeb38`. The complete 6,341-byte execution document retains all nine result
+areas and eight stored events. The actual pinned-Go plan generator test ran
+once and verified the existing complete byte fixture unchanged; its raw
+JSON test log/status, fixture digest and 86 source-file hashes are recorded.
+The four existing Rust tests remain selected with two corruption controls.
+The original source pins, whole-byte plan/effect comparisons and complete
+execution equality are retained. Other OS defaults and explicit live mode
+run bounded Go; no native campaign acceptance is inferred from Linux data.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual
