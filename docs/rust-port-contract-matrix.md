@@ -13,6 +13,15 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 LLM preparation now binds default observations to five independently
+downloaded native Go manifests (Linux/Windows both architectures and macOS
+Intel) from `37158381207` at `0d1be28`. All 65 archive members, 194 source/input
+hashes and seven whole LLM outputs are verified; source/target mutation
+controls are added. The Rust provider/retry/redaction behavior stays live.
+Mac arm64 retains actual Go until its capture is available, and modified
+native Rust acceptance is pending. This adds one control to the selected
+Go-free workflow (136 tests) and does not promote a contract row.
+
 The #1131 preparation also proves the entire 23-test `command_surface` binary
 with Go absent on native Linux/amd64 at clean `b8faa96fec95ddfffe0776ceea0d83579f639455`:
 the 175-case CLI corpus, thirteen scheduler/file-manifest cases and populated

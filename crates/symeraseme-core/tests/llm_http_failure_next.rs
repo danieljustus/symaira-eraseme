@@ -38,6 +38,8 @@ const FIXTURE_MALFORMED_CHOICE: &str = include_str!(concat!(
     "/../../tests/fixtures/llm-failures-next/malformed-choice.json"
 ));
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+#[path = "support/frozen_native_capture.rs"]
+mod frozen_native_capture;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
@@ -209,7 +211,10 @@ fn go_source(path: &str) -> &'static [u8] {
 fn live_go_required() -> bool {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => !cfg!(target_os = "linux"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+                .is_none()
+        }
         _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
 }
@@ -282,6 +287,14 @@ fn assert_oracle_fixture_matches(
 }
 
 fn verify_frozen_llm_fixture(fixture: &[u8], args: &[&str]) {
+    if let Some(bytes) =
+        frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+    {
+        let manifest =
+            frozen_native_capture::verify(bytes, std::env::consts::OS, std::env::consts::ARCH);
+        frozen_native_capture::verify_llm(&manifest, fixture, args);
+        return;
+    }
     let manifest: Value = serde_json::from_slice(include_bytes!(
         "../../../tests/fixtures/go-frozen/llm-failures-next/manifest.json"
     ))
@@ -331,6 +344,46 @@ fn frozen_llm_failure_rejects_changed_message_and_unobserved_arguments() {
         ))
         .is_err()
     );
+}
+
+#[test]
+fn native_frozen_llm_records_reject_wrong_target_and_source_inventory() {
+    for (os, arch) in [
+        ("linux", "x86_64"),
+        ("linux", "aarch64"),
+        ("windows", "x86_64"),
+        ("windows", "aarch64"),
+        ("macos", "x86_64"),
+    ] {
+        let bytes = frozen_native_capture::manifest_bytes(os, arch).unwrap();
+        let manifest = frozen_native_capture::verify(bytes, os, arch);
+        frozen_native_capture::verify_llm(&manifest, FIXTURE.as_bytes(), &[]);
+        let mut wrong = manifest.clone();
+        wrong["native_target"] = "fabricated/host".into();
+        assert!(
+            std::panic::catch_unwind(|| frozen_native_capture::verify(
+                &serde_json::to_vec(&wrong).unwrap(),
+                os,
+                arch
+            ))
+            .is_err()
+        );
+        let mut wrong = manifest;
+        wrong["source_files"]
+            .as_object_mut()
+            .unwrap()
+            .remove("go.mod");
+        assert!(
+            std::panic::catch_unwind(|| frozen_native_capture::verify(
+                &serde_json::to_vec(&wrong).unwrap(),
+                os,
+                arch
+            ))
+            .is_err()
+        );
+    }
+    assert!(frozen_native_capture::manifest_bytes("macos", "aarch64").is_none());
+    assert!(frozen_native_capture::manifest_bytes("linux", "unrecorded").is_none());
 }
 
 #[derive(Debug)]

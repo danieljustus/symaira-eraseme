@@ -10,6 +10,39 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Reviewed five-target LLM frozen preparation (2026-10-03, #1131)
+
+Five actual Go artifact archives from run `37158381207` at clean source
+`0d1be28288594354941a07d19f834f2553928bc4` were downloaded and verified:
+Linux amd64/arm64, Windows amd64/arm64 and macOS Intel. Each has exactly 65
+bounded regular members; its archive digest, every captured stream and all
+194 source/input file hashes match immutable Git contents. All seven LLM
+outputs and all eight review CLI outputs are byte-identical to the existing
+Linux records on those five actual hosts. Raw native manifests and the archive
+readback receipt are retained unchanged under `go-frozen/native-0d`.
+
+The LLM family now selects its actual per-target manifest, verifies native
+Go/VCS/OS/architecture and all 194 sources, and compares complete outputs for
+the exact observed argument list. Windows and macOS Intel can default to
+these frozen producer observations; the real Rust loopback provider, retry
+counts, messages, redaction and unchanged fifteen-second active budget remain
+executed. Explicit live Go mode remains. Uncaptured Mac arm64 and unknown
+architectures keep the actual live producer; no host is inferred from another.
+An added control checks all five records and rejects wrong target identity
+and missing source inventories, in addition to retained whole-byte and unknown
+argument controls. The selected Go-free workflow grows from 135 to 136 tests.
+All twelve local LLM tests pass with Go absent, including all five actual
+source/target records, the retained provider loopbacks and both fixture
+lifecycle controls; strict targeted core Clippy and formatting pass.
+Current-source complete-workflow and native Rust acceptance remain pending.
+
+This verifies actual Go captures, not the old full native run's success:
+its Linux arm64 suite retains the reproduced scheduler root race fixed later
+at `aa68478`; macOS Intel's full suite passes. Mac arm64 capture is still
+pending, and no new cross-platform Rust Go-independence is claimed before
+execution. The review/grant defaults and other runtime families remain
+separately scoped; #1131 remains open.
+
 ### Complete Linux CLI without Go (2026-10-03, #1131)
 
 At clean `b8faa96fec95ddfffe0776ceea0d83579f639455`, all 23 tests in

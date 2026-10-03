@@ -1,0 +1,72 @@
+[
+  {
+    "id": 11287554809,
+    "name": "frozen-go-services-macOS-X64",
+    "digest": "sha256:a337df8bcbef11ad32e59056c330f82d50d92d116aa3b09a96f52b4a996b14cc",
+    "size_bytes": 42463,
+    "path": "/workspace/attachments/36857767-c709-46cd-8f26-4e422340175a/frozen-go-56-11287554809.zip",
+    "native_target": "darwin/amd64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  },
+  {
+    "id": 11286950681,
+    "name": "frozen-go-services-Linux-X64",
+    "digest": "sha256:9c23ab1dc018fc26e4297551d276ee0ddda9bd10af109e8af53fca8d938e6b77",
+    "size_bytes": 42479,
+    "path": "/workspace/attachments/fcf5e14c-e6b6-4677-b303-0fd11a6b4bc0/frozen-go-56-11286950681.zip",
+    "native_target": "linux/amd64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  },
+  {
+    "id": 11286875854,
+    "name": "frozen-go-services-Linux-ARM64",
+    "digest": "sha256:254a1dc5595d55f4b5ef0d3ed3e3eee4f9bb8a204b5313c6dfca8d340a2339f6",
+    "size_bytes": 42482,
+    "path": "/workspace/attachments/ce3bfeb4-f8de-46f1-9154-3d10d8704679/frozen-go-56-11286875854.zip",
+    "native_target": "linux/arm64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  },
+  {
+    "id": 11286621440,
+    "name": "frozen-go-services-Windows-ARM64",
+    "digest": "sha256:d5fa2475128d8d4a9076304935cdba8849ce0db074a1b7a89cc511f5e878543c",
+    "size_bytes": 42485,
+    "path": "/workspace/attachments/12ce7988-ce0b-45c4-9b04-2e6af5cf8dd7/frozen-go-56-11286621440.zip",
+    "native_target": "windows/arm64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  },
+  {
+    "id": 11285699586,
+    "name": "frozen-go-services-Windows-X64",
+    "digest": "sha256:5064bc2a5ecd70fbf120179cae4243311463f8d6a7b65cad39a3d61c57e13822",
+    "size_bytes": 42455,
+    "path": "/workspace/attachments/a8e53195-6786-400e-a294-841600979d0d/frozen-go-56-11285699586.zip",
+    "native_target": "windows/amd64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  }
+]
