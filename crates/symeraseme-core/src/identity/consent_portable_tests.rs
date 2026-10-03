@@ -35,7 +35,7 @@ fn fixture_case(name: &str) -> Value {
 }
 
 #[cfg(windows)]
-fn fault_fixture_case(name: &str) -> Value {
+pub(super) fn fault_fixture_case(name: &str) -> Value {
     let fixture: Value = serde_json::from_str(include_str!(
         "../../../../tests/fixtures/consent-contract/id005-faults.json"
     ))
@@ -114,7 +114,7 @@ fn manifest(root: &Path, directory: &Path, entries: &mut Vec<Value>) {
     }
 }
 
-fn matches_go_cleanup(root: &Path, failed: bool, expected: &Value) -> bool {
+pub(super) fn matches_go_cleanup(root: &Path, failed: bool, expected: &Value) -> bool {
     let mut entries = Vec::new();
     manifest(root, root, &mut entries);
     // This additional portable subset compares failure and the complete tree's
