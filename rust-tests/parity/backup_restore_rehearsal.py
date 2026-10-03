@@ -73,7 +73,9 @@ def invoke(root, label, executable, args, env, *, success, json_output=True):
     require(record_path.is_file(), label + ': shared runner did not retain a command record')
     record = json.loads(record_path.read_bytes())
     require(record['success'] is success,
-            label + ': command success state did not match the rehearsal contract')
+            label + ': command success state did not match the rehearsal contract; '
+            + 'native exit=' + str(record.get('exit_code'))
+            + ', failure_class=' + str(record.get('failure_class')))
     stdout = (root / record['stdout']['path']).read_bytes()
     stderr = (root / record['stderr']['path']).read_bytes()
     if success:
@@ -202,6 +204,7 @@ def confinement_controls(root, env, windows_control):
                     'stalled native process was not bounded')
             require(stalled['sandbox']['job_active_after_cleanup'] == 0
                     and stalled['sandbox']['profile_deleted']
+                    and stalled['sandbox']['network_filters_removed']
                     and stalled['sandbox']['root_sid_removed'], 'native timeout cleanup did not finish')
         return {'checks': checks, 'outside_marker_hashes_unchanged': True,
                 'outside_markers_owned_and_removed': True}

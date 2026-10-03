@@ -64,6 +64,119 @@ class Accounting(c.Structure):
                 ('faults', DWORD), ('total', DWORD), ('active', DWORD), ('terminated', DWORD)]
 
 
+class Guid(c.Structure):
+    _fields_ = [('data1', c.c_uint32), ('data2', c.c_uint16), ('data3', c.c_uint16),
+                ('data4', c.c_ubyte * 8)]
+
+    @classmethod
+    def from_text(cls, text):
+        return cls.from_buffer_copy(uuid.UUID(text).bytes_le)
+
+
+class Display(c.Structure):
+    _fields_ = [('name', w.LPWSTR), ('description', w.LPWSTR)]
+
+
+class Blob(c.Structure):
+    _fields_ = [('size', c.c_uint32), ('data', P)]
+
+
+class ValueData(c.Union):
+    _fields_ = [('pointer', P), ('uint32', c.c_uint32), ('uint8', c.c_ubyte)]
+
+
+class Value(c.Structure):
+    _fields_ = [('type', c.c_uint32), ('data', ValueData)]
+
+
+class Condition(c.Structure):
+    _fields_ = [('key', Guid), ('match', c.c_uint32), ('value', Value)]
+
+
+class Action(c.Structure):
+    _fields_ = [('type', c.c_uint32), ('key', Guid)]
+
+
+class FilterContext(c.Union):
+    _fields_ = [('raw', c.c_uint64), ('provider', Guid)]
+
+
+class Filter(c.Structure):
+    _fields_ = [('key', Guid), ('display', Display), ('flags', c.c_uint32),
+                ('provider', P), ('provider_data', Blob), ('layer', Guid), ('sublayer', Guid),
+                ('weight', Value), ('condition_count', c.c_uint32), ('conditions', c.POINTER(Condition)),
+                ('action', Action), ('context', FilterContext), ('reserved', P),
+                ('id', c.c_uint64), ('effective_weight', Value)]
+
+
+class Session(c.Structure):
+    _fields_ = [('key', Guid), ('display', Display), ('flags', c.c_uint32),
+                ('transaction_timeout', c.c_uint32), ('pid', DWORD), ('sid', P),
+                ('username', w.LPWSTR), ('kernel_mode', w.BOOL)]
+
+
+class NetworkRules:
+    """Dynamic WFP filters match only this unique AppContainer SID."""
+    def __init__(self, sid, profile):
+        dll = c.WinDLL('fwpuclnt', use_last_error=True)
+        self.open = api(dll, 'FwpmEngineOpen0', [w.LPCWSTR, c.c_uint32, P, c.POINTER(Session), c.POINTER(w.HANDLE)], DWORD)
+        self.close = api(dll, 'FwpmEngineClose0', [w.HANDLE], DWORD)
+        self.add = api(dll, 'FwpmFilterAdd0', [w.HANDLE, c.POINTER(Filter), P, c.POINTER(c.c_uint64)], DWORD)
+        self.get = api(dll, 'FwpmFilterGetById0', [w.HANDLE, c.c_uint64, c.POINTER(P)], DWORD)
+        self.free = api(dll, 'FwpmFreeMemory0', [c.POINTER(P)], None)
+        self.engine, self.ids = w.HANDLE(), []
+        session = Session()
+        session.key = Guid.from_text(str(uuid.uuid4()))
+        session.display.name = profile
+        session.flags = 1  # FWPM_SESSION_FLAG_DYNAMIC; filters vanish on session close/crash.
+        self.status(self.open(None, 10, None, c.byref(session), c.byref(self.engine)), 'FwpmEngineOpen0')
+        try:
+            for layer in ('c38d57d1-05a7-4c33-904f-7fbceee60e82', '4a72393b-319f-44bc-84c3-ba54dcb3b6b4'):
+                condition = Condition()
+                condition.key = Guid.from_text('71bc78fa-f17c-4997-a602-6abb261f351c')
+                condition.match = 0  # FWP_MATCH_EQUAL
+                condition.value.type = 13  # FWP_SID
+                condition.value.data.pointer = sid
+                rule = Filter()
+                rule.key = Guid.from_text(str(uuid.uuid4()))
+                rule.display.name = profile
+                rule.layer = Guid.from_text(layer)
+                rule.sublayer = Guid.from_text('eebecc03-ced4-4380-819a-2734397b2b74')
+                rule.weight.type = 1  # FWP_UINT8
+                rule.weight.data.uint8 = 15
+                rule.condition_count, rule.conditions = 1, c.pointer(condition)
+                rule.action.type = 0x1001  # FWP_ACTION_BLOCK
+                identity = c.c_uint64()
+                self.status(self.add(self.engine, c.byref(rule), None, c.byref(identity)), 'FwpmFilterAdd0')
+                self.ids.append(identity.value)
+        except BaseException:
+            self.remove()
+            raise
+
+    @staticmethod
+    def status(code, name):
+        if code != 0:
+            raise OSError(name + ' returned native WFP status ' + hex(code))
+
+    def remove(self):
+        if not self.engine:
+            return
+        self.status(self.close(self.engine), 'FwpmEngineClose0 owned dynamic session')
+        self.engine = w.HANDLE()
+        probe = w.HANDLE()
+        self.status(self.open(None, 10, None, None, c.byref(probe)), 'FwpmEngineOpen0 cleanup readback')
+        try:
+            for identity in self.ids:
+                found = P()
+                code = self.get(probe, identity, c.byref(found))
+                if found:
+                    self.free(c.byref(found))
+                if code != 0x80320003:  # FWP_E_FILTER_NOT_FOUND
+                    raise RuntimeError('owned WFP filter remained after session close: ' + hex(code))
+        finally:
+            self.status(self.close(probe), 'FwpmEngineClose0 cleanup readback')
+
+
 def api(dll, name, args, result=w.BOOL):
     fn = getattr(dll, name)
     fn.argtypes, fn.restype = args, result
@@ -85,6 +198,8 @@ def command(root, label, argv, env, timeout=30):
                           'capability_count': 0, 'child_creation': 'restricted',
                           'writable_root': str(root), 'job_active_after_cleanup': None,
                           'profile_deleted': False, 'root_sid_removed': False}}
+    record['sandbox']['network'] = 'SID-scoped dynamic WFP connect denial for IPv4 and IPv6'
+    record['sandbox']['network_filters_removed'] = False
     try:
         return _command(root, label, argv, env, timeout, record)
     except BaseException as error:
@@ -139,7 +254,7 @@ def _command(root, label, argv, env, timeout, record):
     sid, text_sid, job, process = P(), w.LPWSTR(), None, Process()
     attrs_ready, profile_created, granted = False, False, False
     record['sandbox']['profile'] = profile
-    attrs = None
+    attrs, network = None, None
     try:
         hr = create_profile(profile, profile, 'Disposable EraseMe migration fixture', None, 0, c.byref(sid))
         if hr != 0:
@@ -155,6 +270,8 @@ def _command(root, label, argv, env, timeout, record):
         granted = True  # Even a partial icacls failure must remove the exact owned SID.
         acl('/grant', '*' + sid_string + ':(OI)(CI)F')
         acl('/setintegritylevel', '(OI)(CI)L')
+        network = NetworkRules(sid, profile)
+        record['sandbox']['network_filter_ids'] = list(network.ids)
         job = checked(create_job(None, None), 'CreateJobObjectW')
         limits = ExtendedLimits()
         limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
@@ -244,9 +361,14 @@ def _command(root, label, argv, env, timeout, record):
             if attrs_ready:
                 delete_attrs(attrs)
             try:
-                if granted:
-                    acl('/remove', '*' + sid_string)
-                    record['sandbox']['root_sid_removed'] = True
+                try:
+                    if network:
+                        network.remove()
+                        record['sandbox']['network_filters_removed'] = True
+                finally:
+                    if granted:
+                        acl('/remove', '*' + sid_string)
+                        record['sandbox']['root_sid_removed'] = True
             finally:
                 if text_sid:
                     local_free(c.cast(text_sid, P))
@@ -266,6 +388,7 @@ def _command(root, label, argv, env, timeout, record):
                                      and not record['output_limit_exceeded']
                                      and record['sandbox']['job_active_after_cleanup'] == 0
                                      and record['sandbox']['profile_deleted']
+                                     and record['sandbox']['network_filters_removed']
                                      and record['sandbox']['root_sid_removed'])
                 gate.save(root / (label + '.json'), record)
     if not record['success']:

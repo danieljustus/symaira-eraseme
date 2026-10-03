@@ -54,6 +54,17 @@ documentation and workflow files now require LF through `.gitattributes`;
 hash validation remains exact. The original failure is retained and does not
 count as Windows confinement or restore evidence.
 
+At `afd16a0`, Windows amd64 job `111231995068` reached the native executable.
+Raw artifact `11276899617` records actual read/write denial outside the owned
+root, allowed owned writes/removal, blocked child creation, Job active count 0,
+removed SID ACL and deleted UUID profile. TCP and UDP denial both failed on
+this hosted image; no-capability AppContainer alone is not network confinement
+there. The driver now adds two dynamic native WFP connect-denial filters that
+match only the unique package SID (IPv4/IPv6). Session close removes them even
+after a parent crash; normal cleanup independently queries their actual IDs
+and requires `FWP_E_FILTER_NOT_FOUND`. The existing strict TCP/UDP permission
+checks are unchanged. New Windows network and full restore proof remain pending.
+
 ## Archive verification preparation — 2026-09-29
 
 At clean candidate `cfdc59a0d9266b67a5541de4562a3e7b702d894c`, all five
