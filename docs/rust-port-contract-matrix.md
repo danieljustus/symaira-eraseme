@@ -93,6 +93,12 @@ snapshots/controls (41 product observations total). It retains raw Go test
 streams and the archived Python-generator binding. New per-target
 observations require native runs and review; no new native acceptance is
 inferred merely from the pipeline code.
+The Linux LLM error preparation records all seven actual Go fixtures at
+clean `54acd9b` and checks exact known arguments plus whole fixture/source
+hashes. All ten existing Rust loopback/retry/error/redaction/budget tests
+remain selected with one integrity control. Other OS defaults retain live
+Go through bounded owned temporary compilation; production behavior,
+existing LLM/native acceptance and cutover statuses are unchanged.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

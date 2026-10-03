@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "source_revision": "54acd9bdb1bb4df1f7c8b323d5cec93da0f7ca54",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "captured_at_utc": "2026-10-03T21:42:55.535544+00:00",
+  "source_files": {
+    "internal/llm/factory.go": {
+      "bytes": 3779,
+      "sha256": "8180713d346cce1f7f195fdadd0040ebe4fb96f1bf7a725170819de10f4596b4"
+    },
+    "internal/llm/llmkit.go": {
+      "bytes": 5201,
+      "sha256": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7"
+    },
+    "internal/llm/llm.go": {
+      "bytes": 5574,
+      "sha256": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717"
+    },
+    "rust-tests/parity/oracle/llm-failures-next/main.go": {
+      "bytes": 5602,
+      "sha256": "1b54744ec94ff0ed0bdaecde3cc1a93193a7b5e8dcd475a52a3996e64ac41c98"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "embedded_build_info": "/workspace/scratch/frozen-go-llm-failures-54acd9b/llm-failures-next: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/llm-failures-next\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003213904-54acd9bdb1bb\t\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=54acd9bdb1bb4df1f7c8b323d5cec93da0f7ca54\n\tbuild\tvcs.time=2026-10-03T21:39:04Z\n\tbuild\tvcs.modified=false\n",
+  "cases": [
+    {
+      "name": "case",
+      "args": [],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1165,
+        "sha256": "6e24c6e19460dec99dcffb733ee7b3617fe5c59567edf30a2e2ae9a43350b3aa"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1165,
+        "sha256": "6e24c6e19460dec99dcffb733ee7b3617fe5c59567edf30a2e2ae9a43350b3aa"
+      }
+    },
+    {
+      "name": "case-404",
+      "args": [
+        "--status",
+        "404"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1171,
+        "sha256": "0fa37a7766d6cc79a26e9e251584c88f9622720922ca7019f46e0aff530f28e7"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1171,
+        "sha256": "0fa37a7766d6cc79a26e9e251584c88f9622720922ca7019f46e0aff530f28e7"
+      }
+    },
+    {
+      "name": "case-400",
+      "args": [
+        "--status",
+        "400"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1222,
+        "sha256": "53e14ae3fcaef537a91043de53d7a02cba6d6ca2dcc91e652468e4b152337b9e"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1222,
+        "sha256": "53e14ae3fcaef537a91043de53d7a02cba6d6ca2dcc91e652468e4b152337b9e"
+      }
+    },
+    {
+      "name": "case-500",
+      "args": [
+        "--status",
+        "500"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1217,
+        "sha256": "f574db3a18aa6ca1b73828b6975e03a9cf922a857d3af7d295431ae4a3cb4fab"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1217,
+        "sha256": "f574db3a18aa6ca1b73828b6975e03a9cf922a857d3af7d295431ae4a3cb4fab"
+      }
+    },
+    {
+      "name": "case-401",
+      "args": [
+        "--status",
+        "401"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1271,
+        "sha256": "1c52de757732bc631a5393deb838d623deda7218aca4fc1cc53c8f454d24f5e0"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1271,
+        "sha256": "1c52de757732bc631a5393deb838d623deda7218aca4fc1cc53c8f454d24f5e0"
+      }
+    },
+    {
+      "name": "malformed-envelope",
+      "args": [
+        "--status",
+        "403",
+        "--malformed-envelope"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1558,
+        "sha256": "0f6735c975b5d29926db699e985e9a53cb64379af4e362ff0b36bd71a6d1bafc"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1558,
+        "sha256": "0f6735c975b5d29926db699e985e9a53cb64379af4e362ff0b36bd71a6d1bafc"
+      }
+    },
+    {
+      "name": "malformed-choice",
+      "args": [
+        "--status",
+        "403",
+        "--malformed-choice"
+      ],
+      "exit_status": 0,
+      "stdout": {
+        "bytes": 1590,
+        "sha256": "78dab71a83f179d9551716d86cd796e2d0d40c5476b03fe81ce4dd0132cc8da6"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture": {
+        "bytes": 1590,
+        "sha256": "78dab71a83f179d9551716d86cd796e2d0d40c5476b03fe81ce4dd0132cc8da6"
+      }
+    }
+  ],
+  "limits": "Actual Linux seven complete loopback-provider observations; no paid provider, operator credentials or inferred other-target acceptance."
+}

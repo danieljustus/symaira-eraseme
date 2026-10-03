@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -38,9 +38,21 @@ const FIXTURE_MALFORMED_CHOICE: &str = include_str!(concat!(
     "/../../tests/fixtures/llm-failures-next/malformed-choice.json"
 ));
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
 
 #[test]
 fn llm_failure_fixtures_regenerate_from_pinned_go_oracle() {
+    let live = if live_go_required() {
+        Some(build_live_oracle())
+    } else {
+        None
+    };
+    let binary = live.as_ref().map(|root| {
+        root.path()
+            .join(format!("llm-failure{}", std::env::consts::EXE_SUFFIX))
+    });
+    let executable = binary.as_deref();
     let cases = [
         (FIXTURE, &[][..]),
         (FIXTURE_404, &["--status", "404"][..]),
@@ -58,7 +70,7 @@ fn llm_failure_fixtures_regenerate_from_pinned_go_oracle() {
     ];
     thread::scope(|scope| {
         let checks = cases.map(|(fixture, args)| {
-            scope.spawn(move || assert_oracle_fixture_matches(fixture, args))
+            scope.spawn(move || assert_oracle_fixture_matches(fixture, args, executable))
         });
         for check in checks {
             check.join().expect("Go fixture comparison thread");
@@ -194,38 +206,130 @@ fn go_source(path: &str) -> &'static [u8] {
     }
 }
 
-fn assert_oracle_fixture_matches(fixture_json: &str, args: &[&str]) {
-    static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("wall clock after Unix epoch")
-        .as_nanos();
-    let index = NEXT_TEMP_FILE.fetch_add(1, Ordering::Relaxed);
-    let output_path = std::env::temp_dir().join(format!(
-        "symeraseme-llm-failure-oracle-{}-{nonce}-{index}.json",
-        std::process::id(),
-    ));
-    let output = Command::new("go")
-        .args(["run", "./rust-tests/parity/oracle/llm-failures-next"])
-        .args(args)
+fn live_go_required() -> bool {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(std::env::VarError::NotPresent) => !cfg!(target_os = "linux"),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
+}
+
+fn build_live_oracle() -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    let executable = root
+        .path()
+        .join(format!("llm-failure{}", std::env::consts::EXE_SUFFIX));
+    let mut command = Command::new("go");
+    command
+        .args(["build", "-mod=readonly", "-buildvcs=true", "-o"])
+        .arg(executable)
+        .arg("./rust-tests/parity/oracle/llm-failures-next")
         .current_dir(ROOT)
         .env("GOTOOLCHAIN", "go1.26.6")
         .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .env("LLM_FAILURES_NEXT_FIXTURE", &output_path)
-        .output()
-        .expect("run source-pinned Go LLM failure oracle");
+        .env("GOSUMDB", "off");
+    let output = go_oracle::run_bounded(
+        command,
+        None,
+        &root.path().join("build.stdout"),
+        &root.path().join("build.stderr"),
+        go_oracle::ORACLE_BUILD_TIMEOUT,
+    )
+    .unwrap();
     assert!(
         output.status.success(),
-        "Go LLM failure oracle failed: {}",
+        "Go LLM build failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let generated = std::fs::read(&output_path).expect("read regenerated Go fixture");
-    let _ = std::fs::remove_file(output_path);
+    root
+}
+
+fn assert_oracle_fixture_matches(
+    fixture_json: &str,
+    args: &[&str],
+    executable: Option<&std::path::Path>,
+) {
+    let Some(executable) = executable else {
+        verify_frozen_llm_fixture(fixture_json.as_bytes(), args);
+        return;
+    };
+    static NEXT_INVOCATION: AtomicU64 = AtomicU64::new(0);
+    let index = NEXT_INVOCATION.fetch_add(1, Ordering::Relaxed);
+    let root = executable.parent().unwrap();
+    let mut command = Command::new(executable);
+    command
+        .args(args)
+        .current_dir(ROOT)
+        .env_remove("LLM_FAILURES_NEXT_FIXTURE");
+    let output = go_oracle::run_bounded(
+        command,
+        None,
+        &root.join(format!("run-{index}.stdout")),
+        &root.join(format!("run-{index}.stderr")),
+        go_oracle::ORACLE_TIMEOUT,
+    )
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "Go LLM fixture failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(
-        generated,
+        output.stdout,
         fixture_json.as_bytes(),
-        "Go 1.26.6 failure oracle, source hashes or fixture drifted"
+        "complete pinned Go fixture drifted"
+    );
+}
+
+fn verify_frozen_llm_fixture(fixture: &[u8], args: &[&str]) {
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/llm-failures-next/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "54acd9bdb1bb4df1f7c8b323d5cec93da0f7ca54"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    let cases = manifest["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 7);
+    let capture = cases
+        .iter()
+        .find(|case| case["args"] == serde_json::to_value(args).unwrap())
+        .expect("unobserved LLM fixture arguments cannot receive a cached answer");
+    assert_eq!(capture["exit_status"], 0);
+    assert_eq!(capture["stdout"]["bytes"], fixture.len());
+    assert_eq!(
+        capture["stdout"]["sha256"],
+        hex::encode(Sha256::digest(fixture))
+    );
+    assert_eq!(capture["stderr"]["bytes"], 0);
+    assert_eq!(capture["stderr"]["sha256"], hex::encode(Sha256::digest([])));
+    for (path, metadata) in manifest["source_files"].as_object().unwrap() {
+        let source = go_source(path);
+        assert_eq!(metadata["bytes"], source.len());
+        assert_eq!(metadata["sha256"], hex::encode(Sha256::digest(source)));
+    }
+}
+
+#[test]
+fn frozen_llm_failure_rejects_changed_message_and_unobserved_arguments() {
+    let mut changed: Value = serde_json::from_str(FIXTURE).unwrap();
+    changed["message"] = "fabricated provider message".into();
+    assert!(
+        std::panic::catch_unwind(|| verify_frozen_llm_fixture(
+            &serde_json::to_vec(&changed).unwrap(),
+            &[]
+        ))
+        .is_err()
+    );
+    assert!(
+        std::panic::catch_unwind(|| verify_frozen_llm_fixture(
+            FIXTURE.as_bytes(),
+            &["--status", "418"]
+        ))
+        .is_err()
     );
 }
 

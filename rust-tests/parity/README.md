@@ -140,6 +140,16 @@ is bound as an archived Git blob, not a deleted current source file. This
 pipeline extension requires real native execution before those new target
 observations can be accepted; it never updates committed fixtures.
 
+The Linux LLM failure family also defaults to seven actual whole Go
+observations from clean `54acd9b`. Argument lookup is exact and every raw
+fixture/source/status hash remains strict. All ten original tests still run
+their real Rust loopback requests, retry/text/redaction comparisons and the
+unchanged 15-second active-fixture controls; one corruption/unobserved-args
+test is added. Other OS defaults and explicit live mode build the same Go
+oracle once into an owned temporary directory, use the existing shared
+120-second build/30-second execution limits, and retain all seven byte
+comparisons. No production retry/TLS/config or provider traffic is changed.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

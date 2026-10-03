@@ -775,6 +775,15 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — #1131's actual clean `54acd9b` Go capture produced all seven
+  complete LLM failure fixtures unchanged. Linux defaults verify exact
+  arguments and whole raw/source/status hashes; all ten original Rust
+  loopback/retry/text/redaction/15-second active-budget tests remain selected
+  with one integrity control. Other OS and explicit live modes compile Go
+  once into an owned temporary directory and use existing shared bounded
+  build/runtime helpers. This changes test reference execution only, without
+  changing production retry, TLS, provider configuration or acceptance rows.
+
 - 2026-10-03 — Clean `5c7fd11` passed exactly 98 selected tests with Go
   absent from PATH and all eleven SQLite tests in actual private-root
   pinned-Go live mode. The next opt-in native pipeline records campaign
