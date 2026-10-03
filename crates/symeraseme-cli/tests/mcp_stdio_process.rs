@@ -510,14 +510,14 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
     .expect("scheduler oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "3b61859ff95702536a4390d0675c474c7b5077c3"
+        "0d34c46348932b076086730f2adf72a23bef533a"
     );
     assert_eq!(
         fixture["source_files"],
         serde_json::json!([
             {
                 "path": "internal/mcp/contract_handler.go",
-                "sha256": "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"
+                "sha256": "7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8"
             },
             {
                 "path": "internal/scheduler/scheduler.go",
@@ -665,12 +665,12 @@ fn scheduler_uninstall_and_status_stdio_match_source_bound_go() {
     .expect("scheduler oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "3b61859ff95702536a4390d0675c474c7b5077c3"
+        "0d34c46348932b076086730f2adf72a23bef533a"
     );
     let source_checks = [
         (
             include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
-            "1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2",
+            "7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8",
         ),
         (
             include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
@@ -892,12 +892,12 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
     .expect("campaign oracle fixture");
     assert_eq!(
         fixture["source_revision"],
-        "3b61859ff95702536a4390d0675c474c7b5077c3"
+        "0d34c46348932b076086730f2adf72a23bef533a"
     );
     assert_eq!(
         fixture["source_files"],
         serde_json::json!([
-            {"path":"internal/mcp/contract_handler.go","sha256":"1932919d1e782d70b687557d04f6fd32d848b3853282f6868b77cb82ce1ea5d2"},
+            {"path":"internal/mcp/contract_handler.go","sha256":"7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8"},
             {"path":"internal/campaign/campaign.go","sha256":"9ac7626cf372c64a1c229919603b3b6b77212eca688232d5c74d244424dcc49a"},
             {"path":"internal/campaign/planning.go","sha256":"ee3599dd7bf23acbc36848e47776fc37379ef41abf73d2a2400f52176c945bfd"},
             {"path":"internal/campaign/execution.go","sha256":"eb68d2e1ae49b4908407c26849c4f69d212dd115caae451ca3bcb4f54febaf7c"},

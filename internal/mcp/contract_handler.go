@@ -276,11 +276,11 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 				return nil, err
 			}
 			defer func() { runErr = errors.Join(runErr, store.Close()) }()
-			data, err := reporting.GetDashboardData(ctx, store, "", time.Now().UTC())
+			data, err := reporting.GetDashboardData(ctx, store, "", now().UTC())
 			if err != nil {
 				return nil, err
 			}
-			content, err := reporting.GenerateDashboard(data, getInt(args, "auto_refresh", 0), time.Now().UTC())
+			content, err := reporting.GenerateDashboard(data, getInt(args, "auto_refresh", 0), now().UTC())
 			if err != nil {
 				return nil, err
 			}
@@ -306,7 +306,7 @@ func ContractHandlerWithOptions(opts ContractHandlerOptions) Handler {
 			if err != nil {
 				return nil, err
 			}
-			content, err := reporting.GenerateReport(data, format, time.Now().UTC())
+			content, err := reporting.GenerateReport(data, format, now().UTC())
 			if err != nil {
 				return nil, err
 			}
