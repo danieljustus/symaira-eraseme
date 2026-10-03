@@ -349,7 +349,7 @@ cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundati
 security.SecTrustSettingsCopyExternalRepresentation.argtypes=[ctypes.c_uint32,ctypes.POINTER(ctypes.c_void_p)]
 security.SecTrustSettingsCopyExternalRepresentation.restype=ctypes.c_int32
 data=ctypes.c_void_p()
-status=security.SecTrustSettingsCopyExternalRepresentation(1,ctypes.byref(data))
+status=security.SecTrustSettingsCopyExternalRepresentation(0,ctypes.byref(data))
 if status == -25263:
     assert not expected['trustList'], 'native empty domain lost unrelated user trust settings'
 else:
