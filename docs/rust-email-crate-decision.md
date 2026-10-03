@@ -51,3 +51,11 @@ Do not promote DOM-006/DOM-007 or task 6.1 solely from this document, a local
 certificate-file test, a successful build, or queued CI. Acceptance requires
 completed native results and the source-bound Go transcript gates. The finite
 TLS controls do not establish every platform chain-policy corner case.
+
+Run `37121189734` at `8319356d` also stalls in login-session removal,
+while rule restoration again passes. The next fixture uses the external
+admin trust representation API: export the current settings, remove exactly
+the owned certificate SHA-1 entry, import, re-export and compare the complete
+remaining settings before deleting its unique Keychain certificate. Every
+command retains the 30-second bound. No unrelated trust entry may change;
+this cleanup route still requires native validation.

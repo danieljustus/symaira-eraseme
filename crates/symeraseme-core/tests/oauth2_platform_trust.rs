@@ -379,14 +379,36 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
+            // Both login/root remove-trusted-cert stall on hosted macOS.
+            // Edit only this certificate's entry through the external trust
+            // representation API, then prove every unrelated entry survived.
+            let files = tempfile::tempdir().map_err(|error| error.to_string())?;
+            let before = files.path().join("before.plist");
+            let removed = files.path().join("removed.plist");
+            let after = files.path().join("after.plist");
             checked(
-                // Run removal in the runner's login session. The temporary
-                // admin trust authorization above permits this owned change;
-                // sudo's root session stalls in the native removal command.
-                Command::new("security")
-                    .args(["remove-trusted-cert", "-d"])
-                    .arg(&self.source),
+                Command::new("sudo")
+                    .args(["-n", "security", "trust-settings-export", "-d"])
+                    .arg(&before),
             )?;
+            checked(Command::new("python3").args([
+                "-c",
+                "import hashlib,plistlib,ssl,sys; source,before,out=sys.argv[1:]; digest=hashlib.sha1(ssl.PEM_cert_to_DER_cert(open(source).read())).hexdigest().upper(); data=plistlib.load(open(before,'rb')); entries=data['trustList']; owned=[k for k in entries if k.upper()==digest]; assert len(owned)==1, 'owned CI CA trust entry missing or ambiguous'; del entries[owned[0]]; plistlib.dump(data,open(out,'wb')); print('removed exactly one owned CI CA trust entry')",
+            ]).arg(&self.source).arg(&before).arg(&removed))?;
+            checked(
+                Command::new("sudo")
+                    .args(["-n", "security", "trust-settings-import", "-d"])
+                    .arg(&removed),
+            )?;
+            checked(
+                Command::new("sudo")
+                    .args(["-n", "security", "trust-settings-export", "-d"])
+                    .arg(&after),
+            )?;
+            checked(Command::new("python3").args([
+                "-c",
+                "import plistlib,sys; expected,actual=[plistlib.load(open(p,'rb')) for p in sys.argv[1:]]; assert expected==actual, 'CI CA trust removal changed unrelated settings'; print('owned CA trust entry absent; unrelated trust settings unchanged')",
+            ]).arg(&removed).arg(&after))?;
             checked(Command::new("sudo").args([
                 "-n",
                 "security",
