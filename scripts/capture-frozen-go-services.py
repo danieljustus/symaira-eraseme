@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import time
@@ -67,6 +68,9 @@ def main():
     assert info["GOVERSION"] == "go1.26.6"
     assert info["GOHOSTOS"] == info["GOOS"] and info["GOHOSTARCH"] == info["GOARCH"], "cross-compilation is not native evidence"
     assert info["GOHOSTARCH"] in ("amd64", "arm64")
+    native_arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine().lower()]
+    assert info["GOHOSTARCH"] == native_arch, "Go must execute the actual host architecture"
+    assert info["GOHOSTOS"] == platform.system().lower(), "Go must execute the actual host OS"
     args.output.mkdir(mode=0o700)  # Refuse existing files, directories and symlinks.
     output_root = args.output.resolve()
     private = output_root / "private"
