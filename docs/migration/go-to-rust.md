@@ -45,6 +45,13 @@ verify trusted/unrelated/expired chains before authentication.
 limits. The native workflow selects these controls and retained plan/CLI
 suites on all six targets. Local controls and strict linting pass; native
 acceptance remains pending and DOM-002/CLI-010 remain PARTIAL.
+At `419d60c9`, targeted run `37123597940` passed Linux amd64/arm64 and
+Windows amd64/arm64, including the actual transports and retained plan/CLI
+checks; its macOS jobs are pending. Full workspace run `37123623125` found a
+retained Windows arm64 HTTP fixture failure in job `111204464694`, not an SMTP
+mismatch. This branch carries the bounded request-staging repair described in
+`docs/rust-port/handoffs/2026-10-03-windows-mcp-staged-request.md`; no timeout or
+response comparison was relaxed. Final candidate native evidence is pending.
 
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 

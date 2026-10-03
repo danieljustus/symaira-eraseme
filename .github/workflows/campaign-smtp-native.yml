@@ -8,6 +8,7 @@ on:
       - crates/symeraseme-core/tests/campaign*.rs
       - crates/symeraseme-core/tests/smtp*.rs
       - crates/symeraseme-cli/tests/plan_execute_live_process.rs
+      - crates/symeraseme-cli/tests/mcp_http_windows_process.rs
       - rust-tests/parity/oracle/campaign-smtp/**
       - internal/campaign/**
       - internal/email/**
