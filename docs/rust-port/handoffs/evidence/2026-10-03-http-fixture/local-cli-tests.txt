@@ -1,0 +1,272 @@
+   Compiling symeraseme-cli v0.13.0 (<original-repository>/crates/symeraseme-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.74s
+     Running unittests src/main.rs (target/debug/deps/symeraseme_rust-fc970dcb9680ffea)
+
+running 100 tests
+test mcp::envelope::tests::sanitize_error_matches_the_go_marker_rules ... ok
+test mcp::handler::tests::close_result_reports_store_close_failures_around_the_operation_outcome ... ok
+test mcp::envelope::tests::source_bound_go_result_fixture_matches ... ok
+test cli::tests::positive_tick_action_uses_go_struct_json_bytes ... ok
+test cli::tests::actual_clap_tree_matches_frozen_inventory ... ok
+test cli::migration_tests::migration_repeated_platform_uses_last_value ... ok
+test cli::migration_tests::migration_failed_secret_copy_emits_report_and_error ... ok
+test mcp::handler::tests::generate_scheduler_rejects_invalid_poll_hours ... ok
+test mcp::handler::tests::generate_scheduler_writes_rendered_files_outside_dry_run ... ok
+test mcp::handler::tests::go_map_dispatch_reports_tools_missing_from_its_own_arms ... ok
+test mcp::handler::tests::grant_reports_a_missing_revoke_target_with_go_wording ... ok
+test mcp::handler::tests::auto_confirm_answers_no_reply_without_a_stored_reply ... ok
+test mcp::handler::tests::execute_live_run_fails_closed_without_a_consent_artifact ... ok
+test mcp::handler::tests::classify_reply_reports_a_missing_reply_before_invoking_the_model ... ok
+test mcp::handler::tests::matched_message_json_renders_absent_date_and_flags_as_null ... ok
+test mcp::handler::tests::generate_dashboard_embeds_the_rendered_html_when_output_is_omitted ... ok
+test mcp::handler::tests::generate_report_writes_the_rendered_file_when_output_is_set ... ok
+test mcp::handler::tests::poll_inbox_fails_loudly_on_an_unresolvable_password_reference ... ok
+test mcp::handler::tests::list_requests_keeps_unparseable_timestamps_verbatim ... ok
+test mcp::handler::tests::poll_inbox_falls_back_to_the_username_and_splits_comma_folders ... ok
+test mcp::handler::tests::poll_inbox_filters_by_campaign_when_the_folder_argument_is_not_a_list ... ok
+test mcp::handler::tests::poll_inbox_honours_oauth_username_override_and_array_folders ... ok
+test mcp::handler::tests::result_payload_sorts_go_map_keys_and_drops_message_on_error ... ok
+test mcp::handler::tests::cancelled_classification_flows_through_handler_service_and_agent ... ok
+test mcp::handler::tests::poll_inbox_labels_messages_without_a_subject_header ... ok
+test mcp::handler::tests::poll_inbox_resolves_a_literal_password_and_json_string_folders ... ok
+test mcp::handler::tests::classify_and_rebuttal_mcp_tools_use_the_corekit_llm_transport ... ok
+test mcp::handler::tests::schedule_install_dry_run_shape ... ok
+test mcp::handler::tests::schedule_install_rejects_unknown_platforms_before_touching_the_system ... ok
+test mcp::handler::tests::schedule_uninstall_rejects_unknown_platforms_before_touching_the_system ... ok
+test mcp::handler::tests::schedule_status_reports_cron_without_changing_anything ... ok
+test mcp::handler::tests::source_bound_go_manual_task_fixture_matches ... ok
+test mcp::handler::tests::source_bound_go_store_read_fixtures_match ... ok
+test mcp::handler::tests::source_bound_go_tools_call_fixture_matches ... ok
+test mcp::handler::tests::source_bound_legacy_redact_file_fixture_matches ... ok
+test mcp::handler::tests::source_bound_poll_inbox_fixture_matches ... ok
+test mcp::handler::tests::store_read_tools_need_a_store_and_keep_unparsable_timestamps ... ok
+test mcp::handler::tests::triage_agent_rejects_an_unknown_provider_with_the_known_provider_list ... ok
+test mcp::http::origin_tests::origin_header_validation_distinguishes_absent_empty_and_invalid_bytes ... ok
+test mcp::http::transport_tests::authorized_requires_one_well_formed_bearer_token ... ok
+test mcp::http::transport_tests::dropping_http_client_cancels_the_inflight_tool_handler ... ok
+test mcp::http::transport_tests::is_loopback_host_accepts_mapped_ipv6_loopback ... ok
+test mcp::http::transport_tests::listen_error_words_each_bind_failure_like_go ... ok
+test mcp::http::transport_tests::protocol_reply_answers_204_when_no_batch_item_wants_a_response ... ok
+test mcp::http::transport_tests::protocol_reply_joins_batched_responses ... ok
+test mcp::http::transport_tests::protocol_reply_rejects_empty_and_malformed_batches ... ok
+test mcp::http::transport_tests::protocol_reply_reports_a_parse_error_for_frames_serde_rejects ... ok
+test mcp::http::transport_tests::serve_rejects_an_invalid_port_before_building_the_handler ... ok
+test mcp::http::transport_tests::wait_for_shutdown_returns_when_the_signal_already_fired ... ok
+test mcp::protocol::tests::dispatch_fails_frames_the_catalogue_deserializer_rejects ... ok
+test mcp::protocol::tests::float_text_expands_decimal_and_signed_mantissas ... ok
+test mcp::protocol::tests::id_decoding_renders_lone_surrogates_as_replacement_characters ... ok
+test mcp::protocol::tests::initialize_response_is_byte_stable_and_lexically_ordered ... ok
+test mcp::protocol::tests::json_number_validator_rejects_truncated_forms_and_non_utf8 ... ok
+test mcp::protocol::tests::malformed_json_is_left_to_the_transport_parser ... ok
+test mcp::protocol::tests::object_field_scanning_rejects_non_objects_and_malformed_members ... ok
+test mcp::protocol::tests::params_and_id_validation_match_go ... ok
+test mcp::protocol::tests::parse_request_rejects_values_it_cannot_frame ... ok
+test mcp::protocol::tests::raw_field_classification_handles_null_truncated_and_trailing_tokens ... ok
+test mcp::protocol::tests::scanner_enforces_go_depth_limit_and_reports_unframeable_positions ... ok
+test mcp::protocol::tests::shared_entry_dispatches_tools_list_to_the_tools_list_slice ... ok
+test mcp::protocol::tests::shared_entry_keeps_tools_list_notifications_silent ... ok
+test mcp::protocol::tests::source_bound_go_envelope_fixture_matches_through_the_shared_entry ... ok
+test mcp::protocol::tests::source_bound_go_initialize_fixture_matches ... ok
+test mcp::protocol::tests::tools_call_notifications_are_dropped_before_dispatch ... ok
+test mcp::stream::tests::a_truncated_stream_reports_unexpected_eof_and_writes_nothing_extra ... ok
+test mcp::stream::tests::depth_overflow_and_unreadable_frames_fail_loudly ... ok
+test mcp::stream::tests::every_request_gets_exactly_one_response_and_notifications_get_none ... ok
+test mcp::stream::tests::go_syntax_oracle_matches_buffered_and_chunked_streams ... ok
+test mcp::stream::tests::serve_stdio_emits_nothing_for_a_notification ... ok
+test mcp::stream::tests::serve_stdio_matches_the_buffered_stream_for_every_fixture_case ... ok
+test mcp::stream::tests::serve_stdio_reports_a_value_cut_off_mid_stream ... ok
+test mcp::stream::tests::serve_stdio_reports_read_and_write_failures_loudly ... ok
+test mcp::stream::tests::serve_stdio_reports_syntax_errors_before_eof ... ok
+test mcp::stream::tests::serve_stream_rejects_go_syntax_errors_with_recorded_wording ... ok
+test mcp::stream::tests::serve_stream_rejects_truncated_and_misaligned_values ... ok
+test mcp::stream::tests::source_bound_go_stream_fixture_matches ... ok
+test mcp::stream::tests::stdio_primitive_waits_for_lookahead_or_eof ... ok
+test mcp::stream::tests::stream_error_text_names_position_and_io_cause ... ok
+test mcp::stream::tests::syntax_error_matches_go_wording_per_error_class ... ok
+test mcp::tools_call::tests::a_valid_call_matches_the_go_handler_less_backend_error ... ok
+test mcp::tools_call::tests::argument_kinds_match_the_go_checks ... ok
+test mcp::tools_call::tests::non_object_payloads_are_parse_errors ... ok
+test mcp::tools_call::tests::the_legacy_status_alias_reaches_the_handler ... ok
+test mcp::tools_list::tests::go_html_escaping_applies_to_string_ids ... ok
+test mcp::tools_list::tests::invalid_envelopes_are_invalid_requests_carrying_the_supplied_id ... ok
+test mcp::tools_list::tests::non_json_and_non_object_payloads_are_parse_errors ... ok
+test mcp::tools_list::tests::non_object_params_are_invalid_params ... ok
+test mcp::tools_list::tests::notifications_are_silent_and_the_list_tools_alias_is_accepted ... ok
+test mcp::handler::tests::execute_dry_run_answers_without_consent_or_a_profile ... ok
+test mcp::handler::tests::run_web_form_fails_loudly_when_no_instant_was_injected ... ok
+test mcp::handler::tests::run_web_form_creates_a_manual_task_for_an_active_web_form ... ok
+test mcp::handler::tests::run_web_form_answers_an_invalid_spec_without_queueing_a_task ... ok
+test mcp::handler::tests::manual_task_shapes_and_unreached_branches ... ok
+test mcp::handler::tests::plan_create_shape_and_profile_paths ... ok
+test mcp::handler::tests::list_brokers_shape_matches_the_measured_handler_answers ... ok
+test mcp::handler::tests::auto_confirm_previews_then_creates_manual_task_without_clicking ... ok
+test mcp::handler::tests::classify_reply_surfaces_model_transport_failures ... ok
+test mcp::handler::tests::generate_rebuttal_falls_back_to_the_template_when_the_model_is_unreachable ... ok
+test mcp::handler::tests::source_bound_go_mcp_clock_results_match_fixed_instant ... ok
+
+test result: ok. 100 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.02s
+
+     Running tests/backend_fallback_process.rs (target/debug/deps/backend_fallback_process-9cc4974c1ea94d97)
+
+running 1 test
+test explicit_go_backend_matches_live_go_process_and_requires_sibling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.76s
+
+     Running tests/command_surface.rs (target/debug/deps/command_surface-93cad5ff338f4b2b)
+
+running 21 tests
+test fold_root_handles_json_escaped_windows_paths ... ok
+test fold_path_only_replaces_the_recorded_root ... ok
+test migration_oracle::migration_fixture_paths_reject_escape ... ok
+test brokers_list_honors_resources_override ... ok
+test manual_tasks_list_matches_go_on_a_populated_store ... ok
+test render_template_accepts_go_double_prefix_normalization ... ok
+test init_profile_round_trips_through_show_profile ... ok
+test render_template_unknown_name_matches_go_error ... ok
+test render_template_does_not_double_strip_final_go_names ... ok
+test manual_tasks_populated_paths_match_the_go_bodies ... ok
+test migration_oracle::migration_filesystem_rejects_corrupted_output_and_backup ... ok
+test migration_oracle::migration_filesystem_matches_frozen_go_backup_and_state ... ok
+test plan_populated_paths_match_the_go_bodies ... ok
+test manual_task_timestamps_match_the_go_sql_driver ... ok
+test schedule_commands_match_the_go_oracle ... ok
+test source_bound_status_and_tick_match_the_go_oracle ... ok
+test brokers_json_operations_match_source_bound_goldens ... ok
+test events_and_grant_populated_paths_match_live_go ... ok
+test review_positional_and_path_aliases_match_the_live_go_cli ... ok
+test brokers_operations_match_go_text_filters_and_errors ... ok
+test frozen_command_surface_matches_phase_two_contract ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.99s
+
+     Running tests/filesystem_generators.rs (target/debug/deps/filesystem_generators-046dfef06c88a2b0)
+
+running 1 test
+test filesystem_generators_match_go_observations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/mcp_agent_error_json.rs (target/debug/deps/mcp_agent_error_json-716f44b086e3403b)
+
+running 1 test
+test mcp_json_normalizes_raw_host_agent_error_like_go ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.70s
+
+     Running tests/mcp_agent_error_json_windows.rs (target/debug/deps/mcp_agent_error_json_windows-b888d077c69638ad)
+
+running 1 test
+test native_helper_and_go_contract_observation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.79s
+
+     Running tests/mcp_http_headers_process.rs (target/debug/deps/mcp_http_headers_process-ffb7b6e4014ffd5e)
+
+running 5 tests
+test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+test bounded_response_capture_enforces_deadline_and_size ... ok
+test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+test native_http_complete_headers_and_bodies_match_go ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+     Running tests/mcp_http_process.rs (target/debug/deps/mcp_http_process-5c2100f19064dfb9)
+
+running 12 tests
+test signal_stops_accepting_before_in_flight_request_drains ... ok
+test http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals ... ok
+test slow_header_connections_are_bounded_and_backpressured ... ok
+test many_sequential_http_connections_complete_cleanly ... ok
+test occupied_bind_error_matches_go_for_ipv4_and_ipv6 ... ok
+test unavailable_local_address_error_matches_go ... ok
+test obs_text_origin_rejection_matches_go_and_rust_processes ... ok
+test go_oracle_http_wire_transcripts_match ... ok
+test startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness ... ok
+test live_http_disconnect_cancels_provider_request_like_go ... ok
+test live_http_disconnect_cancels_and_reaps_host_agent_like_go ... ok
+test incomplete_request_headers_expire_at_the_go_five_second_timeout ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.09s
+
+     Running tests/mcp_http_windows_process.rs (target/debug/deps/mcp_http_windows_process-f4215083ead4cf50)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_stdio_mutation_process.rs (target/debug/deps/mcp_stdio_mutation_process-4a0bf8adb355a994)
+
+running 1 test
+test malformed_and_boundary_stdio_matches_source_bound_go_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.76s
+
+     Running tests/mcp_stdio_process.rs (target/debug/deps/mcp_stdio_process-50b59ec2ce302267)
+
+running 10 tests
+test malformed_stdio_exits_before_stdin_eof ... ok
+test stdio_process_matches_go_envelope_param_and_call_id_corpus ... ok
+test stdio_process_matches_go_initialize_id_and_params_corpus ... ok
+test stdio_answers_each_request_before_eof_without_stdout_pollution ... ok
+test imap_server::tests::server_starts ... ok
+test malformed_stdio_process_matches_go_errors ... ok
+test scheduler_uninstall_and_status_stdio_match_source_bound_go ... ok
+test stdio_poll_inbox_default_dialer_reaches_local_starttls ... ok
+test scheduler_tools_match_source_bound_go_with_private_crontab ... ok
+test campaign_tools_match_source_bound_go_with_private_profile_store_and_consent ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+
+     Running tests/mcp_tools_list.rs (target/debug/deps/mcp_tools_list-f2b1f2235d0def9b)
+
+running 10 tests
+test envelope::tests::sanitize_error_matches_the_go_marker_rules ... ok
+test tools_list_notifications_are_silent ... ok
+test tools_list::tests::non_json_and_non_object_payloads_are_parse_errors ... ok
+test tools_list::tests::non_object_params_are_invalid_params ... ok
+test tools_list_rejects_non_object_params ... ok
+test tools_list::tests::invalid_envelopes_are_invalid_requests_carrying_the_supplied_id ... ok
+test envelope::tests::source_bound_go_result_fixture_matches ... ok
+test tools_list::tests::notifications_are_silent_and_the_list_tools_alias_is_accepted ... ok
+test tools_list::tests::go_html_escaping_applies_to_string_ids ... ok
+test tools_list_matches_source_bound_response_shape ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_triage_process.rs (target/debug/deps/mcp_triage_process-9236525fb029b002)
+
+running 1 test
+test mcp_triage_matches_live_go_handler_with_local_agent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests/plan_execute_live_process.rs (target/debug/deps/plan_execute_live_process-0b259709fa8905f6)
+
+running 2 tests
+test consented_live_plan_execute_matches_source_bound_go_process ... ok
+test consented_live_plan_execute_without_email_sender_matches_go_process ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.70s
+
+     Running tests/triage_commands.rs (target/debug/deps/triage_commands-cce2cf5870a81cf8)
+
+running 1 test
+test cli_triage_matches_source_bound_go_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.90s
+
+     Running tests/version.rs (target/debug/deps/version-d06164ef231ecc91)
+
+running 8 tests
+test root_version_ignores_trailing_argument_like_go ... ok
+test root_version_short_flag_matches_go_bytes ... ok
+test root_version_matches_go_bytes ... ok
+test version_text_matches_go_bytes ... ok
+test version_json_matches_handshake_bytes ... ok
+test unsupported_root_version_short_flag_matches_go_bytes ... ok
+test version_rejects_extra_positional_arguments_with_go_error ... ok
+test poisoned_environment_cannot_override_any_version_surface ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
