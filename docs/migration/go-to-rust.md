@@ -36,6 +36,18 @@ source/target records, the retained provider loopbacks and both fixture
 lifecycle controls; strict targeted core Clippy and formatting pass.
 Current-source complete-workflow and native Rust acceptance remain pending.
 
+The complete selected workflow passes all 136 tests at clean
+`5197905ca2753a616b62336a9d5b679bd622fd96`, zero failures or ignores.
+Git's general manifest LF rule initially converted the two captured Windows
+manifest files (57,163→55,882 and 57,179→55,898 bytes). An explicit native
+capture attribute at `b0c67cb6b6ddf2f09f8d3c23c4feb928d0edc661` preserves
+the actual recorded CRLF bytes. All five Git blobs now exactly match the
+downloaded artifacts, and a real `core.autocrlf=true` checkout preserves them.
+On that clean final source all twelve LLM tests pass both with Go absent and
+with the explicitly selected real Go producer in private roots. No output,
+source digest, native identity or comparison is rewritten. Current-head
+GitHub and full native Rust acceptance remain pending.
+
 This verifies actual Go captures, not the old full native run's success:
 its Linux arm64 suite retains the reproduced scheduler root race fixed later
 at `aa68478`; macOS Intel's full suite passes. Mac arm64 capture is still
