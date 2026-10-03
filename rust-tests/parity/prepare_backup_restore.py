@@ -7,17 +7,28 @@ import argparse
 import ctypes
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import stat
 import tarfile
 import urllib.request
+import urllib.error
 import zipfile
 
 import backup_restore_rehearsal as rehearsal
 
 REPOSITORY = 'danieljustus/symaira-eraseme'
 RELEASE = 'v0.12.1'
+RELEASE_METADATA_URL = 'https://api.github.com/repos/' + REPOSITORY + '/releases/tags/' + RELEASE
+
+
+class NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        # Metadata has one fixed API URL. Never forward its CI token to a
+        # redirect target; archive/checksum downloads remain anonymous.
+        raise urllib.error.HTTPError(request.full_url, code,
+                                     'authenticated release metadata redirect refused', headers, response)
 
 
 def native_architecture():
@@ -40,7 +51,13 @@ def fetch(url, maximum):
                       'release URL must belong to GitHub')
     request = urllib.request.Request(url, headers={'User-Agent': 'EraseMe-native-restore-proof',
                                                  'Accept': 'application/vnd.github+json'})
-    with urllib.request.urlopen(request, timeout=30) as response:
+    token = os.environ.get('ERASEME_RELEASE_METADATA_TOKEN') if url == RELEASE_METADATA_URL else None
+    if token:
+        request.add_header('Authorization', 'Bearer ' + token)
+        open_request = urllib.request.build_opener(NoCredentialRedirect()).open
+    else:
+        open_request = urllib.request.urlopen
+    with open_request(request, timeout=30) as response:
         raw = response.read(maximum + 1)
     rehearsal.require(len(raw) <= maximum, 'release response exceeded its byte bound')
     return raw
@@ -55,7 +72,7 @@ def prepare(destination):
     rehearsal.require(system and arch, 'unsupported native release platform')
     extension = '.zip' if system == 'windows' else '.tar.gz'
     name = 'symeraseme_0.12.1_' + system + '_' + arch + extension
-    release = json.loads(fetch('https://api.github.com/repos/' + REPOSITORY + '/releases/tags/' + RELEASE, 1024 * 1024))
+    release = json.loads(fetch(RELEASE_METADATA_URL, 1024 * 1024))
     rehearsal.require(release['tag_name'] == RELEASE and not release['draft'] and not release['prerelease'],
                       'historical release identity changed')
     def asset(asset_name):

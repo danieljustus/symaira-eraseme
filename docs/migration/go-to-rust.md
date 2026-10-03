@@ -716,6 +716,16 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — Fresh backup head `d46ef15` run `37150148562`, macOS Intel
+  job `111282134679`, failed before native tests when the anonymous official
+  release metadata API returned HTTP403 rate-limit exceeded. This failure
+  remains recorded. Preparation now uses the job's existing contents-read
+  token only for the exact fixed `v0.12.1` metadata URL, with authenticated
+  redirects refused and archive/checksum downloads still anonymous. Three
+  scope/redirect/bound controls and the five existing backup controls pass
+  locally. No digest, archive, restore, confinement or native acceptance
+  check is relaxed; the new head still needs current six-target acceptance.
+
 - 2026-09-22 — all three wave-1 worker results came back HTTP 429 (Codex
   quota); the coordinator implemented CLI-020/021/022 itself in the slice
   worktrees. Dispatch failure is not a slice outcome.

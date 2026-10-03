@@ -191,6 +191,15 @@ specific to the exact supplied artifact and this rehearsal.
 
 ## Release-bound replay — 2026-09-27
 
+CI release preparation uses the workflow's existing read-only GitHub token
+only for the exact official `v0.12.1` metadata API request. That request
+refuses redirects; checksum and archive downloads receive no token. Published
+asset sizes/digests, archive checksum and sole regular-member verification
+remain mandatory. The token is scoped to the preparation step and is absent
+from the later native product/rehearsal steps. This addresses the fresh
+macOS Intel HTTP403 rate-limit failure in run `37150148562`, job
+`111282134679`; it does not turn that failed run into native evidence.
+
 The same eight-case sequence passed on macOS arm64 at candidate
 `62e18d2efdb098854124f2d859361c4c5d07530f` with the official
 `v0.12.1` `symeraseme_0.12.1_darwin_arm64.tar.gz` archive. Its SHA-256

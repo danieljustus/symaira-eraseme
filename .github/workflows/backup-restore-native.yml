@@ -69,10 +69,13 @@ jobs:
           go env GOVERSION GOOS GOARCH > "$RUNNER_TEMP/restore-logs/go-native-env.txt"
       - name: Verify immutable official native Go release inputs
         shell: bash
+        env:
+          ERASEME_RELEASE_METADATA_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 rust-tests/parity/prepare_backup_restore.py --output-dir "$RUNNER_TEMP/restore-release" | tee "$RUNNER_TEMP/restore-logs/release-prepare.log"
           python3 -m unittest discover -s rust-tests/parity -p test_plain_backup_restore.py -v 2>&1 | tee "$RUNNER_TEMP/restore-logs/archive-backup-controls.log"
+          python3 -m unittest discover -s rust-tests/parity -p test_prepare_backup_restore.py -v 2>&1 | tee "$RUNNER_TEMP/restore-logs/release-metadata-controls.log"
       - name: Build native Rust and native Windows denial control
         shell: bash
         run: |
