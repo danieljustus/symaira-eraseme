@@ -31,6 +31,17 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Artifact-level SBOM preparation (2026-10-03, #1128)
+
+The native shadow archive workflow now prepares embedded Cargo inventories
+with pinned cargo-auditable and rust-audit-info, records native Go fallback
+build info, and binds both executables and archives into CycloneDX documents.
+Independent packed-member readback reproduces every inventory and SBOM.
+Six local mutation/identity controls and a real Linux ELF extractor smoke pass;
+these are preparation evidence only. REL-010 and release/Homebrew rows remain
+PARTIAL pending native product archives, signatures, provenance, audit/deny
+and published readback. Details: [artifact SBOM handoff](../rust-port/handoffs/2026-10-03-artifact-sbom.md).
+
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
 `host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap
