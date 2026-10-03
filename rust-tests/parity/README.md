@@ -8,7 +8,7 @@ and [docs/rust-port-contract-matrix.md](../../docs/rust-port-contract-matrix.md)
 
 ## 1. Structure
 
-### Frozen neutral suite preparation (#1131)
+### Frozen neutral and cryptography suite preparation (#1131)
 
 `make parity` now tests the neutral harness without building Go. Its time and
 confirmation differential loads actual Go 1.26.6 observations from
@@ -25,6 +25,24 @@ cleanup. Cache discovery, build and execution share the existing total
 30-second budget; the deadline is not increased. Default tests require no
 Go executable. The Go-free CI job checks this with a PATH containing no Go
 compiler executable and offline Rust dependency resolution after fetch.
+
+The core `identity_interop` and `encryption_parity` integration tests also
+default to actual recorded Go observations. The 15 complete requests, stdout,
+stderr and statuses in `tests/fixtures/go-frozen/identity-crypto/` include five
+rejected tampered envelopes and actual Rust-writer envelopes consumed by Go.
+The manifest pins the clean capture source, native Go version and every byte
+stream's length and SHA-256. Lookup requires an exact recorded request; an
+unknown ciphertext cannot receive a cached plaintext. All 17 encryption and
+four original identity tests remain selected, with an additional corpus
+control checking all 15 records, the five Rust rejections and an unknown key.
+
+Two private writer tests reproduce the complete observed Go/Rust envelopes
+using existing private nonce/salt/IV/clock helpers. Public encryption still
+uses fresh production randomness, and fresh-envelope round trips remain
+checked. Explicit `SYMERASEME_PARITY_LIVE_GO=1` retains live interoperability
+for these integrations. The Go-free workflow executes both integration files
+and the two writer tests as well as the neutral package; other core tests
+remain outside this preparation's Go-free claim.
 
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still

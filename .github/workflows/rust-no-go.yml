@@ -1,4 +1,4 @@
-name: Frozen neutral parity without Go
+name: Frozen parity without Go
 
 on:
   pull_request:
@@ -6,6 +6,12 @@ on:
       - rust-tests/parity/**
       - crates/symeraseme-core/src/timeutil.rs
       - crates/symeraseme-core/src/confirmation.rs
+      - crates/symeraseme-core/src/identity/profile.rs
+      - crates/symeraseme-core/src/storage/encryption.rs
+      - crates/symeraseme-core/tests/identity_interop.rs
+      - crates/symeraseme-core/tests/encryption_parity.rs
+      - crates/symeraseme-core/tests/support/frozen_go_oracle.rs
+      - tests/fixtures/go-frozen/**
       - Cargo.toml
       - Cargo.lock
       - Makefile
@@ -21,7 +27,7 @@ concurrency:
 
 jobs:
   frozen-neutral:
-    name: Rust / frozen neutral parity without Go
+    name: Rust / frozen neutral and crypto parity without Go
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -62,4 +68,8 @@ jobs:
               print("Verified: go absent from PATH; default frozen suite selected", flush=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "parity", "--all-targets", "--locked", "--offline"],
                              env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "identity_interop",
+                              "--test", "encryption_parity", "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--lib",
+                              "frozen_actual_go_and_rust_writers", "--locked", "--offline"], env=environment, check=True)
           PY

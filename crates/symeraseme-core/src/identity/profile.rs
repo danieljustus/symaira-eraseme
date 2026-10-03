@@ -1054,6 +1054,52 @@ pub fn encrypt_profile(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, ProfileE
     encrypt_profile_with_nonce(plaintext, key, &nonce)
 }
 
+#[cfg(test)]
+mod frozen_writer_tests {
+    use super::*;
+
+    #[test]
+    fn frozen_actual_go_and_rust_writers_reproduce_complete_profile_bytes() {
+        let go_request = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/identity-go-encrypt.stdin"
+        );
+        let go_envelope = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/identity-go-encrypt.stdout"
+        );
+        let rust_request = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/identity-original-rust-writer-go-decrypt.stdin"
+        );
+        let go_read_rust = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/identity-original-rust-writer-go-decrypt.stdout"
+        );
+        for (key, plaintext, envelope) in [
+            (
+                &go_request[1..33],
+                &go_request[33..],
+                go_envelope.as_slice(),
+            ),
+            (
+                &rust_request[1..33],
+                go_read_rust.as_slice(),
+                &rust_request[33..],
+            ),
+        ] {
+            let separator = envelope.iter().position(|byte| *byte == b'\n').unwrap();
+            let header: Envelope = serde_json::from_slice(&envelope[..separator]).unwrap();
+            let nonce: [u8; 12] = hex::decode(header.nonce).unwrap().try_into().unwrap();
+            assert_eq!(
+                encrypt_profile_with_nonce(plaintext, key, &nonce).unwrap(),
+                envelope,
+                "actual cross-language header/AAD/ciphertext bytes"
+            );
+            assert_eq!(
+                decrypt_profile_with_key(envelope, key).unwrap().0,
+                plaintext
+            );
+        }
+    }
+}
+
 fn write_canonical_string(output: &mut String, value: &str) {
     output.push('"');
     for character in value.chars() {

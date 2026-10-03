@@ -1,0 +1,530 @@
+{
+  "schema": 1,
+  "purpose": "Actual synthetic Go observations for future fixture preparation",
+  "limits": "One native Linux host; not a complete frozen corpus or a Go-absent parity-suite result",
+  "source_revision": "aa2dd0f31d30061b5ed66e7638a0dcddde060009",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "captured_at_utc": "2026-10-03T18:25:33.562495+00:00",
+  "source_files": {
+    "internal/identity/additional_test.go": {
+      "bytes": 6997,
+      "sha256": "5824e1bb6e3aeb0b21c6a9fedc86380b64bdf433aaa78cacf56c32367b6b91ca"
+    },
+    "internal/identity/bootstrap.go": {
+      "bytes": 2041,
+      "sha256": "03cbfc3a8fbd661bcfae87a456a576d1c28fc5a3ee34f4c8a999335a3be240bf"
+    },
+    "internal/identity/consent.go": {
+      "bytes": 11696,
+      "sha256": "491f6b7386ff2c84913437b9dff5c3c6190124aaac34ac8b3dabf08e2629943c"
+    },
+    "internal/identity/consent_test.go": {
+      "bytes": 3609,
+      "sha256": "f1040c6db2516147d071f887258af535e6289141b748f375d3f601c2e349a911"
+    },
+    "internal/identity/gate.go": {
+      "bytes": 4429,
+      "sha256": "2f995708ea3106b5809fdc675252ec2569ba55c89b94638966b7b5f5e1d7399a"
+    },
+    "internal/identity/path_additional_test.go": {
+      "bytes": 467,
+      "sha256": "f8df6667b9dd95d21a664e8324f0b9289c907882ae68b7f57872f316d5097617"
+    },
+    "internal/identity/profile.go": {
+      "bytes": 22457,
+      "sha256": "c637ff49dd7bdd278e11b4ca874e6115e18a982da4bf36631bb7053e259b25bf"
+    },
+    "internal/identity/profile_interop_test.go": {
+      "bytes": 17781,
+      "sha256": "f06b35eb8d239fbb2a183771951abb2aa9ba89bd5730f6fb398e8229e1e5b5f4"
+    },
+    "internal/identity/profile_nonce_test.go": {
+      "bytes": 4126,
+      "sha256": "c4aabb18c3d48c0dfc8bfce3320f06f7b12ead83fd7a709a38c244f1a8012c81"
+    },
+    "internal/identity/profile_regression_test.go": {
+      "bytes": 14271,
+      "sha256": "c173772e8ae6b5e3600dc387b0d54896afbbd16204cb88d8898211feb3497670"
+    },
+    "internal/identity/profile_test.go": {
+      "bytes": 5101,
+      "sha256": "d34991902fc0b47e52ae439cfc2b8d4b356b7a63d52a765a66bf6facf91440b7"
+    },
+    "internal/identity/resolve.go": {
+      "bytes": 5270,
+      "sha256": "36020241ba651fe52c602941a2f67d50a224977965ef553d26e3bf4cc1e78e59"
+    },
+    "internal/identity/resolve_test.go": {
+      "bytes": 5538,
+      "sha256": "b4d170cf2f448b007d8b89c71fc8a5186d85d13cbd3108d1d279164c77246a58"
+    },
+    "internal/identity/secrets.go": {
+      "bytes": 9849,
+      "sha256": "462c8fda343842bd674e50e974e59e1f6970794c9b60946dee3b39207362dd44"
+    },
+    "internal/identity/secrets_test.go": {
+      "bytes": 1113,
+      "sha256": "920fb34685b4ecb0228c825998d320d76054a8b4e1f27688dd95e8274d799de8"
+    },
+    "internal/eventstore/atomic_replace_unix.go": {
+      "bytes": 280,
+      "sha256": "adcf1def3e9898718213886e11164051e2c7430535a9facded42a20004c64884"
+    },
+    "internal/eventstore/atomic_replace_windows.go": {
+      "bytes": 634,
+      "sha256": "abb17e1984ddabff15baa338e22fb03b2454432f041303f2521372e75f37e9a8"
+    },
+    "internal/eventstore/cleanup.go": {
+      "bytes": 8014,
+      "sha256": "0e1430305c5ced6a2073f6b96b7722c37b2e0cac184425cd427857e5fda35f0e"
+    },
+    "internal/eventstore/cleanup_additional_test.go": {
+      "bytes": 5806,
+      "sha256": "480afb34d429ce86aa2fcd5c7a202ce94ca6e19b361d927cf7cb5ddbb12e3e2f"
+    },
+    "internal/eventstore/cleanup_safety_test.go": {
+      "bytes": 19122,
+      "sha256": "dc235cd50d196be4610ce56eccda4f08705b1b38c5b7965d5cd8b2f31479b79f"
+    },
+    "internal/eventstore/configured_test.go": {
+      "bytes": 15368,
+      "sha256": "cc1d5e3d894501f8623940442b7d6a02ebd3a68b9351f5aaccb16bd954789845"
+    },
+    "internal/eventstore/conformance_test.go": {
+      "bytes": 7559,
+      "sha256": "7027ddcff6e17158a8ca1bd1fb2423f2a55c190c43328bcdb2fb794501280f2a"
+    },
+    "internal/eventstore/encrypt.go": {
+      "bytes": 41859,
+      "sha256": "b72e44f3e88bfe67e6e5e03409c7add282f22cb706eb9496b3d20e9895e42f17"
+    },
+    "internal/eventstore/encrypt_test.go": {
+      "bytes": 6223,
+      "sha256": "53be04f07d4e6878ee78cde9f99369cd0e195331975b73e50b0ba00455b5d683"
+    },
+    "internal/eventstore/encryption_additional_test.go": {
+      "bytes": 5652,
+      "sha256": "01adcf399e24c902814da23cc5902d112d635a1833b414e6b8ac89a457de9e5a"
+    },
+    "internal/eventstore/eventtypes.go": {
+      "bytes": 3332,
+      "sha256": "89394cfcbdc6221f5622c08fe15a32ada42dbc3ed1c17258784f311306636fda"
+    },
+    "internal/eventstore/flock_unix.go": {
+      "bytes": 790,
+      "sha256": "c918d3f9d2532d644f924cadf5192e13c8e16526bd70d4bfa01afd5e76d16696"
+    },
+    "internal/eventstore/flock_windows.go": {
+      "bytes": 735,
+      "sha256": "237970385d9d37969d77a6a3e5a6ce08519911353b0be6ff939f31ee1c7a3574"
+    },
+    "internal/eventstore/imap_hwm_test.go": {
+      "bytes": 6030,
+      "sha256": "7d1b3f4e4373d0fabd57b89fd82274de03ce0a8df8e13f69157ca4547cf5350c"
+    },
+    "internal/eventstore/private_dir_unix.go": {
+      "bytes": 289,
+      "sha256": "19687de0acb3191a96f13f3b407ddf5c9815e3bdf93933276cea034e8bd3dd5c"
+    },
+    "internal/eventstore/private_dir_windows.go": {
+      "bytes": 455,
+      "sha256": "2863bc2f5e42148a8b4dbd210e68efd3ded4e7bcc2a5fbd22855b2dd37d65c46"
+    },
+    "internal/eventstore/projection.go": {
+      "bytes": 11610,
+      "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+    },
+    "internal/eventstore/projection_additional_test.go": {
+      "bytes": 6543,
+      "sha256": "6457c105367cac1220312a754cb30ce74aca261f25b99fc1cd7e95f82a5379e1"
+    },
+    "internal/eventstore/python_fernet_compat_test.go": {
+      "bytes": 22452,
+      "sha256": "5558fefcf7e0b324d09d2bd1c843e900809bf6149004778927f4b670667d5927"
+    },
+    "internal/eventstore/repo.go": {
+      "bytes": 11850,
+      "sha256": "339cf7d383d03de0fbb1f3cba994f8282b45c060a9a5294891e36893374a4625"
+    },
+    "internal/eventstore/repo_test.go": {
+      "bytes": 11612,
+      "sha256": "8ff4fc07c08288376c37c07ff78d6b411a41059a40b763232a455875f973adaa"
+    },
+    "internal/eventstore/store.go": {
+      "bytes": 20876,
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    },
+    "internal/eventstore/sync_directory_unix.go": {
+      "bytes": 320,
+      "sha256": "9cdfe967c394e4012b1dbf4096454887754a136b4e3d1c8aef781efd66f06af0"
+    },
+    "internal/eventstore/sync_directory_windows.go": {
+      "bytes": 281,
+      "sha256": "33dc2d3d00bbbb2d1feea24b9d94f5f0a6cd4ccae8cac8bbdb7be9ebb5bf8cee"
+    },
+    "internal/eventstore/timeutil/timeutil.go": {
+      "bytes": 2527,
+      "sha256": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df"
+    },
+    "internal/eventstore/timeutil/timeutil_test.go": {
+      "bytes": 1161,
+      "sha256": "497cfab3cce7ed1475287e510af672b2cda00b11b3d12a5876412faf3f7131ff"
+    },
+    "rust-tests/parity/oracle/identity/main.go": {
+      "bytes": 1418,
+      "sha256": "0fd9a721ebced41bdddaa71cb373848b2a4b8e14c43fffa973c995899ba969a6"
+    },
+    "rust-tests/parity/oracle/crypto/main.go": {
+      "bytes": 1323,
+      "sha256": "d0d5223ebaae81e6a38078d016a2446cf3b9669461bf9c9fe668dc10bced5c48"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "builds": {
+    "identity": {
+      "command": [
+        "/workspace/toolchains/go/bin/go",
+        "build",
+        "-mod=readonly",
+        "-buildvcs=true",
+        "-trimpath",
+        "-o",
+        "/workspace/scratch/go-freeze-capture-identity-crypto-v2/go-identity",
+        "./rust-tests/parity/oracle/identity"
+      ],
+      "binary": {
+        "bytes": 10397345,
+        "sha256": "c1373a6ecc3c684898eceee7a8befe935a23a1b49113af5caf8c8b2982264574"
+      },
+      "embedded_build_info": "/workspace/scratch/go-freeze-capture-identity-crypto-v2/go-identity: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/identity\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003163940-aa2dd0f31d30\t\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/godbus/dbus/v5\tv5.2.2\th1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\t-trimpath=true\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=aa2dd0f31d30061b5ed66e7638a0dcddde060009\n\tbuild\tvcs.time=2026-10-03T16:39:40Z\n\tbuild\tvcs.modified=false\n"
+    },
+    "crypto": {
+      "command": [
+        "/workspace/toolchains/go/bin/go",
+        "build",
+        "-mod=readonly",
+        "-buildvcs=true",
+        "-trimpath",
+        "-o",
+        "/workspace/scratch/go-freeze-capture-identity-crypto-v2/go-crypto",
+        "./rust-tests/parity/oracle/crypto"
+      ],
+      "binary": {
+        "bytes": 9042389,
+        "sha256": "f5becf55f550bc7d0da561405f21fed973a08fb09d107aef1a5b2400eab07b76"
+      },
+      "embedded_build_info": "/workspace/scratch/go-freeze-capture-identity-crypto-v2/go-crypto: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/crypto\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003163940-aa2dd0f31d30\t\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\t-trimpath=true\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=aa2dd0f31d30061b5ed66e7638a0dcddde060009\n\tbuild\tvcs.time=2026-10-03T16:39:40Z\n\tbuild\tvcs.modified=false\n"
+    }
+  },
+  "observations": [
+    {
+      "case": "identity-canonical",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 349,
+        "sha256": "5b9b36196e267c07b320b6851d0208a95a9f3d080ee822e087ede3999cea58bb"
+      },
+      "stdout": {
+        "bytes": 390,
+        "sha256": "8e4451fd81b7bd5d5e7c8c3f172aa24c3fa760658c0628eadc49946368df7053"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "identity-hash",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 349,
+        "sha256": "3a39bbdcfbffbcb99839a9694ba4c09ff7c84e3e8b480a3e72343f7a143ba498"
+      },
+      "stdout": {
+        "bytes": 64,
+        "sha256": "de19e3383d0f2c6c8c2ffac2fb0b57cf4efcbbc23f47de7b2c73953374bdf441"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "generic-float64",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 77,
+        "sha256": "97a68d1e7f362debc00047651bc1b9e5a06f5d005ba8addc8777ca77b6ff4cf3"
+      },
+      "stdout": {
+        "bytes": 86,
+        "sha256": "029ad6d8e2da76938339bf5c0a4fc1a9b38d8c793b01c945de229d3bc3715ae3"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "identity-go-encrypt",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 381,
+        "sha256": "2e40cf4bfc4b42b1822f124d5265fda9db1f8918638d027bae70b83c54287294"
+      },
+      "stdout": {
+        "bytes": 439,
+        "sha256": "291da33addb316a1a64607cf25240e860e6c29ef2b8a57f75607cf62d3530ec7"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "identity-go-decrypt",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "b46965781934bc79f35b7d28e4a6d6473b297a78e61cc993bc846241c33573ad"
+      },
+      "stdout": {
+        "bytes": 348,
+        "sha256": "3722fb169bd6679e0920b9d3ac5b8f8181385f374139978c4d945a631e768c4e"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "identity-tamper-rejected",
+      "package": "identity",
+      "exit_status": 1,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "34e543196039a1a2f81b85dd38ea462d3c3761ff861606ef3d2de21d61d8bf95"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 65,
+        "sha256": "1c1c5a362b03806f4b184b120f18fd0849c2b4e9c711903a474bc0da93c3cc3b"
+      }
+    },
+    {
+      "case": "crypto-go-encrypt",
+      "package": "crypto",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 84,
+        "sha256": "327e09366c2e7431dbf5ddee3973439ecd68a162708a0b0d7bcf698d5f4ab490"
+      },
+      "stdout": {
+        "bytes": 197,
+        "sha256": "3a27bf86c31653051c35f9f3a9d5b8f844074ebf6834607b93435e7a976560a1"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "crypto-go-decrypt",
+      "package": "crypto",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 230,
+        "sha256": "e25f4aabe46bf114ae7060179cdd42be0e7cc56658c0ae4850fe07bf1c21e7de"
+      },
+      "stdout": {
+        "bytes": 51,
+        "sha256": "18534690daa82fd0fa755377d6021f359d32bd2c0afa251a8e3c0d9aa0150971"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "crypto-tamper-rejected",
+      "package": "crypto",
+      "exit_status": 1,
+      "stdin": {
+        "bytes": 230,
+        "sha256": "2e948f39e1dde228803ffc875408d11a7f5b718590116f7f64f9e45db0bb9040"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 24,
+        "sha256": "51bc7a561c531901acc363b0480ef258aecee87232c0c336790f6a3f134156d3"
+      }
+    },
+    {
+      "case": "identity-rust-writer-go-decrypt",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "2527cde7ae6bfe1bb5693fd326080a455d8a89e0c26ec820c149d79f79a0f2eb"
+      },
+      "stdout": {
+        "bytes": 348,
+        "sha256": "3722fb169bd6679e0920b9d3ac5b8f8181385f374139978c4d945a631e768c4e"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "writer": "actual Rust product random encryption API"
+    },
+    {
+      "case": "identity-rust-writer-tamper-rejected",
+      "package": "identity",
+      "exit_status": 1,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "41aae5256fdaa2938d285eab60f8b3d4f0d4014a6fb6038ba49affcf7042ba6e"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 65,
+        "sha256": "1c1c5a362b03806f4b184b120f18fd0849c2b4e9c711903a474bc0da93c3cc3b"
+      },
+      "writer": "actual Rust product random encryption API"
+    },
+    {
+      "case": "crypto-rust-writer-go-decrypt",
+      "package": "crypto",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 230,
+        "sha256": "96a60729199d48eea3184d0b4add6382974f10258dbe55125777d8b4a8a1c643"
+      },
+      "stdout": {
+        "bytes": 51,
+        "sha256": "18534690daa82fd0fa755377d6021f359d32bd2c0afa251a8e3c0d9aa0150971"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "writer": "actual Rust product random encryption API"
+    },
+    {
+      "case": "crypto-rust-writer-tamper-rejected",
+      "package": "crypto",
+      "exit_status": 1,
+      "stdin": {
+        "bytes": 230,
+        "sha256": "cd50abf82be3ee89b9dcb0a511571347b3133a9cb528888ac627ee2865c2d1f0"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 24,
+        "sha256": "51bc7a561c531901acc363b0480ef258aecee87232c0c336790f6a3f134156d3"
+      },
+      "writer": "actual Rust product random encryption API"
+    },
+    {
+      "case": "identity-original-rust-writer-go-decrypt",
+      "package": "identity",
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "44ee1de3bbef06a3df2aaa659dbe1e51469ded57800bf02bc45cd9fc3bae6b04"
+      },
+      "stdout": {
+        "bytes": 348,
+        "sha256": "3722fb169bd6679e0920b9d3ac5b8f8181385f374139978c4d945a631e768c4e"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "writer": "actual random Rust writer with original identity_interop 0x5a key and exact serialized Profile"
+    },
+    {
+      "case": "identity-original-rust-writer-tamper-rejected",
+      "package": "identity",
+      "exit_status": 1,
+      "stdin": {
+        "bytes": 472,
+        "sha256": "2f2ec197a4f367299ea7599d6eb5d09c9cfef32c4d498b654973c4dfe2ebc751"
+      },
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 65,
+        "sha256": "1c1c5a362b03806f4b184b120f18fd0849c2b4e9c711903a474bc0da93c3cc3b"
+      },
+      "writer": "actual random Rust writer with original identity_interop 0x5a key and exact serialized Profile"
+    }
+  ],
+  "rust_probe": {
+    "source_revision": "aa2dd0f31d30061b5ed66e7638a0dcddde060009",
+    "passed_reader_canonicalization_rejection_checks": 7,
+    "stdout": {
+      "bytes": 127,
+      "sha256": "b5e00f037fb26e68165bd533ab579a5487cd924090525c3fd25a175b1e3b5d0c"
+    },
+    "source": {
+      "bytes": 2882,
+      "sha256": "f691041392e9336a81ed532e3d8bb5f82a08aa8fe36027eafbd792a4b1c85c84"
+    },
+    "locked_dependencies": "every dependency version, source and checksum matches product Cargo.lock; feature/dev-dependency edges differ for the external probe",
+    "production_randomness": "unchanged",
+    "limits": "one native Linux host; not a complete corpus, default-suite Go-absence proof or release acceptance",
+    "rust_version": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+    "product_source_files": {
+      "Cargo.toml": {
+        "bytes": 2507,
+        "sha256": "1baacb22b0a7637c367cb861e62798102ded1fc56c831c9a58698b4b60100ac3"
+      },
+      "Cargo.lock": {
+        "bytes": 82045,
+        "sha256": "605cf3799c5134445dd5c6bc095c033dbd4dc5b87c6ebd06e1bc143120ee9a37"
+      },
+      "crates/symeraseme-core/src/identity/profile.rs": {
+        "bytes": 47599,
+        "sha256": "7484781af222f75645df6dd4e10336949f413b186696ac5472cfbaff8c37984b"
+      },
+      "crates/symeraseme-core/src/storage/encryption.rs": {
+        "bytes": 22152,
+        "sha256": "d4e7264db721e23d87c9d575a9691fa7b4d21aedf54cade067cd886b8e8c3007"
+      }
+    }
+  },
+  "completed_at_utc": "2026-10-03T19:35:47.218349+00:00",
+  "additional_rust_writer": {
+    "producer_source_sha256": "f429f405d1f19b08c8d1eff7ec3dee2155b1c3ab88ec781c37aba63678bfe21a",
+    "serialized_profile": "confirmed byte-equal to original identity_interop profile serialization",
+    "source_revision": "aa2dd0f31d30061b5ed66e7638a0dcddde060009"
+  }
+}

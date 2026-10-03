@@ -418,6 +418,50 @@ mod tests {
     const IV: [u8; 16] = [0x33; 16];
 
     #[test]
+    fn frozen_actual_go_and_rust_writers_reproduce_complete_v3_bytes() {
+        let go_request = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/crypto-go-encrypt.stdin"
+        );
+        let go_envelope = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/crypto-go-encrypt.stdout"
+        );
+        let rust_request = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/crypto-rust-writer-go-decrypt.stdin"
+        );
+        let go_read_rust = include_bytes!(
+            "../../../../tests/fixtures/go-frozen/identity-crypto/crypto-rust-writer-go-decrypt.stdout"
+        );
+        for (key, plaintext, envelope) in [
+            (
+                &go_request[1..33],
+                &go_request[33..],
+                go_envelope.as_slice(),
+            ),
+            (
+                &rust_request[1..33],
+                go_read_rust.as_slice(),
+                &rust_request[33..],
+            ),
+        ] {
+            assert!(envelope.starts_with(V3_HEADER));
+            let token_start = V3_HEADER.len() + V3_SALT_LEN;
+            let token = URL_SAFE.decode(&envelope[token_start..]).unwrap();
+            assert_eq!(token[0], 0x80);
+            let timestamp = u64::from_be_bytes(token[1..9].try_into().unwrap());
+            let reproduced = encrypt_v3_with_material(
+                plaintext,
+                key,
+                &envelope[V3_HEADER.len()..token_start],
+                &token[9..25],
+                timestamp,
+            )
+            .unwrap();
+            assert_eq!(reproduced, envelope, "actual cross-language writer bytes");
+            assert_eq!(decrypt_v3(envelope, key).unwrap(), plaintext);
+        }
+    }
+
+    #[test]
     fn deterministic_vector_is_stable_and_round_trips() {
         let envelope = encrypt_v3_with_material(
             b"SQLite format 3\0\xff boundary",

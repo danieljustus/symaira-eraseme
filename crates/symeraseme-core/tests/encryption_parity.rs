@@ -1,6 +1,8 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE;
 use sha2::{Digest, Sha256};
+#[path = "support/frozen_go_oracle.rs"]
+mod frozen_go_oracle;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
@@ -288,13 +290,32 @@ fn rust_writer_is_consumed_by_go_oracle_and_go_writer_by_rust() {
         request.push(operation);
         request.extend_from_slice(&key);
         request.extend_from_slice(payload);
+        if !frozen_go_oracle::live_mode() {
+            return frozen_go_oracle::run("crypto", &request);
+        }
         let run = go_oracle::run_oracle("crypto", Some(&request));
         assert!(run.status.success(), "Go oracle failed: {:?}", run.stderr);
         run.stdout
     };
 
-    let rust_envelope = symeraseme_core::storage::encryption::encrypt_v3(plaintext, &key)
+    let fresh = symeraseme_core::storage::encryption::encrypt_v3(plaintext, &key)
         .expect("Rust V3 writer must succeed");
+    assert_eq!(decrypt_v3(&fresh, &key).unwrap(), plaintext);
+    let rust_envelope = if frozen_go_oracle::live_mode() {
+        fresh
+    } else {
+        let recorded = frozen_go_oracle::case("crypto-rust-writer-go-decrypt");
+        assert_eq!(&recorded.request[1..33], &key);
+        assert_eq!(recorded.stdout, plaintext);
+        assert_ne!(
+            fresh,
+            recorded.request[33..],
+            "production salt and IV must remain fresh"
+        );
+        // Replay only the actual recorded Rust writer and its measured Go
+        // reader. A private-material writer test reproduces this exact wire.
+        recorded.request[33..].to_vec()
+    };
     assert_eq!(run(b'd', &rust_envelope), plaintext);
 
     let go_envelope = run(b'e', plaintext);

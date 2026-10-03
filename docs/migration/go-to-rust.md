@@ -10,7 +10,7 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
-### Neutral frozen-oracle preparation (2026-10-03, #1131)
+### Neutral and crypto frozen-oracle preparation (2026-10-03, #1131)
 
 Actual private-root Go 1.26.6 capture at clean source
 `aa2dd0f31d30061b5ed66e7638a0dcddde060009` records all 32 timestamp and eight
@@ -21,6 +21,23 @@ default execution with `go` absent from PATH passes all 21 existing harness
 unit tests and both differential/control tests, including all 40 observed
 inputs and three corrupted-oracle controls. The original 40-case differential
 is retained; the extra test exercises corruption detection.
+
+Fifteen additional native Go observations at the same clean capture source
+record identity/crypto requests, stdout, stderr and status, including five
+tampering failures and real Go reads of Rust writers. Default core identity
+and encryption integrations use exact recorded request lookup with complete
+stream length/SHA-256 verification. All original 21 integration tests remain;
+one added control checks all 15 records, equivalent Rust rejection of all five
+tampered envelopes and refusal to answer an unknown key. Two private writer
+tests reproduce whole captured envelopes through existing deterministic
+helpers, while public encryption retains fresh randomness and round trips.
+The Go-free workflow now selects these integrations and the two writer tests
+alongside the neutral package. This is not a complete core/CLI/engine freeze.
+Executing the exact workflow script locally with Go absent from PATH passed
+47 tests: 23 neutral, 17 encryption, five identity and two private writer
+tests, with zero failures or ignores. Strict core all-target/all-feature
+Clippy, workspace formatting and task-graph checks pass. Native CI remains
+pending; these local results do not establish all-six-target acceptance.
 
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime

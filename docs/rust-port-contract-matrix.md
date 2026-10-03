@@ -21,6 +21,16 @@ observations protect the corpus. Existing TIME/confirmation acceptance is
 retained. This does not promote CUT-005, complete all runtime-oracle freezing,
 or establish release/native cutover acceptance.
 
+The same preparation freezes 15 actual identity/crypto Go requests and their
+complete output/status at that capture source, including five tampering
+rejections and Go reads of actual Rust writers. Exact request lookup and
+input/output hashes reject fabricated oracle answers. The original 21 core
+integration tests remain selected; one added control checks the complete
+15-case corpus and rejects an unknown request. Two private tests reproduce
+complete writer bytes with existing deterministic helpers. Production
+randomness and existing ID/CRY acceptance are unchanged. These selected
+tests, rather than the complete core suite, are covered by the Go-free job.
+
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
 `execution_state.contract_issue_owners`, and owners of every unfinished task
