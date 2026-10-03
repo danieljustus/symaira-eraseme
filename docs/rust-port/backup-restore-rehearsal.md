@@ -8,6 +8,42 @@ failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
 
+## Native Linux/Windows candidate — 2026-10-03 (#1122)
+
+`backup-restore-native.yml` selects all six native OS/architecture targets and
+checks the Rust compiler host before building and executing the candidate.
+Its retained Go input is the official v0.12.1 native archive, checked against
+both release asset digest/size and `checksums.txt`; only the sole regular
+executable member is copied. The runtime additionally verifies the unmodified
+archive bytes and embedded source revision `240bf67c`/`vcs.modified=false`.
+The same eight-case sequence and partial-restore rejection remain mandatory.
+
+Linux amd64 now uses the existing real namespace/Landlock ABI-4 driver, as
+arm64 does. The rehearsal runs native file-read/write, TCP/UDP and child-exec
+negative controls before any CLI observation. Its audit records private
+namespace identities and any virtiofs remounts actually present; absence of
+virtiofs on a hosted runner is not a host-share-remount claim. The separate
+full-switchback runner retains its historical arm64/virtiofs requirements.
+
+The new Windows driver launches a suspended AppContainer process with no
+capabilities, grants only its unique SID access to the fresh evidence root,
+forbids child creation, then assigns an owned kill-on-close Job before resume.
+Native controls require real outside-root file denial, TCP/UDP access denial,
+allowed owned-root writes, blocked child creation, exact nonzero exit 23 and a
+250 ms stalled-process deadline. Cleanup checks the actual Job active-process
+count, removes the owned SID ACL and deletes only the UUID profile it created.
+Raw stdout/stderr and failure records remain available if any assertion fails.
+No administrator trust/network policy, existing profile or operator data changes.
+The parent creates SQLite backup/restore and deliberately partial fixture states;
+the Windows CLI receives no access to the parent Python runtime.
+
+The workflow also executes the real migration-engine, command-surface and
+consented live manual-fallback cases. The accepted #809 deviation remains:
+automatic browser clicking is deferred; confirmation is a manual task.
+CLI-023/024 remain PARTIAL until these native observations are accepted.
+Local archive/SQLite controls and syntax/Go vet checks pass, but the new
+Windows confinement and full Linux restore are not yet observed.
+
 ## Archive verification preparation — 2026-09-29
 
 At clean candidate `cfdc59a0d9266b67a5541de4562a3e7b702d894c`, all five

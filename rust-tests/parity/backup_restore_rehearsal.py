@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 import plain_store_switchback as gate
@@ -87,6 +88,11 @@ def harness_identity():
         ['git', '-C', str(REPO), 'status', '--porcelain=v1', '--untracked-files=all'],
         check=True, capture_output=True, text=True, timeout=5).stdout.splitlines()
     files = ('rust-tests/parity/backup_restore_rehearsal.py',
+             'rust-tests/parity/plain_store_switchback.py',
+             'rust-tests/parity/linux_store_sandbox.py',
+             'rust-tests/parity/windows_store_sandbox.py',
+             'rust-tests/parity/prepare_backup_restore.py',
+             'rust-tests/parity/oracle/store-sandbox-control/main.go',
              'rust-tests/parity/test_plain_backup_restore.py',
              'docs/rust-port/backup-restore-rehearsal.md')
     committed = {}
@@ -103,6 +109,8 @@ def harness_identity():
     runner = gate.identity(Path(__file__).resolve())
     require(committed[files[0]]['matches_head'],
             'rehearsal runner must be the committed candidate being measured')
+    require(all(entry['matches_head'] for entry in committed.values()),
+            'all measured harness files must match the committed candidate')
     return {
         'committed_revision': head,
         'worktree_dirty_status': 'dirty' if status else 'clean',
@@ -157,14 +165,55 @@ def verify_go_archive(archive, binary):
             'member_sha256': digest.hexdigest(), 'matches_supplied_binary': True}
 
 
-def run(go, rust, go_tool, output_dir, go_archive=None):
-    require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
-            'unsupported: shared switchback confinement supports macOS and Linux')
+def confinement_controls(root, env, windows_control):
+    """Exercise actual kernel denial on harmless owned markers outside root."""
+    with tempfile.TemporaryDirectory(prefix='eraseme-outside-control-', dir=root.parent) as outside:
+        outside = Path(outside)
+        read_marker, write_marker = outside / 'read-marker', outside / 'write-marker'
+        read_marker.write_bytes(b'owned read denial control')
+        write_marker.write_bytes(b'owned write denial control')
+        original = [gate.identity(path) for path in (read_marker, write_marker)]
+        if sys.platform == 'win32':
+            require(windows_control is not None, 'Windows requires the native compiled sandbox control')
+            control = root / 'bin/sandbox-control.exe'
+            shutil.copyfile(windows_control, control)
+            require(gate.identity(control) == gate.identity(Path(windows_control)), 'sandbox control copy differs')
+            args = [str(read_marker), str(write_marker)]
+        else:
+            control = Path(sys.executable).resolve()
+            args = ['-I', '-S', '-c', gate.PROBE, str(read_marker), str(outside), str(write_marker)]
+        observed, _, _, stderr = invoke(root, 'native-confinement-control', control, args, env, success=True)
+        require(not stderr, 'native confinement control emitted unexpected stderr')
+        checks = observed['checks'] if sys.platform == 'win32' else observed
+        require(bool(checks) and all(value is True for value in checks.values()), 'native kernel denial failed')
+        require([gate.identity(path) for path in (read_marker, write_marker)] == original,
+                'owned outside-root marker changed')
+        if sys.platform == 'win32':
+            invoke(root, 'sandbox-real-exit-23', control, ['failure'], env, success=False, json_output=False)
+            failure = json.loads((root / 'sandbox-real-exit-23.json').read_bytes())
+            require(failure['exit_code'] == 23 and not failure['timed_out'], 'actual nonzero exit was not preserved')
+            try:
+                gate.command(root, 'sandbox-real-timeout', [str(control), 'stall'], env, timeout=0.25)
+            except ValueError:
+                pass
+            stalled = json.loads((root / 'sandbox-real-timeout.json').read_bytes())
+            require(stalled['timed_out'] is True and stalled['success'] is False,
+                    'stalled native process was not bounded')
+            require(stalled['sandbox']['job_active_after_cleanup'] == 0
+                    and stalled['sandbox']['profile_deleted']
+                    and stalled['sandbox']['root_sid_removed'], 'native timeout cleanup did not finish')
+        return {'checks': checks, 'outside_marker_hashes_unchanged': True,
+                'outside_markers_owned_and_removed': True}
+
+
+def run(go, rust, go_tool, output_dir, go_archive=None, sandbox_control=None):
+    require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
+            'unsupported native backup/restore platform')
     if sys.platform.startswith('linux'):
         require(os.getuid() != 0 and os.getgid() != 0,
                 'Linux sandbox runner must start as an unprivileged user')
-        require(platform.machine().lower() in ('aarch64', 'arm64'),
-                'Linux rehearsal requires native aarch64')
+        require(platform.machine().lower() in ('aarch64', 'arm64', 'x86_64', 'amd64'),
+                'Linux rehearsal requires native arm64 or amd64')
 
     root = Path(output_dir)
     require(not root.is_symlink(), 'rehearsal root must not be a symlink')
@@ -198,7 +247,8 @@ def run(go, rust, go_tool, output_dir, go_archive=None):
         report['fixture'] = {'path': str(FIXTURE), **fixture_identity}
         go, rust, go_tool = (Path(path).resolve(strict=True) for path in (go, rust, go_tool))
         report['go_artifact_provenance']['path'] = str(go)
-        staged_go, staged_rust = root / 'bin/retained-go', root / 'bin/rust-candidate'
+        suffix = '.exe' if sys.platform == 'win32' else ''
+        staged_go, staged_rust = root / ('bin/retained-go' + suffix), root / ('bin/rust-candidate' + suffix)
         shutil.copyfile(go, staged_go)
         shutil.copyfile(rust, staged_rust)
         staged_go.chmod(0o700)
@@ -230,8 +280,21 @@ def run(go, rust, go_tool, output_dir, go_archive=None):
             'SYMERASEME_ENCRYPT_DB': 'false',
         }
         report['environment'] = env
-        go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
-        invoke(root, 'go-build-info', go_tool, ['version', '-m', str(staged_go)],
+        if sys.platform == 'win32':
+            # go version -m only reads the staged executable; it needs no SDK.
+            env['SystemRoot'] = os.environ['SystemRoot']
+            env['APPDATA'] = str(root / 'config')
+            env['LOCALAPPDATA'] = str(root / 'cache')
+            staged_tool = root / 'bin/go-build-info.exe'
+            shutil.copyfile(go_tool, staged_tool)
+            require(gate.identity(staged_tool) == gate.identity(go_tool), 'staged Go tool differs')
+            go_info_env = dict(env, GOROOT=str(root / 'bin'))
+        else:
+            staged_tool = go_tool
+            go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
+        if sys.platform.startswith('linux') or sys.platform == 'win32':
+            report['native_confinement_controls'] = confinement_controls(root, env, sandbox_control)
+        invoke(root, 'go-build-info', staged_tool, ['version', '-m', str(staged_go)],
                go_info_env, success=True, json_output=False)
         go_metadata = (root / 'go-build-info.stdout').read_bytes().decode('utf-8', 'replace')
         report['go_artifact_provenance']['build_metadata'] = go_metadata
@@ -395,9 +458,29 @@ db.close()
         mutation_env = dict(env, XDG_DATA_HOME=str(root / 'partial/data'),
                             SYMERASEME_DATA_DIR=str(root / 'partial/data'),
                             SYMERASEME_DB_DIR=str(root / 'partial/data'))
-        changed, _, _, stderr = invoke(
-            root, 'partial-restore-mutation', python,
-            ['-I', '-S', '-c', mutation, str(partial_db)], mutation_env, success=True)
+        if sys.platform == 'win32':
+            # The trusted parent creates the deliberately incomplete fixture,
+            # as it already does for online backup/restore. No Python runtime
+            # access is added to the AppContainer CLI boundary.
+            namespace = {'__name__': '__fixture_mutation__'}
+            import contextlib
+            import io
+            with contextlib.redirect_stdout(io.StringIO()) as captured:
+                original_argv = sys.argv
+                try:
+                    sys.argv = ['fixture-mutation', str(partial_db)]
+                    exec(compile(mutation, '<owned-partial-restore-fixture>', 'exec'), namespace)
+                finally:
+                    sys.argv = original_argv
+            changed, stderr = json.loads(captured.getvalue()), b''
+            gate.save(root / 'partial-restore-mutation.json', {
+                'mechanism': 'trusted parent SQLite mutation of owned fixture only',
+                'database': str(partial_db), 'mutation_sha256': hashlib.sha256(mutation.encode()).hexdigest(),
+                'result': changed, 'success': True})
+        else:
+            changed, _, _, stderr = invoke(
+                root, 'partial-restore-mutation', python,
+                ['-I', '-S', '-c', mutation, str(partial_db)], mutation_env, success=True)
         require(not stderr and type(changed.get('deleted_request_id')) is int
                 and changed.get('remaining_requests') == 2,
                 'partial-restore negative control did not delete one baseline request')
@@ -453,8 +536,10 @@ def main():
                         help='Go tool used to record retained artifact build metadata')
     parser.add_argument('--output-dir', type=Path, required=True,
                         help='new disposable evidence directory; it must not exist')
+    parser.add_argument('--sandbox-control', type=Path,
+                        help='native compiled Windows kernel-denial control')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive, args.sandbox_control)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']),
                       'schema_versions': result['schema_versions'],
