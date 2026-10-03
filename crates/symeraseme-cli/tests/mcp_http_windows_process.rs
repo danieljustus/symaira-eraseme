@@ -37,6 +37,16 @@ fn start(binary: &Path, root: &Path, port: &mut u16) -> Server {
 }
 
 fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)]) -> Server {
+    start_with_flags(binary, root, port, envs, 0x0000_0200)
+}
+
+fn start_with_flags(
+    binary: &Path,
+    root: &Path,
+    port: &mut u16,
+    envs: &[(&str, &str)],
+    flags: u32,
+) -> Server {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
     let process = spawn_with_handoff(
@@ -46,7 +56,7 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
         |candidate, stderr| {
             let mut command = Command::new(binary);
             command
-                .creation_flags(0x0000_0200) // CREATE_NEW_PROCESS_GROUP
+                .creation_flags(flags)
                 .args([
                     "mcp",
                     "--host",
@@ -54,13 +64,25 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
                     "--port",
                     &candidate.to_string(),
                 ])
+                .env_clear()
+                .current_dir(root)
                 .env("HOME", &home)
                 .env("USERPROFILE", &home)
                 .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("TMP", &home)
+                .env("TEMP", &home)
                 .envs(envs.iter().copied())
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(stderr);
+            for key in ["CONFIG", "DATA", "STATE", "CACHE"] {
+                command.env(format!("XDG_{key}_HOME"), home.join(key.to_lowercase()));
+            }
+            for key in ["SystemRoot", "WINDIR"] {
+                if let Some(value) = std::env::var_os(key) {
+                    command.env(key, value);
+                }
+            }
             command.spawn()
         },
     );
@@ -463,6 +485,23 @@ fn native_windows_slow_header_timeout_matches_go() {
 /// https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent
 #[test]
 fn native_windows_ctrl_break_shutdown_matches_go() {
+    console_shutdown_matches_go(false);
+}
+
+/// CTRL_C_EVENT cannot target a process group. Broadcast only inside the
+/// separately created test console, with its controller ignoring the event.
+#[test]
+fn native_windows_ctrl_c_shutdown_matches_go() {
+    console_shutdown_matches_go(true);
+}
+
+fn console_shutdown_matches_go(ctrl_c: bool) {
+    let signal = if ctrl_c { "Ctrl+C" } else { "Ctrl+Break" };
+    let test = if ctrl_c {
+        "native_windows_ctrl_c_shutdown_matches_go"
+    } else {
+        "native_windows_ctrl_break_shutdown_matches_go"
+    };
     const CHILD_ROOT: &str = "SYMERASEME_CTRL_BREAK_TEST_ROOT";
     const GO_ORACLE: &str = "SYMERASEME_CTRL_BREAK_GO_ORACLE";
     if let Some(root) = std::env::var_os(CHILD_ROOT) {
@@ -474,19 +513,46 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
         ] {
             let mut port = port();
             let server_root = root.join(name);
-            let mut server = start(binary, &server_root, &mut port);
-            ready(&mut server, port, &server_root);
             #[link(name = "Kernel32")]
             unsafe extern "system" {
                 fn GenerateConsoleCtrlEvent(event: u32, process_group: u32) -> i32;
+                fn SetConsoleCtrlHandler(
+                    handler: Option<unsafe extern "system" fn(u32) -> i32>,
+                    add: i32,
+                ) -> i32;
             }
-            // SAFETY: no pointers; the nonzero PID belongs to our live child,
-            // created as a new process group in this helper's private console.
-            let sent = unsafe { GenerateConsoleCtrlEvent(1, server.0.id()) };
+            if ctrl_c {
+                // SAFETY: NULL resets this private controller's inheritable
+                // ignore flag. The new server must inherit CTRL_C enabled.
+                assert_ne!(unsafe { SetConsoleCtrlHandler(None, 0) }, 0);
+            }
+            let mut server = start_with_flags(
+                binary,
+                &server_root,
+                &mut port,
+                &[],
+                if ctrl_c { 0 } else { 0x0000_0200 },
+            );
+            if ctrl_c {
+                // SAFETY: ignore only in this already isolated controller,
+                // after the child inherited the enabled flag. It owns the
+                // only console descendants and starts them sequentially.
+                assert_ne!(unsafe { SetConsoleCtrlHandler(None, 1) }, 0);
+            }
+            ready(&mut server, port, &server_root);
+            // SAFETY: Ctrl+Break targets our owned live group. Ctrl+C group
+            // zero broadcasts solely in this CREATE_NEW_CONSOLE helper;
+            // it cannot reach the test runner or an operator's console.
+            let sent = unsafe {
+                GenerateConsoleCtrlEvent(
+                    if ctrl_c { 0 } else { 1 },
+                    if ctrl_c { 0 } else { server.0.id() },
+                )
+            };
             assert_ne!(
                 sent,
                 0,
-                "send Ctrl+Break: {}",
+                "send {signal}: {}",
                 std::io::Error::last_os_error()
             );
             let deadline = Instant::now() + Duration::from_secs(8);
@@ -494,16 +560,13 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
                 if let Some(status) = server.0.try_wait().unwrap() {
                     break status;
                 }
-                assert!(
-                    Instant::now() < deadline,
-                    "{name} did not handle Ctrl+Break"
-                );
+                assert!(Instant::now() < deadline, "{name} did not handle {signal}");
                 thread::sleep(Duration::from_millis(20));
             };
-            assert!(status.success(), "{name} Ctrl+Break exit: {status}");
+            assert!(status.success(), "{name} {signal} exit: {status}");
             assert!(TcpStream::connect(("127.0.0.1", port)).is_err());
         }
-        println!("Ctrl+Break Go/Rust comparison executed both processes");
+        println!("{signal} Go/Rust comparison executed both processes");
         return;
     }
 
@@ -513,12 +576,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     let log = std::fs::File::create(&log_path).unwrap();
     let mut helper = Server(StartedChild::from_child(
         Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "native_windows_ctrl_break_shutdown_matches_go",
-                "--nocapture",
-                "--test-threads=1",
-            ])
+            .args(["--exact", test, "--nocapture", "--test-threads=1"])
             .env(CHILD_ROOT, root.path())
             .env(GO_ORACLE, oracle)
             .creation_flags(0x0000_0010) // CREATE_NEW_CONSOLE
@@ -538,5 +596,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     };
     let log = std::fs::read_to_string(log_path).unwrap();
     assert!(status.success(), "isolated console test failed: {log}");
-    assert!(log.contains("Ctrl+Break Go/Rust comparison executed both processes"));
+    assert!(log.contains(&format!(
+        "{signal} Go/Rust comparison executed both processes"
+    )));
 }

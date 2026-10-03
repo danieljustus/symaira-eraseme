@@ -31,6 +31,37 @@ open and blocks the full provider acceptance in #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native MCP HTTP completion candidate (2026-10-03, #1126)
+
+The full-header comparator already exists in `mcp_http_headers_process.rs`:
+ten actual Go/Rust responses compare the status line, every header including
+duplicates and raw body bytes. Only a validated canonical Date value is
+normalized; deliberate missing/extra/changed/duplicate-header controls fail.
+The older MCP-007 row does not describe this merged implementation.
+
+`mcp-http-native.yml` now explicitly selects that comparator and three actual
+socket-error controls on all six targets: occupied IPv4, occupied IPv6 and an
+unavailable TEST-NET address. IPv6 cannot be silently skipped. Both actual
+checked-out Go 1.26.6 and Rust CLIs must reach token creation, fail within ten
+seconds, and match complete exit code/stdout/stderr without normalization.
+
+Windows additionally compares complete token owner/group/DACL SDDL, inherited
+and owner-only parent behavior, protection/read-only flags, restart rotation,
+old-token rejection/new-token authentication, and read-only replacement failure
+with exact token/sentinel retention. PowerShell uses framework ACL APIs in a
+cleared private environment; commands have thirty-second bounds. Random token
+bytes differ intentionally; both must decode to 32 bytes and independently
+rotate. No operator data or ACL is changed.
+
+Both Ctrl+C and Ctrl+Break run Go and Rust sequentially in a newly created
+private console. Ctrl+Break targets the owned child process group; Ctrl+C can
+only broadcast inside that private console, after the controller enables the
+child's inherited signal flag and then ignores the signal itself. The runner's
+console is never targeted. Exit success and listener closure are required for
+each real child. Existing bearer, Origin, timeout and disconnect gates remain.
+These newly added platform controls are candidates, not native PASS evidence;
+MCP-007/011/012/013 and task 8.3 remain PARTIAL until actual six-target results.
+
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
 The shared iterative protocol scanner now reports Go-compatible diagnostic
@@ -81,8 +112,8 @@ that remaining tool/error-path scope is complete.
   validation after retrying a Go dependency-download network timeout.
 - MCP-007 HTTP response parity: #1111 merged as
   `fd63a368ffa660247134b41a7f44da6b32553a7b`. Both named HTTP comparator tests
-  passed on all six targets in `36632119595` at `aa882843`. #1109 remains
-  open for the broader fuzz-coverage residual; this slice does not close it.
+  passed on all six targets in `36632119595` at `aa882843`. #1109 is
+  closed after integrated six-target run `36934832118` at `28e32a1c` revalidated both complete-header comparator and its mutation controls on every target. Broader parser fuzzing belongs to #1125; remaining native ACL/signal/bind controls belong to #1126.
 - MCP-005A/DOM-008: #1113 merged as
   `726156748d886029e54509cf2181f9639d9cba0d`. Native run `36637116514` at
   `60bb1ec4` passed all six targets. Both Windows job logs confirm the real

@@ -1,0 +1,69 @@
+name: Native MCP HTTP platform parity
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-cli/src/mcp/**
+      - crates/symeraseme-cli/tests/mcp_http*.rs
+      - crates/symeraseme-cli/tests/support/mcp_*
+      - cmd/symeraseme/**
+      - internal/mcp/**
+      - go.mod
+      - go.sum
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/mcp-http-native.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-http-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-mcp:
+    name: MCP HTTP / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Download pinned Go modules
+        shell: bash
+        run: GOTOOLCHAIN=go1.26.6 go mod download
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Complete response headers, raw bodies and native bind failures
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked \
+            --test mcp_http_headers_process --test mcp_http_native_contract -- --nocapture
+      - name: Native Windows console, auth, rotation, timeout and disconnect contracts
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture
+      - name: Native Unix process and signal contracts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
