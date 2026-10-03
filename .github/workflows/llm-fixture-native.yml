@@ -1,0 +1,63 @@
+name: Native LLM fixture lifecycle
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-core/tests/llm_http_failure_next.rs
+      - crates/symeraseme-core/tests/llmkit_transport_contract.rs
+      - crates/symeraseme-core/src/llm/**
+      - rust-tests/parity/oracle/llm-failures-next/**
+      - tests/fixtures/llm-failures-next/**
+      - go.mod
+      - go.sum
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/llm-fixture-native.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llm-fixture-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-llm:
+    name: LLM fixture / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Download pinned Go modules
+        shell: bash
+        run: GOTOOLCHAIN=go1.26.6 go mod download
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Lifecycle distinction, bounded missing retry and actual production retry cases
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --locked --test llm_http_failure_next -- --nocapture
+      - name: Retained source-bound LLM transport transcript gates
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --locked \
+            --test llmkit_transport_contract --test llm_surface -- --nocapture
