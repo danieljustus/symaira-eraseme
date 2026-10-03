@@ -199,6 +199,7 @@ fn addr_not_available_message() -> String {
 /// punctuation, trimming only CR/LF. Rust's Display adds an OS-code suffix and
 /// uses the user's locale, which does not preserve that byte contract.
 #[cfg(windows)]
+#[allow(unsafe_code)] // Audited fixed-buffer, read-only Windows message boundary.
 fn windows_socket_message(code: u32) -> String {
     #[link(name = "Kernel32")]
     unsafe extern "system" {
