@@ -1018,7 +1018,16 @@ fn cli_on_path_from_with_extensions(
 }
 
 fn executable_candidates(name: &str, extensions: &[OsString]) -> Vec<OsString> {
-    let mut candidates = vec![OsString::from(name)];
+    let mut candidates = Vec::new();
+    // Go's Windows findExecutable tries the bare filename only if no
+    // extensions are configured or the last path component already has one.
+    let has_extension = name
+        .rsplit(['/', '\\', ':'])
+        .next()
+        .is_some_and(|component| component.contains('.'));
+    if extensions.is_empty() || has_extension {
+        candidates.push(OsString::from(name));
+    }
     candidates.extend(extensions.iter().map(|extension| {
         let mut candidate = OsString::from(name);
         candidate.push(extension);
