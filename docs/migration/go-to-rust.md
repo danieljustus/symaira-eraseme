@@ -43,6 +43,14 @@ and `exec.LookPath`/`AgentClient.IsAvailable` observations in disposable roots.
 No operator profile or paid agent is used. These are new pending native gates,
 not PASS evidence; DOM-008/DOM-008A remain PARTIAL until their results land.
 
+The first native run `37115382421` at `cd2e68ee` established both Windows
+disconnect/reap controls, but the PATH comparison failed on amd64 job
+`111181097154` and arm64 job `111181097006`: Go rejected an extensionless
+`claude` with `PATHEXT=.EXE`, while Rust reported it available. The candidate
+builder now follows Go's extension rule; the portable filesystem regression
+also checks the contrasting empty-extension-list case. The original failures
+remain evidence; final native validation of the repair is pending.
+
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
 The shared iterative protocol scanner now reports Go-compatible diagnostic

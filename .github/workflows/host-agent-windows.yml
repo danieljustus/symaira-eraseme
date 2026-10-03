@@ -4,9 +4,16 @@ on:
   pull_request:
     paths:
       - crates/symeraseme-core/src/llm/**
+      - crates/symeraseme-cli/src/mcp/**
       - crates/symeraseme-cli/tests/mcp_http_windows_process.rs
       - crates/symeraseme-cli/tests/support/native_host_agent.rs
       - rust-tests/parity/oracle/native-host-agent/**
+      - internal/llm/**
+      - internal/mcp/**
+      - go.mod
+      - go.sum
+      - Cargo.toml
+      - Cargo.lock
       - .github/workflows/host-agent-windows.yml
   workflow_dispatch: {}
 
