@@ -61,6 +61,12 @@ root children; compiler-descendant confinement is not claimed. The new
 output directory must be outside the checkout and must not already exist.
 Only actual successful captures produce a manifest; CI artifacts still
 need native execution and review before incorporation as frozen fixtures.
+Before that full native capture run, the preparation also retains the exact
+SMTP candidate's staged Windows HTTP fixture repair: one complete request
+buffer and the existing bounded reader, with unchanged five-second deadline
+and full header/body requirements. This prevents the reproduced split-write
+failure retained by #1154 (`37148405763`, job `111276980727`). It changes no
+production server behavior and claims no new Windows result before execution.
 
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime
