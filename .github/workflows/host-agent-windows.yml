@@ -1,0 +1,62 @@
+name: Native Windows host agent
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-core/src/llm/**
+      - crates/symeraseme-cli/tests/mcp_http_windows_process.rs
+      - crates/symeraseme-cli/tests/support/native_host_agent.rs
+      - rust-tests/parity/oracle/native-host-agent/**
+      - .github/workflows/host-agent-windows.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-agent-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-agent:
+    name: Host agent / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Download pinned Go modules
+        shell: bash
+        run: GOTOOLCHAIN=go1.26.6 go mod download
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Live Go and Rust host-agent reaping
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process \
+            -- --exact native_windows_disconnect_reaps_host_agent_like_go --nocapture
+      - name: Source-bound native Go PATHEXT observations
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process \
+            -- --exact native_windows_pathext_availability_matches_live_go --nocapture
+      - name: Native malformed-stderr MCP boundary
+        shell: bash
+        run: cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_agent_error_json_windows -- --nocapture

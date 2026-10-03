@@ -26,10 +26,22 @@ network calls or fixture regeneration; CI runs the same check.
 The accepted CLI-023 manual-confirmation deviation (#809, 2026-09-28) is not
 a browser-implementation blocker. #1122 owns its remaining native evidence
 and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
-#1129, not the closed historical Go signing fix #794. CoreKit #366 remains
-open and blocks the full provider acceptance in #1121. Publication, production
+#1129, not the closed historical Go signing fix #794. CoreKit #366 closed
+on 2026-10-02; #1121 still owns native Windows host-agent acceptance. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
+
+## Native Windows host-agent gate (2026-10-03, #1121)
+
+`host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap
+and PATHEXT differential tests on amd64 and arm64. Each disconnect case runs
+the checked-out Go CLI and Rust CLI with a locally built synthetic executable;
+an owned Windows process handle establishes that it was live before the
+disconnect and terminated afterwards, with a healthy MCP server and no saved
+classification. The PATH cases record source hashes from the actual Go helper
+and `exec.LookPath`/`AgentClient.IsAvailable` observations in disposable roots.
+No operator profile or paid agent is used. These are new pending native gates,
+not PASS evidence; DOM-008/DOM-008A remain PARTIAL until their results land.
 
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
