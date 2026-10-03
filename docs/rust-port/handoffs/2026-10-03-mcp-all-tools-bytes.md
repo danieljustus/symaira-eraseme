@@ -46,3 +46,14 @@ bound; runtime remains 30 seconds, build 180 seconds, and stderr 64 KiB. The
 compiled native triage fixture is shared with #1120; it does not establish the
 independent OS trust gate #1119. The staged Windows HTTP request repair is
 retained from #1126 to avoid the demonstrated partial-request rejection race.
+
+The first full native workspace run at `47d5845` exposed two additional
+source-bound cancellation fixtures: `agent-cancel/http.json` and
+`provider-cancel/http.json` still named the previous Go handler hash.
+Actual private-root Go 1.26.6 recaptures changed only that hash, to
+`7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8`.
+Handler/client cancellation, provider cancellation, disconnect and child-exit
+observations remain byte-identical. Failed full native jobs
+111222283345/111222283270/111222283296 and PR jobs
+111222281063/111222281307 retain the original failure; targeted MCP-tool
+checks passed on Linux and Windows but do not substitute for the full gate.
