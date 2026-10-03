@@ -120,6 +120,7 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
     let api_key = fixture["api_key"].as_str().unwrap();
     let attempts = fixture["attempts"].as_u64().unwrap() as usize;
     assert_eq!(fixture["status"], expected_status);
+    let started = Instant::now();
     let (base_url, server) =
         local_failure_server(attempts, expected_status, fixture["body"].as_str().unwrap());
     let client = create_with(
@@ -134,6 +135,13 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
     )
     .expect("local fake provider client");
     let result = client.classify("system", "user", &ClassifyOptions::default());
+    writeln!(
+        std::io::stderr(),
+        "LLM_FAILURE_NEXT status={expected_status} outcome_provider={} elapsed_ms={}",
+        matches!(&result, Err(ClientError::Provider(_))),
+        started.elapsed().as_millis()
+    )
+    .expect("write local provider outcome diagnostics");
     let paths = server.join().expect("local provider server thread");
 
     assert_eq!(paths.len(), attempts, "Go retry count");
@@ -223,7 +231,8 @@ fn local_failure_server(
     let body = body.to_owned();
     let server = thread::spawn(move || {
         let mut paths = Vec::with_capacity(attempts);
-        let deadline = Instant::now() + Duration::from_secs(15);
+        let started = Instant::now();
+        let deadline = started + Duration::from_secs(15);
         while paths.len() < attempts {
             let (stream, _) = match listener.accept() {
                 Ok(connection) => connection,
@@ -234,10 +243,23 @@ fn local_failure_server(
                     thread::sleep(Duration::from_millis(10));
                     continue;
                 }
-                Err(error) => panic!("accept provider request: {error}"),
+                Err(error) => panic!(
+                    "accept provider request: {error}; status={status} received={}/{} elapsed_ms={} accept_limit_ms=15000",
+                    paths.len(),
+                    attempts,
+                    started.elapsed().as_millis()
+                ),
             };
             let (mut stream, path) = read_request(stream);
             paths.push(path);
+            writeln!(
+                std::io::stderr(),
+                "LLM_FAILURE_NEXT status={status} received={}/{} elapsed_ms={}",
+                paths.len(),
+                attempts,
+                started.elapsed().as_millis()
+            )
+            .expect("write local request progress diagnostics");
             let response = format!(
                 "HTTP/1.1 {status} Synthetic Failure\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len(),
