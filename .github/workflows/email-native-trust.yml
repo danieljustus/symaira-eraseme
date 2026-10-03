@@ -48,3 +48,8 @@ jobs:
         run: |
           cargo +1.98.0 test -p symeraseme-core --test oauth2_platform_trust --locked -- \
             --ignored --exact native_platform_roots_accept_ca_and_reject_foreign_expired_chains --nocapture
+      - name: Source-bound mailbox and OAuth2 transcript parity
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --locked \
+            --test email_parity --test imap_transport_parity --test oauth2_parity
