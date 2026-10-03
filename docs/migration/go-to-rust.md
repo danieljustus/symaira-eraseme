@@ -31,6 +31,18 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native migration backup/restore candidate (2026-10-03, #1122)
+
+The new six-target `backup-restore-native.yml` binds historical Go v0.12.1
+archive bytes to release checksums/digests and executes the eight retained
+schema-v1 → Rust-v2 → restored-v1 cases. Linux amd64 uses the existing
+namespace/Landlock driver; Windows adds a no-capability AppContainer,
+child-creation restriction and owned suspended-start Job with native denial,
+exit and timeout controls. Actual native observations are pending; CLI-023/024
+and task 7.4 remain PARTIAL. The accepted manual-confirmation deviation (#809)
+is now explicit in the release notes; no automatic browser executor is added.
+See `docs/rust-port/backup-restore-rehearsal.md` for the boundary and controls.
+
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
 `host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap

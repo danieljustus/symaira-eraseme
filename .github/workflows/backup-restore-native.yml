@@ -1,0 +1,133 @@
+name: Native historical Go backup restore
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/backup-restore-native.yml'
+      - 'rust-tests/parity/*backup*'
+      - 'rust-tests/parity/*store*sandbox*'
+      - 'rust-tests/parity/plain_store_switchback.py'
+      - 'rust-tests/parity/oracle/store-sandbox-control/**'
+      - 'docs/rust-port/backup-restore-rehearsal.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-backup-restore-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  GOTOOLCHAIN: go1.26.6
+  GOWORK: 'off'
+  CGO_ENABLED: '0'
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  native:
+    name: Backup restore / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.6'
+      - name: Pin native build paths and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/restore-logs" "$RUNNER_TEMP/restore-binaries"
+          printf 'CARGO_TARGET_DIR=%s\n' "$RUNNER_TEMP/restore-target" >> "$GITHUB_ENV"
+          git rev-parse HEAD > "$RUNNER_TEMP/restore-logs/source-revision.txt"
+          git status --porcelain=v1 > "$RUNNER_TEMP/restore-logs/source-before.txt"
+          test ! -s "$RUNNER_TEMP/restore-logs/source-before.txt"
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup override set 1.98.0
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "${{ matrix.target }}"
+          go env GOVERSION GOOS GOARCH > "$RUNNER_TEMP/restore-logs/go-native-env.txt"
+      - name: Verify immutable official native Go release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 rust-tests/parity/prepare_backup_restore.py --output-dir "$RUNNER_TEMP/restore-release" | tee "$RUNNER_TEMP/restore-logs/release-prepare.log"
+          python3 -m unittest discover -s rust-tests/parity -p test_plain_backup_restore.py -v 2>&1 | tee "$RUNNER_TEMP/restore-logs/archive-backup-controls.log"
+      - name: Build native Rust and native Windows denial control
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p symeraseme-cli --bin symeraseme-rust 2>&1 | tee "$RUNNER_TEMP/restore-logs/rust-build.log"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            go build -mod=readonly -trimpath -buildvcs=true -o "$RUNNER_TEMP/restore-binaries/sandbox-control.exe" ./rust-tests/parity/oracle/store-sandbox-control
+            go version -m "$RUNNER_TEMP/restore-binaries/sandbox-control.exe" > "$RUNNER_TEMP/restore-logs/control-build-info.txt"
+          fi
+      - name: Execute migration CLI and accepted manual web-form contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symeraseme-engine --test migration --test migration_json --test migration_review_regressions --test migration_native_paths -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/migration-engine.log"
+          cargo test --locked -p symeraseme-cli --test command_surface -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/cli-contracts.log"
+          cargo test --locked -p symeraseme-cli --test plan_execute_live_process -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/manual-fallback.log"
+      - name: Run eight real migration and restore cases with native kernel controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' 2>&1 | tee "$RUNNER_TEMP/restore-logs/rehearsal.log"
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          release = json.loads((root/'restore-release/release-inputs.json').read_text())
+          suffix = '.exe' if sys.platform == 'win32' else ''
+          # Linux's system Python runtime is the explicitly read-only namespace runtime.
+          python = '/usr/bin/python3' if sys.platform.startswith('linux') else sys.executable
+          args = [python, 'rust-tests/parity/backup_restore_rehearsal.py',
+                  '--go', release['executable'], '--go-archive', release['archive'],
+                  '--rust', str(root/('restore-target/debug/symeraseme-rust'+suffix)),
+                  '--go-tool', __import__('shutil').which('go'),
+                  '--output-dir', str(root/'restore-evidence')]
+          if sys.platform == 'win32':
+              args.extend(['--sandbox-control', str(root/'restore-binaries/sandbox-control.exe')])
+          subprocess.run(args, check=True, timeout=600)
+          report = json.loads((root/'restore-evidence/report.json').read_text())
+          assert report['status'] == 'passed' and len(report['steps']) == 8
+          assert report['schema_versions'] == {'pre_rust':1, 'post_rust':2, 'restored':1}
+          assert report['restore_performed'] and report['negative_control_rejected']
+          assert report['rust_created_request_absent_after_restore']
+          assert report['go_artifact_provenance']['source_revision'] == '240bf67cefa05e643e32611a02e6e7ed87a033ea'
+          assert report['go_artifact_provenance']['vcs_modified'] == 'false'
+          assert '\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.1\t' in report['go_artifact_provenance']['build_metadata']
+          PY
+          git status --porcelain=v1 > "$RUNNER_TEMP/restore-logs/source-after.txt"
+          test ! -s "$RUNNER_TEMP/restore-logs/source-after.txt"
+      - name: Retain raw native observations including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: backup-restore-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/restore-logs
+            ${{ runner.temp }}/restore-release/release-inputs.json
+            ${{ runner.temp }}/restore-release/checksums.txt
+            ${{ runner.temp }}/restore-evidence
+          if-no-files-found: error
+          retention-days: 30

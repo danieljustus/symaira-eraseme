@@ -1,5 +1,24 @@
 # Historical Go fallback backup and restore rehearsal
 
+The SID-scoped WFP probe at `6a4cf8fe60afbd14047586cb593caa2ea668a24b`
+executed on both native Windows targets in run `37134021246`. Its amd64 raw
+record proves TCP permission denial, outside-root read/write denial, owned
+write/remove access, child-creation denial, zero remaining Job processes,
+removed profile/root SID, and both dynamic filters absent after session close.
+UDP did not report permission denial, so Windows acceptance remains open. The
+next candidate adds the same exact-package-SID block at IPv4/IPv6 socket
+assignment and records native TCP/UDP error numbers. Neither timeout nor
+connection refusal counts as network-denial evidence.
+
+At `04aba6b06d1c838a31c4975c62ea369792f506dd`, both Windows jobs in run
+`37135322292` passed that denial control and the real exit-23 control, then
+failed while cleaning the deliberately stalled process. Job termination is
+asynchronous: calling `TerminateProcess` again while the leader is already
+terminating returned native access denied. The fallback now applies only if
+Job assignment never succeeded; assigned children still require bounded
+process-handle wait and actual zero-active Job accounting before resources,
+SID permissions, profile and WFP filters are released.
+
 This executable rehearsal covers one explicit rollback boundary for RUST-016.
 It starts from the checked-in synthetic schema-v1 fixture, reads its three
 requests with the supplied retained Go artifact, takes a SQLite online backup,
@@ -7,6 +26,63 @@ performs one real Rust campaign write, and records the Go artifact's actual
 failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
+
+## Native Linux/Windows candidate — 2026-10-03 (#1122)
+
+`backup-restore-native.yml` selects all six native OS/architecture targets and
+checks the Rust compiler host before building and executing the candidate.
+Its retained Go input is the official v0.12.1 native archive, checked against
+both release asset digest/size and `checksums.txt`; only the sole regular
+executable member is copied. The runtime additionally verifies the unmodified
+archive bytes and embedded source revision `240bf67c`/`vcs.modified=false`.
+The same eight-case sequence and partial-restore rejection remain mandatory.
+
+Linux amd64 now uses the existing real namespace/Landlock ABI-4 driver, as
+arm64 does. The rehearsal runs native file-read/write, TCP/UDP and child-exec
+negative controls before any CLI observation. Its audit records private
+namespace identities and any virtiofs remounts actually present; absence of
+virtiofs on a hosted runner is not a host-share-remount claim. The separate
+full-switchback runner retains its historical arm64/virtiofs requirements.
+
+The new Windows driver launches a suspended AppContainer process with no
+capabilities, grants only its unique SID access to the fresh evidence root,
+forbids child creation, then assigns an owned kill-on-close Job before resume.
+Native controls require real outside-root file denial, TCP/UDP access denial,
+allowed owned-root writes, blocked child creation, exact nonzero exit 23 and a
+250 ms stalled-process deadline. Cleanup checks the actual Job active-process
+count, removes the owned SID ACL and deletes only the UUID profile it created.
+Raw stdout/stderr and failure records remain available if any assertion fails.
+No administrator trust/network policy, existing profile or operator data changes.
+The parent creates SQLite backup/restore and deliberately partial fixture states;
+the Windows CLI receives no access to the parent Python runtime.
+
+The workflow also executes the real migration-engine, command-surface and
+consented live manual-fallback cases. The accepted #809 deviation remains:
+automatic browser clicking is deferred; confirmation is a manual task.
+CLI-023/024 remain PARTIAL until these native observations are accepted.
+Local archive/SQLite controls and syntax/Go vet checks pass, but the new
+Windows confinement and full Linux restore are not yet observed.
+
+At candidate `b88e3d0`, native Linux arm64 job `111230070745` and Linux amd64
+job `111230070780` in run `37132442133` passed all eight actual restore cases,
+with the required native namespace/Landlock controls and source-bound official
+release artifact. The first Windows amd64 job `111230070798` stopped at the
+committed-harness byte check: its default Git checkout converted Python files
+to CRLF, before any AppContainer or migration execution. The measured Python,
+documentation and workflow files now require LF through `.gitattributes`;
+hash validation remains exact. The original failure is retained and does not
+count as Windows confinement or restore evidence.
+
+At `afd16a0`, Windows amd64 job `111231995068` reached the native executable.
+Raw artifact `11276899617` records actual read/write denial outside the owned
+root, allowed owned writes/removal, blocked child creation, Job active count 0,
+removed SID ACL and deleted UUID profile. TCP and UDP denial both failed on
+this hosted image; no-capability AppContainer alone is not network confinement
+there. The driver now adds two dynamic native WFP connect-denial filters that
+match only the unique package SID (IPv4/IPv6). Session close removes them even
+after a parent crash; normal cleanup independently queries their actual IDs
+and requires `FWP_E_FILTER_NOT_FOUND`. The existing strict TCP/UDP permission
+checks are unchanged. New Windows network and full restore proof remain pending.
 
 ## Archive verification preparation — 2026-09-29
 
