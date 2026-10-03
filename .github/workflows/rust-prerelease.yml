@@ -276,6 +276,14 @@ jobs:
 
           probe_command go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
             "$go_pair" version --json
+          python3 - "$pair/go-version.stdout" <<'PY'
+          import json, os, sys
+          with open(sys.argv[1], encoding='utf-8') as source:
+              observed = json.load(source)
+          expected = {'tool': 'symeraseme', 'version': os.environ['RELEASE_VERSION'], 'schema_version': 1}
+          if observed != expected:
+              raise SystemExit('native Go fallback version differs from the Rust release identity')
+          PY
           probe_command rust-go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
             "$rust_pair" version --json
           compare_probe version-output "$pair/go-version.stdout" "$pair/rust-go-version.stdout"

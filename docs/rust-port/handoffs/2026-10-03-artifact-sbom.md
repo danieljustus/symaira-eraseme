@@ -31,6 +31,19 @@ ELF smoke executable yielded six actual embedded packages, accepted by the
 same extractor and graph validator. This smoke is a tool compatibility check;
 it is not a six-target product release result.
 
+At clean source `aa2dd0f31d30061b5ed66e7638a0dcddde060009`, a native
+Linux amd64 debug build of the actual `symeraseme-cli 0.13.0` yielded 229
+embedded packages through the same pinned recorder/extractor and validator.
+Its binary SHA-256 is
+`a754ddd0a6dcf0f2487353abda684242772cc1bd462f04fafa897281fa849180`;
+the extracted inventory SHA-256 is
+`7cd26fd98fabbc36d31db51ab4939d5dcb30a860a4ff83189be8dea3df86cb83`.
+The compiler reports native `x86_64-unknown-linux-gnu`, Rust 1.98.0. This
+validates the extractor on the nontrivial product graph; it does not establish
+release-mode musl linkage or other native targets. The workflow additionally
+requires the actual Go fallback's version JSON to match the Rust release's
+tool name, version and schema before comparing fallback dispatch output.
+
 REL-010 remains PARTIAL until native product archive execution, signatures,
 provenance, current audit/deny results and independently verified published
 assets exist. REL-001..005 retain their existing status. Release routing,
