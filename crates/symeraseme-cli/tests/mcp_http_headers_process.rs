@@ -137,17 +137,21 @@ fn exchange(
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .unwrap();
+    // Stage the whole request before sending. An early rejection can close
+    // between separate header/body writes and discard its response on reset.
+    let mut request = Vec::new();
     write!(
-        stream,
+        request,
         "{method} / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {}\r\n",
         body.len()
     )
     .unwrap();
     for (name, value) in headers {
-        write!(stream, "{name}: {value}\r\n").unwrap();
+        write!(request, "{name}: {value}\r\n").unwrap();
     }
-    stream.write_all(b"\r\n").unwrap();
-    stream.write_all(body).unwrap();
+    request.extend_from_slice(b"\r\n");
+    request.extend_from_slice(body);
+    stream.write_all(&request).unwrap();
     let raw = read_bounded_response(&mut stream, Instant::now() + Duration::from_secs(5))
         .expect("capture complete bounded HTTP response");
     eprintln!(
