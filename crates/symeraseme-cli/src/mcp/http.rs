@@ -168,7 +168,7 @@ async fn serve_async(
 fn listen_error(address: &str, error: std::io::Error) -> String {
     match error.kind() {
         std::io::ErrorKind::AddrInUse => {
-            format!("listen tcp {address}: bind: address already in use")
+            format!("listen tcp {address}: bind: {}", addr_in_use_message())
         }
         std::io::ErrorKind::AddrNotAvailable => {
             format!(
@@ -180,14 +180,70 @@ fn listen_error(address: &str, error: std::io::Error) -> String {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn addr_not_available_message() -> &'static str {
-    "cannot assign requested address"
+#[cfg(not(windows))]
+fn addr_in_use_message() -> String {
+    "address already in use".to_owned()
 }
 
-#[cfg(not(target_os = "linux"))]
-fn addr_not_available_message() -> &'static str {
-    "can't assign requested address"
+#[cfg(windows)]
+fn addr_in_use_message() -> String {
+    windows_socket_message(10048) // WSAEADDRINUSE
+}
+
+#[cfg(windows)]
+fn addr_not_available_message() -> String {
+    windows_socket_message(10049) // WSAEADDRNOTAVAIL
+}
+
+/// Go's Windows syscall diagnostic requests US English first and preserves
+/// punctuation, trimming only CR/LF. Rust's Display adds an OS-code suffix and
+/// uses the user's locale, which does not preserve that byte contract.
+#[cfg(windows)]
+fn windows_socket_message(code: u32) -> String {
+    #[link(name = "Kernel32")]
+    unsafe extern "system" {
+        fn FormatMessageW(
+            flags: u32,
+            source: *const std::ffi::c_void,
+            code: u32,
+            language: u32,
+            buffer: *mut u16,
+            size: u32,
+            arguments: *const std::ffi::c_void,
+        ) -> u32;
+    }
+    let mut buffer = [0u16; 300];
+    for language in [0x0409, 0] {
+        // SAFETY: the system supplies the message, no insert arguments are
+        // processed, and this writable UTF-16 buffer has the declared size.
+        let length = unsafe {
+            FormatMessageW(
+                0x0000_3200, // FROM_SYSTEM | ARGUMENT_ARRAY | IGNORE_INSERTS
+                std::ptr::null(),
+                code,
+                language,
+                buffer.as_mut_ptr(),
+                buffer.len() as u32,
+                std::ptr::null(),
+            )
+        };
+        if length != 0 {
+            return String::from_utf16_lossy(&buffer[..length as usize])
+                .trim_end_matches(['\r', '\n'])
+                .to_owned();
+        }
+    }
+    format!("winapi error #{code}")
+}
+
+#[cfg(target_os = "linux")]
+fn addr_not_available_message() -> String {
+    "cannot assign requested address".to_owned()
+}
+
+#[cfg(all(not(target_os = "linux"), not(windows)))]
+fn addr_not_available_message() -> String {
+    "can't assign requested address".to_owned()
 }
 
 async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
@@ -546,7 +602,7 @@ mod transport_tests {
         let in_use = std::io::Error::from(std::io::ErrorKind::AddrInUse);
         assert_eq!(
             listen_error("127.0.0.1:8080", in_use),
-            "listen tcp 127.0.0.1:8080: bind: address already in use"
+            format!("listen tcp 127.0.0.1:8080: bind: {}", addr_in_use_message())
         );
 
         let unavailable = std::io::Error::from(std::io::ErrorKind::AddrNotAvailable);

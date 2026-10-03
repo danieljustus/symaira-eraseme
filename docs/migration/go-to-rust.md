@@ -45,6 +45,14 @@ unavailable TEST-NET address. IPv6 cannot be silently skipped. Both actual
 checked-out Go 1.26.6 and Rust CLIs must reach token creation, fail within ten
 seconds, and match complete exit code/stdout/stderr without normalization.
 
+Initial actual Windows amd64 run `37124645649` at `a0984d1c` failed the
+occupied IPv4 diagnostic: Rust returned Unix wording while Go returned the
+native Windows WSAEADDRINUSE message. Token DACL/rotation/retention and all ten
+full-header scenarios passed in the same job `111207382913`. Rust now formats
+these two bind-error classes through the system's US-English message API,
+matching Go's locale fallback and CR/LF-only trimming, with no OS-code suffix.
+The original failure is retained; candidate native results remain pending.
+
 Windows additionally compares complete token owner/group/DACL SDDL, inherited
 and owner-only parent behavior, protection/read-only flags, restart rotation,
 old-token rejection/new-token authentication, and read-only replacement failure
