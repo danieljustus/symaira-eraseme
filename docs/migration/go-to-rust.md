@@ -54,7 +54,14 @@ PowerShell ACL observation deadline in its cleared private environment.
 The observation script now uses framework ACL APIs and direct bounded JSON
 output, avoiding cmdlet module discovery, with explicit stage diagnostics.
 This is a pending harness repair; the original failure is retained.
-Native execution remains pending; ID-005 and task 4.7 remain PARTIAL.
+Native run `37121535781` at `21a4fca0cebe4d3956a8c62090b91948672066d2`
+passed amd64 job `111198458769` and arm64 job `111198458869`: all four
+complete-tree byte/DACL comparisons, both actual-kernel close-error and
+open-old-file controls, twelve Windows API tests and three portable cleanup
+controls. The environment child helper is an expected skip, not evidence.
+ID-005 and task 4.7 are PASS; existing native Unix evidence is retained,
+with unchanged Unix production behavior. Complete final PR CI remains a
+separate requirement before merge.
 
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
