@@ -95,3 +95,15 @@ add a fresh-process post-cleanup control that requires the formerly trusted
 CA to fail OAuth2 HTTPS, IMAP TLS and STARTTLS without transmitting credentials.
 This route and cleanup control require actual native validation; the existing
 failed probes remain retained and the matrix stays PARTIAL.
+
+The user-domain route at `1a5b936` failed native macOS arm64 job
+`111224971133` in run `37130671704`: `security add-trusted-cert` hit the
+existing 30-second bound before any TLS case. The next fixture probe restores
+the previously observed admin-domain installation and calls the native
+`SecTrustStoreRemoveCertificate` for the exact owned certificate, with both
+`SecTrustStoreContains` and the actual admin external settings checked before
+and after. Apple uses Admin=3 in SecTrustStoreDomain but Admin=1 in
+SecTrustSettingsDomain; external export is
+`SecTrustSettingsCreateExternalRepresentation`. This is a bounded native
+fixture experiment, not an accepted cleanup claim; DOM-006/007 stay PARTIAL
+until both Macs prove all TLS classes, exact removal and rejection after cleanup.

@@ -102,8 +102,6 @@ struct InstalledRoot {
     path: PathBuf,
     #[cfg(target_vendor = "apple")]
     source: PathBuf,
-    #[cfg(target_vendor = "apple")]
-    keychain: PathBuf,
     installed: bool,
 }
 
@@ -234,22 +232,6 @@ fn native_command_control_bounds_children_and_reports_real_exit_failure() {
 
 impl InstalledRoot {
     fn install(source: &Path, name: String) -> Self {
-        #[cfg(target_vendor = "apple")]
-        let keychain = {
-            let raw = command_output_with_budget(
-                Command::new("security").args(["default-keychain", "-d", "user"]),
-                Duration::from_secs(30),
-                Stdio::null(),
-            )
-            .unwrap();
-            let path = PathBuf::from(String::from_utf8(raw).unwrap().trim().trim_matches('"'));
-            let home = PathBuf::from(std::env::var_os("HOME").expect("hosted runner home"));
-            assert!(
-                path.is_absolute() && path.is_file() && path.starts_with(home),
-                "native trust must use the hosted runner's own default keychain"
-            );
-            path
-        };
         let mut root = Self {
             #[cfg(not(target_os = "linux"))]
             name: name.clone(),
@@ -257,8 +239,6 @@ impl InstalledRoot {
             path: PathBuf::from(format!("/usr/local/share/ca-certificates/{name}.crt")),
             #[cfg(target_vendor = "apple")]
             source: source.to_path_buf(),
-            #[cfg(target_vendor = "apple")]
-            keychain,
             installed: false,
         };
         #[cfg(target_os = "linux")]
@@ -275,13 +255,18 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
-            // Native roots include the current user's trust domain. Use the
-            // disposable runner's own keychain and user authorization right;
-            // the admin-domain removal/import paths stalled headlessly.
             checked(
-                Command::new("security")
-                    .args(["add-trusted-cert", "-r", "trustRoot", "-k"])
-                    .arg(&root.keychain)
+                Command::new("sudo")
+                    .args([
+                        "-n",
+                        "security",
+                        "add-trusted-cert",
+                        "-d",
+                        "-r",
+                        "trustRoot",
+                        "-k",
+                        "/Library/Keychains/System.keychain",
+                    ])
                     .arg(source),
             )
             .unwrap();
@@ -315,55 +300,64 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
-            let files = tempfile::tempdir().map_err(|error| error.to_string())?;
-            let before = files.path().join("before.plist");
-            let removed = files.path().join("removed.plist");
-            checked(
-                Command::new("security")
-                    .arg("trust-settings-export")
-                    .arg(&before),
-            )?;
-            checked(Command::new("python3").args([
-                "-c",
-                "import hashlib,plistlib,ssl,sys; source,before,out=sys.argv[1:]; digest=hashlib.sha1(ssl.PEM_cert_to_DER_cert(open(source).read())).hexdigest().upper(); data=plistlib.load(open(before,'rb')); entries=data['trustList']; owned=[k for k in entries if k.upper()==digest]; assert len(owned)==1, 'owned CI CA trust entry missing or ambiguous'; del entries[owned[0]]; plistlib.dump(data,open(out,'wb')); print('expected settings remove exactly one owned CI CA trust entry')",
-            ]).arg(&self.source).arg(&before).arg(&removed))?;
-            checked(
-                Command::new("security")
-                    .arg("remove-trusted-cert")
-                    .arg(&self.source),
-            )?;
-            checked(
-                Command::new("security")
-                    .args(["delete-certificate", "-c", &self.name])
-                    .arg(&self.keychain),
-            )?;
-            // Read the real user trust domain through Security.framework. The
-            // specific native errSecNoTrustSettings status is valid only if
-            // removing this CA left no unrelated entries in the expected set.
-            checked(Command::new("python3").args([
-                "-c",
-                r#"import ctypes,plistlib,sys
-expected=plistlib.load(open(sys.argv[1],'rb'))
+            // The CLI removal/import routes authorize an empty admin domain
+            // interactively. Probe the native store's exact-certificate API;
+            // both store and legacy external settings must prove absence.
+            checked(Command::new("sudo").args(["-n", "python3", "-c", r#"import ctypes,hashlib,plistlib,ssl,sys
 security=ctypes.CDLL('/System/Library/Frameworks/Security.framework/Security')
 cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
-security.SecTrustSettingsCopyExternalRepresentation.argtypes=[ctypes.c_uint32,ctypes.POINTER(ctypes.c_void_p)]
-security.SecTrustSettingsCopyExternalRepresentation.restype=ctypes.c_int32
-data=ctypes.c_void_p()
-status=security.SecTrustSettingsCopyExternalRepresentation(0,ctypes.byref(data))
-if status == -25263:
-    assert not expected['trustList'], 'native empty domain lost unrelated user trust settings'
+P=ctypes.c_void_p
+cf.CFDataCreate.argtypes=[P,P,ctypes.c_long]; cf.CFDataCreate.restype=P
+cf.CFDataGetLength.argtypes=[P]; cf.CFDataGetLength.restype=ctypes.c_long
+cf.CFDataGetBytePtr.argtypes=[P]; cf.CFDataGetBytePtr.restype=P
+cf.CFRelease.argtypes=[P]
+security.SecCertificateCreateWithData.argtypes=[P,P]; security.SecCertificateCreateWithData.restype=P
+security.SecTrustSettingsCreateExternalRepresentation.argtypes=[ctypes.c_uint32,ctypes.POINTER(P)]
+security.SecTrustSettingsCreateExternalRepresentation.restype=ctypes.c_int32
+security.SecTrustStoreForDomain.argtypes=[ctypes.c_uint32]; security.SecTrustStoreForDomain.restype=P
+security.SecTrustStoreContains.argtypes=[P,P]; security.SecTrustStoreContains.restype=ctypes.c_ubyte
+security.SecTrustStoreRemoveCertificate.argtypes=[P,P]; security.SecTrustStoreRemoveCertificate.restype=ctypes.c_int32
+def external():
+    data=P()
+    status=security.SecTrustSettingsCreateExternalRepresentation(1,ctypes.byref(data))
+    if status == -25263: return None
+    assert status == 0 and data.value, 'admin native external read failed: %s' % status
+    try: return plistlib.loads(ctypes.string_at(cf.CFDataGetBytePtr(data),cf.CFDataGetLength(data)))
+    finally: cf.CFRelease(data)
+der=ssl.PEM_cert_to_DER_cert(open(sys.argv[1]).read())
+digest=hashlib.sha1(der).hexdigest().upper()
+before=external()
+assert before is not None and 'trustList' in before
+owned=[k for k in before['trustList'] if k.upper()==digest]
+assert len(owned)==1, 'owned CA native external entry missing or ambiguous'
+del before['trustList'][owned[0]]
+raw=ctypes.create_string_buffer(der)
+data=cf.CFDataCreate(None,raw,len(der)); assert data
+cert=security.SecCertificateCreateWithData(None,data)
+cf.CFRelease(data); assert cert
+try:
+    # SecTrustStoreDomain: System=1, User=2, Admin=3; this differs from
+    # SecTrustSettingsDomain: User=0, Admin=1, System=2.
+    store=security.SecTrustStoreForDomain(3); assert store
+    assert security.SecTrustStoreContains(store,cert), 'owned CA not in native admin store'
+    status=security.SecTrustStoreRemoveCertificate(store,cert)
+    assert status == 0, 'native exact CA removal failed: %s' % status
+    assert not security.SecTrustStoreContains(store,cert), 'owned CA remained in native admin store'
+finally: cf.CFRelease(cert)
+after=external()
+if after is None:
+    assert not before['trustList'], 'native removal lost unrelated admin trust settings'
 else:
-    assert status == 0 and data.value, 'native user trust read failed: %s' % status
-    cf.CFDataGetLength.argtypes=[ctypes.c_void_p]; cf.CFDataGetLength.restype=ctypes.c_long
-    cf.CFDataGetBytePtr.argtypes=[ctypes.c_void_p]; cf.CFDataGetBytePtr.restype=ctypes.c_void_p
-    cf.CFRelease.argtypes=[ctypes.c_void_p]
-    try:
-        actual=plistlib.loads(ctypes.string_at(cf.CFDataGetBytePtr(data),cf.CFDataGetLength(data)))
-    finally:
-        cf.CFRelease(data)
-    assert expected == actual, 'owned CA removal changed unrelated user trust settings'
-print('owned CA user trust absent; unrelated trust settings unchanged')"#,
-            ]).arg(&removed))?;
+    assert after == before, 'native removal changed unrelated admin trust settings or retained owned CA'
+print('owned CA native store and external entry absent; unrelated admin trust settings unchanged')"#]).arg(&self.source))?;
+            checked(Command::new("sudo").args([
+                "-n",
+                "security",
+                "delete-certificate",
+                "-c",
+                &self.name,
+                "/Library/Keychains/System.keychain",
+            ]))?;
         }
         #[cfg(windows)]
         checked(Command::new("certutil").args(["-delstore", "Root", &self.name]))?;
