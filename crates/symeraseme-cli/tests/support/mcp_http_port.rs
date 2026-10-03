@@ -157,56 +157,71 @@ fn is_address_in_use(stderr: &str, port: u16) -> bool {
     })
 }
 
-/// Drain buffered bytes through EOF/reset without changing socket timeouts
-/// after a peer reset. Leaves the socket nonblocking; callers drop it next.
+/// Wake on socket readiness instead of sleeping while a peer may reset.
+/// Keep the absolute deadline/cap and avoid timeout setters after a reset.
+/// Leaves the original socket nonblocking; callers drop it next.
 pub fn read_bounded_response(
     stream: &mut TcpStream,
     deadline: Instant,
 ) -> std::io::Result<Vec<u8>> {
     stream.set_nonblocking(true)?;
-    let mut response = Vec::new();
-    let mut buffer = [0; 4096];
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                "total response deadline",
-            ));
-        }
-        match stream.read(&mut buffer) {
-            Ok(0) => {
-                eprintln!(
-                    "http_capture thread={:?} close=eof bytes={}",
-                    thread::current().id(),
-                    response.len()
-                );
-                return Ok(response);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        let stream = tokio::net::TcpStream::from_std(stream.try_clone()?)?;
+        let capture = async {
+            let mut response = Vec::new();
+            let mut buffer = [0; 4096];
+            loop {
+                stream.readable().await?;
+                if Instant::now() >= deadline {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "total response deadline",
+                    ));
+                }
+                match stream.try_read(&mut buffer) {
+                    Ok(0) => {
+                        eprintln!(
+                            "http_capture thread={:?} close=eof bytes={}",
+                            thread::current().id(),
+                            response.len()
+                        );
+                        return Ok(response);
+                    }
+                    Ok(count) if response.len() + count <= 64 * 1024 => {
+                        response.extend_from_slice(&buffer[..count]);
+                    }
+                    Ok(_) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "bounded response capture",
+                        ));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                        eprintln!(
+                            "http_capture thread={:?} close=reset bytes={}",
+                            thread::current().id(),
+                            response.len()
+                        );
+                        return Ok(response);
+                    }
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+                        ) => {}
+                    Err(error) => return Err(error),
+                }
             }
-            Ok(count) if response.len() + count <= 64 * 1024 => {
-                response.extend_from_slice(&buffer[..count]);
-            }
-            Ok(_) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "bounded response capture",
-                ));
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
-                eprintln!(
-                    "http_capture thread={:?} close=reset bytes={}",
-                    thread::current().id(),
-                    response.len()
-                );
-                return Ok(response);
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(remaining.min(Duration::from_millis(5)));
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(error) => return Err(error),
-        }
-    }
+        };
+        tokio::time::timeout_at(deadline.into(), capture)
+            .await
+            .map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, "total response deadline")
+            })?
+    })
 }
 
 /// Bound the complete connect/write/read probe, not just each individual read.

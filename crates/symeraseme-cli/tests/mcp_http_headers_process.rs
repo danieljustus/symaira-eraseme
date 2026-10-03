@@ -236,6 +236,38 @@ fn bounded_response_capture_preserves_fin_and_native_reset_bytes() {
 }
 
 #[test]
+fn bounded_response_capture_enforces_deadline_and_size() {
+    use std::io::ErrorKind;
+
+    for (size, expired, expected_error) in [
+        (0, true, Some(ErrorKind::TimedOut)),
+        (64 * 1024, false, None),
+        (64 * 1024 + 1, false, Some(ErrorKind::InvalidData)),
+    ] {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let peer = std::thread::spawn(move || stream.write_all(&vec![b'x'; size]).unwrap());
+        let deadline = Instant::now()
+            + if expired {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(2)
+            };
+        let captured = read_bounded_response(&mut client, deadline);
+        peer.join().unwrap();
+        if let Some(kind) = expected_error {
+            assert_eq!(captured.unwrap_err().kind(), kind);
+        } else {
+            assert_eq!(captured.unwrap(), vec![b'x'; size]);
+        }
+    }
+}
+
+#[test]
 fn readiness_probe_is_bounded_when_peer_dribbles_bytes() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
