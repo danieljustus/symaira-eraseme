@@ -1,0 +1,45 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.56s
+     Running `target/debug/symeraseme-rust --help`
+symeraseme is the Go-port command-line entrypoint of Symaira EraseMe. The CLI vocabulary is settled in docs/mcp-contract.md §5; commands land as their port issues are implemented.
+
+Usage:
+  symeraseme [command]
+
+Available Commands:
+  auto-confirm
+  brokers            brokers commands
+  calendar
+  classify-reply
+  completion         Generate shell completion scripts
+  config             config commands
+  dashboard
+  events             events commands
+  generate-dashboard
+  generate-rebuttal
+  generate-report
+  generate-scheduler
+  grant
+  help               Help about any command
+  init-profile       Create or replace the encrypted identity profile
+  manual-tasks       manual-tasks commands
+  mcp                Run the MCP JSON-RPC interface
+  migrate            Migrate a Python-era installation to the Go layout
+  plan               plan commands
+  poll-inbox
+  registry           registry commands
+  render-template    Render a legal template
+  requests           requests commands
+  review
+  run-web-form
+  schedule           schedule commands
+  show-profile       Show the encrypted identity profile
+  status             Show campaign status
+  tick               Run the deadline tick engine
+  version            Show the installed Symaira EraseMe version
+
+Flags:
+  -h, --help            help for symeraseme
+      --output string   output format: text or json (default "text")
+  -v, --version         version for symeraseme
+
+Use "symeraseme [command] --help" for more information about a command.

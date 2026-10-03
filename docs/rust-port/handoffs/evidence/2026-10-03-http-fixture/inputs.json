@@ -1,0 +1,863 @@
+{
+  "artifact_count": 122,
+  "artifacts": [
+    {
+      "name": "eraseme-1117-pr-v2.md",
+      "bytes": 689,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1117-pr.md",
+      "bytes": 760,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849647138.log",
+      "bytes": 158474,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849647323.log",
+      "bytes": 145674,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849647626.log",
+      "bytes": 143845,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849648187.log",
+      "bytes": 121633,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849648355.log",
+      "bytes": 116310,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-37007678845-attempt2-job110849696833.log",
+      "bytes": 157838,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1125-4c4d573-source.manifest.json",
+      "bytes": 502819,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-4c4d573-source.tar",
+      "bytes": 56494080,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-91af942-acceptance-manifest.json",
+      "bytes": 5115,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-91af942-fuzz-raw-complete.log",
+      "bytes": 1529383,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-91af942-fuzz.log",
+      "bytes": 49883,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-91af942-mutations-raw-complete.log",
+      "bytes": 42437,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-91af942-mutations.log",
+      "bytes": 49883,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-all-scalar-tails.json",
+      "bytes": 12330,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-live-after.json",
+      "bytes": 7363,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-live-before.json",
+      "bytes": 7356,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-live-probe.py",
+      "bytes": 3109,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-old-mutations.log",
+      "bytes": 49883,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-pinned-go1.26.6-stream.go",
+      "bytes": 13258,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1125-pr.md",
+      "bytes": 2372,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1125-suffix-review-probe.json",
+      "bytes": 8302,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1135-4c4d573-ci-wait.py",
+      "bytes": 2187,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1135-91af942-attempt2-ci-wait.py",
+      "bytes": 2347,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1135-91af942-ci-wait.py",
+      "bytes": 2187,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1135-ci-wait.py",
+      "bytes": 2187,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1136-pr.md",
+      "bytes": 4517,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1136-readiness-after.log",
+      "bytes": 542,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1136-readiness-before.log",
+      "bytes": 971,
+      "disposition": "excluded",
+      "reason": "Obsolete diagnostic/source-review artifact for already-integrated parser/task-graph/port-handoff work; not an active continuation input. Source and regressions are in merged PRs #1134/#1135/#1137; original remains local"
+    },
+    {
+      "name": "eraseme-1137-30c7172-ci-wait.py",
+      "bytes": 2478,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365149-raw.log",
+      "bytes": 157969,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365354-raw.log",
+      "bytes": 144574,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365430-raw.log",
+      "bytes": 145254,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365460-raw.log",
+      "bytes": 116179,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365547-raw.log",
+      "bytes": 157918,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-30c7172-job110890365555-raw.log",
+      "bytes": 121067,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-ci-wait.py",
+      "bytes": 2478,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-job110880437949-raw.log",
+      "bytes": 144821,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-job110880438040-raw.log",
+      "bytes": 116039,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-job110880438121-raw.log",
+      "bytes": 158088,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-job110880438132-failure-raw.log",
+      "bytes": 121074,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-4be5c68-job110880438278-raw.log",
+      "bytes": 158146,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-93d074e-ci-wait.py",
+      "bytes": 2478,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "eraseme-1137-93d074e-job110873284534-failure.log",
+      "bytes": 32566,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1137-93d074e-job110873284548-failure.log",
+      "bytes": 33967,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1138-1140-independent-review-prompt.txt",
+      "bytes": 3179,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1138-1140-independent-review-result.txt",
+      "bytes": 2307,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1138-1140-independent-review-run.log",
+      "bytes": 471658,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1138-built-process-replay.log",
+      "bytes": 185,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-cargo-metadata.json",
+      "bytes": 38888,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-local-oracle-check.log",
+      "bytes": 47,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-local-step0.log",
+      "bytes": 1099,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-local-step1.log",
+      "bytes": 98,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-local-step2.log",
+      "bytes": 0,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1138-native-followup.md",
+      "bytes": 724,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1138-pr.md",
+      "bytes": 2294,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1139-run-37045269185-job-110965028174.log",
+      "bytes": 159900,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1139-run-37045269185-job-110965028585.log",
+      "bytes": 122564,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1139-run-37045269185-job-110965028842.log",
+      "bytes": 117667,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1139-updated-run-37054779350-job-110996683763.log",
+      "bytes": 56575,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1140-go-env-control.json",
+      "bytes": 476,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1140-go-env-final-source.json",
+      "bytes": 656,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1140-pr.md",
+      "bytes": 2029,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928056.log",
+      "bytes": 158321,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928126.log",
+      "bytes": 115958,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928133.log",
+      "bytes": 158190,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928184.log",
+      "bytes": 144671,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928207.log",
+      "bytes": 121482,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1141-run-37048250641-job-110974928236.log",
+      "bytes": 146578,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1142-pr.md",
+      "bytes": 1746,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1143-run-37050932501-job-110983863178.log",
+      "bytes": 120629,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1143-run-37050932501-job-110983863294.log",
+      "bytes": 123828,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1144-1142-independent-review-prompt.txt",
+      "bytes": 3384,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-1142-independent-review-result.txt",
+      "bytes": 1484,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1144-1142-independent-review-run.log",
+      "bytes": 122106,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-complete-request-experiment.json",
+      "bytes": 903,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1144-complete-request-local-cli-tests.log",
+      "bytes": 17275,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/local-cli-tests.txt",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1144-complete-request-pr.md",
+      "bytes": 3115,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1144-diagnostic-pr.md",
+      "bytes": 3219,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1144-diagnostic-review-prompt.txt",
+      "bytes": 1925,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-diagnostic-review-result.txt",
+      "bytes": 1589,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1144-diagnostic-review-run.log",
+      "bytes": 73151,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-event-driven-experiment.json",
+      "bytes": 2255,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1144-event-driven-pr.md",
+      "bytes": 4283,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1144-final-head-review-prompt.txt",
+      "bytes": 2390,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-final-head-review-result.txt",
+      "bytes": 1010,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1144-final-head-review-run.log",
+      "bytes": 123006,
+      "disposition": "excluded",
+      "reason": "Raw assistant transcript or private execution prompt; not a code/test input. Necessary source-bound verdicts are published in historical-reviews.md; no chat/memory export"
+    },
+    {
+      "name": "eraseme-1144-native-darwin-socket-control.json",
+      "bytes": 2723,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/darwin-socket-control.json",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-1144-pr.md",
+      "bytes": 2509,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-1144-tokio-local-cli-tests.log",
+      "bytes": 17275,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376165.log",
+      "bytes": 118004,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376350.log",
+      "bytes": 122016,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376362.log",
+      "bytes": 144351,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376418.log",
+      "bytes": 158810,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376515.log",
+      "bytes": 149156,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-diagnostic-run-37066468147-job-111035376579.log",
+      "bytes": 158348,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-final-run-37061056628-job-111017893883.log",
+      "bytes": 121280,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-final-run-37061056628-job-111017894278.log",
+      "bytes": 158982,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-final-run-37061056628-job-111017894318.log",
+      "bytes": 158431,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-final-run-37061056628-job-111017894325.log",
+      "bytes": 116501,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-final-run-37061056628-job-111017894335.log",
+      "bytes": 144433,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-run-37058595903-job-111009311394.log",
+      "bytes": 116634,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-1145-tokio-run-37104549436-job-111150420181.log",
+      "bytes": 120520,
+      "disposition": "published",
+      "path": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/failed-readiness-candidate.txt",
+      "reason": "Necessary current verification or scoped historical finding retained in repository evidence"
+    },
+    {
+      "name": "eraseme-20261002T094047Z-issues.json",
+      "bytes": 25465,
+      "disposition": "reproducible",
+      "reason": "Outdated issue snapshot; refresh the linked GitHub issues. Never infer current task state from old metadata"
+    },
+    {
+      "name": "eraseme-20261002T094047Z.json",
+      "bytes": 110138,
+      "disposition": "excluded",
+      "reason": "Large local coordination report includes private paths and superseded snapshots; interrupted updates did not land. Required decisions, code refs, failures and current evidence are transferred to this handoff, not this stale report"
+    },
+    {
+      "name": "eraseme-37007678845-110840142292.log",
+      "bytes": 49883,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-go-oracle-temp-issue.md",
+      "bytes": 1601,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-http-port-race-issue.md",
+      "bytes": 2216,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-http-socket-timeout-issue.md",
+      "bytes": 1860,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-llm-fixture-deadline-issue.md",
+      "bytes": 1960,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-native-36934832118.log",
+      "bytes": 1271657,
+      "disposition": "reproducible",
+      "reason": "Copy of an existing GitHub Actions log; exact run/job numbers remain in the filename and handoff. Fetch with gh api repos/danieljustus/symaira-eraseme/actions/jobs/JOB/logs --allow-escape-sequences. Required current named-case evidence is retained in native-status.json and excerpts"
+    },
+    {
+      "name": "eraseme-native-evidence-36934832118.json",
+      "bytes": 3101,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "eraseme-open-issue-metadata-after-1137.json",
+      "bytes": 12176,
+      "disposition": "reproducible",
+      "reason": "Outdated issue snapshot; refresh the linked GitHub issues. Never infer current task state from old metadata"
+    },
+    {
+      "name": "eraseme-oracle-windows-cleanup-issue.md",
+      "bytes": 1838,
+      "disposition": "reproducible",
+      "reason": "Local public issue/PR draft; GitHub issue/PR is authoritative. Current requirements and actual next task are in the versioned handoff"
+    },
+    {
+      "name": "eraseme-remaining-issue-bodies-after-1137.json",
+      "bytes": 19274,
+      "disposition": "reproducible",
+      "reason": "Outdated issue snapshot; refresh the linked GitHub issues. Never infer current task state from old metadata"
+    },
+    {
+      "name": "eraseme-review-batch-a085707b-b331f604-b2d282e2.json",
+      "bytes": 1740,
+      "disposition": "excluded",
+      "reason": "Superseded local diagnostic/control/metadata artifact; not consumed by any active test or build. Necessary current facts are retained in the handoff and source-bound evidence; original remains local"
+    },
+    {
+      "name": "watch-1139-60b994c5.py",
+      "bytes": 2087,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "watch-1145-2b6913ee.py",
+      "bytes": 2087,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "watch-1145-43c369e-complete-request.py",
+      "bytes": 2087,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "watch-1145-728fbcd2.py",
+      "bytes": 2087,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    },
+    {
+      "name": "watch-1145-a085707b-diagnostic.py",
+      "bytes": 2087,
+      "disposition": "excluded",
+      "reason": "Retired observation helper with local hard-coded run/head; not a source input. Observe the named remote run with one-shot gh run view; own watcher is terminated"
+    }
+  ],
+  "provenance": [
+    {
+      "source_name": "eraseme-1144-complete-request-local-cli-tests.log",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/local-cli-tests.txt",
+      "original_sha256": "a0999eecfe07bd1d9e9880e6ce731cb12ac7fa5c5b1a7b974c940a252d2753fe",
+      "published_sha256": "fbefd8fd3f45f7bac2783a5de6569e227358291087a0a93a80cd67186610dba1",
+      "transformation": "private path prefixes replaced in log metadata only; no case names, counters, outcomes, commits, timings or oracle data changed"
+    },
+    {
+      "source_name": "end-work-cloud-fresh-cli-tests.log",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/fresh-checkout-cli-tests.txt",
+      "original_sha256": "da26a1008a051e8ef35aa7e98614007ef9a563c18ab6c86e10ced5f14afff768",
+      "published_sha256": "6697fbf1861d7f81ce6a5dde7026900382181372803c7def623fdad20481f19f",
+      "transformation": "private path prefixes replaced in log metadata only; no case names, counters, outcomes, commits, timings or oracle data changed"
+    },
+    {
+      "source_name": "end-work-cloud-fresh-clippy.log",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/fresh-checkout-clippy.txt",
+      "original_sha256": "c03fbe9a94c6e3552b784b54d07232b50811776da67cf6fc8ed55d3287382b14",
+      "published_sha256": "7d7ccf5c511ddbd65acfb1cb6cbea032929a95fc0bdad6704850136a8176c5ff",
+      "transformation": "private path prefixes replaced in log metadata only; no case names, counters, outcomes, commits, timings or oracle data changed"
+    },
+    {
+      "source_name": "end-work-cloud-fresh-help.log",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/fresh-checkout-help.txt",
+      "original_sha256": "e35cbd0f2585f0fd57594204bc79f3198344a2de44029547d53eb7abb73fd71e",
+      "published_sha256": "ccd69404ac7a0e3931122afc7510596179ba4a412cad24c0947ac8adcd52c586",
+      "transformation": "unchanged"
+    },
+    {
+      "source_name": "eraseme-1144-native-darwin-socket-control.json",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/darwin-socket-control.json",
+      "original_sha256": "86a51f11000000137aec888b6f8be51d8417f73be4bad4123a15860e65b4ae82",
+      "published_sha256": "86a51f11000000137aec888b6f8be51d8417f73be4bad4123a15860e65b4ae82",
+      "transformation": "unchanged"
+    },
+    {
+      "source_name": "end-work-cloud-native-evidence.json",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/native-status.json",
+      "original_sha256": "7149c20e5d732b1f406062e96fb6d512d5bfb7d23b5bb6b1bd5511bdade2e96d",
+      "published_sha256": "7149c20e5d732b1f406062e96fb6d512d5bfb7d23b5bb6b1bd5511bdade2e96d",
+      "transformation": "unchanged"
+    },
+    {
+      "source_name": "end-work-cloud-native-case-excerpts.txt",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/native-case-excerpts.txt",
+      "original_sha256": "cf4376651dce797c876a59818968669315101b55a956d20dbb2aa8c70618cd62",
+      "published_sha256": "cf4376651dce797c876a59818968669315101b55a956d20dbb2aa8c70618cd62",
+      "transformation": "unchanged"
+    },
+    {
+      "source_name": "eraseme-1138-1140-independent-review-result.txt",
+      "original_sha256": "9032d5a5ef4ca7249104c0155459d31f7efdb21e43b689be914fd90edcdda6e7",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "transformation": "verbatim review text under source-name heading; private path prefixes removed if present",
+      "published_sha256": "bec31a8acdecbfd8cf4762844444a867d569ed348d99a52efaa9b7650ec8fd4a"
+    },
+    {
+      "source_name": "eraseme-1144-1142-independent-review-result.txt",
+      "original_sha256": "9b6432a62da29769d61558fe7e0b50713533b51d85d274a0927b604fd1b44ffd",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "transformation": "verbatim review text under source-name heading; private path prefixes removed if present",
+      "published_sha256": "bec31a8acdecbfd8cf4762844444a867d569ed348d99a52efaa9b7650ec8fd4a"
+    },
+    {
+      "source_name": "eraseme-1144-final-head-review-result.txt",
+      "original_sha256": "0cbf8b80683489ac7aec6f01afb1ce2bf54d14456a958c2a93382368d7ab2032",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "transformation": "verbatim review text under source-name heading; private path prefixes removed if present",
+      "published_sha256": "bec31a8acdecbfd8cf4762844444a867d569ed348d99a52efaa9b7650ec8fd4a"
+    },
+    {
+      "source_name": "eraseme-1144-diagnostic-review-result.txt",
+      "original_sha256": "300694ed2e9142e7a2e5b4bddd862017bd9b9bdef6c2dd3c705dd911280d8b3b",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/historical-reviews.md",
+      "transformation": "verbatim review text under source-name heading; private path prefixes removed if present",
+      "published_sha256": "bec31a8acdecbfd8cf4762844444a867d569ed348d99a52efaa9b7650ec8fd4a"
+    },
+    {
+      "source_name": "eraseme-1145-tokio-run-37104549436-job-111150420181.log",
+      "original_sha256": "519aab7317007d053626a631cf359f3ceb3cc60bd692bcd3810a85fe8ea7878e",
+      "destination": "docs/rust-port/handoffs/evidence/2026-10-03-http-fixture/failed-readiness-candidate.txt",
+      "published_sha256": "5e67716be04e964778fdcbeaab4634eef67bbac9b4a06f9961d749ef4ef9e304",
+      "transformation": "unchanged failure/HTTP-diagnostic lines with original line numbers and two preceding/four following context lines; private path metadata removed",
+      "remote_original": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37104549436/job/111150420181"
+    }
+  ],
+  "code_branches": [
+    {
+      "branch": "agent/http-reset-read-1144",
+      "base_code_commit": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "pr": 1145
+    },
+    {
+      "branch": "agent/windows-oracle-cleanup-1138",
+      "head": "60b994c55929f1918683064110ef3030e07076cd",
+      "pr": 1139
+    },
+    {
+      "branch": "agent/llm-deadline-diagnosis-1142",
+      "head": "55e6d05e41d46f7237a9b899bd2e7417a745a496",
+      "pr": 1143
+    }
+  ],
+  "ignored_own_inputs": {
+    "http": "target build outputs only, reproduced by Cargo.lock and documented commands",
+    "cleanup": "target plus Python __pycache__; both regenerated, not inputs",
+    "llm_diagnosis": "none"
+  },
+  "stashes": "none",
+  "foreign_units": [
+    "main checkout older ignored reports/configs/builds",
+    "fix/blocker-lane-20260930",
+    "handoff/20260930-cloud"
+  ],
+  "foreign_disposition": "excluded, outside this session ownership; left untouched",
+  "fresh_checkout": "cloned from GitHub code commit with no copied source, untracked input, stash, symlink or local source override; ordinary package-manager caches allowed",
+  "private_configuration": "excluded; no credential, provider configuration, application state, personal memory or production data is required by scoped mock/process checks",
+  "text_formatting": "For text logs and review excerpts only: remove trailing display padding and extra EOF blank lines for repository whitespace hygiene. Private path substitutions are documented per origin. Case names, outcomes, counters, timings, source revisions and diagnostics remain intact. Protocol bytes and oracle fixture files are not reformatted."
+}

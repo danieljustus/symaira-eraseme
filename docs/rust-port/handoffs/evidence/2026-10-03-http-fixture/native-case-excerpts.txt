@@ -1,0 +1,41 @@
+TARGET Rust / native (macos-14)
+2026-10-03T07:29:35.0431640Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:29:35.0432690Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:29:35.0717890Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:29:35.4174930Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:29:36.5272540Z test native_http_complete_headers_and_bodies_match_go ... ok
+
+TARGET Rust / native (ubuntu-24.04-arm)
+2026-10-03T07:30:20.6676516Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:30:20.6679196Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:30:20.6736717Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:30:20.9234637Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:30:21.4635907Z test native_http_complete_headers_and_bodies_match_go ... ok
+
+TARGET Rust / native (macos-15-intel)
+2026-10-03T07:33:20.8755760Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:33:20.9760970Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:33:21.0241230Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:33:21.1605540Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:33:22.8068370Z test native_http_complete_headers_and_bodies_match_go ... ok
+
+TARGET Rust / native (ubuntu-24.04)
+2026-10-03T07:30:48.5083710Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:30:48.5093920Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:30:48.5196431Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:30:48.7650494Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:30:49.3841063Z test native_http_complete_headers_and_bodies_match_go ... ok
+
+TARGET Rust / native (windows-2025)
+2026-10-03T07:32:46.3573153Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:32:46.3596700Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:32:46.3707365Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:32:46.6110294Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:32:48.2924695Z test native_http_complete_headers_and_bodies_match_go ... ok
+
+TARGET Rust / native (windows-11-arm)
+2026-10-03T07:33:09.9510576Z test header_comparison_rejects_missing_extra_changed_and_duplicate_headers ... ok
+2026-10-03T07:33:09.9538266Z test bounded_response_capture_preserves_fin_and_native_reset_bytes ... ok
+2026-10-03T07:33:09.9647452Z test bounded_response_capture_enforces_deadline_and_size ... ok
+2026-10-03T07:33:10.2050579Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+2026-10-03T07:33:12.1635500Z test native_http_complete_headers_and_bodies_match_go ... ok
