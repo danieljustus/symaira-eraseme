@@ -31,8 +31,14 @@ all three certificate classes for all three transports, then hit the workflow
 deadline during CA cleanup. This is a failed acceptance gate, not PASS evidence.
 The command helper now records bounded native command stages into regular
 files, rather than waiting for pipe EOF, and enforces a 30-second command
-lifetime. The trust-store operations and certificate policy are unchanged;
-final macOS cleanup and six-target acceptance remain pending.
+lifetime. Run `37118725509` at `6a9a04de` localizes the actual macOS stall to
+`security remove-trusted-cert`; import and all TLS cases finish first. The
+disposable macOS fixture now saves the `com.apple.trust-settings.admin` rule,
+temporarily allows its noninteractive trust operations, then restores that
+rule from its original plist and verifies all policy fields (excluding only
+generated timestamps/version). Successful CA removal and verified rule
+restoration are required before acceptance. Production certificate policy is
+unchanged; final macOS cleanup and six-target acceptance remain pending.
 
 Do not promote DOM-006/DOM-007 or task 6.1 solely from this document, a local
 certificate-file test, a successful build, or queued CI. Acceptance requires

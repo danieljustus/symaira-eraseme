@@ -102,6 +102,8 @@ struct InstalledRoot {
     path: PathBuf,
     #[cfg(target_vendor = "apple")]
     source: PathBuf,
+    #[cfg(target_vendor = "apple")]
+    authorization: TemporaryTrustAuthorization,
     installed: bool,
 }
 
@@ -110,6 +112,14 @@ fn checked(command: &mut Command) -> Result<(), String> {
 }
 
 fn checked_with_budget(command: &mut Command, budget: Duration) -> Result<(), String> {
+    command_output_with_budget(command, budget, Stdio::null()).map(|_| ())
+}
+
+fn command_output_with_budget(
+    command: &mut Command,
+    budget: Duration,
+    input: Stdio,
+) -> Result<Vec<u8>, String> {
     // A native security tool may leave a helper holding a pipe after its own
     // exit. Capture regular files and bound the actual command's lifetime.
     let logs = tempfile::tempdir().map_err(|error| error.to_string())?;
@@ -122,7 +132,7 @@ fn checked_with_budget(command: &mut Command, budget: Duration) -> Result<(), St
     );
     eprintln!("native CA command start: {label}");
     let mut child = command
-        .stdin(Stdio::null())
+        .stdin(input)
         .stdout(std::fs::File::create(&stdout).map_err(|error| error.to_string())?)
         .stderr(std::fs::File::create(&stderr).map_err(|error| error.to_string())?)
         .spawn()
@@ -153,7 +163,14 @@ fn checked_with_budget(command: &mut Command, budget: Duration) -> Result<(), St
         started.elapsed().as_millis()
     );
     if status.success() {
-        Ok(())
+        if std::fs::metadata(&stdout)
+            .map_err(|error| error.to_string())?
+            .len()
+            > 64 * 1024
+        {
+            return Err("native CA command exceeded its output limit".into());
+        }
+        std::fs::read(&stdout).map_err(|error| error.to_string())
     } else {
         let size = std::fs::metadata(&stderr)
             .map_err(|error| error.to_string())?
@@ -166,6 +183,81 @@ fn checked_with_budget(command: &mut Command, budget: Duration) -> Result<(), St
             "native CA command failed: {}",
             String::from_utf8_lossy(&error)
         ))
+    }
+}
+
+#[cfg(target_vendor = "apple")]
+struct TemporaryTrustAuthorization {
+    original: Vec<u8>,
+    active: bool,
+}
+
+#[cfg(target_vendor = "apple")]
+impl TemporaryTrustAuthorization {
+    const RIGHT: &'static str = "com.apple.trust-settings.admin";
+
+    fn read() -> Result<Vec<u8>, String> {
+        command_output_with_budget(
+            Command::new("sudo").args(["-n", "security", "authorizationdb", "read", Self::RIGHT]),
+            Duration::from_secs(30),
+            Stdio::null(),
+        )
+    }
+
+    fn allow() -> Self {
+        // This fixture already requires a disposable GitHub-hosted runner.
+        // Avoid an interactive authorization prompt during root removal,
+        // preserving and restoring the runner's original admin trust rule.
+        let mut guard = Self {
+            original: Self::read().unwrap(),
+            active: true,
+        };
+        if let Err(error) = checked(Command::new("sudo").args([
+            "-n",
+            "security",
+            "authorizationdb",
+            "write",
+            Self::RIGHT,
+            "allow",
+        ])) {
+            guard
+                .restore()
+                .expect("restore original trust authorization after setup failure");
+            panic!("temporary trust authorization: {error}");
+        }
+        guard
+    }
+
+    fn restore(&mut self) -> Result<(), String> {
+        if !self.active {
+            return Ok(());
+        }
+        let files = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let original = files.path().join("original.plist");
+        let restored = files.path().join("restored.plist");
+        std::fs::write(&original, &self.original).map_err(|error| error.to_string())?;
+        command_output_with_budget(
+            Command::new("sudo").args(["-n", "security", "authorizationdb", "write", Self::RIGHT]),
+            Duration::from_secs(30),
+            Stdio::from(std::fs::File::open(&original).map_err(|error| error.to_string())?),
+        )?;
+        std::fs::write(&restored, Self::read()?).map_err(|error| error.to_string())?;
+        checked(Command::new("python3").args([
+            "-c",
+            "import plistlib,sys; a,b=[plistlib.load(open(p,'rb')) for p in sys.argv[1:]]; [v.pop(k,None) for v in (a,b) for k in ('created','modified','version')]; assert a == b, 'admin trust authorization was not restored'",
+        ]).arg(&original).arg(&restored))?;
+        self.active = false;
+        eprintln!("original admin trust authorization restored and verified");
+        Ok(())
+    }
+}
+
+#[cfg(target_vendor = "apple")]
+impl Drop for TemporaryTrustAuthorization {
+    fn drop(&mut self) {
+        if let Err(error) = self.restore() {
+            eprintln!("CI trust authorization restoration failed: {error}");
+        }
     }
 }
 
@@ -224,6 +316,8 @@ impl InstalledRoot {
             path: PathBuf::from(format!("/usr/local/share/ca-certificates/{name}.crt")),
             #[cfg(target_vendor = "apple")]
             source: source.to_path_buf(),
+            #[cfg(target_vendor = "apple")]
+            authorization: TemporaryTrustAuthorization::allow(),
             installed: false,
         };
         #[cfg(target_os = "linux")]
@@ -298,6 +392,7 @@ impl InstalledRoot {
                 &self.name,
                 "/Library/Keychains/System.keychain",
             ]))?;
+            self.authorization.restore()?;
         }
         #[cfg(windows)]
         checked(Command::new("certutil").args(["-delstore", "Root", &self.name]))?;
