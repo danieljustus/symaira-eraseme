@@ -1,0 +1,71 @@
+name: Native SMTP campaign parity
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-core/src/email/**
+      - crates/symeraseme-core/src/campaign.rs
+      - crates/symeraseme-core/tests/campaign*.rs
+      - crates/symeraseme-core/tests/smtp*.rs
+      - crates/symeraseme-cli/tests/plan_execute_live_process.rs
+      - rust-tests/parity/oracle/campaign-smtp/**
+      - internal/campaign/**
+      - internal/email/**
+      - internal/eventstore/**
+      - go.mod
+      - go.sum
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/campaign-smtp-native.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: campaign-smtp-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-smtp:
+    name: SMTP campaign / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Download pinned Go modules
+        shell: bash
+        run: GOTOOLCHAIN=go1.26.6 go mod download
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Actual SMTP transport, MIME and persisted campaign differential
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --locked \
+            --test campaign_smtp --test smtp_transport --test smtp_parity -- --nocapture
+      - name: Source-bound plan and execution contracts
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --locked \
+            --test campaign_plan_contract --test campaign_execution_oracle -- --nocapture
+          cargo +1.98.0 test -p symeraseme-cli --locked --test plan_execute_live_process -- --nocapture
+          cargo +1.98.0 test -p symeraseme-cli --locked --test command_surface \
+            -- --exact plan_populated_paths_match_the_go_bodies --nocapture

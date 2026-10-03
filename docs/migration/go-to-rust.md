@@ -31,6 +31,21 @@ open and blocks the full provider acceptance in #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native SMTP campaign gate (2026-10-03, #1118)
+
+The new explicit `NetSmtpTransport` now supplies the previously absent Rust
+network sender. The actual Go/Rust campaign differential checks rejected
+recipient followed by successful send, exact normalized SMTP/MIME bytes,
+persisted events and complete projected state. Eight ordinary protocol
+controls match Go; an additional credential-echo control verifies Rust's
+required redaction of the raw/quoted/encoded synthetic secret actually
+observed in Go's diagnostic. Three private-root Rust STARTTLS handshakes
+verify trusted/unrelated/expired chains before authentication.
+`docs/rust-smtp-transport.md` records the adapter, bounds and precise evidence
+limits. The native workflow selects these controls and retained plan/CLI
+suites on all six targets. Local controls and strict linting pass; native
+acceptance remains pending and DOM-002/CLI-010 remain PARTIAL.
+
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
 The shared iterative protocol scanner now reports Go-compatible diagnostic
