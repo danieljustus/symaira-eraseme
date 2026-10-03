@@ -10,6 +10,24 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Scheduler test-root race correction (2026-10-03, #1131)
+
+The complete Go-absent selection at clean `0d1be28288594354941a07d19f834f2553928bc4`
+retains an actual scheduler failure: the twenty-case differential found an
+empty file inventory for `launchd_install_over_own_units_succeeds`. The
+parallel unsupported-platform test called the same PID-only `run_root` helper,
+which recursively removed the first test's live files. Each test now owns a
+unique RAII temporary directory; creating or dropping a sibling cannot remove
+its evidence, and panic/normal cleanup affects only its owner. A control
+writes sibling evidence and checks both its preservation and final owner
+cleanup. Original Go observations, every case, file/mode/command comparison,
+parallel test execution and all production scheduler code remain unchanged.
+All nine scheduler installation tests and thirteen config tests now pass
+with Go absent, including sibling-evidence preservation and full original
+file/mode/command comparisons. Strict targeted engine Clippy and formatting
+pass. The complete updated workflow and native current-source acceptance
+still require fresh execution; the earlier failed run is retained.
+
 ### Actual native Mac scheduler/config frozen preparation (2026-10-03, #1131)
 
 Run `37154503080` at clean `30eeb38f1e43c8f633d3537818d1de8b96ba9d6a`

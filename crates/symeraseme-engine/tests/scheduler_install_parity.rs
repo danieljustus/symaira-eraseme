@@ -479,15 +479,28 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 
-/// A stable per-run root, so paths can be folded.
-fn run_root() -> PathBuf {
-    let root = std::env::temp_dir().join(format!(
-        "symeraseme-sched-install-rust-{}",
-        std::process::id()
-    ));
-    let _ = fs::remove_dir_all(&root);
-    fs::create_dir_all(&root).expect("create run root");
-    root
+/// Every test owns its root; a sibling test cannot remove live evidence.
+fn run_root() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix("symeraseme-sched-install-rust-")
+        .tempdir()
+        .expect("create owned run root")
+}
+
+#[test]
+fn scheduler_test_roots_preserve_sibling_evidence_and_cleanup_only_their_owner() {
+    let first = run_root();
+    let path = first.path().to_path_buf();
+    let sentinel = path.join("evidence.txt");
+    fs::write(&sentinel, b"owned first-test evidence").unwrap();
+    {
+        let second = run_root();
+        assert_ne!(first.path(), second.path());
+        assert_eq!(fs::read(&sentinel).unwrap(), b"owned first-test evidence");
+    }
+    assert_eq!(fs::read(&sentinel).unwrap(), b"owned first-test evidence");
+    drop(first);
+    assert!(!path.exists());
 }
 
 fn platform_of(value: &str) -> Option<Platform> {
@@ -620,7 +633,8 @@ fn rust_install_status_uninstall_match_the_go_capture() {
     let script: BTreeMap<String, String> =
         serde_json::from_value(document["runner_script"].clone()).expect("runner_script shape");
     let cases = document["cases"].as_object().expect("cases object");
-    let root = run_root();
+    let owned_root = run_root();
+    let root = owned_root.path().to_path_buf();
     let mut checked = 0;
 
     for (name, case) in cases {
@@ -783,7 +797,6 @@ fn rust_install_status_uninstall_match_the_go_capture() {
     }
 
     assert_eq!(checked, cases.len(), "every captured case was replayed");
-    let _ = fs::remove_dir_all(&root);
     let _ = &committed;
 }
 
@@ -872,7 +885,8 @@ impl Scenario {
 
 #[test]
 fn unsupported_platform_is_rejected_before_any_side_effect() {
-    let root = run_root();
+    let owned_root = run_root();
+    let root = owned_root.path().to_path_buf();
     let runner = RecordingRunner::new(&BTreeMap::new(), root.clone(), root.clone());
     let config = plain_config(Platform::Cron, root.join("schedules").to_str().unwrap());
     // Go validates the platform string before it does anything else; the Rust
