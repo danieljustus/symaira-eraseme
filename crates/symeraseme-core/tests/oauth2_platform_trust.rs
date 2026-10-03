@@ -380,8 +380,11 @@ impl InstalledRoot {
         #[cfg(target_vendor = "apple")]
         {
             checked(
-                Command::new("sudo")
-                    .args(["-n", "security", "remove-trusted-cert", "-d"])
+                // Run removal in the runner's login session. The temporary
+                // admin trust authorization above permits this owned change;
+                // sudo's root session stalls in the native removal command.
+                Command::new("security")
+                    .args(["remove-trusted-cert", "-d"])
                     .arg(&self.source),
             )?;
             checked(Command::new("sudo").args([

@@ -40,6 +40,13 @@ generated timestamps/version). Successful CA removal and verified rule
 restoration are required before acceptance. Production certificate policy is
 unchanged; final macOS cleanup and six-target acceptance remain pending.
 
+Run `37120643595` at `f2554fc2` confirms that allowing and then restoring the
+admin trust rule succeeds, but sudo/root-session removal still stalls. The
+next native probe executes the owned admin trust removal in the runner's
+login session with that temporary authorization, retaining the same 30-second
+bound and mandatory restoration. This is a pending cleanup probe, not an
+established root cause or completed acceptance.
+
 Do not promote DOM-006/DOM-007 or task 6.1 solely from this document, a local
 certificate-file test, a successful build, or queued CI. Acceptance requires
 completed native results and the source-bound Go transcript gates. The finite
