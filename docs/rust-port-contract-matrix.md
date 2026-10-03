@@ -35,6 +35,11 @@ Go output captured at clean `812cc7ee7c7d6b4021c7259f9cda6923efa2fd98`. Its
 original source pins and persisted-effect comparisons remain unchanged;
 five original tests plus a two-mutation control pass locally without Go.
 This preparation does not promote DOM-004/CLI-022 or their prerequisites.
+Projection boundary freezing remains open until actual native AMD64 and ARM64
+captures are reviewed. The opt-in native CI capture records seven projection
+inputs and four service operations with complete bytes, source/toolchain
+provenance and status. Neither cross-compilation nor local AMD64 prediction
+is accepted as ARM64 evidence.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

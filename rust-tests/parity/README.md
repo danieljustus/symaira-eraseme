@@ -51,6 +51,13 @@ length/digest and retains all original source hashes and persisted-effect
 comparisons. Five original tests and a byte-change/missing-operation control
 remain selected; explicit live mode runs the original Go service oracle.
 
+To collect new service and architecture-specific projection observations,
+dispatch existing Rust CI with `capture_frozen_oracles: true`. Its six native
+jobs run `scripts/capture-frozen-go-services.py` and upload immutable raw
+outputs with source/toolchain/native-target provenance. This capture does
+not overwrite fixtures or synthesize an unobserved target result. The regular
+native Rust suite still executes; capture success alone is not suite proof.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

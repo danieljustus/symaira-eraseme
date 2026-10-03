@@ -49,6 +49,18 @@ Default service tests verify the raw output manifest and retain the original
 eight Go source pins and all four effect comparisons. The five original
 tests and one added byte-change/missing-operation control pass with Go absent
 from PATH, with strict core Clippy. Explicit live Go mode remains available.
+All six service tests also pass in actual explicitly selected private-root
+Go 1.26.6 mode at clean `8484efa`. An opt-in native Rust CI input,
+`capture_frozen_oracles`, now runs a read-only capture of these four service
+operations and all seven projection boundary cases on the existing six
+native hosts. The projection's out-of-range Go float-to-int conversion is
+architecture-specific; no AMD64 observation is fabricated into ARM64 data.
+Captures use clean source/build provenance, private runtime roots, exact
+raw streams, existing 120-second build/30-second oracle budgets and reaped
+root children; compiler-descendant confinement is not claimed. The new
+output directory must be outside the checkout and must not already exist.
+Only actual successful captures produce a manifest; CI artifacts still
+need native execution and review before incorporation as frozen fixtures.
 
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime

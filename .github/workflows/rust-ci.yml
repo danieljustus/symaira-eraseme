@@ -7,7 +7,12 @@ on:
     branches: [main]
   schedule:
     - cron: '43 5 * * 1'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      capture_frozen_oracles:
+        description: Capture actual native Go service/projection observations for reviewed freezing
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -309,6 +314,22 @@ jobs:
 
       - name: Download Go oracle modules
         run: go mod download
+
+      - name: Capture actual native Go service and projection observations
+        if: github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+        run: python3 scripts/capture-frozen-go-services.py --output "${{ runner.temp }}/frozen-go-services"
+
+      - name: Upload native Go observations for fixture review
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frozen-go-services-${{ runner.os }}-${{ runner.arch }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/frozen-go-services/manifest.json
+            ${{ runner.temp }}/frozen-go-services/*.stdout
+            ${{ runner.temp }}/frozen-go-services/*.stderr
 
       - name: Check MCP stdio oracle without rewriting fixtures
         shell: bash
