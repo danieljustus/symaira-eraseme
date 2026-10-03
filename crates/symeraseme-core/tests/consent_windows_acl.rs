@@ -30,7 +30,12 @@ fn capture(mut command: Command, root: &Path, label: &str, budget: Duration) -> 
         if Instant::now() >= deadline {
             let _ = child.kill();
             child.wait().unwrap();
-            panic!("{label} exceeded its native deadline");
+            let diagnostic = if fs::metadata(&stderr).unwrap().len() <= 4096 {
+                fs::read_to_string(&stderr).unwrap_or_default()
+            } else {
+                "diagnostic exceeds limit".into()
+            };
+            panic!("{label} exceeded its native deadline: {diagnostic}");
         }
         std::thread::sleep(Duration::from_millis(20));
     };

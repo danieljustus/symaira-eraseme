@@ -49,6 +49,11 @@ propagate that failure, skip chmod, retain the old token and sentinel, and
 remove its temporary file exactly like the retained Go close-failure fixture.
 This is an actual kernel-error control through the operation-local seam;
 it does not manufacture an invalid owning `File` or double-close a handle.
+Initial amd64 run `37120919444` at `576c07f6` hit the bounded 30-second
+PowerShell ACL observation deadline in its cleared private environment.
+The observation script now uses framework ACL APIs and direct bounded JSON
+output, avoiding cmdlet module discovery, with explicit stage diagnostics.
+This is a pending harness repair; the original failure is retained.
 Native execution remains pending; ID-005 and task 4.7 remain PARTIAL.
 
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
