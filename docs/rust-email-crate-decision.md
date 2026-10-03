@@ -66,3 +66,14 @@ plist that the runner cannot read. Exports now run as the runner; only
 the actual admin import remains privileged. This preserves private file
 ownership and the complete remaining-trust comparison. Native import/removal
 acceptance is still pending.
+
+The current `e61f49ac` probe `37122888055` failed on macOS Intel job
+`111202340118` before installing the CA: `security authorizationdb write`
+returned `NO (-60005)` for both temporary override and attempted restoration.
+The speculative authorization override did not repair the earlier removal
+hangs and is now removed entirely. The existing hosted-runner `sudo -n`
+certificate installation remains; cleanup directly imports the trust
+representation with exactly the owned entry removed, re-exports to verify all
+unrelated settings and then deletes the owned certificate. Native results for
+this direct route are pending. No authorization database is modified by the
+current candidate; Linux/Windows production trust logic is unchanged.
