@@ -588,12 +588,21 @@ fn close_file(file: fs::File) -> io::Result<()> {
 #[allow(unsafe_code)]
 fn close_windows_file(file: fs::File) -> io::Result<()> {
     use std::os::windows::io::IntoRawHandle;
-    use windows_sys::Win32::Foundation::CloseHandle;
 
     let handle = file.into_raw_handle();
     // SAFETY: `file` owns this live handle. Consuming it above transfers its
     // sole ownership here; CloseHandle is called exactly once and no `File`
     // drop can close or reuse the handle afterward.
+    checked_windows_close(handle)
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn checked_windows_close(handle: windows_sys::Win32::Foundation::HANDLE) -> io::Result<()> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    // SAFETY: CloseHandle validates the opaque kernel handle. Production
+    // transfers one live owner above; the native negative control supplies
+    // a null handle without constructing a stale owned File.
     if unsafe { CloseHandle(handle) } != 0 {
         Ok(())
     } else {
