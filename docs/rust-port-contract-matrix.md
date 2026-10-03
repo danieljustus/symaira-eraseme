@@ -13,6 +13,16 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 preparation also proves the entire 23-test `command_surface` binary
+with Go absent on native Linux/amd64 at clean `b8faa96fec95ddfffe0776ceea0d83579f639455`:
+the 175-case CLI corpus, thirteen scheduler/file-manifest cases and populated
+status/tick, profile, plan, manual-task, review and grant paths retain their
+original comparisons. The recorded umask 022 is explicit; the first local
+restrictive-umask failure is retained. The workflow expands from 116 to 135
+tests across its selected Go-free Linux families without dropping a prior
+test. Native Windows and Mac live-oracle paths remain; no contract row or
+retirement gate is promoted by this local preparation.
+
 The #1131 neutral freeze preparation records actual Go 1.26.6 observations for
 32 timestamp and eight confirmation-URL inputs at clean source
 `aa2dd0f31d30061b5ed66e7638a0dcddde060009`. Default neutral-package tests read

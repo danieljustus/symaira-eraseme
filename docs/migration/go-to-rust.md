@@ -10,6 +10,28 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Complete Linux CLI without Go (2026-10-03, #1131)
+
+At clean `b8faa96fec95ddfffe0776ceea0d83579f639455`, all 23 tests in
+the entire `command_surface` binary pass with Go absent from PATH and default
+frozen mode. This includes the 175-case recorded CLI corpus, eight populated
+status/tick frames, all thirteen scheduler cases with file manifests, profile
+round trips, populated plans/manual tasks, eight review processes and six
+grant processes with real Rust file effects. Existing assertions and cases
+are retained. Windows keeps its actual native Go migration/scheduler gates;
+this result does not claim the entire CLI is Go-free on Windows or Mac.
+
+The first local attempt faithfully failed the recorded migration-directory
+mode under the workspace's restrictive umask (0700 instead of recorded
+0755). Running with the recorded Unix umask 022 passes all 23 tests; no
+fixture byte, file mode assertion or product permission rule changes.
+The Go-absent workflow now runs this entire binary once, instead of only the
+four selected review/grant tests, for 135 total tests in its selected Linux
+families. It explicitly uses umask 022 and observes all fixture changes.
+Current-source complete-workflow and GitHub validation remain required.
+Other runtime-oracle families and six-native acceptance remain open under
+#1131; no Go deletion or release/cutover is claimed.
+
 ### Consent-grant frozen-oracle preparation (2026-10-03, #1131)
 
 Actual native Go 1.26.6 at clean `aa684787641be9c92a8b0c5a30fa75d804c1c48d`

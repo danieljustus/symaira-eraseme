@@ -20,9 +20,10 @@ on:
       - crates/symeraseme-cli/tests/command_surface.rs
       - crates/symeraseme-cli/tests/support/frozen_review_oracle.rs
       - crates/symeraseme-cli/tests/support/frozen_grant_oracle.rs
+      - crates/symeraseme-cli/tests/support/migration_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_go_oracle.rs
-      - tests/fixtures/go-frozen/**
+      - tests/fixtures/**
       - crates/symeraseme-engine/tests/scheduler_parity.rs
       - crates/symeraseme-engine/tests/scheduler_install_parity.rs
       - .gitattributes
@@ -77,6 +78,9 @@ jobs:
               environment = os.environ.copy()
               environment["PATH"] = str(tools)
               environment.pop("SYMERASEME_PARITY_LIVE_GO", None)
+              # Match the recorded Unix input-directory modes; all private
+              # consent/key files still enforce their explicit 0600 mode.
+              os.umask(0o022)
               assert shutil.which("go", path=str(tools)) is None
               cargo = shutil.which("cargo", path=str(tools))
               assert cargo is not None
@@ -104,7 +108,5 @@ jobs:
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "llm_http_failure_next",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
-                              "review_", "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
-                              "grant_", "--locked", "--offline"], env=environment, check=True)
+                              "--locked", "--offline"], env=environment, check=True)
           PY
