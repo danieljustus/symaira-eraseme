@@ -14,7 +14,7 @@
     }
   ],
   "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
-  "generator_sha256": "f0105e665807547baf438aa0266748d506a301df3f5a3a74da8e80baad9062fb",
+  "generator_sha256": "d990f6f738c832421f27efe7ae40f5d11ee350ff7e0fa2cbe02333e47697bbe6",
   "cases": [
     {
       "name": "initialize_trailing_comma_is_parse_error",

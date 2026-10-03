@@ -8,8 +8,27 @@ import json
 import random
 import re
 import subprocess
+import sys
 import tempfile
+import time
 from pathlib import Path
+
+
+class OracleTemporaryDirectory(tempfile.TemporaryDirectory):
+    """Retry only a transient Windows sharing violation on this owned root."""
+
+    def cleanup(self, *, timeout=5.0):
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                super().cleanup()
+                return
+            except OSError as error:
+                remaining = deadline - time.monotonic()
+                if (sys.platform != "win32" or getattr(error, "winerror", None) != 32
+                        or remaining <= 0):
+                    raise
+                time.sleep(min(0.05, remaining))
 
 ROOT = Path(__file__).resolve().parents[4]
 SOURCE_REVISION = "6d175f6355a67fe0c0e539754121b6643df812bf"
@@ -137,11 +156,11 @@ def capture(go):
         stdout=subprocess.DEVNULL,
     )
     recorded = []
-    with tempfile.TemporaryDirectory(prefix="symeraseme-mcp008-") as directory:
+    with OracleTemporaryDirectory(prefix="symeraseme-mcp008-") as directory:
         binary = Path(directory) / "symeraseme-go.exe"
         subprocess.run([str(go), "build", "-o", str(binary), "./cmd/symeraseme"], cwd=ROOT, check=True)
         for case in case_specs():
-            with tempfile.TemporaryDirectory(dir=directory, prefix="case-") as scenario:
+            with OracleTemporaryDirectory(dir=directory, prefix="case-") as scenario:
                 result = subprocess.run(
                     [str(binary), "mcp", "--stdio"],
                     cwd=scenario,
