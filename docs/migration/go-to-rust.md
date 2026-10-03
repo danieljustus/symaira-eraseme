@@ -10,6 +10,31 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Actual native Mac scheduler/config frozen preparation (2026-10-03, #1131)
+
+Run `37154503080` at clean `30eeb38f1e43c8f633d3537818d1de8b96ba9d6a`
+now passes the complete Rust workspace on all six native targets. All six
+37-case Go artifacts independently verify published ZIP digests, 65 current
+source files, eight whole stdout/stderr streams, the complete twenty-case
+installation document and unmodified native Go 1.26.6 VCS identities. Both
+Mac artifacts (`11285567103` arm64, `11285378517` amd64) are retained with
+their original whole documents and manifests. The original Windows CRLF
+failures and superseded four-target captures remain recorded above.
+
+Actual Mac installation/config bytes match each other across architectures
+and the independently captured Linux outputs; this equality is measured,
+not a synthesized platform conversion. Both Mac defaults now use their
+native source-bound recordings. The twenty installation cases retain every
+file hash/mode and recording-runner command; all six config effects retain
+the original semantic and provenance checks. Native manifests also check
+all 65 source hashes, exact target and embedded unmodified build identity.
+Additional controls reject changed streams and unobserved architecture/OS.
+The eight installation and thirteen config tests pass locally with Go absent,
+and strict targeted engine/core Clippy passes. Native execution of these new
+Mac default paths and the complete updated selection still remain required;
+source30e acceptance does not stand in for later code. No migration task or
+contract row is promoted by this preparation.
+
 ### CLI review frozen-oracle preparation (2026-10-03, #1131)
 
 Actual Go 1.26.6 capture at clean `46f2aec331a49b1d2e6423f15763b67c0fda7eba`
@@ -25,8 +50,11 @@ shared 120-second budget and existing bounded file/process cleanup.
 Both selected review tests pass with Go absent, including changed/truncated
 stderr rejection; strict CLI command-surface Clippy and formatting pass. The
 previous 109-test selection also passed at the same clean capture source.
-The workflow now selects these two additional tests; the complete extended
-selection and native current-source acceptance remain to be executed. The
+At clean `f34cbb35d0045ca034370063dd3e02851081be44`, both tests also pass
+against actual private-root live Go, the exact extended workflow passes all
+111 tests with Go absent, and the complete 56-operation native capture pipeline
+runs successfully on actual Linux amd64. Current-source all-six native
+acceptance remains required. The
 native observation pipeline additionally captures all eight real review
 process outcomes, for 56 product observations in total. This preparation does
 not close #1131, remove Go, or claim unsupported native results.

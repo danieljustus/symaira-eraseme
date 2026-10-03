@@ -27,14 +27,15 @@ use symeraseme_engine::scheduler::{Config, Platform};
 const FIXTURE: &str = include_str!("../../../tests/fixtures/scheduler-install/cases.json");
 const FROZEN_OBSERVATIONS: &[u8] =
     include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/observations.json");
+const FROZEN_MAC: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/darwin.observations.json");
 const FROZEN_WINDOWS: &[u8] =
     include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/windows.observations.json");
 
 #[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
 mod go_oracle;
 
-/// Linux and Windows use their actual source-bound native captures by default.
-/// Mac retains live Go until its own full file/mode capture exists.
+/// Linux, Windows and Mac use their actual source-bound native captures by default.
 /// Explicit live mode always rebuilds and runs the same twenty-case oracle.
 fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
@@ -51,7 +52,15 @@ fn selected_oracle_capture() -> &'static Value {
                         "aarch64" => "arm64",
                         other => panic!("no actual Windows install capture for {other}"),
                     };
-                    return verified_windows_install(FROZEN_WINDOWS, arch);
+                    return verified_native_install(FROZEN_WINDOWS, "windows", arch);
+                }
+                if cfg!(target_os = "macos") {
+                    let arch = match std::env::consts::ARCH {
+                        "x86_64" => "amd64",
+                        "aarch64" => "arm64",
+                        other => panic!("no actual Mac install capture for {other}"),
+                    };
+                    return verified_native_install(FROZEN_MAC, "darwin", arch);
                 }
             }
             _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
@@ -134,17 +143,25 @@ fn verified_frozen_install(bytes: &[u8]) -> Value {
     document
 }
 
-fn verified_windows_install(bytes: &[u8], arch: &str) -> Value {
-    let manifest_bytes = match arch {
-        "amd64" => include_bytes!(
+fn verified_native_install(bytes: &[u8], os: &str, arch: &str) -> Value {
+    let manifest_bytes = match (os, arch) {
+        ("windows", "amd64") => include_bytes!(
             "../../../tests/fixtures/go-frozen/scheduler-install/windows-amd64.manifest.json"
         )
         .as_slice(),
-        "arm64" => include_bytes!(
+        ("windows", "arm64") => include_bytes!(
             "../../../tests/fixtures/go-frozen/scheduler-install/windows-arm64.manifest.json"
         )
         .as_slice(),
-        other => panic!("no actual native Windows install capture for {other}"),
+        ("darwin", "amd64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/darwin-amd64.manifest.json"
+        )
+        .as_slice(),
+        ("darwin", "arm64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/darwin-arm64.manifest.json"
+        )
+        .as_slice(),
+        other => panic!("no actual native install capture for {other:?}"),
     };
     let manifest: Value = serde_json::from_slice(manifest_bytes).unwrap();
     assert_eq!(
@@ -152,7 +169,7 @@ fn verified_windows_install(bytes: &[u8], arch: &str) -> Value {
         "30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"
     );
     assert_eq!(manifest["go_version"], "go1.26.6");
-    assert_eq!(manifest["native_target"], format!("windows/{arch}"));
+    assert_eq!(manifest["native_target"], format!("{os}/{arch}"));
     let capture = manifest["observations"]
         .as_array()
         .unwrap()
@@ -167,21 +184,21 @@ fn verified_windows_install(bytes: &[u8], arch: &str) -> Value {
         capture["fixture"]["sha256"],
         hex::encode(Sha256::digest(bytes))
     );
-    for (path, source) in [
-        (
-            "internal/scheduler/scheduler.go",
-            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
-        ),
-        (
-            "rust-tests/parity/oracle/scheduler-install/main.go",
-            include_bytes!("../../../rust-tests/parity/oracle/scheduler-install/main.go")
-                .as_slice(),
-        ),
-    ] {
-        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+    let build_info = capture["embedded_build_info"].as_str().unwrap();
+    assert!(build_info.contains("vcs.revision=30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"));
+    assert!(build_info.contains("vcs.modified=false"));
+    assert!(build_info.contains(&format!("\tGOOS={os}\n")));
+    assert!(build_info.contains(&format!("\tGOARCH={arch}\n")));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let sources = manifest["source_files"].as_object().unwrap();
+    assert_eq!(sources.len(), 65);
+    for (name, metadata) in sources {
+        let source = fs::read(root.join(name)).unwrap();
+        assert_eq!(metadata["bytes"], source.len(), "{name}");
         assert_eq!(
-            manifest["source_files"][path]["sha256"],
-            hex::encode(Sha256::digest(source))
+            metadata["sha256"],
+            hex::encode(Sha256::digest(source)),
+            "{name}"
         );
     }
     let document: Value = serde_json::from_slice(bytes).unwrap();
@@ -192,8 +209,11 @@ fn verified_windows_install(bytes: &[u8], arch: &str) -> Value {
 
 #[test]
 fn actual_native_windows_install_preserves_full_cases_and_rejects_unknown_architecture() {
-    let amd64 = verified_windows_install(FROZEN_WINDOWS, "amd64");
-    assert_eq!(amd64, verified_windows_install(FROZEN_WINDOWS, "arm64"));
+    let amd64 = verified_native_install(FROZEN_WINDOWS, "windows", "amd64");
+    assert_eq!(
+        amd64,
+        verified_native_install(FROZEN_WINDOWS, "windows", "arm64")
+    );
     assert_eq!(amd64["cases"].as_object().unwrap().len(), 20);
     let linux = verified_frozen_install(FROZEN_OBSERVATIONS);
     assert_ne!(
@@ -201,12 +221,38 @@ fn actual_native_windows_install_preserves_full_cases_and_rejects_unknown_archit
         linux["cases"]["cron_install_writes_block"]["files"]["schedules/install.sh"]
     );
     assert!(
-        std::panic::catch_unwind(|| verified_windows_install(FROZEN_WINDOWS, "unobserved"))
-            .is_err()
+        std::panic::catch_unwind(|| verified_native_install(
+            FROZEN_WINDOWS,
+            "windows",
+            "unobserved"
+        ))
+        .is_err()
     );
     let mut changed = FROZEN_WINDOWS.to_vec();
     changed[0] ^= 1;
-    assert!(std::panic::catch_unwind(|| verified_windows_install(&changed, "amd64")).is_err());
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(&changed, "windows", "amd64")).is_err()
+    );
+}
+
+#[test]
+fn actual_native_mac_install_preserves_full_file_and_mode_effects() {
+    let amd64 = verified_native_install(FROZEN_MAC, "darwin", "amd64");
+    assert_eq!(
+        amd64,
+        verified_native_install(FROZEN_MAC, "darwin", "arm64")
+    );
+    let linux = verified_frozen_install(FROZEN_OBSERVATIONS);
+    assert_eq!(amd64["cases"], linux["cases"]);
+    let mut changed = FROZEN_MAC.to_vec();
+    changed[0] ^= 1;
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(&changed, "darwin", "amd64")).is_err()
+    );
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(FROZEN_MAC, "unobserved", "amd64"))
+            .is_err()
+    );
 }
 
 #[test]
