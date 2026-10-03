@@ -31,7 +31,7 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
-## Complete MCP tool byte candidate (2026-10-03, #1124)
+## Complete MCP tool byte acceptance (2026-10-03, #1124)
 
 The new `mcp-tools-native.yml` selects all six native targets. It combines
 production dispatcher/envelope tests, the real stdio campaign/scheduler cases
@@ -49,8 +49,17 @@ Go recaptures of CLI triage, agent-error JSON, scheduler and campaign fixtures
 changed only source provenance; all request, response and side-effect bytes
 remain unchanged. The source commit is `0d34c46348932b076086730f2adf72a23bef533a`.
 The accepted manual browser fallback remains documented under #809.
-MCP-003/004/005 remain PARTIAL until complete native candidate results and
-required PR checks are available. See the tool-by-tool handoff below.
+Native run `37137670713` passed all six targets at
+`0980de4edd354b69f77ea5c86a0001ecc6b2d16f` (clean PR merge
+`b45637860246dc51ca02a5158326b14bfbf0af01`). Each target actually executes
+97 selected MCP tests, all 25 newly complete Go responses, retained stdio
+cases and both native-agent tests. MCP-003/004/005 pass their scoped contracts.
+Full native workspace run `37137772972` has its Intel Mac pending at this
+acceptance update; final current-head PR checks and main integration remain
+required. Task 8.1 remains unfinished because its aggregate gate also includes
+#1126, and task 8.5 still depends on completed CLI/handler wiring. See
+`docs/rust-port/handoffs/2026-10-03-mcp-all-tools-bytes.md` and the coordinator
+specification/quality reviews; no independent-agent review is claimed.
 
 ## Native Windows consent gate (2026-10-03, #1123)
 

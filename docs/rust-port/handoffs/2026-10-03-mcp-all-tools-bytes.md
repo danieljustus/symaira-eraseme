@@ -1,4 +1,4 @@
-# All MCP tools: byte comparison candidate
+# All MCP tools: native byte comparison acceptance
 
 Issue #1124 requires complete response comparisons for all 26 catalogue tools
 on six native targets. Schema/value comparisons alone do not meet this gate.
@@ -37,8 +37,33 @@ its default remains `time.Now`. Current-source commit
 `0d34c46348932b076086730f2adf72a23bef533a` changes only those three clock calls.
 Actual Go recaptures of scheduler, campaign, CLI-triage and agent-error fixtures
 changed only source metadata, with requests, responses and effects unchanged.
-Historical failed comparisons remain in the local logs; native acceptance is
-pending and MCP-003/004/005 stay PARTIAL.
+Historical failed comparisons remain in the local logs. Native run
+`37137670713` passed all six targets at implementation source
+`0980de4edd354b69f77ea5c86a0001ecc6b2d16f`, checked out as clean PR merge
+`b45637860246dc51ca02a5158326b14bfbf0af01` against main
+`37cdc851efb39eb72e22653fdc724f563d505e64`. MCP-003/004/005 now pass their
+scoped response-byte contracts. Final PR checks and main integration remain
+required; aggregate task 8.1 still includes #1126's HTTP acceptance and task
+8.5 remains gated by all handler/CLI predecessors.
+
+| Native target | Successful job |
+|---|---|
+| Linux amd64 | 111245403116 |
+| Linux arm64 | 111245403136 |
+| Windows amd64 | 111245403235 |
+| Windows arm64 | 111245403137 |
+| macOS arm64 | 111245402961 |
+| macOS amd64 | 111245403884 |
+
+All six logs show 97 selected production MCP tests, including the 25 complete
+current-Go responses and verified nine source hashes. Native stdio executes
+ten tests on Unix and six on Windows; the difference is platform selection,
+not skipped execution counted as evidence. The two native-agent tests execute
+all eight raw MCP comparisons, all 16 CLI inputs and ten agent controls on
+every target. Local exact-source workspace verification passed 591 tests with
+two intentional ignores and strict all-target/all-feature Clippy. Full native
+workspace run `37137772972` still has an Intel Mac pending at acceptance time;
+its completed targets do not substitute for that final check.
 
 Go runtime roots clear the environment and isolate HOME/USERPROFILE/XDG/temp
 and database paths. The large public registry capture has an explicit 8 MiB
