@@ -116,6 +116,19 @@ the newly extended corpus on all six native targets, task 8.1 acceptance
 review and ordinary integration remain pending; this local result alone
 does not complete task 8.1 or task 8.3.
 
+Current-source official CI job `111316975982` in run `37161925589` passes
+all six checks at PR head `32d5c6bba4244571428276608024ba896db06961`.
+Downloaded artifact `11287877386` verifies its fixed single manifest member,
+archive SHA-256, pinned upstream/SDK/Node identity, actual Go unmodified VCS
+metadata and virtual merge `034aba85a28aec46d28e76b2d647c1838d28b5a7`
+whose parents are that head and main `7a1baac8`.
+The full native run `37161978066` retains four Linux/Windows failures in the
+non-writing Python oracle acceptance control, before the native Rust suite:
+its two inventory assertions still expected 670 instead of the measured 678.
+Only those expected inventory counts are corrected; all existing corruption,
+compiler/host, missing-case and no-write controls remain intact. Fresh complete
+native acceptance on the corrected head remains required.
+
 ## Complete MCP tool byte acceptance (2026-10-03, #1124)
 
 The new `mcp-tools-native.yml` selects all six native targets. It combines
