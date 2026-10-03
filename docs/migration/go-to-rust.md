@@ -775,6 +775,18 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — #1131 SQLite preparation records the actual clean `f13f405`
+  Linux Go snapshot (12,585 bytes), tagged Go controls (three top-level
+  tests plus four quoted-literal subcases) and complete raw status/logs.
+  The Python fixture generator is verified as archived blob `28456fcf` at
+  immutable `python-final`; it is absent from current source. Initial
+  metadata assembly incorrectly looked for the deleted current file; the
+  successful Go streams were retained and independently read back against
+  that actual archived blob. All ten existing Rust tests remain selected
+  with one integrity control; immutable Git/hash/schema/persisted SQL and
+  co-mutated-provenance checks are unchanged. Linux defaults are frozen,
+  other OS/default and explicit live paths retain bounded tagged Go.
+
 - 2026-10-03 — Clean campaign checkpoint `65fede1` passed all 86 selected
   Go-free tests and the same six campaign tests in private-root pinned-Go
   live mode. Four actual `30eeb38` native artifacts in run `37154503080`

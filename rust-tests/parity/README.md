@@ -121,6 +121,16 @@ A native-corpus control verifies both observed architectures and rejects an
 unknown target or changed bytes. Local readback is not native execution of
 the new frozen Windows Rust path; that acceptance is still pending.
 
+Linux SQLite contract tests now read the real source-bound Go snapshot at
+clean `f13f405`, containing complete fresh/golden schema, pragmas, row counts
+and immutable provenance. The actual tagged Go test run includes three
+top-level controls and four quoted-literal subcases; its raw status/logs are
+verified. All ten existing Rust tests remain selected, including altered
+and co-altered fixture/provenance rejections and immutable Git-blob checks,
+plus a byte-change/missing-schema control. The Go-free checkout fetches full
+history for those unchanged fail-closed checks. Other OS defaults and
+explicit live mode retain the existing bounded tagged Go runner.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

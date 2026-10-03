@@ -80,6 +80,13 @@ OS-specific file/mode differences. Windows install defaults select this
 actual corpus with their native architecture manifest; original comparisons
 and the existing POSIX-mode capability rule remain intact. Local readback
 does not establish native execution of the new frozen Rust path.
+The Linux SQLite preparation replays an actual tagged Go snapshot at clean
+`f13f405` with complete immutable provenance, fresh/golden schemas, pragmas
+and row counts. Its three actual Go controls and four subcases are retained
+as raw observed logs; all ten Rust DB contracts and immutable-history
+mutation controls remain selected with one added corpus-integrity test.
+Other native OS observation acceptance and Go retirement remain separate;
+no DB or cutover status is promoted by this preparation.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

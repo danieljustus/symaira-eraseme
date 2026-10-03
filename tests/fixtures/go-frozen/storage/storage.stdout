@@ -1,0 +1,242 @@
+{
+  "provenance": {
+    "schema": "symaira-eraseme.storage-parity.v1",
+    "go_source_revision": "18c5dc1109e8824265f862f14584697d08152e40",
+    "go_source_path": "internal/eventstore/store.go",
+    "go_source_git_blob": "2201ac9ffd929f871fbd54f9e7e77eb59749c5a6",
+    "go_source_sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3",
+    "fixture_origin_revision": "993f9a652efd4470985c29b15fff0d8efb8d72c7",
+    "fixture_archive_tag": "python-final",
+    "fixture_archive_tag_oid": "9381296d68c7d674b102196f6d6b25a050bd6a66",
+    "fixture_archive_commit": "538f97070202fb1577db3c81d88ab908bd8671eb",
+    "fixture_generator_path": "scripts/generate_event_store_fixture.py",
+    "fixture_generator_git_blob": "28456fcfe96a27a32ee9be8eeb84089069f49f8e",
+    "fixture_generator_sha256": "2dff9a2ab364a4ec80674175fe8731ab9c6061a83960d50b04f184777be82e84",
+    "fixture_path": "tests/fixtures/event-store/golden-campaign.db",
+    "fixture_git_blob": "83d02232e9c1d146ef55c3cee058c646fe1c8c28",
+    "fixture_sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120",
+    "fixture_size": 102400
+  },
+  "fresh": {
+    "user_version": 2,
+    "pragmas": {
+      "busy_timeout": 5000,
+      "foreign_keys": 1,
+      "journal_mode": "wal"
+    },
+    "schema": [
+      {
+        "type": "index",
+        "name": "idx_events_occurred_at",
+        "sql": "CREATE INDEX idx_events_occurred_at ON request_events(occurred_at DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_events_request",
+        "sql": "CREATE INDEX idx_events_request ON request_events(request_id, occurred_at)"
+      },
+      {
+        "type": "index",
+        "name": "idx_inbox_replies_classified",
+        "sql": "CREATE INDEX idx_inbox_replies_classified ON inbox_replies(classified_as)"
+      },
+      {
+        "type": "index",
+        "name": "idx_inbox_replies_request",
+        "sql": "CREATE INDEX idx_inbox_replies_request ON inbox_replies(request_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_manual_tasks_request",
+        "sql": "CREATE INDEX idx_manual_tasks_request ON manual_tasks(request_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_manual_tasks_status",
+        "sql": "CREATE INDEX idx_manual_tasks_status ON manual_tasks(status)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_broker",
+        "sql": "CREATE INDEX idx_removal_requests_broker ON removal_requests(broker_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_campaign",
+        "sql": "CREATE INDEX idx_removal_requests_campaign ON removal_requests(campaign_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_jurisdiction",
+        "sql": "CREATE INDEX idx_removal_requests_jurisdiction ON removal_requests(jurisdiction)"
+      },
+      {
+        "type": "index",
+        "name": "idx_request_state_next_action",
+        "sql": "CREATE INDEX idx_request_state_next_action ON request_state(next_action_at, current_status)"
+      },
+      {
+        "type": "table",
+        "name": "campaigns",
+        "sql": "CREATE TABLE campaigns ( id TEXT PRIMARY KEY, created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), kind TEXT NOT NULL DEFAULT 'initial', notes TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "imap_state",
+        "sql": "CREATE TABLE imap_state ( host TEXT NOT NULL, folder TEXT NOT NULL, uid_validity INTEGER NOT NULL, last_uid INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (host, folder) )"
+      },
+      {
+        "type": "table",
+        "name": "inbox_replies",
+        "sql": "CREATE TABLE inbox_replies ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER REFERENCES removal_requests(id), message_id TEXT UNIQUE NOT NULL, thread_id TEXT, received_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), from_addr TEXT, subject TEXT, snippet TEXT, classified_as TEXT, classifier_confidence REAL, llm_summary TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "manual_tasks",
+        "sql": "CREATE TABLE manual_tasks ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER REFERENCES removal_requests(id), broker_id TEXT NOT NULL DEFAULT '', broker_name TEXT NOT NULL DEFAULT '', form_url TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT 'generic_error', instructions TEXT NOT NULL DEFAULT '', screenshot_path TEXT NOT NULL DEFAULT '', html_snapshot_path TEXT NOT NULL DEFAULT '', form_fields_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), completed_at TIMESTAMP, notes TEXT NOT NULL DEFAULT '' )"
+      },
+      {
+        "type": "table",
+        "name": "removal_requests",
+        "sql": "CREATE TABLE removal_requests ( id INTEGER PRIMARY KEY AUTOINCREMENT, broker_id TEXT NOT NULL, channel TEXT NOT NULL DEFAULT 'email', campaign_id TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), jurisdiction TEXT NOT NULL, template_id TEXT NOT NULL DEFAULT '', identity_snapshot_hash TEXT NOT NULL DEFAULT '' )"
+      },
+      {
+        "type": "table",
+        "name": "reply_drafts",
+        "sql": "CREATE TABLE reply_drafts ( id INTEGER PRIMARY KEY AUTOINCREMENT, reply_id INTEGER NOT NULL REFERENCES inbox_replies(id), request_id INTEGER REFERENCES removal_requests(id), draft_body TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), sent_at TIMESTAMP, account TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "request_events",
+        "sql": "CREATE TABLE request_events ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER NOT NULL REFERENCES removal_requests(id), occurred_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), recorded_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), event_type TEXT NOT NULL, payload_json TEXT NOT NULL DEFAULT '{}', source TEXT NOT NULL DEFAULT 'system' )"
+      },
+      {
+        "type": "table",
+        "name": "request_state",
+        "sql": "CREATE TABLE request_state ( request_id INTEGER PRIMARY KEY REFERENCES removal_requests(id), current_status TEXT NOT NULL DEFAULT 'PLANNED', last_event_id INTEGER NOT NULL DEFAULT 0, last_event_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), sent_at TIMESTAMP, acknowledged_at TIMESTAMP, resolved_at TIMESTAMP, deadline_at TIMESTAMP, next_action_at TIMESTAMP, reminders_sent INTEGER NOT NULL DEFAULT 0, escalation_level INTEGER NOT NULL DEFAULT 0 )"
+      },
+      {
+        "type": "table",
+        "name": "sqlite_sequence",
+        "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+      }
+    ],
+    "table_row_counts": {
+      "campaigns": 0,
+      "removal_requests": 0,
+      "request_events": 0,
+      "request_state": 0
+    }
+  },
+  "golden": {
+    "user_version": 2,
+    "pragmas": {
+      "busy_timeout": 5000,
+      "foreign_keys": 1,
+      "journal_mode": "wal"
+    },
+    "schema": [
+      {
+        "type": "index",
+        "name": "idx_events_occurred_at",
+        "sql": "CREATE INDEX idx_events_occurred_at ON request_events(occurred_at DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_events_request",
+        "sql": "CREATE INDEX idx_events_request ON request_events(request_id, occurred_at)"
+      },
+      {
+        "type": "index",
+        "name": "idx_inbox_replies_classified",
+        "sql": "CREATE INDEX idx_inbox_replies_classified ON inbox_replies(classified_as)"
+      },
+      {
+        "type": "index",
+        "name": "idx_inbox_replies_request",
+        "sql": "CREATE INDEX idx_inbox_replies_request ON inbox_replies(request_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_manual_tasks_request",
+        "sql": "CREATE INDEX idx_manual_tasks_request ON manual_tasks(request_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_manual_tasks_status",
+        "sql": "CREATE INDEX idx_manual_tasks_status ON manual_tasks(status)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_broker",
+        "sql": "CREATE INDEX idx_removal_requests_broker ON removal_requests(broker_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_campaign",
+        "sql": "CREATE INDEX idx_removal_requests_campaign ON removal_requests(campaign_id)"
+      },
+      {
+        "type": "index",
+        "name": "idx_removal_requests_jurisdiction",
+        "sql": "CREATE INDEX idx_removal_requests_jurisdiction ON removal_requests(jurisdiction)"
+      },
+      {
+        "type": "index",
+        "name": "idx_request_state_next_action",
+        "sql": "CREATE INDEX idx_request_state_next_action ON request_state(next_action_at, current_status)"
+      },
+      {
+        "type": "table",
+        "name": "campaigns",
+        "sql": "CREATE TABLE campaigns ( id TEXT PRIMARY KEY, created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), kind TEXT NOT NULL DEFAULT 'initial', notes TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "imap_state",
+        "sql": "CREATE TABLE imap_state ( host TEXT NOT NULL, folder TEXT NOT NULL, uid_validity INTEGER NOT NULL, last_uid INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (host, folder) )"
+      },
+      {
+        "type": "table",
+        "name": "inbox_replies",
+        "sql": "CREATE TABLE inbox_replies ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER REFERENCES removal_requests(id), message_id TEXT UNIQUE NOT NULL, thread_id TEXT, received_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), from_addr TEXT, subject TEXT, snippet TEXT, classified_as TEXT, classifier_confidence REAL, llm_summary TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "manual_tasks",
+        "sql": "CREATE TABLE manual_tasks ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER REFERENCES removal_requests(id), broker_id TEXT NOT NULL DEFAULT '', broker_name TEXT NOT NULL DEFAULT '', form_url TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT 'generic_error', instructions TEXT NOT NULL DEFAULT '', screenshot_path TEXT NOT NULL DEFAULT '', html_snapshot_path TEXT NOT NULL DEFAULT '', form_fields_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), completed_at TIMESTAMP, notes TEXT NOT NULL DEFAULT '' )"
+      },
+      {
+        "type": "table",
+        "name": "removal_requests",
+        "sql": "CREATE TABLE removal_requests ( id INTEGER PRIMARY KEY AUTOINCREMENT, broker_id TEXT NOT NULL, channel TEXT NOT NULL DEFAULT 'email', campaign_id TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), jurisdiction TEXT NOT NULL, template_id TEXT NOT NULL DEFAULT '', identity_snapshot_hash TEXT NOT NULL DEFAULT '' )"
+      },
+      {
+        "type": "table",
+        "name": "reply_drafts",
+        "sql": "CREATE TABLE reply_drafts ( id INTEGER PRIMARY KEY AUTOINCREMENT, reply_id INTEGER NOT NULL REFERENCES inbox_replies(id), request_id INTEGER REFERENCES removal_requests(id), draft_body TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), sent_at TIMESTAMP, account TEXT )"
+      },
+      {
+        "type": "table",
+        "name": "request_events",
+        "sql": "CREATE TABLE request_events ( id INTEGER PRIMARY KEY AUTOINCREMENT, request_id INTEGER NOT NULL REFERENCES removal_requests(id), occurred_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), recorded_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), event_type TEXT NOT NULL, payload_json TEXT NOT NULL DEFAULT '{}', source TEXT NOT NULL DEFAULT 'system' )"
+      },
+      {
+        "type": "table",
+        "name": "request_state",
+        "sql": "CREATE TABLE request_state ( request_id INTEGER PRIMARY KEY REFERENCES removal_requests(id), current_status TEXT NOT NULL DEFAULT 'PLANNED', last_event_id INTEGER NOT NULL DEFAULT 0, last_event_at TIMESTAMP NOT NULL DEFAULT (datetime('now')), sent_at TIMESTAMP, acknowledged_at TIMESTAMP, resolved_at TIMESTAMP, deadline_at TIMESTAMP, next_action_at TIMESTAMP, reminders_sent INTEGER NOT NULL DEFAULT 0, escalation_level INTEGER NOT NULL DEFAULT 0 )"
+      },
+      {
+        "type": "table",
+        "name": "sqlite_sequence",
+        "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+      }
+    ],
+    "table_row_counts": {
+      "campaigns": 1,
+      "removal_requests": 3,
+      "request_events": 12,
+      "request_state": 0
+    }
+  }
+}
