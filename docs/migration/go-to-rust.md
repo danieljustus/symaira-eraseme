@@ -18,8 +18,9 @@ evidence. Phases 6–8 are not complete. Closed historical phase issues
 `execution_state.task_issues` maps every unfinished task to the granular
 issues of #813; `contract_issue_owners` maps every PARTIAL/TODO row. The
 matrix's row status remains authoritative. `active_tasks` means unfinished
-implementation/evidence, not a live writer claim. Task 6.1 remains unfinished
-because its planned crate-decision artifact is absent; #1119 owns that gap.
+implementation/evidence, not a live writer claim. Task 6.1 remains unfinished pending native trust acceptance; its crate-decision
+artifact is now recorded in `docs/rust-email-crate-decision.md`, and #1119 owns
+the remaining gate.
 `python3 tests/test_rust_task_graph.py` checks this reconciliation without Go,
 network calls or fixture regeneration; CI runs the same check.
 
@@ -30,6 +31,18 @@ and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
 on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
+
+## Email platform-root repair (2026-10-03, #1119)
+
+The real OAuth2 HTTPS regression reproduced a trust mismatch: default ureq
+Mozilla roots rejected an explicitly configured private CA, whereas IMAP
+already loaded platform certificates. `email/tls.rs` now supplies both
+adapters with the existing platform/Windows-machine certificate policy.
+Trusted, foreign-issuer and expired-certificate controls pass locally, as do
+the seven existing OAuth2 and five IMAP parity tests. No live provider or
+mailbox is involved. The explicit six-target native OS-store proof is pending;
+DOM-006/DOM-007 remain PARTIAL. See `docs/rust-email-crate-decision.md` for the
+previously missing task 6.1 decision artifact and its acceptance limits.
 
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
