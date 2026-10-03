@@ -49,6 +49,35 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## LLM fixture lifecycle candidate (2026-10-03, #1142)
+
+The original `b2d282e` Windows amd64 failure in run `37045269185`, job
+`110965028842`, remains retained. Diagnostics merged by #1143 proved request
+counts and redacted outcomes but did not identify the original scheduler event.
+Code inspection identifies a lifecycle defect: the accept timer starts before
+`create_with` finishes constructing the client, so unrelated client preparation
+can consume the budget intended for its three HTTP attempts. The production
+retry policy is two then four seconds; successful diagnostics record requests
+at approximately zero, two and six seconds.
+
+The fixture now binds first, constructs its actual client, then starts serving
+with the same fifteen-second accept lifetime. Separate setup/active timings,
+status, received/expected counts and error class remain observable; no prompts,
+keys or response bodies are logged. Accepted sockets use bounded read/write
+waits instead of unbounded reads. Production retry, TLS trust, LLM configuration
+and pinned Go fixtures are unchanged.
+
+A distinguishing executable control uses the same short budget on both clock
+origins: delayed preparation exhausts the original origin with zero requests,
+while arming at readiness returns the required complete 403 response. A second
+control sends one of three requests and must fail with an exact one-request
+count within its short deadline, with the thread joined. The seven retained
+provider cases still require all three actual production attempts, exact path,
+Go error class/message after required credential redaction, and unchanged Go
+fixture regeneration. All ten local tests pass. Current native six-target proof,
+including both Windows architectures, is pending. This proves the mechanism and
+repair; it does not fabricate a timestamp for the historical client setup.
+
 ## Native Windows consent gate (2026-10-03, #1123)
 
 `consent-windows.yml` selects actual amd64 and arm64 execution. Four private

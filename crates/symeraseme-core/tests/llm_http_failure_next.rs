@@ -121,8 +121,9 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
     let attempts = fixture["attempts"].as_u64().unwrap() as usize;
     assert_eq!(fixture["status"], expected_status);
     let started = Instant::now();
-    let (base_url, server) =
-        local_failure_server(attempts, expected_status, fixture["body"].as_str().unwrap());
+    let pending =
+        PendingFailureServer::new(attempts, expected_status, fixture["body"].as_str().unwrap());
+    let base_url = pending.base_url();
     let client = create_with(
         &CreateOptions {
             provider: "openai".to_owned(),
@@ -134,15 +135,25 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
         &|_| false,
     )
     .expect("local fake provider client");
+    let setup_elapsed = started.elapsed();
+    // Client setup is not an HTTP attempt. Arm the unchanged 15-second active
+    // fixture lifetime only after its actual client is ready to send.
+    let server = pending.start(Duration::from_secs(15));
+    let active_started = Instant::now();
     let result = client.classify("system", "user", &ClassifyOptions::default());
     writeln!(
         std::io::stderr(),
-        "LLM_FAILURE_NEXT status={expected_status} outcome_provider={} elapsed_ms={}",
+        "LLM_FAILURE_NEXT status={expected_status} outcome_provider={} elapsed_ms={} setup_ms={} active_ms={}",
         matches!(&result, Err(ClientError::Provider(_))),
-        started.elapsed().as_millis()
+        started.elapsed().as_millis(),
+        setup_elapsed.as_millis(),
+        active_started.elapsed().as_millis()
     )
     .expect("write local provider outcome diagnostics");
-    let paths = server.join().expect("local provider server thread");
+    let paths = server
+        .join()
+        .expect("local provider server thread")
+        .expect("complete expected provider attempts");
 
     assert_eq!(paths.len(), attempts, "Go retry count");
     let go_path = fixture["path"].as_str().unwrap();
@@ -218,65 +229,179 @@ fn assert_oracle_fixture_matches(fixture_json: &str, args: &[&str]) {
     );
 }
 
-fn local_failure_server(
+#[derive(Debug)]
+struct ServerFailure {
+    kind: std::io::ErrorKind,
+    received: usize,
+}
+
+struct PendingFailureServer {
+    listener: TcpListener,
     attempts: usize,
     status: u16,
-    body: &str,
-) -> (String, thread::JoinHandle<Vec<String>>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback provider server");
-    listener
-        .set_nonblocking(true)
-        .expect("nonblocking listener");
-    let base_url = format!("http://{}", listener.local_addr().unwrap());
-    let body = body.to_owned();
-    let server = thread::spawn(move || {
-        let mut paths = Vec::with_capacity(attempts);
-        let started = Instant::now();
-        let deadline = started + Duration::from_secs(15);
-        while paths.len() < attempts {
-            let (stream, _) = match listener.accept() {
-                Ok(connection) => connection,
-                Err(error)
-                    if error.kind() == std::io::ErrorKind::WouldBlock
-                        && Instant::now() < deadline =>
-                {
-                    thread::sleep(Duration::from_millis(10));
-                    continue;
-                }
-                Err(error) => panic!(
-                    "accept provider request: {error}; status={status} received={}/{} elapsed_ms={} accept_limit_ms=15000",
-                    paths.len(),
-                    attempts,
-                    started.elapsed().as_millis()
-                ),
-            };
-            let (mut stream, path) = read_request(stream);
-            paths.push(path);
-            writeln!(
-                std::io::stderr(),
-                "LLM_FAILURE_NEXT status={status} received={}/{} elapsed_ms={}",
-                paths.len(),
-                attempts,
-                started.elapsed().as_millis()
-            )
-            .expect("write local request progress diagnostics");
-            let response = format!(
-                "HTTP/1.1 {status} Synthetic Failure\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len(),
-            );
-            stream
-                .write_all(response.as_bytes())
-                .expect("write local 403 response");
+    body: String,
+}
+
+impl PendingFailureServer {
+    fn new(attempts: usize, status: u16, body: &str) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback provider server");
+        listener
+            .set_nonblocking(true)
+            .expect("nonblocking listener");
+        Self {
+            listener,
+            attempts,
+            status,
+            body: body.to_owned(),
         }
-        paths
-    });
-    (base_url, server)
+    }
+
+    fn base_url(&self) -> String {
+        format!("http://{}", self.listener.local_addr().unwrap())
+    }
+
+    fn start(self, budget: Duration) -> thread::JoinHandle<Result<Vec<String>, ServerFailure>> {
+        self.start_until(Instant::now() + budget, budget)
+    }
+
+    fn start_until(
+        self,
+        deadline: Instant,
+        budget: Duration,
+    ) -> thread::JoinHandle<Result<Vec<String>, ServerFailure>> {
+        thread::spawn(move || {
+            let started = Instant::now();
+            let mut paths = Vec::with_capacity(self.attempts);
+            while paths.len() < self.attempts {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    eprintln!(
+                        "LLM_FAILURE_NEXT status={} phase=accept_deadline received={}/{} elapsed_ms={} accept_limit_ms={}",
+                        self.status,
+                        paths.len(),
+                        self.attempts,
+                        started.elapsed().as_millis(),
+                        budget.as_millis()
+                    );
+                    return Err(ServerFailure {
+                        kind: std::io::ErrorKind::TimedOut,
+                        received: paths.len(),
+                    });
+                }
+                let (stream, _) = match self.listener.accept() {
+                    Ok(connection) => connection,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10).min(remaining));
+                        continue;
+                    }
+                    Err(error) => {
+                        return Err(ServerFailure {
+                            kind: error.kind(),
+                            received: paths.len(),
+                        });
+                    }
+                };
+                stream
+                    .set_nonblocking(false)
+                    .expect("blocking accepted provider stream");
+                stream
+                    .set_read_timeout(Some(remaining))
+                    .expect("bounded provider request read");
+                stream
+                    .set_write_timeout(Some(remaining))
+                    .expect("bounded provider response write");
+                let (mut stream, path) = read_request(stream);
+                paths.push(path);
+                eprintln!(
+                    "LLM_FAILURE_NEXT status={} received={}/{} elapsed_ms={} accept_limit_ms={}",
+                    self.status,
+                    paths.len(),
+                    self.attempts,
+                    started.elapsed().as_millis(),
+                    budget.as_millis()
+                );
+                let response = format!(
+                    "HTTP/1.1 {} Synthetic Failure\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    self.status,
+                    self.body.len(),
+                    self.body
+                );
+                if let Err(error) = stream.write_all(response.as_bytes()) {
+                    return Err(ServerFailure {
+                        kind: error.kind(),
+                        received: paths.len(),
+                    });
+                }
+            }
+            Ok(paths)
+        })
+    }
+}
+
+#[test]
+fn client_preparation_must_not_consume_active_fixture_deadline() {
+    let budget = Duration::from_millis(500);
+    let old = PendingFailureServer::new(1, 403, "synthetic");
+    let old_deadline = Instant::now() + budget;
+    let prepared = PendingFailureServer::new(1, 403, "synthetic");
+    // A bounded setup delay distinguishes the old clock origin from arming
+    // the same budget at readiness. It changes no production retry policy.
+    thread::sleep(budget * 2);
+    let failure = old
+        .start_until(old_deadline, budget)
+        .join()
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(failure.kind, std::io::ErrorKind::TimedOut);
+    assert_eq!(failure.received, 0);
+    let address = prepared.listener.local_addr().unwrap();
+    let success = prepared.start(budget);
+    let mut client = TcpStream::connect_timeout(&address, Duration::from_secs(1)).unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    client
+        .write_all(b"POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+        .unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 403 Synthetic Failure\r\n"));
+    assert_eq!(success.join().unwrap().unwrap(), ["/v1/chat/completions"]);
+}
+
+#[test]
+fn missing_retry_is_a_bounded_failure_with_exact_request_count() {
+    let pending = PendingFailureServer::new(3, 400, "synthetic");
+    let address = pending.listener.local_addr().unwrap();
+    let started = Instant::now();
+    let server = pending.start(Duration::from_millis(300));
+    let mut client = TcpStream::connect_timeout(&address, Duration::from_secs(1)).unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    client
+        .write_all(b"POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+        .unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 400 Synthetic Failure\r\n"));
+    let failure = server.join().unwrap().unwrap_err();
+    assert_eq!(failure.kind, std::io::ErrorKind::TimedOut);
+    assert_eq!(failure.received, 1);
+    assert!(started.elapsed() >= Duration::from_millis(300));
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "missing retry exceeded the bounded control"
+    );
 }
 
 fn read_request(stream: TcpStream) -> (TcpStream, String) {
-    stream
-        .set_nonblocking(false)
-        .expect("set accepted provider stream blocking");
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     reader.read_line(&mut line).expect("read request line");
