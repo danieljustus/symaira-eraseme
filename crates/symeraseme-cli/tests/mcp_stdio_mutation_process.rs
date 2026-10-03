@@ -161,7 +161,7 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     assert_eq!(fixture["generator_sha256"], sha256(GENERATOR));
     assert_eq!(
         fixture["source_revision"],
-        "6d175f6355a67fe0c0e539754121b6643df812bf"
+        "0bc6b051890340822448fa3846c96f70022b79ad"
     );
     assert_eq!(fixture["mutation_seed"], 0x4D43503135u64);
     assert_eq!(fixture["mutation_count"], 128);
@@ -177,8 +177,8 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     let cases = fixture["cases"].as_array().unwrap();
     assert_eq!(
         cases.len(),
-        670,
-        "six parse cases, four boundaries, 128 seeded mutations, 532 syntax probes"
+        678,
+        "six parse cases, four boundaries, 128 seeded mutations, 532 syntax probes, eight ping frames"
     );
     assert_eq!(
         cases[..6]
@@ -195,9 +195,25 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         assert_eq!(case["name"], format!("seeded-byte-mutation-{index:02}"));
     }
     assert!(
-        cases[138..]
+        cases[138..670]
             .iter()
             .all(|case| case["name"].as_str().unwrap().starts_with("syntax-"))
+    );
+    assert_eq!(
+        cases[670..]
+            .iter()
+            .map(|case| case["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        [
+            "ping-request",
+            "ping-null-params",
+            "ping-null-id",
+            "ping-escaped-id",
+            "ping-invalid-params",
+            "ping-invalid-id",
+            "ping-notification",
+            "ping-invalid-params-notification"
+        ]
     );
 
     for case in cases {
