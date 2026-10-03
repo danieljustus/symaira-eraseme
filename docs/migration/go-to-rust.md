@@ -158,10 +158,12 @@ Native run `37137670713` passed all six targets at
 `b45637860246dc51ca02a5158326b14bfbf0af01`). Each target actually executes
 97 selected MCP tests, all 25 newly complete Go responses, retained stdio
 cases and both native-agent tests. MCP-003/004/005 pass their scoped contracts.
-Full native workspace run `37137772972` has its Intel Mac pending at this
-acceptance update; final current-head PR checks and main integration remain
-required. Task 8.1 remains unfinished because its aggregate gate also includes
-#1126, and task 8.5 still depends on completed CLI/handler wiring. See
+Full native workspace run `37137772972` passed all six targets. PR #1153
+integrated as `7a1baac8051de92527141b1e6e120b6dd5ddbcb4` after all 39
+current-head checks and all nine overall workflows completed successfully.
+Issue #1124 is completed for its scoped MCP-003/004/005 acceptance. Task 8.1
+remains unfinished under #1126; task 8.4 retains its remaining open owners.
+Task 8.5 remains gated by completed CLI/handler wiring and is owned by #813. See
 `docs/rust-port/handoffs/2026-10-03-mcp-all-tools-bytes.md` and the coordinator
 specification/quality reviews; no independent-agent review is claimed.
 
