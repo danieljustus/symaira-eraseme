@@ -10,6 +10,28 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Backup candidate Windows HTTP fixture reconciliation (2026-10-03)
+
+Fresh main-based #1154 head `04d33e700ed486b11a4aea4c0de1a83050269429`
+failed its Windows PR gate in run `37148405763`, job `111276980727` at clean
+PR merge `c77385167e3ee197b98510e57c9552c64b29e61a`. Five Windows process
+tests passed; `native_windows_http_matches_checked_out_go` received no
+complete HTTP headers and failed at the delimiter check. That fixture still
+wrote request headers and body separately, permitting a Windows reset during
+early authentication/origin rejection. The retained failure is not accepted
+proof, even though the separate backup rehearsal and earlier full native
+workspace run `37137774907` passed all six targets.
+
+Reuse the exact staged-request and bounded-response repair already present
+in SMTP source `cb3234c2291c8b243aeed8452e2bfce6f1938868`. The entire request
+is sent from one staged buffer, and the existing five-second bounded reader
+requires complete headers and the declared complete body on every response.
+No retry, deadline increase, response normalization, production server or
+backup confinement change is introduced. Local bounded/backpressure control,
+strict CLI all-target/all-feature Clippy, formatting and task-graph checks
+pass; these Linux checks do not execute the Windows-only fixture. Fresh
+candidate native Windows and required PR acceptance remain necessary.
+
 The task graph is reconciled against integrated `28e32a1c` and the current
 matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
 evidence. Phases 6–8 are not complete. Closed historical phase issues
