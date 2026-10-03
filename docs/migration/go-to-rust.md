@@ -31,7 +31,37 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
-## LLM fixture lifecycle candidate (2026-10-03, #1142)
+## Complete MCP tool byte acceptance (2026-10-03, #1124)
+
+The new `mcp-tools-native.yml` selects all six native targets. It combines
+production dispatcher/envelope tests, the real stdio campaign/scheduler cases
+and compiled native-agent triage. Current Go recordings add complete bytes
+for six fixed-clock calendar/dashboard cases, four stored-reply auto-confirm
+responses, and 25 remaining-tool/boundary cases, including the entire embedded
+registry and ten corrupt-database errors. The cleanup boundary additionally
+proves that manual-file cleanup does not inspect the database. Current-source
+hashes are checked before comparing responses; execution uses private roots.
+
+The candidate fixes broker struct field order, integral form-spec numbers and
+Go's public `SQLITE_NOTADB` spelling at store open. Rendered Go reporting now
+uses its existing optional clock, whose default remains `time.Now`. The actual
+Go recaptures of CLI triage, agent-error JSON, scheduler and campaign fixtures
+changed only source provenance; all request, response and side-effect bytes
+remain unchanged. The source commit is `0d34c46348932b076086730f2adf72a23bef533a`.
+The accepted manual browser fallback remains documented under #809.
+Native run `37137670713` passed all six targets at
+`0980de4edd354b69f77ea5c86a0001ecc6b2d16f` (clean PR merge
+`b45637860246dc51ca02a5158326b14bfbf0af01`). Each target actually executes
+97 selected MCP tests, all 25 newly complete Go responses, retained stdio
+cases and both native-agent tests. MCP-003/004/005 pass their scoped contracts.
+Full native workspace run `37137772972` has its Intel Mac pending at this
+acceptance update; final current-head PR checks and main integration remain
+required. Task 8.1 remains unfinished because its aggregate gate also includes
+#1126, and task 8.5 still depends on completed CLI/handler wiring. See
+`docs/rust-port/handoffs/2026-10-03-mcp-all-tools-bytes.md` and the coordinator
+specification/quality reviews; no independent-agent review is claimed.
+
+## Integrated LLM fixture lifecycle acceptance (2026-10-03, #1142)
 
 The original `b2d282e` Windows amd64 failure in run `37045269185`, job
 `110965028842`, remains retained. Diagnostics merged by #1143 proved request
@@ -56,9 +86,15 @@ control sends one of three requests and must fail with an exact one-request
 count within its short deadline, with the thread joined. The seven retained
 provider cases still require all three actual production attempts, exact path,
 Go error class/message after required credential redaction, and unchanged Go
-fixture regeneration. All ten local tests pass. Current native six-target proof,
-including both Windows architectures, is pending. This proves the mechanism and
-repair; it does not fabricate a timestamp for the historical client setup.
+fixture regeneration. All ten local tests pass. Source
+`71f36604856f49ebc249fd1088d2c014e36df200` passed all six targets in targeted
+run `37137392379` and full native workspace run `37137564400`. Archive run
+`37137392415` passed all six native binaries and same-run six-archive verification
+job `111275349421`; all 46 final PR checks are accepted. PR #1152 merged as
+`c797d217b97197d0dbfb56741ecc95c5be001a77`, and #1142 is closed by readback.
+This proves the mechanism and repair; it does not fabricate a timestamp for
+historical client setup. Following candidates include this verified main
+predecessor and require their own current-head checks before integration.
 
 ## Native Windows consent gate (2026-10-03, #1123)
 

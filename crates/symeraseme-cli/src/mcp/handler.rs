@@ -711,10 +711,8 @@ impl ContractHandler {
 
     /// Go's `list_brokers`: the embedded registry through the shared filter.
     ///
-    /// Not recorded in the oracle — the answer is the registry itself (1274
-    /// brokers, 985 KB with `include_inactive`, 1273 without), and the model and
-    /// filter semantics already have byte-exact coverage in the registry
-    /// goldens. The handler path is asserted by shape instead.
+    /// The envelope and filter keys follow Go map order; nested brokers and
+    /// channels retain the declaration order of Go registry structs.
     fn list_brokers(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
         let status = optional_str(arguments, "status").or_else(|| Some("active".to_owned()));
@@ -728,14 +726,35 @@ impl ContractHandler {
             include_inactive: get_bool(arguments, "include_inactive", false),
         };
         let filtered = registry::filter_brokers(&brokers, &filter);
+        let mut broker_values =
+            serde_json::to_value(&filtered).map_err(|error| ToolError(error.to_string()))?;
+        // Registry form-spec floats use Go's integral-number spelling. Keep
+        // struct field order while converting only those numeric wire fields.
+        for broker in broker_values.as_array_mut().expect("broker array") {
+            for channel in broker["opt_out"].as_array_mut().expect("channel array") {
+                if let Some(spec) = channel.get_mut("form_spec") {
+                    for key in ["timeout_seconds", "rate_limit_delay"] {
+                        if let Some(number) = spec.get_mut(key) {
+                            let value = number.as_f64().expect("validated form-spec number");
+                            if value.fract() == 0.0
+                                && value >= i64::MIN as f64
+                                && value < i64::MAX as f64
+                            {
+                                *number = json!(value as i64);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         Ok(json!({
-            "schema_version": 1,
+            "brokers": broker_values,
             "count": filtered.len(),
-            "brokers": filtered,
             "filters": {
                 "include_disabled": filter.include_disabled,
                 "status": status,
             },
+            "schema_version": 1,
         }))
     }
 
@@ -1505,6 +1524,7 @@ impl ToolHandler for ContractHandler {
         if matches!(
             name,
             "auto_confirm"
+                | "list_brokers"
                 | "schedule_install"
                 | "schedule_status"
                 | "classify_reply"
@@ -1793,7 +1813,10 @@ mod tests {
         let oracle_process = std::process::Command::new("go")
             .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
             .current_dir(&repository_root)
-            .env("TMPDIR", "/tmp")
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOENV", "off")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
             .output()
             .expect("run source-bound Go auto-confirm oracle");
         assert!(
@@ -1807,6 +1830,17 @@ mod tests {
             oracle["source_revision"],
             "e8a8c969cb1a3b5a7f77dfe28f807e3707d0a8d8"
         );
+        assert_eq!(oracle["go_version"], "go1.26.6");
+        let sources = oracle["sources_sha256"].as_object().unwrap();
+        assert_eq!(sources.len(), 7);
+        for (path, expected) in sources {
+            use sha2::{Digest, Sha256};
+            let actual = Sha256::digest(fs::read(repository_root.join(path)).unwrap())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            assert_eq!(expected.as_str().unwrap(), actual, "{path}");
+        }
         let oracle_response = |key: &str| -> Value {
             let frame: Value =
                 serde_json::from_str(oracle[key].as_str().expect("oracle process response"))
@@ -1849,10 +1883,25 @@ mod tests {
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
         );
+        let call_wire = |arguments: &Map<String, Value>, key: &str| -> Value {
+            let request = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "auto_confirm", "arguments": arguments}});
+            let wire = match initialize(&serde_json::to_vec(&request).unwrap(), &handler) {
+                InitializeOutcome::Response(bytes) => bytes,
+                other => panic!("{key}: expected complete response, got {other:?}"),
+            };
+            assert_response_matches(
+                key,
+                Some(String::from_utf8(wire.clone()).unwrap()),
+                oracle[key].as_str(),
+            );
+            let envelope: Value = serde_json::from_slice(&wire).unwrap();
+            serde_json::from_str(envelope["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap()
+        };
         let mut arguments = Map::new();
         arguments.insert("request_id".to_owned(), serde_json::json!(1));
         arguments.insert("dry_run".to_owned(), serde_json::json!(true));
-        let dry_run = handler.call("auto_confirm", &arguments).expect("dry run");
+        let dry_run = call_wire(&arguments, "dry_run_response");
         assert_eq!(dry_run, oracle_response("dry_run_response"));
         assert_eq!(dry_run["Success"], true);
         assert_eq!(dry_run["Step"], "dry_run");
@@ -1871,9 +1920,7 @@ mod tests {
         assert_eq!(oracle["dry_run_state"]["human_action_required_events"], 0);
 
         arguments.insert("dry_run".to_owned(), serde_json::json!(false));
-        let result = handler
-            .call("auto_confirm", &arguments)
-            .expect("manual fallback");
+        let result = call_wire(&arguments, "manual_response");
         assert_eq!(result, oracle_response("manual_response"));
         assert_eq!(result["Success"], false);
         assert_eq!(result["Step"], "manual_confirmation_required");
@@ -1932,15 +1979,11 @@ mod tests {
 
         arguments.insert("request_id".to_owned(), json!(2));
         arguments.insert("dry_run".to_owned(), json!(true));
-        let no_links_dry = handler
-            .call("auto_confirm", &arguments)
-            .expect("no-links dry run");
+        let no_links_dry = call_wire(&arguments, "no_links_dry_response");
         assert_eq!(no_links_dry, oracle_response("no_links_dry_response"));
         assert_eq!(no_links_dry["DryRun"], false);
         arguments.insert("dry_run".to_owned(), json!(false));
-        let no_links = handler
-            .call("auto_confirm", &arguments)
-            .expect("no-links result");
+        let no_links = call_wire(&arguments, "no_links_response");
         assert_eq!(no_links, oracle_response("no_links_response"));
         let notes: i64 = store
             .db()
@@ -3033,6 +3076,8 @@ mod tests {
             tool: String,
             arguments: Map<String, Value>,
             result: Value,
+            request: String,
+            response: String,
         }
 
         #[derive(Deserialize)]
@@ -3261,8 +3306,179 @@ mod tests {
                 .call(&case.tool, &case.arguments)
                 .unwrap_or_else(|error| panic!("{}: {error}", case.name));
             assert_eq!(actual, case.result, "{}", case.name);
+            let wire = match initialize(case.request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => bytes,
+                other => panic!("{} expected a complete response, got {other:?}", case.name),
+            };
+            assert_eq!(
+                wire,
+                case.response.as_bytes(),
+                "{} complete current-Go response bytes",
+                case.name
+            );
         }
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Record the real Go server rather than reconstructing its result envelope.
+    #[test]
+    fn remaining_tool_responses_match_current_go_bytes() {
+        use sha2::{Digest, Sha256};
+        use std::collections::BTreeMap;
+        use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
+        use symeraseme_core::config::ConfigContext;
+
+        struct ChildGuard(std::process::Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                if self.0.try_wait().ok().flatten().is_none() {
+                    let _ = self.0.kill();
+                }
+                let _ = self.0.wait();
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let capture = |mut command: Command, label: &str, budget: Duration, limit: u64| {
+            let out = root.path().join(format!("{label}.stdout"));
+            let err = root.path().join(format!("{label}.stderr"));
+            let mut child = ChildGuard(
+                command
+                    .stdin(Stdio::null())
+                    .stdout(fs::File::create(&out).unwrap())
+                    .stderr(fs::File::create(&err).unwrap())
+                    .spawn()
+                    .unwrap(),
+            );
+            let deadline = Instant::now() + budget;
+            let status = loop {
+                if let Some(status) = child.0.try_wait().unwrap() {
+                    break status;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "{label} exceeded its bounded deadline"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            };
+            child.0.wait().unwrap();
+            assert!(fs::metadata(&out).unwrap().len() <= limit);
+            assert!(fs::metadata(&err).unwrap().len() <= 64 * 1024);
+            assert!(
+                status.success(),
+                "{label}: {}",
+                String::from_utf8_lossy(&fs::read(&err).unwrap())
+            );
+            fs::read(out).unwrap()
+        };
+        let binary = root
+            .path()
+            .join(format!("mcp-tool-gaps{}", std::env::consts::EXE_SUFFIX));
+        let mut cache_query = Command::new("go");
+        cache_query
+            .args(["env", "GOMODCACHE"])
+            .env("GOTOOLCHAIN", "go1.26.6");
+        let cache = capture(
+            cache_query,
+            "go-module-cache",
+            Duration::from_secs(5),
+            64 * 1024,
+        );
+        let cache = PathBuf::from(String::from_utf8(cache).unwrap().trim());
+        assert!(
+            cache.is_dir(),
+            "pinned Go modules must be available offline"
+        );
+        let mut build = Command::new("go");
+        build
+            .args(["build", "-o"])
+            .arg(&binary)
+            .arg("./rust-tests/parity/oracle/mcp-tool-gaps")
+            .current_dir(&repository)
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .env("GOMODCACHE", &cache)
+            .env("GOCACHE", root.path().join("go-build"))
+            .env("GOENV", "off")
+            .env_remove("GOFLAGS")
+            .env("GOWORK", "off")
+            .env("HOME", root.path())
+            .env("USERPROFILE", root.path())
+            .env("TMPDIR", root.path())
+            .env("TEMP", root.path())
+            .env("TMP", root.path());
+        capture(build, "go-build", Duration::from_secs(180), 64 * 1024);
+        let mut run = Command::new(&binary);
+        run.current_dir(&repository)
+            .env_clear()
+            .env("HOME", root.path())
+            .env("USERPROFILE", root.path())
+            .env("TMPDIR", root.path())
+            .env("TEMP", root.path())
+            .env("TMP", root.path());
+        if let Some(system_root) = std::env::var_os("SystemRoot") {
+            run.env("SystemRoot", system_root);
+        }
+        let raw = capture(run, "go-gaps", Duration::from_secs(30), 8 * 1024 * 1024);
+        let oracle: Value = serde_json::from_slice(&raw).unwrap();
+        assert_eq!(oracle["schema"], "symeraseme.go-oracle.mcp-tool-gaps.v1");
+        assert_eq!(oracle["go_version"], "go1.26.6");
+        let sources = oracle["sources_sha256"].as_object().unwrap();
+        assert_eq!(sources.len(), 9);
+        for (source, digest) in sources {
+            let expected = Sha256::digest(fs::read(repository.join(source)).unwrap())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            assert_eq!(digest.as_str().unwrap(), expected, "{source}");
+        }
+        let now = DateTime::parse_from_rfc3339(oracle["now"].as_str().unwrap())
+            .unwrap()
+            .with_timezone(&Utc);
+        let cases = oracle["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 25);
+        for case in cases {
+            let name = case["name"].as_str().unwrap();
+            let data = root.path().join(name).join("data");
+            fs::create_dir_all(&data).unwrap();
+            Store::open(data.join("symeraseme.db"))
+                .unwrap()
+                .close()
+                .unwrap();
+            if case["bad_store"] == true {
+                fs::write(
+                    data.join("symeraseme.db"),
+                    b"synthetic corrupt SQLite database",
+                )
+                .unwrap();
+            }
+            let mut environment = BTreeMap::new();
+            environment.insert(
+                "SYMERASEME_DATA_DIR".into(),
+                data.to_string_lossy().into_owned(),
+            );
+            let handler = ContractHandler::new(root.path())
+                .with_store(
+                    ConfigContext::new(root.path().to_owned(), root.path().to_owned(), environment),
+                    now,
+                )
+                .with_data_dir(&data);
+            let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":case["tool"],"arguments":case["arguments"]}});
+            let actual = match initialize(&serde_json::to_vec(&request).unwrap(), &handler) {
+                InitializeOutcome::Response(bytes) => bytes,
+                other => panic!("{name}: expected a complete response, got {other:?}"),
+            };
+            assert_response_matches(
+                name,
+                Some(String::from_utf8(actual).unwrap()),
+                case["response"].as_str(),
+            );
+        }
+        eprintln!(
+            "25 current-Go tool gap cases match complete response bytes; nine source digests verified"
+        );
     }
 
     /// Builds a handler whose store lives under an isolated data dir with a

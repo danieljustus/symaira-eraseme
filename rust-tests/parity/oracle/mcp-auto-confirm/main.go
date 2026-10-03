@@ -4,10 +4,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/danieljustus/symaira-eraseme/internal/config"
@@ -32,23 +35,56 @@ type snapshot struct {
 }
 
 type oracleResult struct {
-	SourceRevision     string   `json:"source_revision"`
-	SourcePath         string   `json:"source_path"`
-	DryRunResponse     string   `json:"dry_run_response"`
-	DryRunState        snapshot `json:"dry_run_state"`
-	ManualResponse     string   `json:"manual_response"`
-	FinalState         snapshot `json:"final_state"`
-	NoLinksDryResponse string   `json:"no_links_dry_response"`
-	NoLinksResponse    string   `json:"no_links_response"`
-	NoLinksNotes       int      `json:"no_links_notes"`
+	GoVersion          string            `json:"go_version"`
+	SourcesSHA256      map[string]string `json:"sources_sha256"`
+	SourceRevision     string            `json:"source_revision"`
+	SourcePath         string            `json:"source_path"`
+	DryRunResponse     string            `json:"dry_run_response"`
+	DryRunState        snapshot          `json:"dry_run_state"`
+	ManualResponse     string            `json:"manual_response"`
+	FinalState         snapshot          `json:"final_state"`
+	NoLinksDryResponse string            `json:"no_links_dry_response"`
+	NoLinksResponse    string            `json:"no_links_response"`
+	NoLinksNotes       int               `json:"no_links_notes"`
 }
 
 func main() {
+	sourceRoot, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	sources := map[string]string{}
+	for _, path := range []string{"go.mod", "go.sum", "internal/mcp/contract_handler.go", "internal/mcp/server.go", "internal/confirmation/confirmation.go", "internal/replies/service.go", "rust-tests/parity/oracle/mcp-auto-confirm/main.go"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			fail(err)
+		}
+		digest := sha256.Sum256(data)
+		sources[path] = hex.EncodeToString(digest[:])
+	}
 	root, err := os.MkdirTemp("", "mcp-auto-confirm")
 	if err != nil {
 		fail(err)
 	}
-	defer os.RemoveAll(root)
+	defer func() {
+		_ = os.Chdir(sourceRoot)
+		_ = os.RemoveAll(root)
+	}()
+	systemRoot := os.Getenv("SystemRoot")
+	os.Clearenv()
+	if systemRoot != "" {
+		if err := os.Setenv("SystemRoot", systemRoot); err != nil {
+			fail(err)
+		}
+	}
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "TMPDIR", "TMP", "TEMP"} {
+		if err := os.Setenv(key, root); err != nil {
+			fail(err)
+		}
+	}
+	if err := os.Chdir(root); err != nil {
+		fail(err)
+	}
 	dataDir := filepath.Join(root, "data")
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		fail(err)
@@ -106,6 +142,8 @@ func main() {
 	}
 
 	if err := json.NewEncoder(os.Stdout).Encode(oracleResult{
+		GoVersion:          runtime.Version(),
+		SourcesSHA256:      sources,
 		SourceRevision:     sourceRevision,
 		SourcePath:         sourcePath,
 		DryRunResponse:     dryResponse,

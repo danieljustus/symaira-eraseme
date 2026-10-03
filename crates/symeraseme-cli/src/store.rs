@@ -28,7 +28,19 @@ pub(crate) fn open(context: &ConfigContext) -> Result<Store, String> {
         Some(&storage.temp_dir),
         storage.encrypt_db,
     )
-    .map_err(|error| error.to_string())
+    .map_err(|error| match &error {
+        // The actual Go driver reports SQLITE_NOTADB at the initial ping.
+        // Preserve that public error class without adding a SQLite marker
+        // that would change MCP's source-bound sanitization decision.
+        EncryptedStoreError::Sqlite(sqlite)
+            if sqlite
+                .sqlite_error()
+                .is_some_and(|code| code.extended_code == 26) =>
+        {
+            "eventstore: ping: file is not a database (26)".to_owned()
+        }
+        _ => error.to_string(),
+    })
 }
 
 #[must_use = "close the store and handle its finalization error"]
