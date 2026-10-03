@@ -775,6 +775,16 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — #1131 preparation adds the actual native Linux Go scheduler
+  installation capture at clean `7ba198d` (20 cases, 62,849 JSON bytes,
+  umask 022). The first local capture under a restrictive inherited umask
+  failed the original file-mode comparison and was retained separately.
+  Linux defaults preserve all five existing tests and add one byte/missing
+  effect corruption control; other OS defaults retain live Go until their
+  full native captures exist. The opt-in native pipeline now collects all
+  31 service/projection/install cases without updating committed fixtures.
+  No scheduler contract/cutover status or issue is completed by this step.
+
 - 2026-09-22 — all three wave-1 worker results came back HTTP 429 (Codex
   quota); the coordinator implemented CLI-020/021/022 itself in the slice
   worktrees. Dispatch failure is not a slice outcome.

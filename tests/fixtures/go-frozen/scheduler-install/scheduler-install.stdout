@@ -1,0 +1,21 @@
+recorded 20 install/status/uninstall cases
+  cron_install_replaces_existing_block       ok
+  cron_install_writes_block                  ok
+  cron_status_reports_missing_block          ok
+  cron_uninstall_rewrites_crontab            ok
+  launchd_install_no_legacy                  ok
+  launchd_install_over_own_units_succeeds    ok
+  launchd_install_refuses_foreign_unit       error: legacy scheduler units detected; replacement was not requested
+  launchd_install_refuses_python_legacy      error: legacy scheduler units detected; replacement was not requested
+  launchd_install_replaces_python_legacy     ok
+  launchd_reinstall_after_a_successful_install ok
+  launchd_status_after_uninstall_reports_absent ok
+  launchd_status_reports_active_and_errors   ok
+  launchd_status_reports_legacy_units        ok
+  launchd_uninstall_removes_units            ok
+  systemd_install_no_legacy                  ok
+  systemd_install_refuses_python_legacy      error: legacy scheduler units detected; replacement was not requested
+  systemd_reinstall_after_a_successful_install ok
+  systemd_status_reports_active_and_errors   ok
+  systemd_uninstall_removes_units            ok
+  unsupported_platform_is_rejected           error: unsupported platform: windows

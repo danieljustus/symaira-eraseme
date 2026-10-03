@@ -330,6 +330,7 @@ jobs:
             ${{ runner.temp }}/frozen-go-services/manifest.json
             ${{ runner.temp }}/frozen-go-services/*.stdout
             ${{ runner.temp }}/frozen-go-services/*.stderr
+            ${{ runner.temp }}/frozen-go-services/scheduler-install.observations.json
 
       - name: Check MCP stdio oracle without rewriting fixtures
         shell: bash

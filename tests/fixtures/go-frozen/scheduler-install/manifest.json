@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "source_revision": "7ba198dab7c4a97efcddb1fa6aedbf2f9d9857d3",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "captured_at_utc": "2026-10-03T21:03:20.219522+00:00",
+  "exit_status": 0,
+  "cases": [
+    "cron_install_replaces_existing_block",
+    "cron_install_writes_block",
+    "cron_status_reports_missing_block",
+    "cron_uninstall_rewrites_crontab",
+    "launchd_install_no_legacy",
+    "launchd_install_over_own_units_succeeds",
+    "launchd_install_refuses_foreign_unit",
+    "launchd_install_refuses_python_legacy",
+    "launchd_install_replaces_python_legacy",
+    "launchd_reinstall_after_a_successful_install",
+    "launchd_status_after_uninstall_reports_absent",
+    "launchd_status_reports_active_and_errors",
+    "launchd_status_reports_legacy_units",
+    "launchd_uninstall_removes_units",
+    "systemd_install_no_legacy",
+    "systemd_install_refuses_python_legacy",
+    "systemd_reinstall_after_a_successful_install",
+    "systemd_status_reports_active_and_errors",
+    "systemd_uninstall_removes_units",
+    "unsupported_platform_is_rejected"
+  ],
+  "source_files": {
+    "internal/scheduler/scheduler.go": {
+      "bytes": 33472,
+      "sha256": "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"
+    },
+    "rust-tests/parity/oracle/scheduler-install/main.go": {
+      "bytes": 21354,
+      "sha256": "4a47c42a6ac6578eb5f4c219067d928e3a90b7b282f87b4236a683ce463da580"
+    },
+    "tests/fixtures/scheduler-install/cases.json": {
+      "bytes": 62821,
+      "sha256": "b871f8d7ee713ae867c05f7861c00a4665537de49079e9ee4bee5e0d3e9d1842"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "embedded_build_info": "/workspace/scratch/frozen-go-scheduler-install-7ba198d-umask022/scheduler-install: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/scheduler-install\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003205059-7ba198dab7c4\t\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=7ba198dab7c4a97efcddb1fa6aedbf2f9d9857d3\n\tbuild\tvcs.time=2026-10-03T20:50:59Z\n\tbuild\tvcs.modified=false\n",
+  "stdin": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 1245,
+    "sha256": "5288bed15544ffb9ef19431291fd4e76455e54dc0520e2c0dcc5c2ae87dda41e"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "observations": {
+    "bytes": 62849,
+    "sha256": "a6f0e403ce4efb94a99a0b75831a81e60cae84c01c5c150730adec9cad509b06"
+  },
+  "binary": {
+    "bytes": 3794201,
+    "sha256": "a793d337956fb30f91b58c5619d087a0fa0ce6a64d834f93fb15370459a854ad"
+  },
+  "limits": "Actual native Linux capture with recording Runner, not execution of host schedulers. Other native OS fixtures still require capture.",
+  "capture_umask": "0022",
+  "retained_local_failure": "Initial actual capture under the inherited restrictive shell umask produced0600/0700 rather than original0644/0755; that failed capture was retained separately and not accepted."
+}

@@ -13,6 +13,7 @@
 //! second install refusing to run. They are pinned as measured, not as desired.
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs;
@@ -24,37 +25,122 @@ use symeraseme_engine::scheduler::install::{
 use symeraseme_engine::scheduler::{Config, Platform};
 
 const FIXTURE: &str = include_str!("../../../tests/fixtures/scheduler-install/cases.json");
+const FROZEN_OBSERVATIONS: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/observations.json");
 
-/// Rebuilds the capture from the committed oracle and fails if it drifted, so
-/// this test cannot pass against a fixture that no longer describes Go.
-fn live_oracle_capture() -> &'static Value {
+#[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
+mod go_oracle;
+
+/// Linux uses the actual source-bound native capture by default. Other native
+/// operating systems retain live Go until their full file/mode captures exist.
+/// Explicit live mode always rebuilds and runs the same twenty-case oracle.
+fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
     CAPTURE.get_or_init(|| {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let executable = std::env::temp_dir().join(format!(
-            "symeraseme-sched-install-oracle-{}{}",
-            std::process::id(),
-            std::env::consts::EXE_SUFFIX
-        ));
-        let build = std::process::Command::new("go")
-            .args(["build", "-o"])
-            .arg(&executable)
-            .arg("./rust-tests/parity/oracle/scheduler-install")
-            .current_dir(&root)
-            .status()
-            .expect("Go must be available for the scheduler install oracle");
-        assert!(build.success(), "Go oracle failed to build");
-
-        let output = std::process::Command::new(&executable)
-            .arg("-fixture")
-            .arg(executable.with_extension("json"))
-            .current_dir(&root)
-            .output()
-            .expect("run the Go oracle");
+        match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+            Ok("1") => {}
+            Ok("0") | Err(std::env::VarError::NotPresent) => {
+                if cfg!(target_os = "linux") {
+                    return verified_frozen_install(FROZEN_OBSERVATIONS);
+                }
+            }
+            _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        }
+        let output = go_oracle::run_oracle("scheduler-install", None);
         assert!(output.status.success(), "Go oracle run failed");
-        let recorded = fs::read(executable.with_extension("json")).expect("oracle fixture");
-        serde_json::from_slice(&recorded).expect("oracle fixture is JSON")
+        assert!(output.stderr.is_empty(), "Go oracle emitted errors");
+        // Without -fixture the existing oracle emits its case-name summary,
+        // then the complete JSON document. Preserve all twenty recorded cases.
+        let start = output.stdout.iter().position(|byte| *byte == b'{').unwrap();
+        let document: Value = serde_json::from_slice(&output.stdout[start..]).unwrap();
+        assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+        document
     })
+}
+
+fn verified_frozen_install(bytes: &[u8]) -> Value {
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/scheduler-install/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "7ba198dab7c4a97efcddb1fa6aedbf2f9d9857d3"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["capture_umask"], "0022");
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["observations"]["bytes"], bytes.len());
+    assert_eq!(
+        manifest["observations"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    for (name, stream) in [
+        (
+            "stdout",
+            include_bytes!(
+                "../../../tests/fixtures/go-frozen/scheduler-install/scheduler-install.stdout"
+            )
+            .as_slice(),
+        ),
+        (
+            "stderr",
+            include_bytes!(
+                "../../../tests/fixtures/go-frozen/scheduler-install/scheduler-install.stderr"
+            )
+            .as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest[name]["bytes"], stream.len());
+        assert_eq!(
+            manifest[name]["sha256"],
+            hex::encode(Sha256::digest(stream))
+        );
+        if name == "stderr" {
+            assert!(stream.is_empty());
+        }
+    }
+    for (path, source) in [
+        (
+            "internal/scheduler/scheduler.go",
+            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/scheduler-install/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/scheduler-install/main.go")
+                .as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["source_revision"], manifest["source_revision"]);
+    assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+    document
+}
+
+#[test]
+fn frozen_install_rejects_changed_bytes_and_missing_file_effects() {
+    let mut changed = FROZEN_OBSERVATIONS.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_install(&changed)).is_err());
+    let mut missing: Value = serde_json::from_slice(FROZEN_OBSERVATIONS).unwrap();
+    missing["cases"]["cron_install_writes_block"]["files"]
+        .as_object_mut()
+        .unwrap()
+        .remove("schedules/symeraseme-poll.sh")
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| verified_frozen_install(
+            &serde_json::to_vec(&missing).unwrap()
+        ))
+        .is_err()
+    );
 }
 
 /// Answers commands from the capture's own script, so both sides see the same
@@ -374,7 +460,7 @@ fn windows_fixture_projection_keeps_unrelated_hashes_strict() {
 
 #[test]
 fn rust_install_status_uninstall_match_the_go_capture() {
-    let document = live_oracle_capture();
+    let document = selected_oracle_capture();
     let committed: Value = serde_json::from_str(FIXTURE).expect("committed fixture is JSON");
     assert_eq!(document["runner_script"], committed["runner_script"]);
     let live_cases = comparable_fixture_cases(&document["cases"], cfg!(windows));

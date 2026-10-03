@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Capture actual native Go service/projection observations for reviewed freezing.
+"""Capture actual native Go service/projection/install observations for freezing.
 
 Never synthesizes an output or changes a committed fixture. The output directory
-must be new, and a manifest is written only after both real oracles succeed.
+must be new, and a manifest is written only after all three real oracles succeed.
 """
 
 import argparse
@@ -71,6 +71,8 @@ def main():
     native_arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine().lower()]
     assert info["GOHOSTARCH"] == native_arch, "Go must execute the actual host architecture"
     assert info["GOHOSTOS"] == platform.system().lower(), "Go must execute the actual host OS"
+    if info["GOHOSTOS"] != "windows":
+        os.umask(0o022)  # The existing install fixture includes exact permission bits.
     args.output.mkdir(mode=0o700)  # Refuse existing files, directories and symlinks.
     output_root = args.output.resolve()
     private = output_root / "private"
@@ -96,13 +98,14 @@ def main():
     }
     sources = [source / "go.mod", source / "go.sum"]
     for directory in ("internal/eventstore", "internal/triage", "internal/replies", "internal/llm",
-                      "internal/timeutil", "rust-tests/parity/oracle/triage-service", "rust-tests/parity/oracle/projection"):
+                      "internal/timeutil", "internal/scheduler", "rust-tests/parity/oracle/triage-service",
+                      "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install"):
         sources.extend(sorted((source / directory).rglob("*.go")))
     cases_path = source / "rust-tests/parity/oracle/projection/cases.json"
     sources.append(cases_path)
     for path in sources:
         manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
-    for package in ("triage-service", "projection"):
+    for package in ("triage-service", "projection", "scheduler-install"):
         binary = output_root / (package + (".exe" if info["GOHOSTOS"] == "windows" else ""))
         # runtime.Caller locates projection/cases.json: do not trim its path.
         capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(binary),
@@ -110,24 +113,37 @@ def main():
                 output_root / (package + "-build"), 120)
         build_info = subprocess.check_output([go, "version", "-m", str(binary)], env=environment, timeout=10)
         assert ("vcs.revision=" + revision).encode() in build_info and b"vcs.modified=false" in build_info
-        output, errors = capture([str(binary)], source, environment, output_root / package, 30)
+        command = [str(binary)]
+        if package == "scheduler-install":
+            command += ["-fixture", str(output_root / "scheduler-install.observations.json"), "-revision", revision]
+        output, errors = capture(command, source, environment, output_root / package, 30)
         assert not errors
-        observed = json.loads(output)
-        if package == "projection":
+        fixture_metadata = {}
+        if package == "scheduler-install":
+            fixture_bytes = (output_root / "scheduler-install.observations.json").read_bytes()
+            assert len(fixture_bytes) <= 1024 * 1024
+            observed = json.loads(fixture_bytes)
+            names = sorted(observed["cases"])
+            assert len(names) == 20 and observed["source_revision"] == revision
+            fixture_metadata = {"fixture": digest(fixture_bytes)}
+        elif package == "projection":
+            observed = json.loads(output)
             names = [case["name"] for case in json.loads(cases_path.read_bytes())]
             assert set(observed["cases"]) == set(names) and len(names) == 7
         else:
+            observed = json.loads(output)
             names = ["classify", "rebuttal", "fallback", "llm_error"]
             assert set(observed) == set(names) | {"source_sha256"}
         manifest["observations"].append({
             "package": package, "cases": names, "exit_status": 0, "stdin": digest(b""),
             "stdout": digest(output), "stderr": digest(errors), "binary": digest(binary.read_bytes()),
             "embedded_build_info": build_info.decode(),
+            **fixture_metadata,
         })
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 11, "status": "actual observations captured"}))
+                      "operations": 31, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

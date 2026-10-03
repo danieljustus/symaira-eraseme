@@ -51,6 +51,16 @@ output for its six configurations and twelve legacy inputs at clean
 `3a3e250`. All six original Rust tests and a new two-mutation control pass
 locally without Go. Scheduler install/config, complete engine/native freeze
 and cutover remain open; existing scheduler contract statuses are unchanged.
+The Linux install/status/uninstall family additionally replays an actual
+twenty-case capture from clean `7ba198d` with umask 022. Its five existing
+tests and one corruption control retain complete file/mode/command/error
+comparisons. Other native OS install observations and the config family
+remain open; native capture now collects the full installation document.
+Run `37152018065` at `3a3e250` independently passed the complete Rust suites
+on Linux and Windows AMD64/ARM64. All four new artifacts have 49 matching
+source-file hashes, LF JSON inputs and unchanged whole Go product outputs;
+the earlier Windows CRLF failures remain recorded. Both Mac jobs and the
+subsequent scheduler changes are outside that four-target acceptance.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

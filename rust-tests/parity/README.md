@@ -80,6 +80,16 @@ Explicit live mode retains the real Go comparison through the shared
 bounded runner. Scheduler install/config and the complete engine suite
 are not covered by this family's Go-free claim.
 
+The `scheduler_install_parity` integration now defaults on Linux to a real
+Go 1.26.6 twenty-case capture at clean `7ba198d`, produced with the fixture's
+umask 022. All original file hashes, modes, errors and recorded commands are
+compared. The five existing tests plus a byte-change/missing-file control
+execute without Go on Linux. Other operating systems retain live Go until
+their actual native captures are reviewed; no Unix fixture is presented as a
+Windows observation. Explicit live mode uses the existing bounded oracle
+runner. Native capture now records these twenty cases in addition to the
+eleven service/projection observations, including the complete JSON file.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual
