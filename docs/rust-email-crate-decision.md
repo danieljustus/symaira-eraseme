@@ -25,6 +25,15 @@ classes, and removes its own CA and trust entry. It refuses to modify trust
 outside a disposable GitHub-hosted runner. A normal local test run ignores
 this privileged control; that ignore is not native evidence.
 
+At source `fa21054f`, native run `37114908180` passed the complete controls on
+both Linux and both Windows targets. Intel macOS job `111179740236` completed
+all three certificate classes for all three transports, then hit the workflow
+deadline during CA cleanup. This is a failed acceptance gate, not PASS evidence.
+The command helper now records bounded native command stages into regular
+files, rather than waiting for pipe EOF, and enforces a 30-second command
+lifetime. The trust-store operations and certificate policy are unchanged;
+final macOS cleanup and six-target acceptance remain pending.
+
 Do not promote DOM-006/DOM-007 or task 6.1 solely from this document, a local
 certificate-file test, a successful build, or queued CI. Acceptance requires
 completed native results and the source-bound Go transcript gates. The finite

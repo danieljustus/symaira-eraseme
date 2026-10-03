@@ -43,6 +43,11 @@ jobs:
             ~/.cargo/git/db
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Native command success, failure and bounded termination controls
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-core --test oauth2_platform_trust --locked -- \
+            --exact native_command_control_bounds_children_and_reports_real_exit_failure --nocapture
       - name: Private CA in the real OS store with negative TLS controls
         shell: bash
         run: |

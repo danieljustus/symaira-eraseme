@@ -7,7 +7,7 @@ use std::net::TcpListener;
 use std::path::Path;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -106,15 +106,113 @@ struct InstalledRoot {
 }
 
 fn checked(command: &mut Command) -> Result<(), String> {
-    let output = command.output().map_err(|error| error.to_string())?;
-    if output.status.success() {
+    checked_with_budget(command, Duration::from_secs(30))
+}
+
+fn checked_with_budget(command: &mut Command, budget: Duration) -> Result<(), String> {
+    // A native security tool may leave a helper holding a pipe after its own
+    // exit. Capture regular files and bound the actual command's lifetime.
+    let logs = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let stdout = logs.path().join("stdout");
+    let stderr = logs.path().join("stderr");
+    let label = format!(
+        "{:?} {:?}",
+        command.get_program(),
+        command.get_args().take(3).collect::<Vec<_>>()
+    );
+    eprintln!("native CA command start: {label}");
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(std::fs::File::create(&stdout).map_err(|error| error.to_string())?)
+        .stderr(std::fs::File::create(&stderr).map_err(|error| error.to_string())?)
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+            break status;
+        }
+        if started.elapsed() >= budget {
+            child.kill().map_err(|error| {
+                format!(
+                    "native CA command exceeded {}ms; terminate failed: {label}: {error}",
+                    budget.as_millis()
+                )
+            })?;
+            child.wait().map_err(|error| error.to_string())?;
+            return Err(format!(
+                "native CA command exceeded {}ms: {label}",
+                budget.as_millis()
+            ));
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    child.wait().map_err(|error| error.to_string())?;
+    eprintln!(
+        "native CA command finished: {label}, status={status}, elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    if status.success() {
         Ok(())
     } else {
+        let size = std::fs::metadata(&stderr)
+            .map_err(|error| error.to_string())?
+            .len();
+        if size > 64 * 1024 {
+            return Err("native CA command exceeded its diagnostic limit".into());
+        }
+        let error = std::fs::read(&stderr).map_err(|error| error.to_string())?;
         Err(format!(
             "native CA command failed: {}",
-            String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(&error)
         ))
     }
+}
+
+#[test]
+fn native_command_control_bounds_children_and_reports_real_exit_failure() {
+    const MODE: &str = "SYMERASEME_CA_COMMAND_CONTROL";
+    if let Ok(mode) = std::env::var(MODE) {
+        match mode.as_str() {
+            "success" => std::process::exit(0),
+            "failure" => {
+                eprintln!("synthetic native command failure");
+                std::process::exit(23);
+            }
+            "stall" => {
+                thread::sleep(Duration::from_secs(10));
+                std::process::exit(0);
+            }
+            _ => panic!("unexpected native command control"),
+        }
+    }
+    let command = |mode: &str| {
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "native_command_control_bounds_children_and_reports_real_exit_failure",
+                "--nocapture",
+            ])
+            .env(MODE, mode);
+        command
+    };
+    checked(&mut command("success")).unwrap();
+    assert!(
+        checked(&mut command("failure"))
+            .unwrap_err()
+            .contains("synthetic native command failure")
+    );
+    let started = Instant::now();
+    assert!(
+        checked_with_budget(&mut command("stall"), Duration::from_millis(100))
+            .unwrap_err()
+            .contains("exceeded 100ms")
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "stalled command must be terminated and reaped"
+    );
 }
 
 impl InstalledRoot {
