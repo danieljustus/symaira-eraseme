@@ -248,6 +248,9 @@ fn serve_connection(listener: TcpListener, config: ServerConfig) -> Vec<u8> {
             Err(error) => panic!("TLS accept: {error}"),
         }
     };
+    // Windows accepted sockets inherit the listener's nonblocking mode.
+    // Use bounded blocking TLS I/O after the separately bounded accept loop.
+    socket.set_nonblocking(false).unwrap();
     socket
         .set_read_timeout(Some(Duration::from_secs(3)))
         .unwrap();
