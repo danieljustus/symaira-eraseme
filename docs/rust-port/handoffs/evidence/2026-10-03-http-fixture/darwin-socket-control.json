@@ -1,0 +1,124 @@
+{
+  "class": "real native Python POSIX setsockopt socket-state controls; not Rust fixture acceptance",
+  "rust_1_98_source": "duration conversion floors subsec_micros and never exceeds 999999; carry/rounding hypothesis rejected",
+  "results": [
+    {
+      "mode": "normal-close",
+      "stages": [
+        {
+          "stage": "before-drain",
+          "timeouts": [
+            {
+              "sec": 5,
+              "usec": 0,
+              "set_ok": true
+            },
+            {
+              "sec": 4,
+              "usec": 999999,
+              "set_ok": true
+            },
+            {
+              "sec": 0,
+              "usec": 1,
+              "set_ok": true
+            },
+            {
+              "sec": 4,
+              "usec": 500001,
+              "set_ok": true
+            }
+          ]
+        },
+        {
+          "stage": "after-drain",
+          "timeouts": [
+            {
+              "sec": 5,
+              "usec": 0,
+              "set_ok": true
+            },
+            {
+              "sec": 4,
+              "usec": 999999,
+              "set_ok": true
+            },
+            {
+              "sec": 0,
+              "usec": 1,
+              "set_ok": true
+            },
+            {
+              "sec": 4,
+              "usec": 500001,
+              "set_ok": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "reset-close",
+      "stages": [
+        {
+          "stage": "before-drain",
+          "timeouts": [
+            {
+              "sec": 5,
+              "usec": 0,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 4,
+              "usec": 999999,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 0,
+              "usec": 1,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 4,
+              "usec": 500001,
+              "set_ok": false,
+              "errno": 22
+            }
+          ]
+        },
+        {
+          "stage": "after-drain",
+          "timeouts": [
+            {
+              "sec": 5,
+              "usec": 0,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 4,
+              "usec": 999999,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 0,
+              "usec": 1,
+              "set_ok": false,
+              "errno": 22
+            },
+            {
+              "sec": 4,
+              "usec": 500001,
+              "set_ok": false,
+              "errno": 22
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+  "run": 37106329046,
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046",
+  "native": [
+    {
+      "target": "Rust / native (macos-14)",
+      "job": 111155472430,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472430",
+      "raw_log_sha256": "d2e4f752a32abeecc3b96692bd2c43adc13ee61e1f8f90ac40f3eb2e877e3399",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    },
+    {
+      "target": "Rust / native (ubuntu-24.04-arm)",
+      "job": 111155472556,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472556",
+      "raw_log_sha256": "bc0585a8a8e7a8c3944e518b3a1ca985b2be10dfdd0b0e99cf859bd5abb66fa7",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    },
+    {
+      "target": "Rust / native (macos-15-intel)",
+      "job": 111155472559,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472559",
+      "raw_log_sha256": "55d44676c02543a927adad8895dba528f18ab07fa0119e8d13b136d014f60bbf",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    },
+    {
+      "target": "Rust / native (ubuntu-24.04)",
+      "job": 111155472568,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472568",
+      "raw_log_sha256": "014a540ccdb6e4834dcb79ecf55798fd5e4de5fafecc6752620bd5d7c53cf01f",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    },
+    {
+      "target": "Rust / native (windows-2025)",
+      "job": 111155472596,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472596",
+      "raw_log_sha256": "caa4c3c5bfac83e0c33aa3b6a7899a0bc230d35eb0fe0219cf5b42501a1cd40c",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    },
+    {
+      "target": "Rust / native (windows-11-arm)",
+      "job": 111155472628,
+      "state": "completed",
+      "conclusion": "success",
+      "source_head": "43c369e681e7c9124c1f7467c7b36f59b98a721c",
+      "run": 37106329046,
+      "url": "https://github.com/danieljustus/symaira-eraseme/actions/runs/37106329046/job/111155472628",
+      "raw_log_sha256": "d285a55034653da6c335add9df809eeb4be995d90c9ec741fd0dcf47312251b4",
+      "cases": {
+        "bounded_response_capture_enforces_deadline_and_size": true,
+        "bounded_response_capture_preserves_fin_and_native_reset_bytes": true,
+        "header_comparison_rejects_missing_extra_changed_and_duplicate_headers": true,
+        "native_http_complete_headers_and_bodies_match_go": true,
+        "readiness_probe_is_bounded_when_peer_dribbles_bytes": true
+      }
+    }
+  ],
+  "native_successes": 6,
+  "named_cases_verified_on_completed_targets": true,
+  "all_six_complete": true,
+  "independent_final_review": "pending",
+  "local_full_cli_passed": 175,
+  "fresh_remote_clone_full_cli_passed": 175,
+  "target_cloud_runtime": "not checked"
+}

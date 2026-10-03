@@ -1,0 +1,40 @@
+Original log line 659: 2026-10-03T07:01:46.5112130Z test bounded_response_capture_enforces_deadline_and_size ... ok
+Original log line 660: 2026-10-03T07:01:47.8341366Z test readiness_probe_is_bounded_when_peer_dribbles_bytes ... ok
+Original log line 661: 2026-10-03T07:01:48.3023965Z test native_http_complete_headers_and_bodies_match_go ... FAILED
+Original log line 662: 2026-10-03T07:01:48.3024347Z
+Original log line 663: 2026-10-03T07:01:48.3024502Z failures:
+Original log line 664: 2026-10-03T07:01:48.3024646Z
+Original log line 665: 2026-10-03T07:01:48.3024872Z ---- native_http_complete_headers_and_bodies_match_go stdout ----
+Original log line 666: 2026-10-03T07:01:48.3025787Z http_capture thread=ThreadId(5) close=eof bytes=274
+Original log line 667: 2026-10-03T07:01:48.3026186Z http_capture thread=ThreadId(5) close=eof bytes=274
+Original log line 668: 2026-10-03T07:01:48.3026646Z http_exchange thread=ThreadId(5) implementation=rust case=0 start
+Original log line 669: 2026-10-03T07:01:48.3027078Z http_capture thread=ThreadId(5) close=eof bytes=221
+Original log line 670: 2026-10-03T07:01:48.3027659Z http_exchange thread=ThreadId(5) implementation=rust case=0 bytes=221 headers_complete=true elapsed_ms=0
+Original log line 671: 2026-10-03T07:01:48.3028257Z http_exchange thread=ThreadId(5) implementation=go case=0 start
+Original log line 672: 2026-10-03T07:01:48.3028688Z http_capture thread=ThreadId(5) close=eof bytes=221
+Original log line 673: 2026-10-03T07:01:48.3029786Z http_exchange thread=ThreadId(5) implementation=go case=0 bytes=221 headers_complete=true elapsed_ms=0
+Original log line 674: 2026-10-03T07:01:48.3030944Z http_exchange thread=ThreadId(5) implementation=rust case=1 start
+Original log line 675: 2026-10-03T07:01:48.3031800Z http_capture thread=ThreadId(5) close=eof bytes=214
+Original log line 676: 2026-10-03T07:01:48.3032482Z http_exchange thread=ThreadId(5) implementation=rust case=1 bytes=214 headers_complete=true elapsed_ms=0
+Original log line 677: 2026-10-03T07:01:48.3033109Z http_exchange thread=ThreadId(5) implementation=go case=1 start
+Original log line 678: 2026-10-03T07:01:48.3033572Z http_capture thread=ThreadId(5) close=eof bytes=214
+Original log line 679: 2026-10-03T07:01:48.3034128Z http_exchange thread=ThreadId(5) implementation=go case=1 bytes=214 headers_complete=true elapsed_ms=0
+Original log line 680: 2026-10-03T07:01:48.3034746Z http_exchange thread=ThreadId(5) implementation=rust case=2 start
+Original log line 681: 2026-10-03T07:01:48.3035191Z http_capture thread=ThreadId(5) close=eof bytes=227
+Original log line 682: 2026-10-03T07:01:48.3035772Z http_exchange thread=ThreadId(5) implementation=rust case=2 bytes=227 headers_complete=true elapsed_ms=0
+Original log line 683: 2026-10-03T07:01:48.3036373Z http_exchange thread=ThreadId(5) implementation=go case=2 start
+Original log line 684: 2026-10-03T07:01:48.3036822Z http_capture thread=ThreadId(5) close=reset bytes=0
+Original log line 685: 2026-10-03T07:01:48.3037394Z http_exchange thread=ThreadId(5) implementation=go case=2 bytes=0 headers_complete=false elapsed_ms=0
+Original log line 686: 2026-10-03T07:01:48.3037787Z
+Original log line 687: 2026-10-03T07:01:48.3038263Z thread 'native_http_complete_headers_and_bodies_match_go' (7240) panicked at crates\symeraseme-cli\tests\mcp_http_headers_process.rs:78:63:
+Original log line 688: 2026-10-03T07:01:48.3038960Z called `Option::unwrap()` on a `None` value
+Original log line 689: 2026-10-03T07:01:48.3039164Z
+Original log line 690: 2026-10-03T07:01:48.3039169Z
+Original log line 691: 2026-10-03T07:01:48.3039283Z failures:
+Original log line 692: 2026-10-03T07:01:48.3039615Z     native_http_complete_headers_and_bodies_match_go
+Original log line 693: 2026-10-03T07:01:48.3039841Z
+Original log line 694: 2026-10-03T07:01:48.3040138Z test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+Original log line 695: 2026-10-03T07:01:48.3040515Z
+Original log line 696: 2026-10-03T07:01:48.3046320Z error: test failed, to rerun pass `-p symeraseme-cli --test mcp_http_headers_process`
+Original log line 697: 2026-10-03T07:01:48.3048761Z      Running tests\mcp_http_process.rs (target\debug\deps\mcp_http_process-1feb5d4de38148d8.exe)
+Original log line 698: 2026-10-03T07:01:48.3232033Z
