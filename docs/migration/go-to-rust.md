@@ -775,6 +775,14 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — Clean `5c7fd11` passed exactly 98 selected tests with Go
+  absent from PATH and all eleven SQLite tests in actual private-root
+  pinned-Go live mode. The next opt-in native pipeline records campaign
+  execution, the actually executed Go plan-generator test/full fixture and
+  SQLite snapshot/control results as well as prior families (41 product
+  observations). Raw test streams and historical Python Git-blob bindings
+  remain mandatory; no new native result is synthesized from Linux.
+
 - 2026-10-03 — #1131 SQLite preparation records the actual clean `f13f405`
   Linux Go snapshot (12,585 bytes), tagged Go controls (three top-level
   tests plus four quoted-literal subcases) and complete raw status/logs.

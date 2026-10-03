@@ -315,7 +315,7 @@ jobs:
       - name: Download Go oracle modules
         run: go mod download
 
-      - name: Capture actual native Go service and projection observations
+      - name: Capture actual native Go observations for reviewed freezing
         if: github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
         run: python3 scripts/capture-frozen-go-services.py --output "${{ runner.temp }}/frozen-go-services"
 
@@ -331,6 +331,7 @@ jobs:
             ${{ runner.temp }}/frozen-go-services/*.stdout
             ${{ runner.temp }}/frozen-go-services/*.stderr
             ${{ runner.temp }}/frozen-go-services/scheduler-install.observations.json
+            ${{ runner.temp }}/frozen-go-services/campaign-plan.observations.json
 
       - name: Check MCP stdio oracle without rewriting fixtures
         shell: bash

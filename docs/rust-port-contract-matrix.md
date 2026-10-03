@@ -87,6 +87,12 @@ as raw observed logs; all ten Rust DB contracts and immutable-history
 mutation controls remain selected with one added corpus-integrity test.
 Other native OS observation acceptance and Go retirement remain separate;
 no DB or cutover status is promoted by this preparation.
+The opt-in native pipeline additionally collects actual campaign execution,
+the plan-generator's verified full byte fixture, and tagged SQLite
+snapshots/controls (41 product observations total). It retains raw Go test
+streams and the archived Python-generator binding. New per-target
+observations require native runs and review; no new native acceptance is
+inferred merely from the pipeline code.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

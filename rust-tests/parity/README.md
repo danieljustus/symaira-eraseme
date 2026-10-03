@@ -131,6 +131,15 @@ plus a byte-change/missing-schema control. The Go-free checkout fetches full
 history for those unchanged fail-closed checks. Other OS defaults and
 explicit live mode retain the existing bounded tagged Go runner.
 
+The next opt-in native capture includes campaign execution, the actually
+executed plan-byte generator and tagged SQLite snapshot/control tests as
+well as the existing service/projection/install/config families. It records
+41 product observations, full plan/install documents and raw Go-control
+logs only after actual success. The original historical Python generator
+is bound as an archived Git blob, not a deleted current source file. This
+pipeline extension requires real native execution before those new target
+observations can be accepted; it never updates committed fixtures.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

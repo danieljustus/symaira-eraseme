@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Capture actual native Go service/projection/install/config observations.
+"""Capture actual native Go service, projection, scheduler, config and DB data.
 
 Never synthesizes an output or changes a committed fixture. The output directory
-must be new, and a manifest is written only after all four real oracles succeed.
+must be new, and a manifest is written only after every real oracle succeeds.
 """
 
 import argparse
@@ -98,18 +98,47 @@ def main():
     }
     sources = [source / "go.mod", source / "go.sum"]
     for directory in ("internal/eventstore", "internal/triage", "internal/replies", "internal/llm",
-                      "internal/timeutil", "internal/scheduler", "internal/config", "rust-tests/parity/oracle/triage-service",
-                      "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install", "rust-tests/parity/oracle/config"):
+                      "internal/timeutil", "internal/scheduler", "internal/config", "internal/campaign",
+                      "internal/identity", "internal/manualtasks", "internal/registry", "rust-tests/parity/oracle/triage-service",
+                      "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install", "rust-tests/parity/oracle/config",
+                      "rust-tests/parity/oracle/campaign-execution", "rust-tests/parity/oracle/storage"):
         sources.extend(sorted((source / directory).rglob("*.go")))
     cases_path = source / "rust-tests/parity/oracle/projection/cases.json"
     sources.append(cases_path)
     sources += [source / "rust-tests/parity/oracle/config/inputs.json", source / "rust-tests/parity/oracle/config/config_cases.json"]
+    plan_fixture = source / "tests/fixtures/event-store/campaign-plan-bytes-oracle.json"
+    sources += [source / "rust-tests/parity/oracle/campaign-execution/cases.json", plan_fixture,
+                source / "tests/fixtures/event-store/golden-campaign.db", source / "registry/brokers/eu/adventori-eu.yaml"]
+    sources += sorted((source / "tests/fixtures/registry-contract").glob("golden-*.yaml"))
     for path in sources:
         manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
-    for package in ("triage-service", "projection", "scheduler-install", "config"):
+    manifest["controls"] = []
+    for package, test_path, tags, test_name in (
+        ("campaign-plan-go-test", "./internal/campaign", [], "^TestCampaignPlanBytesOracle$"),
+        ("storage-go-test", "./rust-tests/parity/oracle/storage", ["-tags", "storage_oracle"], None),
+    ):
+        command = [go, "test", "-mod=readonly", *tags, test_path, "-count=1", "-json"]
+        if test_name:
+            command += ["-run", test_name]
+        output, errors = capture(command, source, environment, output_root / package, 120)
+        assert not errors
+        records = [json.loads(line) for line in output.splitlines()]
+        passed = [record["Test"] for record in records if record.get("Action") == "pass" and record.get("Test")]
+        assert passed and not any(record.get("Action") == "fail" for record in records)
+        metadata = {"package": package, "exit_status": 0, "stdout": digest(output),
+                    "stderr": digest(errors), "executed_pass_tests": passed}
+        if test_name:
+            assert passed == ["TestCampaignPlanBytesOracle"]
+            fixture = plan_fixture.read_bytes()
+            assert digest(fixture) == manifest["source_files"][plan_fixture.relative_to(source).as_posix()]
+            (output_root / "campaign-plan.observations.json").write_bytes(fixture)
+            metadata["fixture"] = digest(fixture)
+        manifest["controls"].append(metadata)
+    for package in ("triage-service", "projection", "scheduler-install", "config", "campaign-execution", "storage"):
         binary = output_root / (package + "-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
         # runtime.Caller locates projection/cases.json: do not trim its path.
-        capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(binary),
+        tags = ["-tags", "storage_oracle"] if package == "storage" else []
+        capture([go, "build", "-mod=readonly", "-buildvcs=true", *tags, "-o", str(binary),
                  "./rust-tests/parity/oracle/" + package], source, environment,
                 output_root / (package + "-build"), 30 if package == "config" else 120)
         build_info = subprocess.check_output([go, "version", "-m", str(binary)], env=environment, timeout=10)
@@ -136,6 +165,22 @@ def main():
             names = [f"CFG-{number:03}" for number in range(1, 7)]
             assert set(observed["cases"]) == set(names)
             assert observed["provenance"]["source_sha256"] == manifest["source_files"]["internal/config/config.go"]["sha256"]
+        elif package == "campaign-execution":
+            observed = json.loads(output)
+            names = ["execution_transitions"]
+            assert set(observed) == {"plan_before", "plan_after", "result", "events", "statuses",
+                                     "fake_send_plan_before", "fake_send_plan_after", "fake_send_result", "fake_send_events"}
+        elif package == "storage":
+            observed = json.loads(output)
+            names = ["fresh", "golden"]
+            assert set(observed) == {"provenance", "fresh", "golden"}
+            provenance = observed["provenance"]
+            archived = subprocess.check_output([git, "show", provenance["fixture_archive_commit"] + ":" +
+                                               provenance["fixture_generator_path"]], cwd=source, timeout=10)
+            assert digest(archived)["sha256"] == provenance["fixture_generator_sha256"]
+            manifest["archived_sources"] = {provenance["fixture_generator_path"]: {
+                **digest(archived), "revision": provenance["fixture_archive_commit"],
+                "git_blob": provenance["fixture_generator_git_blob"]}}
         else:
             observed = json.loads(output)
             names = ["classify", "rebuttal", "fallback", "llm_error"]
@@ -149,7 +194,7 @@ def main():
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 37, "status": "actual observations captured"}))
+                      "operations": 41, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":
