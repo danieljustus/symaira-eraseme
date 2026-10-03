@@ -1,5 +1,15 @@
 # Historical Go fallback backup and restore rehearsal
 
+The SID-scoped WFP probe at `6a4cf8fe60afbd14047586cb593caa2ea668a24b`
+executed on both native Windows targets in run `37134021246`. Its amd64 raw
+record proves TCP permission denial, outside-root read/write denial, owned
+write/remove access, child-creation denial, zero remaining Job processes,
+removed profile/root SID, and both dynamic filters absent after session close.
+UDP did not report permission denial, so Windows acceptance remains open. The
+next candidate adds the same exact-package-SID block at IPv4/IPv6 socket
+assignment and records native TCP/UDP error numbers. Neither timeout nor
+connection refusal counts as network-denial evidence.
+
 This executable rehearsal covers one explicit rollback boundary for RUST-016.
 It starts from the checked-in synthetic schema-v1 fixture, reads its three
 requests with the supplied retained Go artifact, takes a SQLite online backup,

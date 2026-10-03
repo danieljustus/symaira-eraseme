@@ -131,7 +131,11 @@ class NetworkRules:
         session.flags = 1  # FWPM_SESSION_FLAG_DYNAMIC; filters vanish on session close/crash.
         self.status(self.open(None, 10, None, c.byref(session), c.byref(self.engine)), 'FwpmEngineOpen0')
         try:
-            for layer in ('c38d57d1-05a7-4c33-904f-7fbceee60e82', '4a72393b-319f-44bc-84c3-ba54dcb3b6b4'):
+            # UDP sends can complete before ALE_AUTH_CONNECT rejects the
+            # queued datagram. Deny socket assignment as well, so bind fails
+            # synchronously with WSAEACCES for the same unique package SID.
+            for layer in ('c38d57d1-05a7-4c33-904f-7fbceee60e82', '4a72393b-319f-44bc-84c3-ba54dcb3b6b4',
+                          '1247d66d-0b60-4a15-8d44-7155d0f53a0c', '55a650e1-5f0a-4eca-a653-88f53b26aa8c'):
                 condition = Condition()
                 condition.key = Guid.from_text('71bc78fa-f17c-4997-a602-6abb261f351c')
                 condition.match = 0  # FWP_MATCH_EQUAL
@@ -198,7 +202,7 @@ def command(root, label, argv, env, timeout=30):
                           'capability_count': 0, 'child_creation': 'restricted',
                           'writable_root': str(root), 'job_active_after_cleanup': None,
                           'profile_deleted': False, 'root_sid_removed': False}}
-    record['sandbox']['network'] = 'SID-scoped dynamic WFP connect denial for IPv4 and IPv6'
+    record['sandbox']['network'] = 'SID-scoped dynamic WFP socket-assignment and connect denial for IPv4 and IPv6'
     record['sandbox']['network_filters_removed'] = False
     try:
         return _command(root, label, argv, env, timeout, record)

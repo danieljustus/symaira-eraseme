@@ -40,6 +40,7 @@ func main() {
 		panic("expected outside read and write markers")
 	}
 	checks := map[string]bool{}
+	codes := map[string]uintptr{}
 	_, err := os.ReadFile(os.Args[1])
 	checks["outside_read_denied"] = os.IsPermission(err)
 	err = os.WriteFile(os.Args[2], []byte("must not escape"), 0600)
@@ -53,6 +54,7 @@ func main() {
 	}
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:9", time.Second)
 	checks["tcp_denied"] = isDenied(err)
+	codes["tcp"] = errorCode(err)
 	if conn != nil {
 		_ = conn.Close()
 	}
@@ -62,14 +64,16 @@ func main() {
 		_ = packet.Close()
 	}
 	checks["udp_denied"] = isDenied(err)
+	codes["udp"] = errorCode(err)
 	err = exec.Command(os.Args[0], "failure").Run()
 	// ERROR_CHILD_PROCESS_BLOCKED (367) is an actual kernel policy denial.
 	checks["child_creation_denied"] = isDenied(err) || errorCode(err) == 367
+	codes["child_creation"] = errorCode(err)
 	all := true
 	for _, passed := range checks {
 		all = all && passed
 	}
-	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"checks": checks, "passed": all,
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"checks": checks, "native_error_codes": codes, "passed": all,
 		"go_version": runtime.Version(), "os": runtime.GOOS, "arch": runtime.GOARCH})
 	if !all {
 		fmt.Fprintln(os.Stderr, "native sandbox negative control failed")
