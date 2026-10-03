@@ -130,7 +130,7 @@ fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, St
     Ok(config)
 }
 
-fn platform_root_store() -> Result<RootCertStore, String> {
+pub(crate) fn platform_root_store() -> Result<RootCertStore, String> {
     let loaded = rustls_native_certs::load_native_certs();
     let mut roots = RootCertStore::empty();
     roots.add_parsable_certificates(loaded.certs);
