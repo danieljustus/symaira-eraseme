@@ -47,7 +47,9 @@ class TaskGraphTests(unittest.TestCase):
         for field in ("task_issues", "contract_issue_owners"):
             with self.subTest(missing_owner=field):
                 corrupt = copy.deepcopy(graph)
-                corrupt["execution_state"][field].pop(next(iter(corrupt["execution_state"][field])))
+                required_owner = (min(unfinished) if field == "contract_issue_owners"
+                                  else next(iter(corrupt["execution_state"][field])))
+                corrupt["execution_state"][field].pop(required_owner)
                 with self.assertRaises(AssertionError):
                     validate(corrupt)
 

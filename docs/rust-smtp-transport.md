@@ -42,5 +42,15 @@ a byte-equal Go error. All ordinary error controls remain byte-equal.
 Local Linux execution passes these controls and the three existing MIME tests,
 strict workspace Clippy, formatting and Go vet. The six-target workflow also
 selects the retained plan/Go execution suites and actual consented plan CLI
-process pairs. Its native results and final PR checks are pending; DOM-002 and
-CLI-010 are not promoted from local execution or queued jobs.
+process pairs. At branch source
+`cb3234c2291c8b243aeed8452e2bfce6f1938868`,
+[run 37137509483](https://github.com/danieljustus/symaira-eraseme/actions/runs/37137509483)
+passed all six native targets: Linux amd64/arm64 jobs
+`111244931322`/`111244931484`, Windows amd64/arm64
+`111244931505`/`111244931531`, and macOS amd64/arm64
+`111244931566`/`111244931454`. Each executes the actual campaign SMTP pair,
+eight ordinary protocol comparisons plus the credential-echo privacy control,
+all three private-root TLS cases, MIME, plan/execution and retained CLI gates.
+DOM-002/CLI-010 now meet that native scope. Required final PR checks and actual
+main integration remain separate. These synthetic local transactions do not
+claim paid-provider execution or the independent #1119 OS-store trust gate.
