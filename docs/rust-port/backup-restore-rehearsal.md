@@ -10,6 +10,15 @@ next candidate adds the same exact-package-SID block at IPv4/IPv6 socket
 assignment and records native TCP/UDP error numbers. Neither timeout nor
 connection refusal counts as network-denial evidence.
 
+At `04aba6b06d1c838a31c4975c62ea369792f506dd`, both Windows jobs in run
+`37135322292` passed that denial control and the real exit-23 control, then
+failed while cleaning the deliberately stalled process. Job termination is
+asynchronous: calling `TerminateProcess` again while the leader is already
+terminating returned native access denied. The fallback now applies only if
+Job assignment never succeeded; assigned children still require bounded
+process-handle wait and actual zero-active Job accounting before resources,
+SID permissions, profile and WFP filters are released.
+
 This executable rehearsal covers one explicit rollback boundary for RUST-016.
 It starts from the checked-in synthetic schema-v1 fixture, reads its three
 requests with the supplied retained Go artifact, takes a SQLite online backup,

@@ -257,6 +257,7 @@ def _command(root, label, argv, env, timeout, record):
     profile = 'eraseme-migration-' + uuid.uuid4().hex
     sid, text_sid, job, process = P(), w.LPWSTR(), None, Process()
     attrs_ready, profile_created, granted = False, False, False
+    assigned = False
     record['sandbox']['profile'] = profile
     attrs, network = None, None
     try:
@@ -314,6 +315,7 @@ def _command(root, label, argv, env, timeout, record):
                     checked(inherit(handle, 1, 0), 'disable selected handle inheritance')
             # Assignment failure never resumes the unowned suspended process.
             checked(assign_job(job, process.process), 'AssignProcessToJobObject')
+            assigned = True
             if resume(process.thread) == 0xffffffff:
                 raise c.WinError(c.get_last_error(), 'ResumeThread')
             deadline = time.monotonic() + timeout
@@ -340,7 +342,11 @@ def _command(root, label, argv, env, timeout, record):
                 # Terminate the job even when its leader already exited.
                 if job:
                     checked(terminate_job(job, 124), 'TerminateJobObject')
-                if wait(process.process, 0) == 258:
+                # Job termination is asynchronous. Its owned leader may still
+                # have an unsignalled handle while the kernel has already
+                # withdrawn PROCESS_TERMINATE access. Only an assignment
+                # failure needs the separate suspended-process fallback.
+                if not assigned and wait(process.process, 0) == 258:
                     checked(terminate_process(process.process, 124), 'TerminateProcess owned suspended child')
                 if wait(process.process, 5000) != 0:
                     raise RuntimeError('owned Windows process did not reap within five seconds')
