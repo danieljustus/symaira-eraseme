@@ -27,7 +27,7 @@ The accepted CLI-023 manual-confirmation deviation (#809, 2026-09-28) is not
 a browser-implementation blocker. #1122 owns its remaining native evidence
 and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
 #1129, not the closed historical Go signing fix #794. CoreKit #366 closed
-on 2026-10-02; #1121 still owns native Windows host-agent acceptance. Publication, production
+on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
@@ -40,8 +40,12 @@ an owned Windows process handle establishes that it was live before the
 disconnect and terminated afterwards, with a healthy MCP server and no saved
 classification. The PATH cases record source hashes from the actual Go helper
 and `exec.LookPath`/`AgentClient.IsAvailable` observations in disposable roots.
-No operator profile or paid agent is used. These are new pending native gates,
-not PASS evidence; DOM-008/DOM-008A remain PARTIAL until their results land.
+No operator profile or paid agent is used. DOM-008/DOM-008A are PASS on
+source `54d8c138a9d7aa0811701c736faa0575c08d4558`: targeted run
+`37117363917` passed both Windows jobs (amd64 `111186642692`, arm64
+`111186642789`), including all nine lookup cases and malformed-stderr MCP
+replay. Full native run `37117425498` passed all six OS/architecture targets,
+including provider descriptors, retries/errors and cancellation.
 
 The first native run `37115382421` at `cd2e68ee` established both Windows
 disconnect/reap controls, but the PATH comparison failed on amd64 job
@@ -49,7 +53,10 @@ disconnect/reap controls, but the PATH comparison failed on amd64 job
 `claude` with `PATHEXT=.EXE`, while Rust reported it available. The candidate
 builder now follows Go's extension rule; the portable filesystem regression
 also checks the contrasting empty-extension-list case. The original failures
-remain evidence; final native validation of the repair is pending.
+remain evidence; both final native lookup comparisons reject the extensionless
+file with .EXE and accept it with an empty extension list. Task 6.5 now meets
+its recorded contract and source-bound descriptor/provider gates. The
+independent CoreKit #366 dependency and EraseMe #1112 are closed.
 
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
