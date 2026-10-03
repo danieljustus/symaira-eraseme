@@ -22,6 +22,7 @@ const CHILD: &str = "SYMERASEME_OAUTH_TRUST_CASE";
 
 #[cfg(windows)]
 fn inspect_windows_root() {
+    use schannel::cert_context::ValidUses;
     use schannel::cert_store::CertStore;
     let expected =
         CertificateDer::from_pem_file(std::env::var("SYMERASEME_OAUTH_TEST_ROOT").unwrap())
@@ -36,7 +37,10 @@ fn inspect_windows_root() {
     eprintln!(
         "native owned CA time_valid={:?} valid_uses={:?}",
         cert.is_time_valid(),
-        cert.valid_uses()
+        cert.valid_uses().map(|uses| match uses {
+            ValidUses::All => vec!["all".to_owned()],
+            ValidUses::Oids(oids) => oids,
+        })
     );
     let mut parsed = rustls::RootCertStore::empty();
     eprintln!("native owned CA rustls_parse={:?}", parsed.add(expected));
