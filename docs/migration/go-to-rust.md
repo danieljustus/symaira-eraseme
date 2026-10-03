@@ -60,6 +60,38 @@ fixture regeneration. All ten local tests pass. Current native six-target proof,
 including both Windows architectures, is pending. This proves the mechanism and
 repair; it does not fabricate a timestamp for the historical client setup.
 
+## Native Windows consent gate (2026-10-03, #1123)
+
+`consent-windows.yml` selects actual amd64 and arm64 execution. Four private
+filesystem cases compare checked-out Go 1.26.6 with Rust: inherited DACLs,
+an owner-only parent, a read-only directory and failed replacement of a
+read-only token. The comparison covers complete filename sets, exact bytes,
+owner/group/DACL SDDL, protection flags, read-only state and unrelated sentinel
+preservation. The oracle records and verifies the four source hashes.
+Windows Go chmod changes read-only attributes and inherits the parent's DACL;
+0700/0600 are not translated into an owner-only Windows DACL by this gate.
+
+The checked-close control releases its owned file once, then calls the same
+production `CloseHandle` error boundary with a null handle. Windows must
+return real `ERROR_INVALID_HANDLE` (6); the atomic-write operation must
+propagate that failure, skip chmod, retain the old token and sentinel, and
+remove its temporary file exactly like the retained Go close-failure fixture.
+This is an actual kernel-error control through the operation-local seam;
+it does not manufacture an invalid owning `File` or double-close a handle.
+Initial amd64 run `37120919444` at `576c07f6` hit the bounded 30-second
+PowerShell ACL observation deadline in its cleared private environment.
+The observation script now uses framework ACL APIs and direct bounded JSON
+output, avoiding cmdlet module discovery, with explicit stage diagnostics.
+This is a pending harness repair; the original failure is retained.
+Native run `37121535781` at `21a4fca0cebe4d3956a8c62090b91948672066d2`
+passed amd64 job `111198458769` and arm64 job `111198458869`: all four
+complete-tree byte/DACL comparisons, both actual-kernel close-error and
+open-old-file controls, twelve Windows API tests and three portable cleanup
+controls. The environment child helper is an expected skip, not evidence.
+ID-005 and task 4.7 are PASS; existing native Unix evidence is retained,
+with unchanged Unix production behavior. Complete final PR CI remains a
+separate requirement before merge.
+
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
 `host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap
