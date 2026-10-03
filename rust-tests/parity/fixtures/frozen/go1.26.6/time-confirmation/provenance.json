@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "source_revision": "aa2dd0f31d30061b5ed66e7638a0dcddde060009",
+  "captured_at_utc": "2026-10-03T18:47:39.411173+00:00",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "build_command": [
+    "/workspace/toolchains/go/bin/go",
+    "build",
+    "-mod=readonly",
+    "-buildvcs=true",
+    "-o",
+    "/workspace/scratch/go-freeze-capture-time-urls/actual-go-time-url-oracle",
+    "./rust-tests/parity/oracle"
+  ],
+  "embedded_build_info": "/workspace/scratch/go-freeze-capture-time-urls/actual-go-time-url-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003163940-aa2dd0f31d30\t\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=aa2dd0f31d30061b5ed66e7638a0dcddde060009\n\tbuild\tvcs.time=2026-10-03T16:39:40Z\n\tbuild\tvcs.modified=false\n",
+  "binary": {
+    "bytes": 3715851,
+    "sha256": "4c58bb0f0c620bae0285de6f17ef4dd43f508e7eba88e93187a4d319e4926fa9"
+  },
+  "exit_status": 0,
+  "stdout": {
+    "bytes": 6215,
+    "sha256": "480992c881309c134f7260709d9f7212c9845a9b8b2b774072d61938144d6620"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sources": {
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    },
+    "rust-tests/parity/oracle/main.go": {
+      "bytes": 2329,
+      "sha256": "3fb8f3b91fe81bf7f7efaaad5dbf10e0b3899fb08d3cb3430b343e232910a1bb"
+    },
+    "rust-tests/parity/oracle/cases.json": {
+      "bytes": 2608,
+      "sha256": "88bff1eafd3864ae9fb71563e82dd18267875103fb4e8eb03bc942573721b466"
+    },
+    "internal/confirmation/confirmation.go": {
+      "bytes": 4957,
+      "sha256": "b31b92c055908556f153d0b012e584e030f75b9e62b7347aa09a61bba9896e8c"
+    },
+    "internal/confirmation/confirmation_test.go": {
+      "bytes": 2111,
+      "sha256": "76a2a80646712ad3728ca899bdff503baedc705d592be2bbe931ba4b903a9530"
+    },
+    "internal/eventstore/timeutil/timeutil.go": {
+      "bytes": 2527,
+      "sha256": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df"
+    },
+    "internal/eventstore/timeutil/timeutil_test.go": {
+      "bytes": 1161,
+      "sha256": "497cfab3cce7ed1475287e510af672b2cda00b11b3d12a5876412faf3f7131ff"
+    }
+  },
+  "counts": {
+    "timestamps": 32,
+    "urls": 8
+  },
+  "limits": "Actual observations from one native Linux host. Preparation only; no complete corpus, changed default suite or six-target acceptance claim.",
+  "rust_frozen_reader_probe": {
+    "checked_rows": 40,
+    "timestamp_rows": 32,
+    "url_rows": 8,
+    "mutation_controls": 3,
+    "runtime_path": "/workspace/scratch/frozen-time-url-rust-probe/empty-path",
+    "no_go_on_runtime_path": true,
+    "source": {
+      "sha256": "ac551b48ca66e976fafaf6a412d7067ed2f93795dff3830e1eb7f13ec08f05c2"
+    },
+    "stdout_sha256": "ac4e7d76ef54524d1fc4b258f710ee2598e12da6b90e2a73940011683a16781a",
+    "limits": "external pure-API probe only; current default parity suite and other runtime Go helpers have not yet been changed"
+  },
+  "rust_source_files": {
+    "crates/symeraseme-core/src/timeutil.rs": "057de28dd57fdec40fee4fc3aa53df58e1990af80b623a0ffe05243caf03afb5",
+    "crates/symeraseme-core/src/confirmation.rs": "aa215d06ad496efc9913e66080071d3aab1ccdf681991d84d7622caccd858915"
+  }
+}

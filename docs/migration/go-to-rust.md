@@ -10,6 +10,24 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Neutral frozen-oracle preparation (2026-10-03, #1131)
+
+Actual private-root Go 1.26.6 capture at clean source
+`aa2dd0f31d30061b5ed66e7638a0dcddde060009` records all 32 timestamp and eight
+ordered confirmation-URL inputs. The neutral package now defaults to these
+whole-output/input-hashed observations while retaining explicit live mode
+with private runtime roots and the unchanged 30-second total budget. Local
+default execution with `go` absent from PATH passes all 21 existing harness
+unit tests and both differential/control tests, including all 40 observed
+inputs and three corrupted-oracle controls. The original 40-case differential
+is retained; the extra test exercises corruption detection.
+
+This candidate changes no contract-row status or integrated task completion.
+Its Go-free CI definition still needs candidate execution. The other runtime
+Go helpers, command-line live interface and switchback runners remain open
+under #1131. Go removal stays gated by the actual stable release and seven
+days; neither #1131 nor #1133 is closed by this preparation.
+
 The task graph is reconciled against integrated `28e32a1c` and the current
 matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
 evidence. Phases 6–8 are not complete. Closed historical phase issues

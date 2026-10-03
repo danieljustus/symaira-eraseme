@@ -1,0 +1,65 @@
+name: Frozen neutral parity without Go
+
+on:
+  pull_request:
+    paths:
+      - rust-tests/parity/**
+      - crates/symeraseme-core/src/timeutil.rs
+      - crates/symeraseme-core/src/confirmation.rs
+      - Cargo.toml
+      - Cargo.lock
+      - Makefile
+      - .github/workflows/rust-no-go.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-no-go-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frozen-neutral:
+    name: Rust / frozen neutral parity without Go
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Fetch locked Rust dependencies
+        run: cargo +1.98.0 fetch --locked
+      - name: Execute default suite with Go absent from PATH
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import shutil
+          import subprocess
+          import tempfile
+
+          with tempfile.TemporaryDirectory(prefix="neutral-tools-no-go-") as temporary:
+              tools = pathlib.Path(temporary)
+              for directory in os.environ["PATH"].split(os.pathsep):
+                  if not directory or not pathlib.Path(directory).is_dir():
+                      continue
+                  for program in pathlib.Path(directory).iterdir():
+                      if program.name.startswith(("go", "gccgo")):
+                          continue
+                      destination = tools / program.name
+                      if not destination.exists() and program.is_file() and os.access(program, os.X_OK):
+                          destination.symlink_to(program.resolve())
+              environment = os.environ.copy()
+              environment["PATH"] = str(tools)
+              environment.pop("SYMERASEME_PARITY_LIVE_GO", None)
+              assert shutil.which("go", path=str(tools)) is None
+              cargo = shutil.which("cargo", path=str(tools))
+              assert cargo is not None
+              print("Verified: go absent from PATH; default frozen suite selected", flush=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "parity", "--all-targets", "--locked", "--offline"],
+                             env=environment, check=True)
+          PY

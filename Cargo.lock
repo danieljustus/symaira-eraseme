@@ -1387,7 +1387,9 @@ version = "0.13.0"
 dependencies = [
  "rusqlite",
  "serde_json",
+ "sha2",
  "symeraseme-core",
+ "tempfile",
  "windows-sys 0.61.2",
 ]
 

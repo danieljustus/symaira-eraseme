@@ -13,6 +13,14 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 neutral freeze preparation records actual Go 1.26.6 observations for
+32 timestamp and eight confirmation-URL inputs at clean source
+`aa2dd0f31d30061b5ed66e7638a0dcddde060009`. Default neutral-package tests read
+the same observed cases without Go; input/output hashes and three corrupted
+observations protect the corpus. Existing TIME/confirmation acceptance is
+retained. This does not promote CUT-005, complete all runtime-oracle freezing,
+or establish release/native cutover acceptance.
+
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
 `execution_state.contract_issue_owners`, and owners of every unfinished task

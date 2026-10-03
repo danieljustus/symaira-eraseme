@@ -8,6 +8,30 @@ and [docs/rust-port-contract-matrix.md](../../docs/rust-port-contract-matrix.md)
 
 ## 1. Structure
 
+### Frozen neutral suite preparation (#1131)
+
+`make parity` now tests the neutral harness without building Go. Its time and
+confirmation differential loads actual Go 1.26.6 observations from
+`fixtures/frozen/go1.26.6/time-confirmation/`, including capture provenance,
+full-output SHA-256 and input SHA-256 checks. All 32 timestamp and eight ordered
+URL cases still run. Three corrupted-observation controls must fail: changed
+ISO output, a missing timestamp row and an added URL. The original harness
+mutation/process/filesystem/HTTP/SQLite checks remain selected.
+
+`make parity-live` explicitly rebuilds Go and selects the same cases with
+`SYMERASEME_PARITY_LIVE_GO=1`. Live observation requires Go 1.26.6 and uses
+private HOME/USERPROFILE/XDG/temp/data roots, regular capture files and child
+cleanup. Cache discovery, build and execution share the existing total
+30-second budget; the deadline is not increased. Default tests require no
+Go executable. The Go-free CI job checks this with a PATH containing no Go
+compiler executable and offline Rust dependency resolution after fetch.
+
+This is preparation for #1131. Other core/CLI/engine runtime oracles, the
+command-line harness's live `--go` interface, and switchback runners are still
+to be frozen. The suite-wide Go retirement, release prerequisites and actual
+seven-day observation remain open. No live-mode observation is fabricated,
+and no production randomness or Rust/Go comparator is relaxed.
+
 ```
 rust-tests/parity/
 ├── README.md               # This document: harness overview and baseline definitions
