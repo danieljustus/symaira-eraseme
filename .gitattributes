@@ -56,6 +56,8 @@ tests/fixtures/provider-cancel/*.json text eol=lf
 # Actual captured byte streams must survive Windows autocrlf unchanged.
 tests/fixtures/go-frozen/** -text
 tests/fixtures/go-frozen/**/manifest.json text eol=lf
+# Native Python manifests retain the producing host's measured line endings.
+tests/fixtures/go-frozen/native-0d/** -text
 rust-tests/parity/oracle/projection/cases.json text eol=lf
 rust-tests/parity/oracle/config/inputs.json text eol=lf
 rust-tests/parity/oracle/config/config_cases.json text eol=lf
