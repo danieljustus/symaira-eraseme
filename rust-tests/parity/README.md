@@ -149,6 +149,10 @@ test is added. Other OS defaults and explicit live mode build the same Go
 oracle once into an owned temporary directory, use the existing shared
 120-second build/30-second execution limits, and retain all seven byte
 comparisons. No production retry/TLS/config or provider traffic is changed.
+The next native capture also runs these seven fixed LLM cases against owned
+loopback providers and verifies their complete output against the same
+fixtures. Together with prior families, it records 48 product observations;
+native acceptance still requires actual target execution and review.
 
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still

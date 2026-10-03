@@ -6,6 +6,7 @@ must be new, and a manifest is written only after every real oracle succeeds.
 """
 
 import argparse
+import concurrent.futures
 import datetime
 import hashlib
 import json
@@ -101,7 +102,8 @@ def main():
                       "internal/timeutil", "internal/scheduler", "internal/config", "internal/campaign",
                       "internal/identity", "internal/manualtasks", "internal/registry", "rust-tests/parity/oracle/triage-service",
                       "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install", "rust-tests/parity/oracle/config",
-                      "rust-tests/parity/oracle/campaign-execution", "rust-tests/parity/oracle/storage"):
+                      "rust-tests/parity/oracle/campaign-execution", "rust-tests/parity/oracle/storage",
+                      "rust-tests/parity/oracle/llm-failures-next"):
         sources.extend(sorted((source / directory).rglob("*.go")))
     cases_path = source / "rust-tests/parity/oracle/projection/cases.json"
     sources.append(cases_path)
@@ -191,10 +193,33 @@ def main():
             "embedded_build_info": build_info.decode(),
             **fixture_metadata,
         })
+    llm_binary = output_root / ("llm-failures-next-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
+    capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(llm_binary),
+             "./rust-tests/parity/oracle/llm-failures-next"], source, environment,
+            output_root / "llm-failures-next-build", 120)
+    llm_build_info = subprocess.check_output([go, "version", "-m", str(llm_binary)], env=environment, timeout=10)
+    assert ("vcs.revision=" + revision).encode() in llm_build_info and b"vcs.modified=false" in llm_build_info
+    llm_cases = [("case", []), ("case-404", ["--status", "404"]), ("case-400", ["--status", "400"]),
+                 ("case-500", ["--status", "500"]), ("case-401", ["--status", "401"]),
+                 ("malformed-envelope", ["--status", "403", "--malformed-envelope"]),
+                 ("malformed-choice", ["--status", "403", "--malformed-choice"])]
+
+    def observe_llm(case):
+        name, arguments = case
+        output, errors = capture([str(llm_binary), *arguments], source, environment,
+                                 output_root / ("llm-failures-next-" + name), 30)
+        assert not errors
+        assert output == (source / "tests/fixtures/llm-failures-next" / (name + ".json")).read_bytes()
+        return {"name": name, "args": arguments, "exit_status": 0,
+                "stdout": digest(output), "stderr": digest(errors)}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as pool:
+        llm_observations = list(pool.map(observe_llm, llm_cases))
+    manifest["llm_failures"] = {"embedded_build_info": llm_build_info.decode(), "cases": llm_observations}
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 41, "status": "actual observations captured"}))
+                      "operations": 48, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

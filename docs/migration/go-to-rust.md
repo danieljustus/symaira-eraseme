@@ -775,6 +775,13 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — Clean `6421dea` passed exactly 109 selected Go-free tests,
+  zero failed/ignored, and the same eleven LLM tests in actual private-root
+  Go 1.26.6 live mode. Native capture additionally executes the seven LLM
+  fixture cases through owned loopback providers and verifies their whole
+  output, raising the reviewed product-observation scope to 48. Real native
+  execution remains required; the new pipeline alone proves no target.
+
 - 2026-10-03 — #1131's actual clean `54acd9b` Go capture produced all seven
   complete LLM failure fixtures unchanged. Linux defaults verify exact
   arguments and whole raw/source/status hashes; all ten original Rust

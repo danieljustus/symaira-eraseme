@@ -99,6 +99,11 @@ hashes. All ten existing Rust loopback/retry/error/redaction/budget tests
 remain selected with one integrity control. Other OS defaults retain live
 Go through bounded owned temporary compilation; production behavior,
 existing LLM/native acceptance and cutover statuses are unchanged.
+Clean `6421dea` locally passed exactly 109 selected tests without Go in PATH
+and all eleven LLM tests in actual private-root pinned-Go live mode. The
+next native capture includes seven whole LLM outputs (48 total product
+observations), while other native OS/default and CLI/MCP runtime families
+remain open. This does not complete #1131 or promote CUT-005.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
