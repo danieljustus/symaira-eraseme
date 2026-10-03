@@ -10,6 +10,26 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Consent-grant frozen-oracle preparation (2026-10-03, #1131)
+
+Actual native Go 1.26.6 at clean `aa684787641be9c92a8b0c5a30fa75d804c1c48d`
+records six complete grant issue/list/positional-TTL/revoke/revoke-all/empty
+process outcomes in a disposable data root. Every raw stream, token-derived
+filename, file byte/hash, mode and persisted TTL is retained with 171 source
+hashes and the unmodified native VCS identity. Linux defaults use verified
+recorded Go expectations and effects; the Rust CLI still genuinely issues,
+reads and revokes independent fresh grants. Existing normalization is limited
+to random tokens and issued/expires Unix timestamps; all other whole bytes,
+filename/hash/mode, count, command and 86,400/60-second TTL checks remain.
+No frozen Go files are written into a pretend producer directory. Other
+platforms and explicit live mode keep the real Go producer. Both CLI families
+share a bounded 120-second offline readonly/VCS build and unchanged ten-second
+process/capture bounds. Added controls reject changed bytes, filenames and
+modes and retain both persisted and emptied states. Four selected review/grant
+tests pass with Go absent locally. The observation pipeline now captures
+all six genuine grant processes/files, for 62 product observations; fresh
+complete/live/native validation remains required. This does not close #1131.
+
 ### Scheduler test-root race correction (2026-10-03, #1131)
 
 The complete Go-absent selection at clean `0d1be28288594354941a07d19f834f2553928bc4`

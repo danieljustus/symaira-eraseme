@@ -248,10 +248,46 @@ def main():
         review_cases.append({"argv": arguments, "exit_status": status, "stdout": digest(output), "stderr": digest(errors)})
     manifest["cli_review"] = {"embedded_build_info": review_build_info.decode(), "cases": review_cases,
                               "input_unchanged": True, "input": digest(original)}
+    grant_data = private / "grant-data"
+    grant_data.mkdir(mode=0o700)
+    grant_environment = {**review_environment, "SYMERASEME_DATA_DIR": str(grant_data)}
+    grant_arguments = [["grant", "--output", "json"], ["grant", "--list", "--output", "json"],
+                       ["grant", "--command", "ignored", "send-removal", "--ttl", "60", "--output", "json"],
+                       None, ["grant", "--revoke-all", "--output", "json"],
+                       ["grant", "--list-tokens", "--output", "json"]]
+    grant_cases = []
+    first_token = None
+    for index, arguments in enumerate(grant_arguments):
+        if index == 3:
+            arguments = ["grant", "--revoke", first_token, "--output", "json"]
+        status, output, errors = capture_process([str(review_binary), *arguments], review_cwd, grant_environment,
+                                                output_root / ("cli-grant-case-" + str(index)), 10)
+        assert status == 0 and not errors, "actual native Go grant failed"
+        response = json.loads(output)
+        if index == 0:
+            first_token = response["token"]
+        records = []
+        for number, path in enumerate(sorted(grant_data.iterdir())):
+            assert path.is_file() and not path.is_symlink()
+            content = path.read_bytes()
+            record = json.loads(content)
+            expected_name = "consent_" + hashlib.sha256(record["token"].encode()).hexdigest()[:16] + ".json"
+            assert path.name == expected_name
+            mode = format(path.stat().st_mode & 0o777, "04o")
+            if info["GOHOSTOS"] != "windows":
+                assert mode == "0600"
+            assert record["expires_at"] - record["issued_at"] == (60 if record["command"] == "send-removal" else 86400)
+            filename = "cli-grant-case-" + str(index) + "-consent-" + str(number) + ".observations.json"
+            (output_root / filename).write_bytes(content)
+            records.append({"file": filename, "name": path.name, "mode": mode, **digest(content)})
+        assert len(records) == [1, 1, 2, 1, 0, 0][index]
+        grant_cases.append({"argv": arguments, "exit_status": status, "stdout": digest(output),
+                            "stderr": digest(errors), "consent_records": records})
+    manifest["cli_grants"] = {"embedded_build_info": review_build_info.decode(), "cases": grant_cases}
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 56, "status": "actual observations captured"}))
+                      "operations": 62, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ on:
       - crates/symeraseme-core/tests/campaign_plan_contract.rs
       - crates/symeraseme-cli/tests/command_surface.rs
       - crates/symeraseme-cli/tests/support/frozen_review_oracle.rs
+      - crates/symeraseme-cli/tests/support/frozen_grant_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_go_oracle.rs
       - tests/fixtures/go-frozen/**
@@ -104,4 +105,6 @@ jobs:
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
                               "review_", "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
+                              "grant_", "--locked", "--offline"], env=environment, check=True)
           PY
