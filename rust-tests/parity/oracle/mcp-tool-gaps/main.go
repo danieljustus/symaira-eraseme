@@ -32,7 +32,7 @@ func main() {
 	sourceRoot, err := os.Getwd()
 	must(err)
 	sources := map[string]string{}
-	for _, name := range []string{"go.mod", "go.sum", "internal/eventstore/store.go", "internal/eventstore/encrypt.go", "internal/config/storage.go", "internal/mcp/contract_handler.go", "internal/mcp/server.go", "internal/reporting/reporting.go", "rust-tests/parity/oracle/mcp-tool-gaps/main.go"} {
+	for _, name := range []string{"go.mod", "go.sum", "internal/eventstore/store.go", "internal/eventstore/encrypt.go", "internal/config/config.go", "internal/mcp/contract_handler.go", "internal/mcp/server.go", "internal/reporting/reporting.go", "rust-tests/parity/oracle/mcp-tool-gaps/main.go"} {
 		raw, err := os.ReadFile(filepath.Join(sourceRoot, name))
 		must(err)
 		hash := sha256.Sum256(raw)
