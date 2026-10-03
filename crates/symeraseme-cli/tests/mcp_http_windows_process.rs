@@ -14,6 +14,8 @@ use symeraseme_core::storage::repository::Repository;
 
 #[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
+#[path = "support/native_host_agent.rs"]
+mod native_host_agent;
 use mcp_http_port::{
     StartedChild, accepts_token, free_port, read_bounded_response, spawn_with_handoff,
 };
@@ -57,6 +59,26 @@ fn start_with_flags(
         Duration::from_secs(10),
         |candidate, stderr| {
             let mut command = Command::new(binary);
+            if envs.iter().any(|(key, _)| *key == "AGENT_STARTED") {
+                command.env_clear();
+                for key in ["SystemRoot", "WINDIR"] {
+                    if let Some(value) = std::env::var_os(key) {
+                        command.env(key, value);
+                    }
+                }
+                for (key, suffix) in [
+                    ("XDG_CONFIG_HOME", "config"),
+                    ("XDG_DATA_HOME", "data"),
+                    ("XDG_STATE_HOME", "state"),
+                    ("XDG_CACHE_HOME", "cache"),
+                    ("TEMP", "tmp"),
+                    ("TMP", "tmp"),
+                ] {
+                    let directory = home.join(suffix);
+                    std::fs::create_dir_all(&directory).unwrap();
+                    command.env(key, directory);
+                }
+            }
             command
                 .creation_flags(flags)
                 .args([
@@ -284,6 +306,206 @@ fn seed_reply(root: &Path) {
             (request_id, "cancel-message", "cancel-thread", "privacy@example.invalid", "Please verify your address", "We need your current address."),
         )
         .unwrap();
+}
+
+/// A handle to the exact running synthetic agent, opened before disconnect.
+/// Waiting on it proves termination without PID reuse or tasklist parsing.
+struct AgentProcess(*mut std::ffi::c_void);
+
+#[link(name = "Kernel32")]
+unsafe extern "system" {
+    fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+    fn WaitForSingleObject(handle: *mut std::ffi::c_void, milliseconds: u32) -> u32;
+    fn TerminateProcess(handle: *mut std::ffi::c_void, code: u32) -> i32;
+    fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+}
+
+impl AgentProcess {
+    fn open(pid: u32) -> Self {
+        // SAFETY: opens only the PID published by our private fake executable.
+        let handle = unsafe { OpenProcess(0x0010_0001, 0, pid) }; // SYNCHRONIZE | TERMINATE
+        assert!(
+            !handle.is_null(),
+            "open synthetic agent: {}",
+            std::io::Error::last_os_error()
+        );
+        Self(handle)
+    }
+    fn wait(&self, milliseconds: u32) -> u32 {
+        // SAFETY: the owned handle remains valid until Drop.
+        unsafe { WaitForSingleObject(self.0, milliseconds) }
+    }
+}
+
+impl Drop for AgentProcess {
+    fn drop(&mut self) {
+        // SAFETY: terminate only our owned still-running fake agent on failure,
+        // then close the handle in both success and failure paths.
+        unsafe {
+            if self.wait(0) == 258 {
+                TerminateProcess(self.0, 99);
+                WaitForSingleObject(self.0, 5000);
+            }
+            CloseHandle(self.0);
+        }
+    }
+}
+
+#[test]
+fn native_windows_disconnect_reaps_host_agent_like_go() {
+    let root = tempfile::tempdir().unwrap();
+    let helper = native_host_agent::helper(root.path());
+    let oracle = build_oracle(root.path());
+    let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"agent","save":true}}}"#;
+    for (name, binary) in [
+        ("go", oracle.as_path()),
+        ("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"))),
+    ] {
+        let case = root.path().join(name);
+        seed_reply(&case);
+        let bin = case.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::copy(&helper, bin.join("claude.exe")).unwrap();
+        let started = case.join("agent.pid");
+        let path = bin.to_str().unwrap();
+        let started_path = started.to_str().unwrap();
+        let mut port = port();
+        let mut server = start_with(
+            binary,
+            &case,
+            &mut port,
+            &[
+                ("PATH", path),
+                ("PATHEXT", ".EXE"),
+                ("SYMERASEME_LLM_PROVIDER", "agent"),
+                ("SYMERASEME_AGENT_BACKEND", "claude"),
+                ("AGENT_STARTED", started_path),
+            ],
+        );
+        ready(&mut server, port, &case);
+        let token = std::fs::read_to_string(case.join("data/mcp_token")).unwrap();
+        let mut client = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        write!(client, "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", body.len()).unwrap();
+        client.write_all(body).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let pid = loop {
+            if let Ok(contents) = std::fs::read_to_string(&started) {
+                break contents.trim().parse().unwrap();
+            }
+            assert!(server.0.try_wait().unwrap().is_none());
+            assert!(
+                Instant::now() < deadline,
+                "{name} did not reach the fake host agent"
+            );
+            thread::sleep(Duration::from_millis(10));
+        };
+        let agent = AgentProcess::open(pid);
+        assert_eq!(
+            agent.wait(0),
+            258,
+            "agent must be running before disconnect"
+        );
+        drop(client);
+        assert_eq!(
+            agent.wait(5000),
+            0,
+            "{name} did not reap the agent after disconnect"
+        );
+        assert!(server.0.try_wait().unwrap().is_none());
+        assert_eq!(exchange(port, Some(&token), None).0, 200);
+        let store = Store::open(case.join("data/symeraseme.db")).unwrap();
+        let classification: Option<String> = store
+            .connection()
+            .query_row(
+                "SELECT classified_as FROM inbox_replies WHERE message_id = 'cancel-message'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            classification, None,
+            "{name} persisted a cancelled classification"
+        );
+        eprintln!(
+            "native host-agent {name}: live before disconnect, terminated afterwards, server healthy, no classification"
+        );
+    }
+}
+
+#[test]
+fn native_windows_pathext_availability_matches_live_go() {
+    const CHILD: &str = "SYMERASEME_LOOKUP_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        println!("lookup={}", symeraseme_core::llm::cli_on_path("claude"));
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    let helper = native_host_agent::helper(root.path());
+    for (id, filename, pathext, relative) in [
+        ("exe", "claude.EXE", ".EXE", false),
+        ("com", "claude.com", ".COM;.EXE", false),
+        ("cmd", "claude.cmd", ".CMD", false),
+        ("normalized", "claude.exe", "EXE", false),
+        ("default", "claude.exe", "", false),
+        ("excluded", "claude.exe", ".COM", false),
+        ("no-extension", "claude", ".EXE", false),
+        ("empty-extension-list", "claude", ";", false),
+        ("relative", "claude.exe", ".EXE", true),
+    ] {
+        let case = root.path().join(id);
+        let bin = case.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::copy(&helper, bin.join(filename)).unwrap();
+        let mut go = Command::new(&helper);
+        let mut rust = Command::new(std::env::current_exe().unwrap());
+        go.env_clear()
+            .arg("--lookup")
+            .env("SYMERASEME_ORACLE_SOURCE_ROOT", repo());
+        rust.env_clear()
+            .args([
+                "--exact",
+                "native_windows_pathext_availability_matches_live_go",
+                "--nocapture",
+            ])
+            .env(CHILD, "1");
+        for command in [&mut go, &mut rust] {
+            // These lookup children need no credentials or operator profile.
+            // Reconstruct the Windows loader environment and private roots.
+            if let Some(value) = std::env::var_os("SystemRoot") {
+                command.env("SystemRoot", value);
+            }
+            command
+                .current_dir(&case)
+                .env("HOME", &case)
+                .env("USERPROFILE", &case)
+                .env("PATH", if relative { Path::new("bin") } else { &bin })
+                .env("PATHEXT", pathext)
+                .env("GODEBUG", "")
+                .env("NoDefaultCurrentDirectoryInExePath", "1");
+        }
+        let observation = native_host_agent::observe(go, &case, "go-lookup");
+        assert!(observation.status.success());
+        let observation: serde_json::Value = serde_json::from_slice(&observation.stdout).unwrap();
+        use sha2::{Digest, Sha256};
+        for (source, digest) in observation["sources_sha256"].as_object().unwrap() {
+            let actual = Sha256::digest(std::fs::read(repo().join(source)).unwrap());
+            let actual: String = actual.iter().map(|byte| format!("{byte:02x}")).collect();
+            assert_eq!(actual, digest.as_str().unwrap(), "source-bound {source}");
+        }
+        assert_eq!(observation["found"], observation["available"]);
+        let result = native_host_agent::observe(rust, &case, "rust-lookup");
+        assert!(result.status.success());
+        let expected = format!("lookup={}\n", observation["available"].as_bool().unwrap());
+        assert!(
+            String::from_utf8_lossy(&result.stdout).contains(&expected),
+            "{id}: Rust disagrees with live Go {observation}: {}",
+            String::from_utf8_lossy(&result.stdout)
+        );
+        eprintln!("native PATHEXT {id}: {observation}");
+    }
 }
 
 /// Synthetic loopback OpenAI endpoint: captures one request, never answers,

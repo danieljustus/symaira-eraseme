@@ -128,4 +128,27 @@ fn windows_pathext_candidates_follow_go_path_extension_rules() {
         None,
         &super::windows_path_extensions(Some(OsStr::new(".EXE"))),
     ));
+
+    fs::remove_file(executable).unwrap();
+    let bare = root.path().join("claude");
+    fs::write(&bare, "extensionless native PATH control").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&bare, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    assert!(!super::cli_on_path_from_with_extensions(
+        "claude",
+        Some(root.path().as_os_str()),
+        false,
+        None,
+        &super::windows_path_extensions(Some(OsStr::new(".EXE"))),
+    ));
+    assert!(super::cli_on_path_from_with_extensions(
+        "claude",
+        Some(root.path().as_os_str()),
+        false,
+        None,
+        &super::windows_path_extensions(Some(OsStr::new(";"))),
+    ));
 }
