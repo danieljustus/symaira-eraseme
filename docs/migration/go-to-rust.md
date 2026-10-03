@@ -31,6 +31,18 @@ open and blocks the full provider acceptance in #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Email platform-root repair (2026-10-03, #1119)
+
+The real OAuth2 HTTPS regression reproduced a trust mismatch: default ureq
+Mozilla roots rejected an explicitly configured private CA, whereas IMAP
+already loaded platform certificates. `email/tls.rs` now supplies both
+adapters with the existing platform/Windows-machine certificate policy.
+Trusted, foreign-issuer and expired-certificate controls pass locally, as do
+the seven existing OAuth2 and five IMAP parity tests. No live provider or
+mailbox is involved. The explicit six-target native OS-store proof is pending;
+DOM-006/DOM-007 remain PARTIAL. See `docs/rust-email-crate-decision.md` for the
+previously missing task 6.1 decision artifact and its acceptance limits.
+
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
 The shared iterative protocol scanner now reports Go-compatible diagnostic
