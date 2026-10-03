@@ -31,6 +31,26 @@ open and blocks the full provider acceptance in #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native Windows consent gate (2026-10-03, #1123)
+
+`consent-windows.yml` selects actual amd64 and arm64 execution. Four private
+filesystem cases compare checked-out Go 1.26.6 with Rust: inherited DACLs,
+an owner-only parent, a read-only directory and failed replacement of a
+read-only token. The comparison covers complete filename sets, exact bytes,
+owner/group/DACL SDDL, protection flags, read-only state and unrelated sentinel
+preservation. The oracle records and verifies the four source hashes.
+Windows Go chmod changes read-only attributes and inherits the parent's DACL;
+0700/0600 are not translated into an owner-only Windows DACL by this gate.
+
+The checked-close control releases its owned file once, then calls the same
+production `CloseHandle` error boundary with a null handle. Windows must
+return real `ERROR_INVALID_HANDLE` (6); the atomic-write operation must
+propagate that failure, skip chmod, retain the old token and sentinel, and
+remove its temporary file exactly like the retained Go close-failure fixture.
+This is an actual kernel-error control through the operation-local seam;
+it does not manufacture an invalid owning `File` or double-close a handle.
+Native execution remains pending; ID-005 and task 4.7 remain PARTIAL.
+
 ## MCP parser diagnostic hardening (2026-10-02, #1125)
 
 The shared iterative protocol scanner now reports Go-compatible diagnostic
