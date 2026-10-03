@@ -84,8 +84,8 @@ The `scheduler_install_parity` integration now defaults on Linux to a real
 Go 1.26.6 twenty-case capture at clean `7ba198d`, produced with the fixture's
 umask 022. All original file hashes, modes, errors and recorded commands are
 compared. The five existing tests plus a byte-change/missing-file control
-execute without Go on Linux. Other operating systems retain live Go until
-their actual native captures are reviewed; no Unix fixture is presented as a
+execute without Go on Linux. Mac retains live Go until its actual native
+captures are reviewed; no Unix fixture is presented as a
 Windows observation. Explicit live mode uses the existing bounded oracle
 runner. Native capture now records these twenty cases in addition to the
 eleven service/projection observations, including the complete JSON file.
@@ -109,6 +109,17 @@ The four existing Rust tests remain selected with two corruption controls.
 The original source pins, whole-byte plan/effect comparisons and complete
 execution equality are retained. Other OS defaults and explicit live mode
 run bounded Go; no native campaign acceptance is inferred from Linux data.
+
+The scheduler-install default now also uses the actual Windows document from
+run `37154503080` at clean `30eeb38`. Both native Windows architecture
+artifacts contain byte-identical twenty-case documents; their unchanged raw
+manifests and the four-target ZIP/source/stream readback are retained.
+Windows-specific wrapper hashes and observed Go permission values remain
+intact, and all original Rust payload/file/command comparisons are preserved.
+The existing Windows capability rule for POSIX mode comparison is unchanged.
+A native-corpus control verifies both observed architectures and rejects an
+unknown target or changed bytes. Local readback is not native execution of
+the new frozen Windows Rust path; that acceptance is still pending.
 
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still

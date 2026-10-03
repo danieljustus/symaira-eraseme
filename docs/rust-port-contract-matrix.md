@@ -72,6 +72,14 @@ an actually executed source-bound plan-generator test at clean `30eeb38`.
 All four existing Rust tests retain complete serialized/persisted-effect
 comparisons, with two added integrity controls. Other OS live execution,
 native campaign capture and all domain/cutover acceptance remain separate.
+Actual run `37154503080` at `30eeb38` now supplies four native 37-case
+service/projection/install/config captures. Each artifact verifies 65 source
+files, eight whole runtime streams and the complete install document. The
+two Windows install documents are byte-identical and retain their measured
+OS-specific file/mode differences. Windows install defaults select this
+actual corpus with their native architecture manifest; original comparisons
+and the existing POSIX-mode capability rule remain intact. Local readback
+does not establish native execution of the new frozen Rust path.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in

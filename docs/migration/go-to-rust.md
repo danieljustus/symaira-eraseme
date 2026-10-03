@@ -775,6 +775,17 @@ artifact gates still require separate evidence.
 
 ## Decisions
 
+- 2026-10-03 — Clean campaign checkpoint `65fede1` passed all 86 selected
+  Go-free tests and the same six campaign tests in private-root pinned-Go
+  live mode. Four actual `30eeb38` native artifacts in run `37154503080`
+  independently verify 37 cases, 65 sources, eight complete runtime streams
+  and installation JSON. Windows AMD64/ARM64 installation bytes are equal
+  and retain their actual wrapper/mode differences. The Windows install
+  default now selects those actual observations; its original Rust file,
+  payload and command comparisons remain intact. The existing Windows
+  POSIX-mode capability rule is unchanged. Local corpus/control validation
+  is not native proof for the new frozen Rust default, which remains pending.
+
 - 2026-10-03 — #1131 campaign preparation uses actual clean `30eeb38`
   native Linux Go execution output (6,341 bytes, nine result areas, eight
   stored events) and an actual `TestCampaignPlanBytesOracle` PASS verifying

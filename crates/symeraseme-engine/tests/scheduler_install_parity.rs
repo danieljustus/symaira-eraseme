@@ -27,12 +27,14 @@ use symeraseme_engine::scheduler::{Config, Platform};
 const FIXTURE: &str = include_str!("../../../tests/fixtures/scheduler-install/cases.json");
 const FROZEN_OBSERVATIONS: &[u8] =
     include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/observations.json");
+const FROZEN_WINDOWS: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/windows.observations.json");
 
 #[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
 mod go_oracle;
 
-/// Linux uses the actual source-bound native capture by default. Other native
-/// operating systems retain live Go until their full file/mode captures exist.
+/// Linux and Windows use their actual source-bound native captures by default.
+/// Mac retains live Go until its own full file/mode capture exists.
 /// Explicit live mode always rebuilds and runs the same twenty-case oracle.
 fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
@@ -42,6 +44,14 @@ fn selected_oracle_capture() -> &'static Value {
             Ok("0") | Err(std::env::VarError::NotPresent) => {
                 if cfg!(target_os = "linux") {
                     return verified_frozen_install(FROZEN_OBSERVATIONS);
+                }
+                if cfg!(windows) {
+                    let arch = match std::env::consts::ARCH {
+                        "x86_64" => "amd64",
+                        "aarch64" => "arm64",
+                        other => panic!("no actual Windows install capture for {other}"),
+                    };
+                    return verified_windows_install(FROZEN_WINDOWS, arch);
                 }
             }
             _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
@@ -122,6 +132,81 @@ fn verified_frozen_install(bytes: &[u8]) -> Value {
     assert_eq!(document["source_revision"], manifest["source_revision"]);
     assert_eq!(document["cases"].as_object().unwrap().len(), 20);
     document
+}
+
+fn verified_windows_install(bytes: &[u8], arch: &str) -> Value {
+    let manifest_bytes = match arch {
+        "amd64" => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/windows-amd64.manifest.json"
+        )
+        .as_slice(),
+        "arm64" => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/windows-arm64.manifest.json"
+        )
+        .as_slice(),
+        other => panic!("no actual native Windows install capture for {other}"),
+    };
+    let manifest: Value = serde_json::from_slice(manifest_bytes).unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"
+    );
+    assert_eq!(manifest["go_version"], "go1.26.6");
+    assert_eq!(manifest["native_target"], format!("windows/{arch}"));
+    let capture = manifest["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|capture| capture["package"] == "scheduler-install")
+        .unwrap();
+    assert_eq!(capture["exit_status"], 0);
+    assert_eq!(capture["stderr"]["bytes"], 0);
+    assert_eq!(capture["stderr"]["sha256"], hex::encode(Sha256::digest([])));
+    assert_eq!(capture["fixture"]["bytes"], bytes.len());
+    assert_eq!(
+        capture["fixture"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    for (path, source) in [
+        (
+            "internal/scheduler/scheduler.go",
+            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/scheduler-install/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/scheduler-install/main.go")
+                .as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["source_revision"], manifest["source_revision"]);
+    assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+    document
+}
+
+#[test]
+fn actual_native_windows_install_preserves_full_cases_and_rejects_unknown_architecture() {
+    let amd64 = verified_windows_install(FROZEN_WINDOWS, "amd64");
+    assert_eq!(amd64, verified_windows_install(FROZEN_WINDOWS, "arm64"));
+    assert_eq!(amd64["cases"].as_object().unwrap().len(), 20);
+    let linux = verified_frozen_install(FROZEN_OBSERVATIONS);
+    assert_ne!(
+        amd64["cases"]["cron_install_writes_block"]["files"]["schedules/install.sh"],
+        linux["cases"]["cron_install_writes_block"]["files"]["schedules/install.sh"]
+    );
+    assert!(
+        std::panic::catch_unwind(|| verified_windows_install(FROZEN_WINDOWS, "unobserved"))
+            .is_err()
+    );
+    let mut changed = FROZEN_WINDOWS.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_windows_install(&changed, "amd64")).is_err());
 }
 
 #[test]
