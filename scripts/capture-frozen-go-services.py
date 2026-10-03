@@ -101,7 +101,7 @@ def main():
     cases_path = source / "rust-tests/parity/oracle/projection/cases.json"
     sources.append(cases_path)
     for path in sources:
-        manifest["source_files"][str(path.relative_to(source))] = digest(path.read_bytes())
+        manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
     for package in ("triage-service", "projection"):
         binary = output_root / (package + (".exe" if info["GOHOSTOS"] == "windows" else ""))
         # runtime.Caller locates projection/cases.json: do not trim its path.

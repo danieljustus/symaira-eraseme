@@ -67,6 +67,33 @@ buffer and the existing bounded reader, with unchanged five-second deadline
 and full header/body requirements. This prevents the reproduced split-write
 failure retained by #1154 (`37148405763`, job `111276980727`). It changes no
 production server behavior and claims no new Windows result before execution.
+Native capture run `37150753738` at `6ab9537` records all eleven operations
+on both Linux and Windows architectures; both Mac captures and complete
+suite acceptance remain pending. Readback exposed Windows CRLF conversion
+of the projection JSON input, faithfully recorded as a different source
+digest. A real local Git checkout with `core.autocrlf=true` also reproduces
+conversion of the captured raw service output. Pin raw captured streams as
+non-text and manifests/projection inputs to LF, and use portable source-path
+keys for subsequent captures. No stored observation is rewritten to conceal
+the original checkout difference; new native acceptance is still required.
+Both native Windows full-suite jobs (`111283985890`, `111283985991`) at
+`6ab9537` subsequently reproduce those exact length failures: neutral output
+6215→6216, recorded stderr 65→66 and service output 7986→7987. Both Linux
+full suites pass. The correction preserves all original stream bytes and
+all digest/length assertions. A real Rust negative control rejects the
+actual Git-converted service output with exit 101; the fixed Git checkout
+preserves all 53 then-existing fixture/input files byte-for-byte.
+
+Four downloaded native artifacts (`11283751634`, `11284415392`,
+`11283852460`, `11283628107`) verify archive digests, all 49 source files,
+all raw stream lengths/hashes, clean embedded Go build/source/native-target
+identity and all eleven operations per target. Linux/Windows projection
+outputs are byte-identical within each architecture; only `int64_max_payload`
+differs between AMD64 and ARM64. The projection family now defaults to those
+actual separate whole outputs, preserves all seven original comparisons and
+adds byte-change/missing-boundary controls. Both local default tests pass
+without Go, with strict core Clippy. Native Mac captures, corrected Windows
+suite acceptance and the other runtime-oracle families remain open.
 
 This candidate changes no contract-row status or integrated task completion.
 Its Go-free CI definition still needs candidate execution. The other runtime

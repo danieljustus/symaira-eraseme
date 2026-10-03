@@ -58,6 +58,20 @@ outputs with source/toolchain/native-target provenance. This capture does
 not overwrite fixtures or synthesize an unobserved target result. The regular
 native Rust suite still executes; capture success alone is not suite proof.
 
+The core `projection_oversized_parity` integration defaults to actual separate
+AMD64/ARM64 captures in `tests/fixtures/go-frozen/projection/`. Four native
+Linux/Windows artifacts verify seven cases and show exactly one architecture
+difference (`int64_max_payload`). Every original Rust comparison remains
+selected, with two added byte-change/missing-case controls in one test.
+Source/input pins and complete output digests guard both observed corpora.
+The Go-free workflow selects this integration too; Mac capture and complete
+corrected native suite acceptance still remain pending.
+
+Captured streams and raw neutral observations use explicit Git byte-preserving
+attributes; input JSON uses LF. This retains the strict hashes on Windows.
+The original 6ab9537 Windows CRLF failures and actual Git/Rust negative control
+remain documented rather than normalized away.
+
 This is preparation for #1131. Other core/CLI/engine runtime oracles, the
 command-line harness's live `--go` interface, and switchback runners are still
 to be frozen. The suite-wide Go retirement, release prerequisites and actual

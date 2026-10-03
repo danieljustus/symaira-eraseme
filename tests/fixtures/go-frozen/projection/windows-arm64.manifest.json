@@ -1,0 +1,265 @@
+{
+  "schema": 1,
+  "source_revision": "6ab95372e69e6346d3929f709f9403321c642067",
+  "go_version": "go1.26.6",
+  "native_target": "windows/arm64",
+  "captured_at_utc": "2026-10-03T20:14:38.011808+00:00",
+  "source_files": {
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    },
+    "internal\\eventstore\\atomic_replace_unix.go": {
+      "bytes": 280,
+      "sha256": "adcf1def3e9898718213886e11164051e2c7430535a9facded42a20004c64884"
+    },
+    "internal\\eventstore\\atomic_replace_windows.go": {
+      "bytes": 634,
+      "sha256": "abb17e1984ddabff15baa338e22fb03b2454432f041303f2521372e75f37e9a8"
+    },
+    "internal\\eventstore\\cleanup.go": {
+      "bytes": 8014,
+      "sha256": "0e1430305c5ced6a2073f6b96b7722c37b2e0cac184425cd427857e5fda35f0e"
+    },
+    "internal\\eventstore\\cleanup_additional_test.go": {
+      "bytes": 5806,
+      "sha256": "480afb34d429ce86aa2fcd5c7a202ce94ca6e19b361d927cf7cb5ddbb12e3e2f"
+    },
+    "internal\\eventstore\\cleanup_safety_test.go": {
+      "bytes": 19122,
+      "sha256": "dc235cd50d196be4610ce56eccda4f08705b1b38c5b7965d5cd8b2f31479b79f"
+    },
+    "internal\\eventstore\\configured_test.go": {
+      "bytes": 15368,
+      "sha256": "cc1d5e3d894501f8623940442b7d6a02ebd3a68b9351f5aaccb16bd954789845"
+    },
+    "internal\\eventstore\\conformance_test.go": {
+      "bytes": 7559,
+      "sha256": "7027ddcff6e17158a8ca1bd1fb2423f2a55c190c43328bcdb2fb794501280f2a"
+    },
+    "internal\\eventstore\\encrypt.go": {
+      "bytes": 41859,
+      "sha256": "b72e44f3e88bfe67e6e5e03409c7add282f22cb706eb9496b3d20e9895e42f17"
+    },
+    "internal\\eventstore\\encrypt_test.go": {
+      "bytes": 6223,
+      "sha256": "53be04f07d4e6878ee78cde9f99369cd0e195331975b73e50b0ba00455b5d683"
+    },
+    "internal\\eventstore\\encryption_additional_test.go": {
+      "bytes": 5652,
+      "sha256": "01adcf399e24c902814da23cc5902d112d635a1833b414e6b8ac89a457de9e5a"
+    },
+    "internal\\eventstore\\eventtypes.go": {
+      "bytes": 3332,
+      "sha256": "89394cfcbdc6221f5622c08fe15a32ada42dbc3ed1c17258784f311306636fda"
+    },
+    "internal\\eventstore\\flock_unix.go": {
+      "bytes": 790,
+      "sha256": "c918d3f9d2532d644f924cadf5192e13c8e16526bd70d4bfa01afd5e76d16696"
+    },
+    "internal\\eventstore\\flock_windows.go": {
+      "bytes": 735,
+      "sha256": "237970385d9d37969d77a6a3e5a6ce08519911353b0be6ff939f31ee1c7a3574"
+    },
+    "internal\\eventstore\\imap_hwm_test.go": {
+      "bytes": 6030,
+      "sha256": "7d1b3f4e4373d0fabd57b89fd82274de03ce0a8df8e13f69157ca4547cf5350c"
+    },
+    "internal\\eventstore\\private_dir_unix.go": {
+      "bytes": 289,
+      "sha256": "19687de0acb3191a96f13f3b407ddf5c9815e3bdf93933276cea034e8bd3dd5c"
+    },
+    "internal\\eventstore\\private_dir_windows.go": {
+      "bytes": 455,
+      "sha256": "2863bc2f5e42148a8b4dbd210e68efd3ded4e7bcc2a5fbd22855b2dd37d65c46"
+    },
+    "internal\\eventstore\\projection.go": {
+      "bytes": 11610,
+      "sha256": "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a"
+    },
+    "internal\\eventstore\\projection_additional_test.go": {
+      "bytes": 6543,
+      "sha256": "6457c105367cac1220312a754cb30ce74aca261f25b99fc1cd7e95f82a5379e1"
+    },
+    "internal\\eventstore\\python_fernet_compat_test.go": {
+      "bytes": 22452,
+      "sha256": "5558fefcf7e0b324d09d2bd1c843e900809bf6149004778927f4b670667d5927"
+    },
+    "internal\\eventstore\\repo.go": {
+      "bytes": 11850,
+      "sha256": "339cf7d383d03de0fbb1f3cba994f8282b45c060a9a5294891e36893374a4625"
+    },
+    "internal\\eventstore\\repo_test.go": {
+      "bytes": 11612,
+      "sha256": "8ff4fc07c08288376c37c07ff78d6b411a41059a40b763232a455875f973adaa"
+    },
+    "internal\\eventstore\\store.go": {
+      "bytes": 20876,
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    },
+    "internal\\eventstore\\sync_directory_unix.go": {
+      "bytes": 320,
+      "sha256": "9cdfe967c394e4012b1dbf4096454887754a136b4e3d1c8aef781efd66f06af0"
+    },
+    "internal\\eventstore\\sync_directory_windows.go": {
+      "bytes": 281,
+      "sha256": "33dc2d3d00bbbb2d1feea24b9d94f5f0a6cd4ccae8cac8bbdb7be9ebb5bf8cee"
+    },
+    "internal\\eventstore\\timeutil\\timeutil.go": {
+      "bytes": 2527,
+      "sha256": "c597d0b04e83ac414e8f9fb79b7decb1c257bb685ba9ca89abc9674a8a94c7df"
+    },
+    "internal\\eventstore\\timeutil\\timeutil_test.go": {
+      "bytes": 1161,
+      "sha256": "497cfab3cce7ed1475287e510af672b2cda00b11b3d12a5876412faf3f7131ff"
+    },
+    "internal\\triage\\additional_test.go": {
+      "bytes": 3570,
+      "sha256": "4ad711cffe05827eac53d77b0a18494282ef7f53e95f9946d31850521871ba35"
+    },
+    "internal\\triage\\classifier.go": {
+      "bytes": 6961,
+      "sha256": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97"
+    },
+    "internal\\triage\\rebuttal.go": {
+      "bytes": 7102,
+      "sha256": "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa"
+    },
+    "internal\\triage\\rebuttal_test.go": {
+      "bytes": 1418,
+      "sha256": "2b9f81d4e2c1298fc043604753330de2476a214a9d4bccf4a883f706d115304e"
+    },
+    "internal\\triage\\triage_test.go": {
+      "bytes": 2470,
+      "sha256": "914a0c836c740ce1256a9edc70452b2b9af511d5b9986f411066000bba7f2a61"
+    },
+    "internal\\replies\\additional_test.go": {
+      "bytes": 5093,
+      "sha256": "2f081fb89a4f7fd6af18af1f4b243860b5d4ba4bc0dfa41d200f65f84637d80a"
+    },
+    "internal\\replies\\confirmation_fallback_test.go": {
+      "bytes": 2325,
+      "sha256": "9440a7348ffa12dd19af73de102c015d2a9652d442d71fd7951c801f391edb46"
+    },
+    "internal\\replies\\confirmation_security_test.go": {
+      "bytes": 3603,
+      "sha256": "f9fd0ef5da8935212ab6e1baf7832c5f0fb135a1d8506718756a1c5ec4de172b"
+    },
+    "internal\\replies\\replies_test.go": {
+      "bytes": 1281,
+      "sha256": "a2b1fad521cbd4016a9900941a1f05c49ca63a1bb72a37b0d2ca148bed08c968"
+    },
+    "internal\\replies\\repository.go": {
+      "bytes": 8049,
+      "sha256": "725369fd4a9527004870ab757cbfbb95b6d61e02015ff6debd7e3685cc753e7f"
+    },
+    "internal\\replies\\service.go": {
+      "bytes": 8216,
+      "sha256": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281"
+    },
+    "internal\\llm\\additional_test.go": {
+      "bytes": 2991,
+      "sha256": "822c4c7618b5cab4416461088486c2ffbf81dd368249e91f6ad107490222c846"
+    },
+    "internal\\llm\\agent.go": {
+      "bytes": 5531,
+      "sha256": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8"
+    },
+    "internal\\llm\\factory.go": {
+      "bytes": 3779,
+      "sha256": "8180713d346cce1f7f195fdadd0040ebe4fb96f1bf7a725170819de10f4596b4"
+    },
+    "internal\\llm\\llm.go": {
+      "bytes": 5574,
+      "sha256": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717"
+    },
+    "internal\\llm\\llm_test.go": {
+      "bytes": 5797,
+      "sha256": "4205e8fd4376a73ddb85b8bb2f96721e9d13b55ebdf6e490903a3216cf014ba0"
+    },
+    "internal\\llm\\llmkit.go": {
+      "bytes": 5201,
+      "sha256": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7"
+    },
+    "internal\\llm\\util.go": {
+      "bytes": 1405,
+      "sha256": "c05fae2692954fad8a2368fb1915cea0329f183688bf420e3a159fa58afc6148"
+    },
+    "rust-tests\\parity\\oracle\\triage-service\\main.go": {
+      "bytes": 7854,
+      "sha256": "05f8e0ae89644c4dfd420b3b37afb950f19e1dea94b3160d484bb8c21c2b8810"
+    },
+    "rust-tests\\parity\\oracle\\projection\\main.go": {
+      "bytes": 1962,
+      "sha256": "e80059985361e9acb16a308e8c581e5ad6c53d5f691c34a3ed18e7b5d3ce59d9"
+    },
+    "rust-tests\\parity\\oracle\\projection\\cases.json": {
+      "bytes": 472,
+      "sha256": "65115b5b798097bb3c56b221bc7a8a9123460d86021ffc98cdd0b0c066d14a6c"
+    }
+  },
+  "observations": [
+    {
+      "package": "triage-service",
+      "cases": [
+        "classify",
+        "rebuttal",
+        "fallback",
+        "llm_error"
+      ],
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7986,
+        "sha256": "dc632eaa6a15cac34a390d6d3472f22ca0223b628fafcac32adeff29edc02e1f"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary": {
+        "bytes": 14859264,
+        "sha256": "2747664d1b997f0622de2e34e7c8248f0660486509592248c7bdf15281ac6f8f"
+      },
+      "embedded_build_info": "C:\\a\\_temp\\frozen-go-services\\triage-service.exe: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/triage-service\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.2-0.20261003201203-6ab95372e69e\t\n\tdep\tgithub.com/danieljoos/wincred\tv1.2.3\th1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMFLdQ=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=arm64\n\tbuild\tGOOS=windows\n\tbuild\tGOARM64=v8.0\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=6ab95372e69e6346d3929f709f9403321c642067\n\tbuild\tvcs.time=2026-10-03T20:12:03Z\n\tbuild\tvcs.modified=false\n"
+    },
+    {
+      "package": "projection",
+      "cases": [
+        "default",
+        "negative_one",
+        "fractional",
+        "duration_max_without_overflow",
+        "duration_day_overflow",
+        "int64_max_payload",
+        "int64_min_payload"
+      ],
+      "exit_status": 0,
+      "stdin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 2211,
+        "sha256": "1b817457a98c9067541576d47a0e81bf5be7e5731639879ba536c271d15a6af9"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary": {
+        "bytes": 10376704,
+        "sha256": "ae6cf574ed5ba9f1e7ae46d4ab453e0cd142ba180de062ba4e20450ec9e3c5bb"
+      },
+      "embedded_build_info": "C:\\a\\_temp\\frozen-go-services\\projection.exe: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/projection\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.2-0.20261003201203-6ab95372e69e\t\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=arm64\n\tbuild\tGOOS=windows\n\tbuild\tGOARM64=v8.0\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=6ab95372e69e6346d3929f709f9403321c642067\n\tbuild\tvcs.time=2026-10-03T20:12:03Z\n\tbuild\tvcs.modified=false\n"
+    }
+  ],
+  "limits": "Actual native capture only; review observations before committing fixtures. Root children are reaped; no compiler-descendant confinement claim."
+}

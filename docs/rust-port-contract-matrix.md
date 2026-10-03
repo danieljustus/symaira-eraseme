@@ -40,6 +40,12 @@ captures are reviewed. The opt-in native CI capture records seven projection
 inputs and four service operations with complete bytes, source/toolchain
 provenance and status. Neither cross-compilation nor local AMD64 prediction
 is accepted as ARM64 evidence.
+Actual Linux/Windows AMD64/ARM64 artifacts from run `37150753738` now verify
+the architecture-specific seven-case outputs at clean `6ab9537`; only
+`int64_max_payload` differs between architectures. The default projection
+test retains all seven rows, choosing the actual recorded architecture, and
+adds two corruption controls. Corrected Windows checkout and Mac/native
+acceptance remain pending. No DB or cutover row is promoted by this freeze.
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
