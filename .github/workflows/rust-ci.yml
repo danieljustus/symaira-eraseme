@@ -315,6 +315,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tests/test_mcp_stdio_oracle_check.py
+          python3 tests/test_mcp_stdio_oracle_cleanup.py
           python3 rust-tests/parity/oracle/mcp-stdio-mutations/generate.py "$(command -v go)" --check
 
       - name: Cache Cargo dependencies and target
