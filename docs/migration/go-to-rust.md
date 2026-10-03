@@ -76,6 +76,46 @@ complete-header comparator. Task 8.3 remains pending integration of its
 recorded task 8.1 and 4.7 predecessors; no dependency is inferred from these
 individual row results.
 
+## Official MCP core conformance candidate (2026-10-03, #1126)
+
+The required official conformance gate was measured with upstream
+`@modelcontextprotocol/conformance` 0.1.16, immutable source
+`21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0`, its unchanged package lock
+(`df89d138b91871a7fb041f8d3923a78b9a1e2d5bdf28ba589fe6f944f30814fe`)
+and SDK 1.27.1. At `d9a66fabb031d9c44b515a9d40295839be5af625`,
+both actual Go and Rust passed `server-initialize` and `tools-list`, but
+failed `ping` with -32601. This earlier failure is retained.
+
+Source `0bc6b051890340822448fa3846c96f70022b79ad` adds the protocol
+method in both backends: empty result, existing ID encoding and parameter
+validation, no tool dispatch, and silent notifications. It changes no
+catalogue entry or existing initialize, HTTP, error or notification frame.
+Actual Go 1.26.6 recaptures at `0718834abaea0c78ea22008e28c8f8153ce8a89f`
+preserve every previous 670 stdio process observation, agent/provider
+cancellation effect and malformed-agent error response; only source
+provenance changes. Eight new raw ping cases extend the process corpus to
+678. The earlier compiler-host suffix is retained in historical captures;
+the recapture records its actual Linux/amd64 host.
+
+At clean `a46bc2c07c0ae0f9f9c1d8ef35dc663b72e65c52`, the pinned official
+three-scenario core subset passes for both real backends on native
+Linux/amd64 (six SUCCESS checks, no baseline or rewritten assertion).
+`scripts/check-mcp-conformance.py` builds source-bound Go with unmodified
+VCS metadata and uses the built Rust CLI, private roots and authenticated
+loopback servers. Its small fetch adapter supplies only the owned disposable
+bearer header, rejects other endpoints and preserves SDK requests/responses.
+All owned processes are bounded and reaped; retained receipts exclude tokens
+and private server logs. `mcp-http-native.yml` now repeats this pinned core
+check in addition to the six existing native HTTP platform jobs.
+
+This is the applicable official core subset, not the entire reference-server
+suite: other scenarios require upstream `test_*` tools or unadvertised
+resources, prompts, logging, sampling and SSE capabilities. Adding those
+reference tools would break the pinned 26-tool catalogue. Current-head CI,
+the newly extended corpus on all six native targets, task 8.1 acceptance
+review and ordinary integration remain pending; this local result alone
+does not complete task 8.1 or task 8.3.
+
 ## Complete MCP tool byte acceptance (2026-10-03, #1124)
 
 The new `mcp-tools-native.yml` selects all six native targets. It combines
