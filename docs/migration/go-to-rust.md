@@ -10,6 +10,27 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### CLI review frozen-oracle preparation (2026-10-03, #1131)
+
+Actual Go 1.26.6 capture at clean `46f2aec331a49b1d2e6423f15763b67c0fda7eba`
+records all eight positional/path/output review cases on Linux amd64. Each
+record retains complete exit status/stdout/stderr, original input hash and
+unchanged-file effect, plus 171 current Go source/module hashes and the actual
+unmodified embedded VCS build identity. Linux default replay verifies those
+sources and streams, then executes every original Rust CLI process and raw
+comparison, including redaction and unchanged input. Other platforms and
+explicit live mode retain actual Go execution; the one-off build now has the
+shared 120-second budget and existing bounded file/process cleanup.
+
+Both selected review tests pass with Go absent, including changed/truncated
+stderr rejection; strict CLI command-surface Clippy and formatting pass. The
+previous 109-test selection also passed at the same clean capture source.
+The workflow now selects these two additional tests; the complete extended
+selection and native current-source acceptance remain to be executed. The
+native observation pipeline additionally captures all eight real review
+process outcomes, for 56 product observations in total. This preparation does
+not close #1131, remove Go, or claim unsupported native results.
+
 ### Neutral and crypto frozen-oracle preparation (2026-10-03, #1131)
 
 Actual private-root Go 1.26.6 capture at clean source

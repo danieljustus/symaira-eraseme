@@ -1,6 +1,9 @@
 #[path = "support/migration_oracle.rs"]
 mod migration_oracle;
 
+#[path = "support/frozen_review_oracle.rs"]
+mod frozen_review_oracle;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -1250,26 +1253,65 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
     let original = b"Alice Example <alice@example.invalid>\n";
     fs::write(&input, original).expect("review input");
 
-    let go_binary = root.join(if cfg!(windows) {
-        "symeraseme-go.exe"
+    let live = frozen_review_oracle::live_required();
+    let go_binary = if live {
+        let go_binary = root.join(if cfg!(windows) {
+            "symeraseme-go.exe"
+        } else {
+            "symeraseme-go"
+        });
+        let mut build_command = Command::new("go");
+        build_command
+            .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+            .env("GOWORK", "off")
+            .env("GOENV", "off")
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .args(["build", "-o"])
+            .arg(&go_binary)
+            .arg("./cmd/symeraseme")
+            .stdin(Stdio::null());
+        let stdout_path = capture.join("review-build.stdout");
+        let stderr_path = capture.join("review-build.stderr");
+        build_command
+            .stdout(Stdio::from(fs::File::create(&stdout_path).unwrap()))
+            .stderr(Stdio::from(fs::File::create(&stderr_path).unwrap()));
+        configure_process_group(&mut build_command);
+        let mut child = build_command.spawn().expect("build live Go CLI");
+        let started = Instant::now();
+        let status = loop {
+            if capture_exceeded(&stdout_path, &stderr_path) {
+                terminate_bounded(&mut child).expect("Go build oversized-output cleanup");
+                panic!("Go review build exceeded output limit");
+            }
+            if let Some(status) = child.try_wait().expect("poll Go build") {
+                break status;
+            }
+            if started.elapsed() >= Duration::from_secs(120) {
+                terminate_bounded(&mut child).expect("Go build timeout cleanup");
+                panic!("Go review build exceeded the shared oracle build budget");
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        let build = ProcessOutput {
+            status,
+            stdout: read_bounded(&stdout_path),
+            stderr: read_bounded(&stderr_path),
+        };
+        assert!(
+            build.status.success(),
+            "Go CLI build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+
+        Some(go_binary)
     } else {
-        "symeraseme-go"
-    });
-    let build = Command::new("go")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .args(["build", "-o"])
-        .arg(&go_binary)
-        .arg("./cmd/symeraseme")
-        .output()
-        .expect("build live Go CLI");
-    assert!(
-        build.status.success(),
-        "Go CLI build failed: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
+        None
+    };
+    let frozen = if live {
+        Vec::new()
+    } else {
+        frozen_review_oracle::observations()
+    };
 
     let cases: &[&[&str]] = &[
         &["review"],
@@ -1288,18 +1330,37 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
         &["review", "--path", "missing.txt", "--output", "json"],
         &["review", "review.txt", "--output", "yaml"],
     ];
+    if !live {
+        assert_eq!(frozen.len(), cases.len());
+    }
     for (index, argv) in cases.iter().enumerate() {
-        let go =
-            run_program_with_resources(&go_binary, argv, &home, &cwd, &capture, index * 2, None);
+        let live_output = go_binary.as_ref().map(|program| {
+            run_program_with_resources(program, argv, &home, &cwd, &capture, index * 2, None)
+        });
+        let (status, stdout, stderr) = if let Some(output) = &live_output {
+            (
+                output.status.code(),
+                output.stdout.as_slice(),
+                output.stderr.as_slice(),
+            )
+        } else {
+            let observation = &frozen[index];
+            assert_eq!(observation.argv, *argv, "source-bound review argv");
+            (
+                Some(observation.status),
+                observation.stdout,
+                observation.stderr,
+            )
+        };
         let rust =
             run_program_with_resources(&binary(), argv, &home, &cwd, &capture, index * 2 + 1, None);
-        assert_eq!(rust.status.code(), go.status.code(), "{argv:?} status");
-        assert_eq!(rust.stdout, go.stdout, "{argv:?} stdout");
-        assert_eq!(rust.stderr, go.stderr, "{argv:?} stderr");
+        assert_eq!(rust.status.code(), status, "{argv:?} status");
+        assert_eq!(rust.stdout, stdout, "{argv:?} stdout");
+        assert_eq!(rust.stderr, stderr, "{argv:?} stderr");
         if matches!(index, 1 | 2 | 4 | 5) {
-            assert!(go.status.success(), "{argv:?} did not exercise redaction");
+            assert_eq!(status, Some(0), "{argv:?} did not exercise redaction");
             assert!(
-                !go.stdout
+                !stdout
                     .windows(b"alice@example.invalid".len())
                     .any(|window| { window == b"alice@example.invalid" }),
                 "{argv:?} exposed the input address"
@@ -1307,6 +1368,27 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
         }
     }
     assert_eq!(fs::read(input).expect("review input remains"), original);
+}
+
+#[test]
+fn review_frozen_stream_corruption_is_rejected() {
+    let observations = frozen_review_oracle::observations();
+    let expected = &observations[6];
+    let metadata = serde_json::json!({
+        "bytes": expected.stderr.len(),
+        "sha256": frozen_review_oracle::digest(expected.stderr),
+    });
+    assert!(frozen_review_oracle::valid_bytes(
+        &metadata,
+        expected.stderr
+    ));
+    let mut changed = expected.stderr.to_vec();
+    changed[0] ^= 1;
+    assert!(!frozen_review_oracle::valid_bytes(&metadata, &changed));
+    assert!(!frozen_review_oracle::valid_bytes(
+        &metadata,
+        &expected.stderr[..expected.stderr.len() - 1]
+    ));
 }
 
 #[test]

@@ -22,7 +22,7 @@ def digest(data):
     return {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def capture(command, cwd, environment, destination, deadline_seconds):
+def capture_process(command, cwd, environment, destination, deadline_seconds):
     stdout = destination.with_suffix(".stdout")
     stderr = destination.with_suffix(".stderr")
     with stdout.open("xb") as out, stderr.open("xb") as err:
@@ -42,7 +42,12 @@ def capture(command, cwd, environment, destination, deadline_seconds):
             child.wait(timeout=5)
     output, errors = stdout.read_bytes(), stderr.read_bytes()
     assert len(output) <= 1024 * 1024 and len(errors) <= 65536
-    assert child.returncode == 0, f"actual oracle failed; inspect {stderr}"
+    return child.returncode, output, errors
+
+
+def capture(command, cwd, environment, destination, deadline_seconds):
+    status, output, errors = capture_process(command, cwd, environment, destination, deadline_seconds)
+    assert status == 0, f"actual oracle failed; inspect {destination.with_suffix('.stderr')}"
     return output, errors
 
 
@@ -98,7 +103,7 @@ def main():
         "limits": "Actual native capture only; review observations before committing fixtures. Root children are reaped; no compiler-descendant confinement claim.",
     }
     sources = [source / "go.mod", source / "go.sum"]
-    for directory in ("internal/eventstore", "internal/triage", "internal/replies", "internal/llm",
+    for directory in ("cmd", "internal", "internal/eventstore", "internal/triage", "internal/replies", "internal/llm",
                       "internal/timeutil", "internal/scheduler", "internal/config", "internal/campaign",
                       "internal/identity", "internal/manualtasks", "internal/registry", "rust-tests/parity/oracle/triage-service",
                       "rust-tests/parity/oracle/projection", "rust-tests/parity/oracle/scheduler-install", "rust-tests/parity/oracle/config",
@@ -216,10 +221,37 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as pool:
         llm_observations = list(pool.map(observe_llm, llm_cases))
     manifest["llm_failures"] = {"embedded_build_info": llm_build_info.decode(), "cases": llm_observations}
+    review_binary = output_root / ("cli-review-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
+    capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(review_binary), "./cmd/symeraseme"],
+            source, environment, output_root / "cli-review-build", 120)
+    review_build_info = subprocess.check_output([go, "version", "-m", str(review_binary)], env=environment, timeout=10)
+    assert ("vcs.revision=" + revision).encode() in review_build_info and b"vcs.modified=false" in review_build_info
+    review_cwd = private / "review-cwd"
+    review_cwd.mkdir(mode=0o700)
+    original = b"Alice Example <alice@example.invalid>\n"
+    review_input = review_cwd / "review.txt"
+    review_input.write_bytes(original)
+    review_environment = {"HOME": str(private / "home"), "USERPROFILE": str(private / "home"),
+                          "LC_ALL": "C", "TZ": "UTC", "PWD": str(review_cwd)}
+    review_arguments = [["review"], ["review", "--path", "review.txt", "--output", "json"],
+                        ["review", "review.txt", "--path", "missing.txt", "--output", "json"],
+                        ["review", "missing.txt", "--path", "review.txt"], ["review", "review.txt"],
+                        ["--output", "json", "review", "review.txt"],
+                        ["review", "--path", "missing.txt", "--output", "json"],
+                        ["review", "review.txt", "--output", "yaml"]]
+    review_cases = []
+    for index, arguments in enumerate(review_arguments):
+        status, output, errors = capture_process([str(review_binary), *arguments], review_cwd, review_environment,
+                                                output_root / ("cli-review-case-" + str(index)), 10)
+        assert status in (0, 1), "actual review CLI unexpected exit"
+        assert review_input.read_bytes() == original, "actual Go review changed its input"
+        review_cases.append({"argv": arguments, "exit_status": status, "stdout": digest(output), "stderr": digest(errors)})
+    manifest["cli_review"] = {"embedded_build_info": review_build_info.decode(), "cases": review_cases,
+                              "input_unchanged": True, "input": digest(original)}
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 48, "status": "actual observations captured"}))
+                      "operations": 56, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":
