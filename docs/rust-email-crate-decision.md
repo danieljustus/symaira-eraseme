@@ -25,85 +25,42 @@ classes, and removes its own CA and trust entry. It refuses to modify trust
 outside a disposable GitHub-hosted runner. A normal local test run ignores
 this privileged control; that ignore is not native evidence.
 
-At source `fa21054f`, native run `37114908180` passed the complete controls on
-both Linux and both Windows targets. Intel macOS job `111179740236` completed
-all three certificate classes for all three transports, then hit the workflow
-deadline during CA cleanup. This is a failed acceptance gate, not PASS evidence.
-The command helper now records bounded native command stages into regular
-files, rather than waiting for pipe EOF, and enforces a 30-second command
-lifetime. Run `37118725509` at `6a9a04de` localizes the actual macOS stall to
-`security remove-trusted-cert`; import and all TLS cases finish first. The
-disposable macOS fixture now saves the `com.apple.trust-settings.admin` rule,
-temporarily allows its noninteractive trust operations, then restores that
-rule from its original plist and verifies all policy fields (excluding only
-generated timestamps/version). Successful CA removal and verified rule
-restoration are required before acceptance. Production certificate policy is
-unchanged; final macOS cleanup and six-target acceptance remain pending.
+Current cleanup probe: native run `37133611213` at
+`ff9f4c67606d65868d4dee8de28a3274e8070999` passes all twelve TLS cases
+on both Linux and both Windows targets. macOS ARM job `111233501324`
+passes the nine pre-cleanup cases, then reports that the newer native admin
+store has no owned certificate while the classic external representation
+still has its exact SHA-1 entry. This is failed cleanup acceptance.
 
-Run `37120643595` at `f2554fc2` confirms that allowing and then restoring the
-admin trust rule succeeds, but sudo/root-session removal still stalls. The
-next native probe executes the owned admin trust removal in the runner's
-login session with that temporary authorization, retaining the same 30-second
-bound and mandatory restoration. This is a pending cleanup probe, not an
-established root cause or completed acceptance.
+The next macOS fixture first removes a measured native-store entry if present.
+If the classic entry remains, it considers only Apple's two fixed admin-plist
+locations. Exactly one readable regular, single-link file must equal the
+complete native external representation. Under an exclusive lock, inode,
+owner/group, mode and original bytes must still match; it removes only the
+uniquely generated certificate digest, fsyncs, and verifies complete remaining
+settings and unchanged ownership/permissions. No vault/authorization permission
+is relaxed, no directory is searched, and unreadable or ambiguous stores fail
+closed. Native external readback and deletion of the uniquely named Keychain
+certificate remain required. Fresh-process OAuth2, IMAP TLS and STARTTLS must
+then reject the formerly trusted CA without delivering credential bytes.
+This fixture-only legacy cleanup route still requires actual native proof.
 
-Do not promote DOM-006/DOM-007 or task 6.1 solely from this document, a local
-certificate-file test, a successful build, or queued CI. Acceptance requires
-completed native results and the source-bound Go transcript gates. The finite
-TLS controls do not establish every platform chain-policy corner case.
+Earlier failures remain retained in their run logs:
 
-Run `37121189734` at `8319356d` also stalls in login-session removal,
-while rule restoration again passes. The next fixture uses the external
-admin trust representation API: export the current settings, remove exactly
-the owned certificate SHA-1 entry, import, re-export and compare the complete
-remaining settings before deleting its unique Keychain certificate. Every
-command retains the 30-second bound. No unrelated trust entry may change;
-this cleanup route still requires native validation.
+| Source/run | Measured failure |
+| --- | --- |
+| `fa21054f` / `37114908180` | macOS passed nine TLS cases, then the unbounded native cleanup hit the workflow deadline. |
+| `6a9a04de` / `37118725509` | Bounded `security remove-trusted-cert` exceeded thirty seconds. |
+| `f2554fc2` / `37120643595` | Temporary authorization restoration passed; root-session removal still stalled. |
+| `8319356d` / `37121189734` | Login-session removal also stalled; authorization restoration passed. |
+| `2d661295` / `37122245131` | Export ownership prevented the runner reading its root-owned private plist. |
+| `e61f49ac` / `37122888055` | Native authorization write/restoration returned `NO (-60005)` before CA installation. The override was removed. |
+| `2a514352` / `37126123832` | Both macOS targets passed nine TLS cases; direct admin import exceeded thirty seconds. |
+| `1a5b936` / `37130671704` | User-domain installation exceeded thirty seconds on macOS ARM before TLS cases. |
+| `ff9f4c67` / `37133611213` | macOS ARM classic entry exists, but native private admin-store membership is false. |
 
-The first external-representation probe (`37122245131`, `2d661295`)
-exports successfully, then fails because sudo creates a root-owned 0600
-plist that the runner cannot read. Exports now run as the runner; only
-the actual admin import remains privileged. This preserves private file
-ownership and the complete remaining-trust comparison. Native import/removal
-acceptance is still pending.
-
-The current `e61f49ac` probe `37122888055` failed on macOS Intel job
-`111202340118` before installing the CA: `security authorizationdb write`
-returned `NO (-60005)` for both temporary override and attempted restoration.
-The speculative authorization override did not repair the earlier removal
-hangs and is now removed entirely. The existing hosted-runner `sudo -n`
-certificate installation remains; cleanup directly imports the trust
-representation with exactly the owned entry removed, re-exports to verify all
-unrelated settings and then deletes the owned certificate. Native results for
-this direct route are pending. No authorization database is modified by the
-current candidate; Linux/Windows production trust logic is unchanged.
-
-Direct admin import at `2a514352` in run `37126123832` also exceeds the
-30-second bound on macOS ARM job `111211644787` and Intel job `111211644710`,
-after all nine native TLS controls pass. Exporting/removing only the owned
-entry succeeds; the privileged import stalls. No cleanup success is claimed.
-
-The next candidate uses the disposable hosted runner's existing default user
-keychain and native user trust domain. Apple trustd distinguishes the user
-and admin authorization rights; no authorization database override is used.
-The fixture requires the keychain to be an existing absolute file under the
-runner's HOME, imports only the uniquely generated CA, and removes its trust
-and certificate with user-domain native APIs. A Security.framework read then
-compares complete remaining trust settings. Native errSecNoTrustSettings is
-accepted only when the expected unrelated-entry set is empty. All platforms
-add a fresh-process post-cleanup control that requires the formerly trusted
-CA to fail OAuth2 HTTPS, IMAP TLS and STARTTLS without transmitting credentials.
-This route and cleanup control require actual native validation; the existing
-failed probes remain retained and the matrix stays PARTIAL.
-
-The user-domain route at `1a5b936` failed native macOS arm64 job
-`111224971133` in run `37130671704`: `security add-trusted-cert` hit the
-existing 30-second bound before any TLS case. The next fixture probe restores
-the previously observed admin-domain installation and calls the native
-`SecTrustStoreRemoveCertificate` for the exact owned certificate, with both
-`SecTrustStoreContains` and the actual admin external settings checked before
-and after. Apple uses Admin=3 in SecTrustStoreDomain but Admin=1 in
-SecTrustSettingsDomain; external export is
-`SecTrustSettingsCreateExternalRepresentation`. This is a bounded native
-fixture experiment, not an accepted cleanup claim; DOM-006/007 stay PARTIAL
-until both Macs prove all TLS classes, exact removal and rejection after cleanup.
+Do not promote DOM-006/DOM-007 or tasks 6.1/6.3/6.4 from local
+certificate-file tests, builds or queued CI. Both macOS cleanup results,
+all twelve actual OS-store TLS cases and source-bound mailbox/OAuth2
+transcript gates remain mandatory. No mailbox, operator profile or paid
+provider is used. The finite probes do not establish every chain-policy case.

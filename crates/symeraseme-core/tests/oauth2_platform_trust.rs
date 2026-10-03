@@ -300,10 +300,10 @@ impl InstalledRoot {
         }
         #[cfg(target_vendor = "apple")]
         {
-            // The CLI removal/import routes authorize an empty admin domain
-            // interactively. Probe the native store's exact-certificate API;
-            // both store and legacy external settings must prove absence.
-            checked(Command::new("sudo").args(["-n", "python3", "-c", r#"import ctypes,hashlib,plistlib,ssl,sys
+            // The disposable runner can retain a legacy admin entry even when
+            // its newer native store has no such certificate. Remove only the
+            // generated entry, with complete unrelated-settings readback.
+            checked(Command::new("sudo").args(["-n", "python3", "-c", r#"import ctypes,fcntl,hashlib,os,pathlib,plistlib,ssl,stat,sys
 security=ctypes.CDLL('/System/Library/Frameworks/Security.framework/Security')
 cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
 P=ctypes.c_void_p
@@ -330,6 +330,7 @@ before=external()
 assert before is not None and 'trustList' in before
 owned=[k for k in before['trustList'] if k.upper()==digest]
 assert len(owned)==1, 'owned CA native external entry missing or ambiguous'
+original=plistlib.loads(plistlib.dumps(before))
 del before['trustList'][owned[0]]
 raw=ctypes.create_string_buffer(der)
 data=cf.CFDataCreate(None,raw,len(der)); assert data
@@ -339,12 +340,51 @@ try:
     # SecTrustStoreDomain: System=1, User=2, Admin=3; this differs from
     # SecTrustSettingsDomain: User=0, Admin=1, System=2.
     store=security.SecTrustStoreForDomain(3); assert store
-    assert security.SecTrustStoreContains(store,cert), 'owned CA not in native admin store'
-    status=security.SecTrustStoreRemoveCertificate(store,cert)
-    assert status == 0, 'native exact CA removal failed: %s' % status
+    if security.SecTrustStoreContains(store,cert):
+        status=security.SecTrustStoreRemoveCertificate(store,cert)
+        assert status == 0, 'native exact CA removal failed: %s' % status
     assert not security.SecTrustStoreContains(store,cert), 'owned CA remained in native admin store'
 finally: cf.CFRelease(cert)
 after=external()
+if after != before and after is not None:
+    # Apple TrustSettingsSchema.h and trustdFileLocations.m name these two
+    # admin plist locations. Never discover files by globbing, change vault
+    # permissions, or remove any entry other than this generated DER digest.
+    candidates=[]
+    for path in (pathlib.Path('/Library/Security/Trust Settings/Admin.plist'),
+                 pathlib.Path('/private/var/protected/trustd/private/Admin.plist')):
+        try:
+            if path.is_symlink(): raise RuntimeError('admin plist is a symlink')
+            fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+        except FileNotFoundError: continue
+        except PermissionError: continue
+        try:
+            info=os.fstat(fd)
+            assert stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_size<=1024*1024
+            raw=os.read(fd,info.st_size+1)
+            value=plistlib.loads(raw)
+            if value==original: candidates.append((path,raw,info))
+        finally: os.close(fd)
+    assert len(candidates)==1, 'owned legacy admin plist was not uniquely readable and exact'
+    path,raw,prior=candidates[0]
+    fd=os.open(path,os.O_RDWR|os.O_NOFOLLOW)
+    try:
+        fcntl.flock(fd,fcntl.LOCK_EX)
+        current=os.fstat(fd)
+        assert (current.st_dev,current.st_ino,current.st_uid,current.st_gid,current.st_mode)==(prior.st_dev,prior.st_ino,prior.st_uid,prior.st_gid,prior.st_mode)
+        assert os.read(fd,current.st_size+1)==raw, 'legacy admin plist changed concurrently'
+        cleaned=plistlib.dumps(before,fmt=plistlib.FMT_XML,sort_keys=False)
+        os.lseek(fd,0,os.SEEK_SET)
+        remaining=memoryview(cleaned)
+        while remaining:
+            written=os.write(fd,remaining); assert written>0
+            remaining=remaining[written:]
+        os.ftruncate(fd,len(cleaned)); os.fsync(fd)
+        restored=os.fstat(fd)
+        assert (restored.st_uid,restored.st_gid,restored.st_mode)==(prior.st_uid,prior.st_gid,prior.st_mode)
+    finally: os.close(fd)
+    assert plistlib.loads(path.read_bytes())==before, 'owned legacy entry cleanup readback differs'
+    after=external()
 if after is None:
     assert not before['trustList'], 'native removal lost unrelated admin trust settings'
 else:
