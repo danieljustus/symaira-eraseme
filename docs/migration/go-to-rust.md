@@ -31,6 +31,27 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Complete MCP tool byte candidate (2026-10-03, #1124)
+
+The new `mcp-tools-native.yml` selects all six native targets. It combines
+production dispatcher/envelope tests, the real stdio campaign/scheduler cases
+and compiled native-agent triage. Current Go recordings add complete bytes
+for six fixed-clock calendar/dashboard cases, four stored-reply auto-confirm
+responses, and 25 remaining-tool/boundary cases, including the entire embedded
+registry and ten corrupt-database errors. The cleanup boundary additionally
+proves that manual-file cleanup does not inspect the database. Current-source
+hashes are checked before comparing responses; execution uses private roots.
+
+The candidate fixes broker struct field order, integral form-spec numbers and
+Go's public `SQLITE_NOTADB` spelling at store open. Rendered Go reporting now
+uses its existing optional clock, whose default remains `time.Now`. The actual
+Go recaptures of CLI triage, agent-error JSON, scheduler and campaign fixtures
+changed only source provenance; all request, response and side-effect bytes
+remain unchanged. The source commit is `0d34c46348932b076086730f2adf72a23bef533a`.
+The accepted manual browser fallback remains documented under #809.
+MCP-003/004/005 remain PARTIAL until complete native candidate results and
+required PR checks are available. See the tool-by-tool handoff below.
+
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
 `host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap

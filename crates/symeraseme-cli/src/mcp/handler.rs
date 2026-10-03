@@ -1813,7 +1813,10 @@ mod tests {
         let oracle_process = std::process::Command::new("go")
             .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
             .current_dir(&repository_root)
-            .env("TMPDIR", "/tmp")
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOENV", "off")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
             .output()
             .expect("run source-bound Go auto-confirm oracle");
         assert!(
@@ -1827,6 +1830,17 @@ mod tests {
             oracle["source_revision"],
             "e8a8c969cb1a3b5a7f77dfe28f807e3707d0a8d8"
         );
+        assert_eq!(oracle["go_version"], "go1.26.6");
+        let sources = oracle["sources_sha256"].as_object().unwrap();
+        assert_eq!(sources.len(), 7);
+        for (path, expected) in sources {
+            use sha2::{Digest, Sha256};
+            let actual = Sha256::digest(fs::read(repository_root.join(path)).unwrap())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            assert_eq!(expected.as_str().unwrap(), actual, "{path}");
+        }
         let oracle_response = |key: &str| -> Value {
             let frame: Value =
                 serde_json::from_str(oracle[key].as_str().expect("oracle process response"))
@@ -1869,10 +1883,25 @@ mod tests {
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
         );
+        let call_wire = |arguments: &Map<String, Value>, key: &str| -> Value {
+            let request = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "auto_confirm", "arguments": arguments}});
+            let wire = match initialize(&serde_json::to_vec(&request).unwrap(), &handler) {
+                InitializeOutcome::Response(bytes) => bytes,
+                other => panic!("{key}: expected complete response, got {other:?}"),
+            };
+            assert_response_matches(
+                key,
+                Some(String::from_utf8(wire.clone()).unwrap()),
+                oracle[key].as_str(),
+            );
+            let envelope: Value = serde_json::from_slice(&wire).unwrap();
+            serde_json::from_str(envelope["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap()
+        };
         let mut arguments = Map::new();
         arguments.insert("request_id".to_owned(), serde_json::json!(1));
         arguments.insert("dry_run".to_owned(), serde_json::json!(true));
-        let dry_run = handler.call("auto_confirm", &arguments).expect("dry run");
+        let dry_run = call_wire(&arguments, "dry_run_response");
         assert_eq!(dry_run, oracle_response("dry_run_response"));
         assert_eq!(dry_run["Success"], true);
         assert_eq!(dry_run["Step"], "dry_run");
@@ -1891,9 +1920,7 @@ mod tests {
         assert_eq!(oracle["dry_run_state"]["human_action_required_events"], 0);
 
         arguments.insert("dry_run".to_owned(), serde_json::json!(false));
-        let result = handler
-            .call("auto_confirm", &arguments)
-            .expect("manual fallback");
+        let result = call_wire(&arguments, "manual_response");
         assert_eq!(result, oracle_response("manual_response"));
         assert_eq!(result["Success"], false);
         assert_eq!(result["Step"], "manual_confirmation_required");
@@ -1952,15 +1979,11 @@ mod tests {
 
         arguments.insert("request_id".to_owned(), json!(2));
         arguments.insert("dry_run".to_owned(), json!(true));
-        let no_links_dry = handler
-            .call("auto_confirm", &arguments)
-            .expect("no-links dry run");
+        let no_links_dry = call_wire(&arguments, "no_links_dry_response");
         assert_eq!(no_links_dry, oracle_response("no_links_dry_response"));
         assert_eq!(no_links_dry["DryRun"], false);
         arguments.insert("dry_run".to_owned(), json!(false));
-        let no_links = handler
-            .call("auto_confirm", &arguments)
-            .expect("no-links result");
+        let no_links = call_wire(&arguments, "no_links_response");
         assert_eq!(no_links, oracle_response("no_links_response"));
         let notes: i64 = store
             .db()
