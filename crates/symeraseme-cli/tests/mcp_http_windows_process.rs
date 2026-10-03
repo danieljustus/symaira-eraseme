@@ -16,7 +16,9 @@ use symeraseme_core::storage::repository::Repository;
 mod mcp_http_port;
 #[path = "support/native_host_agent.rs"]
 mod native_host_agent;
-use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
+use mcp_http_port::{
+    StartedChild, accepts_token, free_port, read_bounded_response, spawn_with_handoff,
+};
 
 const GO_PROVIDER_CANCEL_FIXTURE: &str =
     include_str!("../../../tests/fixtures/provider-cancel/http.json");
@@ -39,6 +41,16 @@ fn start(binary: &Path, root: &Path, port: &mut u16) -> Server {
 }
 
 fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)]) -> Server {
+    start_with_flags(binary, root, port, envs, 0x0000_0200)
+}
+
+fn start_with_flags(
+    binary: &Path,
+    root: &Path,
+    port: &mut u16,
+    envs: &[(&str, &str)],
+    flags: u32,
+) -> Server {
     let home = root.join("home");
     std::fs::create_dir_all(&home).unwrap();
     let process = spawn_with_handoff(
@@ -68,7 +80,7 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
                 }
             }
             command
-                .creation_flags(0x0000_0200) // CREATE_NEW_PROCESS_GROUP
+                .creation_flags(flags)
                 .args([
                     "mcp",
                     "--host",
@@ -76,13 +88,25 @@ fn start_with(binary: &Path, root: &Path, port: &mut u16, envs: &[(&str, &str)])
                     "--port",
                     &candidate.to_string(),
                 ])
+                .env_clear()
+                .current_dir(root)
                 .env("HOME", &home)
                 .env("USERPROFILE", &home)
                 .env("SYMERASEME_DATA_DIR", root.join("data"))
+                .env("TMP", &home)
+                .env("TEMP", &home)
                 .envs(envs.iter().copied())
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(stderr);
+            for key in ["CONFIG", "DATA", "STATE", "CACHE"] {
+                command.env(format!("XDG_{key}_HOME"), home.join(key.to_lowercase()));
+            }
+            for key in ["SystemRoot", "WINDIR"] {
+                if let Some(value) = std::env::var_os(key) {
+                    command.env(key, value);
+                }
+            }
             command.spawn()
         },
     );
@@ -110,43 +134,42 @@ fn exchange(port: u16, token: Option<&str>, origin: Option<&str>) -> (u16, Vec<u
     let body = br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#;
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_write_timeout(Some(Duration::from_secs(5)))
         .unwrap();
+    // Stage the entire request before sending: an early auth/origin rejection
+    // can reset while a separate body write is still in flight on Windows.
+    let mut request = Vec::new();
     write!(
-        stream,
+        request,
         "POST / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Length: {}\r\n",
         body.len()
     )
     .unwrap();
     if let Some(token) = token {
-        write!(stream, "Authorization: Bearer {token}\r\n").unwrap();
+        write!(request, "Authorization: Bearer {token}\r\n").unwrap();
     }
     if let Some(origin) = origin {
-        write!(stream, "Origin: {origin}\r\n").unwrap();
+        write!(request, "Origin: {origin}\r\n").unwrap();
     }
-    stream.write_all(b"\r\n").unwrap();
-    stream.write_all(body).unwrap();
-    let mut response = Vec::new();
-    let read_error = stream.read_to_end(&mut response).err();
+    request.extend_from_slice(b"\r\n");
+    request.extend_from_slice(body);
+    stream.write_all(&request).unwrap();
+    let response = read_bounded_response(&mut stream, Instant::now() + Duration::from_secs(5))
+        .expect("bounded native response capture");
     let split = response
         .windows(4)
         .position(|bytes| bytes == b"\r\n\r\n")
-        .unwrap();
+        .expect("native response must contain complete headers");
     let head = std::str::from_utf8(&response[..split]).unwrap();
     let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
     let body = response[split + 4..].to_vec();
-    if let Some(error) = read_error {
-        assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
-        // Windows can report an RST after an early auth/origin rejection.
-        // Accept it only when the complete HTTP response arrived first.
-        let length = head
-            .lines()
-            .filter_map(|line| line.split_once(':'))
-            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
-            .and_then(|(_, value)| value.trim().parse::<usize>().ok())
-            .expect("reset response must declare Content-Length");
-        assert_eq!(body.len(), length, "reset truncated the HTTP response");
-    }
+    let length = head
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+        .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+        .expect("native response must declare Content-Length");
+    assert_eq!(body.len(), length, "native response body was truncated");
     (status, body)
 }
 
@@ -685,6 +708,23 @@ fn native_windows_slow_header_timeout_matches_go() {
 /// https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent
 #[test]
 fn native_windows_ctrl_break_shutdown_matches_go() {
+    console_shutdown_matches_go(false);
+}
+
+/// CTRL_C_EVENT cannot target a process group. Broadcast only inside the
+/// separately created test console, with its controller ignoring the event.
+#[test]
+fn native_windows_ctrl_c_shutdown_matches_go() {
+    console_shutdown_matches_go(true);
+}
+
+fn console_shutdown_matches_go(ctrl_c: bool) {
+    let signal = if ctrl_c { "Ctrl+C" } else { "Ctrl+Break" };
+    let test = if ctrl_c {
+        "native_windows_ctrl_c_shutdown_matches_go"
+    } else {
+        "native_windows_ctrl_break_shutdown_matches_go"
+    };
     const CHILD_ROOT: &str = "SYMERASEME_CTRL_BREAK_TEST_ROOT";
     const GO_ORACLE: &str = "SYMERASEME_CTRL_BREAK_GO_ORACLE";
     if let Some(root) = std::env::var_os(CHILD_ROOT) {
@@ -696,19 +736,46 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
         ] {
             let mut port = port();
             let server_root = root.join(name);
-            let mut server = start(binary, &server_root, &mut port);
-            ready(&mut server, port, &server_root);
             #[link(name = "Kernel32")]
             unsafe extern "system" {
                 fn GenerateConsoleCtrlEvent(event: u32, process_group: u32) -> i32;
+                fn SetConsoleCtrlHandler(
+                    handler: Option<unsafe extern "system" fn(u32) -> i32>,
+                    add: i32,
+                ) -> i32;
             }
-            // SAFETY: no pointers; the nonzero PID belongs to our live child,
-            // created as a new process group in this helper's private console.
-            let sent = unsafe { GenerateConsoleCtrlEvent(1, server.0.id()) };
+            if ctrl_c {
+                // SAFETY: NULL resets this private controller's inheritable
+                // ignore flag. The new server must inherit CTRL_C enabled.
+                assert_ne!(unsafe { SetConsoleCtrlHandler(None, 0) }, 0);
+            }
+            let mut server = start_with_flags(
+                binary,
+                &server_root,
+                &mut port,
+                &[],
+                if ctrl_c { 0 } else { 0x0000_0200 },
+            );
+            if ctrl_c {
+                // SAFETY: ignore only in this already isolated controller,
+                // after the child inherited the enabled flag. It owns the
+                // only console descendants and starts them sequentially.
+                assert_ne!(unsafe { SetConsoleCtrlHandler(None, 1) }, 0);
+            }
+            ready(&mut server, port, &server_root);
+            // SAFETY: Ctrl+Break targets our owned live group. Ctrl+C group
+            // zero broadcasts solely in this CREATE_NEW_CONSOLE helper;
+            // it cannot reach the test runner or an operator's console.
+            let sent = unsafe {
+                GenerateConsoleCtrlEvent(
+                    if ctrl_c { 0 } else { 1 },
+                    if ctrl_c { 0 } else { server.0.id() },
+                )
+            };
             assert_ne!(
                 sent,
                 0,
-                "send Ctrl+Break: {}",
+                "send {signal}: {}",
                 std::io::Error::last_os_error()
             );
             let deadline = Instant::now() + Duration::from_secs(8);
@@ -716,16 +783,13 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
                 if let Some(status) = server.0.try_wait().unwrap() {
                     break status;
                 }
-                assert!(
-                    Instant::now() < deadline,
-                    "{name} did not handle Ctrl+Break"
-                );
+                assert!(Instant::now() < deadline, "{name} did not handle {signal}");
                 thread::sleep(Duration::from_millis(20));
             };
-            assert!(status.success(), "{name} Ctrl+Break exit: {status}");
+            assert!(status.success(), "{name} {signal} exit: {status}");
             assert!(TcpStream::connect(("127.0.0.1", port)).is_err());
         }
-        println!("Ctrl+Break Go/Rust comparison executed both processes");
+        println!("{signal} Go/Rust comparison executed both processes");
         return;
     }
 
@@ -735,12 +799,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     let log = std::fs::File::create(&log_path).unwrap();
     let mut helper = Server(StartedChild::from_child(
         Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "native_windows_ctrl_break_shutdown_matches_go",
-                "--nocapture",
-                "--test-threads=1",
-            ])
+            .args(["--exact", test, "--nocapture", "--test-threads=1"])
             .env(CHILD_ROOT, root.path())
             .env(GO_ORACLE, oracle)
             .creation_flags(0x0000_0010) // CREATE_NEW_CONSOLE
@@ -760,5 +819,7 @@ fn native_windows_ctrl_break_shutdown_matches_go() {
     };
     let log = std::fs::read_to_string(log_path).unwrap();
     assert!(status.success(), "isolated console test failed: {log}");
-    assert!(log.contains("Ctrl+Break Go/Rust comparison executed both processes"));
+    assert!(log.contains(&format!(
+        "{signal} Go/Rust comparison executed both processes"
+    )));
 }

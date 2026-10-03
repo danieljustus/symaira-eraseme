@@ -31,6 +31,51 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native MCP HTTP completion candidate (2026-10-03, #1126)
+
+The full-header comparator already exists in `mcp_http_headers_process.rs`:
+ten actual Go/Rust responses compare the status line, every header including
+duplicates and raw body bytes. Only a validated canonical Date value is
+normalized; deliberate missing/extra/changed/duplicate-header controls fail.
+The older MCP-007 row does not describe this merged implementation.
+
+`mcp-http-native.yml` now explicitly selects that comparator and three actual
+socket-error controls on all six targets: occupied IPv4, occupied IPv6 and an
+unavailable TEST-NET address. IPv6 cannot be silently skipped. Both actual
+checked-out Go 1.26.6 and Rust CLIs must reach token creation, fail within ten
+seconds, and match complete exit code/stdout/stderr without normalization.
+
+Initial actual Windows amd64 run `37124645649` at `a0984d1c` failed the
+occupied IPv4 diagnostic: Rust returned Unix wording while Go returned the
+native Windows WSAEADDRINUSE message. Token DACL/rotation/retention and all ten
+full-header scenarios passed in the same job `111207382913`. Rust now formats
+these two bind-error classes through the system's US-English message API,
+matching Go's locale fallback and CR/LF-only trimming, with no OS-code suffix.
+The original failure is retained; candidate native results remain pending.
+
+Windows additionally compares complete token owner/group/DACL SDDL, inherited
+and owner-only parent behavior, protection/read-only flags, restart rotation,
+old-token rejection/new-token authentication, and read-only replacement failure
+with exact token/sentinel retention. PowerShell uses framework ACL APIs in a
+cleared private environment; commands have thirty-second bounds. Random token
+bytes differ intentionally; both must decode to 32 bytes and independently
+rotate. No operator data or ACL is changed.
+
+Both Ctrl+C and Ctrl+Break run Go and Rust sequentially in a newly created
+private console. Ctrl+Break targets the owned child process group; Ctrl+C can
+only broadcast inside that private console, after the controller enables the
+child's inherited signal flag and then ignores the signal itself. The runner's
+console is never targeted. Exit success and listener closure are required for
+each real child. Existing bearer, Origin, timeout and disconnect gates remain.
+MCP-007/011/012/013 are PASS on source
+`53a0e3684652f0676f02e2994bcd46fbeb9d83b2`: targeted run `37128540191`
+and full Rust run `37128575147` passed all six native targets. Both Windows
+jobs executed complete DACL/read-only retention and private-console Ctrl+C/
+Ctrl+Break; every target executed all three mandatory bind errors and the
+complete-header comparator. Task 8.3 remains pending integration of its
+recorded task 8.1 and 4.7 predecessors; no dependency is inferred from these
+individual row results.
+
 ## Native Windows host-agent gate (2026-10-03, #1121)
 
 `host-agent-windows.yml` now selects the real Windows HTTP disconnect/reap
@@ -108,8 +153,8 @@ that remaining tool/error-path scope is complete.
   validation after retrying a Go dependency-download network timeout.
 - MCP-007 HTTP response parity: #1111 merged as
   `fd63a368ffa660247134b41a7f44da6b32553a7b`. Both named HTTP comparator tests
-  passed on all six targets in `36632119595` at `aa882843`. #1109 remains
-  open for the broader fuzz-coverage residual; this slice does not close it.
+  passed on all six targets in `36632119595` at `aa882843`. #1109 is
+  closed after integrated six-target run `36934832118` at `28e32a1c` revalidated both complete-header comparator and its mutation controls on every target. Broader parser fuzzing belongs to #1125; remaining native ACL/signal/bind controls belong to #1126.
 - MCP-005A/DOM-008: #1113 merged as
   `726156748d886029e54509cf2181f9639d9cba0d`. Native run `36637116514` at
   `60bb1ec4` passed all six targets. Both Windows job logs confirm the real
