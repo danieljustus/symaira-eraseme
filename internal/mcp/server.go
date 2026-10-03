@@ -200,6 +200,11 @@ func (s *Server) handle(ctx context.Context, raw json.RawMessage) *response {
 func (s *Server) handleRequest(ctx context.Context, req request, id any) *response {
 	params, object := decodeParams(req.Params)
 	switch req.Method {
+	case "ping":
+		if req.Params != nil && !object {
+			return rpcResponseError(-32602, "invalid params", id)
+		}
+		return &response{JSONRPC: "2.0", Result: map[string]any{}, ID: id}
 	case "initialize":
 		if req.Params != nil && !object {
 			return rpcResponseError(-32602, "invalid params", id)
