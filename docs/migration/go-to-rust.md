@@ -18,7 +18,7 @@ evidence. Phases 6–8 are not complete. Closed historical phase issues
 `execution_state.task_issues` maps every unfinished task to the granular
 issues of #813; `contract_issue_owners` maps every PARTIAL/TODO row. The
 matrix's row status remains authoritative. `active_tasks` means unfinished
-implementation/evidence, not a live writer claim. Task 6.1 remains unfinished pending native trust acceptance; its crate-decision
+implementation/evidence, not a live writer claim. Task 6.1's native evidence now passes; verified integration remains pending. Its crate-decision
 artifact is now recorded in `docs/rust-email-crate-decision.md`, and #1119 owns
 the remaining gate.
 `python3 tests/test_rust_task_graph.py` checks this reconciliation without Go,
@@ -40,9 +40,17 @@ already loaded platform certificates. `email/tls.rs` now supplies both
 adapters with the existing platform/Windows-machine certificate policy.
 Trusted, foreign-issuer and expired-certificate controls pass locally, as do
 the seven existing OAuth2 and five IMAP parity tests. No live provider or
-mailbox is involved. The explicit six-target native OS-store proof is pending;
-DOM-006/DOM-007 remain PARTIAL. See `docs/rust-email-crate-decision.md` for the
-previously missing task 6.1 decision artifact and its acceptance limits.
+mailbox is involved. At branch source
+`d35ddca04abebe03e8a90fb77be97fb4129f7f74`, run `37137506583` passed all six
+native OS/architecture targets with clean PR merge source
+`9c2b43626d4994a59ff58b66fee1e9e5c00fced4`. Each job executes all twelve
+OS-store TLS cases across OAuth2 HTTPS, IMAP TLS and STARTTLS, including
+fresh-process rejection after the owned CA's removal. Both native Mac cleanup
+paths and command success/exit-23/stall controls pass, as do the source-bound
+mailbox/IMAP/OAuth2 transcripts. DOM-006/DOM-007 are PASS for that scope;
+tasks 6.1/6.3/6.4 await final PR checks and verified main integration. See
+`docs/rust-email-crate-decision.md` for the decision artifact, retained failure
+history, exact cleanup invariants and finite-probe limits.
 
 ## Native Windows consent gate (2026-10-03, #1123)
 

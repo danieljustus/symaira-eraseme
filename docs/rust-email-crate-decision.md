@@ -1,7 +1,7 @@
 # Email transport crate decision
 
 Decision for tasks 6.1, DOM-006 and DOM-007, 2026-10-03. This records the
-implemented choices; native trust acceptance remains tracked by #1119.
+implemented choices and six-target native trust acceptance under #1119.
 
 | Boundary | Selected implementation | Reason and executable contract |
 | --- | --- | --- |
@@ -25,14 +25,14 @@ classes, and removes its own CA and trust entry. It refuses to modify trust
 outside a disposable GitHub-hosted runner. A normal local test run ignores
 this privileged control; that ignore is not native evidence.
 
-Current cleanup probe: native run `37133611213` at
+Retained cleanup failure: native run `37133611213` at
 `ff9f4c67606d65868d4dee8de28a3274e8070999` passes all twelve TLS cases
 on both Linux and both Windows targets. macOS ARM job `111233501324`
 passes the nine pre-cleanup cases, then reports that the newer native admin
 store has no owned certificate while the classic external representation
 still has its exact SHA-1 entry. This is failed cleanup acceptance.
 
-The next macOS fixture first removes a measured native-store entry if present.
+The accepted macOS fixture first removes a measured native-store entry if present.
 If the classic entry remains, it considers only Apple's two fixed admin-plist
 locations. Exactly one readable regular, single-link file must equal the
 complete native external representation. Under an exclusive lock, inode,
@@ -43,7 +43,32 @@ is relaxed, no directory is searched, and unreadable or ambiguous stores fail
 closed. Native external readback and deletion of the uniquely named Keychain
 certificate remain required. Fresh-process OAuth2, IMAP TLS and STARTTLS must
 then reject the formerly trusted CA without delivering credential bytes.
-This fixture-only legacy cleanup route still requires actual native proof.
+This fixture-only legacy cleanup route has actual proof on both native Mac
+architectures in the accepted run below.
+
+## Six-target native acceptance
+
+At branch source `d35ddca04abebe03e8a90fb77be97fb4129f7f74`,
+[run 37137506583](https://github.com/danieljustus/symaira-eraseme/actions/runs/37137506583)
+passed Linux amd64/arm64 (`111244924095`/`111244923952`), Windows amd64/arm64
+(`111244924158`/`111244924149`) and macOS amd64/arm64
+(`111244924117`/`111244924197`). The actual clean PR merge source is
+`9c2b43626d4994a59ff58b66fee1e9e5c00fced4`.
+
+Every native job executes the three command lifecycle controls (success,
+actual exit 23 and bounded stalled-child termination), installs the unique CA
+in the real OS store with certificate-file overrides absent, and checks twelve
+TLS cases: trusted, unrelated, expired and fresh-process formerly-trusted
+after removal, each through OAuth2 HTTPS, IMAP TLS and STARTTLS. Both native
+Mac logs record successful bounded exact-entry cleanup, deletion of the owned
+Keychain certificate and all three formerly accepted connections rejected in
+a new process. Untrusted/expired/removed cases deliver no credential/form
+bytes. Ten mailbox, five IMAP transport and seven OAuth2 transcript tests also
+pass in every job; local privileged skips are not counted as native evidence.
+
+DOM-006/DOM-007 and task 6.1's crate-decision evidence now meet their native
+scope. Tasks 6.1/6.3/6.4 still await final PR checks and actual main integration.
+No dependency, certificate-verification policy or timeout was relaxed.
 
 Earlier failures remain retained in their run logs:
 
@@ -59,8 +84,8 @@ Earlier failures remain retained in their run logs:
 | `1a5b936` / `37130671704` | User-domain installation exceeded thirty seconds on macOS ARM before TLS cases. |
 | `ff9f4c67` / `37133611213` | macOS ARM classic entry exists, but native private admin-store membership is false. |
 
-Do not promote DOM-006/DOM-007 or tasks 6.1/6.3/6.4 from local
-certificate-file tests, builds or queued CI. Both macOS cleanup results,
+Do not infer native acceptance from local certificate-file tests, builds or
+queued CI. The accepted run above contains both macOS cleanup results,
 all twelve actual OS-store TLS cases and source-bound mailbox/OAuth2
 transcript gates remain mandatory. No mailbox, operator profile or paid
 provider is used. The finite probes do not establish every chain-policy case.
