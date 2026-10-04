@@ -13,6 +13,46 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The original real-network SMTP comparators now also replay measured native
+Linux amd64 Go processes from clean producer
+`0b57be7f59923fd69eca54b7807743ffbaf6de2d`. The complete campaign record
+preserves stdout, stderr, exit status, the original SMTP transaction with its
+existing Date-only fold, and complete result/events/projected-plan output.
+The transport record preserves all nine original inputs, raw process streams
+and complete original client transactions: plain, OAuth2, rejected/challenged
+auth, credential echo, missing STARTTLS, rejected DATA/greeting and HELO
+fallback. The empty rejected-greeting transaction is the measured result.
+Every Rust socket, synthetic TLS-chain control, credential-redaction check,
+exact wire comparison and saved-effect assertion still executes. Recorded
+Go input ports remain unchanged; Rust connects to its own original native
+listener. Neither a Go child nor a Go server is simulated.
+
+Both records independently verify 172 immutable/current Go inputs and four
+immutable/current Rust input generators, native unmodified Go 1.26.6 VCS and
+all ten successful Go process statuses/streams. Whole-record SHA-256 pins are
+`ab0a2a2a89e06287237238452aafc2d82af3f83885d5a1d8c7a584150a6c1d3e`
+(campaign, 35149 bytes) and
+`99b28b29c764ed8d38cad725fb146eb2cbf5a47797c9cb1fed6b9ba909cd0a12`
+(transport, 42549 bytes). Explicit live/capture modes and unrecorded hosts
+continue to run actual Go. Current native capture uploads only these two
+bounded synthetic observation records, not profiles or databases.
+
+At clean `4f6ee8b0e48abb9a58fd8af34bf5516cee20c9bb`, the exact default
+Go-absent workflow passes **375 tests, zero failures**. All three original
+SMTP integration tests execute, including all nine transport cases and the
+three private TLS-chain controls. The delegated consent child still runs
+all sixteen original cases. All twenty retained native files match immutable
+Git blobs and a real autocrlf checkout. The same SMTP comparators pass with
+private actual Go; strict core/CLI all-target Clippy passes.
+
+A broader full-workspace Go-absent diagnostic at `114fd2a` is retained as a
+failure: twelve actual tests across six targets required Go, including these
+two now-prepared SMTP families. The remaining fallback, native helper/triage
+and six HTTP auxiliary cases need their own measured evidence. The new SMTP
+readers require actual capture and current Rust acceptance on all six native
+hosts. Issue #1131 remains open; run `37176774792` at `6ca3072` is preserved
+until both queued macOS captures complete before another manual dispatch.
+
 The stricter complete-header HTTP comparator now also replays a measured
 Linux amd64 record from clean producer
 `17cfa0931b853345bd0b14afda3f77f25d66c656`. Its ten original cases retain the
