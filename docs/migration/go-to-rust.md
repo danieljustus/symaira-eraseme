@@ -31,6 +31,14 @@ the regression controls and the original failed Rust parent. Windows retains
 its separate existing native complete-header/body family; the original wire
 parent is Unix-only. No platform or original test is removed from acceptance.
 
+A clean ordinary Git checkout at `1670979cef854f3ca72ec216fbee05747264be95`
+passes all fifteen live Linux amd64 HTTP tests: all twelve original parents
+plus the three new read-error controls, zero failures/ignored tests. The
+original ten wire cases also pass against the actual Go 1.26.6 process and
+produce a real local Linux record. Its 171 current/immutable Go inputs,
+all four generator hashes and native unmodified VCS/build identity are
+independently verified. This does not substitute for any other native host.
+
 The previous complete 380-test Go-absent result is bound to `81bb019`, before
 this generator change. Four genuine current-input wire records, independent
 archive/source/native build readback and the complete refreshed no-Go/native
