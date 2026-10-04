@@ -1,17 +1,19 @@
-//! Actual four-target grant captures. Unrecorded runtime targets use real Go.
+//! Actual six-target grant captures. Unrecorded runtime targets use real Go.
 use super::frozen_review_oracle::{digest, valid_bytes};
 use serde_json::Value;
 use std::path::{Component, Path};
 use std::sync::OnceLock;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const DIRECTORY: &str = "tests/fixtures/go-frozen/cli-grant-native-344";
-const REVISION: &str = "344dfaae9c51a9ae4dabe8fc50bd5f04f0b379d0";
-const TARGETS: [&str; 4] = [
+const DIRECTORY: &str = "tests/fixtures/go-frozen/native-0d/e8";
+const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+const TARGETS: [&str; 6] = [
     "linux-amd64",
     "linux-arm64",
     "windows-amd64",
     "windows-arm64",
+    "darwin-amd64",
+    "darwin-arm64",
 ];
 
 fn recorded_target(os: &str, arch: &str) -> Option<&'static str> {
@@ -20,6 +22,8 @@ fn recorded_target(os: &str, arch: &str) -> Option<&'static str> {
         ("linux", "aarch64") => Some("linux-arm64"),
         ("windows", "x86_64") => Some("windows-amd64"),
         ("windows", "aarch64") => Some("windows-arm64"),
+        ("macos", "x86_64") => Some("darwin-amd64"),
+        ("macos", "aarch64") => Some("darwin-arm64"),
         _ => None,
     }
 }
@@ -78,7 +82,7 @@ fn verify(manifest: &Value, target: &str) {
     assert_eq!(manifest["go_version"], "go1.26.6");
     assert_eq!(manifest["native_target"], format!("{os}/{arch}"));
     let sources = manifest["source_files"].as_object().unwrap();
-    assert_eq!(sources.len(), 194);
+    assert_eq!(sources.len(), 1481);
     for (name, metadata) in sources {
         let path = Path::new(name);
         assert!(
@@ -185,8 +189,8 @@ pub fn first_record_metadata() -> &'static Value {
 }
 
 pub fn verify_all_native_records_and_reject_changed_provenance() {
-    assert!(recorded_target("macos", "aarch64").is_none());
-    assert!(recorded_target("macos", "x86_64").is_none());
+    assert_eq!(recorded_target("macos", "aarch64"), Some("darwin-arm64"));
+    assert_eq!(recorded_target("macos", "x86_64"), Some("darwin-amd64"));
     for target in TARGETS {
         let manifest: Value = serde_json::from_slice(&read(target, "manifest.json")).unwrap();
         verify(&manifest, target);

@@ -95,6 +95,7 @@
       "CUT-004": 1132,
       "CUT-005": 1133
     },
+    "frozen_oracle_preparation": {"issue": 1131, "pull_request": 1156, "capture_run": 37188052753, "capture_source": "e8bb6643cbc2a05dbc19f3ad3749513887095ac9", "actual_native_targets": 6, "verified_artifact_archives": 40, "verified_whole_process_records": 52, "current_service_source_files": 1481, "linux_default_no_go_passed_tests": 380, "linux_default_no_go_failed_tests": 0, "acceptance": "capture artifacts independently verified; refreshed reader native acceptance pending; six auxiliary HTTP parents still require Go; app Go test change requires genuine post-integration service recapture", "task_completed": false},
     "accepted_deviations": {"CLI-023": "Automatic confirmation clicks remain durable manual tasks by the maintainer decision of 2026-09-28 (#809); this is not a blocker requiring browser implementation."}
   },
   "external_gates": {

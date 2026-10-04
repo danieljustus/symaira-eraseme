@@ -8,6 +8,59 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Actual six-target current-source frozen refresh (2026-10-04, #1131)
+
+Capture run `37188052753` at clean Go 1.26.6 source
+`e8bb6643cbc2a05dbc19f3ad3749513887095ac9` now retains the genuine
+macOS Intel producer as well as Linux amd64/arm64, Windows amd64/arm64 and
+macOS arm64. All forty original ZIP SHA-256 digests match GitHub's artifact
+readback: six service archives and thirty-four native process archives.
+`tests/fixtures/go-frozen/native-0d/e8/capture-receipts.json` records their
+identities. Every service manifest verifies all 1,481 current input files,
+native unmodified VCS/build identity, actual streams and original cases.
+Fifty-two complete process records also retain their measured streams,
+statuses/effects and unchanged archived generators. This capture/upload
+success is distinct from the run's subsequent stale-reader failures, which
+remain recorded; it is not whole-workspace Rust acceptance.
+
+The frozen readers now select these actual observations on all six targets,
+including macOS MCP runtime, grant and schedule families. Shared Unix or MCP
+streams were compared against every applicable genuine native producer
+before import. Target-specific Windows data keeps its original CRLF bytes
+under the existing byte-preserving attribute path; `.gitattributes` and the
+archived capture inputs are unchanged. No old answer is assigned a new
+source hash, no missing target is inferred, and no comparison or budget is
+relaxed. Linux compile-only workspace/all-feature verification and strict
+workspace/all-target/all-feature Clippy pass. The exact default Go-absent
+workflow passes 380 tests with zero failures. Its single top-level ignored
+consent harness child is still executed by the original parent in all sixteen
+private cases; it is not skipped acceptance. The full Linux CLI corpus and
+original SMTP/wire/header/triage/process assertions execute unchanged.
+
+The first refreshed PR run identified missing immutable history in the
+Windows host-agent and six-native HTTP workflows. Their checkouts now fetch
+full history; immutable generator/source checks remain strict. TruffleHog's
+three unverified matches in the generated legacy review manifest are exact
+hashes of actual broker YAML files (PeopleDataLabs, SentryLink, TeamUnify),
+independently recalculated from current source bytes. The adapter now retains
+the original full size/hash metadata instead of reducing it to adjacent
+keyword/hash strings, strengthening source verification and preserving the
+actual producer timestamp. The same pinned scanner and detectors remain
+required; no path/value exclusion is added. Only the author's final draft
+refresh commit is replaced, with the previous commit retained locally; raw
+capture archives and their recorded identities remain unchanged. The pinned
+3.97.5 image passes the complete original primary scan with zero verified or
+unverified findings and no scan errors; the corrected reader passes the exact
+380-test Go-absent suite again, with strict workspace Clippy.
+
+Current-head native reader acceptance is still required on all six hosts.
+The six auxiliary HTTP process parents still require actual Go, so #1131
+and complete-workspace independence remain open. The separate app PR's Go
+release-contract test edit will require another genuine service recapture
+once integrated because the service manifest deliberately binds Go tests
+as well as production sources. No release, observation interval, Go removal
+or cutover acceptance is claimed by this import.
+
 ## Exact mutation-anchor maintenance for MCP ping (2026-10-04, #1126)
 
 The standard ping addition shifts the existing protocol parser functions by

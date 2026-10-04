@@ -74,12 +74,12 @@ pub fn observations() -> Vec<Observation> {
     .unwrap();
     assert_eq!(
         manifest["source_revision"],
-        "46f2aec331a49b1d2e6423f15763b67c0fda7eba"
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9"
     );
     assert_eq!(manifest["go_version"], "go1.26.6");
     assert_eq!(manifest["native_target"], "linux/amd64");
     let build_info = manifest["binary_build_info"].as_str().unwrap();
-    assert!(build_info.contains("vcs.revision=46f2aec331a49b1d2e6423f15763b67c0fda7eba"));
+    assert!(build_info.contains("vcs.revision=e8bb6643cbc2a05dbc19f3ad3749513887095ac9"));
     assert!(build_info.contains("vcs.modified=false"));
     assert_eq!(manifest["build"]["exit_status"], 0);
     let (build_out, build_err) = streams!("build");
@@ -92,10 +92,10 @@ pub fn observations() -> Vec<Observation> {
         digest(b"Alice Example <alice@example.invalid>\n")
     );
     let sources = manifest["source_files"].as_object().unwrap();
-    assert_eq!(sources.len(), 171);
+    assert_eq!(sources.len(), 1481);
     for (name, expected) in sources {
         let bytes = std::fs::read(Path::new(ROOT).join(name)).unwrap();
-        assert_eq!(expected, &digest(&bytes), "Go source drift: {name}");
+        assert!(valid_bytes(expected, &bytes), "Go source drift: {name}");
     }
     let streams = [
         streams!("case-0"),

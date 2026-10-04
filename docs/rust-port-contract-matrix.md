@@ -1,5 +1,21 @@
 # Go → Rust executable contract matrix
 
+Current-source frozen preparation (2026-10-04, #1131) now retains and
+independently verifies all forty actual artifacts from six-native capture
+`37188052753` at `e8bb6643`: 1,481 source pins per service manifest and
+fifty-two whole process records. The source-bound MCP/grant/schedule readers
+now cover both Mac architectures in addition to Linux/Windows; native
+streams, original finite cases, input generators and budgets remain intact.
+The receipt under `go-frozen/native-0d/e8` records genuine artifact digests
+and the producer run's later stale-reader failures. Strict workspace Clippy
+and compile-only verification pass. The exact default Go-absent suite passes
+380 tests with zero failures; the delegated consent parent executes all sixteen
+private cases. Current-head six-native reader acceptance
+and six auxiliary HTTP parents without Go remain required. #1131, release
+and cutover rows stay open. The app PR's Go test change additionally requires
+real post-integration service recapture; old hashes must not be relabelled.
+
+
 > Performance/release baseline: commit
 > `240bf67cefa05e643e32611a02e6e7ed87a033ea` (`v0.12.1`). The corrected Go
 > executable contract oracle is pinned to

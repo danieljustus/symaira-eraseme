@@ -9,10 +9,46 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
+        "darwin/amd64",
+        "campaign",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "5cb2a797d4bf5d8b8df205cc12fac67a6afd8667d3c813c474d943a447555a1a",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/darwin-amd64/campaign.json"
+        ),
+    ),
+    (
+        "darwin/amd64",
+        "transport",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "05519eda14142d9460c90fb7c3f61d8141a4a3a4f3ce80c112c43bf5f4358fe0",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/darwin-amd64/transport.json"
+        ),
+    ),
+    (
+        "darwin/arm64",
+        "campaign",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "63caa5207c366444033664ee8a5ac28aaaf8d67ef1d4156247bc582fa0a55159",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/darwin-arm64/campaign.json"
+        ),
+    ),
+    (
+        "darwin/arm64",
+        "transport",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "55e5dad6e7cc1465fb40ec976e44e86c0b870e9c497b39fa096a905ea2bf42bd",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/darwin-arm64/transport.json"
+        ),
+    ),
+    (
         "linux/amd64",
         "campaign",
-        "e6fc336212717bd8cd5e8cd8965aab255216d541",
-        "4aa66e48e58b7a7ea7acd0a7ac84c5adbfda9380b4bf59fbc7fea764e6ea9524",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "cfbb7b42c430608eda8a566bdb8fa7aa58219b66acd0dd743fc14f8aa02f910d",
         include_bytes!(
             "../../../../tests/fixtures/go-frozen/smtp-native/linux-amd64/campaign.json"
         ),
@@ -20,10 +56,64 @@ const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
         "linux/amd64",
         "transport",
-        "e6fc336212717bd8cd5e8cd8965aab255216d541",
-        "7697aa0eeb6638ccfefc0e0e813da700bb1f59022c86ae8a51d381f97bc4b250",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "4c62b263987ec739db3da638904e1fa31fae2177c92ba937494da6df92fc6b12",
         include_bytes!(
             "../../../../tests/fixtures/go-frozen/smtp-native/linux-amd64/transport.json"
+        ),
+    ),
+    (
+        "linux/arm64",
+        "campaign",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "cf2516aae36f0b60134adaed5a1df8c4992f843db64200c99d49c64d5c3822ae",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/linux-arm64/campaign.json"
+        ),
+    ),
+    (
+        "linux/arm64",
+        "transport",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "c02cb93f73f39498a12c2f5512a2602fa1dd183dd8b7a59cae42ecca32eb32a9",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/linux-arm64/transport.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "campaign",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "4aa2ffeaad2b8a40c4234c0f4047a071c0490515aeea82ae630a05d2c3f34d4f",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/windows-amd64/campaign.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "transport",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "c4c40cb2a3c1353d3443cfe2061bb2daa99d3c73771b2587b29595ae02b42112",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/windows-amd64/transport.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "campaign",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "4b39879fd5f1899d2cbdbb1b5cbf541bca9fe71ac7791e63419b4d2f27fc0c62",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/windows-arm64/campaign.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "transport",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "2bea54a9c787da4c4676d134bb7332274a9fdaae98da4ab793361eb11e4e39c4",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/windows-arm64/transport.json"
         ),
     ),
 ];

@@ -1,11 +1,11 @@
-//! Immutable actual Linux/Windows Go observations; unrecorded hosts remain live.
+//! Immutable actual six-target Go observations; unrecorded hosts remain live.
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "f0a91ab986387f3e7b96a55388452bd56346f4e0";
-const NATIVE_REVISION: &str = "85acc5137f4bd703e6d809e84f66f7a986fc1873";
+const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+const NATIVE_REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
 const MANIFEST: &[u8] =
     include_bytes!("../../../../tests/fixtures/go-frozen/mcp-runtime/manifest.json");
 
@@ -14,7 +14,7 @@ fn native_manifest(os: &str, arch: &str) -> Option<(&'static [u8], &'static str)
         ($directory:literal, $target:literal) => {
             Some((
                 include_bytes!(concat!(
-                    "../../../../tests/fixtures/go-frozen/mcp-runtime-native-85/",
+                    "../../../../tests/fixtures/go-frozen/native-0d/e8/",
                     $directory,
                     "/manifest.json"
                 ))
@@ -28,6 +28,8 @@ fn native_manifest(os: &str, arch: &str) -> Option<(&'static [u8], &'static str)
         ("linux", "aarch64") => recorded!("linux-arm64", "linux/arm64"),
         ("windows", "x86_64") => recorded!("windows-amd64", "windows/amd64"),
         ("windows", "aarch64") => recorded!("windows-arm64", "windows/arm64"),
+        ("macos", "x86_64") => recorded!("darwin-amd64", "darwin/amd64"),
+        ("macos", "aarch64") => recorded!("darwin-arm64", "darwin/arm64"),
         _ => None,
     }
 }
@@ -91,7 +93,7 @@ fn verify_for_target(
     assert_eq!(manifest["go_version"], "go1.26.6");
     assert_eq!(manifest["native_target"], target);
     let sources = manifest["source_files"].as_object().unwrap();
-    assert_eq!(sources.len(), 1476);
+    assert_eq!(sources.len(), 1481);
     for (name, record) in sources {
         let path = Path::new(name);
         assert!(
@@ -139,13 +141,15 @@ fn verify_for_target(
 
 #[test]
 fn changed_frames_unknown_families_and_source_identity_are_rejected() {
-    assert!(native_manifest("macos", "x86_64").is_none());
-    assert!(native_manifest("macos", "aarch64").is_none());
+    assert!(native_manifest("macos", "x86_64").is_some());
+    assert!(native_manifest("macos", "aarch64").is_some());
     for (os, arch) in [
         ("linux", "x86_64"),
         ("linux", "aarch64"),
         ("windows", "x86_64"),
         ("windows", "aarch64"),
+        ("macos", "x86_64"),
+        ("macos", "aarch64"),
     ] {
         let (native, target) = native_manifest(os, arch).unwrap();
         for family in ["mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps"] {

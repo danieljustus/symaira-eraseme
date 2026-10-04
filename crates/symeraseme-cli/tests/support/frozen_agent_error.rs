@@ -7,14 +7,56 @@ use std::process::Command;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
-const RECORDS: &[(&str, &str, &str, &[u8])] = &[(
-    "linux/amd64",
-    "e6fc336212717bd8cd5e8cd8965aab255216d541",
-    "5e49f586dcd1bc4f0a78b5c743619bb42eceba19c040ad0bcdc7eff107783005",
-    include_bytes!(
-        "../../../../tests/fixtures/go-frozen/native-agent-error/linux-amd64/agent-error.json"
+const RECORDS: &[(&str, &str, &str, &[u8])] = &[
+    (
+        "darwin/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "5df3c06eadc3682b96c543c4bb8a2bf1e8d88c5adaeaea0d26bbf9d9b77b25fd",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/darwin-amd64/agent-error.json"
+        ),
     ),
-)];
+    (
+        "darwin/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "944aea21b099b1a35e731e95f9290a6a3f6721c7574c3aed286ec0d4600db04d",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/darwin-arm64/agent-error.json"
+        ),
+    ),
+    (
+        "linux/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "7f6852773df6d28081b46bce219e18ad3691232dff7d74992ea36f29d5e0d7e4",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/linux-amd64/agent-error.json"
+        ),
+    ),
+    (
+        "linux/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "fa734026f106e57c8f77ea27257a28a2f63cc36f1804902a9861dfef477e1082",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/linux-arm64/agent-error.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "c8fcae495fef50d4936125eed2d233876cd6f9cf15ce658f59e27f771949ceb4",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/windows-amd64/agent-error.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "f204d3c81e67c576e0fd1fcab2918f543dac884021548144bbaf81a3c2128d0d",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/native-agent-error/windows-arm64/agent-error.json"
+        ),
+    ),
+];
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)

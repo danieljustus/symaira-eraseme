@@ -4,13 +4,41 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "0972f73f2be6197197814bf4dbfba0c039a3c6dd";
+const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
 fn native_manifest() -> Option<(&'static str, &'static [u8], &'static str)> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("linux", "x86_64") => Some(("linux/amd64", include_bytes!("../../../../tests/fixtures/go-frozen/unix-process-native097/linux-amd64/manifest.json").as_slice(), "653176a94c6305333da872e9515ab4907495d5bbb4fddb05569b2ca2ca9411fa")),
-        ("linux", "aarch64") => Some(("linux/arm64", include_bytes!("../../../../tests/fixtures/go-frozen/unix-process-native097/linux-arm64/manifest.json").as_slice(), "f4828f7028adccaaf7937b68302a848024f1a53ffe7b11eaf9618eb79b0efcba")),
-        ("macos", "x86_64") => Some(("darwin/amd64", include_bytes!("../../../../tests/fixtures/go-frozen/unix-process-native097/darwin-amd64/manifest.json").as_slice(), "bdafb6e3992e6f4bff83396dbe92b1e1d28e233ba38bd5a5749aaf4c405d08d6")),
-        ("macos", "aarch64") => Some(("darwin/arm64", include_bytes!("../../../../tests/fixtures/go-frozen/unix-process-native097/darwin-arm64/manifest.json").as_slice(), "ab8ff5e20026cbe60008d0706730cc0ca637eb7d997b9bc4d31ae0023902dc4f")),
+        ("linux", "x86_64") => Some((
+            "linux/amd64",
+            include_bytes!(
+                "../../../../tests/fixtures/go-frozen/native-0d/e8/linux-amd64/manifest.json"
+            )
+            .as_slice(),
+            "88560fcf54bcb8533612e9f50761ede89af6db8a69b184f022d7ae7297e7848d",
+        )),
+        ("linux", "aarch64") => Some((
+            "linux/arm64",
+            include_bytes!(
+                "../../../../tests/fixtures/go-frozen/native-0d/e8/linux-arm64/manifest.json"
+            )
+            .as_slice(),
+            "8e996eb93d67f6eb8c6672a7657a0cdbdcecf7b0af768807e38d83f0711eb7ca",
+        )),
+        ("macos", "x86_64") => Some((
+            "darwin/amd64",
+            include_bytes!(
+                "../../../../tests/fixtures/go-frozen/native-0d/e8/darwin-amd64/manifest.json"
+            )
+            .as_slice(),
+            "203cfa77952c6dfb3c2dc78cd59cdcec0c7a616185b165eea2a18cd1339f5629",
+        )),
+        ("macos", "aarch64") => Some((
+            "darwin/arm64",
+            include_bytes!(
+                "../../../../tests/fixtures/go-frozen/native-0d/e8/darwin-arm64/manifest.json"
+            )
+            .as_slice(),
+            "a9966ea6e3d1d7583a7306eefd350231eecde17722015a0d100de33c32a4f6cd",
+        )),
         _ => None,
     }
 }

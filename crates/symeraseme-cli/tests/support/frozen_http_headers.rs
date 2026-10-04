@@ -7,12 +7,56 @@ use std::process::Command;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
-const RECORDS: &[(&str, &str, &str, &[u8])] = &[(
-    "linux/amd64",
-    "e6fc336212717bd8cd5e8cd8965aab255216d541",
-    "8ad3377c860a97dec3fd969a3a95efd2cba8ed6d0c0509c4e33c43eb8bb82a79",
-    include_bytes!("../../../../tests/fixtures/go-frozen/http-headers/linux-amd64/headers.json"),
-)];
+const RECORDS: &[(&str, &str, &str, &[u8])] = &[
+    (
+        "darwin/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "1da4fc4e7ea2325bde7e1e6be27a39b08d3ae9615a1ea0128e42703868aba474",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/darwin-amd64/headers.json"
+        ),
+    ),
+    (
+        "darwin/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "06c30abb149761b020b96921a477a198e1cff56107d6e80a904a7aff9b76cff6",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/darwin-arm64/headers.json"
+        ),
+    ),
+    (
+        "linux/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "fe919a2b65f3a88a06447f49519945969185c9e3763c952f5c5e6d60edc8f594",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/linux-amd64/headers.json"
+        ),
+    ),
+    (
+        "linux/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "c4f59543084535a381c82eac1890591575d888b9628f674c39cdce19a3db2c49",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/linux-arm64/headers.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "e0c360ca217c23855db783083d0709f8353d7ec115f7dfbaee3f56d5c675cea4",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/windows-amd64/headers.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+        "f2ab4598427c2f6b2af43e7ad1b7f20070fd65f3782b78832b7fa68e266c24a0",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-headers/windows-arm64/headers.json"
+        ),
+    ),
+];
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)

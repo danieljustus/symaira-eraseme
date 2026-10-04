@@ -4,14 +4,14 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
-const REVISION: &str = "0d1be28288594354941a07d19f834f2553928bc4";
+const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 pub fn manifest_bytes(os: &str, arch: &str) -> Option<&'static [u8]> {
     macro_rules! recorded {
         ($target:literal) => {
             include_bytes!(concat!(
-                "../../../../tests/fixtures/go-frozen/native-0d/",
+                "../../../../tests/fixtures/go-frozen/native-0d/e8/",
                 $target,
                 "/manifest.json"
             ))
@@ -44,7 +44,7 @@ pub fn verify(bytes: &[u8], os: &str, arch: &str) -> Value {
     let sources = manifest["source_files"]
         .as_object()
         .expect("source inventory");
-    assert_eq!(sources.len(), 194);
+    assert_eq!(sources.len(), 1481);
     for (path, metadata) in sources {
         let relative = Path::new(path);
         assert!(!relative.is_absolute());

@@ -1,0 +1,298 @@
+{
+  "schema": "symeraseme.actual-go.capture-receipts.v1",
+  "repository": "danieljustus/symaira-eraseme",
+  "workflow_run": 37188052753,
+  "source_revision": "e8bb6643cbc2a05dbc19f3ad3749513887095ac9",
+  "go_version": "go1.26.6",
+  "native_targets": [
+    "darwin/amd64",
+    "darwin/arm64",
+    "linux/amd64",
+    "linux/arm64",
+    "windows/amd64",
+    "windows/arm64"
+  ],
+  "acceptance": "Producer capture/upload steps passed on all six hosts. Subsequent frozen-reader validation failed at this source and must pass after refresh. This receipt is not whole-workspace acceptance.",
+  "artifacts": [
+    {
+      "artifact_id": 11297828292,
+      "artifact_name": "frozen-go-agent-error-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "bc4eb0b22c752bf633c91d95d14a641cf3722c973065a242bfa70372985090bb",
+      "archive_bytes": 11900
+    },
+    {
+      "artifact_id": 11298950006,
+      "artifact_name": "frozen-go-agent-error-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "702965bd5268b70f950d0c4443b953e0839332ba6d4a63848253c4b56c6a695a",
+      "archive_bytes": 11899
+    },
+    {
+      "artifact_id": 11298686605,
+      "artifact_name": "frozen-go-agent-error-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "1390e856a5f3c31601627dd4b284920c164d637fa27b29b994a7c8ffe1403c71",
+      "archive_bytes": 11996
+    },
+    {
+      "artifact_id": 11298530884,
+      "artifact_name": "frozen-go-agent-error-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "5a56aa69b22d60fdae69cae4e46376238bafdf9618cc060106ca48cc89a3b73d",
+      "archive_bytes": 12000
+    },
+    {
+      "artifact_id": 11300211395,
+      "artifact_name": "frozen-go-agent-error-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "2ad4402d6d424ac810047c103ab3227eca0d12f934fac8288b79f21bb1b575c3",
+      "archive_bytes": 11998
+    },
+    {
+      "artifact_id": 11302749146,
+      "artifact_name": "frozen-go-agent-error-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "9b7ed38039d85ee0af00eab49c6a7ea6cfe345e127f973409f117b81d1c8b98c",
+      "archive_bytes": 11995
+    },
+    {
+      "artifact_id": 11298003081,
+      "artifact_name": "frozen-go-http-headers-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "e2b1920cbceab6709cfa238b9808259867380adedcbb85830689605c2dfce226",
+      "archive_bytes": 13039
+    },
+    {
+      "artifact_id": 11298805337,
+      "artifact_name": "frozen-go-http-headers-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "57641a5381550c3a13064db43dfe0819b3c772da3e35569cb07f297026de772d",
+      "archive_bytes": 13036
+    },
+    {
+      "artifact_id": 11299145724,
+      "artifact_name": "frozen-go-http-headers-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "ac69c510f59c8505df430c9028fe8cf1bfefd32cd99d0f2dec5de7a793a82979",
+      "archive_bytes": 13212
+    },
+    {
+      "artifact_id": 11297369912,
+      "artifact_name": "frozen-go-http-headers-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "2a3b5110f307edaf6c8b65b8aea174790c5efe3e94126ea9606af1fc58f708d2",
+      "archive_bytes": 13243
+    },
+    {
+      "artifact_id": 11300350635,
+      "artifact_name": "frozen-go-http-headers-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "7d65f1bc5fd6a69ff028d41f3490f5314c83c81c9b5bed53bb1556ab3ec89309",
+      "archive_bytes": 13136
+    },
+    {
+      "artifact_id": 11303175340,
+      "artifact_name": "frozen-go-http-headers-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "c0c59b378c2564d42c5c3ccd5ee0901feb2ea759bae15b03cb0d1a34ebe496b8",
+      "archive_bytes": 13168
+    },
+    {
+      "artifact_id": 11298003080,
+      "artifact_name": "frozen-go-http-wire-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "c5cd99718fa07c32318cb073fe5a47d44994834d70c5864482368114f4bad1a7",
+      "archive_bytes": 12564
+    },
+    {
+      "artifact_id": 11298635726,
+      "artifact_name": "frozen-go-http-wire-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "04be8b4b6a7b4dd95073a0b9f331fd151b42548aaca75b906f4e111239447dd4",
+      "archive_bytes": 12563
+    },
+    {
+      "artifact_id": 11300066701,
+      "artifact_name": "frozen-go-http-wire-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "1a7ea616c903a002b5e4bb466ce7b9cafcdeb170e1f2ac82c0243e2610f50059",
+      "archive_bytes": 12660
+    },
+    {
+      "artifact_id": 11303125512,
+      "artifact_name": "frozen-go-http-wire-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "32e5d1b67e36d7d80592529e4556020c7720b5c580472f8082702794d4d5f3f4",
+      "archive_bytes": 12657
+    },
+    {
+      "artifact_id": 11297828289,
+      "artifact_name": "frozen-go-native-triage-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "4cbcf4dfe65d7b621b94ea1e6eda304eb57a98efe31d94de522cc9586a4f4844",
+      "archive_bytes": 27242
+    },
+    {
+      "artifact_id": 11298585755,
+      "artifact_name": "frozen-go-native-triage-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "e514506f28b7be2c05bec270492b275fabfeb4e596d4a39fe77dcf710d692e32",
+      "archive_bytes": 27240
+    },
+    {
+      "artifact_id": 11298981047,
+      "artifact_name": "frozen-go-native-triage-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "4dad9e18989590d61afcb2fa677d15d46160621dd2db59d5aede605d0ceb7bc3",
+      "archive_bytes": 27581
+    },
+    {
+      "artifact_id": 11297414819,
+      "artifact_name": "frozen-go-native-triage-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "b44727a6613c2c1cb34371930ab576fb3ce8241cead279c66b8d331806c2cbf6",
+      "archive_bytes": 27577
+    },
+    {
+      "artifact_id": 11300375517,
+      "artifact_name": "frozen-go-native-triage-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "89191604c3108489e0ea34224fb5da33540baf1410132701a4fc4940c9bbe552",
+      "archive_bytes": 27430
+    },
+    {
+      "artifact_id": 11302946097,
+      "artifact_name": "frozen-go-native-triage-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "6c15372a532315d91128b3af1ac5d9ddffa5254a3c73e60ac676cbc2e67f5b2e",
+      "archive_bytes": 27420
+    },
+    {
+      "artifact_id": 11298540125,
+      "artifact_name": "frozen-go-plan-processes-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "aa1add2fc59259fea5c9750123afe28ff4937e9da2806b08c2dee6dbd08e3480",
+      "archive_bytes": 22882
+    },
+    {
+      "artifact_id": 11297738933,
+      "artifact_name": "frozen-go-plan-processes-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "0b49d623a42889af4044df0783010a93098c9c1a7f6a7ea28fd33dda81d2f955",
+      "archive_bytes": 22880
+    },
+    {
+      "artifact_id": 11298991058,
+      "artifact_name": "frozen-go-plan-processes-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "5c084e6c55444c91079211834a6e8108fa5ad33a22194b46aa3f8dc879ab2ef6",
+      "archive_bytes": 23222
+    },
+    {
+      "artifact_id": 11297504758,
+      "artifact_name": "frozen-go-plan-processes-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "f05565add58f4b6aa6d6a4040e6cbc390a13152ad966fb685352b6a50f14d07e",
+      "archive_bytes": 23218
+    },
+    {
+      "artifact_id": 11299827365,
+      "artifact_name": "frozen-go-plan-processes-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "cc67fcd08620acae50866590bb1b615032ee4d5d0cc845cb8b106c569a86861f",
+      "archive_bytes": 23071
+    },
+    {
+      "artifact_id": 11302714241,
+      "artifact_name": "frozen-go-plan-processes-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "bfc3fcb3403d20e9c1d7a2fba73b9dedde5abdfd25c3994b18c1e1b9ae179085",
+      "archive_bytes": 23065
+    },
+    {
+      "artifact_id": 11297274182,
+      "artifact_name": "frozen-go-services-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "06805392d6ef19e9acffd3100cb0e04f76cb586a349014a7dad2d1b904556442",
+      "archive_bytes": 203031
+    },
+    {
+      "artifact_id": 11297384073,
+      "artifact_name": "frozen-go-services-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "04a9864338b8c5af1ae8a4b857fc51c1c7b7250f20cf606f8fe5655af14efd37",
+      "archive_bytes": 203011
+    },
+    {
+      "artifact_id": 11298204190,
+      "artifact_name": "frozen-go-services-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "887b7b0dafac6062844b07a26ec4f252b21a57c3ad9cbfd4a95caadeef325a0c",
+      "archive_bytes": 196301
+    },
+    {
+      "artifact_id": 11298353154,
+      "artifact_name": "frozen-go-services-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "7301d8a7ac7374c82e158b7f7d92f4263ab3bbe1dc550ae77881ff247272f5fb",
+      "archive_bytes": 196292
+    },
+    {
+      "artifact_id": 11299293403,
+      "artifact_name": "frozen-go-services-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "a72628c2641abcab046d86d64a8fd470b13b8c9f860ed73df5dbd399e37343c9",
+      "archive_bytes": 203030
+    },
+    {
+      "artifact_id": 11302299002,
+      "artifact_name": "frozen-go-services-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "e0305a0fafd8560eaacb4539fe3bb8e97e92591bd6b6407dc0f80fbf9fb5584c",
+      "archive_bytes": 203032
+    },
+    {
+      "artifact_id": 11297628674,
+      "artifact_name": "frozen-go-smtp-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "archive_sha256": "78ac9363a1ef5b6ed0746a36110b203c5f08abb2e6d313382e3f8b7c51aaf259",
+      "archive_bytes": 27029
+    },
+    {
+      "artifact_id": 11298516104,
+      "artifact_name": "frozen-go-smtp-Linux-X64",
+      "native_target": "linux/amd64",
+      "archive_sha256": "d9ad4c703593692f41e983bf03e133d90eb34fbf81df692fa6853ebfc488e913",
+      "archive_bytes": 27018
+    },
+    {
+      "artifact_id": 11298606872,
+      "artifact_name": "frozen-go-smtp-Windows-ARM64",
+      "native_target": "windows/arm64",
+      "archive_sha256": "0a937fcce7d13210e990e284e8a4d2356c21fa5944c83f7eeec44df7736bb0a6",
+      "archive_bytes": 27194
+    },
+    {
+      "artifact_id": 11297459865,
+      "artifact_name": "frozen-go-smtp-Windows-X64",
+      "native_target": "windows/amd64",
+      "archive_sha256": "b8f5b8ea985a3b54327f2f69a3ad3e7c735a378e364c419202a17a97e4844926",
+      "archive_bytes": 27189
+    },
+    {
+      "artifact_id": 11300226297,
+      "artifact_name": "frozen-go-smtp-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "archive_sha256": "77eec45de167da4b8e28cb7319407e3eb2b48303ba920caf7d4f00cf78045fc8",
+      "archive_bytes": 27186
+    },
+    {
+      "artifact_id": 11302827359,
+      "artifact_name": "frozen-go-smtp-macOS-X64",
+      "native_target": "darwin/amd64",
+      "archive_sha256": "77bb7cab8f0c90479096c250a8f7bdbd7f4939a07f14226a0ba0d8ba189fcd19",
+      "archive_bytes": 27183
+    }
+  ]
+}
