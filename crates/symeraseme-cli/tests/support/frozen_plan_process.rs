@@ -117,9 +117,15 @@ pub fn observation(case: &str) -> Option<(Output, Value)> {
         ("linux", "aarch64") => "linux/arm64",
         ("windows", "x86_64") => "windows/amd64",
         ("windows", "aarch64") => "windows/arm64",
+        ("macos", "x86_64") => "darwin/amd64",
+        ("macos", "aarch64") => "darwin/arm64",
         _ => return None, // Unrecorded hosts still execute actual Go.
     };
     let (raw, pin) = match (target, case) {
+        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/darwin-arm64/web-form.json").as_slice(), "71d6ae3b54357ebc9e4a9e3fe41e8ff56c9509943ece3f55544a77fa36046e72"),
+        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/darwin-arm64/senderless-email.json").as_slice(), "982014917ebca7e5678f9343a08a52a08517c4bbb8dd40dfbfd12f97798c633b"),
+        ("darwin/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/darwin-amd64/web-form.json").as_slice(), "adce693235ffce0fe60c6f418c858ba13005216bfb97b28c5ee8d40bc29d0b61"),
+        ("darwin/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/darwin-amd64/senderless-email.json").as_slice(), "63f725e502561399f3a1cfe438a75b2abf7c4784f0123dbd0ebb4e17bcdd536e"),
         ("windows/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-amd64/web-form.json").as_slice(), "8c3831a4405e4562695adcbb937a54ab9dd08ad2185c9ee2e14b49c36e01f19c"),
         ("windows/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-amd64/senderless-email.json").as_slice(), "06cc4c1fa830116b12efd17cbdd6ee75015de13fd7085bdd537c2b9b7a901ee5"),
         ("windows/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-arm64/web-form.json").as_slice(), "8ce4133f41f33d5d1b1e0e630aa96200fe2beb50a190c81238b6393927d776e7"),

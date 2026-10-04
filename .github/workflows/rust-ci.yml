@@ -391,8 +391,7 @@ jobs:
             cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
           fi
 
-      - name: Verify both whole plan processes with Go absent on recorded native hosts
-        if: runner.os == 'Linux' || runner.os == 'Windows'
+      - name: Verify both whole plan processes with Go absent on all six native hosts
         shell: bash
         run: python3 scripts/verify-frozen-plan-without-go.py
 

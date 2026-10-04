@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 
-assert sys.platform in ("linux", "win32"), "this scoped proof has no Mac recordings yet"
+assert sys.platform in ("linux", "win32", "darwin"), "unrecorded native host"
 with tempfile.TemporaryDirectory(prefix="native-plan-no-go-") as temporary:
     environment = os.environ.copy()
     environment.pop("SYMERASEME_CAPTURE_PLAN_PROCESSES", None)
