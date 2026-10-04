@@ -44,7 +44,10 @@ jobs:
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.98.0 --profile minimal
       - name: Verify packaging controls
-        run: bash tests/test_release_dmg.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/test_release_dmg.sh 2>&1 | tee "$RUNNER_TEMP/packaging-controls.log"
       - name: Stage actual app with default Rust and explicit Go sibling
         shell: bash
         run: |
@@ -77,6 +80,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: swift-rust-bundle-${{ matrix.os }}-${{ github.sha }}
-          path: ${{ runner.temp }}/swift-rust-bundle-tests.log
+          path: |
+            ${{ runner.temp }}/packaging-controls.log
+            ${{ runner.temp }}/swift-rust-bundle-tests.log
           if-no-files-found: error
           retention-days: 30

@@ -1040,3 +1040,17 @@ Go builds and registry-loading children. Every case, comparison and child
 deadline is retained; full native workspace coverage remains unchanged.
 This is a scheduling candidate, not accepted Windows evidence. Both native
 Windows architectures and the current full suite must pass before merge.
+
+## Retained Intel pre-Swift packaging failure (2026-10-04, #1158)
+
+At head `6a9c47da`, Intel job `111468062530` in run `37213097514`
+selects the available Xcode26.3.0 correctly, then fails the first packaging
+control before staging or Swift tests. The captured shell output was not
+printed when the command failed, so its underlying cause is not established.
+The mock harness now prints that failure output and returns its original exit
+status. The native workflow retains packaging logs even when Swift never
+starts; all packaging assertions, actual icon compilation, both architectures
+and the complete Swift suite remain required. No native pass is inferred from
+this diagnostic repair. Native ARM at this head did pass all42 Swift tests
+(job111468062472), and both Windows HTTP jobs pass all7 original parents
+(jobs111468062686/111468062737). Fresh current-head acceptance is required.

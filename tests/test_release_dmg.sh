@@ -165,7 +165,14 @@ test_local_test_mode_without_credentials() {
     rm -f "$DIST_DIR"/Symaira-EraseMe-*-macos.dmg
 
     local OUT
-    OUT="$(VERSION="0.13.0" "$REPO_ROOT/scripts/package-dmg.sh" 2>&1)"
+    if OUT="$(VERSION="0.13.0" "$REPO_ROOT/scripts/package-dmg.sh" 2>&1)"; then
+        :
+    else
+        local EXIT_CODE=$?
+        printf '%s\n' "$OUT" >&2
+        echo "FAIL: local packaging exited with status $EXIT_CODE" >&2
+        return "$EXIT_CODE"
+    fi
     echo "$OUT" | grep -q "CODESIGN_IDENTITY not set. Skipping code signing (non-release test mode only)."
     echo "$OUT" | grep -q "DMG successfully created"
     test -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
