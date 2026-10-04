@@ -13,6 +13,22 @@
 
 ## Granular issue ownership (2026-10-02)
 
+At clean `6f084b0070dff5664c2bd234a571e651d82f58bd`, the exact current
+Go-absent workflow passes all 361 selected tests with zero failures. Its
+sole top-level ignored harness child is actually executed in all sixteen
+isolated consent cases by the passing parent and is never counted as
+skipped acceptance. All 25 CLI tests pass without Go; the same thirteen-case
+schedule comparison passes with private actual Go; strict CLI Clippy passes.
+All 102 CLI binary unit tests and three actual-live MCP comparators retain
+their `dd51bb0` proof, and all eight triage/projection tests retain their
+Go-absent/actual-live proof at `90c50c0`. Four complete native Rust suites
+pass at `85acc513` and all four 98-member/110-observation actual Go captures
+are independently verified. Their twelve newly retained raw manifests and
+scheduler streams match the artifact bytes in Git and autocrlf checkouts.
+Current six-target acceptance of the new readers and complete-workspace
+Go independence remain required. Issue #1131 stays open.
+
+
 The thirteen CLI schedule cases now select complete actual Linux2/Windows2
 outputs from native source `85acc513`, with native unmodified VCS and all
 1476 immutable input pins. Windows bytes are retained separately from Unix
