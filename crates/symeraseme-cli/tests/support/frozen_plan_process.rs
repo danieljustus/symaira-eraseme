@@ -1,4 +1,4 @@
-//! Actual complete Linux-amd64 Go plan process and original persisted effects.
+//! Complete actual native Linux/Windows Go plan processes and persisted effects.
 use base64::Engine;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -6,7 +6,7 @@ use std::path::{Component, Path};
 use std::process::{Command, Output};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "fae7b5da416db5e491ed3b4d1944069d3f80d291";
+const REVISION: &str = "0972f73f2be6197197814bf4dbfba0c039a3c6dd";
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -15,14 +15,14 @@ fn digest(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn verify(raw: &[u8], expected: &str, case: &str) -> Value {
+fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
     assert_eq!(digest(raw), expected, "whole actual process record");
     let record: Value = serde_json::from_slice(raw).unwrap();
     assert_eq!(record["schema"], "symeraseme.actual-go.plan-process.v1");
     assert_eq!(record["case"], case);
     assert_eq!(record["source_revision"], REVISION);
     assert_eq!(record["go_version"], "go1.26.6");
-    assert_eq!(record["native_target"], "linux/amd64");
+    assert_eq!(record["native_target"], target);
     assert_eq!(record["exit_status"], 0);
     assert_eq!(record["stdin"]["bytes"], 0);
     assert_eq!(record["stdin"]["sha256"], digest(&[]));
@@ -53,15 +53,32 @@ fn verify(raw: &[u8], expected: &str, case: &str) -> Value {
             archive.status.success(),
             "immutable input generator must remain verifiable"
         );
-        assert_eq!(pin["bytes"], archive.stdout.len());
-        assert_eq!(pin["sha256"], digest(&archive.stdout));
+        // These three archived generators were measured as an actual Git
+        // autocrlf checkout on both Windows producers. Preserve the recorded
+        // digest and reproduce only that independently verified transform.
+        let bytes = if target.starts_with("windows/") {
+            assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
+            let mut bytes = Vec::with_capacity(archive.stdout.len());
+            for byte in archive.stdout {
+                if byte == b'\n' {
+                    bytes.push(b'\r');
+                }
+                bytes.push(byte);
+            }
+            bytes
+        } else {
+            archive.stdout
+        };
+        assert_eq!(pin["bytes"], bytes.len());
+        assert_eq!(pin["sha256"], digest(&bytes));
     }
     let build = record["embedded_build_info"].as_str().unwrap();
+    let (os, arch) = target.split_once('/').unwrap();
     for expected in [
         format!("vcs.revision={REVISION}"),
         "vcs.modified=false".into(),
-        "GOOS=linux".into(),
-        "GOARCH=amd64".into(),
+        format!("GOOS={os}"),
+        format!("GOARCH={arch}"),
     ] {
         assert!(build.contains(&expected));
     }
@@ -83,40 +100,40 @@ pub fn observation(case: &str) -> Option<(Output, Value)> {
     }
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => return None,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                return None;
-            }
-        }
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
         _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
-    let (raw, pin) = match case {
-        "web-form" => (
-            include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-fae7/web-form.json")
-                .as_slice(),
-            "6927b253e89d9bc680ead7e04108e09fedcd41502219efe7a6c6854f86580f95",
-        ),
-        "senderless-email" => (
-            include_bytes!(
-                "../../../../tests/fixtures/go-frozen/plan-process-fae7/senderless-email.json"
-            )
-            .as_slice(),
-            "03de24f57a8ecb4ebfb5d520059fe0e357ad1cac80b3ff3521b38da32dab59d4",
-        ),
+    let target = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "linux/amd64",
+        ("linux", "aarch64") => "linux/arm64",
+        ("windows", "x86_64") => "windows/amd64",
+        ("windows", "aarch64") => "windows/arm64",
+        _ => return None, // Unrecorded hosts still execute actual Go.
+    };
+    let (raw, pin) = match (target, case) {
+        ("windows/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-amd64/web-form.json").as_slice(), "8c3831a4405e4562695adcbb937a54ab9dd08ad2185c9ee2e14b49c36e01f19c"),
+        ("windows/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-amd64/senderless-email.json").as_slice(), "06cc4c1fa830116b12efd17cbdd6ee75015de13fd7085bdd537c2b9b7a901ee5"),
+        ("windows/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-arm64/web-form.json").as_slice(), "8ce4133f41f33d5d1b1e0e630aa96200fe2beb50a190c81238b6393927d776e7"),
+        ("windows/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/windows-arm64/senderless-email.json").as_slice(), "7e154b1fb76c9d9d47b0d9c05108fb0a96360b5754d3ccb4a453900285bb9ed2"),
+        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/linux-arm64/web-form.json").as_slice(), "393988f100003967ec96356d3b1b4b1be4fd0abbbdbb946e0f26ecd11a50c9c5"),
+        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/linux-arm64/senderless-email.json").as_slice(), "51686167dc69dd24d8114af8e96486eb909f47a2766a2d09bd6595b0e12cc5cc"),
+        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/linux-amd64/web-form.json").as_slice(), "9ef1a6f604bec0f519e953f7c32076d7e45155be77f0c4eb7b4874bd54f6b187"),
+        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/plan-process-native097/linux-amd64/senderless-email.json").as_slice(), "378c7872b98a127efe8a8fb305437bab0d498d41d931ff7033ae9a083ae54643"),
         _ => panic!("unrecorded plan process cannot receive a cached answer"),
     };
-    let record = verify(raw, pin, case);
+    let record = verify(raw, pin, case, target);
     let mut changed = raw.to_vec();
     changed.push(b'!');
-    assert!(std::panic::catch_unwind(|| verify(&changed, pin, case)).is_err());
-    assert!(std::panic::catch_unwind(|| verify(&raw[..raw.len() - 1], pin, case)).is_err());
+    assert!(std::panic::catch_unwind(|| verify(&changed, pin, case, target)).is_err());
+    assert!(std::panic::catch_unwind(|| verify(&raw[..raw.len() - 1], pin, case, target)).is_err());
     let mut wrong_effects = record.clone();
     wrong_effects["persisted_effects"][0] = "fabricated-state".into();
     assert!(
         std::panic::catch_unwind(|| verify(
             &serde_json::to_vec(&wrong_effects).unwrap(),
             pin,
-            case
+            case,
+            target
         ))
         .is_err()
     );
