@@ -71,6 +71,15 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         };
         assert_eq!(pin["bytes"], bytes.len());
         assert_eq!(pin["sha256"], digest(&bytes));
+        // A changed test input generator or dependency lock requires actual
+        // recapture, even if its older immutable archive remains available.
+        let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        assert_eq!(pin["bytes"], current.len(), "current plan input: {name}");
+        assert_eq!(
+            pin["sha256"],
+            digest(&current),
+            "current plan input: {name}"
+        );
     }
     let build = record["embedded_build_info"].as_str().unwrap();
     let (os, arch) = target.split_once('/').unwrap();
