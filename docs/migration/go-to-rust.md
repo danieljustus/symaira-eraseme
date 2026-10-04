@@ -10,6 +10,32 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The native malformed-agent comparator additionally consumes an actual complete
+Linux amd64 Go helper record from clean producer
+`020bd691459c1107cef5e7ac639eaba58fdf98fb`. The 32024-byte record has SHA-256
+`f84c10a3d412b9257a709cba52370af5042116075508247e3283f26a7932214c`;
+172 Go inputs and five immutable/current input generators independently verify,
+including the measured Git newline policy. Complete Go oracle and helper
+stdout/stderr/status remain unchanged. Both measured Go output-limit rejections
+are retained. A real native Rust child fixture, compiled with Rust 1.98.0,
+produces the same bad UTF-8 bytes and exit 23 and executes both live output-limit
+controls. It implements no MCP or Go oracle. The original MCP JSON/frame and
+byte-mutation assertions remain; native Windows additionally runs the real Rust
+MCP process with that native Rust fixture. Unrecorded hosts and explicit
+live/capture modes still execute actual Go.
+
+At clean `5fbb447bd36e31615f0b1520e33e5033ca27fb8c`, the exact dedicated
+SDK-free workflow passes **377 tests, zero failures**. The original native-agent
+parent now executes with Go absent on Linux amd64; all twenty-one frozen native
+records plus the published-release manifest match immutable Git blobs and an
+actual autocrlf checkout. The delegated consent parent still executes all
+sixteen private cases. Actual captures/current acceptance on the five other
+hosts, native triage and six HTTP auxiliary families remain required. This is
+scoped preparation; issue #1131 and complete-workspace independence stay open.
+The same original native-helper parent passes with private actual current Go;
+strict CLI all-target Clippy passes. Only the bounded measured synthetic
+observation JSON is uploaded, with no profile, database or cache contents.
+
 The rollback preparation at clean
 `486165456bf328a45f09a6529e507953f92f7bfd` passes the exact dedicated
 SDK-free workflow: **376 tests, zero failures**, including the original explicit

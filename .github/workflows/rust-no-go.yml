@@ -3,6 +3,10 @@ name: Frozen parity without Go
 on:
   pull_request:
     paths:
+      - cmd/**
+      - internal/**
+      - go.mod
+      - go.sum
       - rust-tests/parity/**
       - crates/symeraseme-core/src/timeutil.rs
       - crates/symeraseme-core/src/confirmation.rs
@@ -27,6 +31,10 @@ on:
       - crates/symeraseme-cli/tests/triage_commands.rs
       - crates/symeraseme-cli/tests/mcp_triage_process.rs
       - crates/symeraseme-cli/tests/mcp_agent_error_json.rs
+      - crates/symeraseme-cli/tests/mcp_agent_error_json_windows.rs
+      - crates/symeraseme-cli/tests/fixtures/native_agent_error.rs
+      - crates/symeraseme-cli/tests/support/capture_agent_error.rs
+      - crates/symeraseme-cli/tests/support/frozen_agent_error.rs
       - crates/symeraseme-cli/tests/plan_execute_live_process.rs
       - crates/symeraseme-cli/tests/backend_fallback_process.rs
       - crates/symeraseme-cli/tests/support/retained_go_release.rs
