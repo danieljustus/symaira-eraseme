@@ -1,5 +1,13 @@
 # Historical Go fallback backup and restore rehearsal
 
+## Current-main offline oracle preparation — 2026-10-04
+
+The current-main macOS Intel job `111323926955` failed before the populated
+grant comparison: its Go module cache was cold and the source-bound builder
+correctly refused downloads with `GOPROXY=off`. The workflow now runs
+`go mod download` and `go mod verify` before the unchanged offline CLI tests.
+The failed job remains evidence; new six-target acceptance is pending.
+
 ## Six-target native acceptance — 2026-10-03 (#1122)
 
 At branch source `28f13ac1b09caf3b930c89714de27718ef3cdad0`,

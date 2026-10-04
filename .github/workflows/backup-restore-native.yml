@@ -67,6 +67,12 @@ jobs:
           rustup override set 1.98.0
           test "$(rustc -vV | sed -n 's/^host: //p')" = "${{ matrix.target }}"
           go env GOVERSION GOOS GOARCH > "$RUNNER_TEMP/restore-logs/go-native-env.txt"
+      - name: Prepare checksum-verified Go modules for offline CLI parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod download 2>&1 | tee "$RUNNER_TEMP/restore-logs/go-modules.log"
+          go mod verify 2>&1 | tee "$RUNNER_TEMP/restore-logs/go-modules-verify.log"
       - name: Verify immutable official native Go release inputs
         shell: bash
         env:
