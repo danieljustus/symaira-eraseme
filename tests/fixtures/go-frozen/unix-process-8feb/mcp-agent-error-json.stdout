@@ -1,0 +1,19 @@
+{
+  "schema": "symeraseme.go-oracle.mcp-agent-error-json.v1",
+  "go_version": "go1.26.6",
+  "sources_sha256": {
+    "go.mod": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f",
+    "internal/eventstore/store.go": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3",
+    "internal/llm/agent.go": "79e0811b07b51e7716f49680b678eb3f8057646541dc321ecbb172762b2c8fd8",
+    "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
+    "internal/mcp/contract_handler.go": "7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8",
+    "internal/mcp/server.go": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976",
+    "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
+    "rust-tests/parity/oracle/mcp-agent-error-json/main.go": "bf77b28d581dfa392dc503aa125ed093416e78bb5e3be055349073a0c5dc95b5"
+  },
+  "agent_script_sha256": "482069ada6a608d623ee0e43c9612fe8301eaa4de7c97d2339c17f6ba0ad4dc9",
+  "agent_stderr_escaped": "before\\360\\200\\200after\\377end",
+  "agent_stderr_bytes_base64": "YmVmb3Jl8ICAYWZ0ZXL/ZW5k",
+  "request_base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjkxLCJtZXRob2QiOiJ0b29scy9jYWxsIiwicGFyYW1zIjp7Im5hbWUiOiJjbGFzc2lmeV9yZXBseSIsImFyZ3VtZW50cyI6eyJyZXF1ZXN0X2lkIjoxLCJzYXZlIjpmYWxzZX19fQo=",
+  "response_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAzLCJtZXNzYWdlIjoiaG9zdCBhZ2VudCBleGl0ZWQgd2l0aCBjb2RlIDIzOiBiZWZvcmVcdWZmZmRcdWZmZmRcdWZmZmRhZnRlclx1ZmZmZGVuZCJ9LCJpZCI6OTF9Cg=="
+}

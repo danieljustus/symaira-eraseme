@@ -1,5 +1,8 @@
 #![cfg(unix)]
 
+#[path = "support/frozen_unix_process.rs"]
+mod frozen_unix_process;
+
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -96,21 +99,24 @@ fn cli_triage_matches_source_bound_go_oracle() {
         );
     }
 
-    let go = Command::new("go")
-        .args(["run", "./rust-tests/parity/oracle/cli-triage"])
-        .current_dir(REPO_ROOT)
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .output()
-        .expect("run source-bound Go CLI oracle");
-    assert!(
-        go.status.success(),
-        "Go CLI oracle failed:\n{}\n{}",
-        String::from_utf8_lossy(&go.stdout),
-        String::from_utf8_lossy(&go.stderr)
-    );
-    assert_eq!(go.stdout, fixture_bytes, "Go CLI oracle fixture drifted");
+    let observed = frozen_unix_process::observation("cli-triage").unwrap_or_else(|| {
+        let go = Command::new("go")
+            .args(["run", "./rust-tests/parity/oracle/cli-triage"])
+            .current_dir(REPO_ROOT)
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .output()
+            .expect("run source-bound Go CLI oracle");
+        assert!(
+            go.status.success(),
+            "Go CLI oracle failed:\n{}\n{}",
+            String::from_utf8_lossy(&go.stdout),
+            String::from_utf8_lossy(&go.stderr)
+        );
+        go.stdout
+    });
+    assert_eq!(observed, fixture_bytes, "Go CLI oracle fixture drifted");
 
     for case in &fixture.cases {
         replay_case(case);

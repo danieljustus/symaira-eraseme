@@ -1,5 +1,8 @@
 #![cfg(unix)]
 
+#[path = "support/frozen_unix_process.rs"]
+mod frozen_unix_process;
+
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -15,19 +18,22 @@ const AGENT: &str = include_str!("../../../rust-tests/parity/oracle/mcp-triage/a
 
 #[test]
 fn mcp_triage_matches_live_go_handler_with_local_agent() {
-    let go = Command::new("go")
-        .args(["run", "./rust-tests/parity/oracle/mcp-triage"])
-        .current_dir(ROOT)
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .output()
-        .expect("run Go MCP triage oracle");
-    assert!(
-        go.status.success(),
-        "{}",
-        String::from_utf8_lossy(&go.stderr)
-    );
-    let cases: Vec<Value> = serde_json::from_slice(&go.stdout).expect("Go observations");
+    let observed = frozen_unix_process::observation("mcp-triage").unwrap_or_else(|| {
+        let go = Command::new("go")
+            .args(["run", "./rust-tests/parity/oracle/mcp-triage"])
+            .current_dir(ROOT)
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .output()
+            .expect("run Go MCP triage oracle");
+        assert!(
+            go.status.success(),
+            "{}",
+            String::from_utf8_lossy(&go.stderr)
+        );
+        go.stdout
+    });
+    let cases: Vec<Value> = serde_json::from_slice(&observed).expect("Go observations");
     assert_eq!(cases.len(), 4);
 
     for case in cases {

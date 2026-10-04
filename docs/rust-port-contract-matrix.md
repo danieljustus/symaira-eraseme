@@ -13,6 +13,21 @@
 
 ## Granular issue ownership (2026-10-02)
 
+Actual clean Linux-amd64 capture `8febd4dfa3498065b464ccde79aaaceafaba44c6`
+passes 132 observations. Independent readback validates all 1481 immutable
+input/source pins, 115 narrowly selected upload members, native unmodified
+Go VCS and all 22 added complete observations. CLI triage, malformed-stderr
+and provider-cancellation bytes match their original committed fixtures.
+Linux amd64 defaults now replay the retained whole CLI triage/MCP triage/
+malformed-stderr outputs with status/streams/provenance checks. Complete
+live Rust processes, all sixteen CLI cases, all four MCP cases, state effects
+and malformed UTF-8 comparison remain unchanged; explicit live mode and all
+other native hosts run the real producer. Corruption controls reject changed/
+truncated frames and fabricated source identity before replay. The Go-free
+workflow adds the three original complete process tests, making its expected
+selected count 364. Local reader validation and native acceptance are pending.
+
+
 The opt-in #1131 producer additionally prepares actual provider cancellation
 (one loopback client/provider observation on every target) and the existing
 Unix shell-agent corpora: one complete malformed-stderr MCP frame, sixteen

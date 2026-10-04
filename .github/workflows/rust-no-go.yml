@@ -23,6 +23,10 @@ on:
       - crates/symeraseme-cli/tests/support/frozen_mcp_runtime.rs
       - crates/symeraseme-cli/tests/support/frozen_grant_oracle.rs
       - crates/symeraseme-cli/tests/support/frozen_schedule_oracle.rs
+      - crates/symeraseme-cli/tests/support/frozen_unix_process.rs
+      - crates/symeraseme-cli/tests/triage_commands.rs
+      - crates/symeraseme-cli/tests/mcp_triage_process.rs
+      - crates/symeraseme-cli/tests/mcp_agent_error_json.rs
       - crates/symeraseme-cli/tests/support/migration_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_go_oracle.rs
@@ -110,6 +114,9 @@ jobs:
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "llm_http_failure_next",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
+                              "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "triage_commands",
+                              "--test", "mcp_triage_process", "--test", "mcp_agent_error_json",
                               "--locked", "--offline"], env=environment, check=True)
               # The consent child probe is intentionally not launched directly
               # by libtest: its parent actually executes all 16 isolated
