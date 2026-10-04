@@ -131,49 +131,11 @@ fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, St
 }
 
 pub(crate) fn platform_root_store() -> Result<RootCertStore, String> {
-    let loaded = rustls_native_certs::load_native_certs();
+    let certificates = super::super::tls::platform_certificates()
+        .map_err(|error| format!("{ERR_IMAP}: {error}"))?;
     let mut roots = RootCertStore::empty();
-    roots.add_parsable_certificates(loaded.certs);
-    #[cfg(windows)]
-    add_windows_machine_roots(&mut roots)?;
-    if roots.is_empty() {
-        return Err(format!(
-            "{}: no platform TLS root certificates could be loaded: {:?}",
-            ERR_IMAP, loaded.errors
-        ));
-    }
+    roots.add_parsable_certificates(certificates);
     Ok(roots)
-}
-
-#[cfg(windows)]
-fn add_windows_machine_roots(roots: &mut RootCertStore) -> Result<(), String> {
-    let custom_roots_configured = std::env::var_os("SSL_CERT_FILE").is_some()
-        || std::env::var_os("SSL_CERT_DIR").is_some_and(|dirs| {
-            std::env::split_paths(&dirs).any(|path| !path.as_os_str().is_empty())
-        });
-    if custom_roots_configured {
-        return Ok(());
-    }
-
-    use schannel::cert_context::ValidUses;
-    use schannel::cert_store::CertStore;
-
-    let store = CertStore::open_local_machine("ROOT").map_err(|error| {
-        format!(
-            "{}: failed to load Windows LocalMachine ROOT certificates: {}",
-            ERR_IMAP, error
-        )
-    })?;
-    for cert in store.certs() {
-        let server_auth = cert.valid_uses().is_ok_and(|uses| match uses {
-            ValidUses::All => true,
-            ValidUses::Oids(oids) => oids.iter().any(|oid| oid == "1.3.6.1.5.5.7.3.1"),
-        });
-        if server_auth && cert.is_time_valid().unwrap_or(false) {
-            let _ = roots.add(cert.to_der().to_vec().into());
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
