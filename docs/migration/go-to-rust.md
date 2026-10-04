@@ -10,6 +10,18 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The Go-absent workflow now runs every core/engine/CLI library and binary
+unit test, replacing the narrow 98-MCP/three-writer selection. At clean
+`90c50c0`, 225 actual unit tests pass without Go and no failures occur. The
+existing isolated consent child is marked ignored only at top-level libtest:
+its passing parent actually launches and verifies all sixteen child cases
+with their separate umask/resource limits. It is never credited as skipped
+acceptance. The selected total becomes 359 passing tests (prior 235 less
+101 replaced tests plus 225 units); the exact full new workflow is pending.
+Native six-target reader acceptance and complete-workspace independence
+remain open.
+
+
 The #1131 triage-service and oversized-projection defaults additionally bind
 their complete streams to all six actual native `0d1be282` recordings and
 194 immutable source/input hashes. Triage bytes match on every target;
