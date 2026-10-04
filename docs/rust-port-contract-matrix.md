@@ -13,6 +13,11 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The opt-in actual-native capture preparation additionally records complete
+MCP clock/auto-confirm/gap and CLI schedule outputs (110 observations total),
+with native VCS/source/input pins and hostile-config controls. These are
+producer changes pending validation; no Rust default is switched by capture.
+
 The opt-in native freeze artifact allowlist now includes all five actual
 synthetic CLI consent observations. Actual `b8faa96` file selection confirms
 82 complete members versus the prior 77-member selection; no private root

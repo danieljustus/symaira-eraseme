@@ -117,6 +117,10 @@ def main():
     sources += [source / "rust-tests/parity/oracle/campaign-execution/cases.json", plan_fixture,
                 source / "tests/fixtures/event-store/golden-campaign.db", source / "registry/brokers/eu/adventori-eu.yaml"]
     sources += sorted((source / "tests/fixtures/registry-contract").glob("golden-*.yaml"))
+    # Bind the additional runtime oracles and every embedded broker document.
+    sources += [source / ("rust-tests/parity/oracle/" + name + "/main.go")
+                for name in ("cli-schedule", "mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps")]
+    sources += sorted((source / "registry/brokers").rglob("*.yaml"))
     for path in sources:
         manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
     manifest["controls"] = []
@@ -284,10 +288,72 @@ def main():
         grant_cases.append({"argv": arguments, "exit_status": status, "stdout": digest(output),
                             "stderr": digest(errors), "consent_records": records})
     manifest["cli_grants"] = {"embedded_build_info": review_build_info.decode(), "cases": grant_cases}
+    manifest["runtime_oracles"] = []
+    for package in ("cli-schedule", "mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps"):
+        binary = output_root / (package + "-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
+        capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(binary),
+                 "./rust-tests/parity/oracle/" + package], source, environment,
+                output_root / (package + "-build"), 120)
+        build_info = subprocess.check_output([go, "version", "-m", str(binary)], env=environment, timeout=10)
+        for expected in ("vcs.revision=" + revision, "vcs.modified=false",
+                         "GOOS=" + info["GOHOSTOS"], "GOARCH=" + info["GOHOSTARCH"]):
+            assert expected.encode() in build_info
+        runtime_environment = environment.copy()
+        cwd = source
+        isolation = {}
+        if package == "mcp-clock":
+            hostile = private / "mcp-clock-hostile-project"
+            hostile.mkdir(mode=0o700)
+            hostile_db = private / "mcp-clock-forbidden-project-db"
+            hostile_env = private / "mcp-clock-forbidden-inherited-data"
+            # JSON quoted paths are valid TOML strings, including Windows backslashes.
+            (hostile / ".symeraseme.toml").write_text("db_dir = " + json.dumps(str(hostile_db)) + "\n")
+            runtime_environment.update(SYMERASEME_DB_DIR=str(hostile_env / "db"),
+                                       SYMERASEME_DATA_DIR=str(hostile_env / "data"))
+            cwd = hostile
+        output, errors = capture([str(binary)], cwd, runtime_environment, output_root / package, 30)
+        observed = json.loads(output)
+        if package == "cli-schedule":
+            assert observed["schema"] == "symeraseme.go-oracle.cli.v1"
+            cases = observed["cases"]
+            assert len(cases) == 13 and len({c["id"] for c in cases}) == 13
+            import base64
+            for case in cases:
+                for stream in ("stdout", "stderr"):
+                    raw = base64.b64decode(case[stream + "_base64"], validate=True)
+                    assert len(raw) == case[stream + "_bytes"]
+                assert case["exit_code"] in (0, 1) and isinstance(case["files"], dict)
+            names = [case["id"] for case in cases]
+        elif package == "mcp-clock":
+            assert not errors and not hostile_db.exists() and not hostile_env.exists()
+            assert observed["oracle_source"] == "live current-checkout Go ContractHandler"
+            assert observed["now"] == "2026-08-05T12:00:00Z" and len(observed["cases"]) == 6
+            names = [case["name"] for case in observed["cases"]]
+            isolation = {"hostile_project_db_absent": True, "hostile_inherited_data_absent": True}
+        elif package == "mcp-auto-confirm":
+            assert not errors and observed["go_version"] == "go1.26.6"
+            names = ["dry_run_response", "manual_response", "no_links_dry_response", "no_links_response"]
+            assert all(isinstance(observed[name], str) and json.loads(observed[name]) for name in names)
+            assert len(observed["sources_sha256"]) == 7
+        else:
+            assert not errors and observed["schema"] == "symeraseme.go-oracle.mcp-tool-gaps.v1"
+            assert observed["go_version"] == "go1.26.6" and len(observed["cases"]) == 25
+            assert len(observed["sources_sha256"]) == 9
+            names = [case["name"] for case in observed["cases"]]
+        if "sources_sha256" in observed:
+            for path, expected in observed["sources_sha256"].items():
+                assert path in manifest["source_files"]
+                assert manifest["source_files"][path]["sha256"] == expected
+        assert len(set(names)) == len(names)
+        manifest["runtime_oracles"].append({
+            "package": package, "cases": names, "exit_status": 0, "stdin": digest(b""),
+            "stdout": digest(output), "stderr": digest(errors), "binary": digest(binary.read_bytes()),
+            "embedded_build_info": build_info.decode(), **isolation,
+        })
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 62, "status": "actual observations captured"}))
+                      "operations": 110, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

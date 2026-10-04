@@ -10,6 +10,21 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Native MCP/Windows schedule capture preparation (2026-10-04, #1131)
+
+The opt-in actual Go producer now records the four remaining runtime-oracle
+families: thirteen CLI schedule cases, six fixed-instant MCP clock responses,
+four auto-confirm responses with recorded state, and 25 complete MCP gap
+responses. Every binary is built from clean native Go 1.26.6 with unmodified
+VCS, finite compile/runtime/output limits, private configuration/data, and
+whole stdout/stderr/status metadata. Broker YAML inputs and the four oracle
+sources join the source inventory. The clock producer runs from a hostile
+project and must leave both injected project and inherited data paths absent.
+The original 62 observations remain, giving 110 product observations. New
+capture validation is pending; no Rust reader is changed and no new Go-free
+or native acceptance is claimed. The current 62-observation run retains its
+own source-bound scope and will not be credited for this extension.
+
 ### Complete native grant artifact preservation (2026-10-04, #1131)
 
 Review of the opt-in upload allowlist found that the 62-operation producer
