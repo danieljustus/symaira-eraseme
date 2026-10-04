@@ -21,8 +21,17 @@ verified against their immutable Git blobs. Real Rust processes, exact byte
 comparisons and every existing persisted-effect assertion remain intact;
 changed/truncated records and fabricated state are rejected. Explicit capture
 always executes actual Go, as do explicit live mode and unrecorded targets.
-The Go-absent workflow adds both original tests (expected total 366).
-Local reader/workflow validation and current native acceptance are pending.
+At clean `d401fc085d7203d305883e84806acfe9e6f4c9a7`, the exact Go-absent
+workflow passes 366 tests with zero failures. The sole top-level ignored
+consent child is actually executed in all sixteen isolated cases by its
+passing parent. Both new whole-process tests pass without Go and with private
+actual Go; strict CLI Clippy passes. Both raw process records survive Git
+and autocrlf byte-exactly. An initial local run retained a stale encryption
+test binary from the other checkout in the shared Cargo target; its embedded
+build path identifies that source. Sequential recompilation of the current
+checkout resolves the cache issue with no source-byte or acceptance change.
+The old failed log and binary identity are retained. Current six-target
+acceptance and complete-workspace Go independence remain pending.
 
 Actual run `37170268056` at clean `9e1a0bb` passes four complete native Rust
 suites (Linux and Windows on amd64 and arm64). All four downloaded artifacts
