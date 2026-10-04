@@ -20,8 +20,11 @@ whole consent records are retained byte-for-byte. Grant defaults now use
 these measured records on those four targets; macOS and explicit live mode
 continue the actual Go producer. Native Windows mode `0666` is measured,
 and Unix retains `0600`; no Windows private ACL assertion is replaced.
-The existing corruption control also checks all four provenances. Local
-validation and current native Rust acceptance are pending.
+The existing corruption control also checks all four provenances. At clean `48fd77c`, all 24 CLI tests pass with Go absent, the same populated
+grant comparator passes with private actual Go, and strict CLI Clippy passes.
+All 72 Git blobs also match the actual captures under autocrlf checkout. The
+selected workflow count remains 235; unchanged other-family proof is retained
+from `0cfba7c`. Current native Rust acceptance remains pending.
 
 The current #1131 Windows MCP jobs rejected CRLF conversion of embedded
 broker YAML before validating the cached stream. All 1283 embedded broker
