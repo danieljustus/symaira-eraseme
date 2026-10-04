@@ -499,6 +499,21 @@ mod origin_tests {
         headers.insert(header::ORIGIN, HeaderValue::from_static(""));
         assert!(origin_header_allowed(headers.get(header::ORIGIN)));
 
+        for remote in [
+            "https://example.invalid",
+            "http://localhost.example.invalid",
+            "http://127.0.0.2",
+            "http://[::2]",
+            "null",
+            "not a URL",
+        ] {
+            headers.insert(header::ORIGIN, HeaderValue::from_str(remote).unwrap());
+            assert!(
+                !origin_header_allowed(headers.get(header::ORIGIN)),
+                "untrusted origin {remote}"
+            );
+        }
+
         headers.insert(
             header::ORIGIN,
             HeaderValue::from_bytes(b"http://localhost\xff").unwrap(),
@@ -550,12 +565,15 @@ mod transport_tests {
         );
 
         let unavailable = std::io::Error::from(std::io::ErrorKind::AddrNotAvailable);
+        let expected_unavailable = if cfg!(target_os = "linux") {
+            "cannot assign requested address"
+        } else {
+            "can't assign requested address"
+        };
+        assert_eq!(addr_not_available_message(), expected_unavailable);
         assert_eq!(
             listen_error("[::1]:8080", unavailable),
-            format!(
-                "listen tcp [::1]:8080: bind: {}",
-                addr_not_available_message()
-            )
+            format!("listen tcp [::1]:8080: bind: {}", expected_unavailable)
         );
 
         let other = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
@@ -574,6 +592,139 @@ mod transport_tests {
             .expect("current-thread runtime");
         let (_tx, rx) = tokio::sync::watch::channel(true);
         runtime.block_on(wait_for_shutdown(rx));
+    }
+
+    #[test]
+    fn wait_for_shutdown_blocks_until_a_later_signal() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let (tx, rx) = watch::channel(false);
+            let mut task = tokio::spawn(wait_for_shutdown(rx));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(10), &mut task)
+                    .await
+                    .is_err()
+            );
+            tx.send(true).unwrap();
+            tokio::time::timeout(Duration::from_secs(1), task)
+                .await
+                .unwrap()
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn actual_bind_failure_is_not_reported_as_a_successful_server() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let error = runtime
+            .block_on(serve_async(
+                address.clone(),
+                Arc::new("synthetic-test-token".to_owned()),
+                Arc::new(no_backend_handler()),
+                Arc::new(AtomicBool::new(true)),
+            ))
+            .unwrap_err();
+        assert_eq!(
+            error,
+            format!("listen tcp {address}: bind: address already in use")
+        );
+    }
+
+    #[test]
+    fn token_files_are_written_and_tightened_inside_a_private_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        create_token_directory(&data).unwrap();
+        assert!(data.is_dir());
+        let path = data.join("mcp_token");
+        write_token_file(&path, "synthetic-private-token").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"synthetic-private-token");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&data).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+            write_token_file(&path, "replacement-synthetic-token").unwrap();
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+    }
+
+    #[test]
+    fn bind_policy_and_token_generation_are_exercised_in_private_child_processes() {
+        for case in ["localhost", "ipv4", "remote-denied", "remote-allowed"] {
+            let root = tempfile::tempdir().unwrap();
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "mcp::http::transport_tests::private_bind_child",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("HTTP_BIND_CASE", case)
+                .env("HOME", root.path())
+                .env("USERPROFILE", root.path())
+                .env("SYMERASEME_DATA_DIR", root.path().join("data"))
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{case}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        }
+    }
+
+    #[test]
+    #[ignore = "only launched by its parent with a disposable HOME and data directory"]
+    fn private_bind_child() {
+        let case = std::env::var("HTTP_BIND_CASE").unwrap();
+        let (host, allowed) = match case.as_str() {
+            "localhost" => ("localhost", false),
+            "ipv4" => ("127.0.0.1", false),
+            "remote-denied" => ("203.0.113.7", false),
+            "remote-allowed" => ("203.0.113.7", true),
+            _ => panic!("unknown private case"),
+        };
+        // The callback stops before bind; no remote network listener is opened.
+        let error = serve(host.to_owned(), 8080, allowed, || {
+            Err("synthetic-handler-stop".to_owned())
+        })
+        .unwrap_err();
+        let path = std::path::PathBuf::from(std::env::var_os("SYMERASEME_DATA_DIR").unwrap())
+            .join("mcp_token");
+        if case == "remote-denied" {
+            assert_eq!(
+                error,
+                "refusing non-loopback MCP bind \"203.0.113.7\" without --allow-remote"
+            );
+            assert!(!path.exists());
+        } else {
+            assert_eq!(error, "synthetic-handler-stop");
+            let token = fs::read_to_string(path).unwrap();
+            assert_eq!(token.len(), 43);
+            assert_eq!(
+                base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(token)
+                    .unwrap()
+                    .len(),
+                32
+            );
+        }
     }
 
     /// IPv4-mapped IPv6 loopback addresses are loopback binds.
@@ -616,6 +767,21 @@ mod transport_tests {
             http::HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
         );
         assert!(authorized(&headers, token), "exact token");
+
+        // Equal length must still compare every byte, including the ends.
+        for index in 0..token.len() {
+            let mut wrong = token.as_bytes().to_vec();
+            wrong[index] = if wrong[index] == b'x' { b'y' } else { b'x' };
+            headers.insert(
+                http::header::AUTHORIZATION,
+                http::HeaderValue::from_str(&format!(
+                    "Bearer {}",
+                    String::from_utf8(wrong).unwrap()
+                ))
+                .unwrap(),
+            );
+            assert!(!authorized(&headers, token), "wrong bearer byte {index}");
+        }
     }
 
     fn reply_text(reply: &HttpReply) -> String {
@@ -631,7 +797,7 @@ mod transport_tests {
     #[test]
     fn protocol_reply_joins_batched_responses() {
         let handler = no_backend_handler();
-        let body = format!("[{},{}]", request(1), request(2));
+        let body = format!("[{}, {}, {}]", request(1), request(2), request(3));
         let reply = protocol_reply(body.as_bytes(), &handler);
         assert_eq!(reply.status, 200);
         let text = reply_text(&reply);
@@ -639,6 +805,11 @@ mod transport_tests {
         assert!(text.ends_with("]\n"), "{text}");
         assert_eq!(text.matches("\"id\":1").count(), 1, "{text}");
         assert_eq!(text.matches("\"id\":2").count(), 1, "{text}");
+        let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 3);
+        for (index, item) in parsed.as_array().unwrap().iter().enumerate() {
+            assert_eq!(item["id"], index + 1);
+        }
         assert!(
             !text.contains("}\n,"),
             "item newlines must be stripped: {text}"
@@ -802,5 +973,171 @@ mod transport_tests {
                 .expect("server connection exits")
                 .expect("server task");
         });
+    }
+
+    #[test]
+    fn completed_requests_disarm_cancellation_without_hiding_real_disconnects() {
+        let complete = CancellationToken::default();
+        let mut guard = CancelOnDrop::new(complete.clone());
+        guard.disarm();
+        drop(guard);
+        assert!(!complete.is_cancelled());
+        let abandoned = CancellationToken::default();
+        drop(CancelOnDrop::new(abandoned.clone()));
+        assert!(abandoned.is_cancelled());
+    }
+
+    fn actual_http_reply(packet: Vec<u8>) -> Vec<u8> {
+        use std::io::{Read, Write};
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                let service = service_fn(|request| async move {
+                    Ok::<_, std::convert::Infallible>(
+                        handle_request(
+                            request,
+                            "synthetic-auth-token",
+                            Arc::new(no_backend_handler()),
+                        )
+                        .await,
+                    )
+                });
+                let _ = http1::Builder::new()
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await;
+            });
+            let client = tokio::task::spawn_blocking(move || {
+                let mut stream = std::net::TcpStream::connect(address).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                if let Err(error) = stream.write_all(&packet) {
+                    assert!(matches!(
+                        error.kind(),
+                        std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset
+                    ));
+                }
+                let mut response = Vec::new();
+                stream.read_to_end(&mut response).unwrap();
+                response
+            });
+            let response = tokio::time::timeout(Duration::from_secs(4), client)
+                .await
+                .unwrap()
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(4), server)
+                .await
+                .unwrap()
+                .unwrap();
+            response
+        })
+    }
+
+    fn packet(method: &str, extra: &str, body: &[u8], declared: usize) -> Vec<u8> {
+        let mut bytes = format!("{method} / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {declared}\r\n{extra}\r\n").into_bytes();
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    fn expect_http(response: &[u8], status: u16, code: Option<i64>) {
+        let split = response
+            .windows(4)
+            .position(|bytes| bytes == b"\r\n\r\n")
+            .unwrap();
+        let headers = std::str::from_utf8(&response[..split]).unwrap();
+        assert!(
+            headers.starts_with(&format!("HTTP/1.1 {status} ")),
+            "{headers}"
+        );
+        let body = &response[split + 4..];
+        if let Some(code) = code {
+            assert!(
+                headers
+                    .to_ascii_lowercase()
+                    .contains("content-type: application/json")
+            );
+            let value: serde_json::Value = serde_json::from_slice(body).unwrap();
+            assert_eq!(value["jsonrpc"], "2.0");
+            assert_eq!(value["error"]["code"], code);
+        } else {
+            assert_eq!(status, 204);
+            assert!(body.is_empty());
+            assert!(!headers.to_ascii_lowercase().contains("content-type:"));
+        }
+    }
+
+    #[test]
+    fn actual_http_wire_rejects_unsafe_auth_origin_methods_and_frames() {
+        let body = br#"{"jsonrpc":"2.0","id":1,"method":"unknown"}"#;
+        let auth = "Authorization: Bearer synthetic-auth-token\r\n";
+        let cases = [
+            ("GET", auth.to_owned(), body.as_slice(), 405, -32600),
+            ("POST", String::new(), body.as_slice(), 401, -32000),
+            (
+                "POST",
+                "Authorization: Bearer synthetic-auth-tokex\r\n".to_owned(),
+                body.as_slice(),
+                401,
+                -32000,
+            ),
+            (
+                "POST",
+                format!("{auth}Origin: https://example.invalid\r\n"),
+                body.as_slice(),
+                403,
+                -32000,
+            ),
+            ("POST", auth.to_owned(), b"{".as_slice(), 200, -32700),
+            ("POST", auth.to_owned(), body.as_slice(), 200, -32601),
+        ];
+        for (method, headers, body, status, code) in cases {
+            expect_http(
+                &actual_http_reply(packet(method, &headers, body, body.len())),
+                status,
+                Some(code),
+            );
+        }
+        let notification = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
+        expect_http(
+            &actual_http_reply(packet("POST", auth, notification, notification.len())),
+            204,
+            None,
+        );
+    }
+
+    #[test]
+    fn actual_http_body_limit_accepts_exactly_five_mib_and_rejects_the_next_byte() {
+        // Independent Go contract boundary, never derived from the mutable
+        // implementation's MAX_BODY_BYTES constant.
+        const CONTRACT_LIMIT: usize = 5_242_880;
+        let auth = "Authorization: Bearer synthetic-auth-token\r\n";
+        let mut exact = Vec::from(b"{}".as_slice());
+        exact.resize(CONTRACT_LIMIT, b' ');
+        expect_http(
+            &actual_http_reply(packet("POST", auth, &exact, CONTRACT_LIMIT)),
+            200,
+            Some(-32600),
+        );
+        expect_http(
+            &actual_http_reply(packet("POST", auth, &[], CONTRACT_LIMIT + 1)),
+            413,
+            Some(-32600),
+        );
+        exact.push(b' ');
+        let mut chunked = format!("POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n{auth}\r\n{:x}\r\n", exact.len()).into_bytes();
+        chunked.extend_from_slice(&exact);
+        chunked.extend_from_slice(b"\r\n0\r\n\r\n");
+        // Go's chunked over-limit contract is HTTP 200 / JSON-RPC parse error;
+        // only an oversized declared Content-Length produces HTTP 413.
+        expect_http(&actual_http_reply(chunked), 200, Some(-32700));
     }
 }

@@ -418,6 +418,111 @@ mod tests {
     const IV: [u8; 16] = [0x33; 16];
 
     #[test]
+    fn standard_frames_accept_raw_and_encoded_minimum_and_reject_truncation() {
+        // A standard empty Fernet frame has 1 version + 8 timestamp + 16 IV
+        // + 16 padded ciphertext + 32 HMAC bytes, independently of constants.
+        let encoded = encrypt_standard_fernet(b"", &KEY, &IV, 0).unwrap();
+        let raw = URL_SAFE.decode(&encoded).unwrap();
+        assert_eq!(raw.len(), 73);
+        assert_eq!(decrypt_standard_fernet(&encoded, &KEY), Ok(Vec::new()));
+        assert_eq!(decrypt_standard_fernet(&raw, &KEY), Ok(Vec::new()));
+        assert_eq!(decrypt_fernet_compatible(&raw, &KEY), Ok(Vec::new()));
+        for length in [1, 40, 57, 72] {
+            assert_eq!(
+                decrypt_standard_fernet(URL_SAFE.encode(&raw[..length]).as_bytes(), &KEY),
+                Err(EncryptionError::TruncatedToken),
+                "decoded frame length {length}"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_empty_plaintext_is_valid_at_the_exact_minimum_frame_length() {
+        let nonce = [0x44; 12];
+        let cipher = Aes256Gcm::new_from_slice(&KEY).unwrap();
+        let encrypted = cipher
+            .encrypt(&Nonce::try_from(nonce.as_slice()).unwrap(), b"".as_slice())
+            .unwrap();
+        assert_eq!(encrypted.len(), 16);
+        let mut frame = vec![0x80];
+        frame.extend_from_slice(&0_u64.to_be_bytes());
+        frame.extend_from_slice(&nonce);
+        frame.extend_from_slice(&encrypted);
+        let mut mac = <HmacSha256 as KeyInit>::new_from_slice(&KEY).unwrap();
+        mac.update(&frame);
+        frame.extend_from_slice(&mac.finalize().into_bytes());
+        assert_eq!(frame.len(), 69);
+        assert_eq!(decrypt_legacy_go_token(&frame, &KEY), Ok(Vec::new()));
+        assert_eq!(decrypt_fernet_compatible(&frame, &KEY), Ok(Vec::new()));
+        for length in [0, 1, 40, 68] {
+            assert_eq!(
+                decrypt_legacy_go_token(&frame[..length], &KEY),
+                Err(EncryptionError::TruncatedToken)
+            );
+        }
+    }
+
+    #[test]
+    fn encryption_error_diagnostics_retain_their_exact_contract() {
+        for (error, message) in [
+            (
+                EncryptionError::InvalidMasterKeyLength { actual: 31 },
+                "master key must be 32 bytes (got 31)",
+            ),
+            (
+                EncryptionError::UnsupportedEnvelope,
+                "eventstore: unrecognized encryption header",
+            ),
+            (
+                EncryptionError::TruncatedSalt,
+                "truncated V2/V3 encryption salt",
+            ),
+            (
+                EncryptionError::TruncatedEnvelope { version: 3 },
+                "eventstore: encrypted V3 envelope is truncated",
+            ),
+            (
+                EncryptionError::TruncatedToken,
+                "eventstore: fernet token invalid, tampered, or unsupported format",
+            ),
+            (
+                EncryptionError::InvalidBase64,
+                "invalid URL-safe base64 Fernet token",
+            ),
+            (
+                EncryptionError::UnsupportedFernetVersion(0x81),
+                "unsupported Fernet version 0x81",
+            ),
+            (
+                EncryptionError::AuthenticationFailed,
+                "Fernet authentication failed",
+            ),
+            (
+                EncryptionError::InvalidCiphertextLength,
+                "invalid Fernet ciphertext block length",
+            ),
+            (
+                EncryptionError::InvalidPadding,
+                "invalid Fernet PKCS7 padding",
+            ),
+            (
+                EncryptionError::LegacyTokenInvalid,
+                "eventstore: fernet token invalid, tampered, or unsupported format",
+            ),
+            (
+                EncryptionError::RandomnessUnavailable,
+                "OS randomness unavailable",
+            ),
+            (
+                EncryptionError::ClockUnavailable,
+                "system clock unavailable",
+            ),
+        ] {
+            assert_eq!(error.to_string(), message);
+        }
+    }
+
+    #[test]
     fn deterministic_vector_is_stable_and_round_trips() {
         let envelope = encrypt_v3_with_material(
             b"SQLite format 3\0\xff boundary",

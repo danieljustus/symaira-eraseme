@@ -13,27 +13,49 @@
 
 ## Granular issue ownership (2026-10-02)
 
-Task 8.5 preparation adds an opt-in native Linux mutation sweep over crypto,
-consent, HTTP authentication, redaction/path confinement and event projection
-state transitions. It retains the existing pinned cargo-mutants 27.1.0,
-30-second per-mutant budget and 45-minute job limit. Full JSON outcomes,
-baseline logs and mutation diffs are retained even on failure. These scopes
-are preparation, not task completion: final task 8.4 integration, native fault
-injection and secret-sentinel evidence remain required under issue #813.
+Task 8.5 preparation adds a native Linux mutation campaign over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection.
+The pinned cargo-mutants 27.1.0, 30-second per-mutant timeout and 45-minute
+job limit remain unchanged. Crypto and sanitization each use four complete
+shards; the other categories each use one. A same-run verifier requires all
+eleven shards, the same producing source, identical complete catalogs,
+disjoint selections and actual execution of every selected mutant. Missing,
+overlapping, empty or incomplete campaigns fail. Full catalogs, outcomes,
+baseline logs and diffs are retained on success and failure.
 
-The mutation gate now inspects actual outcomes in addition to the exit status.
-In cargo-mutants 27.1.0, timeout exit 3 takes precedence over missed exit 2;
-a run can therefore contain both. The gate rejects any missed mutant, failed
-or missing baseline, incomplete/zero-case run and inconsistent count. It
-requires at least one mutant caught by a failing test. Regression controls
-include a real-schema mixed timeout/missed result. The previously recorded
-MCP proof already has zero missed mutants; no past acceptance is revoked or
-new acceptance claimed. Local scoped baseline runs pass: crypto 21 tests, consent 114, state
-transitions 117, sanitization 16 and HTTP auth 11. The consent filesystem
-and environment child probes appear ignored at top level but are actually
-launched in private cases by their passing parents. Four outcome-verifier
-regression controls pass. The five actual mutation runs remain pending;
-these baseline tests do not establish mutation acceptance.
+Run `37170739620` at `8797f2d47011fea6f008b8207c0bc94d9854ca39`
+exposed real test gaps: HTTP had 40 missed of 102, consent 20 of 82 and
+state transitions 3 of 141. Crypto hit the existing job deadline after 99
+of 117 generated mutants (8 missed); sanitization hit it after 180 of 272
+(63 missed). Both incomplete JSON documents retain null end times. All five
+original archives were checksum-verified and retained; none establishes
+acceptance. The separate MCP campaign passed its actual JSON gate with
+331 mutants: 298 caught, 12 unviable, 21 timeouts and zero missed.
+
+The added checks cover actual HTTP status/JSON/header/body-size behavior,
+equal-length wrong tokens, remote Origins, token permissions, shutdown and
+private bind policy; consent expiry, filename filtering and real filesystem
+races; projection diagnostics and zero chunk-size handling; standard/raw
+Fernet and legacy minimum frames; and redaction profile/path/email/SSN bounds.
+The public consent methods retain native filesystem operations through private
+callbacks that deterministically place real races between lookup and syscall.
+Local verification passes 151 core/integration tests and 18 HTTP tests; the
+two core and one HTTP top-level ignored child harnesses are actually invoked
+by passing parents. Strict core/CLI all-target Clippy passes. Nineteen actual
+compiled regressions are caught: both HTTP controls, all three missed state
+mutants, six consent controls and all eight missed crypto mutants. Source
+bytes are restored after each negative control. Four outcome and five
+whole-campaign verifier regression controls pass.
+
+The gate inspects complete actual outcomes, because timeout exit 3 takes
+precedence over missed exit 2 in cargo-mutants 27.1.0. It rejects any missed
+mutant, failed/missing baseline, incomplete/zero-case result or inconsistent
+count, and requires at least one actual caught mutant. New complete native
+mutation acceptance remains pending; remaining platform/equivalence cases
+are not hidden by broad exclusions. Final task 8.4 integration, native fault
+injection and secret-sentinel proof remain required under issue #813. No
+contract row, release/default switch or cutover task is promoted by this work.
+
 
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)

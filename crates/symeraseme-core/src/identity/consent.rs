@@ -291,12 +291,20 @@ impl ConsentStore {
 
     /// Remove a token after successful use. Missing tokens are ignored.
     pub fn consume_token(&self, token: &str) -> Result<(), ConsentError> {
+        self.consume_token_with(token, fs::remove_file)
+    }
+
+    fn consume_token_with(
+        &self,
+        token: &str,
+        remove: impl FnOnce(PathBuf) -> io::Result<()>,
+    ) -> Result<(), ConsentError> {
         if token.is_empty() {
             return Ok(());
         }
         self.ensure_directory()?;
         match self.find_token_file(token) {
-            Ok(path) => match fs::remove_file(path) {
+            Ok(path) => match remove(path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
                 Err(error) => Err(error.into()),
@@ -308,6 +316,14 @@ impl ConsentStore {
 
     /// Revoke a token, returning whether a file was removed.
     pub fn revoke_token(&self, token: &str) -> Result<bool, ConsentError> {
+        self.revoke_token_with(token, fs::remove_file)
+    }
+
+    fn revoke_token_with(
+        &self,
+        token: &str,
+        remove: impl FnOnce(PathBuf) -> io::Result<()>,
+    ) -> Result<bool, ConsentError> {
         if token.is_empty() {
             return Ok(false);
         }
@@ -317,7 +333,7 @@ impl ConsentStore {
             Err(ConsentError::NotFound) => return Ok(false),
             Err(error) => return Err(error),
         };
-        match fs::remove_file(path) {
+        match remove(path) {
             Ok(()) => Ok(true),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
             Err(error) => Err(error.into()),
@@ -457,6 +473,14 @@ impl ConsentStore {
     }
 
     fn find_token_file(&self, token: &str) -> Result<PathBuf, ConsentError> {
+        self.find_token_file_with(token, |from, to| fs::rename(from, to))
+    }
+
+    fn find_token_file_with(
+        &self,
+        token: &str,
+        rename: impl FnOnce(&Path, &Path) -> io::Result<()>,
+    ) -> Result<PathBuf, ConsentError> {
         let hashed = self.path_for_token(token);
         if hashed.is_file() {
             return Ok(hashed);
@@ -466,7 +490,7 @@ impl ConsentStore {
             return Err(ConsentError::NotFound);
         }
         let destination = self.path_for_token(token);
-        match fs::rename(&legacy, &destination) {
+        match rename(&legacy, &destination) {
             Ok(()) => Ok(destination),
             Err(_) if destination.is_file() => Ok(destination),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Err(ConsentError::NotFound),
@@ -745,6 +769,89 @@ mod tests {
             Err(ConsentError::NotFound)
         );
         assert_eq!(store.consume_token(&token), Ok(()));
+    }
+
+    #[test]
+    fn removal_races_ignore_only_missing_files_and_preserve_other_errors() {
+        for revoke in [false, true] {
+            for missing in [false, true] {
+                let directory = tempfile::tempdir().unwrap();
+                let store = store(directory.path());
+                let token = store.issue_token("delete", 60).unwrap();
+                let original = directory.path().join(token_filename(&token));
+                let original_bytes = fs::read(&original).unwrap();
+                // Replace/remove the real file between lookup and the actual
+                // removal syscall. No scheduler timing or permissions needed.
+                let remove = |path: PathBuf| {
+                    assert_eq!(path, original);
+                    fs::remove_file(&path).unwrap();
+                    if !missing {
+                        fs::create_dir(&path).unwrap();
+                        fs::write(path.join("sentinel"), &original_bytes).unwrap();
+                    }
+                    fs::remove_file(path)
+                };
+                let result = if revoke {
+                    store.revoke_token_with(&token, remove).map(|removed| {
+                        assert!(!removed, "another owner already removed the file");
+                    })
+                } else {
+                    store.consume_token_with(&token, remove)
+                };
+                if missing {
+                    assert_eq!(result, Ok(()));
+                    assert!(!original.exists());
+                } else {
+                    assert!(matches!(result, Err(ConsentError::Io(_))));
+                    assert_eq!(fs::read(original.join("sentinel")).unwrap(), original_bytes);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_rename_races_require_a_regular_destination_and_classify_missing() {
+        for destination_kind in ["file", "directory", "missing"] {
+            let directory = tempfile::tempdir().unwrap();
+            let store = store(directory.path());
+            let token = "legacy-race";
+            let legacy = directory.path().join(format!("consent_{token}.json"));
+            fs::write(&legacy, b"original legacy").unwrap();
+            let destination = directory.path().join(token_filename(token));
+            let result = store.find_token_file_with(token, |from, to| {
+                assert_eq!(from, legacy);
+                assert_eq!(to, destination);
+                if destination_kind == "missing" {
+                    fs::remove_file(from).unwrap();
+                    fs::rename(from, to)
+                } else {
+                    if destination_kind == "file" {
+                        fs::write(to, b"other owner's file").unwrap();
+                        fs::remove_file(from).unwrap();
+                    } else {
+                        fs::create_dir(to).unwrap();
+                    }
+                    // A failed OS rename can leave a concurrently published
+                    // destination. Only a real regular file is a fallback.
+                    fs::rename(from, to)
+                }
+            });
+            match destination_kind {
+                "file" => {
+                    assert_eq!(result.unwrap(), destination);
+                    assert_eq!(fs::read(&destination).unwrap(), b"other owner's file");
+                    assert!(!legacy.exists());
+                }
+                "directory" => {
+                    assert!(matches!(result, Err(ConsentError::Io(error))
+                        if error.raw_os_error().is_some()));
+                    assert!(destination.is_dir());
+                    assert_eq!(fs::read(&legacy).unwrap(), b"original legacy");
+                }
+                "missing" => assert_eq!(result, Err(ConsentError::NotFound)),
+                _ => unreachable!(),
+            }
+        }
     }
 
     #[test]
