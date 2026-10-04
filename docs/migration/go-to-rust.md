@@ -8,6 +8,22 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Verified email integration (2026-10-04, #1119)
+
+PR #1146 at exact head `b07e81d02bcd35d424c5c75090992f1d1b8fe3c1`
+passed all PR workflows, all six native email-trust jobs in run `37197122235`
+and all six complete native Rust workspace jobs in run `37199861723`.
+No unresolved review thread or requested change remained. Normal squash
+merge `ee03eb277ade28fd6deaef976f7d9bfc4db8a468` has the byte-identical
+Git tree of that tested head, and #1119 is closed/completed. Tasks 6.1/6.3/6.4
+are integrated; phase 6 is complete. The graph also records previously
+accepted main integrations for 7.1 (#1149) and 8.1/8.3 (#1150).
+
+The older pending-integration statements below retain their historical scope.
+#1120 still needs integrated #1122 acceptance; 8.4/8.5, default Rust app,
+signed releases, candidate rollback and Go-free parity remain unfinished.
+No release or seven-day observation is inferred from this merge.
+
 ## Exact mutation-anchor maintenance for MCP ping (2026-10-04, #1126)
 
 The standard ping addition shifts the existing protocol parser functions by
