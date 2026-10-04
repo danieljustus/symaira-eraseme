@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Execute both original plan comparators with Go absent on recorded hosts."""
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+assert sys.platform in ("linux", "win32"), "this scoped proof has no Mac recordings yet"
+with tempfile.TemporaryDirectory(prefix="native-plan-no-go-") as temporary:
+    environment = os.environ.copy()
+    environment.pop("SYMERASEME_CAPTURE_PLAN_PROCESSES", None)
+    environment["SYMERASEME_PARITY_LIVE_GO"] = "0"
+    if sys.platform == "win32":
+        # Retain native MSVC/Rust/Git locations, including their adjacent DLLs.
+        # Go's SDK directories are removed only from this subprocess PATH.
+        names = ("go", "go.exe", "go.cmd", "go.bat", "go.com", "gccgo.exe")
+        environment["PATH"] = os.pathsep.join(directory for directory in os.environ["PATH"].split(os.pathsep)
+            if directory and not any((pathlib.Path(directory) / name).is_file() for name in names))
+        environment["NoDefaultCurrentDirectoryInExePath"] = "1"
+    else:
+        tools = pathlib.Path(temporary)
+        for directory in os.environ["PATH"].split(os.pathsep):
+            path = pathlib.Path(directory)
+            if not directory or not path.is_dir():
+                continue
+            for program in path.iterdir():
+                if program.name.startswith(("go", "gccgo")):
+                    continue
+                destination = tools / program.name
+                if not destination.exists() and program.is_file() and os.access(program, os.X_OK):
+                    destination.symlink_to(program.resolve())
+        environment["PATH"] = str(tools)
+        os.umask(0o022)
+    assert shutil.which("go", path=environment["PATH"]) is None, "Go must actually be absent"
+    cargo = shutil.which("cargo", path=environment["PATH"])
+    assert cargo is not None and shutil.which("git", path=environment["PATH"]) is not None
+    print("Verified: Go absent; both original whole-plan comparators execute frozen native records", flush=True)
+    result = subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "plan_execute_live_process",
+                             "--locked", "--offline"], env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert len(result.stdout) <= 2 * 1024 * 1024, "bounded comparator log"
+    sys.stdout.buffer.write(result.stdout)
+    assert result.returncode == 0, "native Go-absent comparator failed"
+    totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
+    assert totals == [(b"2", b"0", b"0")], "both real cases must execute; no skips or zero-case acceptance"
