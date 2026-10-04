@@ -73,10 +73,10 @@ pub fn observations() -> Vec<Observation> {
         std::env::consts::ARCH,
     );
     assert_eq!(native["cli_review"]["input_unchanged"], true);
-    assert_eq!(
-        native["cli_review"]["input_sha256"],
-        digest(b"Alice Example <alice@example.invalid>\n")
-    );
+    assert!(valid_bytes(
+        &native["cli_review"]["input"],
+        b"Alice Example <alice@example.invalid>\n"
+    ));
     let manifest: Value = serde_json::from_slice(include_bytes!(
         "../../../../tests/fixtures/go-frozen/cli-review/manifest.json"
     ))

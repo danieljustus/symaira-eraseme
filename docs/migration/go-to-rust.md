@@ -30,7 +30,11 @@ six recorded hosts and rejects a changed process status. The grant default
 remains separately live outside Linux because its native captures are not
 complete. Explicit live-Go mode still builds and executes the pinned producer.
 The selected Linux Go-free workflow contains 137 tests (24 whole CLI tests),
-with local verification pending at this preparation commit. No contract row,
+with all 113 other-family tests passing at `a02907c`. The first new CLI run
+exposed a reader field-name error (`input_sha256` instead of the actual nested
+`input` record), before process comparisons; the reader now checks both bytes
+and SHA from that recorded object. The failure is retained; corrected CLI and
+explicit live-Go checks remain pending. No contract row,
 phase, issue completion, release, or Go retirement is inferred from captures.
 
 ### Reviewed five-target LLM frozen preparation (2026-10-03, #1131)
