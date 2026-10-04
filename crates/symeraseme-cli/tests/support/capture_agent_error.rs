@@ -1,5 +1,4 @@
 //! Opt-in actual Go native-agent helper and MCP observation from the original comparator.
-use base64::Engine;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::io::Write;
@@ -173,31 +172,4 @@ pub fn record(binary: &Path, observations: serde_json::Value) {
         .unwrap();
     file.write_all(&encoded).unwrap();
     file.write_all(b"\n").unwrap();
-}
-
-pub fn request(method: &str, body: &[u8], headers: &[(&str, String)]) -> serde_json::Value {
-    json!({
-        "method": method,
-        "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
-        "body": digest(body),
-        "headers": headers.iter().map(|(name, value)| {
-            if name.eq_ignore_ascii_case("authorization") {
-                assert!(value.starts_with("Bearer "));
-                json!({"name": name, "role": "private-native-bearer-token"})
-            } else { json!({"name": name, "value": value}) }
-        }).collect::<Vec<_>>()
-    })
-}
-
-pub fn case(
-    index: usize,
-    request: serde_json::Value,
-    reply: &(u16, String, Vec<u8>),
-) -> serde_json::Value {
-    assert!(reply.2.len() <= 1024 * 1024);
-    json!({"index": index, "request": request, "response": {
-        "status": reply.0, "content_type": reply.1,
-        "body_base64": base64::engine::general_purpose::STANDARD.encode(&reply.2),
-        "body": digest(&reply.2)
-    }})
 }
