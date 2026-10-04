@@ -10,6 +10,34 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+Actual native run `37172389657` at clean `0972f73` now passes all six
+complete Rust suites. Every downloaded Linux/Windows/macOS service archive
+has been independently read back: all 1481 immutable source/input pins,
+native unmodified Go 1.26.6 VCS, full streams/status and 132 Unix or 111
+Windows observations. All twelve separate complete plan-process records
+also verify the original stdout/stderr/status and full state/events/manual-
+task tuple, 171 Go inputs and three archived input generators. Both Mac
+recordings preserve the actual producer bytes; no host result is inferred.
+
+The readers now select measured native records for both complete plan tests
+on all six hosts, and the three original Unix process comparisons on all
+four Unix hosts. Each Unix manifest is sealed by its measured whole SHA-256;
+all six raw streams independently match the original retained fixture bytes.
+Changed generators or dependency locks require real recapture. Explicit
+live and plan-capture modes still execute actual Go. Current native CI
+additionally removes Go from its subprocess PATH and requires both original
+plan cases on every host and all three original process cases on Unix.
+At clean `c0f598586d5f76529229a6ba9b7c971f29bf7a76`, the exact default
+Go-absent workflow passes 366 tests with zero failures. Its sole top-level
+consent child is executed in all sixteen private cases by its passing parent.
+The same three Unix comparators also pass with private actual Go; strict
+CLI all-target Clippy passes. All sixteen newly retained plan records/native
+manifests match Git blobs and an actual autocrlf checkout. Current native
+reader acceptance and complete-workspace Go independence remain pending;
+remaining HTTP, native helper and fallback transports still execute Go.
+Issue #1131 remains open. Main `ed6a74f` is integrated; future Go-source
+changes from pending MCP integration require actual recapture.
+
 Linux amd64 now prepares frozen references for both complete consented plan
 process tests using the actual unmodified records from `fae7b5d`. Whole-record
 SHA-256 pins seal stdout/stderr/status, all 171 Go sources and the original
