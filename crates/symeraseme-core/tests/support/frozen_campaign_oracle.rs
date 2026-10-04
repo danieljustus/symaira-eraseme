@@ -1,5 +1,8 @@
 #![allow(dead_code)] // Included separately by the execution and plan integrations.
 
+#[path = "frozen_native_capture.rs"]
+mod frozen_native_capture;
+
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -9,7 +12,10 @@ pub const EXECUTION: &[u8] =
 pub fn live_go_required() -> bool {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => !cfg!(target_os = "linux"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+                .is_none()
+        }
         _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
 }
@@ -35,6 +41,16 @@ fn verify_bytes(metadata: &Value, bytes: &[u8]) {
 
 pub fn execution(bytes: &[u8]) -> Value {
     let manifest = manifest();
+    let native = native_capture();
+    let observed = native["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "campaign-execution")
+        .unwrap();
+    verify_bytes(&observed["stdout"], bytes);
+    assert_eq!(observed["exit_status"], 0);
+    assert_eq!(observed["stderr"]["bytes"], 0);
     let capture = &manifest["execution"];
     assert_eq!(capture["exit_status"], 0);
     verify_bytes(&capture["stdout"], bytes);
@@ -59,6 +75,20 @@ pub fn execution(bytes: &[u8]) -> Value {
 
 pub fn verify_plan_capture(fixture: &[u8]) {
     let manifest = manifest();
+    let native = native_capture();
+    let observed = native["controls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "campaign-plan-go-test")
+        .unwrap();
+    assert_eq!(observed["exit_status"], 0);
+    assert_eq!(observed["stderr"]["bytes"], 0);
+    assert_eq!(
+        observed["executed_pass_tests"],
+        serde_json::json!(["TestCampaignPlanBytesOracle"])
+    );
+    verify_bytes(&observed["fixture"], fixture);
     let capture = &manifest["plan_bytes"];
     assert_eq!(capture["exit_status"], 0);
     verify_bytes(&capture["fixture"], fixture);
@@ -87,4 +117,13 @@ pub fn verify_plan_capture(fixture: &[u8]) {
         .count();
     assert_eq!(passes, 1);
     assert_eq!(capture["executed_test_pass_records"], passes);
+}
+
+fn native_capture() -> Value {
+    frozen_native_capture::verify(
+        frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+            .expect("unrecorded native campaign target must use the actual Go producer"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
 }

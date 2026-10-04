@@ -1,3 +1,5 @@
+#[path = "support/frozen_native_capture.rs"]
+mod frozen_native_capture;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
@@ -206,7 +208,9 @@ fn run_go_storage_oracle() -> serde_json::Value {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => {}
         Ok("0") | Err(std::env::VarError::NotPresent) => {
-            if cfg!(target_os = "linux") {
+            if frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+                .is_some()
+            {
                 return verified_frozen_storage(include_bytes!(
                     "../../../tests/fixtures/go-frozen/storage/storage.stdout"
                 ));
@@ -256,6 +260,38 @@ fn run_go_storage_oracle() -> serde_json::Value {
 }
 
 fn verified_frozen_storage(bytes: &[u8]) -> serde_json::Value {
+    let native = frozen_native_capture::verify(
+        frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+            .expect("unrecorded native storage target must use the actual Go producer"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    );
+    let observed = native["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "storage")
+        .unwrap();
+    assert_eq!(observed["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        observed["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    let native_controls = native["controls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "storage-go-test")
+        .unwrap();
+    assert_eq!(native_controls["exit_status"], 0);
+    assert_eq!(native_controls["stderr"]["bytes"], 0);
+    let mut native_tests: Vec<&str> = native_controls["executed_pass_tests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap())
+        .collect();
+    native_tests.sort_unstable();
     let manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
         "../../../tests/fixtures/go-frozen/storage/manifest.json"
     ))
@@ -308,6 +344,7 @@ fn verified_frozen_storage(bytes: &[u8]) -> serde_json::Value {
         .filter_map(|record| record["Test"].as_str())
         .collect::<Vec<_>>();
     executed.sort_unstable();
+    assert_eq!(native_tests, executed, "native Go storage controls");
     assert_eq!(
         executed,
         [

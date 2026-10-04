@@ -57,16 +57,26 @@ pub fn verify(bytes: &[u8], os: &str, arch: &str) -> Value {
         assert_eq!(metadata["bytes"], source.len(), "{path}");
         assert_eq!(metadata["sha256"], digest(&source), "{path}");
     }
-    for family in ["llm_failures", "cli_review"] {
-        let info = manifest[family]["embedded_build_info"].as_str().unwrap();
+    let check_build = |info: &str| {
         for expected in [
             format!("vcs.revision={REVISION}"),
             "vcs.modified=false".to_owned(),
             format!("GOOS={go_os}"),
             format!("GOARCH={go_arch}"),
         ] {
-            assert!(info.contains(&expected), "native {family} build provenance");
+            assert!(info.contains(&expected), "native build provenance");
         }
+    };
+    for family in ["llm_failures", "cli_review"] {
+        check_build(manifest[family]["embedded_build_info"].as_str().unwrap());
+    }
+    let observations = manifest["observations"].as_array().unwrap();
+    assert_eq!(observations.len(), 6);
+    for observed in observations {
+        assert_eq!(observed["exit_status"], 0);
+        assert_eq!(observed["stderr"]["bytes"], 0);
+        assert_eq!(observed["stderr"]["sha256"], digest(&[]));
+        check_build(observed["embedded_build_info"].as_str().unwrap());
     }
     assert_eq!(
         manifest["llm_failures"]["cases"].as_array().unwrap().len(),

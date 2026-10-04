@@ -10,6 +10,23 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Six-target campaign and SQLite frozen preparation (2026-10-04, #1131)
+
+The independently read-back six-target `0d1be282` artifacts also contain
+byte-identical complete campaign-execution (6341 bytes) and SQLite
+(12585 bytes) outputs on every native host. Their default Rust comparisons
+now select the actual native manifest, verify all 194 source/input pins and
+native unmodified build provenance, and bind each full output's byte count
+and SHA before comparing real Rust effects. Campaign planning additionally
+checks the native successful tagged Go test and its exact 6628-byte fixture;
+SQLite checks all seven native Go corruption/control pass records.
+The original Linux fixture integrity, quoted-SQL, archived Python database,
+real Rust filesystem/database effects, and explicit bounded live-Go paths
+remain enforced. This changes no product observation, contract status or
+Go-free test count (137). Local changed-family and current native Rust
+verification remain pending. The in-flight native capture run uses the
+preceding six-target LLM/review source; it does not accept these new readers.
+
 ### Six-target LLM and review frozen preparation (2026-10-04, #1131)
 
 The final macOS arm64 artifact `11288785362` from capture run `37158381207`
