@@ -19,6 +19,8 @@ on:
       - crates/symeraseme-core/tests/campaign_plan_contract.rs
       - crates/symeraseme-cli/tests/command_surface.rs
       - crates/symeraseme-cli/tests/support/frozen_review_oracle.rs
+      - crates/symeraseme-cli/src/mcp/**
+      - crates/symeraseme-cli/tests/support/frozen_mcp_runtime.rs
       - crates/symeraseme-cli/tests/support/frozen_grant_oracle.rs
       - crates/symeraseme-cli/tests/support/migration_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
@@ -110,4 +112,6 @@ jobs:
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
                               "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--bin", "symeraseme-rust",
+                              "mcp::", "--locked", "--offline"], env=environment, check=True)
           PY

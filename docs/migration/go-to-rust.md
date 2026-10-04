@@ -10,6 +10,20 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Linux MCP runtime frozen-reader preparation (2026-10-04, #1131)
+
+The corrected 110-observation producer passes at clean `f0a91ab` on actual
+Linux amd64. Independent readback validates all 1476 Go/oracle/broker input
+pins, the 98-member upload selection, native unmodified binary provenance,
+complete streams and the clock's hostile-path controls. Its six clock,
+four auto-confirm and 25 gap responses now supply the Linux amd64 default
+comparators; original Rust whole-frame/state/effect checks stay intact.
+The other five native targets and explicit live-Go mode retain the actual
+producer. A control rejects changed/truncated streams, unknown families
+and fabricated source identity. The Go-free workflow adds the complete MCP
+unit test group. Local reader verification and current native CI are pending;
+no all-target or complete-workspace Go independence is claimed.
+
 ### Native MCP/Windows schedule capture preparation (2026-10-04, #1131)
 
 The opt-in actual Go producer now records the four remaining runtime-oracle

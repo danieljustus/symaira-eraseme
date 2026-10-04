@@ -13,6 +13,12 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 Linux-amd64 MCP reader preparation additionally uses actual complete
+clock/auto-confirm/gap responses from clean `f0a91ab`, bound to all 1476
+source/input pins and native unmodified binary metadata. Other native targets
+and explicit live-Go mode still execute the actual producer. The complete
+MCP unit group is added to the Go-free workflow; validation remains pending.
+
 The opt-in actual-native capture preparation additionally records complete
 MCP clock/auto-confirm/gap and CLI schedule outputs (110 observations total),
 with native VCS/source/input pins and hostile-config controls. These are
