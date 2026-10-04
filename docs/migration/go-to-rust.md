@@ -8,6 +8,17 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Exact mutation-anchor maintenance for MCP ping (2026-10-04, #1126)
+
+The standard ping addition shifts the existing protocol parser functions by
+twelve lines. The four equivalent-mutant exclusions in `.cargo/mutants.toml`
+now follow those exact new line/column locations (844, 893, 595, 603).
+Each three-line context is byte-identical to the old accepted main source;
+the excluded operations and function names are unchanged. The stream anchor
+at 91 stays unchanged. No wider exclusion or timeout increase is introduced.
+Actual pinned cargo-mutants execution remains pending; this metadata repair
+alone does not establish hardening task 8.5 acceptance or complete #1126.
+
 ## Current task ownership (2026-10-02)
 
 The task graph is reconciled against integrated `28e32a1c` and the current
@@ -30,6 +41,104 @@ and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
 on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
+
+## Native MCP HTTP completion candidate (2026-10-03, #1126)
+
+The full-header comparator already exists in `mcp_http_headers_process.rs`:
+ten actual Go/Rust responses compare the status line, every header including
+duplicates and raw body bytes. Only a validated canonical Date value is
+normalized; deliberate missing/extra/changed/duplicate-header controls fail.
+The older MCP-007 row does not describe this merged implementation.
+
+`mcp-http-native.yml` now explicitly selects that comparator and three actual
+socket-error controls on all six targets: occupied IPv4, occupied IPv6 and an
+unavailable TEST-NET address. IPv6 cannot be silently skipped. Both actual
+checked-out Go 1.26.6 and Rust CLIs must reach token creation, fail within ten
+seconds, and match complete exit code/stdout/stderr without normalization.
+
+Initial actual Windows amd64 run `37124645649` at `a0984d1c` failed the
+occupied IPv4 diagnostic: Rust returned Unix wording while Go returned the
+native Windows WSAEADDRINUSE message. Token DACL/rotation/retention and all ten
+full-header scenarios passed in the same job `111207382913`. Rust now formats
+these two bind-error classes through the system's US-English message API,
+matching Go's locale fallback and CR/LF-only trimming, with no OS-code suffix.
+The original failure is retained; candidate native results remain pending.
+
+Windows additionally compares complete token owner/group/DACL SDDL, inherited
+and owner-only parent behavior, protection/read-only flags, restart rotation,
+old-token rejection/new-token authentication, and read-only replacement failure
+with exact token/sentinel retention. PowerShell uses framework ACL APIs in a
+cleared private environment; commands have thirty-second bounds. Random token
+bytes differ intentionally; both must decode to 32 bytes and independently
+rotate. No operator data or ACL is changed.
+
+Both Ctrl+C and Ctrl+Break run Go and Rust sequentially in a newly created
+private console. Ctrl+Break targets the owned child process group; Ctrl+C can
+only broadcast inside that private console, after the controller enables the
+child's inherited signal flag and then ignores the signal itself. The runner's
+console is never targeted. Exit success and listener closure are required for
+each real child. Existing bearer, Origin, timeout and disconnect gates remain.
+MCP-007/011/012/013 are PASS on source
+`53a0e3684652f0676f02e2994bcd46fbeb9d83b2`: targeted run `37128540191`
+and full Rust run `37128575147` passed all six native targets. Both Windows
+jobs executed complete DACL/read-only retention and private-console Ctrl+C/
+Ctrl+Break; every target executed all three mandatory bind errors and the
+complete-header comparator. Task 8.3 remains pending integration of its
+recorded task 8.1 and 4.7 predecessors; no dependency is inferred from these
+individual row results.
+
+## Official MCP core conformance candidate (2026-10-03, #1126)
+
+The required official conformance gate was measured with upstream
+`@modelcontextprotocol/conformance` 0.1.16, immutable source
+`21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0`, its unchanged package lock
+(`df89d138b91871a7fb041f8d3923a78b9a1e2d5bdf28ba589fe6f944f30814fe`)
+and SDK 1.27.1. At `d9a66fabb031d9c44b515a9d40295839be5af625`,
+both actual Go and Rust passed `server-initialize` and `tools-list`, but
+failed `ping` with -32601. This earlier failure is retained.
+
+Source `0bc6b051890340822448fa3846c96f70022b79ad` adds the protocol
+method in both backends: empty result, existing ID encoding and parameter
+validation, no tool dispatch, and silent notifications. It changes no
+catalogue entry or existing initialize, HTTP, error or notification frame.
+Actual Go 1.26.6 recaptures at `0718834abaea0c78ea22008e28c8f8153ce8a89f`
+preserve every previous 670 stdio process observation, agent/provider
+cancellation effect and malformed-agent error response; only source
+provenance changes. Eight new raw ping cases extend the process corpus to
+678. The earlier compiler-host suffix is retained in historical captures;
+the recapture records its actual Linux/amd64 host.
+
+At clean `a46bc2c07c0ae0f9f9c1d8ef35dc663b72e65c52`, the pinned official
+three-scenario core subset passes for both real backends on native
+Linux/amd64 (six SUCCESS checks, no baseline or rewritten assertion).
+`scripts/check-mcp-conformance.py` builds source-bound Go with unmodified
+VCS metadata and uses the built Rust CLI, private roots and authenticated
+loopback servers. Its small fetch adapter supplies only the owned disposable
+bearer header, rejects other endpoints and preserves SDK requests/responses.
+All owned processes are bounded and reaped; retained receipts exclude tokens
+and private server logs. `mcp-http-native.yml` now repeats this pinned core
+check in addition to the six existing native HTTP platform jobs.
+
+This is the applicable official core subset, not the entire reference-server
+suite: other scenarios require upstream `test_*` tools or unadvertised
+resources, prompts, logging, sampling and SSE capabilities. Adding those
+reference tools would break the pinned 26-tool catalogue. Current-head CI,
+the newly extended corpus on all six native targets, task 8.1 acceptance
+review and ordinary integration remain pending; this local result alone
+does not complete task 8.1 or task 8.3.
+
+Current-source official CI job `111316975982` in run `37161925589` passes
+all six checks at PR head `32d5c6bba4244571428276608024ba896db06961`.
+Downloaded artifact `11287877386` verifies its fixed single manifest member,
+archive SHA-256, pinned upstream/SDK/Node identity, actual Go unmodified VCS
+metadata and virtual merge `034aba85a28aec46d28e76b2d647c1838d28b5a7`
+whose parents are that head and main `7a1baac8`.
+The full native run `37161978066` retains four Linux/Windows failures in the
+non-writing Python oracle acceptance control, before the native Rust suite:
+its two inventory assertions still expected 670 instead of the measured 678.
+Only those expected inventory counts are corrected; all existing corruption,
+compiler/host, missing-case and no-write controls remain intact. Fresh complete
+native acceptance on the corrected head remains required.
 
 ## Native SMTP campaign gate (2026-10-03, #1118)
 
@@ -248,8 +357,8 @@ that remaining tool/error-path scope is complete.
   validation after retrying a Go dependency-download network timeout.
 - MCP-007 HTTP response parity: #1111 merged as
   `fd63a368ffa660247134b41a7f44da6b32553a7b`. Both named HTTP comparator tests
-  passed on all six targets in `36632119595` at `aa882843`. #1109 remains
-  open for the broader fuzz-coverage residual; this slice does not close it.
+  passed on all six targets in `36632119595` at `aa882843`. #1109 is
+  closed after integrated six-target run `36934832118` at `28e32a1c` revalidated both complete-header comparator and its mutation controls on every target. Broader parser fuzzing belongs to #1125; remaining native ACL/signal/bind controls belong to #1126.
 - MCP-005A/DOM-008: #1113 merged as
   `726156748d886029e54509cf2181f9639d9cba0d`. Native run `36637116514` at
   `60bb1ec4` passed all six targets. Both Windows job logs confirm the real
