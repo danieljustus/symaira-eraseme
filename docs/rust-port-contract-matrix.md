@@ -13,6 +13,12 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The opt-in native freeze artifact allowlist now includes all five actual
+synthetic CLI consent observations. Actual `b8faa96` file selection confirms
+82 complete members versus the prior 77-member selection; no private root
+or executable is included. Native Grant defaults remain unchanged pending
+current six-target capture/readback.
+
 The #1131 campaign/SQLite preparation additionally binds their byte-identical
 whole outputs to all six actual native `0d1be282` manifests, including the
 native tagged plan fixture and all seven storage Go controls. Original Rust

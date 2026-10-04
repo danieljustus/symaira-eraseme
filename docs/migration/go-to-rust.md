@@ -10,6 +10,19 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Complete native grant artifact preservation (2026-10-04, #1131)
+
+Review of the opt-in upload allowlist found that the 62-operation producer
+wrote five complete synthetic consent observations but the artifact selected
+only the grant process streams and their metadata. The upload now includes
+only `cli-grant-case-*-consent-*.observations.json` as well. Readback against
+the actual clean `b8faa96` Linux capture proves the allowlist grows from
+77 to 82 regular members and includes every measured record; private roots
+and generated executables stay excluded. This is capture completeness,
+not new native Go-free grant acceptance. The preceding `2215b45` native run
+cannot supply these omitted record files and will be replaced only after
+checking that no active capture loses evidence.
+
 ### Six-target campaign and SQLite frozen preparation (2026-10-04, #1131)
 
 The independently read-back six-target `0d1be282` artifacts also contain
