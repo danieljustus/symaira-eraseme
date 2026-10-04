@@ -11,6 +11,7 @@ on:
       - 'fuzz/**'
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
+      - 'scripts/*verify-mutation-outcomes.py'
   pull_request:
     branches: [main]
     paths:
@@ -18,9 +19,16 @@ on:
       - 'fuzz/**'
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
+      - 'scripts/*verify-mutation-outcomes.py'
   schedule:
     - cron: '17 4 * * 1'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      sweep_mutations:
+        description: Run the remaining crypto/consent/state/sanitization/HTTP mutation categories
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -102,9 +110,8 @@ jobs:
       - name: Install cargo-mutants
         run: cargo +"$RUST_TOOLCHAIN" install cargo-mutants --version 27.1.0 --locked
 
-      # Equivalent mutants are excluded in .cargo/mutants.toml. Exit 3 means
-      # only timeouts (a mutant that hangs is detected), so only missed (2)
-      # or a broken baseline fails the gate.
+      # Equivalent mutants are excluded in .cargo/mutants.toml. Timeout exit
+      # 3 can also contain missed mutants; inspect the actual outcome JSON.
       - name: Mutate MCP protocol core
         run: |
           set +e
@@ -114,6 +121,7 @@ jobs:
             --timeout 30 -- --bins -- mcp::protocol mcp::stream
           status=$?
           if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
+          python3 scripts/verify-mutation-outcomes.py mutants.out/outcomes.json
 
       - name: Upload mutants.out
         if: failure()
@@ -122,3 +130,78 @@ jobs:
           name: mutants-mcp-protocol
           path: mutants.out
           if-no-files-found: ignore
+
+  sweep-mutations:
+    if: github.event_name == 'workflow_dispatch' && inputs.sweep_mutations
+    name: Rust / mutants (${{ matrix.scope }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scope: crypto
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/encryption.rs"]'
+            tests: '["--lib", "--test", "encryption_parity", "--", "storage::encryption", "python_final_", "v1_", "v2_", "v3_", "pinned_go_legacy_", "legacy_go_"]'
+          - scope: consent
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/identity/consent.rs"]'
+            tests: '["--lib", "--test", "consent_api"]'
+          - scope: state transitions
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/projection.rs"]'
+            tests: '["--lib", "--test", "projection_contract", "--test", "tick_apply_contract"]'
+          - scope: sanitization
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/redaction/path.rs", "crates/symeraseme-core/src/redaction/pii.rs", "crates/symeraseme-core/src/redaction/review.rs"]'
+            tests: '["--lib", "--", "redaction::"]'
+          - scope: HTTP auth
+            package: symeraseme-cli
+            files: '["crates/symeraseme-cli/src/mcp/http.rs"]'
+            tests: '["--bins", "--", "mcp::http::"]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Install pinned cargo-mutants
+        run: cargo +1.98.0 install cargo-mutants --version 27.1.0 --locked
+      - name: Verify outcome regression controls
+        run: python3 scripts/test-verify-mutation-outcomes.py
+      - name: Execute actual mutations and inspect complete outcomes
+        env:
+          MUTATION_PACKAGE: ${{ matrix.package }}
+          MUTATION_FILES: ${{ matrix.files }}
+          MUTATION_TESTS: ${{ matrix.tests }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          command = ["cargo", "+1.98.0", "mutants", "-p", os.environ["MUTATION_PACKAGE"]]
+          for path in json.loads(os.environ["MUTATION_FILES"]):
+              command += ["--file", path]
+          command += ["--timeout", "30", "--"] + json.loads(os.environ["MUTATION_TESTS"])
+          result = subprocess.run(command)
+          # cargo-mutants gives timeout exit 3 precedence over missed exit 2.
+          # Inspect the actual JSON on both accepted exit codes.
+          assert result.returncode in (0, 3), f"mutation run failed: {result.returncode}"
+          subprocess.run(["python3", "scripts/verify-mutation-outcomes.py",
+                          "mutants.out/outcomes.json"], check=True)
+          PY
+      - name: Retain mutation outcomes and baseline/failure evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-sweep-${{ strategy.job-index }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            mutants.out/outcomes.json
+            mutants.out/mutants.json
+            mutants.out/*.txt
+            mutants.out/log/*.log
+            mutants.out/diff/*.diff

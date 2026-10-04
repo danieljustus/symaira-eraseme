@@ -10,6 +10,29 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+Task 8.5 preparation adds an opt-in native Linux mutation sweep over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection
+state transitions. It retains the existing pinned cargo-mutants 27.1.0,
+30-second per-mutant budget and 45-minute job limit. Full JSON outcomes,
+baseline logs and mutation diffs are retained even on failure. These scopes
+are preparation, not task completion: final task 8.4 integration, native fault
+injection and secret-sentinel evidence remain required under issue #813.
+
+The mutation gate now inspects actual outcomes in addition to the exit status.
+In cargo-mutants 27.1.0, timeout exit 3 takes precedence over missed exit 2;
+a run can therefore contain both. The gate rejects any missed mutant, failed
+or missing baseline, incomplete/zero-case run and inconsistent count. It
+requires at least one mutant caught by a failing test. Regression controls
+include a real-schema mixed timeout/missed result. The previously recorded
+MCP proof already has zero missed mutants; no past acceptance is revoked or
+new acceptance claimed. Local scoped baseline runs pass: crypto 21 tests, consent 114, state
+transitions 117, sanitization 16 and HTTP auth 11. The consent filesystem
+and environment child probes appear ignored at top level but are actually
+launched in private cases by their passing parents. Four outcome-verifier
+regression controls pass. The five actual mutation runs remain pending;
+these baseline tests do not establish mutation acceptance.
+
+
 The task graph is reconciled against integrated `28e32a1c` and the current
 matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
 evidence. Phases 6–8 are not complete. Closed historical phase issues

@@ -13,6 +13,29 @@
 
 ## Granular issue ownership (2026-10-02)
 
+Task 8.5 preparation adds an opt-in native Linux mutation sweep over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection
+state transitions. It retains the existing pinned cargo-mutants 27.1.0,
+30-second per-mutant budget and 45-minute job limit. Full JSON outcomes,
+baseline logs and mutation diffs are retained even on failure. These scopes
+are preparation, not task completion: final task 8.4 integration, native fault
+injection and secret-sentinel evidence remain required under issue #813.
+
+The mutation gate now inspects actual outcomes in addition to the exit status.
+In cargo-mutants 27.1.0, timeout exit 3 takes precedence over missed exit 2;
+a run can therefore contain both. The gate rejects any missed mutant, failed
+or missing baseline, incomplete/zero-case run and inconsistent count. It
+requires at least one mutant caught by a failing test. Regression controls
+include a real-schema mixed timeout/missed result. The previously recorded
+MCP proof already has zero missed mutants; no past acceptance is revoked or
+new acceptance claimed. Local scoped baseline runs pass: crypto 21 tests, consent 114, state
+transitions 117, sanitization 16 and HTTP auth 11. The consent filesystem
+and environment child probes appear ignored at top level but are actually
+launched in private cases by their passing parents. Four outcome-verifier
+regression controls pass. The five actual mutation runs remain pending;
+these baseline tests do not establish mutation acceptance.
+
+
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
 `execution_state.contract_issue_owners`, and owners of every unfinished task
