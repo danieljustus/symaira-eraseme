@@ -10,7 +10,7 @@
     "internal/llm/llm.go": "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
     "internal/llm/llmkit.go": "629c643a61674c8f4ed6de6b47e96e1764e7525ed9c693eb9615be4cebd103e7",
     "internal/mcp/contract_handler.go": "7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8",
-    "internal/mcp/server.go": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976",
+    "internal/mcp/server.go": "735e90fa02be8cbbf8229ee457daa69df54a33397b1f211d811b244e506db52b",
     "internal/replies/service.go": "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281",
     "internal/triage/classifier.go": "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
     "rust-tests/parity/oracle/provider-cancel/main.go": "f68e6f37a2555fbec8f32ce649ab6d712f7fc8f16cff94659839372fdeab2030"

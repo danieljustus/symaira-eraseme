@@ -1,0 +1,121 @@
+name: Native MCP HTTP platform parity
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-cli/src/mcp/**
+      - crates/symeraseme-cli/tests/mcp_http*.rs
+      - crates/symeraseme-cli/tests/support/mcp_*
+      - cmd/symeraseme/**
+      - internal/mcp/**
+      - scripts/check-mcp-conformance.py
+      - scripts/mcp-conformance-auth.mjs
+      - go.mod
+      - go.sum
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/mcp-http-native.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-http-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  official-core:
+    name: Official MCP core / Go and Rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: product
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: modelcontextprotocol/conformance
+          ref: 21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0 # 0.1.16, immutable upstream source
+          path: official-conformance
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.19.0'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Build pinned official conformance CLI
+        working-directory: official-conformance
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Build actual product backends
+        working-directory: product
+        shell: bash
+        run: |
+          GOTOOLCHAIN=go1.26.6 go mod download
+          rustup toolchain install 1.98.0 --profile minimal
+          CARGO_TARGET_DIR="$RUNNER_TEMP/mcp-conformance-target" cargo +1.98.0 build -p symeraseme-cli --bin symeraseme-rust --locked
+      - name: Official applicable core scenarios with private authenticated servers
+        working-directory: product
+        shell: bash
+        run: |
+          python3 scripts/check-mcp-conformance.py \
+            --conformance ../official-conformance \
+            --rust "$RUNNER_TEMP/mcp-conformance-target/debug/symeraseme-rust" \
+            --output "$RUNNER_TEMP/mcp-conformance-result"
+      - name: Retain source-bound official check receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: official-mcp-core
+          path: ${{ runner.temp }}/mcp-conformance-result/manifest.json
+          if-no-files-found: warn
+          retention-days: 7
+  native-mcp:
+    name: MCP HTTP / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Download pinned Go modules
+        shell: bash
+        run: GOTOOLCHAIN=go1.26.6 go mod download
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Complete response headers, raw bodies and native bind failures
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked \
+            --test mcp_http_headers_process --test mcp_http_native_contract -- --nocapture
+      - name: Native Windows console, auth, rotation, timeout and disconnect contracts
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture
+      - name: Native Unix process and signal contracts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
