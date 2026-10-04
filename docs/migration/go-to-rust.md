@@ -8,6 +8,17 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Exact mutation-anchor maintenance for MCP ping (2026-10-04, #1126)
+
+The standard ping addition shifts the existing protocol parser functions by
+twelve lines. The four equivalent-mutant exclusions in `.cargo/mutants.toml`
+now follow those exact new line/column locations (844, 893, 595, 603).
+Each three-line context is byte-identical to the old accepted main source;
+the excluded operations and function names are unchanged. The stream anchor
+at 91 stays unchanged. No wider exclusion or timeout increase is introduced.
+Actual pinned cargo-mutants execution remains pending; this metadata repair
+alone does not establish hardening task 8.5 acceptance or complete #1126.
+
 ## Current task ownership (2026-10-02)
 
 The task graph is reconciled against integrated `28e32a1c` and the current

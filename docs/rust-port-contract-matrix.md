@@ -11,6 +11,11 @@
 > required row is `PASS`. `TODO` means the contract is known but its
 > differential case has not yet been implemented.
 
+The MCP ping preparation also moves the four existing equivalent-mutant
+anchors to their exact new positions, after verifying unchanged source
+contexts. No exclusion scope or budget changes. Actual mutation CI remains
+pending, and task 8.5 remains gated by 8.4 under #813.
+
 ## Granular issue ownership (2026-10-02)
 
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
