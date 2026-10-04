@@ -133,6 +133,18 @@ pub(crate) fn initialize_cancellable(
 
     let notification = !id_present;
     let method = method.as_deref().unwrap_or_default();
+    if method == "ping" {
+        return if notification {
+            InitializeOutcome::Notification
+        } else if matches!(params, ParamsState::Other) {
+            InitializeOutcome::Response(error_response(-32602, "invalid params", id))
+        } else {
+            let mut output = br#"{"jsonrpc":"2.0","result":{},"id":"#.to_vec();
+            append_id(&mut output, &id);
+            output.extend_from_slice(b"}\n");
+            InitializeOutcome::Response(output)
+        };
+    }
     if method != "initialize" {
         if matches!(method, "tools/list" | "list_tools") {
             return match super::tools_list::tools_list(raw) {
@@ -1019,6 +1031,47 @@ mod tests {
         let mut output = raw.as_bytes().to_vec();
         output.push(b'\n');
         output
+    }
+
+    #[test]
+    fn ping_preserves_ids_errors_and_notification_silence() {
+        for (request, expected) in [
+            (
+                r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
+                r#"{"jsonrpc":"2.0","result":{},"id":1}"#,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":1.0,"method":"ping","params":null}"#,
+                r#"{"jsonrpc":"2.0","result":{},"id":1}"#,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":null,"method":"ping","params":{}}"#,
+                r#"{"jsonrpc":"2.0","result":{},"id":null}"#,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":"<&>","method":"ping"}"#,
+                r#"{"jsonrpc":"2.0","result":{},"id":"\u003c\u0026\u003e"}"#,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#,
+                r#"{"jsonrpc":"2.0","error":{"code":-32602,"message":"invalid params"},"id":1}"#,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":true,"method":"ping"}"#,
+                r#"{"jsonrpc":"2.0","error":{"code":-32600,"message":"invalid request"},"id":null}"#,
+            ),
+        ] {
+            assert_eq!(response(request), go_json(expected), "{request}");
+        }
+        for request in [
+            br#"{"jsonrpc":"2.0","method":"ping"}"#.as_slice(),
+            br#"{"jsonrpc":"2.0","method":"ping","params":[]}"#.as_slice(),
+        ] {
+            assert_eq!(
+                initialize(request, &no_backend_handler()),
+                InitializeOutcome::Notification
+            );
+        }
     }
 
     #[test]

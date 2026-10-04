@@ -31,7 +31,7 @@ class OracleTemporaryDirectory(tempfile.TemporaryDirectory):
                 time.sleep(min(0.05, remaining))
 
 ROOT = Path(__file__).resolve().parents[4]
-SOURCE_REVISION = "6d175f6355a67fe0c0e539754121b6643df812bf"
+SOURCE_REVISION = "0bc6b051890340822448fa3846c96f70022b79ad"
 INITIALIZE = ROOT / "tests/fixtures/mcp-contract/initialize_cases.json"
 SOURCE_PATHS = ["cmd/symeraseme/main.go", "internal/mcp/server.go"]
 MUTATION_SEED = 0x4D43503135
@@ -112,12 +112,26 @@ def case_specs():
          "input_spec": {"base64": base64.b64encode(data).decode()}}
         for name, data in syntax
     ]
+    ping = [
+        {"name": "ping-" + name,
+         "input_spec": {"base64": base64.b64encode(data).decode()}}
+        for name, data in [
+            ("request", b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n'),
+            ("null-params", b'{"jsonrpc":"2.0","id":1.0,"method":"ping","params":null}\n'),
+            ("null-id", b'{"jsonrpc":"2.0","id":null,"method":"ping","params":{}}\n'),
+            ("escaped-id", b'{"jsonrpc":"2.0","id":"<&>","method":"ping"}\n'),
+            ("invalid-params", b'{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}\n'),
+            ("invalid-id", b'{"jsonrpc":"2.0","id":true,"method":"ping"}\n'),
+            ("notification", b'{"jsonrpc":"2.0","method":"ping"}\n'),
+            ("invalid-params-notification", b'{"jsonrpc":"2.0","method":"ping","params":[]}\n'),
+        ]
+    ]
     return malformed + [
         {"name": "size-below-8k", "input_spec": {"kind": "padding_request", "size": 8192 - 1}},
         {"name": "size-above-8k", "input_spec": {"kind": "padding_request", "size": 8192 + 1}},
         {"name": "nesting-at-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 9999}},
         {"name": "nesting-over-go-limit", "input_spec": {"kind": "nested_request", "array_depth": 10000}},
-    ] + mutations + diagnostics
+    ] + mutations + diagnostics + ping
 
 
 def materialize(spec):
