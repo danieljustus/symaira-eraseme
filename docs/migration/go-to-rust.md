@@ -19,6 +19,21 @@ at 91 stays unchanged. No wider exclusion or timeout increase is introduced.
 Actual pinned cargo-mutants execution remains pending; this metadata repair
 alone does not establish hardening task 8.5 acceptance or complete #1126.
 
+## Verified MCP main integration (2026-10-04, #1126)
+
+PR #1150 merged as `12c0d6e6d4517e12743f89f9f65c81103652be7f` after
+all 61 checks completed (54 success, six intentional skips, one neutral
+summary) and all twelve overall workflows succeeded. Full native Rust run
+`37174296262` and native HTTP run `37174228880` passed on all six targets;
+release/archive verification also completed. The official pinned core subset
+passes initialize, ping and tools-list against both actual backends. The
+merged tree is identical to tested PR source `cdc39352d6e1fa7be49dfb61533a7ab465b65664`.
+Issue #1126 is closed/completed. Tasks 8.1 and 8.3 meet their gates, including
+already merged consent task 4.7. Task 7.1 is also reconciled to the verified
+SMTP merge #1149. Task 8.4 still awaits #1119/#1120/#1122; hardening, app,
+release, seven-day observation and Go retirement remain separately gated.
+Earlier candidate paragraphs below retain their historical pending states.
+
 ## Current task ownership (2026-10-02)
 
 The native triage fixture preparation also passes both original Linux amd64
