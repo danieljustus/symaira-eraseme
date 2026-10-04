@@ -96,9 +96,9 @@ Sources/SymairaEraseMe/
 - SwiftUI apps require Xcode (or Xcode-beta) for the macro plugins that power
   `@State`, `@StateObject`, `@Binding`, etc. Building with plain `swift build`
   from CommandLineTools alone will fail.
-- Release bundles include the Go MCP server and need no Python installation or
-  external runtime. Development builds use the sibling Go binary produced by
-  `build.sh`; a Homebrew `symeraseme` or configured Binary Path is supported as
-  a fallback.
+- Release bundles include the Rust MCP server and need no Python installation
+  or external runtime. Development builds stage the same Rust discovery path
+  through `build.sh`. The transitional `symeraseme-go` sibling permits explicit
+  rollback; a Homebrew `symeraseme` or configured Binary Path is also supported.
 - No external Swift dependencies beyond the Symaira AppKit packages declared
   in `Package.swift`.
