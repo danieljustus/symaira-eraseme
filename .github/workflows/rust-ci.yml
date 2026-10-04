@@ -307,6 +307,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Retain immutable MCP oracle source across squash merges
+        shell: bash
+        run: |
+          git fetch --no-tags --no-write-fetch-head --depth=1 origin 0bc6b051890340822448fa3846c96f70022b79ad
+          git cat-file -e 0bc6b051890340822448fa3846c96f70022b79ad^{commit}
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
