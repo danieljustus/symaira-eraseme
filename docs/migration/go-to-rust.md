@@ -10,6 +10,32 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Four-target native grant replay and Windows source bytes (2026-10-04, #1131)
+
+Run `37165107890` at clean `344dfaae` passes complete Rust suites on both
+Linux and both Windows hosts. All four actual Go artifacts are downloaded
+and independently verified: 82 bounded regular members each, 194 immutable
+source/input pins, native unmodified Go 1.26.6 VCS, full process streams and
+five actual consent records per host. Four raw manifests, 48 grant streams
+and twenty whole records are retained unchanged. The grant default selects
+those measured targets; macOS and explicit live mode keep real Go. The
+existing corruption control checks all four source/target identities and
+changed consent payload, filename and host-specific measured mode (Unix
+0600, Windows 0666). Actual Rust private file/ACL checks remain unchanged.
+At clean `48fd77ca6bde5e0182e4dc1e066af5860ee4ff04`, all 24 CLI tests pass
+without Go, the same grant comparator passes with private real Go, and
+strict CLI Clippy passes. All 72 raw Git blobs survive autocrlf unchanged.
+The selected workflow remains 235 tests; other-family proof is retained
+from `0cfba7c`. Native Rust acceptance of these new readers is pending.
+
+Current Windows MCP jobs `111330072961`/`111330072837` exposed Git CRLF
+conversion of byte-hashed broker YAML. Explicit LF for all embedded broker
+inputs and binary for the pinned database preserve all 1476 recorded input
+lengths/hashes under actual `git -c core.autocrlf=true checkout-index` at
+`766d41f`. Source checks and corruption controls are unchanged; new native
+acceptance is pending. Neither correction closes issue #1131 or promotes
+release/cutover rows.
+
 ### Linux MCP runtime frozen-reader preparation (2026-10-04, #1131)
 
 The corrected 110-observation producer passes at clean `f0a91ab` on actual
