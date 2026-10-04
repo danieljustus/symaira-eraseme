@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Execute recorded whole plan and Unix process comparators with Go absent."""
 import os
+import json
 import pathlib
 import re
 import shutil
@@ -56,3 +57,19 @@ with tempfile.TemporaryDirectory(prefix="native-plan-no-go-") as temporary:
         assert result.returncode == 0, "native Go-absent Unix comparator failed"
         totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
         assert totals == [(b"1", b"0", b"0")] * 3, "all three real cases must execute"
+    # The sole permitted retained Go runtime is the actual published rollback
+    # sibling. Keep it outside PATH; no SDK or source build is needed here.
+    retained = json.loads(subprocess.check_output(
+        [sys.executable, "scripts/fetch-retained-go-release.py", "--output-dir",
+         str(pathlib.Path(temporary).resolve() / "published-rollback")], env=environment))
+    assert retained["sdk_required"] is False
+    environment["SYMERASEME_ROLLBACK_GO_BINARY"] = retained["binary"]
+    assert shutil.which("go", path=environment["PATH"]) is None
+    print("Verified: Go SDK absent; real published rollback sibling selected only for explicit fallback", flush=True)
+    result = subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "backend_fallback_process",
+                             "--locked", "--offline"], env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert len(result.stdout) <= 2 * 1024 * 1024, "bounded rollback comparator log"
+    sys.stdout.buffer.write(result.stdout)
+    assert result.returncode == 0, "actual published rollback comparator failed"
+    totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
+    assert totals == [(b"1", b"0", b"0")], "the original rollback case must execute"

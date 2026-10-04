@@ -3,6 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "support/retained_go_release.rs"]
+mod retained_go_release;
+
 struct Scratch(PathBuf);
 
 impl Scratch {
@@ -33,6 +36,15 @@ fn build_go_cli(directory: &Path) -> PathBuf {
     } else {
         "symeraseme-go"
     });
+    if std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() != Ok("1")
+        && let Some(retained) =
+            std::env::var_os("SYMERASEME_ROLLBACK_GO_BINARY").filter(|value| !value.is_empty())
+    {
+        // This comparator exercises the real explicitly selected rollback
+        // sibling. It must execute the actual published binary, not a shim.
+        retained_go_release::stage(Path::new(&retained), &binary);
+        return binary;
+    }
     let output = Command::new("go")
         .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .env("GOWORK", "off")
