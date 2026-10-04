@@ -34,6 +34,33 @@ func responseErrorCode(t *testing.T, rec *httptest.ResponseRecorder) int {
 	return value.Error.Code
 }
 
+func TestPingProtocolFrames(t *testing.T) {
+	server := NewServer(func(context.Context, string, map[string]any) (any, error) {
+		t.Fatal("ping must not dispatch a tool")
+		return nil, nil
+	})
+	for _, tc := range []struct{ request, response string }{
+		{`{"jsonrpc":"2.0","id":1,"method":"ping"}`, "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}\n"},
+		{`{"jsonrpc":"2.0","id":1.0,"method":"ping","params":null}`, "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":1}\n"},
+		{`{"jsonrpc":"2.0","id":null,"method":"ping","params":{}}`, "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":null}\n"},
+		{`{"jsonrpc":"2.0","id":"<&>","method":"ping"}`, "{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":\"\\u003c\\u0026\\u003e\"}\n"},
+		{`{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}`, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"invalid params\"},\"id\":1}\n"},
+		{`{"jsonrpc":"2.0","id":true,"method":"ping"}`, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"invalid request\"},\"id\":null}\n"},
+		{`{"jsonrpc":"2.0","method":"ping"}`, ""},
+		{`{"jsonrpc":"2.0","method":"ping","params":[]}`, ""},
+	} {
+		t.Run(tc.request, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := server.ServeStdio(context.Background(), strings.NewReader(tc.request+"\n"), &output); err != nil {
+				t.Fatal(err)
+			}
+			if output.String() != tc.response {
+				t.Fatalf("response = %q, want %q", output.String(), tc.response)
+			}
+		})
+	}
+}
+
 func TestServeHTTPRejectsNonPost(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
