@@ -22,7 +22,12 @@ offline modules and unchanged process/capture bounds. Unrecorded macOS
 retains its existing Unix fixture pending actual native readback. A new
 control checks all four full native frames and rejects corruption, case loss
 and fabricated source/target identity. Local/current native acceptance is
-pending; the expected selected total becomes 361 tests.
+pending; the expected selected total becomes 361 tests. The first local
+reader run retained 23 passes and two failures because it incorrectly
+required empty producer stderr. Actual whole schedule captures retain
+Cobra error/help output there; the reader now verifies those bytes against
+the measured length/SHA-256 instead. All per-case stderr comparisons stay
+unchanged, and corrected validation remains pending.
 
 
 Actual 110-observation run `37167564927` at clean `85acc513` records complete

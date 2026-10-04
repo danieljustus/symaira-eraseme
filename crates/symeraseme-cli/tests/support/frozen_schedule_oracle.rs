@@ -76,7 +76,6 @@ fn verify(target: &str, manifest: &Value, bytes: &[u8]) -> Value {
     assert!(valid_bytes(&recorded["stdout"], bytes));
     let stderr = read("cli-schedule-native-85", target, "cli-schedule.stderr");
     assert!(valid_bytes(&recorded["stderr"], &stderr));
-    assert!(stderr.is_empty());
     let info = recorded["embedded_build_info"].as_str().unwrap();
     for expected in [
         format!("vcs.revision={REVISION}"),
