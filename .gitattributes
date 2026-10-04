@@ -77,3 +77,6 @@ tests/fixtures/go-frozen/unix-process-8feb/** -text
 
 # Whole authenticated native manifests retain actual producer bytes.
 tests/fixtures/go-frozen/unix-process-native097/** -text
+
+# Published Go rollback artifact identities are pinned byte-for-byte.
+tests/fixtures/go-rollback/** -text

@@ -13,6 +13,19 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 rollback preparation additionally retains the actual six published
+`v0.12.1` archive identities and reads bounded native Go build metadata without
+a Go SDK. All six actual archive consumers and 24 corruption/symlink/foreign
+target controls pass with Go absent; metadata independently matches the actual
+SDK output. Optional published-release modes preserve the complete original
+switchback and backup/restore assertions, with native execution still pending.
+The actual Linux amd64 archive reads owned schema v1 but refuses schema v2.
+The candidate-built switchback workflow stays intact: it cannot establish
+compatibility of this older published binary. See
+[`plain-store-switchback.md`](rust-port/plain-store-switchback.md) and
+[`backup-restore-rehearsal.md`](rust-port/backup-restore-rehearsal.md).
+Issue #1131 and published fallback acceptance remain open.
+
 The original real-network SMTP comparators now also replay measured native
 Linux amd64 Go processes from clean producer
 `0b57be7f59923fd69eca54b7807743ffbaf6de2d`. The complete campaign record

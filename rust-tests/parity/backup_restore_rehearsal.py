@@ -157,7 +157,9 @@ def verify_go_archive(archive, binary):
             'member_sha256': digest.hexdigest(), 'matches_supplied_binary': True}
 
 
-def run(go, rust, go_tool, output_dir, go_archive=None):
+def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=False):
+    require(published_go_release != (go_tool is not None),
+            'choose published Go release or explicit Go SDK metadata verification')
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: shared switchback confinement supports macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -196,7 +198,9 @@ def run(go, rust, go_tool, output_dir, go_archive=None):
             (root / name).mkdir(mode=0o700, parents=True)
         fixture_identity = gate.identity(FIXTURE)
         report['fixture'] = {'path': str(FIXTURE), **fixture_identity}
-        go, rust, go_tool = (Path(path).resolve(strict=True) for path in (go, rust, go_tool))
+        go, rust = (Path(path).resolve(strict=True) for path in (go, rust))
+        if go_tool is not None:
+            go_tool = Path(go_tool).resolve(strict=True)
         report['go_artifact_provenance']['path'] = str(go)
         staged_go, staged_rust = root / 'bin/retained-go', root / 'bin/rust-candidate'
         shutil.copyfile(go, staged_go)
@@ -230,10 +234,25 @@ def run(go, rust, go_tool, output_dir, go_archive=None):
             'SYMERASEME_ENCRYPT_DB': 'false',
         }
         report['environment'] = env
-        go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
-        invoke(root, 'go-build-info', go_tool, ['version', '-m', str(staged_go)],
-               go_info_env, success=True, json_output=False)
-        go_metadata = (root / 'go-build-info.stdout').read_bytes().decode('utf-8', 'replace')
+        if published_go_release:
+            architecture = {'arm64': 'arm64', 'aarch64': 'arm64',
+                            'x86_64': 'amd64'}[platform.machine().lower()]
+            operating_system = 'darwin' if sys.platform == 'darwin' else 'linux'
+            metadata, release = gate.go_build_info.verify_release(
+                staged_go, operating_system + '/' + architecture)
+            go_metadata = metadata['sdk_style_output']
+            (root / 'go-artifact.metadata.txt').write_text(go_metadata)
+            report['go_artifact_provenance'].update({
+                'release_identity_asserted_by_runner': True,
+                'retained_go_release': release,
+                'artifact_metadata_reader': 'bounded stdlib Python, no Go SDK process',
+                'note': 'Exact published binary SHA-256, module bytes and native clean Git build metadata verified against the pinned release manifest.',
+            })
+        else:
+            go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
+            invoke(root, 'go-build-info', go_tool, ['version', '-m', str(staged_go)],
+                   go_info_env, success=True, json_output=False)
+            go_metadata = (root / 'go-build-info.stdout').read_bytes().decode('utf-8', 'replace')
         report['go_artifact_provenance']['build_metadata'] = go_metadata
         report['go_artifact_provenance']['source_revision'] = next(
             (line.split('=', 1)[1] for line in go_metadata.splitlines()
@@ -449,12 +468,15 @@ def main():
                         help='optional official Go archive; its sole symeraseme member must match --go')
     parser.add_argument('--rust', type=Path, required=True,
                         help='locally built Rust CLI candidate')
-    parser.add_argument('--go-tool', type=Path, required=True,
+    parser.add_argument('--go-tool', type=Path,
                         help='Go tool used to record retained artifact build metadata')
+    parser.add_argument('--published-go-release', action='store_true',
+                        help='verify the pinned actual published Go binary without a Go SDK')
     parser.add_argument('--output-dir', type=Path, required=True,
                         help='new disposable evidence directory; it must not exist')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive,
+                 args.published_go_release)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']),
                       'schema_versions': result['schema_versions'],

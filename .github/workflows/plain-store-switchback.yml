@@ -53,6 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s rust-tests/parity -p test_plain_store_switchback.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/controls.log"
+          python3 -m unittest discover -s rust-tests/parity -p test_go_build_info.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/retained-go-metadata-controls.log"
       - name: Build both implementations from the candidate
         shell: bash
         run: |
