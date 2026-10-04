@@ -978,3 +978,14 @@ remains in its original required order. `TestReleaseWorkflowContract` and
 `TestPackageDMGMockSuite` pass locally with Go 1.26.6. Fresh PR checks remain
 required. This Go test-source change also requires honest new source-bound
 capture after final app integration; it does not relabel older observations.
+
+### Native Swift Intel toolchain availability (2026-10-04, #1127)
+
+Actual Intel job `111429073763` fails before building or testing because
+its image provides Xcode 26.3.0 (17C529), not the ARM image's 26.4.1. The
+app native matrix now pins those actual Xcode versions separately. Both
+architectures still stage the complete Rust-default app with its actual Go
+sibling and require the entire Swift suite, auth/tools/shutdown assertions
+and original packaging controls. Neither platform is removed or inferred;
+new native acceptance is required. The production ARM release toolchain
+remains pinned at 26.4.1.
