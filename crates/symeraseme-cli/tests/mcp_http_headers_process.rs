@@ -13,6 +13,11 @@ use mcp_http_port::{
     StartedChild, accepts_token, free_port, read_bounded_response, spawn_with_handoff,
 };
 
+#[path = "support/capture_http_headers.rs"]
+mod capture_http_headers;
+#[path = "support/frozen_http_headers.rs"]
+mod frozen_http_headers;
+
 struct Server(StartedChild);
 
 impl Drop for Server {
@@ -128,6 +133,24 @@ fn exchange(
     body: &[u8],
     headers: &[(&str, String)],
 ) -> Response {
+    parse_response(&exchange_raw(
+        implementation,
+        case,
+        port,
+        method,
+        body,
+        headers,
+    ))
+}
+
+fn exchange_raw(
+    implementation: &str,
+    case: usize,
+    port: u16,
+    method: &str,
+    body: &[u8],
+    headers: &[(&str, String)],
+) -> Vec<u8> {
     let started = Instant::now();
     eprintln!(
         "http_exchange thread={:?} implementation={implementation} case={case} start",
@@ -161,7 +184,7 @@ fn exchange(
         raw.windows(4).any(|bytes| bytes == b"\r\n\r\n"),
         started.elapsed().as_millis()
     );
-    parse_response(&raw)
+    raw
 }
 
 fn assert_matches(candidate: &Response, oracle: &Response) {
@@ -362,22 +385,31 @@ fn header_comparison_rejects_missing_extra_changed_and_duplicate_headers() {
 fn native_http_complete_headers_and_bodies_match_go() {
     let root = tempfile::tempdir().unwrap();
     let binary = root.path().join("oracle.exe");
-    let build = Command::new("go")
-        .args(["build", "-o"])
-        .arg(&binary)
-        .arg("./cmd/symeraseme")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .output()
-        .unwrap();
-    assert!(
-        build.status.success(),
-        "{}",
-        String::from_utf8_lossy(&build.stderr)
-    );
-    let (go_server, go_port, go_token) = start(&binary, &root.path().join("go"));
+    let frozen = frozen_http_headers::observations();
+    let go_process = if frozen.is_none() {
+        let build = Command::new("go")
+            .args(["build", "-o"])
+            .arg(&binary)
+            .arg("./cmd/symeraseme")
+            .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "{}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        Some(start(&binary, &root.path().join("go")))
+    } else {
+        None
+    };
+    let go_token = go_process
+        .as_ref()
+        .map(|(_, _, token)| token.as_str())
+        .unwrap_or("recorded-private-native-bearer-token");
     let (rust_server, rust_port, rust_token) = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &root.path().join("rust"),
@@ -394,6 +426,7 @@ fn native_http_complete_headers_and_bodies_match_go() {
         ("POST", b"[]", true, None),
         ("POST", br#"[{"jsonrpc":"2.0","id":1,"method":"initialize"},7]"#, true, None),
     ];
+    let mut measured = Vec::new();
     for (index, (method, body, authorized, origin)) in cases.into_iter().enumerate() {
         let headers = |token: &str| {
             let mut headers = Vec::new();
@@ -413,7 +446,17 @@ fn native_http_complete_headers_and_bodies_match_go() {
             body,
             &headers(&rust_token),
         );
-        let go = exchange("go", index, go_port, method, body, &headers(&go_token));
+        let go_headers = headers(go_token);
+        let request = capture_http_headers::request(method, body, &go_headers);
+        let raw = if let Some(corpus) = &frozen {
+            corpus.reply(index, &request)
+        } else {
+            let (_, go_port, _) = go_process.as_ref().unwrap();
+            let raw = exchange_raw("go", index, *go_port, method, body, &go_headers);
+            measured.push(capture_http_headers::case(index, request, &raw));
+            raw
+        };
+        let go = parse_response(&raw);
         let expected_status = [405, 401, 403, 200, 200, 204, 200, 204, 200, 200][index];
         for reply in [&rust, &go] {
             assert_eq!(
@@ -424,6 +467,9 @@ fn native_http_complete_headers_and_bodies_match_go() {
         }
         assert_matches(&rust, &go);
     }
-    drop(go_server);
+    if go_process.is_some() {
+        capture_http_headers::record(&binary, &measured);
+    }
+    drop(go_process);
     drop(rust_server);
 }

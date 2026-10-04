@@ -382,6 +382,7 @@ jobs:
         env:
           SYMERASEME_CAPTURE_PLAN_PROCESSES: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-plan-processes', runner.temp) || '' }}
           SYMERASEME_CAPTURE_HTTP_WIRE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && runner.os != 'Windows' && format('{0}/frozen-go-http-wire', runner.temp) || '' }}
+          SYMERASEME_CAPTURE_HTTP_HEADERS: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-http-headers', runner.temp) || '' }}
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -415,6 +416,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: ${{ runner.temp }}/frozen-go-http-wire/wire.json
+
+      - name: Upload actual complete Go HTTP response observations
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frozen-go-http-headers-${{ runner.os }}-${{ runner.arch }}
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ runner.temp }}/frozen-go-http-headers/headers.json
 
       - name: Run neutral parity subset on Unix
         if: runner.os != 'Windows'
