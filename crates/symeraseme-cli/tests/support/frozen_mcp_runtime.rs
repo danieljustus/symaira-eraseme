@@ -1,18 +1,42 @@
-//! Immutable actual Linux-amd64 Go runtime observations; other hosts remain live.
+//! Immutable actual Linux/Windows Go observations; unrecorded hosts remain live.
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "f0a91ab986387f3e7b96a55388452bd56346f4e0";
+const NATIVE_REVISION: &str = "85acc5137f4bd703e6d809e84f66f7a986fc1873";
 const MANIFEST: &[u8] =
     include_bytes!("../../../../tests/fixtures/go-frozen/mcp-runtime/manifest.json");
+
+fn native_manifest(os: &str, arch: &str) -> Option<(&'static [u8], &'static str)> {
+    macro_rules! recorded {
+        ($directory:literal, $target:literal) => {
+            Some((
+                include_bytes!(concat!(
+                    "../../../../tests/fixtures/go-frozen/mcp-runtime-native-85/",
+                    $directory,
+                    "/manifest.json"
+                ))
+                .as_slice(),
+                $target,
+            ))
+        };
+    }
+    match (os, arch) {
+        ("linux", "x86_64") => recorded!("linux-amd64", "linux/amd64"),
+        ("linux", "aarch64") => recorded!("linux-arm64", "linux/arm64"),
+        ("windows", "x86_64") => recorded!("windows-amd64", "windows/amd64"),
+        ("windows", "aarch64") => recorded!("windows-arm64", "windows/arm64"),
+        _ => None,
+    }
+}
 
 pub fn live_required() -> bool {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => true,
         Ok("0") | Err(std::env::VarError::NotPresent) => {
-            !cfg!(all(target_os = "linux", target_arch = "x86_64"))
+            native_manifest(std::env::consts::OS, std::env::consts::ARCH).is_none()
         }
         _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
@@ -43,14 +67,29 @@ pub fn observation(family: &str) -> Vec<u8> {
         _ => panic!("unobserved MCP family cannot receive a cached answer"),
     };
     verify(MANIFEST, family, bytes);
+    // Unrecorded hosts only inspect the Linux capture in corruption controls;
+    // live_required() keeps their runtime comparator on the actual producer.
+    let (native, target) = native_manifest(std::env::consts::OS, std::env::consts::ARCH)
+        .unwrap_or_else(|| native_manifest("linux", "x86_64").unwrap());
+    verify_for_target(native, family, bytes, NATIVE_REVISION, target);
     bytes.to_vec()
 }
 
 fn verify(manifest_bytes: &[u8], family: &str, bytes: &[u8]) {
+    verify_for_target(manifest_bytes, family, bytes, REVISION, "linux/amd64");
+}
+
+fn verify_for_target(
+    manifest_bytes: &[u8],
+    family: &str,
+    bytes: &[u8],
+    revision: &str,
+    target: &str,
+) {
     let manifest: Value = serde_json::from_slice(manifest_bytes).unwrap();
-    assert_eq!(manifest["source_revision"], REVISION);
+    assert_eq!(manifest["source_revision"], revision);
     assert_eq!(manifest["go_version"], "go1.26.6");
-    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["native_target"], target);
     let sources = manifest["source_files"].as_object().unwrap();
     assert_eq!(sources.len(), 1476);
     for (name, record) in sources {
@@ -76,11 +115,12 @@ fn verify(manifest_bytes: &[u8], family: &str, bytes: &[u8]) {
     assert_eq!(record["stderr"]["bytes"], 0);
     assert_eq!(record["stderr"]["sha256"], digest(&[]));
     let info = record["embedded_build_info"].as_str().unwrap();
+    let (os, arch) = target.split_once('/').unwrap();
     for expected in [
-        format!("vcs.revision={REVISION}"),
+        format!("vcs.revision={revision}"),
         "vcs.modified=false".to_owned(),
-        "GOOS=linux".to_owned(),
-        "GOARCH=amd64".to_owned(),
+        format!("GOOS={os}"),
+        format!("GOARCH={arch}"),
     ] {
         assert!(info.contains(&expected), "native MCP build provenance");
     }
@@ -99,6 +139,40 @@ fn verify(manifest_bytes: &[u8], family: &str, bytes: &[u8]) {
 
 #[test]
 fn changed_frames_unknown_families_and_source_identity_are_rejected() {
+    assert!(native_manifest("macos", "x86_64").is_none());
+    assert!(native_manifest("macos", "aarch64").is_none());
+    for (os, arch) in [
+        ("linux", "x86_64"),
+        ("linux", "aarch64"),
+        ("windows", "x86_64"),
+        ("windows", "aarch64"),
+    ] {
+        let (native, target) = native_manifest(os, arch).unwrap();
+        for family in ["mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps"] {
+            let bytes = observation(family);
+            verify_for_target(native, family, &bytes, NATIVE_REVISION, target);
+            assert!(
+                std::panic::catch_unwind(|| verify_for_target(
+                    native,
+                    family,
+                    &bytes[..bytes.len() - 1],
+                    NATIVE_REVISION,
+                    target
+                ))
+                .is_err()
+            );
+            assert!(
+                std::panic::catch_unwind(|| verify_for_target(
+                    native,
+                    family,
+                    &bytes,
+                    NATIVE_REVISION,
+                    "fabricated/target"
+                ))
+                .is_err()
+            );
+        }
+    }
     for family in ["mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps"] {
         let bytes = observation(family);
         let mut changed = bytes.clone();

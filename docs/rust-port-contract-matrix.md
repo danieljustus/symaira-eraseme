@@ -13,14 +13,29 @@
 
 ## Granular issue ownership (2026-10-02)
 
+Actual 110-observation run `37167564927` at clean `85acc513` records complete
+MCP runtime frames on both Linux and both Windows hosts. All four downloaded
+98-member archives independently validate all 1476 immutable inputs, native
+Go 1.26.6/unmodified VCS, whole streams, case counts and hostile clock-path
+controls. All three MCP families are byte-identical to the retained actual
+Linux frames. Defaults now additionally validate the producing native
+manifest on these four hosts; macOS and explicit live mode retain actual Go.
+Original Linux provenance stays verified too. Existing corruption controls
+check truncated frames and fabricated target identities on all four native
+captures. Local and current native reader acceptance remain pending.
+
+
 The Go-absent workflow now runs every core/engine/CLI library and binary
-unit test, replacing the narrow 98-MCP/three-writer selection. At clean
+unit test, replacing the narrow 98-MCP/two-writer selection. At clean
 `90c50c0`, 225 actual unit tests pass without Go and no failures occur. The
 existing isolated consent child is marked ignored only at top-level libtest:
 its passing parent actually launches and verifies all sixteen child cases
 with their separate umask/resource limits. It is never credited as skipped
-acceptance. The selected total becomes 359 passing tests (prior 235 less
-101 replaced tests plus 225 units); the exact full new workflow is pending.
+acceptance. The selected total becomes 360 passing tests (prior 235 less
+100 replaced tests plus 225 units). The exact full new Go-absent workflow
+passes at clean `2fd1645` with 360 passing tests and zero failures; its sole
+top-level ignored harness child is actually executed sixteen times by the
+passing parent. It contributes no skipped acceptance.
 Native six-target reader acceptance and complete-workspace independence
 remain open.
 
