@@ -22,6 +22,7 @@ on:
       - crates/symeraseme-cli/src/mcp/**
       - crates/symeraseme-cli/tests/support/frozen_mcp_runtime.rs
       - crates/symeraseme-cli/tests/support/frozen_grant_oracle.rs
+      - crates/symeraseme-cli/tests/support/frozen_schedule_oracle.rs
       - crates/symeraseme-cli/tests/support/migration_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
       - crates/symeraseme-core/tests/support/frozen_go_oracle.rs

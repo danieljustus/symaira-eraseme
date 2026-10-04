@@ -7,6 +7,9 @@ mod frozen_review_oracle;
 #[path = "support/frozen_grant_oracle.rs"]
 mod frozen_grant_oracle;
 
+#[path = "support/frozen_schedule_oracle.rs"]
+mod frozen_schedule_oracle;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -1607,10 +1610,8 @@ fn hash_tree(
     out
 }
 
-/// The frozen schedule bytes were recorded on Unix. On Windows, execute the
-/// same checked-in Go oracle rather than comparing against Unix path syntax.
-#[cfg(windows)]
-fn windows_schedule_fixture() -> Value {
+/// Explicit live mode and unrecorded Windows hosts execute the same Go oracle.
+fn live_schedule_fixture() -> Value {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated oracle capture root");
     let _cleanup = Cleanup(root.clone());
@@ -1622,6 +1623,10 @@ fn windows_schedule_fixture() -> Value {
     command
         .args(["run", "./rust-tests/parity/oracle/cli-schedule"])
         .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOPROXY", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
         .env("TMP", &root)
         .env("TEMP", &root)
         .stdin(Stdio::null())
@@ -1649,7 +1654,7 @@ fn windows_schedule_fixture() -> Value {
         "Go schedule oracle failed: {}",
         String::from_utf8_lossy(&read_bounded(&stderr_path))
     );
-    serde_json::from_slice(&read_bounded(&stdout_path)).expect("Windows Go schedule fixture")
+    serde_json::from_slice(&read_bounded(&stdout_path)).expect("actual native Go schedule fixture")
 }
 
 /// `schedule install/uninstall/status` answer the Go oracle's recorded bytes.
@@ -1661,10 +1666,14 @@ fn windows_schedule_fixture() -> Value {
 /// exact everywhere else.
 #[test]
 fn schedule_commands_match_the_go_oracle() {
-    #[cfg(windows)]
-    let fixture = windows_schedule_fixture();
-    #[cfg(not(windows))]
-    let fixture: Value = serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture");
+    let fixture = frozen_schedule_oracle::fixture().unwrap_or_else(|| {
+        if cfg!(windows) || frozen_schedule_oracle::live_requested() {
+            live_schedule_fixture()
+        } else {
+            // Retain the existing Unix fixture until a Mac-native capture is read back.
+            serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture")
+        }
+    });
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.cli.v1");
     assert_eq!(
         fixture["source"],
@@ -2854,4 +2863,9 @@ fn frozen_grant_records_reject_changed_payload_names_and_modes() {
 #[test]
 fn frozen_review_native_records_reject_changed_frames() {
     frozen_review_oracle::verify_all_native_records_and_reject_changed_frames();
+}
+
+#[test]
+fn frozen_schedule_native_records_reject_changed_frames_and_case_loss() {
+    frozen_schedule_oracle::verify_all_native_frames_and_reject_corruption();
 }

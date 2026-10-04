@@ -13,6 +13,18 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The thirteen CLI schedule cases now select complete actual Linux2/Windows2
+outputs from native source `85acc513`, with native unmodified VCS and all
+1476 immutable input pins. Windows bytes are retained separately from Unix
+bytes; original Rust stdout/stderr/status and generated-file hashes remain
+compared. Explicit live mode executes the original finite Go producer with
+offline modules and unchanged process/capture bounds. Unrecorded macOS
+retains its existing Unix fixture pending actual native readback. A new
+control checks all four full native frames and rejects corruption, case loss
+and fabricated source/target identity. Local/current native acceptance is
+pending; the expected selected total becomes 361 tests.
+
+
 Actual 110-observation run `37167564927` at clean `85acc513` records complete
 MCP runtime frames on both Linux and both Windows hosts. All four downloaded
 98-member archives independently validate all 1476 immutable inputs, native
@@ -22,7 +34,9 @@ Linux frames. Defaults now additionally validate the producing native
 manifest on these four hosts; macOS and explicit live mode retain actual Go.
 Original Linux provenance stays verified too. Existing corruption controls
 check truncated frames and fabricated target identities on all four native
-captures. Local and current native reader acceptance remain pending.
+captures. At clean `dd51bb0`, all 102 CLI binary unit tests pass without Go, including
+all 98 MCP tests; the same three changed comparators pass with private real
+Go. Current native reader acceptance and strict CLI Clippy remain pending.
 
 
 The Go-absent workflow now runs every core/engine/CLI library and binary

@@ -71,3 +71,4 @@ rust-tests/parity/oracle/cases.json text eol=lf
 tests/fixtures/go-frozen/mcp-runtime/** -text
 tests/fixtures/go-frozen/cli-grant-native-344/** -text
 tests/fixtures/go-frozen/mcp-runtime-native-85/** -text
+tests/fixtures/go-frozen/cli-schedule-native-85/** -text
