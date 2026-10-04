@@ -250,7 +250,7 @@ jobs:
         run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
       - name: Compare native Windows MCP HTTP against Go
         shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked
+        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked -- --test-threads=1
 
   rust-tools-cache:
     name: Rust / verification tools cache

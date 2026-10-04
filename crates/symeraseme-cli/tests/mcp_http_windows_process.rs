@@ -749,6 +749,7 @@ fn console_shutdown_matches_go(ctrl_c: bool) {
                 // ignore flag. The new server must inherit CTRL_C enabled.
                 assert_ne!(unsafe { SetConsoleCtrlHandler(None, 0) }, 0);
             }
+            println!("{signal} starting {name} MCP process in private console");
             let mut server = start_with_flags(
                 binary,
                 &server_root,

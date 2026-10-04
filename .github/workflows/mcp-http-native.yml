@@ -113,7 +113,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture --test-threads=1
       - name: Native Unix process and signal contracts
         if: runner.os != 'Windows'
         shell: bash

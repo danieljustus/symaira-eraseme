@@ -89,3 +89,12 @@ queued CI. The accepted run above contains both macOS cleanup results,
 all twelve actual OS-store TLS cases and source-bound mailbox/OAuth2
 transcript gates remain mandatory. No mailbox, operator profile or paid
 provider is used. The finite probes do not establish every chain-policy case.
+
+## Verified main integration (2026-10-04)
+
+Exact head `b07e81d02bcd35d424c5c75090992f1d1b8fe3c1` passed six native
+trust jobs in run `37197122235`, all six full workspace jobs in `37199861723`
+and all PR checks. PR #1146 merged normally by squash as
+`ee03eb277ade28fd6deaef976f7d9bfc4db8a468`; its Git tree equals the tested
+head. #1119 is closed/completed, so tasks 6.1/6.3/6.4 are integrated. Earlier
+pending statements describe the earlier source and are superseded here.
