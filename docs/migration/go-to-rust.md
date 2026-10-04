@@ -21,8 +21,13 @@ comparators; original Rust whole-frame/state/effect checks stay intact.
 The other five native targets and explicit live-Go mode retain the actual
 producer. A control rejects changed/truncated streams, unknown families
 and fabricated source identity. The Go-free workflow adds the complete MCP
-unit test group. Local reader verification and current native CI are pending;
-no all-target or complete-workspace Go independence is claimed.
+unit test group. At clean `0cfba7c1e3587667de602ba3bdb7d3a28670f90a`,
+all 98 MCP unit tests and the exact full 235-test default workflow pass with
+Go absent (zero failures/ignored tests). Each of the three changed Go-backed
+comparisons also passes explicitly selected real Go 1.26.6 in private roots,
+including the original hostile project/compiler-temp checks. Strict CLI
+Clippy passes. Current native CI remains required; no all-target or complete-
+workspace Go independence is claimed.
 
 ### Native MCP/Windows schedule capture preparation (2026-10-04, #1131)
 
