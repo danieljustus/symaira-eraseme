@@ -10,6 +10,29 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The stricter complete-header HTTP comparator now also replays a measured
+Linux amd64 record from clean producer
+`17cfa0931b853345bd0b14afda3f77f25d66c656`. Its ten original cases retain the
+entire raw response: status line, every header including the original Date,
+and complete body bytes. The unchanged parser validates exactly one
+canonical Date before applying the original `<DATE>` comparison. All other
+header values, duplicate-header controls, status assertions and exact body
+comparisons remain intact. The actual 39156-byte record has SHA-256
+`09a5a5329c9d37839e22b7a6b0c793b5e5cd566dd292a6ac4027c681993b3bdf`;
+171 Go sources and three immutable/current generator pins verify. Original
+cleanup kills the servers; exit/stdout/stderr are outside this comparator.
+Unrecorded targets and explicit live/capture modes still execute actual Go.
+
+At clean `114fd2a5bf1455f874c17a91fe42010954b725de`, the exact default
+Go-absent workflow passes **372 tests, zero failures**, including all five
+complete-header tests and both ten-case HTTP process comparators. The sole
+consent child runs all sixteen isolated cases under its passing parent.
+All eighteen retained native files match immutable Git blobs and an actual
+autocrlf checkout. The same ten complete-header cases pass with private
+actual Go; strict CLI all-target Clippy passes. Current native HTTP reader
+acceptance remains pending, with raw complete-header captures required on
+all six hosts and the older wire captures on all four Unix hosts.
+
 The Linux amd64 original HTTP wire comparator now consumes a measured actual
 Go record from clean producer `b518d619f297754970ac7b44f86497aafd1072ad`.
 All ten unchanged request cases still compare real Rust HTTP status,
