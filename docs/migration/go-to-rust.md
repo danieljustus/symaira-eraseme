@@ -31,6 +31,17 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Artifact-level SBOM preparation (2026-10-03, #1128)
+
+The native shadow archive workflow now prepares embedded Cargo inventories
+with pinned cargo-auditable and rust-audit-info, records native Go fallback
+build info, and binds both executables and archives into CycloneDX documents.
+Independent packed-member readback reproduces every inventory and SBOM.
+Six local mutation/identity controls and a real Linux ELF extractor smoke pass;
+these are preparation evidence only. REL-010 and release/Homebrew rows remain
+PARTIAL pending native product archives, signatures, provenance, audit/deny
+and published readback. Details: [artifact SBOM handoff](../rust-port/handoffs/2026-10-03-artifact-sbom.md).
+
 ## Complete MCP tool byte acceptance (2026-10-03, #1124)
 
 The new `mcp-tools-native.yml` selects all six native targets. It combines
@@ -54,10 +65,12 @@ Native run `37137670713` passed all six targets at
 `b45637860246dc51ca02a5158326b14bfbf0af01`). Each target actually executes
 97 selected MCP tests, all 25 newly complete Go responses, retained stdio
 cases and both native-agent tests. MCP-003/004/005 pass their scoped contracts.
-Full native workspace run `37137772972` has its Intel Mac pending at this
-acceptance update; final current-head PR checks and main integration remain
-required. Task 8.1 remains unfinished because its aggregate gate also includes
-#1126, and task 8.5 still depends on completed CLI/handler wiring. See
+Full native workspace run `37137772972` passed all six targets. PR #1153
+integrated as `7a1baac8051de92527141b1e6e120b6dd5ddbcb4` after all 39
+current-head checks and all nine overall workflows completed successfully.
+Issue #1124 is completed for its scoped MCP-003/004/005 acceptance. Task 8.1
+remains unfinished under #1126; task 8.4 retains its remaining open owners.
+Task 8.5 remains gated by completed CLI/handler wiring and is owned by #813. See
 `docs/rust-port/handoffs/2026-10-03-mcp-all-tools-bytes.md` and the coordinator
 specification/quality reviews; no independent-agent review is claimed.
 
