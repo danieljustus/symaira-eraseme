@@ -130,7 +130,7 @@ fn make_tls_config(root_store: Option<RootCertStore>) -> Result<ClientConfig, St
     Ok(config)
 }
 
-fn platform_root_store() -> Result<RootCertStore, String> {
+pub(crate) fn platform_root_store() -> Result<RootCertStore, String> {
     let certificates = super::super::tls::platform_certificates()
         .map_err(|error| format!("{ERR_IMAP}: {error}"))?;
     let mut roots = RootCertStore::empty();

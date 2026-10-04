@@ -37,7 +37,8 @@ pub use policy::{
 pub use service::{InboxService, ReplyStore};
 pub use session::{FetchedMessage, ImapDialer, ImapSession};
 pub use smtp::{
-    EmailMessage, SmtpError, SmtpTransport, build_mime_at, recipients, send_message_at,
+    EmailMessage, NetSmtpTransport, SmtpConfig, SmtpError, SmtpTransport, build_mime_at,
+    recipients, send_message_at,
 };
 pub use types::{
     ImapConfig, ImapError, MatchMethod, MatchedMessage, Message, OAuth2Token, RemovalRequest,
