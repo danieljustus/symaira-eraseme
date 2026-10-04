@@ -10,6 +10,29 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Six-target LLM and review frozen preparation (2026-10-04, #1131)
+
+The final macOS arm64 artifact `11288785362` from capture run `37158381207`
+was downloaded with its published digest and independently checked against
+immutable source `0d1be28288594354941a07d19f834f2553928bc4`:
+all 194 source/input files, all 65 archive members, native unmodified Go build
+info, seven complete LLM outputs and eight complete review process records.
+The whole LLM/review status/stdout/stderr bytes match the existing records.
+The later Rust scheduler failure remains retained: launchd own-unit reinstall
+reported `Invalid argument (os error 22)` at the shared PID-root fixture.
+The branch already replaces shared scheduler roots with separately owned
+TempDirs; current six-target Rust acceptance remains required.
+
+Default LLM and review comparisons now require their actual native manifest
+on all six targets. Review checks every native argv, status and full stream
+hash before using the original measured bytes. An added control verifies all
+six recorded hosts and rejects a changed process status. The grant default
+remains separately live outside Linux because its native captures are not
+complete. Explicit live-Go mode still builds and executes the pinned producer.
+The selected Linux Go-free workflow contains 137 tests (24 whole CLI tests),
+with local verification pending at this preparation commit. No contract row,
+phase, issue completion, release, or Go retirement is inferred from captures.
+
 ### Reviewed five-target LLM frozen preparation (2026-10-03, #1131)
 
 Five actual Go artifact archives from run `37158381207` at clean source

@@ -1284,7 +1284,7 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
     let original = b"Alice Example <alice@example.invalid>\n";
     fs::write(&input, original).expect("review input");
 
-    let live = frozen_review_oracle::live_required();
+    let live = frozen_review_oracle::live_review_required();
     let go_binary = live.then(|| build_go_cli(&root));
     let frozen = if live {
         Vec::new()
@@ -2848,4 +2848,9 @@ fn frozen_grant_records_reject_changed_payload_names_and_modes() {
     assert_eq!(frozen_grant_oracle::records(2).len(), 2);
     assert!(frozen_grant_oracle::records(4).is_empty());
     assert!(frozen_grant_oracle::records(5).is_empty());
+}
+
+#[test]
+fn frozen_review_native_records_reject_changed_frames() {
+    frozen_review_oracle::verify_all_native_records_and_reject_changed_frames();
 }

@@ -13,6 +13,15 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 preparation additionally includes the independently verified native
+macOS arm64 capture (artifact `11288785362`, source `0d1be282`), so default
+LLM and review oracles now bind complete measured records on all six targets.
+Review validates native argv/status/full streams; a six-record corruption
+control is added. Grant retains its separate Linux-only frozen default.
+The selected Linux Go-free workflow now contains 137 tests; current local
+and six-target Rust acceptance are pending. The old native Mac scheduler
+failure is retained; no row or cutover gate is promoted by this preparation.
+
 The #1131 LLM preparation now binds default observations to five independently
 downloaded native Go manifests (Linux/Windows both architectures and macOS
 Intel) from `37158381207` at `0d1be28`. All 65 archive members, 194 source/input

@@ -292,7 +292,7 @@ fn verify_frozen_llm_fixture(fixture: &[u8], args: &[&str]) {
     {
         let manifest =
             frozen_native_capture::verify(bytes, std::env::consts::OS, std::env::consts::ARCH);
-        frozen_native_capture::verify_llm(&manifest, fixture, args);
+        verify_native_llm(&manifest, fixture, args);
         return;
     }
     let manifest: Value = serde_json::from_slice(include_bytes!(
@@ -354,10 +354,11 @@ fn native_frozen_llm_records_reject_wrong_target_and_source_inventory() {
         ("windows", "x86_64"),
         ("windows", "aarch64"),
         ("macos", "x86_64"),
+        ("macos", "aarch64"),
     ] {
         let bytes = frozen_native_capture::manifest_bytes(os, arch).unwrap();
         let manifest = frozen_native_capture::verify(bytes, os, arch);
-        frozen_native_capture::verify_llm(&manifest, FIXTURE.as_bytes(), &[]);
+        verify_native_llm(&manifest, FIXTURE.as_bytes(), &[]);
         let mut wrong = manifest.clone();
         wrong["native_target"] = "fabricated/host".into();
         assert!(
@@ -382,7 +383,6 @@ fn native_frozen_llm_records_reject_wrong_target_and_source_inventory() {
             .is_err()
         );
     }
-    assert!(frozen_native_capture::manifest_bytes("macos", "aarch64").is_none());
     assert!(frozen_native_capture::manifest_bytes("linux", "unrecorded").is_none());
 }
 
@@ -585,4 +585,21 @@ fn read_request(stream: TcpStream) -> (TcpStream, String) {
         .read_exact(&mut request_body)
         .expect("read request body");
     (reader.into_inner(), path)
+}
+
+fn verify_native_llm(manifest: &Value, fixture: &[u8], args: &[&str]) {
+    let case = manifest["llm_failures"]["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["args"] == serde_json::to_value(args).unwrap())
+        .expect("unobserved native LLM arguments cannot receive a cached answer");
+    assert_eq!(case["exit_status"], 0);
+    assert_eq!(case["stdout"]["bytes"], fixture.len());
+    assert_eq!(
+        case["stdout"]["sha256"],
+        hex::encode(Sha256::digest(fixture))
+    );
+    assert_eq!(case["stderr"]["bytes"], 0);
+    assert_eq!(case["stderr"]["sha256"], hex::encode(Sha256::digest([])));
 }

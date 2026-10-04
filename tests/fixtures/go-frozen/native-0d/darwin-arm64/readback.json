@@ -1,0 +1,16 @@
+[
+  {
+    "id": 11288785362,
+    "name": "frozen-go-services-macOS-ARM64",
+    "digest": "sha256:837d7274cdf271a1d6586a7d3d6e528923566dbdb5048304f241089e5e06a6b5",
+    "size_bytes": 42454,
+    "path": "/workspace/attachments/4d271e67-0fda-4649-919d-9b7d4764177a/frozen-go-56-mac-arm-11288785362.zip",
+    "native_target": "darwin/arm64",
+    "source_revision": "0d1be28288594354941a07d19f834f2553928bc4",
+    "source_files_verified": 194,
+    "archive_members_verified": 65,
+    "llm_whole_bytes_match_existing_fixtures": true,
+    "cli_review_whole_bytes_match_linux": true,
+    "native_full_suite": "Linux arm64 retains actual scheduler root-race failure; this verifies Go captures only"
+  }
+]
