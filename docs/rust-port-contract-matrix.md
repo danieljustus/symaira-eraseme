@@ -19,8 +19,11 @@ their complete streams to all six actual native `0d1be282` recordings and
 projection uses each target's measured amd64 or arm64 overflow results.
 Existing Linux provenance and every Rust service/state comparison remain.
 The corruption controls verify all six actual native full frames and reject
-truncation. Local and current native reader acceptance are pending; no new
-Go-free test count or row promotion is claimed.
+truncation. At clean `90c50c01145359ce35f2e81ce78671c2cbb7e827`, all eight
+affected triage/projection tests pass with Go absent and in private actual
+live-Go mode. Strict core Clippy passes. The selected workflow remains 235
+tests; unchanged other-family proof is retained from `0cfba7c`/`48fd77c`.
+Current native reader acceptance is pending; no row is promoted.
 
 
 Actual source `344dfaae` native grant captures on Linux amd64/arm64 and
