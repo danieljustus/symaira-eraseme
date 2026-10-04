@@ -919,3 +919,18 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Default Rust app bundle candidate (2026-10-04, #1127)
+
+The shared app build script now places the actual Cargo executable under
+`symeraseme` and builds `symeraseme-go` only as the explicit transitional
+sibling. Development builds and DMG staging use the same helper. Both nested
+executables are signed and verified before outer app signing. Configured paths
+retain priority; ordinary bundle discovery launches the default Rust name.
+The Swift integration gate exercises both explicit shadow discovery and actual
+staged bundle discovery with an empty configured Binary Path, private data,
+authentication, tool calls and bounded shutdown. Both native Mac architectures
+must pass the complete Swift suite without skipped integration cases.
+Shell syntax and the existing packaging controls pass locally, including exact
+Rust-member identity and both nested signing order checks. APP-001 remains
+PARTIAL pending real native CI; unsigned staging does not prove #1129.

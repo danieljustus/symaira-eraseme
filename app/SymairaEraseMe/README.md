@@ -1,24 +1,23 @@
 # SymairaEraseMe
 
 Native SwiftUI macOS app for the Symaira EraseMe dashboard. Connects to the
-self-contained Go MCP JSON-RPC server (`symeraseme mcp`) over HTTP.
+self-contained Rust MCP JSON-RPC server (`symeraseme mcp`) over HTTP.
 
 ## Requirements
 
 - macOS 14+ (Sonoma)
 - Swift 5.10+ with Xcode or Xcode-beta installed (SwiftUI macro plugins required)
-- Go 1.26+ for development builds (the release app bundles the Go server)
+- Rust 1.98.0 and Go 1.26.6 for development builds (the app bundles Rust as `symeraseme` and the transitional Go fallback as `symeraseme-go`)
 
 ## Build
 
 ```bash
-# Using the build script (builds Swift + Go and colocates both binaries)
+# Using the build script (builds Swift + Rust and the explicit Go fallback)
 ./build.sh
 
-# Or manually with Xcode (then build the Go server next to the Swift binary)
+# Or manually with Xcode, then build the matching backend siblings
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
-GO_BIN="$(swift build --show-bin-path)/symeraseme"
-(cd ../.. && CGO_ENABLED=0 go build -trimpath -o "$GO_BIN" ./cmd/symeraseme)
+../../scripts/build-app-backends.sh "$(swift build --show-bin-path)" debug
 
 # Or open in Xcode
 open Package.swift
@@ -49,7 +48,7 @@ Sources/SymairaEraseMe/
 │   └── Profile.swift        IdentityProfile, ExecuteResponse
 ├── Services/
 │   ├── MCPClient.swift      JSON-RPC 2.0 HTTP actor (tools/call, tools/list)
-│   └── ServerManager.swift  Bundled/Dev/Homebrew Go server process manager
+│   └── ServerManager.swift  Bundled/Dev/Homebrew backend process manager
 ├── ViewModels/     @MainActor ObservableObject view models
 │   ├── DashboardViewModel.swift
 │   ├── CampaignsViewModel.swift

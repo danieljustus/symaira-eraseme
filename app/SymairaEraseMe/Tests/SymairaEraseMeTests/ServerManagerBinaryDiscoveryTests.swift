@@ -1,7 +1,7 @@
 import XCTest
 @testable import SymairaEraseMe
 
-/// Tests for #727: the app launches the self-contained Go server from the
+/// Tests for #727: the app launches the self-contained Rust server from the
 /// bundle or the local SPM build before considering Homebrew.
 final class ServerManagerBinaryDiscoveryTests: XCTestCase {
 
@@ -152,7 +152,7 @@ final class ServerManagerBinaryDiscoveryTests: XCTestCase {
     func testStartFailureMessageExplainsMissingCli() {
         XCTAssertEqual(
             ServerManager.startFailureMessage(refusals: []),
-            "Could not find the symeraseme CLI. Install the self-contained Go binary via Homebrew or set the Binary Path in Settings."
+            "Could not find the symeraseme CLI. Install the self-contained binary via Homebrew or set the Binary Path in Settings."
         )
     }
 
