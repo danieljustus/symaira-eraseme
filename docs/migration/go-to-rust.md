@@ -10,6 +10,26 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+Linux amd64 now prepares frozen references for both complete consented plan
+process tests using the actual unmodified records from `fae7b5d`. Whole-record
+SHA-256 pins seal stdout/stderr/status, all 171 Go sources and the original
+state/events/manual-task tuple. The archived Rust input generators are
+verified against their immutable Git blobs. Real Rust processes, exact byte
+comparisons and every existing persisted-effect assertion remain intact;
+changed/truncated records and fabricated state are rejected. Explicit capture
+always executes actual Go, as do explicit live mode and unrecorded targets.
+The Go-absent workflow adds both original tests (expected total 366).
+Local reader/workflow validation and current native acceptance are pending.
+
+Actual run `37170268056` at clean `9e1a0bb` passes four complete native Rust
+suites (Linux and Windows on amd64 and arm64). All four downloaded artifacts
+independently verify all 1481 immutable source/input pins, native unmodified
+Go VCS and complete observations: 132 cases/115 exact members on Unix and
+111 cases/103 exact members on Windows. Provider cancellation and the Unix
+process fixtures match their original byte-exact corpora. Both Mac jobs
+remain queued; their acceptance and the new plan recordings are pending.
+
+
 The existing two complete consented plan-execution process comparators now
 prepare an opt-in actual Go recorder. When explicitly selected, it retains
 whole stdout/stderr/status and the original persisted state/events/manual-task
@@ -18,9 +38,11 @@ tuple for both private synthetic web-form and senderless-email cases. All
 Go 1.26.6/unmodified VCS are included; cross-compilation, dirty sources and
 existing output files are rejected. The narrow upload contains exactly two
 JSON records, excluding databases, consent tokens, profiles and build caches.
-Both real Go/Rust process comparisons still execute by default. Local recorder
-validation, actual native capture and frozen-reader integration are pending;
-this preparation does not establish further Go independence.
+Both original complete Go/Rust process comparisons pass in disposable roots
+at clean `fae7b5da416db5e491ed3b4d1944069d3f80d291`. Independent readback
+validates both whole output/effect records, all 171 immutable Go inputs, all
+three archived input-generator identities and actual native Go VCS. Current
+native recordings and frozen-reader acceptance remain required.
 
 
 The subsequent actual 110-observation run `37168958036` at clean
