@@ -96,7 +96,10 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked -p symeraseme-engine --test migration --test migration_json --test migration_review_regressions --test migration_native_paths -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/migration-engine.log"
-          cargo test --locked -p symeraseme-cli --test command_surface -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/cli-contracts.log"
+          # These tests each parse the complete embedded broker registry. Run
+          # them serially so native runner contention does not consume a
+          # child's unchanged ten-second execution deadline.
+          cargo test --locked -p symeraseme-cli --test command_surface -- --test-threads=1 --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/cli-contracts.log"
           cargo test --locked -p symeraseme-cli --test plan_execute_live_process -- --nocapture 2>&1 | tee "$RUNNER_TEMP/restore-logs/manual-fallback.log"
       - name: Run eight real migration and restore cases with native kernel controls
         shell: bash

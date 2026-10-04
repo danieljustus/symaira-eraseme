@@ -982,3 +982,14 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Native backup CLI scheduling repair (2026-10-04, #1122)
+
+Current-head Intel macOS job `111394036537` in run `37188012522`
+passed the migration engine and 19 of 21 command-surface tests, then
+exceeded the existing ten-second child budget in two broker commands.
+The backup workflow now runs all 21 command-surface tests serially, avoiding
+concurrent full-registry parsing on the native runner. The ten-second process
+deadline, four-MiB capture limit, comparisons and all eight restore cases
+remain unchanged. Fresh six-target acceptance is required; the retained
+failed run is not completion evidence.
