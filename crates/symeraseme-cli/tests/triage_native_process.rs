@@ -191,7 +191,7 @@ fn normalize_provider_order(stderr: &[u8]) -> Vec<u8> {
     format!("{}{}{}", &text[..start], providers.join(", "), &text[end..]).into_bytes()
 }
 
-fn prepare(logs: &Path) -> (PathBuf, PathBuf) {
+fn prepare(logs: &Path) -> (PathBuf, PathBuf, PathBuf) {
     let go = oracle(logs);
     let bin = logs.join("bin");
     fs::create_dir(&bin).unwrap();
@@ -215,7 +215,21 @@ fn prepare(logs: &Path) -> (PathBuf, PathBuf) {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    (go, bin)
+    let rust_bin = logs.join("rust-bin");
+    fs::create_dir(&rust_bin).unwrap();
+    let rust_agent = rust_bin.join(agent.file_name().unwrap());
+    let mut build = Command::new("rustc");
+    build
+        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
+        .arg(&rust_agent)
+        .arg(repo().join("crates/symeraseme-cli/tests/fixtures/native_triage_agent.rs"));
+    let output = capture(build, logs, "rust-agent-build", Duration::from_secs(60));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    (go, bin, rust_bin)
 }
 
 fn command(binary: &Path, root: &Path, bin: &Path) -> Command {
@@ -267,7 +281,7 @@ fn assert_process_and_state(
 #[test]
 fn native_cli_triage_matches_go_for_every_retained_case() {
     let root = tempfile::tempdir().unwrap();
-    let (go, bin) = prepare(root.path());
+    let (go, bin, rust_bin) = prepare(root.path());
     let cases: Value = serde_json::from_slice(
         &fs::read(repo().join("tests/fixtures/cli-triage/cases.json")).unwrap(),
     )
@@ -294,7 +308,11 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
                 &rust_root,
             ),
         ] {
-            let mut child = command(binary, directory, &bin);
+            let mut child = command(
+                binary,
+                directory,
+                if label == "go" { &bin } else { &rust_bin },
+            );
             child.args(&argv).stdin(Stdio::null());
             for (key, value) in case["environment"].as_object().unwrap() {
                 child.env(key, value.as_str().unwrap());
@@ -331,7 +349,7 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
 #[test]
 fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
     let root = tempfile::tempdir().unwrap();
-    let (go, bin) = prepare(root.path());
+    let (go, bin, rust_bin) = prepare(root.path());
     let cases = [
         (
             "classify-nosave",
@@ -390,7 +408,11 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
                 &rust_root,
             ),
         ] {
-            let mut child = command(binary, directory, &bin);
+            let mut child = command(
+                binary,
+                directory,
+                if label == "go" { &bin } else { &rust_bin },
+            );
             child
                 .args(["mcp", "--stdio"])
                 .env("SYMERASEME_LLM_PROVIDER", "agent")
