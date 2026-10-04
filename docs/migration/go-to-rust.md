@@ -10,6 +10,15 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+### Current-main offline backup oracle preparation (2026-10-04, #1122)
+
+Job `111323926955` failed before grant parity because the macOS Intel module
+cache was cold and its source-bound builder correctly refused network with
+`GOPROXY=off`. The native backup workflow now downloads modules against the
+committed checksum inventory and runs `go mod verify` before the unchanged
+offline CLI suite. Local module verification and the task graph check pass.
+The failed job remains retained; new six-target acceptance is pending.
+
 ### Backup candidate Windows HTTP fixture reconciliation (2026-10-03)
 
 Fresh main-based #1154 head `04d33e700ed486b11a4aea4c0de1a83050269429`
