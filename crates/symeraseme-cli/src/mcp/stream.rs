@@ -402,7 +402,8 @@ mod tests {
     }
 
     /// Run source-generated Go diagnostics through both production stream
-    /// paths, including one-byte reads and every possible offending byte.
+    /// paths, including one-byte reads, every possible offending byte and
+    /// the eight additive ping frames.
     #[test]
     fn go_syntax_oracle_matches_buffered_and_chunked_streams() {
         use base64::{Engine, engine::general_purpose::STANDARD};
@@ -443,7 +444,7 @@ mod tests {
             }
             executed += 1;
         }
-        assert_eq!(executed, 666);
+        assert_eq!(executed, 674);
     }
 
     /// Go's recorded syntax-error wording for the bytes the shared scanner
