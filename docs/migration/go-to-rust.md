@@ -10,6 +10,40 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The subsequent complete run `37174075472` at clean `30b38e2` retains
+all eleven disjoint shard inventories and all 718 outcomes. State projection
+passes (26 caught / 115 unviable / zero missed). Crypto has 6 missed of 117,
+consent 5 of 86, sanitization 35 of 272 and HTTP 11 of 102; the entire
+campaign correctly fails. The separate complete MCP result remains 331
+mutants, zero missed, and Miri plus all six fuzz targets pass. All original
+failed results remain retained.
+
+At clean `3ae43b06e930b19e9747b0218288776bcf458d54`, the second repairs
+pass 160 core/integration cases, 19 actual HTTP cases and the 25-case crypto
+selection. The two core and one HTTP top-level child harnesses are executed
+by their passing parents. Strict core/CLI all-target Clippy, formatting and
+the task-graph check pass. Eight additional actual compiled regressions are
+caught and restored, including worker/body-collector error signs, complete
+SSN filtering, short email masks, intermediate review limits, consent error
+translation/real kernel close failure and encryption detection. There are
+now 27 retained compiled negative controls across the two repair rounds.
+The complete outcome gate and all six campaign-verifier controls pass.
+
+Fourteen exact mutants are proved equivalent in the
+[classification report](../rust-port/handoffs/mutation-equivalence-2026-10-04.md):
+array prevalidation, redundant terminal loops, empty Unicode segments,
+domain validation and fixed redaction resource/regex invariants. Seven
+cfg-disabled HTTP/Windows-close mutants are excluded only in the applicable
+Linux command. Both native target and the exact exclusions are sealed into
+its receipt and verified; the global configuration keeps these platform
+branches selected on their native targets. Native create/close operations
+retain their original semantics. Operation-local error boundaries test a
+real kernel EBADF without stale ownership, stop before chmod/publication,
+and preserve the old consent file and unrelated entries. New complete
+native mutation acceptance, all-six platform verification and the remaining
+fault/secret-sentinel evidence remain pending under issue #813. Per-mutant
+and per-job budgets stay at 30 seconds and 45 minutes.
+
 Task 8.5 preparation adds a native Linux mutation campaign over crypto,
 consent, HTTP authentication, redaction/path confinement and event projection.
 The pinned cargo-mutants 27.1.0, 30-second per-mutant timeout and 45-minute
