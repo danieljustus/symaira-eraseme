@@ -1748,3 +1748,34 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Current-main frozen native process preparation (2026-10-04, #1131)
+
+Main `12c0d6e6` changes actual Go MCP sources. Genuine Linux Go 1.26.6
+recaptures at `e6fc336212717bd8cd5e8cd8965aab255216d541` retain complete
+HTTP wire/header, SMTP transaction, native malformed-agent and CLI/MCP triage
+records. Native triage executes the original sixteen CLI and eight MCP inputs,
+whole streams/status, saved reply/ordered events and exact agent invocation
+counts. The Rust child is only a compiled synthetic agent fixture. Unrecorded
+targets and explicit live mode still execute actual Go; no oracle process is
+reimplemented. All 24 Linux cases and ten required CLI invocation controls pass
+with Go absent from PATH at `4f38201c`. The original wire/header, SMTP and
+malformed-agent parents also pass: eight selected parents, zero ignored or
+failed, plus strict core/CLI Clippy. Seven retained raw JSON Git blobs remain
+byte-identical under an actual autocrlf checkout.
+
+A clean original-comparator producer at `1410dacd` runs ten actual live parents
+and emits nine bounded synthetic records; all assertions and source/input
+archive bindings are independently verified. Manual native capture runs this
+producer before the complete source-bound reader gates, preserving observations
+when older references reject source drift. Every existing full suite and frozen
+reader check still executes and remains required. Historical six-target
+`6ca3072b` run `37176774792` succeeds completely; all six service archives and
+twelve whole-plan records are retained/read back, including macOS Intel.
+
+The dedicated default suite now selects both original native triage parents;
+its intended 379 passing tests still require genuine current-main captures and
+reader reconciliation on all six hosts. The earlier complete 377-test result
+remains bound to `5fbb447b`, before the Go source change. Six auxiliary HTTP
+process tests still require actual Go. Issue #1131 and complete workspace Go
+independence remain open; no release, default flip or Go retirement is claimed.
