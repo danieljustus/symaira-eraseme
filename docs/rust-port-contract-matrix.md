@@ -13,6 +13,16 @@
 
 ## Granular issue ownership (2026-10-02)
 
+Actual source `344dfaae` native grant captures on Linux amd64/arm64 and
+Windows amd64/arm64 are independently verified (82 complete archive members
+each). Their four raw manifests, all 48 process streams and all twenty
+whole consent records are retained byte-for-byte. Grant defaults now use
+these measured records on those four targets; macOS and explicit live mode
+continue the actual Go producer. Native Windows mode `0666` is measured,
+and Unix retains `0600`; no Windows private ACL assertion is replaced.
+The existing corruption control also checks all four provenances. Local
+validation and current native Rust acceptance are pending.
+
 The current #1131 Windows MCP jobs rejected CRLF conversion of embedded
 broker YAML before validating the cached stream. All 1283 embedded broker
 inputs now have explicit LF checkout attributes, and the pinned SQLite

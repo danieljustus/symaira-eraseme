@@ -2538,7 +2538,7 @@ fn events_and_grant_populated_paths_match_live_go() {
     fs::create_dir_all(&capture).expect("capture directory");
     fs::create_dir_all(&data_dir).expect("isolated data directory");
     fs::create_dir_all(&rust_grant_dir).expect("Rust grant data directory");
-    let live = frozen_review_oracle::live_required();
+    let live = frozen_grant_oracle::live_required();
     if live {
         fs::create_dir_all(&go_grant_dir).expect("Go grant data directory");
     }
@@ -2833,6 +2833,7 @@ fn events_and_grant_populated_paths_match_live_go() {
 
 #[test]
 fn frozen_grant_records_reject_changed_payload_names_and_modes() {
+    frozen_grant_oracle::verify_all_native_records_and_reject_changed_provenance();
     let records = frozen_grant_oracle::records(0);
     let metadata = frozen_grant_oracle::first_record_metadata();
     assert!(frozen_grant_oracle::valid_record(metadata, &records[0]));

@@ -26,16 +26,7 @@ macro_rules! streams {
     };
 }
 
-pub fn live_required() -> bool {
-    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => !cfg!(target_os = "linux"),
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
-    }
-}
-
-// Review has measured native records on all six targets. Grant remains live
-// outside Linux until its separate native capture is available.
+// Review has measured native records on all six targets.
 pub fn live_review_required() -> bool {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
         Ok("1") => true,

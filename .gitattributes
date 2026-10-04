@@ -69,3 +69,4 @@ rust-tests/parity/oracle/cases.json text eol=lf
 
 # Preserve actual whole MCP runtime captures after the generic manifest rule.
 tests/fixtures/go-frozen/mcp-runtime/** -text
+tests/fixtures/go-frozen/cli-grant-native-344/** -text
