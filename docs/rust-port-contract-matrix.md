@@ -13,6 +13,13 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The current #1131 Windows MCP jobs rejected CRLF conversion of embedded
+broker YAML before validating the cached stream. All 1283 embedded broker
+inputs now have explicit LF checkout attributes, and the pinned SQLite
+fixture is explicitly binary. All 1476 inventory members have LF or binary
+attributes; the source-hash and corruption checks remain unchanged. Native
+Windows rerun acceptance remains pending.
+
 The #1131 Linux-amd64 MCP reader preparation additionally uses actual complete
 clock/auto-confirm/gap responses from clean `f0a91ab`, bound to all 1476
 source/input pins and native unmodified binary metadata. Other native targets

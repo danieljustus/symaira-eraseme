@@ -38,6 +38,9 @@ rust-tests/parity/oracle/campaign-execution/cases.json text eol=lf
 
 # These source-bound contracts hash raw bytes, including on native Windows.
 registry/brokers/eu/adventori-eu.yaml text eol=lf
+# Complete embedded broker inputs are now source-bound by native MCP captures.
+registry/brokers/**/*.yaml text eol=lf
+tests/fixtures/event-store/golden-campaign.db binary
 tests/fixtures/registry-contract/*.yaml text eol=lf
 tests/fixtures/event-store/campaign-plan-bytes-oracle.json text eol=lf
 rust-tests/parity/oracle/imap-transport/transcript_cases.json text eol=lf
