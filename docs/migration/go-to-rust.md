@@ -10,6 +10,34 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The rollback preparation at clean
+`486165456bf328a45f09a6529e507953f92f7bfd` passes the exact dedicated
+SDK-free workflow: **376 tests, zero failures**, including the original explicit
+fallback test with the actual published `v0.12.1` sibling. The SDK stays absent;
+this published runtime is retained only for the explicit rollback test until
+removal, outside PATH. All original CLI streams/statuses, native/fallback MCP
+initialize bytes and missing/invalid-backend controls execute. Three actual
+compiled negative runs reject a same-size changed binary, symlink and foreign
+native target. All twenty frozen native files plus the actual release manifest
+match immutable Git blobs and a real autocrlf checkout. The delegated consent
+parent executes all sixteen private cases. The six-native verification script
+now also requires this original fallback test with zero skips; five other native
+hosts remain pending for this new mode.
+
+All six actual published archive consumers and 24 corruption/target/symlink
+controls also pass without a Go SDK at clean `d0443ebb80acf0bbcfaf0fd5e9b307218c532f3f`.
+Their bounded metadata independently matches actual SDK output. Optional
+SDK-free switchback/backup modes preserve all six/eight original real cases;
+new native execution remains pending. A private real Linux amd64 probe confirms
+published Go reads owned schema v1 but refuses schema v2. The candidate-built
+switchback lane remains intact and cannot prove compatibility of this older
+published binary; backup restore loses post-backup Rust writes. Published
+preservation/cutover acceptance and issue #1131 stay open. Current source
+`6ca3072` capture run `37176774792` passes complete Rust on both Linux, both
+Windows and macOS arm64. All five current service archives and ten complete
+plan records are independently verified; macOS amd64 remains queued. That
+manual capture is preserved before another dispatch.
+
 The original real-network SMTP comparators now also replay measured native
 Linux amd64 Go processes from clean producer
 `0b57be7f59923fd69eca54b7807743ffbaf6de2d`. The complete campaign record

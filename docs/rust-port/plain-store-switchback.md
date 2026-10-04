@@ -82,3 +82,24 @@ to build both implementations from the candidate; its result does not establish
 published-release compatibility. A compatible published fallback and native
 acceptance remain required before promoting the rollback/cutover rows. The
 archive preparation leaves issue #1131 open.
+
+The original `backend_fallback_process` test can also select this exact
+published rollback sibling with `SYMERASEME_ROLLBACK_GO_BINARY` set to the
+fetcher's binary path. It verifies the pinned whole manifest and native
+executable hash before staging the real sibling. Its original four CLI
+status/stdout/stderr comparisons, native/fallback MCP initialize comparison,
+missing-sibling failure and invalid-backend rejection remain unchanged.
+`SYMERASEME_PARITY_LIVE_GO=1` still builds and compares actual current Go.
+The Go SDK is absent in the default dedicated job; the published runtime stays
+outside PATH and is used only for this explicit rollback test until removal.
+The six-native verification script requires the same original case to execute
+with zero skips. Native acceptance of this new mode on five other hosts is
+pending; this fallback test does not exercise database upgrade or preservation.
+
+At clean `486165456bf328a45f09a6529e507953f92f7bfd`, the exact dedicated
+SDK-free workflow passes **376 tests, zero failures** on Linux amd64. The
+delegated consent parent executes all sixteen private cases. All twenty frozen
+native records and the published-release manifest remain byte-identical to Git
+blobs and an actual autocrlf checkout. Three actual compiled rejection runs
+prove the published sibling guard rejects a same-size changed binary, symlink
+and foreign native target before comparison.
