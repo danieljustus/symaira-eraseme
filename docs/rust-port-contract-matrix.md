@@ -18,8 +18,10 @@ macOS arm64 capture (artifact `11288785362`, source `0d1be282`), so default
 LLM and review oracles now bind complete measured records on all six targets.
 Review validates native argv/status/full streams; a six-record corruption
 control is added. Grant retains its separate Linux-only frozen default.
-The selected Linux Go-free workflow now contains 137 tests; current local
-and six-target Rust acceptance are pending. The old native Mac scheduler
+The selected Linux Go-free workflow contains 137 tests: 113 other-family
+tests pass at `a02907c`, and corrected 24 whole CLI tests pass at `32f897a`.
+The same twelve LLM and three review tests pass with private actual Go; strict
+core/CLI Clippy passes. Current six-target Rust acceptance remains pending. The old native Mac scheduler
 failure is retained; no row or cutover gate is promoted by this preparation.
 
 The #1131 LLM preparation now binds default observations to five independently

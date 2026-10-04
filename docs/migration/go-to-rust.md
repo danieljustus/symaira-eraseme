@@ -33,8 +33,12 @@ The selected Linux Go-free workflow contains 137 tests (24 whole CLI tests),
 with all 113 other-family tests passing at `a02907c`. The first new CLI run
 exposed a reader field-name error (`input_sha256` instead of the actual nested
 `input` record), before process comparisons; the reader now checks both bytes
-and SHA from that recorded object. The failure is retained; corrected CLI and
-explicit live-Go checks remain pending. No contract row,
+and SHA from that recorded object. The failure is retained. At clean `32f897aec36ee53ec2c23aed935d9bcb2c62926c`,
+all 24 whole CLI tests pass with Go absent; all twelve LLM tests and all three
+review tests also pass in an isolated actual live-Go environment. Together
+with the unchanged 113 other-family tests at `a02907c`, all 137 selected
+Go-free tests are covered; strict core/CLI Clippy passes. Six-target current
+Rust acceptance remains pending. No contract row,
 phase, issue completion, release, or Go retirement is inferred from captures.
 
 ### Reviewed five-target LLM frozen preparation (2026-10-03, #1131)
