@@ -146,6 +146,7 @@ pub fn record(binary: &Path, observations: serde_json::Value) {
         "crates/symeraseme-cli/tests/fixtures/native_agent_error.rs",
         "crates/symeraseme-cli/tests/support/capture_agent_error.rs",
         "Cargo.lock",
+        ".gitattributes",
     ]
     .into_iter()
     .map(|name| {
@@ -155,11 +156,26 @@ pub fn record(binary: &Path, observations: serde_json::Value) {
         )
     })
     .collect::<serde_json::Map<_, _>>();
+    let autocrlf = Command::new("git")
+        .args(["config", "--get", "core.autocrlf"])
+        .current_dir(ROOT)
+        .output()
+        .unwrap();
+    assert!(matches!(autocrlf.status.code(), Some(0 | 1)));
+    assert!(autocrlf.stdout.len() <= 32 && autocrlf.stderr.is_empty());
+    let autocrlf = String::from_utf8(autocrlf.stdout).unwrap();
+    let autocrlf = match autocrlf.trim() {
+        "" | "false" => "false",
+        "true" => "true",
+        "input" => "input",
+        _ => panic!("unrecorded checkout newline policy"),
+    };
     let encoded = serde_json::to_vec_pretty(&json!({
         "schema": "symeraseme.actual-go.native-agent-error.v1",
         "source_revision": revision, "source_files": sources,
         "archived_generators": generators, "native_target": format!("{os}/{arch}"),
         "go_version": "go1.26.6", "embedded_build_info": build_info,
+        "checkout_autocrlf": autocrlf,
         "observations": observations,
         "scope": "Original native Go helper sanity status/stdout/stderr, both actual output-limit rejections and whole MCP ContractHandler oracle stdout/stderr/status. Oversized flood streams are intentionally not retained by the bounded original comparator. The independently compared Rust fixture is a synthetic native child only; it does not implement an MCP or Go oracle. Native Rust production MCP acceptance remains separate."
     }))
