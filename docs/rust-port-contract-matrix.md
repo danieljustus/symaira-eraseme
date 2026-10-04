@@ -889,3 +889,11 @@ was raised without a named, merged test:
   read; it is now the oracle's input, with each file's digest asserted.
 - Rows whose evidence could not be named were left untouched rather than
   upgraded on plausibility.
+
+Frozen HTTP readback (2026-10-04, #1131): all4 real Unix wire captures from
+run37209575551/sourcea1a1af0 are imported without rewriting bytes, after
+independent archive/native/source/generator validation. The unchanged complete
+Go-absent selection passes380 tests; 3 EINTR controls and strict workspace
+Clippy pass. The original ten wire cases and negative corrupt-record controls
+are retained. All-six current-head native acceptance and remaining live-Go
+HTTP parents are still required; no cutover row is promoted.

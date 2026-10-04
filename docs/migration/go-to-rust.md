@@ -1932,3 +1932,25 @@ reader reconciliation on all six hosts. The earlier complete 377-test result
 remains bound to `5fbb447b`, before the Go source change. Six auxiliary HTTP
 process tests still require actual Go. Issue #1131 and complete workspace Go
 independence remain open; no release, default flip or Go retirement is claimed.
+
+## Four genuine HTTP recaptures imported (2026-10-04, #1131)
+
+All four actual native jobs in `37209575551` passed at immutable producer
+`a1a1af0569a59b6dcb33d08c9d6d0196479744be`, including Intel job
+`111457817932`. Their original ZIP SHA-256 values match GitHub's artifact
+digests; each original JSON retains ten observed Go responses, clean native
+Go1.26.6 build identity, all171 current/immutable Go sources and all4 archived
+generators. Both Mac outputs are actual native captures. The strict importer
+now installs those original bytes and binds each reader to its actual capture
+revision and whole-record digest. `http-wire/capture-receipts.json` retains
+all4 original archive/record identities; older e8 receipts remain historical.
+
+The unchanged complete Go-absent workflow selection passes380 tests with zero
+failures. Its top-level ignored consent child is actually executed through
+its parent with all16 original isolated cases. All3 EINTR controls pass, and
+strict workspace/all-target/all-feature Clippy passes. The original ten-case
+HTTP parent also exercises its appended-byte, truncated-record and fabricated
+revision negative controls. No comparison, case count or deadline is reduced.
+Fresh all-six native workspace and reader acceptance remain required; the six
+auxiliary live-Go HTTP parents are still unfinished, so #1131 remains open
+and #1156 stays draft. This is not release or Go-retirement acceptance.
