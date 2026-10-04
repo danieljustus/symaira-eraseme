@@ -23,8 +23,13 @@ SQLite checks all seven native Go corruption/control pass records.
 The original Linux fixture integrity, quoted-SQL, archived Python database,
 real Rust filesystem/database effects, and explicit bounded live-Go paths
 remain enforced. This changes no product observation, contract status or
-Go-free test count (137). Local changed-family and current native Rust
-verification remain pending. The in-flight native capture run uses the
+Go-free test count (137). At clean `2e162369b3b205474ddd52dfac101dd9b08b455e`,
+all 53 affected/shared-reader tests pass with Go absent (campaign execution,
+plan, SQLite, LLM and whole CLI), and all seventeen campaign/plan/SQLite
+tests pass with actual Go 1.26.6 in private HOME/XDG/temp/data roots.
+Strict core/CLI Clippy and the graph controls pass. The unchanged 84 other
+Go-free tests retain their `a02907c` proof. Current native Rust verification
+remains pending. The in-flight native capture run uses the
 preceding six-target LLM/review source; it does not accept these new readers.
 
 ### Six-target LLM and review frozen preparation (2026-10-04, #1131)

@@ -17,7 +17,10 @@ The #1131 campaign/SQLite preparation additionally binds their byte-identical
 whole outputs to all six actual native `0d1be282` manifests, including the
 native tagged plan fixture and all seven storage Go controls. Original Rust
 side-effect, fixture and archived-source checks remain. The selected Linux
-Go-free count stays 137; local changed-family and native acceptance are pending.
+Go-free count stays 137: 53 affected/shared-reader tests pass with Go absent
+at `2e16236`, all seventeen campaign/plan/SQLite tests pass with private real
+Go, and strict core/CLI Clippy passes. The unchanged other 84 tests retain
+their `a02907c` proof. Current native acceptance remains pending.
 
 The #1131 preparation additionally includes the independently verified native
 macOS arm64 capture (artifact `11288785362`, source `0d1be282`), so default
