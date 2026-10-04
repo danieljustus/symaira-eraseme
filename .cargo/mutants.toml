@@ -16,13 +16,13 @@ exclude_re = [
     # Full proofs and target-specific exclusions are documented in
     # docs/rust-port/handoffs/mutation-equivalence-2026-10-04.md.
     # Both limit variants reject every oversized body before protocol dispatch.
-    'http\.rs:290:69: replace \+ with \* in handle_request',
+    'http\.rs:347:69: replace \+ with \* in handle_request',
     # one_json_value already validates the whole array. Each final item breaks
     # at its closing bracket; after a comma a valid item necessarily remains.
-    'http\.rs:389:17: replace < with <= in protocol_reply_cancellable',
-    'http\.rs:389:23: replace - with (\+|/) in protocol_reply_cancellable',
+    'http\.rs:446:17: replace < with <= in protocol_reply_cancellable',
+    'http\.rs:446:23: replace - with (\+|/) in protocol_reply_cancellable',
     # Whole-array validation makes failure of the same item scanner unreachable.
-    'http\.rs:391:35: delete - in protocol_reply_cancellable',
+    'http\.rs:448:35: delete - in protocol_reply_cancellable',
     # An extra pass over empty UTF-8 cannot match an escaped nonempty literal.
     'pii\.rs:364:18: replace < with <= in append_literal',
     'pii\.rs:378:22: replace > with >= in append_literal',

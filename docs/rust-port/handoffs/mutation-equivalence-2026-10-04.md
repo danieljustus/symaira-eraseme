@@ -62,3 +62,17 @@ and permit deterministic fault controls without global hooks. The Unix
 close control closes a valid owner once, then obtains actual kernel EBADF
 from descriptor -1 without constructing a stale owner. It requires the old
 file and unrelated entries to survive, and the owned temporary to be removed.
+
+## Current main MCP integration (2026-10-04)
+
+Main `12c0d6e6` adds native Windows socket-message lookup. The unchanged
+HTTP equivalent operations move by 57 lines to 347:69, 446:17/23 and 448:35;
+their three-line contexts match the previous accepted source exactly. The
+actual pinned cargo-mutants 27.1.0 catalog contains 111 HTTP mutants. Five
+remain exact equivalents; eleven affect cfg-disabled Windows/macOS branches
+on Linux (message bodies at 190, 195, 204 and 247, message API return check
+at 231, and non-Unix token operations at 296/313). Each exclusion keeps an
+exact line/column/function/replacement anchor and applies only to the
+Linux HTTP campaign. Both active Linux message bodies remain selected.
+The resulting 95 actual candidates still require complete fresh execution;
+no missed outcome, timeout budget or native platform expectation is waived.
