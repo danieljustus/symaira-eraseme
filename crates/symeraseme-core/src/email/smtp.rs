@@ -1,12 +1,16 @@
 //! Deterministic MIME construction and the outbound transport boundary.
 //!
-//! The network implementation remains outside core. Callers provide a fixed
-//! clock and message ID for reviewable bytes; an empty ID uses the OS CSPRNG.
+//! Callers provide a fixed clock and message ID for reviewable bytes; an empty
+//! ID uses the OS CSPRNG. [`NetSmtpTransport`] supplies an explicit network
+//! adapter without enabling sending on the default CLI/MCP execution path.
 
 use chrono::{DateTime, FixedOffset};
 use rand::TryRng;
 use sha2::{Digest, Sha256};
 use std::fmt;
+
+mod network;
+pub use network::{NetSmtpTransport, SmtpConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmailMessage {
@@ -39,8 +43,8 @@ impl fmt::Display for SmtpError {
 
 impl std::error::Error for SmtpError {}
 
-/// Side-effect boundary for outbound mail. Production network access is not
-/// implemented by core; tests and future adapters can provide a transport.
+/// Side-effect boundary for outbound mail, implemented by [`NetSmtpTransport`]
+/// or an application's injected adapter.
 pub trait SmtpTransport {
     fn send(&self, recipients: Option<&[String]>, message: &[u8]) -> Result<(), String>;
 }
