@@ -18,7 +18,8 @@ def campaign():
                   "total_mutants": 1, "caught": 1, "missed": 0, "timeout": 0, "unviable": 0, "success": 0,
                   "outcomes": [{"scenario": "Baseline", "summary": "Success"},
                                {"scenario": {"Mutant": full[i]}, "summary": "CaughtMutant"}]}
-        documents.append(({"scope": "crypto", "shard": f"{i}/2", "head": "source"}, full, [full[i]], actual))
+        documents.append(({"scope": "crypto", "shard": f"{i}/2", "head": "source",
+                           "target": "x86_64-unknown-linux-gnu", "inactive_target_exclusions": []}, full, [full[i]], actual))
     return documents
 
 
@@ -57,6 +58,14 @@ class Controls(unittest.TestCase):
         documents[1][3]["end_time"] = None
         with self.assertRaises(AssertionError):
             shards.verify_group(documents, "crypto", 2, "source")
+
+    def test_unexpected_target_or_extra_exclusion_fails(self):
+        for field, value in [("target", "aarch64-apple-darwin"),
+                             ("inactive_target_exclusions", [".*"])]:
+            documents = copy.deepcopy(campaign())
+            documents[0][0][field] = value
+            with self.assertRaises(AssertionError):
+                shards.verify_group(documents, "crypto", 2, "source")
 
 
 if __name__ == "__main__":

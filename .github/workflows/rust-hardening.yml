@@ -12,6 +12,7 @@ on:
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
       - 'scripts/*verify-mutation-*.py'
+      - '.cargo/mutants.toml'
   pull_request:
     branches: [main]
     paths:
@@ -20,6 +21,7 @@ on:
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
       - 'scripts/*verify-mutation-*.py'
+      - '.cargo/mutants.toml'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
@@ -228,6 +230,27 @@ jobs:
           import pathlib
           import subprocess
           command = ["cargo", "+1.98.0", "mutants", "-p", os.environ["MUTATION_PACKAGE"]]
+          target = next(line.removeprefix("host: ") for line in
+                        subprocess.check_output(["rustc", "+1.98.0", "-vV"], text=True).splitlines()
+                        if line.startswith("host: "))
+          assert target == "x86_64-unknown-linux-gnu", "this mutation campaign records the Linux target"
+          # Mutations in cfg-disabled platform branches. Apply these anchors
+          # to the applicable Linux command only, never globally.
+          inactive = []
+          if os.environ["MUTATION_SCOPE"] == "HTTP auth":
+              inactive = [
+                  r'http\.rs:190:5: replace addr_not_available_message .* with (""|"xyzzy")$',
+                  r'http\.rs:239:5: replace write_token_file .* with Ok\(\(\)\)$',
+                  r'http\.rs:256:5: replace create_token_directory .* with Ok\(\(\)\)$',
+              ]
+          elif os.environ["MUTATION_SCOPE"] == "consent":
+              inactive = [
+                  r'consent\.rs:628:5: replace close_windows_file .* with Ok\(\(\)\)$',
+                  r'consent\.rs:640:5: replace checked_windows_close .* with Ok\(\(\)\)$',
+                  r'consent\.rs:644:39: replace != with == in checked_windows_close$',
+              ]
+          for pattern in inactive:
+              command += ["--exclude-re", pattern]
           for path in json.loads(os.environ["MUTATION_FILES"]):
               command += ["--file", path]
           inputs = pathlib.Path("mutation-inputs")
@@ -237,7 +260,8 @@ jobs:
               assert catalog, "empty mutation shard is not acceptance"
               (inputs / (name + "-catalog.json")).write_text(json.dumps(catalog) + "\n")
           receipt = {"scope": os.environ["MUTATION_SCOPE"], "shard": os.environ["MUTATION_SHARD"],
-                     "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()}
+                     "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "target": target, "inactive_target_exclusions": inactive}
           (inputs / "receipt.json").write_text(json.dumps(receipt) + "\n")
           command += ["--shard", os.environ["MUTATION_SHARD"], "--timeout", "30", "--"] + json.loads(os.environ["MUTATION_TESTS"])
           result = subprocess.run(command)

@@ -418,6 +418,30 @@ mod tests {
     const IV: [u8; 16] = [0x33; 16];
 
     #[test]
+    fn version_dispatch_recognizes_each_header_and_rejects_plaintext() {
+        for (header, expected) in [
+            (V1_HEADER, EnvelopeVersion::V1),
+            (V2_HEADER, EnvelopeVersion::V2),
+            (V3_HEADER, EnvelopeVersion::V3),
+        ] {
+            assert_eq!(detect_version(header), Some(expected));
+            assert!(is_encrypted(header));
+        }
+        for plain in [
+            b"".as_slice(),
+            b"SQLite format 3\0",
+            b"unrecognized envelope",
+        ] {
+            assert_eq!(detect_version(plain), None);
+            assert!(!is_encrypted(plain));
+            assert_eq!(
+                decrypt_any(plain, &KEY),
+                Err(EncryptionError::UnsupportedEnvelope)
+            );
+        }
+    }
+
+    #[test]
     fn standard_frames_accept_raw_and_encoded_minimum_and_reject_truncation() {
         // A standard empty Fernet frame has 1 version + 8 timestamp + 16 IV
         // + 16 padded ciphertext + 32 HMAC bytes, independently of constants.
@@ -545,6 +569,10 @@ mod tests {
         );
         assert_eq!(
             decrypt_v3(&envelope, &KEY).unwrap(),
+            b"SQLite format 3\0\xff boundary"
+        );
+        assert_eq!(
+            decrypt_any(&envelope, &KEY).unwrap(),
             b"SQLite format 3\0\xff boundary"
         );
     }

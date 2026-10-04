@@ -718,6 +718,42 @@ mod hardening_tests {
         assert_eq!(suffix_mask(b"xy", 2, 3), b"***xy");
         assert_eq!(mask_parts(b"abc", 2, 2, b"**"), b"abc");
         assert_eq!(mask_parts(b"abcd", 2, 2, b"**"), b"ab****cd");
+        assert_eq!(mask_parts(b"abcde", 2, 3, b"**"), b"ab****cde");
+    }
+
+    #[test]
+    fn complete_match_collection_keeps_the_input_limit_and_invalid_ssn_filter() {
+        assert!(
+            collect_matches(&vec![b'x'; 16_777_216], None)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            collect_matches(&vec![b'x'; 16_777_217], None),
+            Err(RedactionError::InputTooLarge)
+        );
+        assert!(collect_matches(b"666-12-3456", None).unwrap().is_empty());
+        let valid = collect_matches(b"123-12-3456", None).unwrap();
+        assert_eq!(valid.len(), 1);
+        assert_eq!(valid[0].name, "SSN");
+        assert_eq!(valid[0].replacement(), b"***-**-****");
+    }
+
+    #[test]
+    fn scrubbers_preserve_short_values_and_exact_privacy_boundaries() {
+        for (input, expected) in [
+            (b"ab@cd.ef".as_slice(), b"a@c*.ef".as_slice()),
+            (b"abcd@cd.ef", b"a**d@c*.ef"),
+            (b"a@b", b"a@b.*"),
+            (b"@b", b"@b"),
+            (b"ab@", b"ab@"),
+        ] {
+            assert_eq!(scrub_email(input), expected);
+        }
+        assert_eq!(scrub_phone(b"123"), b"123");
+        assert_eq!(scrub_phone(b"1234"), b"***-***-1234");
+        assert_eq!(scrub_phone(b"12345"), b"***-***-2345");
+        assert_eq!(scrub_phone(b"12345678901"), b"+1-***-***-8901");
     }
 
     #[test]

@@ -454,13 +454,9 @@ impl ConsentStore {
         builder.create(&self.directory).map_err(|error| {
             // Go MkdirAll reports ENOTDIR for an existing file at the leaf;
             // Rust's recursive builder reports EEXIST on Unix instead.
-            if error.kind() == io::ErrorKind::AlreadyExists
-                && fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
-            {
-                io::Error::from(io::ErrorKind::NotADirectory)
-            } else {
-                error
-            }
+            directory_create_error(error, || {
+                fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
+            })
         })?;
         // MkdirAll uses 0700 for every new ancestor; only the requested
         // directory is subsequently hardened, ignoring chmod errors in Go.
@@ -556,7 +552,30 @@ fn token_filename(token: &str) -> String {
 }
 
 fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
-    atomic_write_with(path, body, fs::File::sync_all, close_file, chmod_temporary)
+    atomic_write_with(
+        path,
+        body,
+        fs::File::sync_all,
+        |file| {
+            close_file(file, |file| {
+                #[cfg(unix)]
+                {
+                    // Transfer the owner once; retain native EINTR and other errors.
+                    nix::unistd::close(file).map_err(io::Error::from)
+                }
+                #[cfg(windows)]
+                {
+                    close_windows_file(file)
+                }
+                #[cfg(not(any(unix, windows)))]
+                {
+                    drop(file);
+                    Ok(())
+                }
+            })
+        },
+        chmod_temporary,
+    )
 }
 
 // Operation-local seams keep failure tests deterministic without global hooks.
@@ -589,22 +608,17 @@ fn atomic_write_with(
         .map_err(|error| error.error)
 }
 
-fn close_file(file: fs::File) -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        // Consume the owner exactly once. Do not retry a possibly closed fd
-        // or turn EINTR into success; both could conceal a close failure.
-        nix::unistd::close(file).map_err(io::Error::from)
-    }
-    #[cfg(windows)]
-    {
-        close_windows_file(file)
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        // A checked-close API for these targets remains an ID-005 blocker.
-        drop(file);
-        Ok(())
+fn close_file(file: fs::File, close: impl FnOnce(fs::File) -> io::Result<()>) -> io::Result<()> {
+    // Keep this operation-local boundary fallible. Native close operations
+    // remain unchanged; a failed close must prevent chmod and publication.
+    close(file)
+}
+
+fn directory_create_error(error: io::Error, is_file: impl FnOnce() -> bool) -> io::Error {
+    if error.kind() == io::ErrorKind::AlreadyExists && is_file() {
+        io::Error::from(io::ErrorKind::NotADirectory)
+    } else {
+        error
     }
 }
 
@@ -692,6 +706,54 @@ mod windows_filesystem_tests;
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn directory_error_translation_preserves_unrelated_errors_without_a_probe() {
+        for kind in [io::ErrorKind::PermissionDenied, io::ErrorKind::Interrupted] {
+            let error = directory_create_error(io::Error::new(kind, "original error"), || {
+                panic!("unrelated errors must not probe the path")
+            });
+            assert_eq!(error.kind(), kind);
+            assert_eq!(error.to_string(), "original error");
+        }
+        assert_eq!(
+            directory_create_error(io::Error::from(io::ErrorKind::AlreadyExists), || true).kind(),
+            io::ErrorKind::NotADirectory
+        );
+        assert_eq!(
+            directory_create_error(io::Error::from(io::ErrorKind::AlreadyExists), || false).kind(),
+            io::ErrorKind::AlreadyExists
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn real_kernel_close_error_prevents_token_replacement_and_keeps_the_old_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("consent-existing.json");
+        fs::write(&path, b"original consent sentinel").unwrap();
+        let mut closes = 0;
+        let error = atomic_write_with(
+            &path,
+            b"replacement",
+            fs::File::sync_all,
+            |file| {
+                close_file(file, |file| {
+                    // Close the valid owned file once. Then inject a real kernel
+                    // EBADF result using -1, without constructing a stale owner.
+                    nix::unistd::close(file).map_err(io::Error::from)?;
+                    closes += 1;
+                    nix::unistd::close(-1).map_err(io::Error::from)
+                })
+            },
+            |_| panic!("chmod must not follow a failed close"),
+        )
+        .unwrap_err();
+        assert_eq!(closes, 1);
+        assert_eq!(error.raw_os_error(), Some(nix::libc::EBADF));
+        assert_eq!(fs::read(&path).unwrap(), b"original consent sentinel");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
 
     fn store(directory: &Path) -> ConsentStore {
         ConsentStore::new(directory)

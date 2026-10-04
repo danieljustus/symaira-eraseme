@@ -13,4 +13,28 @@ exclude_re = [
     'protocol\.rs:591:30: replace > with >= in decode_json_string',
     # With position == len the scan sees an empty slice and returns Ok(None).
     'stream\.rs:91:21: replace < with <= in serve_stdio',
+    # Full proofs and target-specific exclusions are documented in
+    # docs/rust-port/handoffs/mutation-equivalence-2026-10-04.md.
+    # Both limit variants reject every oversized body before protocol dispatch.
+    'http\.rs:290:69: replace \+ with \* in handle_request',
+    # one_json_value already validates the whole array. Each final item breaks
+    # at its closing bracket; after a comma a valid item necessarily remains.
+    'http\.rs:389:17: replace < with <= in protocol_reply_cancellable',
+    'http\.rs:389:23: replace - with (\+|/) in protocol_reply_cancellable',
+    # Whole-array validation makes failure of the same item scanner unreachable.
+    'http\.rs:391:35: delete - in protocol_reply_cancellable',
+    # An extra pass over empty UTF-8 cannot match an escaped nonempty literal.
+    'pii\.rs:364:18: replace < with <= in append_literal',
+    'pii\.rs:378:22: replace > with >= in append_literal',
+    # The later domain-label check also rejects the empty domain. at==0 returns
+    # before subtraction, so both weakened preliminary checks remain equivalent.
+    'pii\.rs:437:22: replace \+ with (-|\*) in valid_email',
+    # The passport regex's identifier capture is always 6..=9 bytes.
+    'pii\.rs:536:25: replace < with (==|<=) in scrub_passport',
+    # Input <=16MiB and <=100000 matches; every replacement grows a span by
+    # <64 bytes, so this conservative 32MiB fallback cannot be reached.
+    'pii\.rs:557:23: replace > with (==|>=) in redact_bytes',
+    # The for iterator terminates naturally after the last item; no statement
+    # follows the redundant early break inside the loop.
+    'review\.rs:99:18: replace \+ with \* in review_bytes',
 ]

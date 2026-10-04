@@ -988,6 +988,10 @@ mod transport_tests {
     }
 
     fn actual_http_reply(packet: Vec<u8>) -> Vec<u8> {
+        actual_http_reply_with_handler(packet, Arc::new(no_backend_handler()))
+    }
+
+    fn actual_http_reply_with_handler(packet: Vec<u8>, handler: Arc<dyn ToolHandler>) -> Vec<u8> {
         use std::io::{Read, Write};
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -998,15 +1002,13 @@ mod transport_tests {
             let address = listener.local_addr().unwrap();
             let server = tokio::spawn(async move {
                 let (stream, _) = listener.accept().await.unwrap();
-                let service = service_fn(|request| async move {
-                    Ok::<_, std::convert::Infallible>(
-                        handle_request(
-                            request,
-                            "synthetic-auth-token",
-                            Arc::new(no_backend_handler()),
+                let service = service_fn(move |request| {
+                    let handler = handler.clone();
+                    async move {
+                        Ok::<_, std::convert::Infallible>(
+                            handle_request(request, "synthetic-auth-token", handler).await,
                         )
-                        .await,
-                    )
+                    }
                 });
                 let _ = http1::Builder::new()
                     .serve_connection(TokioIo::new(stream), service)
@@ -1139,5 +1141,36 @@ mod transport_tests {
         // Go's chunked over-limit contract is HTTP 200 / JSON-RPC parse error;
         // only an oversized declared Content-Length produces HTTP 413.
         expect_http(&actual_http_reply(chunked), 200, Some(-32700));
+        exact.push(b' ');
+        let mut chunked = format!("POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n{auth}\r\n{:x}\r\n", exact.len()).into_bytes();
+        chunked.extend_from_slice(&exact);
+        chunked.extend_from_slice(b"\r\n0\r\n\r\n");
+        // Also exercise the body collector's error, beyond its one-byte allowance.
+        expect_http(&actual_http_reply(chunked), 200, Some(-32700));
+    }
+
+    #[test]
+    fn panicking_tool_worker_returns_the_original_internal_error_code() {
+        struct PanickingHandler;
+        impl ToolHandler for PanickingHandler {
+            fn call(
+                &self,
+                _name: &str,
+                _arguments: &serde_json::Map<String, serde_json::Value>,
+            ) -> Result<serde_json::Value, crate::mcp::handler::ToolError> {
+                panic!("synthetic isolated worker failure");
+            }
+        }
+        let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1}}}"#;
+        let response = actual_http_reply_with_handler(
+            packet(
+                "POST",
+                "Authorization: Bearer synthetic-auth-token\r\n",
+                body,
+                body.len(),
+            ),
+            Arc::new(PanickingHandler),
+        );
+        expect_http(&response, 200, Some(-32603));
     }
 }

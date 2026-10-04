@@ -24,6 +24,19 @@ def verify_group(documents, scope, denominator, head):
     totals = collections.Counter()
     for receipt, full, selected, actual in documents:
         assert receipt["scope"] == scope and receipt["head"] == head, "mixed source/scope"
+        assert receipt["target"] == "x86_64-unknown-linux-gnu", "unexpected mutation target"
+        expected_inactive = [
+            r'http\.rs:190:5: replace addr_not_available_message .* with (""|"xyzzy")$',
+            r'http\.rs:239:5: replace write_token_file .* with Ok\(\(\)\)$',
+            r'http\.rs:256:5: replace create_token_directory .* with Ok\(\(\)\)$',
+        ] if scope == "HTTP auth" else []
+        if scope == "consent":
+            expected_inactive = [
+                r'consent\.rs:628:5: replace close_windows_file .* with Ok\(\(\)\)$',
+                r'consent\.rs:640:5: replace checked_windows_close .* with Ok\(\(\)\)$',
+                r'consent\.rs:644:39: replace != with == in checked_windows_close$',
+            ]
+        assert receipt["inactive_target_exclusions"] == expected_inactive, "unexpected platform exclusions"
         index, total = map(int, receipt["shard"].split("/"))
         assert total == denominator and 0 <= index < total, "wrong shard denominator"
         assert index not in seen_indices, "duplicate shard"
