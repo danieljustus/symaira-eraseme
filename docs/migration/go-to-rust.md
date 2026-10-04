@@ -129,6 +129,17 @@ Only those expected inventory counts are corrected; all existing corruption,
 compiler/host, missing-case and no-write controls remain intact. Fresh complete
 native acceptance on the corrected head remains required.
 
+## Artifact-level SBOM preparation (2026-10-03, #1128)
+
+The native shadow archive workflow now prepares embedded Cargo inventories
+with pinned cargo-auditable and rust-audit-info, records native Go fallback
+build info, and binds both executables and archives into CycloneDX documents.
+Independent packed-member readback reproduces every inventory and SBOM.
+Six local mutation/identity controls and a real Linux ELF extractor smoke pass;
+these are preparation evidence only. REL-010 and release/Homebrew rows remain
+PARTIAL pending native product archives, signatures, provenance, audit/deny
+and published readback. Details: [artifact SBOM handoff](../rust-port/handoffs/2026-10-03-artifact-sbom.md).
+
 ## Complete MCP tool byte acceptance (2026-10-03, #1124)
 
 The new `mcp-tools-native.yml` selects all six native targets. It combines
