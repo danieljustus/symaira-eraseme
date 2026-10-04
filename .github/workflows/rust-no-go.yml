@@ -130,7 +130,7 @@ jobs:
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "triage_commands",
-                              "--test", "mcp_triage_process", "--test", "mcp_agent_error_json",
+                              "--test", "mcp_triage_process", "--test", "mcp_agent_error_json", "--test", "mcp_agent_error_json_windows",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "plan_execute_live_process",
                               "--locked", "--offline"], env=environment, check=True)
