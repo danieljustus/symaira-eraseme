@@ -13,6 +13,16 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The #1131 triage-service and oversized-projection defaults additionally bind
+their complete streams to all six actual native `0d1be282` recordings and
+194 immutable source/input hashes. Triage bytes match on every target;
+projection uses each target's measured amd64 or arm64 overflow results.
+Existing Linux provenance and every Rust service/state comparison remain.
+The corruption controls verify all six actual native full frames and reject
+truncation. Local and current native reader acceptance are pending; no new
+Go-free test count or row promotion is claimed.
+
+
 Actual source `344dfaae` native grant captures on Linux amd64/arm64 and
 Windows amd64/arm64 are independently verified (82 complete archive members
 each). Their four raw manifests, all 48 process streams and all twenty

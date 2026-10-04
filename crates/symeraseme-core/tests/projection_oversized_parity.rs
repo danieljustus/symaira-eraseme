@@ -9,6 +9,9 @@
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
+#[path = "support/frozen_native_capture.rs"]
+mod frozen_native_capture;
+
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -55,6 +58,7 @@ fn frozen_bytes() -> &'static [u8] {
 }
 
 fn frozen_output(bytes: &[u8]) -> OracleOutput {
+    verify_native_output(bytes, std::env::consts::OS, std::env::consts::ARCH);
     let (raw_manifest, target) = match std::env::consts::ARCH {
         "x86_64" => (
             include_bytes!(
@@ -123,8 +127,52 @@ fn frozen_output(bytes: &[u8]) -> OracleOutput {
     output
 }
 
+fn verify_native_output(bytes: &[u8], os: &str, arch: &str) {
+    let native = frozen_native_capture::verify(
+        frozen_native_capture::manifest_bytes(os, arch)
+            .expect("unrecorded native projection target must use the actual Go producer"),
+        os,
+        arch,
+    );
+    let recorded = native["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|record| record["package"] == "projection")
+        .unwrap();
+    assert_eq!(recorded["stdin"]["bytes"], 0);
+    assert_eq!(
+        recorded["stdin"]["sha256"],
+        hex::encode(Sha256::digest(b""))
+    );
+    assert_eq!(recorded["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        recorded["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+}
+
 #[test]
 fn frozen_projection_rejects_changed_bytes_and_missing_boundary_case() {
+    for (os, arch) in [
+        ("linux", "x86_64"),
+        ("linux", "aarch64"),
+        ("windows", "x86_64"),
+        ("windows", "aarch64"),
+        ("macos", "x86_64"),
+        ("macos", "aarch64"),
+    ] {
+        let bytes = if arch == "x86_64" {
+            include_bytes!("../../../tests/fixtures/go-frozen/projection/amd64.stdout").as_slice()
+        } else {
+            include_bytes!("../../../tests/fixtures/go-frozen/projection/arm64.stdout").as_slice()
+        };
+        verify_native_output(bytes, os, arch);
+        assert!(
+            std::panic::catch_unwind(|| verify_native_output(&bytes[..bytes.len() - 1], os, arch))
+                .is_err()
+        );
+    }
     let mut changed = frozen_bytes().to_vec();
     changed[0] ^= 1;
     assert!(std::panic::catch_unwind(|| frozen_output(&changed)).is_err());

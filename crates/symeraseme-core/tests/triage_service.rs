@@ -12,6 +12,9 @@ use tempfile::tempdir;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
+#[path = "support/frozen_native_capture.rs"]
+mod frozen_native_capture;
+
 const CLASSIFIER_GO: &[u8] = include_bytes!("../../../internal/triage/classifier.go");
 const REBUTTAL_GO: &[u8] = include_bytes!("../../../internal/triage/rebuttal.go");
 const REPLIES_SERVICE_GO: &[u8] = include_bytes!("../../../internal/replies/service.go");
@@ -38,6 +41,7 @@ const FROZEN_GO_STDOUT: &[u8] =
     include_bytes!("../../../tests/fixtures/go-frozen/triage-service/triage-service.stdout");
 
 fn verified_frozen_output(output: &[u8]) -> &[u8] {
+    verify_native_output(output, std::env::consts::OS, std::env::consts::ARCH);
     let manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
         "../../../tests/fixtures/go-frozen/triage-service/manifest.json"
     ))
@@ -55,6 +59,25 @@ fn verified_frozen_output(output: &[u8]) -> &[u8] {
     assert_eq!(manifest["stdout"]["bytes"], output.len());
     assert_eq!(manifest["stdout"]["sha256"], sha256_hex(output));
     output
+}
+
+fn verify_native_output(output: &[u8], os: &str, arch: &str) {
+    let native = frozen_native_capture::verify(
+        frozen_native_capture::manifest_bytes(os, arch)
+            .expect("unrecorded native triage target must use the actual Go producer"),
+        os,
+        arch,
+    );
+    let recorded = native["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|record| record["package"] == "triage-service")
+        .unwrap();
+    assert_eq!(recorded["stdin"]["bytes"], 0);
+    assert_eq!(recorded["stdin"]["sha256"], sha256_hex(b""));
+    assert_eq!(recorded["stdout"]["bytes"], output.len());
+    assert_eq!(recorded["stdout"]["sha256"], sha256_hex(output));
 }
 
 fn go_output() -> Vec<u8> {
@@ -77,6 +100,24 @@ fn go_output() -> Vec<u8> {
 
 #[test]
 fn frozen_service_output_rejects_byte_changes_and_missing_operations() {
+    for (os, arch) in [
+        ("linux", "x86_64"),
+        ("linux", "aarch64"),
+        ("windows", "x86_64"),
+        ("windows", "aarch64"),
+        ("macos", "x86_64"),
+        ("macos", "aarch64"),
+    ] {
+        verify_native_output(FROZEN_GO_STDOUT, os, arch);
+        assert!(
+            std::panic::catch_unwind(|| verify_native_output(
+                &FROZEN_GO_STDOUT[..FROZEN_GO_STDOUT.len() - 1],
+                os,
+                arch
+            ))
+            .is_err()
+        );
+    }
     let mut changed = FROZEN_GO_STDOUT.to_vec();
     changed[0] ^= 1;
     assert!(std::panic::catch_unwind(|| verified_frozen_output(&changed)).is_err());

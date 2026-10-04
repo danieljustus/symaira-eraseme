@@ -10,6 +10,16 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The #1131 triage-service and oversized-projection defaults additionally bind
+their complete streams to all six actual native `0d1be282` recordings and
+194 immutable source/input hashes. Triage bytes match on every target;
+projection uses each target's measured amd64 or arm64 overflow results.
+Existing Linux provenance and every Rust service/state comparison remain.
+The corruption controls verify all six actual native full frames and reject
+truncation. Local and current native reader acceptance are pending; no new
+Go-free test count or row promotion is claimed.
+
+
 ### Four-target native grant replay and Windows source bytes (2026-10-04, #1131)
 
 Run `37165107890` at clean `344dfaae` passes complete Rust suites on both
