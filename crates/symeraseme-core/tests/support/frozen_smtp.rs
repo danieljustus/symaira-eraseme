@@ -101,7 +101,8 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             assert_eq!(case[stream]["bytes"], bytes.len());
             assert_eq!(case[stream]["sha256"], digest(&bytes));
         }
-        assert!(!case["smtp_transcript"].as_array().unwrap().is_empty());
+        let transcript = case["smtp_transcript"].as_array().unwrap();
+        assert_eq!(transcript.is_empty(), *name == "greeting-rejected");
     }
     record
 }
