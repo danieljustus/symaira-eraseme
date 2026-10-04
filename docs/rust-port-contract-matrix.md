@@ -13,6 +13,17 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The native triage fixture preparation also passes both original Linux amd64
+parents at clean `9a7d6b526d16d51735e6dc18935e0b2c1fab786d`: all sixteen CLI cases,
+all eight MCP raw-frame/saved-effect cases and ten positive CLI invocation
+controls. Go uses its original real CLI and Go native child; Rust uses its
+real CLI and a separately compiled native Rust synthetic child. Complete
+status/stdout/stderr, the existing provider-list-only ordering fold, saved
+reply/ordered events and invocation counts remain checked. Strict CLI
+all-target Clippy passes. The Rust fixture implements no Go CLI or MCP oracle.
+Both parents still require actual Go: measured default references and current
+acceptance on five other hosts remain pending.
+
 The native malformed-agent comparator additionally consumes an actual complete
 Linux amd64 Go helper record from clean producer
 `020bd691459c1107cef5e7ac639eaba58fdf98fb`. The 32024-byte record has SHA-256
