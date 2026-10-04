@@ -8,6 +8,7 @@ on:
       - scripts/package-dmg.sh
       - tests/test_release_dmg.sh
       - .github/workflows/app-rust-native.yml
+      - .github/workflows/release.yml
   workflow_dispatch: {}
 
 permissions:
