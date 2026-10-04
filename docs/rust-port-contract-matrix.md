@@ -1,5 +1,15 @@
 # Go → Rust executable contract matrix
 
+The subsequent HTTP EINTR repair preserves the original read timeout and
+all twelve original parents, with three additional bounded-error controls.
+Its changed wire generator requires four real native Unix recaptures;
+`frozen-http-wire-capture.yml` records the original ten Go/Rust comparisons
+on Linux amd64/arm64 and macOS amd64/arm64. The earlier 380-test no-Go result
+is historical at `81bb019`; current frozen acceptance must fail until all
+four original wire references are genuinely refreshed. Other native families
+retain their actual `e8bb6643` records. #1131 and cutover rows remain open.
+
+
 Current-source frozen preparation (2026-10-04, #1131) now retains and
 independently verifies all forty actual artifacts from six-native capture
 `37188052753` at `e8bb6643`: 1,481 source pins per service manifest and

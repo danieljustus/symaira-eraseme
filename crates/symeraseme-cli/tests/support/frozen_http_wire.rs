@@ -60,7 +60,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
     ] {
         assert!(build.contains(&expected));
     }
-    for (field, count) in [("source_files", 171), ("archived_generators", 3)] {
+    for (field, count) in [("source_files", 171), ("archived_generators", 4)] {
         let files = record[field].as_object().unwrap();
         assert_eq!(files.len(), count);
         for (name, recorded) in files {

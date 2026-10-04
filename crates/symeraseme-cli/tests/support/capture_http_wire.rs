@@ -133,6 +133,7 @@ pub fn record(binary: &Path, exit_status: i32, cases: &[serde_json::Value]) {
     let generators = [
         "crates/symeraseme-cli/tests/mcp_http_process.rs",
         "crates/symeraseme-cli/tests/support/capture_http_wire.rs",
+        "crates/symeraseme-cli/tests/support/interrupted_read.rs",
         "Cargo.lock",
     ]
     .into_iter()

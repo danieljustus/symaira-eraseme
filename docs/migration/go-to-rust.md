@@ -8,6 +8,36 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Bounded interrupted HTTP reads and required native recapture (2026-10-04, #1131)
+
+Actual Linux arm64 job `111448045796` passes eleven original HTTP parents
+but fails `http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals`
+when a socket header read returns POSIX EINTR. Both direct chunk reads now
+retry only interruption inside their original finite socket-read timeout:
+each retry receives the remaining budget, and the caller's original timeout
+is restored afterward. Header/body/status assertions, requests, all twelve
+original parents, and capture bounds are unchanged. Three regression controls
+prove interruption preserves bytes, expired budgets do not restart reads,
+and connection reset remains an error. These three controls and the original
+failed parent pass locally, with strict complete workspace Clippy.
+
+The parent and its new bounded-read helper are immutable wire-generator
+inputs. The producer now records all four generators, and the reader requires
+four; old three-generator references must fail until genuinely replaced.
+`frozen-http-wire-capture.yml` records all ten original Go/Rust wire comparisons
+on both Linux and both Mac native hosts, checks out the immutable PR head,
+and retains only bounded actual observation JSON. Every target still runs
+the regression controls and the original failed Rust parent. Windows retains
+its separate existing native complete-header/body family; the original wire
+parent is Unix-only. No platform or original test is removed from acceptance.
+
+The previous complete 380-test Go-absent result is bound to `81bb019`, before
+this generator change. Four genuine current-input wire records, independent
+archive/source/native build readback and the complete refreshed no-Go/native
+reader suites remain required. The six original service captures and the
+other process families remain bound to their verified source `e8bb6643`;
+no reference hash is redirected to an older answer. #1131 remains draft/open.
+
 ## Actual six-target current-source frozen refresh (2026-10-04, #1131)
 
 Capture run `37188052753` at clean Go 1.26.6 source
@@ -32,7 +62,7 @@ archived capture inputs are unchanged. No old answer is assigned a new
 source hash, no missing target is inferred, and no comparison or budget is
 relaxed. Linux compile-only workspace/all-feature verification and strict
 workspace/all-target/all-feature Clippy pass. The exact default Go-absent
-workflow passes 380 tests with zero failures. Its single top-level ignored
+workflow at `81bb019` passes 380 tests with zero failures. Its single top-level ignored
 consent harness child is still executed by the original parent in all sixteen
 private cases; it is not skipped acceptance. The full Linux CLI corpus and
 original SMTP/wire/header/triage/process assertions execute unchanged.

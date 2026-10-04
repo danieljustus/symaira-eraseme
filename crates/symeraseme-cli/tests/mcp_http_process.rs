@@ -21,6 +21,8 @@ use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 mod capture_http_wire;
 #[path = "support/frozen_http_wire.rs"]
 mod frozen_http_wire;
+#[path = "support/interrupted_read.rs"]
+mod interrupted_read;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GO_AGENT_CANCEL_FIXTURE: &str =
@@ -546,11 +548,23 @@ fn chunked_oversized_request(port: u16, token: &str) -> (u16, String, Vec<u8>) {
     read_response(&mut stream)
 }
 
+fn read_response_chunk(stream: &mut TcpStream, chunk: &mut [u8]) -> std::io::Result<usize> {
+    let budget = stream
+        .read_timeout()?
+        .expect("HTTP read requires its original finite timeout");
+    let result = interrupted_read::retry_until(Instant::now() + budget, |remaining| {
+        stream.set_read_timeout(Some(remaining))?;
+        stream.read(chunk)
+    });
+    stream.set_read_timeout(Some(budget))?;
+    result
+}
+
 fn read_response(stream: &mut TcpStream) -> (u16, String, Vec<u8>) {
     let mut response = Vec::new();
     let mut chunk = [0; 4096];
     let header_end = loop {
-        let count = stream.read(&mut chunk).unwrap();
+        let count = read_response_chunk(stream, &mut chunk).unwrap();
         assert_ne!(count, 0, "HTTP response ended before headers");
         response.extend_from_slice(&chunk[..count]);
         if let Some(index) = response.windows(4).position(|part| part == b"\r\n\r\n") {
@@ -582,7 +596,7 @@ fn read_response(stream: &mut TcpStream) -> (u16, String, Vec<u8>) {
     });
     let mut body = response[header_end..].to_vec();
     while content_length.is_some_and(|length| body.len() < length) {
-        let count = stream.read(&mut chunk).unwrap();
+        let count = read_response_chunk(stream, &mut chunk).unwrap();
         assert_ne!(count, 0, "HTTP response body ended early");
         body.extend_from_slice(&chunk[..count]);
     }
