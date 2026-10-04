@@ -794,6 +794,31 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+## Native reply triage candidate (2026-10-03, #1120)
+
+The older CLI/MCP triage process tests were Unix-only because their fake agent
+was a shell script. `triage_native_process.rs` adds an actual compiled local
+agent and direct checked-out Go 1.26.6/Rust comparisons on every platform.
+All sixteen retained CLI inputs compare actual exit/stdout/raw stderr, saved
+classification/confidence/summary and ordered event type/source/payload fields.
+Only the previously accepted randomized provider-name list is sorted. Native
+agent invocation counts must match, with ten required positive/error controls;
+no prompt, credential or body is logged by the agent. The retained fixture is
+input enumeration here; Windows expectations come from its actual Go process,
+not Unix output or a reimplemented oracle.
+
+Eight actual MCP stdio cases compare complete raw response frames and the same
+persisted effects: classification/rebuttal with save true/false, numeric-float
+arguments, missing classification replies, invalid arguments and Go's successful empty-message rebuttal fallback (without an agent call). Both services use disposable
+HOME/USERPROFILE/XDG/data/TEMP/PATH state, a private native executable and regular
+bounded logs; cold Go builds have 180 seconds, runtime children thirty seconds,
+with owned-child termination/reaping. No paid provider or real mailbox is used.
+The local sixteen/eight direct comparisons pass with actual Go. The six-target
+workflow also selects existing source-bound mapping/prompt/service/IMAP corpora,
+the full retained CLI corpus including poll-inbox and the original Unix gates.
+DOM-004/CLI-022 and task 7.3 remain PARTIAL until native completion and #1119's
+email trust prerequisite; a zero-case Windows shell test is not evidence.
+
 ## Native MCP HTTP completion candidate (2026-10-03, #1126)
 
 The full-header comparator already exists in `mcp_http_headers_process.rs`:
