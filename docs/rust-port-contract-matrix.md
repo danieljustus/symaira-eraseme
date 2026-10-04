@@ -13,6 +13,14 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The subsequent actual 110-observation run `37168958036` at clean
+`212c2821eb154544c5948a72f2f24a0a98bcfc12` passes four complete native Rust
+suites (both Linux and both Windows). All four downloaded 98-member archives
+independently verify every 1476 immutable input/source pins, native Go
+1.26.6/unmodified VCS, complete streams and original acceptance controls.
+Both macOS jobs remain queued; this evidence does not establish their result.
+
+
 Actual clean Linux-amd64 capture `8febd4dfa3498065b464ccde79aaaceafaba44c6`
 passes 132 observations. Independent readback validates all 1481 immutable
 input/source pins, 115 narrowly selected upload members, native unmodified
@@ -24,8 +32,14 @@ live Rust processes, all sixteen CLI cases, all four MCP cases, state effects
 and malformed UTF-8 comparison remain unchanged; explicit live mode and all
 other native hosts run the real producer. Corruption controls reject changed/
 truncated frames and fabricated source identity before replay. The Go-free
-workflow adds the three original complete process tests, making its expected
-selected count 364. Local reader validation and native acceptance are pending.
+workflow adds the three original complete process tests. At clean
+`d8dba96a70439d83b4d2dab9d128ff2148d973aa`, its exact Go-absent execution
+passes 364 tests with zero failures. The sole top-level ignored consent
+harness child is actually executed in all sixteen isolated cases by its
+passing parent. The same three complete process comparisons pass with private
+actual Go; strict CLI Clippy passes. All seven retained raw files match Git
+blobs and a real autocrlf checkout. Native acceptance of these additions and
+complete-workspace Go independence remain pending.
 
 
 The opt-in #1131 producer additionally prepares actual provider cancellation
@@ -36,11 +50,12 @@ unmodified Go VCS, immutable oracle/input pins and the original finite
 compile/runtime/output bounds. The actual cancellation file joins the narrow
 artifact allowlist. Unix targets record 132 observations; Windows records
 111 applicable observations while its separate native-executable controls
-remain live. No zero-case substitute is used. Local producer validation is
-pending; Rust defaults and the 361-test workflow remain unchanged.
+remain live. No zero-case substitute is used. The clean local 132-observation
+producer and its independent source/stream readback pass; current native
+132/111-observation acceptance remains required.
 
 
-At clean `6f084b0070dff5664c2bd234a571e651d82f58bd`, the exact current
+At earlier clean `6f084b0070dff5664c2bd234a571e651d82f58bd`, the exact
 Go-absent workflow passes all 361 selected tests with zero failures. Its
 sole top-level ignored harness child is actually executed in all sixteen
 isolated consent cases by the passing parent and is never counted as
