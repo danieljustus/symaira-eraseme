@@ -128,6 +128,8 @@ jobs:
                              env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "mcp_http_headers_process",
                               "--locked", "--offline"], env=environment, check=True)
+              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "campaign_smtp",
+                              "--test", "smtp_transport", "--locked", "--offline"], env=environment, check=True)
               # The consent child probe is intentionally not launched directly
               # by libtest: its parent actually executes all 16 isolated
               # umask/resource-limit cases with --ignored and checks 1 passed.

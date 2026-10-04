@@ -7,7 +7,26 @@ use std::process::Command;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
-const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[];
+const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
+    (
+        "linux/amd64",
+        "campaign",
+        "0b57be7f59923fd69eca54b7807743ffbaf6de2d",
+        "ab0a2a2a89e06287237238452aafc2d82af3f83885d5a1d8c7a584150a6c1d3e",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/linux-amd64/campaign.json"
+        ),
+    ),
+    (
+        "linux/amd64",
+        "transport",
+        "0b57be7f59923fd69eca54b7807743ffbaf6de2d",
+        "99b28b29c764ed8d38cad725fb146eb2cbf5a47797c9cb1fed6b9ba909cd0a12",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/smtp-native/linux-amd64/transport.json"
+        ),
+    ),
+];
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
