@@ -612,17 +612,32 @@ mod transport_tests {
         assert_eq!(error, "invalid MCP port 0: must be between 1 and 65535");
     }
 
+    // Independent expectations measured by the retained native Go/Rust bind
+    // comparisons. Never derive expected wording from the implementation.
+    fn expected_addr_in_use() -> &'static str {
+        if cfg!(windows) {
+            "Only one usage of each socket address (protocol/network address/port) is normally permitted."
+        } else {
+            "address already in use"
+        }
+    }
+
     /// Go's `listen` error wording for each bind failure class.
     #[test]
     fn listen_error_words_each_bind_failure_like_go() {
         let in_use = std::io::Error::from(std::io::ErrorKind::AddrInUse);
         assert_eq!(
             listen_error("127.0.0.1:8080", in_use),
-            format!("listen tcp 127.0.0.1:8080: bind: {}", addr_in_use_message())
+            format!(
+                "listen tcp 127.0.0.1:8080: bind: {}",
+                expected_addr_in_use()
+            )
         );
 
         let unavailable = std::io::Error::from(std::io::ErrorKind::AddrNotAvailable);
-        let expected_unavailable = if cfg!(target_os = "linux") {
+        let expected_unavailable = if cfg!(windows) {
+            "The requested address is not valid in its context."
+        } else if cfg!(target_os = "linux") {
             "cannot assign requested address"
         } else {
             "can't assign requested address"
@@ -691,7 +706,7 @@ mod transport_tests {
             .unwrap_err();
         assert_eq!(
             error,
-            format!("listen tcp {address}: bind: address already in use")
+            format!("listen tcp {address}: bind: {}", expected_addr_in_use())
         );
     }
 
