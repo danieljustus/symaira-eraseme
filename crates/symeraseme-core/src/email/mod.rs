@@ -19,6 +19,7 @@ pub mod policy;
 pub mod service;
 pub mod session;
 pub mod smtp;
+mod tls;
 pub mod types;
 pub mod wire;
 
