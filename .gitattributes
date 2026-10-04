@@ -74,3 +74,6 @@ tests/fixtures/go-frozen/cli-grant-native-344/** -text
 tests/fixtures/go-frozen/mcp-runtime-native-85/** -text
 tests/fixtures/go-frozen/cli-schedule-native-85/** -text
 tests/fixtures/go-frozen/unix-process-8feb/** -text
+
+# Whole authenticated native manifests retain actual producer bytes.
+tests/fixtures/go-frozen/unix-process-native097/** -text

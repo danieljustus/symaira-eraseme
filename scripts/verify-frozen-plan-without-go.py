@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute both original plan comparators with Go absent on recorded hosts."""
+"""Execute recorded whole plan and Unix process comparators with Go absent."""
 import os
 import pathlib
 import re
@@ -45,3 +45,14 @@ with tempfile.TemporaryDirectory(prefix="native-plan-no-go-") as temporary:
     assert result.returncode == 0, "native Go-absent comparator failed"
     totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
     assert totals == [(b"2", b"0", b"0")], "both real cases must execute; no skips or zero-case acceptance"
+    if sys.platform != "win32":
+        print("Verified: Go absent; all three original Unix process comparators execute native records", flush=True)
+        result = subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli",
+                                 "--test", "triage_commands", "--test", "mcp_triage_process",
+                                 "--test", "mcp_agent_error_json", "--locked", "--offline"],
+                                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        assert len(result.stdout) <= 2 * 1024 * 1024, "bounded Unix comparator log"
+        sys.stdout.buffer.write(result.stdout)
+        assert result.returncode == 0, "native Go-absent Unix comparator failed"
+        totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
+        assert totals == [(b"1", b"0", b"0")] * 3, "all three real cases must execute"
