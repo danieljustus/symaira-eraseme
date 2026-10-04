@@ -1,8 +1,8 @@
 {
-  "source_revision": "6d175f6355a67fe0c0e539754121b6643df812bf",
+  "source_revision": "0bc6b051890340822448fa3846c96f70022b79ad",
   "mutation_seed": 331841810741,
   "mutation_count": 128,
-  "go_version": "go version go1.26.6 darwin/arm64",
+  "go_version": "go version go1.26.6 linux/amd64",
   "source_files": [
     {
       "path": "cmd/symeraseme/main.go",
@@ -10,11 +10,11 @@
     },
     {
       "path": "internal/mcp/server.go",
-      "sha256": "2680267b072da5fc29213b99ef798129b0ac37efa646190bd83f55ee944a0976"
+      "sha256": "735e90fa02be8cbbf8229ee457daa69df54a33397b1f211d811b244e506db52b"
     }
   ],
   "initialize_fixture_sha256": "a92666e8d8f6fa937b60a7682d3b6e6f8268105fa64bacc9f8ec7f13cd35c1cf",
-  "generator_sha256": "d990f6f738c832421f27efe7ae40f5d11ee350ff7e0fa2cbe02333e47697bbe6",
+  "generator_sha256": "37240922ade6d87e177533b904b588d4c418d211118993387af69769310765d8",
   "cases": [
     {
       "name": "initialize_trailing_comma_is_parse_error",
@@ -6049,6 +6049,78 @@
       "exit_code": 1,
       "stdout_base64": "",
       "stderr_base64": "aW52YWxpZCBjaGFyYWN0ZXIgJ8O/JyBpbiBzdHJpbmcgZXNjYXBlIGNvZGUK"
+    },
+    {
+      "name": "ping-request",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6InBpbmcifQo="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7fSwiaWQiOjF9Cg==",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-null-params",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEuMCwibWV0aG9kIjoicGluZyIsInBhcmFtcyI6bnVsbH0K"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7fSwiaWQiOjF9Cg==",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-null-id",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOm51bGwsIm1ldGhvZCI6InBpbmciLCJwYXJhbXMiOnt9fQo="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7fSwiaWQiOm51bGx9Cg==",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-escaped-id",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOiI8Jj4iLCJtZXRob2QiOiJwaW5nIn0K"
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7fSwiaWQiOiJcdTAwM2NcdTAwMjZcdTAwM2UifQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-invalid-params",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6InBpbmciLCJwYXJhbXMiOltdfQo="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAyLCJtZXNzYWdlIjoiaW52YWxpZCBwYXJhbXMifSwiaWQiOjF9Cg==",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-invalid-id",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOnRydWUsIm1ldGhvZCI6InBpbmcifQo="
+      },
+      "exit_code": 0,
+      "stdout_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-notification",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoicGluZyJ9Cg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "",
+      "stderr_base64": ""
+    },
+    {
+      "name": "ping-invalid-params-notification",
+      "input_spec": {
+        "base64": "eyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoicGluZyIsInBhcmFtcyI6W119Cg=="
+      },
+      "exit_code": 0,
+      "stdout_base64": "",
+      "stderr_base64": ""
     }
   ]
 }
