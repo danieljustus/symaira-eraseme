@@ -10,6 +10,9 @@ use symeraseme_core::storage::{
     types::{EventType, Source},
 };
 
+#[path = "support/capture_plan_process.rs"]
+mod capture_plan_process;
+
 fn prepare(root: &Path, email: bool) -> (PathBuf, PathBuf, PathBuf, String) {
     let home = root.join("home");
     let data = root.join("data");
@@ -254,6 +257,7 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
     let resources = go_root.join("resources");
 
     let go_output = run(&go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+    capture_plan_process::record("web-form", &go, &go_output, &persisted_effects(&go_data));
     let rust_output = run(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_home,
@@ -307,6 +311,12 @@ fn consented_live_plan_execute_without_email_sender_matches_go_process() {
     init_profile(rust, &rust_home, &rust_data, &rust_cwd);
 
     let go_output = run(&go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+    capture_plan_process::record(
+        "senderless-email",
+        &go,
+        &go_output,
+        &persisted_effects(&go_data),
+    );
     let rust_output = run(
         rust,
         &rust_home,

@@ -10,6 +10,19 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The existing two complete consented plan-execution process comparators now
+prepare an opt-in actual Go recorder. When explicitly selected, it retains
+whole stdout/stderr/status and the original persisted state/events/manual-task
+tuple for both private synthetic web-form and senderless-email cases. All
+171 Go input/source pins, archived Rust input-generator identity and native
+Go 1.26.6/unmodified VCS are included; cross-compilation, dirty sources and
+existing output files are rejected. The narrow upload contains exactly two
+JSON records, excluding databases, consent tokens, profiles and build caches.
+Both real Go/Rust process comparisons still execute by default. Local recorder
+validation, actual native capture and frozen-reader integration are pending;
+this preparation does not establish further Go independence.
+
+
 The subsequent actual 110-observation run `37168958036` at clean
 `212c2821eb154544c5948a72f2f24a0a98bcfc12` passes four complete native Rust
 suites (both Linux and both Windows). All four downloaded 98-member archives
