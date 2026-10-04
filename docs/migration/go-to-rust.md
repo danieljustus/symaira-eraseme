@@ -998,3 +998,17 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Mutation campaign verifier reconciliation (2026-10-04, #813)
+
+At `66e48d6f8ce082e84c8524eb3ea700bcdd8a2b66`, all eleven actual
+mutation shards in run `37188075360` completed, but aggregate verifier job
+`111405689255` rejected the HTTP receipts: its expected inactive-platform
+anchors still described the pre-MCP-integration source. The workflow already
+used the exact current 190/195/204/231/247/296/313 anchors. The verifier now
+requires that same exact list; extra or changed exclusions still fail. No
+production code, exclusion, catalog, result or execution budget changes.
+Independent download and readback of all eleven raw archives now verifies
+700 actual mutants: 538 caught, 162 unviable, zero missed, zero timeouts.
+All ten existing outcome/campaign corruption controls pass. The original
+aggregate failure is retained; fresh current-head CI remains required.
