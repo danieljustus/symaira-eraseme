@@ -119,6 +119,7 @@ func TestReleaseWorkflowContract(t *testing.T) {
 			"Select Xcode 26",
 			"Verify Xcode toolchain",
 			"Set up Go",
+			"Install pinned Rust backend toolchain",
 			"Import Developer ID certificate",
 			"Validate notarization credentials",
 			"Build and sign macOS app bundle",

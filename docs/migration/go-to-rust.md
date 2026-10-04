@@ -968,3 +968,13 @@ must pass the complete Swift suite without skipped integration cases.
 Shell syntax and the existing packaging controls pass locally, including exact
 Rust-member identity and both nested signing order checks. APP-001 remains
 PARTIAL pending real native CI; unsigned staging does not prove #1129.
+
+At `970ef64`, Go CI job `111422925388` and the main CI test job
+`111422926131` failed the retained exact release-step-order contract: it
+still described the Go-only setup and omitted the newly required Rust
+toolchain step. The contract now requires that pinned setup before Developer
+ID material is imported; every existing signing/notarization/checksum step
+remains in its original required order. `TestReleaseWorkflowContract` and
+`TestPackageDMGMockSuite` pass locally with Go 1.26.6. Fresh PR checks remain
+required. This Go test-source change also requires honest new source-bound
+capture after final app integration; it does not relabel older observations.
