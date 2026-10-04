@@ -51,7 +51,7 @@ jobs:
           scripts/package-dmg.sh --app-only --non-release-test
           app="$STAGE_DIR/Symaira EraseMe.app"
           test "$("$app/Contents/MacOS/symeraseme" --version)" = "symeraseme version $VERSION"
-          test "$("$app/Contents/MacOS/symeraseme-go" version)" = "symeraseme version $VERSION"
+          test "$("$app/Contents/MacOS/symeraseme-go" version)" = "symeraseme $VERSION"
           printf 'SYMERASEME_RUST_TEST_APP_BUNDLE=%s\n' "$app" >> "$GITHUB_ENV"
           printf 'SYMERASEME_RUST_TEST_BINARY=%s\n' "$GITHUB_WORKSPACE/target/release/symeraseme-rust" >> "$GITHUB_ENV"
       - name: Full Swift suite including actual bundled discovery, auth and shutdown

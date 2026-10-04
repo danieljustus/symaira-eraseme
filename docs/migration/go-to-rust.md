@@ -42,6 +42,15 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+The shared app-backend helper also built real Rust 1.98.0 and Go 1.26.6
+executables in a clean ordinary checkout at `a8d606a` with an external Cargo
+target directory. Rust reports `symeraseme version 0.13.0`; the direct Go
+`version` command and explicit `SYMERASEME_BACKEND=go` path both report
+`symeraseme 0.13.0`. Go build info pins that clean source revision. The native
+and signed-release version assertions preserve those distinct existing
+command formats. This Linux build validates the shared helper and actual
+fallback dispatch, not Swift or macOS signing.
+
 ## Native reply triage candidate (2026-10-03, #1120)
 
 The older CLI/MCP triage process tests were Unix-only because their fake agent

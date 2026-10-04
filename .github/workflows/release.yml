@@ -147,7 +147,7 @@ jobs:
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
           test -x "$APP_PATH/Contents/MacOS/symeraseme-go"
           test "$("$APP_PATH/Contents/MacOS/symeraseme" --version)" = "symeraseme version ${RELEASE_TAG#v}"
-          test "$("$APP_PATH/Contents/MacOS/symeraseme-go" version)" = "symeraseme version ${RELEASE_TAG#v}"
+          test "$("$APP_PATH/Contents/MacOS/symeraseme-go" version)" = "symeraseme ${RELEASE_TAG#v}"
           for backend in symeraseme symeraseme-go; do
             codesign --verify --strict --verbose=2 "$APP_PATH/Contents/MacOS/$backend"
           done
