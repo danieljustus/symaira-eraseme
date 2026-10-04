@@ -121,6 +121,9 @@ def main():
     sources += [source / ("rust-tests/parity/oracle/" + name + "/main.go")
                 for name in ("cli-schedule", "mcp-clock", "mcp-auto-confirm", "mcp-tool-gaps")]
     sources += sorted((source / "registry/brokers").rglob("*.yaml"))
+    sources += [source / ("rust-tests/parity/oracle/" + name + "/main.go")
+                for name in ("provider-cancel", "mcp-agent-error-json", "cli-triage", "mcp-triage")]
+    sources.append(source / "rust-tests/parity/oracle/mcp-triage/agent.sh")
     for path in sources:
         manifest["source_files"][path.relative_to(source).as_posix()] = digest(path.read_bytes())
     manifest["controls"] = []
@@ -353,10 +356,69 @@ def main():
             "stdout": digest(output), "stderr": digest(errors), "binary": digest(binary.read_bytes()),
             "embedded_build_info": build_info.decode(), **isolation,
         })
+    # These original shell-agent oracles apply to Unix only. Windows retains
+    # its separate real native executable controls; no zero-case substitute.
+    extra_packages = ["provider-cancel"]
+    if info["GOHOSTOS"] != "windows":
+        extra_packages += ["mcp-agent-error-json", "cli-triage", "mcp-triage"]
+    extra_operations = 0
+    for package in extra_packages:
+        binary = output_root / (package + "-oracle" + (".exe" if info["GOHOSTOS"] == "windows" else ""))
+        capture([go, "build", "-mod=readonly", "-buildvcs=true", "-o", str(binary),
+                 "./rust-tests/parity/oracle/" + package], source, environment,
+                output_root / (package + "-build"), 120)
+        build_info = subprocess.check_output([go, "version", "-m", str(binary)], env=environment, timeout=10)
+        for expected in ("vcs.revision=" + revision, "vcs.modified=false",
+                         "GOOS=" + info["GOHOSTOS"], "GOARCH=" + info["GOHOSTARCH"]):
+            assert expected.encode() in build_info
+        command = [str(binary)]
+        fixture_path = output_root / "provider-cancel.observations.json"
+        if package == "provider-cancel":
+            command += ["-fixture", str(fixture_path)]
+        runtime_environment = {**environment, "GOFLAGS": "-mod=readonly -buildvcs=true"}
+        output, errors = capture(command, source, runtime_environment, output_root / package, 30)
+        fixture = {}
+        if package == "provider-cancel":
+            raw = fixture_path.read_bytes()
+            observed = json.loads(raw)
+            assert observed["schema"] == "symeraseme.go-oracle.provider-cancel.v1"
+            assert observed["go_version"] == "go1.26.6"
+            assert observed["provider_canceled"] and observed["client_disconnected"]
+            assert not errors and len(observed["sources_sha256"]) == 12
+            names = ["actual-local-provider-and-client-cancellation"]
+            fixture = {"fixture": {"file": fixture_path.name, **digest(raw)}}
+        elif package == "mcp-agent-error-json":
+            observed = json.loads(output)
+            assert observed["schema"] == "symeraseme.go-oracle.mcp-agent-error-json.v1"
+            assert observed["go_version"] == "go1.26.6" and not errors
+            assert len(observed["sources_sha256"]) == 8
+            names = ["actual-malformed-host-agent-stderr-frame"]
+        elif package == "cli-triage":
+            observed = json.loads(output)
+            assert observed["schema"] == "symeraseme.go-oracle.cli-triage.v1"
+            assert len(observed["cases"]) == 16
+            names = [case["id"] for case in observed["cases"]]
+            for entry in observed["sources"]:
+                assert manifest["source_files"][entry["path"]]["sha256"] == entry["sha256"]
+            assert manifest["source_files"]["rust-tests/parity/oracle/cli-triage/main.go"]["sha256"] == observed["generator_sha256"]
+        else:
+            observed = json.loads(output)
+            assert package == "mcp-triage" and isinstance(observed, list) and len(observed) == 4
+            names = [str(index) + ":" + case["name"] for index, case in enumerate(observed)]
+        assert len(names) == len(set(names))
+        if isinstance(observed, dict):
+            for path, expected in observed.get("sources_sha256", {}).items():
+                assert manifest["source_files"][path]["sha256"] == expected
+        manifest["runtime_oracles"].append({
+            "package": package, "cases": names, "exit_status": 0, "stdin": digest(b""),
+            "stdout": digest(output), "stderr": digest(errors), "binary": digest(binary.read_bytes()),
+            "embedded_build_info": build_info.decode(), **fixture,
+        })
+        extra_operations += len(names)
     assert not subprocess.check_output([git, "status", "--porcelain"], cwd=source), "capture changed source"
     (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"native_target": manifest["native_target"], "source_revision": revision,
-                      "operations": 110, "status": "actual observations captured"}))
+                      "operations": 110 + extra_operations, "status": "actual observations captured"}))
 
 
 if __name__ == "__main__":

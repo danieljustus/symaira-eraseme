@@ -34,6 +34,7 @@ tests/fixtures/llm-failures-next/*.json text eol=lf
 rust-tests/parity/oracle/migration-state/** text eol=lf
 rust-tests/parity/oracle/migration-safety/** text eol=lf
 rust-tests/parity/oracle/mcp-stdio-mutations/** text eol=lf
+rust-tests/parity/oracle/mcp-triage/agent.sh text eol=lf
 rust-tests/parity/oracle/campaign-execution/cases.json text eol=lf
 
 # These source-bound contracts hash raw bytes, including on native Windows.

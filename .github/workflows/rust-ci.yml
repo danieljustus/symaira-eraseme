@@ -332,6 +332,7 @@ jobs:
             ${{ runner.temp }}/frozen-go-services/*.stderr
             ${{ runner.temp }}/frozen-go-services/scheduler-install.observations.json
             ${{ runner.temp }}/frozen-go-services/campaign-plan.observations.json
+            ${{ runner.temp }}/frozen-go-services/provider-cancel.observations.json
             ${{ runner.temp }}/frozen-go-services/cli-grant-case-*-consent-*.observations.json
 
       - name: Check MCP stdio oracle without rewriting fixtures

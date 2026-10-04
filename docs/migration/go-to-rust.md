@@ -10,6 +10,18 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 
 ## Current task ownership (2026-10-02)
 
+The opt-in #1131 producer additionally prepares actual provider cancellation
+(one loopback client/provider observation on every target) and the existing
+Unix shell-agent corpora: one complete malformed-stderr MCP frame, sixteen
+CLI triage cases and four MCP triage cases. Every new binary retains native
+unmodified Go VCS, immutable oracle/input pins and the original finite
+compile/runtime/output bounds. The actual cancellation file joins the narrow
+artifact allowlist. Unix targets record 132 observations; Windows records
+111 applicable observations while its separate native-executable controls
+remain live. No zero-case substitute is used. Local producer validation is
+pending; Rust defaults and the 361-test workflow remain unchanged.
+
+
 At clean `6f084b0070dff5664c2bd234a571e651d82f58bd`, the exact current
 Go-absent workflow passes all 361 selected tests with zero failures. Its
 sole top-level ignored harness child is actually executed in all sixteen
