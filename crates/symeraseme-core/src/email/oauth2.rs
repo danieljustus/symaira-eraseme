@@ -134,7 +134,7 @@ impl TokenTransport for UreqTokenTransport {
         form: &str,
         timeout: Duration,
     ) -> Result<TokenReply, TokenTransportError> {
-        let config = ureq::Agent::config_builder()
+        let mut config = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .https_only(!is_loopback(endpoint))
             .timeout_global(Some(timeout))
@@ -142,9 +142,21 @@ impl TokenTransport for UreqTokenTransport {
             .timeout_recv_response(Some(timeout))
             .timeout_recv_body(Some(timeout))
             .max_redirects(0)
-            .max_redirects_will_error(true)
-            .build();
-        let agent = ureq::Agent::new_with_config(config);
+            .max_redirects_will_error(true);
+        if endpoint
+            .split_once(':')
+            .is_some_and(|(scheme, _)| scheme.eq_ignore_ascii_case("https"))
+        {
+            let certificates =
+                super::tls::platform_certificates().map_err(|_| TokenTransportError)?;
+            let roots: ureq::tls::RootCerts = certificates
+                .iter()
+                .map(|cert| ureq::tls::Certificate::from_der(cert.as_ref()).to_owned())
+                .collect::<Vec<_>>()
+                .into();
+            config = config.tls_config(ureq::tls::TlsConfig::builder().root_certs(roots).build());
+        }
+        let agent = ureq::Agent::new_with_config(config.build());
         let mut response = agent
             .post(endpoint)
             .header("Content-Type", "application/x-www-form-urlencoded")
