@@ -378,14 +378,14 @@ jobs:
               cargo +"$RUST_TOOLCHAIN" check -p symeraseme-core --locked
           )
 
+      - name: Capture original actual native Go process references
+        if: github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+        shell: bash
+        run: python3 scripts/capture-native-process-references.py --output-root "${{ runner.temp }}"
+
       - name: Test and doctest
         env:
-          SYMERASEME_CAPTURE_PLAN_PROCESSES: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-plan-processes', runner.temp) || '' }}
-          SYMERASEME_CAPTURE_HTTP_WIRE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && runner.os != 'Windows' && format('{0}/frozen-go-http-wire', runner.temp) || '' }}
-          SYMERASEME_CAPTURE_HTTP_HEADERS: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-http-headers', runner.temp) || '' }}
-          SYMERASEME_CAPTURE_SMTP: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-smtp', runner.temp) || '' }}
-          SYMERASEME_CAPTURE_AGENT_ERROR: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-agent-error', runner.temp) || '' }}
-          SYMERASEME_CAPTURE_NATIVE_TRIAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-native-triage', runner.temp) || '' }}
+          SYMERASEME_PARITY_LIVE_GO: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && '1' || '0' }}
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
