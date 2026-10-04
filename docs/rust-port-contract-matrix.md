@@ -13,6 +13,36 @@
 
 ## Granular issue ownership (2026-10-02)
 
+The Linux amd64 original HTTP wire comparator now consumes a measured actual
+Go record from clean producer `b518d619f297754970ac7b44f86497aafd1072ad`.
+All ten unchanged request cases still compare real Rust HTTP status,
+Content-Type and complete body bytes. Ephemeral native bearer tokens retain
+only the original request-token substitution; other response headers and
+process stdout/stderr are outside this original comparator. The retained
+38331-byte record SHA-256 is
+`afc81fa177dc03ee70c6f26ed74334304671d2ea20e6106f9a629876c16e7d32`.
+Its 171 actual Go input pins and three immutable/current Rust input generator
+pins were independently read back; native Go 1.26.6 VCS is unmodified and
+server exit status is zero. Whole-record corruption, truncation and source
+changes are rejected before replay. Explicit live/capture modes and the
+three unrecorded Unix hosts continue to execute actual Go.
+
+At clean `a2a7219d16179878b5d4094c0565daf212a03822`, the exact default
+Go-absent workflow passes **367 tests, zero failures**; the sole delegated
+consent child is actually run in all sixteen isolated cases by its parent.
+The same original HTTP comparison passes with private actual Go, and strict
+CLI all-target Clippy passes. All seventeen retained native files match
+immutable Git blobs and an actual autocrlf checkout. The other HTTP cases,
+native Windows helpers and fallback transports still require Go.
+
+Current native reader run `37176774792` at `6ca3072` passes complete Rust on
+both Linux and both Windows hosts. All four service archives and eight
+whole-plan records have been independently read back. Both macOS jobs and
+their current archives remain queued; this run is retained before another
+manual capture is dispatched. The new HTTP reader awaits its own current
+native acceptance, including actual capture on all four Unix hosts. Issue
+#1131 remains open.
+
 Actual native run `37172389657` at clean `0972f73` now passes all six
 complete Rust suites. Every downloaded Linux/Windows/macOS service archive
 has been independently read back: all 1481 immutable source/input pins,
