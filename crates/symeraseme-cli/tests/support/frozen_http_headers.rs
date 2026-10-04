@@ -9,8 +9,8 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[(
     "linux/amd64",
-    "17cfa0931b853345bd0b14afda3f77f25d66c656",
-    "09a5a5329c9d37839e22b7a6b0c793b5e5cd566dd292a6ac4027c681993b3bdf",
+    "e6fc336212717bd8cd5e8cd8965aab255216d541",
+    "8ad3377c860a97dec3fd969a3a95efd2cba8ed6d0c0509c4e33c43eb8bb82a79",
     include_bytes!("../../../../tests/fixtures/go-frozen/http-headers/linux-amd64/headers.json"),
 )];
 
