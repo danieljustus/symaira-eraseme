@@ -1,4 +1,6 @@
 //! Native CLI and MCP triage differentials with a compiled local agent.
+use base64::Engine;
+use serde::Serialize;
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,6 +11,8 @@ use symeraseme_core::storage::{Repository, Store};
 #[allow(dead_code)]
 mod mcp_http_port;
 use mcp_http_port::StartedChild;
+#[path = "support/capture_native_triage.rs"]
+mod capture_native_triage;
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -93,7 +97,7 @@ fn oracle(logs: &Path) -> PathBuf {
     binary
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 struct Snapshot {
     classification: Option<String>,
     confidence: Option<f64>,
@@ -101,7 +105,7 @@ struct Snapshot {
     events: Vec<Event>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 struct Event {
     request_id: i64,
     event_type: String,
@@ -278,6 +282,18 @@ fn assert_process_and_state(
     );
 }
 
+fn observed(output: &Output, root: &Path, id: &str, input: Value) -> Value {
+    json!({
+        "id": id, "input": input,
+        "exit_status": output.status.code().unwrap(),
+        "stdout_bytes": output.stdout.len(), "stderr_bytes": output.stderr.len(),
+        "stdout_base64": base64::engine::general_purpose::STANDARD.encode(&output.stdout),
+        "stderr_base64": base64::engine::general_purpose::STANDARD.encode(&output.stderr),
+        "saved_reply_and_ordered_events": read_snapshot(&root.join("data")),
+        "actual_agent_invocations": fs::read_to_string(root.join("agent-control")).unwrap_or_default(),
+    })
+}
+
 #[test]
 fn native_cli_triage_matches_go_for_every_retained_case() {
     let root = tempfile::tempdir().unwrap();
@@ -289,6 +305,7 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
     let cases = cases["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 16);
     let mut positive_controls = 0;
+    let mut recorded = Vec::new();
     for case in cases {
         let id = case["id"].as_str().unwrap();
         let argv = case["argv"]
@@ -333,6 +350,14 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
         }
         let rust = outputs.pop().unwrap();
         let go = outputs.pop().unwrap();
+        recorded.push(observed(
+            &go,
+            &go_root,
+            id,
+            json!({
+                "argv": argv, "environment": case["environment"], "stdin_base64": "",
+            }),
+        ));
         assert_eq!(
             go.status.code().map(i64::from),
             case["exit_code"].as_i64(),
@@ -341,6 +366,7 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
         assert_process_and_state(go, rust, &go_root, &rust_root, id);
     }
     assert!(positive_controls >= 9);
+    capture_native_triage::record(&go, "cli", &recorded);
     eprintln!(
         "native CLI triage executed all 16 actual Go/Rust cases and {positive_controls} agent controls"
     );
@@ -392,6 +418,7 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
             json!({"request_id":999,"save":false}),
         ),
     ];
+    let mut recorded = Vec::new();
     for (id, name, arguments) in cases {
         let frame = root.path().join(format!("{id}.input"));
         let mut input = serde_json::to_vec(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":name,"arguments":arguments}})).unwrap();
@@ -432,6 +459,11 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
         }
         let rust = outputs.pop().unwrap();
         let go = outputs.pop().unwrap();
+        recorded.push(observed(&go, &go_root, id, json!({
+            "argv": ["mcp", "--stdio"],
+            "environment": {"SYMERASEME_LLM_PROVIDER": "agent"},
+            "stdin_base64": base64::engine::general_purpose::STANDARD.encode(fs::read(&frame).unwrap()),
+        })));
         assert!(go.status.success() && go.stderr.is_empty());
         let reply: Value = serde_json::from_slice(&go.stdout).unwrap();
         let positive = id.ends_with("save")
@@ -445,6 +477,7 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
         );
         assert_process_and_state(go, rust, &go_root, &rust_root, id);
     }
+    capture_native_triage::record(&go, "mcp", &recorded);
     eprintln!(
         "native MCP triage executed all eight actual Go/Rust raw-frame and saved-effect comparisons"
     );

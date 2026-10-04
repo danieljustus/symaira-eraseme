@@ -385,6 +385,7 @@ jobs:
           SYMERASEME_CAPTURE_HTTP_HEADERS: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-http-headers', runner.temp) || '' }}
           SYMERASEME_CAPTURE_SMTP: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-smtp', runner.temp) || '' }}
           SYMERASEME_CAPTURE_AGENT_ERROR: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-agent-error', runner.temp) || '' }}
+          SYMERASEME_CAPTURE_NATIVE_TRIAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && format('{0}/frozen-go-native-triage', runner.temp) || '' }}
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -409,6 +410,17 @@ jobs:
           path: |
             ${{ runner.temp }}/frozen-go-plan-processes/web-form.json
             ${{ runner.temp }}/frozen-go-plan-processes/senderless-email.json
+
+      - name: Upload actual native Go triage observations
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frozen-go-native-triage-${{ runner.os }}-${{ runner.arch }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/frozen-go-native-triage/cli.json
+            ${{ runner.temp }}/frozen-go-native-triage/mcp.json
 
       - name: Upload actual native Go agent-error observation
         if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
