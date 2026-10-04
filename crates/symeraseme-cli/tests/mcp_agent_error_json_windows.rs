@@ -118,6 +118,26 @@ fn helper(root: &Path) -> PathBuf {
     executable
 }
 
+fn rust_fixture(root: &Path) -> PathBuf {
+    let executable = root.join(if cfg!(windows) {
+        "synthetic-agent-error.exe"
+    } else {
+        "synthetic-agent-error"
+    });
+    let mut build = Command::new("rustc");
+    build
+        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
+        .arg(&executable)
+        .arg(Path::new(ROOT).join("crates/symeraseme-cli/tests/fixtures/native_agent_error.rs"));
+    let output = capture(build, root, "rust-fixture-build", Duration::from_secs(60));
+    assert!(
+        output.status.success(),
+        "native synthetic Rust fixture build: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
+}
+
 fn isolated(command: &mut Command, root: &Path, bin: &Path, data: &Path) {
     let home = root.join("home");
     let temp = root.join("tmp");
@@ -198,26 +218,51 @@ fn native_helper_and_go_contract_observation() {
     assert!(sanity.stdout.is_empty());
     assert_eq!(sanity.stderr, BAD_STDERR, "fake agent emitted raw bytes");
 
-    for stream in ["stdout", "stderr"] {
-        let started = Instant::now();
-        let error = std::panic::catch_unwind(|| {
-            let mut flood = Command::new(&executable);
-            flood.args(["--flood", stream]);
-            isolated(
-                &mut flood,
-                root.path(),
-                root.path(),
-                &root.path().join("sanity-data"),
+    let rust_fixture = rust_fixture(root.path());
+    let mut fixture_command = Command::new(&rust_fixture);
+    isolated(
+        &mut fixture_command,
+        root.path(),
+        root.path(),
+        &root.path().join("rust-fixture-data"),
+    );
+    let fixture_sanity = capture(
+        fixture_command,
+        root.path(),
+        "rust-fixture",
+        Duration::from_secs(5),
+    );
+    assert_eq!(fixture_sanity.status, sanity.status);
+    assert_eq!(fixture_sanity.stdout, sanity.stdout);
+    assert_eq!(fixture_sanity.stderr, sanity.stderr);
+
+    for (fixture_name, fixture) in [("go", &executable), ("rust", &rust_fixture)] {
+        for stream in ["stdout", "stderr"] {
+            let started = Instant::now();
+            let error = std::panic::catch_unwind(|| {
+                let mut flood = Command::new(fixture);
+                flood.args(["--flood", stream]);
+                isolated(
+                    &mut flood,
+                    root.path(),
+                    root.path(),
+                    &root.path().join("sanity-data"),
+                );
+                capture(
+                    flood,
+                    root.path(),
+                    &format!("{fixture_name}-flood-{stream}"),
+                    Duration::from_secs(10),
+                );
+            })
+            .expect_err("live capture rejects oversized output");
+            let text = error.downcast_ref::<String>().expect("capture error text");
+            assert!(
+                text.contains("capture limit"),
+                "must fail on size, not timeout"
             );
-            capture(flood, root.path(), "flood", Duration::from_secs(10));
-        })
-        .expect_err("live capture rejects oversized output");
-        let text = error.downcast_ref::<String>().expect("capture error text");
-        assert!(
-            text.contains("capture limit"),
-            "must fail on size, not timeout"
-        );
-        assert!(started.elapsed() < Duration::from_secs(10));
+            assert!(started.elapsed() < Duration::from_secs(10));
+        }
     }
 
     let go_root = root.path().join("go");
