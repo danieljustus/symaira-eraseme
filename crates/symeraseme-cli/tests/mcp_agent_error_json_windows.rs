@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use serde::Deserialize;
 
+#[path = "support/capture_agent_error.rs"]
+mod capture_agent_error;
+
 #[cfg(windows)]
 use symeraseme_core::storage::Store;
 #[cfg(windows)]
@@ -236,6 +239,7 @@ fn native_helper_and_go_contract_observation() {
     assert_eq!(fixture_sanity.stdout, sanity.stdout);
     assert_eq!(fixture_sanity.stderr, sanity.stderr);
 
+    let mut go_limit_controls = Vec::new();
     for (fixture_name, fixture) in [("go", &executable), ("rust", &rust_fixture)] {
         for stream in ["stdout", "stderr"] {
             let started = Instant::now();
@@ -262,6 +266,13 @@ fn native_helper_and_go_contract_observation() {
                 "must fail on size, not timeout"
             );
             assert!(started.elapsed() < Duration::from_secs(10));
+            if fixture_name == "go" {
+                go_limit_controls.push(serde_json::json!({
+                    "stream": stream, "rejected": true,
+                    "actual_reason": text, "elapsed_ms": started.elapsed().as_millis(),
+                    "capture_limit_bytes": MAX_CAPTURE,
+                }));
+            }
         }
     }
 
@@ -312,6 +323,25 @@ fn native_helper_and_go_contract_observation() {
     tampered[0] ^= 1;
     assert!(compare_bytes(&tampered, &expected).is_err());
     assert!(compare_bytes(&expected, &expected).is_ok());
+
+    let stream = |raw: &[u8]| {
+        serde_json::json!({
+            "bytes": raw.len(),
+            "base64": base64::engine::general_purpose::STANDARD.encode(raw),
+        })
+    };
+    capture_agent_error::record(
+        &executable,
+        serde_json::json!({
+            "oracle": {"argv": ["--oracle"], "exit_status": go.status.code().unwrap(),
+                       "stdout": stream(&go.stdout), "stderr": stream(&go.stderr)},
+            "helper_sanity": {"argv": [], "exit_status": sanity.status.code().unwrap(),
+                              "stdout": stream(&sanity.stdout), "stderr": stream(&sanity.stderr)},
+            "helper_limit_controls": go_limit_controls,
+            "Rust_fixture_matches_actual_Go_sanity": fixture_sanity.status == sanity.status
+                && fixture_sanity.stdout == sanity.stdout && fixture_sanity.stderr == sanity.stderr,
+        }),
+    );
 
     #[cfg(windows)]
     {
