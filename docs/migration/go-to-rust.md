@@ -140,6 +140,36 @@ Only those expected inventory counts are corrected; all existing corruption,
 compiler/host, missing-case and no-write controls remain intact. Fresh complete
 native acceptance on the corrected head remains required.
 
+## Native SMTP campaign gate (2026-10-03, #1118)
+
+The new explicit `NetSmtpTransport` now supplies the previously absent Rust
+network sender. The actual Go/Rust campaign differential checks rejected
+recipient followed by successful send, exact normalized SMTP/MIME bytes,
+persisted events and complete projected state. Eight ordinary protocol
+controls match Go; an additional credential-echo control verifies Rust's
+required redaction of the raw/quoted/encoded synthetic secret actually
+observed in Go's diagnostic. Three private-root Rust STARTTLS handshakes
+verify trusted/unrelated/expired chains before authentication.
+`docs/rust-smtp-transport.md` records the adapter, bounds and precise evidence
+limits. The native workflow selects these controls and retained plan/CLI
+suites on all six targets. Local controls and strict linting pass.
+At branch source `cb3234c2291c8b243aeed8452e2bfce6f1938868`, targeted
+run `37137509483` passed all six native targets, including Intel Mac job
+`111244931566`. Actual log records include the complete persisted campaign
+differential, eight ordinary protocol cases, one credential-echo privacy
+control, three private-root TLS handshakes and retained plan/CLI execution.
+DOM-002/CLI-010 are PASS for that scope; task 7.1 awaits final PR checks and
+verified main integration. #1119's independent OS-store trust scope remains open.
+At `419d60c9`, targeted run `37123597940` passed Linux amd64/arm64 and
+Windows amd64/arm64, including the actual transports and retained plan/CLI
+checks; its macOS jobs are pending. Full workspace run `37123623125` found a
+retained Windows arm64 HTTP fixture failure in job `111204464694`, not an SMTP
+mismatch. This branch carries the bounded request-staging repair described in
+`docs/rust-port/handoffs/2026-10-03-windows-mcp-staged-request.md`; no timeout or
+response comparison was relaxed. The current targeted six-platform acceptance
+above supersedes the earlier pending SMTP scope; complete workspace integration
+checks remain separate.
+
 ## Artifact-level SBOM preparation (2026-10-03, #1128)
 
 The native shadow archive workflow now prepares embedded Cargo inventories
