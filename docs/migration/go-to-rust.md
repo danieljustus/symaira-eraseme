@@ -21,7 +21,11 @@ whole stdout/stderr/status metadata. Broker YAML inputs and the four oracle
 sources join the source inventory. The clock producer runs from a hostile
 project and must leave both injected project and inherited data paths absent.
 The original 62 observations remain, giving 110 product observations. New
-capture validation is pending; no Rust reader is changed and no new Go-free
+capture at `60c847e` retained a real 1284895-byte MCP gap output, exposing the
+shared producer's 1 MiB limit. That family now uses its existing Rust test's
+8 MiB complete-frame allowance; all other output limits and every deadline
+remain unchanged. Corrected capture validation is pending; no Rust reader
+is changed and no new Go-free
 or native acceptance is claimed. The current 62-observation run retains its
 own source-bound scope and will not be credited for this extension.
 

@@ -22,7 +22,7 @@ def digest(data):
     return {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def capture_process(command, cwd, environment, destination, deadline_seconds):
+def capture_process(command, cwd, environment, destination, deadline_seconds, stdout_limit=1024 * 1024):
     stdout = destination.with_suffix(".stdout")
     stderr = destination.with_suffix(".stderr")
     with stdout.open("xb") as out, stderr.open("xb") as err:
@@ -31,7 +31,7 @@ def capture_process(command, cwd, environment, destination, deadline_seconds):
         try:
             deadline = time.monotonic() + deadline_seconds
             while child.poll() is None:
-                if stdout.stat().st_size > 1024 * 1024 or stderr.stat().st_size > 65536:
+                if stdout.stat().st_size > stdout_limit or stderr.stat().st_size > 65536:
                     raise RuntimeError("capture exceeded its output limit")
                 if time.monotonic() >= deadline:
                     raise TimeoutError("capture exceeded its existing oracle budget")
@@ -41,12 +41,12 @@ def capture_process(command, cwd, environment, destination, deadline_seconds):
                 child.kill()
             child.wait(timeout=5)
     output, errors = stdout.read_bytes(), stderr.read_bytes()
-    assert len(output) <= 1024 * 1024 and len(errors) <= 65536
+    assert len(output) <= stdout_limit and len(errors) <= 65536
     return child.returncode, output, errors
 
 
-def capture(command, cwd, environment, destination, deadline_seconds):
-    status, output, errors = capture_process(command, cwd, environment, destination, deadline_seconds)
+def capture(command, cwd, environment, destination, deadline_seconds, stdout_limit=1024 * 1024):
+    status, output, errors = capture_process(command, cwd, environment, destination, deadline_seconds, stdout_limit)
     assert status == 0, f"actual oracle failed; inspect {destination.with_suffix('.stderr')}"
     return output, errors
 
@@ -311,7 +311,10 @@ def main():
             runtime_environment.update(SYMERASEME_DB_DIR=str(hostile_env / "db"),
                                        SYMERASEME_DATA_DIR=str(hostile_env / "data"))
             cwd = hostile
-        output, errors = capture([str(binary)], cwd, runtime_environment, output_root / package, 30)
+        # Preserve the original MCP-gap test's 8 MiB complete-frame allowance;
+        # every other producer keeps its original 1 MiB limit.
+        stdout_limit = 8 * 1024 * 1024 if package == "mcp-tool-gaps" else 1024 * 1024
+        output, errors = capture([str(binary)], cwd, runtime_environment, output_root / package, 30, stdout_limit)
         observed = json.loads(output)
         if package == "cli-schedule":
             assert observed["schema"] == "symeraseme.go-oracle.cli.v1"
