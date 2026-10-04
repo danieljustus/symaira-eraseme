@@ -22,9 +22,11 @@ and fabricated source/target identity. Local/current native acceptance is
 pending; the expected selected total becomes 361 tests. The first local
 reader run retained 23 passes and two failures because it incorrectly
 required empty producer stderr. Actual whole schedule captures retain
-Cobra error/help output there; the reader now verifies those bytes against
+the producer's case-summary diagnostics there; the reader now verifies those bytes against
 the measured length/SHA-256 instead. All per-case stderr comparisons stay
-unchanged, and corrected validation remains pending.
+unchanged, At clean `6f084b0070dff5664c2bd234a571e651d82f58bd`, corrected validation
+passes all 25 CLI tests without Go, the same thirteen-case comparison passes
+with private actual Go, and strict CLI Clippy passes.
 
 
 Actual 110-observation run `37167564927` at clean `85acc513` records complete
@@ -38,7 +40,8 @@ Original Linux provenance stays verified too. Existing corruption controls
 check truncated frames and fabricated target identities on all four native
 captures. At clean `dd51bb0`, all 102 CLI binary unit tests pass without Go, including
 all 98 MCP tests; the same three changed comparators pass with private real
-Go. Current native reader acceptance and strict CLI Clippy remain pending.
+Go. Strict CLI Clippy also passes at `6f084b0`; current native reader acceptance
+remains pending.
 
 
 The Go-absent workflow now runs every core/engine/CLI library and binary
