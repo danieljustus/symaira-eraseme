@@ -46,6 +46,17 @@ case "$*" in
 esac
 MOCK
 
+# mock cargo: report the actual output path using Cargo's JSON build protocol.
+cat <<'MOCK' > "$MOCK_BIN/cargo"
+#!/bin/bash
+echo "cargo $*" >> "$MOCK_LOG"
+RUST_BIN="$TEST_DIR/mock_rust_bin/symeraseme-rust"
+mkdir -p "$(dirname "$RUST_BIN")"
+printf '#!/bin/sh\nprintf "symeraseme version 0.13.0\\n"\n' > "$RUST_BIN"
+chmod +x "$RUST_BIN"
+python3 -c 'import json,sys; print(json.dumps({"reason":"compiler-artifact","target":{"name":"symeraseme-rust"},"executable":sys.argv[1]}))' "$RUST_BIN"
+MOCK
+
 # mock go
 cat <<'MOCK' > "$MOCK_BIN/go"
 #!/bin/bash
@@ -154,7 +165,14 @@ test_local_test_mode_without_credentials() {
     rm -f "$DIST_DIR"/Symaira-EraseMe-*-macos.dmg
 
     local OUT
-    OUT="$(VERSION="0.13.0" "$REPO_ROOT/scripts/package-dmg.sh" 2>&1)"
+    if OUT="$(VERSION="0.13.0" "$REPO_ROOT/scripts/package-dmg.sh" 2>&1)"; then
+        :
+    else
+        local EXIT_CODE=$?
+        printf '%s\n' "$OUT" >&2
+        echo "FAIL: local packaging exited with status $EXIT_CODE" >&2
+        return "$EXIT_CODE"
+    fi
     echo "$OUT" | grep -q "CODESIGN_IDENTITY not set. Skipping code signing (non-release test mode only)."
     echo "$OUT" | grep -q "DMG successfully created"
     test -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
@@ -192,7 +210,21 @@ test_package_dmg_modes() {
     python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$APP_BUNDLE/Contents/Info.plist"
     test ! -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
 
-    # Verify nested Go binary signed before outer app bundle
+    # Both backends are executable; the default is the Rust output.
+    test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    test -x "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
+    cmp "$TEST_DIR/mock_rust_bin/symeraseme-rust" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    grep -q 'cargo build --locked -p symeraseme-cli --bin symeraseme-rust --release' "$MOCK_LOG"
+    # Verify both nested binaries are signed before the outer app bundle.
+    python3 - "$MOCK_LOG" "$APP_BUNDLE" <<'PYCODE'
+import pathlib, sys
+lines = pathlib.Path(sys.argv[1]).read_text().splitlines()
+app = sys.argv[2]
+outer = next(i for i, line in enumerate(lines) if line.startswith('codesign --deep --force') and line.endswith(app))
+for name in ('symeraseme', 'symeraseme-go'):
+    nested = next(i for i, line in enumerate(lines) if line.startswith('codesign --force') and line.endswith(app + '/Contents/MacOS/' + name))
+    assert nested < outer
+PYCODE
     grep -q "codesign.*symeraseme" "$MOCK_LOG"
     grep -q "codesign.*Symaira EraseMe.app" "$MOCK_LOG"
 

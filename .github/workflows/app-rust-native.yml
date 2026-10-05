@@ -1,0 +1,87 @@
+name: Native Swift app Rust bundle
+
+on:
+  pull_request:
+    paths:
+      - app/SymairaEraseMe/**
+      - scripts/build-app-backends.sh
+      - scripts/package-dmg.sh
+      - tests/test_release_dmg.sh
+      - .github/workflows/app-rust-native.yml
+      - .github/workflows/release.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-rust-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Swift Rust bundle / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            xcode: '26.4.1'
+          - os: macos-15-intel
+            xcode: '26.3.0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
+        with:
+          xcode-version: ${{ matrix.xcode }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.6'
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Verify packaging controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/test_release_dmg.sh 2>&1 | tee "$RUNNER_TEMP/packaging-controls.log"
+      - name: Stage actual app with default Rust and explicit Go sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          export VERSION="$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
+          export STAGE_DIR="$RUNNER_TEMP/rust-app-stage"
+          scripts/package-dmg.sh --app-only --non-release-test
+          app="$STAGE_DIR/Symaira EraseMe.app"
+          test "$("$app/Contents/MacOS/symeraseme" --version)" = "symeraseme version $VERSION"
+          test "$("$app/Contents/MacOS/symeraseme-go" version)" = "symeraseme $VERSION"
+          printf 'SYMERASEME_RUST_TEST_APP_BUNDLE=%s\n' "$app" >> "$GITHUB_ENV"
+          printf 'SYMERASEME_RUST_TEST_BINARY=%s\n' "$GITHUB_WORKSPACE/target/release/symeraseme-rust" >> "$GITHUB_ENV"
+      - name: Full Swift suite including actual bundled discovery, auth and shutdown
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd app/SymairaEraseMe
+          swift test 2>&1 | tee "$RUNNER_TEMP/swift-rust-bundle-tests.log"
+          # A skipped integration case is not acceptance evidence.
+          python3 - "$RUNNER_TEMP/swift-rust-bundle-tests.log" <<'PY'
+          import pathlib, sys
+          log = pathlib.Path(sys.argv[1]).read_text()
+          for case in ('testExplicitRustBinaryLaunchAuthToolsAndShutdown',
+                       'testDefaultBundledRustLaunchAuthToolsAndShutdown'):
+              assert any(case in line and 'passed' in line for line in log.splitlines()), case
+          PY
+      - name: Retain native Swift evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: swift-rust-bundle-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/packaging-controls.log
+            ${{ runner.temp }}/swift-rust-bundle-tests.log
+          if-no-files-found: error
+          retention-days: 30

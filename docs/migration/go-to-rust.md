@@ -169,6 +169,15 @@ on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
 
+The shared app-backend helper also built real Rust 1.98.0 and Go 1.26.6
+executables in a clean ordinary checkout at `a8d606a` with an external Cargo
+target directory. Rust reports `symeraseme version 0.13.0`; the direct Go
+`version` command and explicit `SYMERASEME_BACKEND=go` path both report
+`symeraseme 0.13.0`. Go build info pins that clean source revision. The native
+and signed-release version assertions preserve those distinct existing
+command formats. This Linux build validates the shared helper and actual
+fallback dispatch, not Swift or macOS signing.
+
 ## Native migration backup/restore acceptance (2026-10-03, #1122)
 
 The new six-target `backup-restore-native.yml` binds historical Go v0.12.1
@@ -1123,6 +1132,70 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Default Rust app bundle candidate (2026-10-04, #1127)
+
+The shared app build script now places the actual Cargo executable under
+`symeraseme` and builds `symeraseme-go` only as the explicit transitional
+sibling. Development builds and DMG staging use the same helper. Both nested
+executables are signed and verified before outer app signing. Configured paths
+retain priority; ordinary bundle discovery launches the default Rust name.
+The Swift integration gate exercises both explicit shadow discovery and actual
+staged bundle discovery with an empty configured Binary Path, private data,
+authentication, tool calls and bounded shutdown. Both native Mac architectures
+must pass the complete Swift suite without skipped integration cases.
+Shell syntax and the existing packaging controls pass locally, including exact
+Rust-member identity and both nested signing order checks. APP-001 remains
+PARTIAL pending real native CI; unsigned staging does not prove #1129.
+
+At `970ef64`, Go CI job `111422925388` and the main CI test job
+`111422926131` failed the retained exact release-step-order contract: it
+still described the Go-only setup and omitted the newly required Rust
+toolchain step. The contract now requires that pinned setup before Developer
+ID material is imported; every existing signing/notarization/checksum step
+remains in its original required order. `TestReleaseWorkflowContract` and
+`TestPackageDMGMockSuite` pass locally with Go 1.26.6. Fresh PR checks remain
+required. This Go test-source change also requires honest new source-bound
+capture after final app integration; it does not relabel older observations.
+
+### Native Swift Intel toolchain availability (2026-10-04, #1127)
+
+Actual Intel job `111429073763` fails before building or testing because
+its image provides Xcode 26.3.0 (17C529), not the ARM image's 26.4.1. The
+app native matrix now pins those actual Xcode versions separately. Both
+architectures still stage the complete Rust-default app with its actual Go
+sibling and require the entire Swift suite, auth/tools/shutdown assertions
+and original packaging controls. Neither platform is removed or inferred;
+new native acceptance is required. The production ARM release toolchain
+remains pinned at 26.4.1.
+
+## Retained Windows console startup failure (2026-10-04, #1158)
+
+At `c292e4bd`, native Windows amd64 HTTP job `111456037338` in run
+`37208968625` passed all five header controls and six of seven Windows
+process parents. The private Ctrl+Break helper exceeded the original
+ten-second startup deadline with empty stderr; the parent correctly failed.
+The log does not identify whether Go or Rust was starting, so the fixture
+now records that phase and backend before launch. The dedicated Windows
+HTTP jobs run all seven original parents serially to avoid concurrent
+Go builds and registry-loading children. Every case, comparison and child
+deadline is retained; full native workspace coverage remains unchanged.
+This is a scheduling candidate, not accepted Windows evidence. Both native
+Windows architectures and the current full suite must pass before merge.
+
+## Retained Intel pre-Swift packaging failure (2026-10-04, #1158)
+
+At head `6a9c47da`, Intel job `111468062530` in run `37213097514`
+selects the available Xcode26.3.0 correctly, then fails the first packaging
+control before staging or Swift tests. The captured shell output was not
+printed when the command failed, so its underlying cause is not established.
+The mock harness now prints that failure output and returns its original exit
+status. The native workflow retains packaging logs even when Swift never
+starts; all packaging assertions, actual icon compilation, both architectures
+and the complete Swift suite remain required. No native pass is inferred from
+this diagnostic repair. Native ARM at this head did pass all42 Swift tests
+(job111468062472), and both Windows HTTP jobs pass all7 original parents
+(jobs111468062686/111468062737). Fresh current-head acceptance is required.
 
 ## Mutation campaign verifier reconciliation (2026-10-04, #813)
 

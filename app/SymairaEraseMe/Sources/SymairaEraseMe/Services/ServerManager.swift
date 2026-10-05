@@ -21,7 +21,7 @@ final class ServerManager: ObservableObject {
         didSet { UserDefaults.standard.set(binaryPath, forKey: "symeraseme_binary_path") }
     }
 
-    /// Data directory configured by the Go backend when no override is set.
+    /// Data directory configured by the backend when no override is set.
     nonisolated static let defaultDataDir = "~/.local/share/symeraseme"
 
     /// Configurable data directory.
@@ -53,9 +53,13 @@ final class ServerManager: ObservableObject {
     @Published var mcpReachable = false
 
     private let supervisor = DaemonSupervisor()
+    private let resourceURL: URL?
+    private let executableURL: URL?
     private var reachabilityTask: Task<Void, Never>?
 
-    init() {
+    init(resourceURL: URL? = Bundle.main.resourceURL, executableURL: URL? = Bundle.main.executableURL) {
+        self.resourceURL = resourceURL
+        self.executableURL = executableURL
         let defaults = UserDefaults.standard
         self.binaryPath = defaults.string(forKey: "symeraseme_binary_path") ?? ""
         self.dataDir = defaults.string(forKey: "symeraseme_data_dir") ?? ""
@@ -135,7 +139,7 @@ final class ServerManager: ObservableObject {
         }
         let arguments = plan.arguments
 
-        // Set up environment. Expand `~` once so the Go server and the
+        // Set up environment. Expand `~` once so the backend and the
         // Swift client address the same token/database directory.
         let resolvedDataDir = dataDir.isEmpty ? nil : (dataDir as NSString).expandingTildeInPath
         var env = [String: String]()
@@ -189,9 +193,9 @@ final class ServerManager: ObservableObject {
     /// 4. Homebrew/PATH, using BinaryLocator's strict check followed by the
     ///    app's safe Homebrew-compatible directory scan.
     ///
-    /// There is deliberately no Python or `uv` fallback. The Go binary is
-    /// self-contained and is the only backend the Swift app supports after
-    /// the cutover.
+    /// There is deliberately no Python or `uv` fallback. The bundled Rust backend is
+    /// self-contained. SYMERASEME_BACKEND=go selects its explicit sibling
+    /// symeraseme-go during the reversible transition.
     private func resolveLaunchPlan() -> LaunchPlan {
         let mcpArguments = ["mcp", "--host", host, "--port", "\(port)"]
 
@@ -200,14 +204,14 @@ final class ServerManager: ObservableObject {
             return LaunchPlan(executable: URL(fileURLWithPath: binaryPath), arguments: mcpArguments, refusals: [])
         }
 
-        // 2. A released app carries the matching Go server in Resources.
-        if let path = Self.bundledBinaryPath(resourceURL: Bundle.main.resourceURL) {
+        // 2. A released app carries the matching Rust server in Contents/MacOS.
+        if let path = Self.bundledBinaryPath(resourceURL: resourceURL) {
             return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: mcpArguments, refusals: [])
         }
 
-        // 3. The build script places a development Go binary next to the
+        // 3. The build script places a development Rust binary next to the
         //    Swift executable so `swift run` remains self-contained.
-        if let path = Self.developmentBinaryPath(executableURL: Bundle.main.executableURL) {
+        if let path = Self.developmentBinaryPath(executableURL: executableURL) {
             return LaunchPlan(executable: URL(fileURLWithPath: path), arguments: mcpArguments, refusals: [])
         }
 
@@ -248,7 +252,7 @@ final class ServerManager: ObservableObject {
         return nil
     }
 
-    /// Return the bundled Go server from the standard nested-code directory.
+    /// Return the bundled Rust server from the standard nested-code directory.
     /// The Resources location remains a compatibility fallback for older apps.
     nonisolated static func bundledBinaryPath(resourceURL: URL?) -> String? {
         guard let resourceURL else { return nil }
@@ -261,7 +265,7 @@ final class ServerManager: ObservableObject {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Return the Go server produced next to the Swift executable by the
+    /// Return the Rust server produced next to the Swift executable by the
     /// local SPM build script. This keeps `swift run` useful without Homebrew.
     nonisolated static func developmentBinaryPath(executableURL: URL?) -> String? {
         guard let executableURL else { return nil }
@@ -286,7 +290,7 @@ final class ServerManager: ObservableObject {
     /// candidate.
     nonisolated static func startFailureMessage(refusals: [String]) -> String {
         if refusals.isEmpty {
-            return "Could not find the symeraseme CLI. Install the self-contained Go binary via Homebrew or set the Binary Path in Settings."
+            return "Could not find the symeraseme CLI. Install the self-contained binary via Homebrew or set the Binary Path in Settings."
         }
         return "Could not start the symeraseme server — no usable CLI found:\n" + refusals.joined(separator: "\n")
     }
