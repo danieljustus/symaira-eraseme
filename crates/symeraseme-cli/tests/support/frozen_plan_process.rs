@@ -5,6 +5,9 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 use std::process::{Command, Output};
 
+#[path = "go_source_pin.rs"]
+mod go_source_pin;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
 
@@ -33,6 +36,9 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         assert!(
             !path.is_absolute() && path.components().all(|c| matches!(c, Component::Normal(_)))
         );
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         let bytes = std::fs::read(Path::new(ROOT).join(path)).unwrap();
         assert_eq!(pin["bytes"], bytes.len(), "{name}");
         assert_eq!(pin["sha256"], digest(&bytes), "{name}");

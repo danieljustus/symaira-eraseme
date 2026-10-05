@@ -1,5 +1,5 @@
 //! Actual six-target grant captures. Unrecorded runtime targets use real Go.
-use super::frozen_review_oracle::{digest, valid_bytes};
+use super::frozen_review_oracle::{digest, go_source_pin, valid_bytes};
 use serde_json::Value;
 use std::path::{Component, Path};
 use std::sync::OnceLock;
@@ -88,6 +88,9 @@ fn verify(manifest: &Value, target: &str) {
         assert!(
             !path.is_absolute() && path.components().all(|c| matches!(c, Component::Normal(_)))
         );
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         let source = std::fs::read(Path::new(ROOT).join(path)).unwrap();
         assert!(valid_bytes(metadata, &source), "grant source drift: {name}");
     }

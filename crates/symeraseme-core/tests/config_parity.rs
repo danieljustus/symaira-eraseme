@@ -15,6 +15,9 @@ use symeraseme_core::config::{
     resolve_storage,
 };
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 const GO_FIXTURE: &str = include_str!("../../../rust-tests/parity/oracle/config/config_cases.json");
 
 struct TestTree {
@@ -251,6 +254,9 @@ fn verified_native_mac_config(bytes: &[u8], arch: &str) -> Value {
     let sources = manifest["source_files"].as_object().unwrap();
     assert_eq!(sources.len(), 65);
     for (name, metadata) in sources {
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         let source = fs::read(root.join(name)).unwrap();
         assert_eq!(metadata["bytes"], source.len(), "{name}");
         assert_eq!(

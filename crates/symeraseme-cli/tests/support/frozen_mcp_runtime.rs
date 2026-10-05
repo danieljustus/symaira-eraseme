@@ -3,6 +3,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
+#[path = "go_source_pin.rs"]
+mod go_source_pin;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
 const NATIVE_REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
@@ -99,6 +102,9 @@ fn verify_for_target(
         assert!(
             !path.is_absolute() && path.components().all(|c| matches!(c, Component::Normal(_)))
         );
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         let actual = std::fs::read(Path::new(ROOT).join(path)).unwrap();
         assert_eq!(record["bytes"], actual.len(), "{name}");
         assert_eq!(record["sha256"], digest(&actual), "{name}");

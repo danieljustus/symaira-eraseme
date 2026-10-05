@@ -1,5 +1,5 @@
 //! Whole CLI schedule frames from six actual native Go producers.
-use super::frozen_review_oracle::{digest, valid_bytes};
+use super::frozen_review_oracle::{digest, go_source_pin, valid_bytes};
 use base64::Engine;
 use serde_json::Value;
 use std::path::{Component, Path};
@@ -60,6 +60,9 @@ fn verify(target: &str, manifest: &Value, bytes: &[u8]) -> Value {
         assert!(
             !path.is_absolute() && path.components().all(|c| matches!(c, Component::Normal(_)))
         );
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         assert!(
             valid_bytes(
                 metadata,

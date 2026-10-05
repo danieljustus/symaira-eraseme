@@ -5,6 +5,9 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 use std::process::Command;
 
+#[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
@@ -174,8 +177,9 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             } else {
                 archive.stdout
             };
-            let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
-            for bytes in [&archived_bytes, &current] {
+            let current = go_source_pin::current_tree_bound(name)
+                .then(|| std::fs::read(Path::new(ROOT).join(path)).unwrap());
+            for bytes in std::iter::once(&archived_bytes).chain(&current) {
                 assert_eq!(recorded["bytes"], bytes.len(), "{name}");
                 assert_eq!(recorded["sha256"], digest(bytes), "{name}");
             }

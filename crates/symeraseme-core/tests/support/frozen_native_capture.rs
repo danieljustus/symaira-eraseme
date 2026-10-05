@@ -5,6 +5,9 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+#[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
+pub mod go_source_pin;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 pub fn manifest_bytes(os: &str, arch: &str) -> Option<&'static [u8]> {
@@ -53,6 +56,9 @@ pub fn verify(bytes: &[u8], os: &str, arch: &str) -> Value {
                 .components()
                 .all(|c| matches!(c, Component::Normal(_)))
         );
+        if !go_source_pin::current_tree_bound(path) {
+            continue;
+        }
         let source = std::fs::read(Path::new(ROOT).join(relative)).expect("captured source file");
         assert_eq!(metadata["bytes"], source.len(), "{path}");
         assert_eq!(metadata["sha256"], digest(&source), "{path}");

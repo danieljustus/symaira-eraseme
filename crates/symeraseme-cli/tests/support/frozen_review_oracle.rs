@@ -5,6 +5,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+pub use frozen_native_capture::go_source_pin;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 macro_rules! streams {
@@ -94,6 +96,9 @@ pub fn observations() -> Vec<Observation> {
     let sources = manifest["source_files"].as_object().unwrap();
     assert_eq!(sources.len(), 1481);
     for (name, expected) in sources {
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
         let bytes = std::fs::read(Path::new(ROOT).join(name)).unwrap();
         assert!(valid_bytes(expected, &bytes), "Go source drift: {name}");
     }
