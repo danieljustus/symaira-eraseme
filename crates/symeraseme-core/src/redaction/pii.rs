@@ -583,3 +583,248 @@ pub fn redact_text(
     String::from_utf8(redact_bytes(input.as_bytes(), profile)?)
         .map_err(|_| RedactionError::InvalidMatchRange)
 }
+
+#[cfg(test)]
+mod hardening_tests {
+    use super::*;
+
+    #[test]
+    fn every_profile_vector_has_an_independent_inclusive_limit() {
+        for field in 0..4 {
+            for length in [4_096, 4_097] {
+                let mut profile = RedactionProfile::default();
+                match field {
+                    0 => profile.name_variants = vec![String::new(); length],
+                    1 => profile.email_addresses = vec![String::new(); length],
+                    2 => profile.phone_numbers = vec![String::new(); length],
+                    3 => profile.addresses = vec![Address::default(); length],
+                    _ => unreachable!(),
+                }
+                assert_eq!(
+                    validate_profile(&profile),
+                    if length == 4_096 {
+                        Ok(())
+                    } else {
+                        Err(RedactionError::InvalidProfileLiteral)
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn profile_literals_reject_nulls_and_enforce_individual_and_aggregate_limits() {
+        for literal in ["x".repeat(16_384), "x".repeat(16_385), "x\0y".to_owned()] {
+            for field in 0..7 {
+                let mut profile = RedactionProfile::default();
+                match field {
+                    0 => profile.full_name = literal.clone(),
+                    1 => profile.name_variants = vec![literal.clone()],
+                    2 => profile.email_addresses = vec![literal.clone()],
+                    3 => profile.phone_numbers = vec![literal.clone()],
+                    4..=6 => {
+                        let mut address = Address::default();
+                        match field {
+                            4 => address.street = literal.clone(),
+                            5 => address.city = literal.clone(),
+                            6 => address.postal_code = literal.clone(),
+                            _ => unreachable!(),
+                        }
+                        profile.addresses = vec![address];
+                    }
+                    _ => unreachable!(),
+                }
+                assert_eq!(
+                    validate_profile(&profile),
+                    if literal.len() == 16_384 {
+                        Ok(())
+                    } else {
+                        Err(RedactionError::InvalidProfileLiteral)
+                    }
+                );
+            }
+        }
+        let mut profile = RedactionProfile {
+            name_variants: vec!["x".repeat(16_384); 64],
+            ..RedactionProfile::default()
+        };
+        assert_eq!(validate_profile(&profile), Ok(())); // Exactly 1 MiB.
+        profile.full_name = "x".into();
+        assert_eq!(
+            validate_profile(&profile),
+            Err(RedactionError::InvalidProfileLiteral)
+        );
+        let mut profile = RedactionProfile {
+            name_variants: vec!["x".into(); 2_048],
+            email_addresses: vec!["x".into(); 2_048],
+            ..RedactionProfile::default()
+        };
+        assert_eq!(validate_profile(&profile), Ok(())); // Exactly 4096 literals.
+        profile.full_name = "x".into();
+        assert_eq!(
+            validate_profile(&profile),
+            Err(RedactionError::InvalidProfileLiteral)
+        );
+    }
+
+    #[test]
+    fn ssn_invalidity_checks_each_disallowed_component() {
+        for value in [
+            b"000-12-3456",
+            b"666-12-3456",
+            b"900-12-3456",
+            b"123-00-3456",
+            b"123-12-0000",
+        ] {
+            assert!(invalid_ssn(value), "{value:?}");
+        }
+        for value in [
+            b"123-12-3456".as_slice(),
+            b"00012345",
+            b"6661234567",
+            b"90012345",
+            b"",
+            b"abc",
+        ] {
+            assert!(!invalid_ssn(value), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn email_validation_rejects_each_invalid_component_and_keeps_boundaries() {
+        for value in [
+            "", "abc", "@a", "a@", "a@b@c", "a@.", "a@-b", "a@b-", "a@b..c", "a@.b", "a@b.",
+        ] {
+            assert!(!valid_email(value.as_bytes()), "{value:?}");
+        }
+        for value in ["a@b", "ab@b.c", "a@b-c.d"] {
+            assert!(valid_email(value.as_bytes()), "{value:?}");
+        }
+        for length in [63, 64] {
+            assert_eq!(
+                valid_email(format!("a@{}", "x".repeat(length)).as_bytes()),
+                length == 63
+            );
+        }
+        for length in [127, 128] {
+            let domain = vec!["x"; length].join(".");
+            assert_eq!(valid_email(format!("a@{domain}").as_bytes()), length == 127);
+        }
+    }
+
+    #[test]
+    fn mask_helpers_handle_exact_prefix_suffix_boundaries() {
+        assert_eq!(suffix_mask(b"x", 2, 3), b"x");
+        assert_eq!(suffix_mask(b"xy", 2, 3), b"***xy");
+        assert_eq!(mask_parts(b"abc", 2, 2, b"**"), b"abc");
+        assert_eq!(mask_parts(b"abcd", 2, 2, b"**"), b"ab****cd");
+        assert_eq!(mask_parts(b"abcde", 2, 3, b"**"), b"ab****cde");
+    }
+
+    #[test]
+    fn complete_match_collection_keeps_the_input_limit_and_invalid_ssn_filter() {
+        assert!(
+            collect_matches(&vec![b'x'; 16_777_216], None)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            collect_matches(&vec![b'x'; 16_777_217], None),
+            Err(RedactionError::InputTooLarge)
+        );
+        assert!(collect_matches(b"666-12-3456", None).unwrap().is_empty());
+        let valid = collect_matches(b"123-12-3456", None).unwrap();
+        assert_eq!(valid.len(), 1);
+        assert_eq!(valid[0].name, "SSN");
+        assert_eq!(valid[0].replacement(), b"***-**-****");
+    }
+
+    #[test]
+    fn scrubbers_preserve_short_values_and_exact_privacy_boundaries() {
+        for (input, expected) in [
+            (b"ab@cd.ef".as_slice(), b"a@c*.ef".as_slice()),
+            (b"abcd@cd.ef", b"a**d@c*.ef"),
+            (b"a@b", b"a@b.*"),
+            (b"@b", b"@b"),
+            (b"ab@", b"ab@"),
+        ] {
+            assert_eq!(scrub_email(input), expected);
+        }
+        assert_eq!(scrub_phone(b"123"), b"123");
+        assert_eq!(scrub_phone(b"1234"), b"***-***-1234");
+        assert_eq!(scrub_phone(b"12345"), b"***-***-2345");
+        assert_eq!(scrub_phone(b"12345678901"), b"+1-***-***-8901");
+    }
+
+    #[test]
+    fn literal_append_preserves_unicode_offsets_and_rejects_invalid_literals() {
+        let mut matches = Vec::new();
+        append_literal(&mut matches, b"abc", "", "literal", b"x").unwrap();
+        assert!(matches.is_empty());
+        for literal in ["x\0y".to_owned(), "x".repeat(16_385)] {
+            assert_eq!(
+                append_literal(&mut matches, b"abc", &literal, "literal", b"x"),
+                Err(RedactionError::InvalidProfileLiteral)
+            );
+        }
+        append_literal(&mut matches, b"abc", &"x".repeat(16_384), "literal", b"x").unwrap();
+        let bytes = [
+            vec![0xff],
+            "Ää".as_bytes().to_vec(),
+            vec![0xfe],
+            "ä".as_bytes().to_vec(),
+            vec![0xe2],
+        ]
+        .concat();
+        append_literal(&mut matches, &bytes, "ä", "literal", b"x").unwrap();
+        assert_eq!(
+            matches
+                .iter()
+                .map(|m| (m.start, m.end, m.value.clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                (1, 3, "Ä".as_bytes().to_vec()),
+                (3, 5, "ä".as_bytes().to_vec()),
+                (6, 8, "ä".as_bytes().to_vec())
+            ]
+        );
+    }
+
+    #[test]
+    fn redaction_diagnostics_and_rule_inventory_are_preserved() {
+        for (error, message) in [
+            (
+                RedactionError::InputTooLarge,
+                "redaction input exceeds the configured limit",
+            ),
+            (RedactionError::MatchLimit, "redaction match limit exceeded"),
+            (
+                RedactionError::OutputTooLarge,
+                "redaction output exceeds the configured limit",
+            ),
+            (
+                RedactionError::InvalidProfileLiteral,
+                "redaction profile literal is invalid",
+            ),
+            (
+                RedactionError::InvalidMatchRange,
+                "redaction match range is invalid",
+            ),
+        ] {
+            assert_eq!(error.to_string(), message);
+        }
+        assert_eq!(
+            rules().iter().map(|r| r.name).collect::<Vec<_>>(),
+            [
+                "IBAN",
+                "German ID",
+                "French ID",
+                "Spanish ID",
+                "Passport",
+                "SSN",
+                "Email",
+                "Phone"
+            ]
+        );
+    }
+}

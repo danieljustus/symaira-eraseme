@@ -37,6 +37,85 @@ alone does not establish hardening task 8.5 acceptance or complete #1126.
 
 ## Current task ownership (2026-10-02)
 
+The subsequent complete run `37174075472` at clean `30b38e2` retains
+all eleven disjoint shard inventories and all 718 outcomes. State projection
+passes (26 caught / 115 unviable / zero missed). Crypto has 6 missed of 117,
+consent 5 of 86, sanitization 35 of 272 and HTTP 11 of 102; the entire
+campaign correctly fails. The separate complete MCP result remains 331
+mutants, zero missed, and Miri plus all six fuzz targets pass. All original
+failed results remain retained.
+
+At clean `3ae43b06e930b19e9747b0218288776bcf458d54`, the second repairs
+pass 160 core/integration cases, 19 actual HTTP cases and the 25-case crypto
+selection. The two core and one HTTP top-level child harnesses are executed
+by their passing parents. Strict core/CLI all-target Clippy, formatting and
+the task-graph check pass. Eight additional actual compiled regressions are
+caught and restored, including worker/body-collector error signs, complete
+SSN filtering, short email masks, intermediate review limits, consent error
+translation/real kernel close failure and encryption detection. There are
+now 27 retained compiled negative controls across the two repair rounds.
+The complete outcome gate and all six campaign-verifier controls pass.
+
+Fourteen exact mutants are proved equivalent in the
+[classification report](../rust-port/handoffs/mutation-equivalence-2026-10-04.md):
+array prevalidation, redundant terminal loops, empty Unicode segments,
+domain validation and fixed redaction resource/regex invariants. Seven
+cfg-disabled HTTP/Windows-close mutants are excluded only in the applicable
+Linux command. Both native target and the exact exclusions are sealed into
+its receipt and verified; the global configuration keeps these platform
+branches selected on their native targets. Native create/close operations
+retain their original semantics. Operation-local error boundaries test a
+real kernel EBADF without stale ownership, stop before chmod/publication,
+and preserve the old consent file and unrelated entries. New complete
+native mutation acceptance, all-six platform verification and the remaining
+fault/secret-sentinel evidence remain pending under issue #813. Per-mutant
+and per-job budgets stay at 30 seconds and 45 minutes.
+
+Task 8.5 preparation adds a native Linux mutation campaign over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection.
+The pinned cargo-mutants 27.1.0, 30-second per-mutant timeout and 45-minute
+job limit remain unchanged. Crypto and sanitization each use four complete
+shards; the other categories each use one. A same-run verifier requires all
+eleven shards, the same producing source, identical complete catalogs,
+disjoint selections and actual execution of every selected mutant. Missing,
+overlapping, empty or incomplete campaigns fail. Full catalogs, outcomes,
+baseline logs and diffs are retained on success and failure.
+
+Run `37170739620` at `8797f2d47011fea6f008b8207c0bc94d9854ca39`
+exposed real test gaps: HTTP had 40 missed of 102, consent 20 of 82 and
+state transitions 3 of 141. Crypto hit the existing job deadline after 99
+of 117 generated mutants (8 missed); sanitization hit it after 180 of 272
+(63 missed). Both incomplete JSON documents retain null end times. All five
+original archives were checksum-verified and retained; none establishes
+acceptance. The separate MCP campaign passed its actual JSON gate with
+331 mutants: 298 caught, 12 unviable, 21 timeouts and zero missed.
+
+The added checks cover actual HTTP status/JSON/header/body-size behavior,
+equal-length wrong tokens, remote Origins, token permissions, shutdown and
+private bind policy; consent expiry, filename filtering and real filesystem
+races; projection diagnostics and zero chunk-size handling; standard/raw
+Fernet and legacy minimum frames; and redaction profile/path/email/SSN bounds.
+The public consent methods retain native filesystem operations through private
+callbacks that deterministically place real races between lookup and syscall.
+Local verification passes 151 core/integration tests and 18 HTTP tests; the
+two core and one HTTP top-level ignored child harnesses are actually invoked
+by passing parents. Strict core/CLI all-target Clippy passes. Nineteen actual
+compiled regressions are caught: both HTTP controls, all three missed state
+mutants, six consent controls and all eight missed crypto mutants. Source
+bytes are restored after each negative control. Four outcome and five
+whole-campaign verifier regression controls pass.
+
+The gate inspects complete actual outcomes, because timeout exit 3 takes
+precedence over missed exit 2 in cargo-mutants 27.1.0. It rejects any missed
+mutant, failed/missing baseline, incomplete/zero-case result or inconsistent
+count, and requires at least one actual caught mutant. New complete native
+mutation acceptance remains pending; remaining platform/equivalence cases
+are not hidden by broad exclusions. Final task 8.4 integration, native fault
+injection and secret-sentinel proof remain required under issue #813. No
+contract row, release/default switch or cutover task is promoted by this work.
+
+
+
 ### Current-main offline backup oracle preparation (2026-10-04, #1122)
 
 Job `111323926955` failed before grant parity because the macOS Intel module
@@ -1044,6 +1123,20 @@ artifact gates still require separate evidence.
 
 Go deletion, release publication and production cutover. The Go tree stays
 runnable — it is the oracle.
+
+## Mutation campaign verifier reconciliation (2026-10-04, #813)
+
+At `66e48d6f8ce082e84c8524eb3ea700bcdd8a2b66`, all eleven actual
+mutation shards in run `37188075360` completed, but aggregate verifier job
+`111405689255` rejected the HTTP receipts: its expected inactive-platform
+anchors still described the pre-MCP-integration source. The workflow already
+used the exact current 190/195/204/231/247/296/313 anchors. The verifier now
+requires that same exact list; extra or changed exclusions still fail. No
+production code, exclusion, catalog, result or execution budget changes.
+Independent download and readback of all eleven raw archives now verifies
+700 actual mutants: 538 caught, 162 unviable, zero missed, zero timeouts.
+All ten existing outcome/campaign corruption controls pass. The original
+aggregate failure is retained; fresh current-head CI remains required.
 
 ## Native backup CLI scheduling repair (2026-10-04, #1122)
 

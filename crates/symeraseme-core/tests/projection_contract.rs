@@ -10,6 +10,35 @@ use symeraseme_core::storage::{
 use tempfile::{TempDir, tempdir};
 
 const GO_ORACLE_COMMIT: &str = "bf53346eec234929bedf0314b99e3da85dbb991b";
+
+#[test]
+fn projection_errors_preserve_contract_diagnostics_and_underlying_sources() {
+    use std::error::Error as _;
+    let unknown_event = ProjectionError::UnknownEventType("FUTURE_EVENT".to_owned());
+    assert_eq!(
+        unknown_event.to_string(),
+        "eventstore: unknown event type: \"FUTURE_EVENT\""
+    );
+    assert!(unknown_event.source().is_none());
+    let unknown_source = ProjectionError::UnknownSource("future-writer".to_owned());
+    assert_eq!(
+        unknown_source.to_string(),
+        "eventstore: unknown source: \"future-writer\""
+    );
+    assert!(unknown_source.source().is_none());
+    let expected = rusqlite::Error::InvalidQuery.to_string();
+    let database = ProjectionError::Database(rusqlite::Error::InvalidQuery);
+    assert_eq!(database.to_string(), expected);
+    assert_eq!(database.source().unwrap().to_string(), expected);
+    let json_error = serde_json::from_str::<Value>("{").unwrap_err();
+    let expected = json_error.to_string();
+    let payload = ProjectionError::PayloadSerialization(json_error);
+    assert_eq!(
+        payload.to_string(),
+        format!("eventstore: marshal payload: {expected}")
+    );
+    assert_eq!(payload.source().unwrap().to_string(), expected);
+}
 const INPUT_FIXTURE: &[u8] =
     include_bytes!("../../../tests/fixtures/event-store/projection-replay-input.json");
 const CONTRACT_FIXTURE: &[u8] =
@@ -700,6 +729,12 @@ fn rebuild_all_states_updates_only_stale_projections() {
     assert_eq!(rebuilt, 2);
 
     let rebuilt_again = store.rebuild_all_states(10).expect("rebuild all again");
+    assert_eq!(
+        store
+            .rebuild_all_states(0)
+            .expect("zero selects the default chunk size"),
+        0
+    );
     assert_eq!(rebuilt_again, 0);
 
     store
