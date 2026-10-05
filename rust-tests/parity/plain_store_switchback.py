@@ -53,6 +53,9 @@ def identity(path):
 
 def command(root, label, argv, env, timeout=30):
     """Retain failures and raw bytes; bound file growth and the owned process group."""
+    if sys.platform == 'win32':
+        from windows_store_sandbox import command as windows_command
+        return windows_command(root, label, argv, env, timeout)
     import resource
 
     def bounds():
@@ -150,6 +153,9 @@ def sandbox(root, executable, extra_reads=()):
 def sandbox_command(root, label, executable, args, env):
     executable = Path(executable).resolve(strict=True)
     args = list(map(str, args))
+    if sys.platform == 'win32':
+        # Native isolation and suspended Job assignment happen in command().
+        return [str(executable), *args]
     if sys.platform == 'darwin':
         extra_reads = (env['GOROOT'],) if label == 'go-build-info' else ()
         return ['/usr/bin/sandbox-exec', '-p', sandbox(root, executable, extra_reads),

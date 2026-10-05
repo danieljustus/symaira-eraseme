@@ -64,6 +64,85 @@ fn hashed_token_path(directory: &Path, token: &str) -> PathBuf {
 }
 
 #[test]
+fn grant_defaults_retain_the_full_day_lifetime_before_normalization() {
+    let defaults = GrantOptions::default();
+    let decoded: GrantOptions = serde_json::from_str("{}").unwrap();
+    for options in [defaults, decoded] {
+        assert_eq!(options.command, "execute");
+        assert_eq!(options.ttl, 86_400);
+        assert!(!options.dry_run);
+        assert!(!options.list_tokens);
+        assert!(!options.revoke_all);
+        assert_eq!(options.revoke, None);
+    }
+}
+
+#[test]
+fn consent_expiry_is_inclusive_at_the_exact_boundary() {
+    let directory = tempdir().unwrap();
+    let token = fixed_store(directory.path(), 100, 4)
+        .issue_token("delete", 60)
+        .unwrap();
+    let boundary = fixed_store(directory.path(), 160, 9);
+    assert_eq!(boundary.verify_token("delete", &token), Ok(()));
+    let listed = boundary.list_tokens().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].token, token);
+    assert_eq!(listed[0].expires_at, 160);
+    assert!(hashed_token_path(directory.path(), &token).is_file());
+    assert_eq!(
+        fixed_store(directory.path(), 161, 9).verify_token("delete", &token),
+        Err(ConsentError::Expired)
+    );
+    assert!(!hashed_token_path(directory.path(), &token).exists());
+}
+
+#[test]
+fn consent_list_requires_both_filename_prefix_and_suffix() {
+    let directory = tempdir().unwrap();
+    for name in ["unrelated.json", "consent_without_suffix", "unrelated"] {
+        write_record(
+            &directory.path().join(name),
+            &record("delete", 100, 200, Some("ignored")),
+        );
+    }
+    write_record(
+        &directory.path().join("consent_valid.json"),
+        &record("delete", 100, 200, Some("valid")),
+    );
+    let listed = fixed_store(directory.path(), 150, 9).list_tokens().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].token, "valid");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 4);
+}
+
+#[test]
+fn consent_lookup_rejects_legacy_directories_and_path_traversal() {
+    let directory = tempdir().unwrap();
+    let store = fixed_store(directory.path(), 150, 9);
+    fs::create_dir(directory.path().join("consent_directory.json")).unwrap();
+    assert_eq!(
+        store.verify_token("delete", "directory"),
+        Err(ConsentError::NotFound)
+    );
+    // The intermediate directory makes the lexical escape resolve to a real,
+    // valid file. Reject it before a rename or read can cross the store root.
+    fs::create_dir(directory.path().join("consent_")).unwrap();
+    let outside = directory.path().parent().unwrap().join(format!(
+        "consent-outside-{}.json",
+        directory.path().file_name().unwrap().to_string_lossy()
+    ));
+    write_record(&outside, &record("delete", 100, 200, None));
+    let name = outside.file_stem().unwrap().to_str().unwrap();
+    let token = format!("/../../{name}");
+    let result = store.verify_token("delete", &token);
+    let preserved = outside.is_file();
+    fs::remove_file(&outside).unwrap();
+    assert_eq!(result, Err(ConsentError::NotFound));
+    assert!(preserved);
+}
+
+#[test]
 fn consent_errors_expose_stable_diagnostics_and_sources() {
     let io_error = ConsentError::from(io::Error::new(io::ErrorKind::PermissionDenied, "hidden"));
     assert_eq!(io_error.to_string(), "identity: consent storage error");

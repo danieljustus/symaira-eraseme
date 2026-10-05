@@ -94,11 +94,8 @@ if [ "$DMG_ONLY" != "true" ]; then
 
     BUILD_DIR="$SWIFT_BIN_PATH"
 
-    echo "Building the self-contained Go MCP server..."
-    GO_BINARY="$BUILD_DIR/symeraseme"
-    CGO_ENABLED=0 go build -trimpath \
-        -ldflags "-s -w -X main.versionValue=$VERSION" \
-        -o "$GO_BINARY" ./cmd/symeraseme
+    echo "Building the default Rust MCP server and explicit Go fallback..."
+    "$REPO_ROOT/scripts/build-app-backends.sh" "$BUILD_DIR" release
 
     echo "Creating App Bundle structure..."
     rm -rf "$STAGE_DIR"
@@ -120,7 +117,14 @@ if [ "$DMG_ONLY" != "true" ]; then
             --development-region en \
             --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
             "$ICON_SOURCE" < /dev/null
-        cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
+        if [ -f "$ICON_BUILD_DIR/Assets.car" ]; then
+            cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
+        elif [ "$REQUIRE_COMPILED_ICON" = "true" ]; then
+            echo "Release requires a compiled Assets.car; actool produced none." >&2
+            exit 1
+        else
+            echo "Warning: actool produced no Assets.car; keeping the approved ICNS fallback only." >&2
+        fi
         rm -rf "$ICON_BUILD_DIR"
     elif [ "$REQUIRE_COMPILED_ICON" = "true" ]; then
         echo "Release requires an Xcode 26+ actool that supports .icon; actool is unavailable." >&2
@@ -129,10 +133,11 @@ if [ "$DMG_ONLY" != "true" ]; then
         echo "Warning: actool unavailable; keeping the approved ICNS fallback only." >&2
     fi
 
-    echo "Copying Swift and Go binaries..."
+    echo "Copying Swift, Rust and explicit Go fallback binaries..."
     cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-    cp "$GO_BINARY" "$APP_BUNDLE/Contents/MacOS/symeraseme"
-    chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    cp "$BUILD_DIR/symeraseme" "$APP_BUNDLE/Contents/MacOS/symeraseme"
+    cp "$BUILD_DIR/symeraseme-go" "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
+    chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme" "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
     test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
 
     echo "Writing Info.plist..."
@@ -175,16 +180,16 @@ EOF
     # Sign nested binary with hardened runtime, then sign app bundle with hardened runtime.
     if [ -n "${CODESIGN_IDENTITY:-}" ]; then
         echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
-        # Go emits an ad-hoc linker signature. Remove it before applying the
-        # Developer ID signature so recursive app signing cannot retain it.
-        codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/symeraseme" || true
-        codesign --force --timestamp --options runtime \
-            ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
-            -s "$CODESIGN_IDENTITY" \
-            "$APP_BUNDLE/Contents/MacOS/symeraseme"
-        echo "Verifying nested Go binary signature before app signing..."
-        codesign --verify --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/symeraseme"
-        codesign -dvvv "$APP_BUNDLE/Contents/MacOS/symeraseme" 2>&1
+        # Sign both nested executables before signing the containing app.
+        for backend in symeraseme symeraseme-go; do
+            codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/$backend" || true
+            codesign --force --timestamp --options runtime \
+                ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
+                -s "$CODESIGN_IDENTITY" \
+                "$APP_BUNDLE/Contents/MacOS/$backend"
+            codesign --verify --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/$backend"
+            codesign -dvvv "$APP_BUNDLE/Contents/MacOS/$backend" 2>&1
+        done
         codesign --deep --force --timestamp --options runtime \
             ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \
             -s "$CODESIGN_IDENTITY" \

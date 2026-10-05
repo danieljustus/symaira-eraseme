@@ -11,6 +11,26 @@ final class RustBackendIntegrationTests: XCTestCase {
         }
         XCTAssertEqual(URL(fileURLWithPath: binary).lastPathComponent, "symeraseme-rust")
 
+        try await exerciseBackend(binary: binary, resourceURL: nil)
+    }
+
+    @MainActor
+    func testDefaultBundledRustLaunchAuthToolsAndShutdown() async throws {
+        guard let bundle = ProcessInfo.processInfo.environment["SYMERASEME_RUST_TEST_APP_BUNDLE"] else {
+            throw XCTSkip("Set SYMERASEME_RUST_TEST_APP_BUNDLE to the staged Rust app")
+        }
+        let app = URL(fileURLWithPath: bundle, isDirectory: true)
+        let resources = app.appendingPathComponent("Contents/Resources", isDirectory: true)
+        let binary = app.appendingPathComponent("Contents/MacOS/symeraseme").path
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: binary))
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath:
+            app.appendingPathComponent("Contents/MacOS/symeraseme-go").path))
+        XCTAssertEqual(ServerManager.bundledBinaryPath(resourceURL: resources), binary)
+        try await exerciseBackend(binary: binary, resourceURL: resources)
+    }
+
+    @MainActor
+    private func exerciseBackend(binary: String, resourceURL: URL?) async throws {
         let defaults = UserDefaults.standard
         let keys = [
             "symeraseme_binary_path", "symeraseme_data_dir", "symeraseme_host",
@@ -35,8 +55,8 @@ final class RustBackendIntegrationTests: XCTestCase {
         try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dataDir) }
 
-        let manager = ServerManager()
-        manager.binaryPath = binary
+        let manager = resourceURL.map { ServerManager(resourceURL: $0, executableURL: nil) } ?? ServerManager()
+        manager.binaryPath = resourceURL == nil ? binary : ""
         manager.dataDir = dataDir.path
         manager.host = "127.0.0.1"
         manager.port = try Self.freePort()

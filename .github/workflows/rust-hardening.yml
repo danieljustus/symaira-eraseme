@@ -11,6 +11,8 @@ on:
       - 'fuzz/**'
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
+      - 'scripts/*verify-mutation-*.py'
+      - '.cargo/mutants.toml'
   pull_request:
     branches: [main]
     paths:
@@ -18,9 +20,17 @@ on:
       - 'fuzz/**'
       - 'Cargo.lock'
       - '.github/workflows/rust-hardening.yml'
+      - 'scripts/*verify-mutation-*.py'
+      - '.cargo/mutants.toml'
   schedule:
     - cron: '17 4 * * 1'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      sweep_mutations:
+        description: Run the remaining crypto/consent/state/sanitization/HTTP mutation categories
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -102,9 +112,8 @@ jobs:
       - name: Install cargo-mutants
         run: cargo +"$RUST_TOOLCHAIN" install cargo-mutants --version 27.1.0 --locked
 
-      # Equivalent mutants are excluded in .cargo/mutants.toml. Exit 3 means
-      # only timeouts (a mutant that hangs is detected), so only missed (2)
-      # or a broken baseline fails the gate.
+      # Equivalent mutants are excluded in .cargo/mutants.toml. Timeout exit
+      # 3 can also contain missed mutants; inspect the actual outcome JSON.
       - name: Mutate MCP protocol core
         run: |
           set +e
@@ -114,11 +123,189 @@ jobs:
             --timeout 30 -- --bins -- mcp::protocol mcp::stream
           status=$?
           if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
+          python3 scripts/verify-mutation-outcomes.py mutants.out/outcomes.json
 
-      - name: Upload mutants.out
-        if: failure()
+      - name: Retain MCP mutation outcomes and baseline/failure evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutants-mcp-protocol
-          path: mutants.out
-          if-no-files-found: ignore
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            mutants.out/outcomes.json
+            mutants.out/mutants.json
+            mutants.out/*.txt
+            mutants.out/log/*.log
+            mutants.out/diff/*.diff
+
+  sweep-mutations:
+    if: github.event_name == 'workflow_dispatch' && inputs.sweep_mutations
+    name: Rust / mutants (${{ matrix.scope }} ${{ matrix.shard }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scope: crypto
+            shard: 0/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/encryption.rs"]'
+            tests: '["--lib","--test","encryption_parity","--","storage::encryption","python_final_","v1_","v2_","v3_","pinned_go_legacy_","legacy_go_"]'
+          - scope: crypto
+            shard: 1/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/encryption.rs"]'
+            tests: '["--lib","--test","encryption_parity","--","storage::encryption","python_final_","v1_","v2_","v3_","pinned_go_legacy_","legacy_go_"]'
+          - scope: crypto
+            shard: 2/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/encryption.rs"]'
+            tests: '["--lib","--test","encryption_parity","--","storage::encryption","python_final_","v1_","v2_","v3_","pinned_go_legacy_","legacy_go_"]'
+          - scope: crypto
+            shard: 3/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/encryption.rs"]'
+            tests: '["--lib","--test","encryption_parity","--","storage::encryption","python_final_","v1_","v2_","v3_","pinned_go_legacy_","legacy_go_"]'
+          - scope: consent
+            shard: 0/1
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/identity/consent.rs"]'
+            tests: '["--lib","--test","consent_api"]'
+          - scope: state transitions
+            shard: 0/1
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/storage/projection.rs"]'
+            tests: '["--lib","--test","projection_contract","--test","tick_apply_contract"]'
+          - scope: sanitization
+            shard: 0/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/redaction/path.rs","crates/symeraseme-core/src/redaction/pii.rs","crates/symeraseme-core/src/redaction/review.rs"]'
+            tests: '["--lib","--","redaction::"]'
+          - scope: sanitization
+            shard: 1/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/redaction/path.rs","crates/symeraseme-core/src/redaction/pii.rs","crates/symeraseme-core/src/redaction/review.rs"]'
+            tests: '["--lib","--","redaction::"]'
+          - scope: sanitization
+            shard: 2/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/redaction/path.rs","crates/symeraseme-core/src/redaction/pii.rs","crates/symeraseme-core/src/redaction/review.rs"]'
+            tests: '["--lib","--","redaction::"]'
+          - scope: sanitization
+            shard: 3/4
+            package: symeraseme-core
+            files: '["crates/symeraseme-core/src/redaction/path.rs","crates/symeraseme-core/src/redaction/pii.rs","crates/symeraseme-core/src/redaction/review.rs"]'
+            tests: '["--lib","--","redaction::"]'
+          - scope: HTTP auth
+            shard: 0/1
+            package: symeraseme-cli
+            files: '["crates/symeraseme-cli/src/mcp/http.rs"]'
+            tests: '["--bins","--","mcp::http::"]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Install pinned cargo-mutants
+        run: cargo +1.98.0 install cargo-mutants --version 27.1.0 --locked
+      - name: Verify outcome regression controls
+        run: |
+          python3 scripts/test-verify-mutation-outcomes.py
+          python3 scripts/test-verify-mutation-shards.py
+      - name: Execute actual mutations and inspect complete outcomes
+        env:
+          MUTATION_SCOPE: ${{ matrix.scope }}
+          MUTATION_SHARD: ${{ matrix.shard }}
+          MUTATION_PACKAGE: ${{ matrix.package }}
+          MUTATION_FILES: ${{ matrix.files }}
+          MUTATION_TESTS: ${{ matrix.tests }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          command = ["cargo", "+1.98.0", "mutants", "-p", os.environ["MUTATION_PACKAGE"]]
+          target = next(line.removeprefix("host: ") for line in
+                        subprocess.check_output(["rustc", "+1.98.0", "-vV"], text=True).splitlines()
+                        if line.startswith("host: "))
+          assert target == "x86_64-unknown-linux-gnu", "this mutation campaign records the Linux target"
+          # Mutations in cfg-disabled platform branches. Apply these anchors
+          # to the applicable Linux command only, never globally.
+          inactive = []
+          if os.environ["MUTATION_SCOPE"] == "HTTP auth":
+              inactive = [
+                  r'http\.rs:190:5: replace addr_in_use_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+                  r'http\.rs:195:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+                  r'http\.rs:204:5: replace windows_socket_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+                  r'http\.rs:231:19: replace != with == in windows_socket_message$',
+                  r'http\.rs:247:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+                  r'http\.rs:296:5: replace write_token_file .* with Ok\(\(\)\)$',
+                  r'http\.rs:313:5: replace create_token_directory .* with Ok\(\(\)\)$',
+              ]
+          elif os.environ["MUTATION_SCOPE"] == "consent":
+              inactive = [
+                  r'consent\.rs:628:5: replace close_windows_file .* with Ok\(\(\)\)$',
+                  r'consent\.rs:640:5: replace checked_windows_close .* with Ok\(\(\)\)$',
+                  r'consent\.rs:644:39: replace != with == in checked_windows_close$',
+              ]
+          for pattern in inactive:
+              command += ["--exclude-re", pattern]
+          for path in json.loads(os.environ["MUTATION_FILES"]):
+              command += ["--file", path]
+          inputs = pathlib.Path("mutation-inputs")
+          inputs.mkdir()
+          for name, flags in [("full", []), ("selected", ["--shard", os.environ["MUTATION_SHARD"]])]:
+              catalog = json.loads(subprocess.check_output(command + flags + ["--list", "--json"]))
+              assert catalog, "empty mutation shard is not acceptance"
+              (inputs / (name + "-catalog.json")).write_text(json.dumps(catalog) + "\n")
+          receipt = {"scope": os.environ["MUTATION_SCOPE"], "shard": os.environ["MUTATION_SHARD"],
+                     "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "target": target, "inactive_target_exclusions": inactive}
+          (inputs / "receipt.json").write_text(json.dumps(receipt) + "\n")
+          command += ["--shard", os.environ["MUTATION_SHARD"], "--timeout", "30", "--"] + json.loads(os.environ["MUTATION_TESTS"])
+          result = subprocess.run(command)
+          # cargo-mutants gives timeout exit 3 precedence over missed exit 2.
+          # Inspect the actual JSON on both accepted exit codes.
+          assert result.returncode in (0, 3), f"mutation run failed: {result.returncode}"
+          subprocess.run(["python3", "scripts/verify-mutation-outcomes.py",
+                          "mutants.out/outcomes.json"], check=True)
+          PY
+      - name: Retain mutation outcomes and baseline/failure evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-sweep-${{ strategy.job-index }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            mutation-inputs/*.json
+            mutants.out/outcomes.json
+            mutants.out/mutants.json
+            mutants.out/*.txt
+            mutants.out/log/*.log
+            mutants.out/diff/*.diff
+
+  verify-sweep:
+    name: Rust / verify complete mutation sweep
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.sweep_mutations
+    needs: [sweep-mutations]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download same-run mutation evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mutation-sweep-*
+          path: ${{ runner.temp }}/mutation-evidence
+      - name: Verify all five categories and every disjoint shard
+        env:
+          EVIDENCE: ${{ runner.temp }}/mutation-evidence
+        run: python3 scripts/verify-mutation-shards.py "$EVIDENCE" "$(git rev-parse HEAD)"

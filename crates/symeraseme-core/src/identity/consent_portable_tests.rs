@@ -4,6 +4,24 @@ use super::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+pub(super) fn close_owned_file(file: fs::File) -> io::Result<()> {
+    close_file(file, |file| {
+        #[cfg(unix)]
+        {
+            nix::unistd::close(file).map_err(io::Error::from)
+        }
+        #[cfg(windows)]
+        {
+            close_windows_file(file)
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            drop(file);
+            Ok(())
+        }
+    })
+}
+
 #[cfg(windows)]
 fn fixed_store(path: &Path) -> ConsentStore {
     ConsentStore::new(path)
@@ -145,7 +163,7 @@ fn id005_destination_conflict_cleans_owned_temp_and_preserves_go_tree() {
         &destination,
         body,
         fs::File::sync_all,
-        close_file,
+        close_owned_file,
         |temporary| {
             assert_eq!(temporary.parent(), Some(dir.as_path()));
             assert_eq!(fs::read(temporary).unwrap(), body);
@@ -189,7 +207,7 @@ fn id005_windows_checked_close_matches_go_rollback() {
         b"replacement must not be published",
         fs::File::sync_all,
         |file| {
-            close_file(file)?;
+            close_owned_file(file)?;
             Err(io::Error::other("injected after native checked close"))
         },
         |_| panic!("chmod reached after close failure"),

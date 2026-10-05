@@ -43,6 +43,9 @@ jobs:
         with:
           go-version: '1.26.6'
 
+      - name: Download Go oracle modules
+        run: go mod download
+
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -255,7 +258,7 @@ jobs:
         run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
       - name: Compare native Windows MCP HTTP against Go
         shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked
+        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked -- --test-threads=1
 
   rust-tools-cache:
     name: Rust / verification tools cache

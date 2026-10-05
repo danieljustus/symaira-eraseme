@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
 
       - name: Select Xcode 26
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
@@ -82,6 +82,11 @@ jobs:
         with:
           go-version: '1.26.6'
           cache: true
+
+      - name: Install pinned Rust backend toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Import Developer ID certificate
         id: signing
@@ -140,6 +145,12 @@ jobs:
           test -d "$APP_PATH"
           test -x "$APP_PATH/Contents/MacOS/Symaira EraseMe"
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
+          test -x "$APP_PATH/Contents/MacOS/symeraseme-go"
+          test "$("$APP_PATH/Contents/MacOS/symeraseme" --version)" = "symeraseme version ${RELEASE_TAG#v}"
+          test "$("$APP_PATH/Contents/MacOS/symeraseme-go" version)" = "symeraseme ${RELEASE_TAG#v}"
+          for backend in symeraseme symeraseme-go; do
+            codesign --verify --strict --verbose=2 "$APP_PATH/Contents/MacOS/$backend"
+          done
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" | grep -Fx "${RELEASE_TAG#v}"
           REQUIRE_COMPILED_ICON=true ./scripts/verify-app-icon.sh "$APP_PATH"

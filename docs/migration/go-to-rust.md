@@ -115,6 +115,7 @@ once integrated because the service manifest deliberately binds Go tests
 as well as production sources. No release, observation interval, Go removal
 or cutover acceptance is claimed by this import.
 
+
 ## Exact mutation-anchor maintenance for MCP ping (2026-10-04, #1126)
 
 The standard ping addition shifts the existing protocol parser functions by
@@ -880,6 +881,116 @@ Go helpers, command-line live interface and switchback runners remain open
 under #1131. Go removal stays gated by the actual stable release and seven
 days; neither #1131 nor #1133 is closed by this preparation.
 
+The subsequent complete run `37174075472` at clean `30b38e2` retains
+all eleven disjoint shard inventories and all 718 outcomes. State projection
+passes (26 caught / 115 unviable / zero missed). Crypto has 6 missed of 117,
+consent 5 of 86, sanitization 35 of 272 and HTTP 11 of 102; the entire
+campaign correctly fails. The separate complete MCP result remains 331
+mutants, zero missed, and Miri plus all six fuzz targets pass. All original
+failed results remain retained.
+
+At clean `3ae43b06e930b19e9747b0218288776bcf458d54`, the second repairs
+pass 160 core/integration cases, 19 actual HTTP cases and the 25-case crypto
+selection. The two core and one HTTP top-level child harnesses are executed
+by their passing parents. Strict core/CLI all-target Clippy, formatting and
+the task-graph check pass. Eight additional actual compiled regressions are
+caught and restored, including worker/body-collector error signs, complete
+SSN filtering, short email masks, intermediate review limits, consent error
+translation/real kernel close failure and encryption detection. There are
+now 27 retained compiled negative controls across the two repair rounds.
+The complete outcome gate and all six campaign-verifier controls pass.
+
+Fourteen exact mutants are proved equivalent in the
+[classification report](../rust-port/handoffs/mutation-equivalence-2026-10-04.md):
+array prevalidation, redundant terminal loops, empty Unicode segments,
+domain validation and fixed redaction resource/regex invariants. Seven
+cfg-disabled HTTP/Windows-close mutants are excluded only in the applicable
+Linux command. Both native target and the exact exclusions are sealed into
+its receipt and verified; the global configuration keeps these platform
+branches selected on their native targets. Native create/close operations
+retain their original semantics. Operation-local error boundaries test a
+real kernel EBADF without stale ownership, stop before chmod/publication,
+and preserve the old consent file and unrelated entries. New complete
+native mutation acceptance, all-six platform verification and the remaining
+fault/secret-sentinel evidence remain pending under issue #813. Per-mutant
+and per-job budgets stay at 30 seconds and 45 minutes.
+
+Task 8.5 preparation adds a native Linux mutation campaign over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection.
+The pinned cargo-mutants 27.1.0, 30-second per-mutant timeout and 45-minute
+job limit remain unchanged. Crypto and sanitization each use four complete
+shards; the other categories each use one. A same-run verifier requires all
+eleven shards, the same producing source, identical complete catalogs,
+disjoint selections and actual execution of every selected mutant. Missing,
+overlapping, empty or incomplete campaigns fail. Full catalogs, outcomes,
+baseline logs and diffs are retained on success and failure.
+
+Run `37170739620` at `8797f2d47011fea6f008b8207c0bc94d9854ca39`
+exposed real test gaps: HTTP had 40 missed of 102, consent 20 of 82 and
+state transitions 3 of 141. Crypto hit the existing job deadline after 99
+of 117 generated mutants (8 missed); sanitization hit it after 180 of 272
+(63 missed). Both incomplete JSON documents retain null end times. All five
+original archives were checksum-verified and retained; none establishes
+acceptance. The separate MCP campaign passed its actual JSON gate with
+331 mutants: 298 caught, 12 unviable, 21 timeouts and zero missed.
+
+The added checks cover actual HTTP status/JSON/header/body-size behavior,
+equal-length wrong tokens, remote Origins, token permissions, shutdown and
+private bind policy; consent expiry, filename filtering and real filesystem
+races; projection diagnostics and zero chunk-size handling; standard/raw
+Fernet and legacy minimum frames; and redaction profile/path/email/SSN bounds.
+The public consent methods retain native filesystem operations through private
+callbacks that deterministically place real races between lookup and syscall.
+Local verification passes 151 core/integration tests and 18 HTTP tests; the
+two core and one HTTP top-level ignored child harnesses are actually invoked
+by passing parents. Strict core/CLI all-target Clippy passes. Nineteen actual
+compiled regressions are caught: both HTTP controls, all three missed state
+mutants, six consent controls and all eight missed crypto mutants. Source
+bytes are restored after each negative control. Four outcome and five
+whole-campaign verifier regression controls pass.
+
+The gate inspects complete actual outcomes, because timeout exit 3 takes
+precedence over missed exit 2 in cargo-mutants 27.1.0. It rejects any missed
+mutant, failed/missing baseline, incomplete/zero-case result or inconsistent
+count, and requires at least one actual caught mutant. New complete native
+mutation acceptance remains pending; remaining platform/equivalence cases
+are not hidden by broad exclusions. Final task 8.4 integration, native fault
+injection and secret-sentinel proof remain required under issue #813. No
+contract row, release/default switch or cutover task is promoted by this work.
+
+
+
+### Current-main offline backup oracle preparation (2026-10-04, #1122)
+
+Job `111323926955` failed before grant parity because the macOS Intel module
+cache was cold and its source-bound builder correctly refused network with
+`GOPROXY=off`. The native backup workflow now downloads modules against the
+committed checksum inventory and runs `go mod verify` before the unchanged
+offline CLI suite. Local module verification and the task graph check pass.
+The failed job remains retained; new six-target acceptance is pending.
+
+### Backup candidate Windows HTTP fixture reconciliation (2026-10-03)
+
+Fresh main-based #1154 head `04d33e700ed486b11a4aea4c0de1a83050269429`
+failed its Windows PR gate in run `37148405763`, job `111276980727` at clean
+PR merge `c77385167e3ee197b98510e57c9552c64b29e61a`. Five Windows process
+tests passed; `native_windows_http_matches_checked_out_go` received no
+complete HTTP headers and failed at the delimiter check. That fixture still
+wrote request headers and body separately, permitting a Windows reset during
+early authentication/origin rejection. The retained failure is not accepted
+proof, even though the separate backup rehearsal and earlier full native
+workspace run `37137774907` passed all six targets.
+
+Reuse the exact staged-request and bounded-response repair already present
+in SMTP source `cb3234c2291c8b243aeed8452e2bfce6f1938868`. The entire request
+is sent from one staged buffer, and the existing five-second bounded reader
+requires complete headers and the declared complete body on every response.
+No retry, deadline increase, response normalization, production server or
+backup confinement change is introduced. Local bounded/backpressure control,
+strict CLI all-target/all-feature Clippy, formatting and task-graph checks
+pass; these Linux checks do not execute the Windows-only fixture. Fresh
+candidate native Windows and required PR acceptance remain necessary.
+
 The task graph is reconciled against integrated `28e32a1c` and the current
 matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
 evidence. Phases 6–8 are not complete. Closed historical phase issues
@@ -901,6 +1012,33 @@ and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
 on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
+
+The shared app-backend helper also built real Rust 1.98.0 and Go 1.26.6
+executables in a clean ordinary checkout at `a8d606a` with an external Cargo
+target directory. Rust reports `symeraseme version 0.13.0`; the direct Go
+`version` command and explicit `SYMERASEME_BACKEND=go` path both report
+`symeraseme 0.13.0`. Go build info pins that clean source revision. The native
+and signed-release version assertions preserve those distinct existing
+command formats. This Linux build validates the shared helper and actual
+fallback dispatch, not Swift or macOS signing.
+
+## Native migration backup/restore acceptance (2026-10-03, #1122)
+
+The new six-target `backup-restore-native.yml` binds historical Go v0.12.1
+archive bytes to release checksums/digests and executes the eight retained
+schema-v1 → Rust-v2 → restored-v1 cases. Linux amd64 uses the existing
+namespace/Landlock driver; Windows adds a no-capability AppContainer,
+child-creation restriction and owned suspended-start Job with native denial,
+exit and timeout controls, plus four dynamic package-SID-scoped WFP filters.
+Run `37137670878` at branch source
+`28f13ac1b09caf3b930c89714de27718ef3cdad0` passed all six targets with
+clean PR merge source `69c5724c32d64a66ffa71a7f91ddabb5ac1335e2`.
+Windows amd64 artifact `11279253544` additionally passed independent raw
+stream-hash and every-command Job/WFP/SID/profile cleanup readback.
+CLI-023/024 are PASS for their scoped native contracts; tasks 7.2/7.4 await
+final PR checks and verified integration. The accepted manual-confirmation deviation (#809)
+is now explicit in the release notes; no automatic browser executor is added.
+See `docs/rust-port/backup-restore-rehearsal.md` for the boundary and controls.
 
 ## Email platform-root repair (2026-10-03, #1119)
 
@@ -1720,9 +1858,11 @@ artifact gates still require separate evidence.
 
 - **CLI-024 release acceptance.** The integrated native CI matrix passed on
   `3f133e75`, including the bounded registry build at 1024 descriptors
-  (#1034). The disposable switchbacks build Go from current source; a
-  retained older Go rollback binary reading schema v2 remains unproved
-  (#1035). Do not promote this row to cutover-ready based on CI alone.
+  (#1034). Run `37137670878` now establishes the separate official-Go
+  backup/restore boundary on all six native targets: v0.12.1 refuses schema
+  v2 and reads the original three requests only after restoring the pre-Rust
+  schema-v1 backup into a separate root. This loses post-backup writes and
+  does not establish in-place backward compatibility or production-data restore.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
   truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
   128 seeded mutations replay the live Go process byte-exactly, and the new
@@ -1730,9 +1870,11 @@ artifact gates still require separate evidence.
   executions historically. The current-source six-target replay and the
   configured 120-second fuzz/mutation campaign now pass (checkpoint above).
   Exhaustive or differential fuzzing is not claimed by these bounded gates.
-- **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
-  explicit message where Go runs `confirmation.AutoConfirm` (browser
-  subsystem unported). The recorded case is the no-reply branch.
+- **Manual confirmation (CLI-023).** The accepted #809 deviation keeps browser
+  clicks as durable manual tasks. Retained stored-reply MCP fixtures cover
+  preview, manual fallback and no-link effects; the six-target #1122 gate
+  executes the actual CLI and consented manual-fallback contracts. This does
+  not claim an automated browser executor.
 - **`go_map_order` exemption (CLI-020).** `ToolHandler::call` sorts every
   result except `auto_confirm` (Go structs keep declaration order). Any
   future Go-struct-returning tool needs the same exemption — grep the
@@ -1835,6 +1977,16 @@ artifact gates still require separate evidence.
   full native captures exist. The opt-in native pipeline now collects all
   31 service/projection/install cases without updating committed fixtures.
   No scheduler contract/cutover status or issue is completed by this step.
+
+- 2026-10-03 — Fresh backup head `d46ef15` run `37150148562`, macOS Intel
+  job `111282134679`, failed before native tests when the anonymous official
+  release metadata API returned HTTP403 rate-limit exceeded. This failure
+  remains recorded. Preparation now uses the job's existing contents-read
+  token only for the exact fixed `v0.12.1` metadata URL, with authenticated
+  redirects refused and archive/checksum downloads still anonymous. Three
+  scope/redirect/bound controls and the five existing backup controls pass
+  locally. No digest, archive, restore, confinement or native acceptance
+  check is relaxed; the new head still needs current six-target acceptance.
 
 - 2026-09-22 — all three wave-1 worker results came back HTTP 429 (Codex
   quota); the coordinator implemented CLI-020/021/022 itself in the slice
@@ -1954,3 +2106,92 @@ revision negative controls. No comparison, case count or deadline is reduced.
 Fresh all-six native workspace and reader acceptance remain required; the six
 auxiliary live-Go HTTP parents are still unfinished, so #1131 remains open
 and #1156 stays draft. This is not release or Go-retirement acceptance.
+
+## Default Rust app bundle candidate (2026-10-04, #1127)
+
+The shared app build script now places the actual Cargo executable under
+`symeraseme` and builds `symeraseme-go` only as the explicit transitional
+sibling. Development builds and DMG staging use the same helper. Both nested
+executables are signed and verified before outer app signing. Configured paths
+retain priority; ordinary bundle discovery launches the default Rust name.
+The Swift integration gate exercises both explicit shadow discovery and actual
+staged bundle discovery with an empty configured Binary Path, private data,
+authentication, tool calls and bounded shutdown. Both native Mac architectures
+must pass the complete Swift suite without skipped integration cases.
+Shell syntax and the existing packaging controls pass locally, including exact
+Rust-member identity and both nested signing order checks. APP-001 remains
+PARTIAL pending real native CI; unsigned staging does not prove #1129.
+
+At `970ef64`, Go CI job `111422925388` and the main CI test job
+`111422926131` failed the retained exact release-step-order contract: it
+still described the Go-only setup and omitted the newly required Rust
+toolchain step. The contract now requires that pinned setup before Developer
+ID material is imported; every existing signing/notarization/checksum step
+remains in its original required order. `TestReleaseWorkflowContract` and
+`TestPackageDMGMockSuite` pass locally with Go 1.26.6. Fresh PR checks remain
+required. This Go test-source change also requires honest new source-bound
+capture after final app integration; it does not relabel older observations.
+
+### Native Swift Intel toolchain availability (2026-10-04, #1127)
+
+Actual Intel job `111429073763` fails before building or testing because
+its image provides Xcode 26.3.0 (17C529), not the ARM image's 26.4.1. The
+app native matrix now pins those actual Xcode versions separately. Both
+architectures still stage the complete Rust-default app with its actual Go
+sibling and require the entire Swift suite, auth/tools/shutdown assertions
+and original packaging controls. Neither platform is removed or inferred;
+new native acceptance is required. The production ARM release toolchain
+remains pinned at 26.4.1.
+
+## Retained Windows console startup failure (2026-10-04, #1158)
+
+At `c292e4bd`, native Windows amd64 HTTP job `111456037338` in run
+`37208968625` passed all five header controls and six of seven Windows
+process parents. The private Ctrl+Break helper exceeded the original
+ten-second startup deadline with empty stderr; the parent correctly failed.
+The log does not identify whether Go or Rust was starting, so the fixture
+now records that phase and backend before launch. The dedicated Windows
+HTTP jobs run all seven original parents serially to avoid concurrent
+Go builds and registry-loading children. Every case, comparison and child
+deadline is retained; full native workspace coverage remains unchanged.
+This is a scheduling candidate, not accepted Windows evidence. Both native
+Windows architectures and the current full suite must pass before merge.
+
+## Retained Intel pre-Swift packaging failure (2026-10-04, #1158)
+
+At head `6a9c47da`, Intel job `111468062530` in run `37213097514`
+selects the available Xcode26.3.0 correctly, then fails the first packaging
+control before staging or Swift tests. The captured shell output was not
+printed when the command failed, so its underlying cause is not established.
+The mock harness now prints that failure output and returns its original exit
+status. The native workflow retains packaging logs even when Swift never
+starts; all packaging assertions, actual icon compilation, both architectures
+and the complete Swift suite remain required. No native pass is inferred from
+this diagnostic repair. Native ARM at this head did pass all42 Swift tests
+(job111468062472), and both Windows HTTP jobs pass all7 original parents
+(jobs111468062686/111468062737). Fresh current-head acceptance is required.
+
+## Mutation campaign verifier reconciliation (2026-10-04, #813)
+
+At `66e48d6f8ce082e84c8524eb3ea700bcdd8a2b66`, all eleven actual
+mutation shards in run `37188075360` completed, but aggregate verifier job
+`111405689255` rejected the HTTP receipts: its expected inactive-platform
+anchors still described the pre-MCP-integration source. The workflow already
+used the exact current 190/195/204/231/247/296/313 anchors. The verifier now
+requires that same exact list; extra or changed exclusions still fail. No
+production code, exclusion, catalog, result or execution budget changes.
+Independent download and readback of all eleven raw archives now verifies
+700 actual mutants: 538 caught, 162 unviable, zero missed, zero timeouts.
+All ten existing outcome/campaign corruption controls pass. The original
+aggregate failure is retained; fresh current-head CI remains required.
+
+## Native backup CLI scheduling repair (2026-10-04, #1122)
+
+Current-head Intel macOS job `111394036537` in run `37188012522`
+passed the migration engine and 19 of 21 command-surface tests, then
+exceeded the existing ten-second child budget in two broker commands.
+The backup workflow now runs all 21 command-surface tests serially, avoiding
+concurrent full-registry parsing on the native runner. The ten-second process
+deadline, four-MiB capture limit, comparisons and all eight restore cases
+remain unchanged. Fresh six-target acceptance is required; the retained
+failed run is not completion evidence.

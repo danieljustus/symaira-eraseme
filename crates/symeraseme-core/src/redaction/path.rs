@@ -228,6 +228,73 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    fn unsafe_relative_paths_are_rejected_independently() {
+        use super::validate_relative;
+        for path in [
+            "",
+            "a\\b",
+            "a\nb",
+            "a\tb",
+            "a//b",
+            "./a",
+            "a/./b",
+            "a/",
+            "/absolute",
+        ] {
+            assert!(
+                matches!(
+                    validate_relative(path),
+                    Err(WorkspaceRootError::InvalidPath)
+                ),
+                "{path:?}"
+            );
+        }
+        for path in ["../a", "a/../b", "C:", "C:relative", "Z:/absolute"] {
+            assert!(
+                matches!(
+                    validate_relative(path),
+                    Err(WorkspaceRootError::OutsideWorkspace)
+                ),
+                "{path:?}"
+            );
+        }
+        for path in ["a", "ab", "a/b", "1:allowed", "é"] {
+            assert!(validate_relative(path).is_ok(), "{path:?}");
+        }
+    }
+
+    #[test]
+    fn file_identity_requires_the_same_inode() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("one"), b"same content").unwrap();
+        fs::write(temp.path().join("two"), b"same content").unwrap();
+        let root =
+            cap_std::fs::Dir::open_ambient_dir(temp.path(), cap_std::ambient_authority()).unwrap();
+        let one = root.metadata("one").unwrap();
+        assert!(super::same_file(&one, &root.metadata("one").unwrap()));
+        assert!(!super::same_file(&one, &root.metadata("two").unwrap()));
+    }
+
+    #[test]
+    fn exact_file_limit_and_utf8_text_are_preserved() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = fs::File::create(temp.path().join("exact")).unwrap();
+        file.set_len(16_777_216).unwrap();
+        drop(file);
+        let root = WorkspaceRoot::open(temp.path()).unwrap();
+        assert_eq!(root.read("exact").unwrap().len(), 16_777_216);
+        fs::write(temp.path().join("text"), "Jürgen\n").unwrap();
+        assert_eq!(
+            super::read_workspace_text(Path::new("text"), Some(temp.path())).unwrap(),
+            "Jürgen\n"
+        );
+        fs::write(temp.path().join("invalid"), [0xff]).unwrap();
+        assert!(
+            matches!(super::read_workspace_text(Path::new("invalid"), Some(temp.path())), Err(WorkspaceRootError::Io(error)) if error.kind() == io::ErrorKind::InvalidData)
+        );
+    }
+
+    #[test]
     fn root_open_failures_match_go_opaque_error_text() {
         let temp = tempfile::tempdir().expect("temporary workspace");
         let missing = temp.path().join("missing-root");

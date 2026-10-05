@@ -578,6 +578,85 @@ next native capture includes seven whole LLM outputs (48 total product
 observations), while other native OS/default and CLI/MCP runtime families
 remain open. This does not complete #1131 or promote CUT-005.
 
+The subsequent complete run `37174075472` at clean `30b38e2` retains
+all eleven disjoint shard inventories and all 718 outcomes. State projection
+passes (26 caught / 115 unviable / zero missed). Crypto has 6 missed of 117,
+consent 5 of 86, sanitization 35 of 272 and HTTP 11 of 102; the entire
+campaign correctly fails. The separate complete MCP result remains 331
+mutants, zero missed, and Miri plus all six fuzz targets pass. All original
+failed results remain retained.
+
+At clean `3ae43b06e930b19e9747b0218288776bcf458d54`, the second repairs
+pass 160 core/integration cases, 19 actual HTTP cases and the 25-case crypto
+selection. The two core and one HTTP top-level child harnesses are executed
+by their passing parents. Strict core/CLI all-target Clippy, formatting and
+the task-graph check pass. Eight additional actual compiled regressions are
+caught and restored, including worker/body-collector error signs, complete
+SSN filtering, short email masks, intermediate review limits, consent error
+translation/real kernel close failure and encryption detection. There are
+now 27 retained compiled negative controls across the two repair rounds.
+The complete outcome gate and all six campaign-verifier controls pass.
+
+Fourteen exact mutants are proved equivalent in the
+[classification report](rust-port/handoffs/mutation-equivalence-2026-10-04.md):
+array prevalidation, redundant terminal loops, empty Unicode segments,
+domain validation and fixed redaction resource/regex invariants. Seven
+cfg-disabled HTTP/Windows-close mutants are excluded only in the applicable
+Linux command. Both native target and the exact exclusions are sealed into
+its receipt and verified; the global configuration keeps these platform
+branches selected on their native targets. Native create/close operations
+retain their original semantics. Operation-local error boundaries test a
+real kernel EBADF without stale ownership, stop before chmod/publication,
+and preserve the old consent file and unrelated entries. New complete
+native mutation acceptance, all-six platform verification and the remaining
+fault/secret-sentinel evidence remain pending under issue #813. Per-mutant
+and per-job budgets stay at 30 seconds and 45 minutes.
+
+Task 8.5 preparation adds a native Linux mutation campaign over crypto,
+consent, HTTP authentication, redaction/path confinement and event projection.
+The pinned cargo-mutants 27.1.0, 30-second per-mutant timeout and 45-minute
+job limit remain unchanged. Crypto and sanitization each use four complete
+shards; the other categories each use one. A same-run verifier requires all
+eleven shards, the same producing source, identical complete catalogs,
+disjoint selections and actual execution of every selected mutant. Missing,
+overlapping, empty or incomplete campaigns fail. Full catalogs, outcomes,
+baseline logs and diffs are retained on success and failure.
+
+Run `37170739620` at `8797f2d47011fea6f008b8207c0bc94d9854ca39`
+exposed real test gaps: HTTP had 40 missed of 102, consent 20 of 82 and
+state transitions 3 of 141. Crypto hit the existing job deadline after 99
+of 117 generated mutants (8 missed); sanitization hit it after 180 of 272
+(63 missed). Both incomplete JSON documents retain null end times. All five
+original archives were checksum-verified and retained; none establishes
+acceptance. The separate MCP campaign passed its actual JSON gate with
+331 mutants: 298 caught, 12 unviable, 21 timeouts and zero missed.
+
+The added checks cover actual HTTP status/JSON/header/body-size behavior,
+equal-length wrong tokens, remote Origins, token permissions, shutdown and
+private bind policy; consent expiry, filename filtering and real filesystem
+races; projection diagnostics and zero chunk-size handling; standard/raw
+Fernet and legacy minimum frames; and redaction profile/path/email/SSN bounds.
+The public consent methods retain native filesystem operations through private
+callbacks that deterministically place real races between lookup and syscall.
+Local verification passes 151 core/integration tests and 18 HTTP tests; the
+two core and one HTTP top-level ignored child harnesses are actually invoked
+by passing parents. Strict core/CLI all-target Clippy passes. Nineteen actual
+compiled regressions are caught: both HTTP controls, all three missed state
+mutants, six consent controls and all eight missed crypto mutants. Source
+bytes are restored after each negative control. Four outcome and five
+whole-campaign verifier regression controls pass.
+
+The gate inspects complete actual outcomes, because timeout exit 3 takes
+precedence over missed exit 2 in cargo-mutants 27.1.0. It rejects any missed
+mutant, failed/missing baseline, incomplete/zero-case result or inconsistent
+count, and requires at least one actual caught mutant. New complete native
+mutation acceptance remains pending; remaining platform/equivalence cases
+are not hidden by broad exclusions. Final task 8.4 integration, native fault
+injection and secret-sentinel proof remain required under issue #813. No
+contract row, release/default switch or cutover task is promoted by this work.
+
+
+
 The reconciled [task graph](plans/2026-09-04-go-to-rust-task-graph.json)
 records the issue owner of every PARTIAL/TODO row in
 `execution_state.contract_issue_owners`, and owners of every unfinished task
@@ -728,8 +807,8 @@ SQLite, network transcript or process behavior.
 | CLI-020 | CLI | manual task list/show/complete/cleanup | golden DB/temp files | manual-task CLI cases | byte+side-effect | all | PASS (native CI: workspace suite and doctests green on all six targets at `5b5ce7c8`, run 36467919816; unix-gated cases ran on the four Unix targets). The command corpus replays empty list/show/complete/cleanup paths; populated task and artifact paths are exercised by `manual_tasks_populated_paths_match_the_go_bodies` and the SQLite timestamp tests. |
 | CLI-021 | CLI | review/redaction positional and flag aliases | redaction fixtures | redaction CLI cases | byte | all | PASS (native CI: workspace suite and doctests green on all six targets at `5b5ce7c8`, run 36467919816; unix-gated cases ran on the four Unix targets). The recorded `operate-review` case remains in the CLI corpus, and `review_positional_and_path_aliases_match_the_live_go_cli` runs eight isolated live Go/Rust process cases: missing path, `--path`, positional precedence, text/JSON and inherited output modes, missing file, and invalid format. It requires successful redaction on four paths, exact exit/stdout/stderr and unchanged input; passed at `fe9250a`. |
 | CLI-022 | CLI | inbox/classify/rebuttal argument aliases/defaults | mock adapters | reply CLI cases | byte+transcript | all | PARTIAL (local). Real `poll-inbox` CLI adapter and invalid `--since` replay source-bound Go cases; Both reply-triage wrappers replay the source-bound local-agent Go corpus; its `classify-agent-invalid-utf8-stderr` process case compares exact Go/Rust exit, stdout and raw stderr bytes after an invalid UTF-8 host-agent failure. The frozen CLI corpus selects all 175 cases after the Rust llmkit chat transport landed (`e8a8c96`); native targets remain open. #1120 adds a six-target native executable-agent gate selecting all sixteen retained CLI inputs and eight raw MCP/side-effect cases; results are pending. |
-| CLI-023 | CLI | web form/auto-confirm dry-run and fallback | fake driver | web CLI cases | byte+side-effect | all | PARTIAL (local). `operate-run-web-form` and `operate-auto-confirm` replay their isolated Go observations; stored-reply `auto_confirm` now compares a source-bound Go MCP process response and SQLite manual-task/event effects on dry-run, fallback and no-link paths (`17daf2c5`); automatic browser clicking remains unimplemented. Maintainer decision (2026-09-28, #809): the Rust port keeps confirmation clicks as a manual task for now; porting the browser executor is deferred and is an accepted deviation from Go for the cutover, not an open parity defect. |
-| CLI-024 | CLI | migrate inspect/run/verify/rollback/resume | migration fixtures | migration CLI cases | byte+filesystem | all | PARTIAL (integrated CI passed; retained release Go rollback rehearsed on macOS). The migration CLI corpus, filesystem replay and 500-case Go JSON oracle pass; the native Rust CI matrix passed on merged `3f133e75`. The disposable switchbacks build Go from current source. Separately, the eight-case isolated backup/restore rehearsal used the checksum-verified official v0.12.1 macOS arm64 Go archive: Go read schema v1, refused Rust-written schema v2, then read all three original requests after restoring the pre-Rust backup; the post-backup Rust write was absent, and the partial-restore negative control failed. See `docs/rust-port/backup-restore-rehearsal.md`. At `cfdc59a0`, five synthetic archive/backup controls pass on native Darwin/arm64 and Linux/arm64: exact ZIP executable bytes, duplicate/nonregular/nested-member rejection, no extraction, existing tar verification, WAL backup and incomplete-restore rejection. This prepares Windows ZIP verification only; it is not a Windows executable or restore run. Native Windows, production restore, and release/cutover approval remain open. |
+| CLI-023 | CLI | web form/auto-confirm dry-run and fallback | fake driver | web CLI cases | byte+side-effect | all | PASS (native). `operate-run-web-form` and `operate-auto-confirm` replay the isolated Go observations; stored-reply `auto_confirm` compares source-bound Go MCP responses and persisted manual-task/event effects. The accepted #809 decision keeps confirmation clicks as manual tasks and defers the browser executor; it is recorded in `CHANGELOG.md`. Run `37137670878` at branch source `28f13ac1b09caf3b930c89714de27718ef3cdad0` passed migration, CLI and consented manual-fallback execution on all six native targets, with clean PR merge source `69c5724c32d64a66ffa71a7f91ddabb5ac1335e2`. Final PR integration checks remain separate. |
+| CLI-024 | CLI | migrate inspect/run/verify/rollback/resume | migration fixtures | migration CLI cases | byte+filesystem | all | PASS (native). The migration CLI/filesystem corpus and 500-case Go JSON oracle pass. Run `37137670878` at branch source `28f13ac1b09caf3b930c89714de27718ef3cdad0` executed all eight actual backup/restore cases on Linux, Windows and macOS amd64/arm64 with checksum/digest-verified official native Go v0.12.1 archives and clean committed-harness bytes. Go reads three schema-v1 requests, rejects Rust-written schema v2, and reads the same three after the separate pre-Rust backup restore; Rust-created request 4 is absent and a partial two-request restore is rejected. Real Linux namespace/Landlock and Windows AppContainer/Job/SID-scoped WFP controls execute; Windows raw artifact `11279253544` independently verifies all stream hashes, TCP/UDP error 10013, child error 5, timeout 124 and complete owned cleanup on every command. See `docs/rust-port/backup-restore-rehearsal.md`. Post-backup writes are lost by this rollback path. Production-data restore, publication, default cutover and Go retirement remain separate gates. |
 | CLI-025 | CLI | `poll-inbox` real IMAP adapter, alias flags and errors | recorded Go CLI corpus, fake IMAP transcript | CLI process replay + transport parity | byte+transcript | all | PASS (native CI: workspace suite and doctests green on all six targets at `5b5ce7c8`, run 36467919816; unix-gated cases ran on the four Unix targets). The live CLI adapter routes into the production Rust IMAP dialer; source-bound Go cases for a refused local connection and invalid `--since` replay byte-exactly. The nine-case MCP handler and eleven-case IMAP transport corpora exercise inbox policy and wire behavior without a paid provider. |
 | CFG-001 | config | defaults | no config/env | unit + differential | semantic | all | PASS |
 | CFG-002 | config | global TOML path | isolated HOME/XDG | unit + differential | semantic | all | PASS |
@@ -807,7 +886,7 @@ SQLite, network transcript or process behavior.
 | MCP-014 | MCP stdio | Consecutive JSON values separated by whitespace — **not** newline frames (measured: a value may span lines, three values may sit on one line); one response per request, notifications silent, nothing else on stdout | Go `ServeStdio`; `tests/fixtures/mcp-contract/mcp-stream/cases.json` (13 measured cases) | `crates/symeraseme-cli/src/mcp/stream.rs`, raw stream comparator | byte | all | PASS (native CI: workspace suite and doctests green on all six targets at `5b5ce7c8`, run 36467919816; unix-gated cases ran on the four Unix targets). `mcp_stdio_process.rs` launches the real Rust shadow executable over a live pipe, checks responses arrive before EOF and asserts stdout contains only JSON-RPC frames; the source-bound 13-case Go stream fixture and 3 focused process tests pass. |
 | MCP-015 | MCP stdio | Malformed, truncated and multiple values in one stream | same oracle fixture (adjacent, truncated, junk, scalar and string cases) | `stream.rs` error cases; seeded mutations; `fuzz/fuzz_targets/mcp_stdio.rs` | byte+exit | all | PASS (six-target source-bound parser replay and bounded hardening; see checkpoint above). `mcp_stdio_process.rs` replays ten source-bound Go 1.26.6 malformed/adjacent/truncated cases with exact process exit, stdout and stderr; the fixtures live under `rust-tests/parity/oracle/mcp-stdio-errors/`. Six parse cases, four size/depth boundaries, and 128 deterministic seeded byte mutations replay the real Go 1.26.6 process byte-exactly. The new in-process libFuzzer target includes the production `protocol.rs` and `stream.rs` directly (only tool dispatch is stubbed), consumes only the input bytes, and has no filesystem/state dependency. Its ten checked-in seeds are copied from the source-bound Go error corpus; a current-source macOS arm64 run completed 330,402 executions in five seconds without a crash (`-max_len=65536`). This bounded run adds parser robustness evidence, not Go differential or native-platform proof. |
 | APP-000 | SwiftUI | `listTools()` parses raw `result.tools`, not call content envelope | exact Go response; issue #797 | `MCPClientToolsListTests` | semantic | macOS | PASS |
-| APP-001 | SwiftUI | binary discovery order and name | Swift unit tests | Rust binary fixture | side-effect | macOS | PARTIAL (local). Discovery unit tests pass and `RustBackendIntegrationTests` proves an explicit `symeraseme-rust` path; the default bundled discovery name and release bundle layout have not switched to Rust. |
+| APP-001 | SwiftUI | binary discovery order and name | Swift unit tests | Rust binary fixture | side-effect | macOS | PARTIAL (local). Discovery unit tests pass and `RustBackendIntegrationTests` proves an explicit `symeraseme-rust` path; the candidate shared build helper now stages Rust as `symeraseme` with explicit `symeraseme-go` rollback, signs both nested binaries, and adds a full native Swift bundled-discovery gate. APP-001 remains PARTIAL until both native Mac jobs pass. |
 | APP-002 | SwiftUI | launch `mcp --host --port` | supervisor test | Rust E2E | side-effect | macOS | PASS (local). The opt-in Swift E2E launches the integrated Rust HTTP binary through `ServerManager` on an isolated ephemeral port; the full 41-test Swift suite including this case passed again on the integrated `49eb79a8` Rust debug binary. |
 | APP-003 | SwiftUI | token read + authenticated tools/list/call | app tests | Rust E2E | semantic | macOS | PASS (local). The Swift E2E checks 401 without a bearer token, reads the per-run token through `MCPClient`, lists tools, calls `list_brokers` raw and typed, and verifies 1,273 active brokers. This found and fixed the client assumption that every valid tool result includes `success` and the model's `total`/`count` mismatch (`026c383`). |
 | APP-004 | SwiftUI | app shutdown terminates backend cleanly | app/supervisor test | Rust E2E | side-effect | macOS | PASS (local). The Swift E2E stops `ServerManager`, waits for process exit and restores shared app settings; 41 Swift tests passed again with the integrated `49eb79a8` Rust debug binary. |
