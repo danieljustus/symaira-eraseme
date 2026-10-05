@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+- **Rust migration**: Keep browser submission and confirmation clicks as manual
+  tasks for the Rust cutover, as accepted in #809 on 2026-09-28. Dry-run previews,
+  persisted manual tasks and confirmation fallback remain supported. The
+  automatic browser executor is deferred; no clicks are performed automatically
+  by these paths (#1122).
+
 - **Release**: Notarize and staple macOS app before creating DMG, sign DMG
   container with Developer ID before notarization, staple and validate DMG with
   Gatekeeper checks, and verify published download bytes before updating release

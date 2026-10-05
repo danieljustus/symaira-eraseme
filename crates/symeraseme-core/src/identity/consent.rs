@@ -291,12 +291,20 @@ impl ConsentStore {
 
     /// Remove a token after successful use. Missing tokens are ignored.
     pub fn consume_token(&self, token: &str) -> Result<(), ConsentError> {
+        self.consume_token_with(token, fs::remove_file)
+    }
+
+    fn consume_token_with(
+        &self,
+        token: &str,
+        remove: impl FnOnce(PathBuf) -> io::Result<()>,
+    ) -> Result<(), ConsentError> {
         if token.is_empty() {
             return Ok(());
         }
         self.ensure_directory()?;
         match self.find_token_file(token) {
-            Ok(path) => match fs::remove_file(path) {
+            Ok(path) => match remove(path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
                 Err(error) => Err(error.into()),
@@ -308,6 +316,14 @@ impl ConsentStore {
 
     /// Revoke a token, returning whether a file was removed.
     pub fn revoke_token(&self, token: &str) -> Result<bool, ConsentError> {
+        self.revoke_token_with(token, fs::remove_file)
+    }
+
+    fn revoke_token_with(
+        &self,
+        token: &str,
+        remove: impl FnOnce(PathBuf) -> io::Result<()>,
+    ) -> Result<bool, ConsentError> {
         if token.is_empty() {
             return Ok(false);
         }
@@ -317,7 +333,7 @@ impl ConsentStore {
             Err(ConsentError::NotFound) => return Ok(false),
             Err(error) => return Err(error),
         };
-        match fs::remove_file(path) {
+        match remove(path) {
             Ok(()) => Ok(true),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
             Err(error) => Err(error.into()),
@@ -438,13 +454,9 @@ impl ConsentStore {
         builder.create(&self.directory).map_err(|error| {
             // Go MkdirAll reports ENOTDIR for an existing file at the leaf;
             // Rust's recursive builder reports EEXIST on Unix instead.
-            if error.kind() == io::ErrorKind::AlreadyExists
-                && fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
-            {
-                io::Error::from(io::ErrorKind::NotADirectory)
-            } else {
-                error
-            }
+            directory_create_error(error, || {
+                fs::metadata(&self.directory).is_ok_and(|metadata| !metadata.is_dir())
+            })
         })?;
         // MkdirAll uses 0700 for every new ancestor; only the requested
         // directory is subsequently hardened, ignoring chmod errors in Go.
@@ -457,6 +469,14 @@ impl ConsentStore {
     }
 
     fn find_token_file(&self, token: &str) -> Result<PathBuf, ConsentError> {
+        self.find_token_file_with(token, |from, to| fs::rename(from, to))
+    }
+
+    fn find_token_file_with(
+        &self,
+        token: &str,
+        rename: impl FnOnce(&Path, &Path) -> io::Result<()>,
+    ) -> Result<PathBuf, ConsentError> {
         let hashed = self.path_for_token(token);
         if hashed.is_file() {
             return Ok(hashed);
@@ -466,7 +486,7 @@ impl ConsentStore {
             return Err(ConsentError::NotFound);
         }
         let destination = self.path_for_token(token);
-        match fs::rename(&legacy, &destination) {
+        match rename(&legacy, &destination) {
             Ok(()) => Ok(destination),
             Err(_) if destination.is_file() => Ok(destination),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Err(ConsentError::NotFound),
@@ -532,7 +552,30 @@ fn token_filename(token: &str) -> String {
 }
 
 fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
-    atomic_write_with(path, body, fs::File::sync_all, close_file, chmod_temporary)
+    atomic_write_with(
+        path,
+        body,
+        fs::File::sync_all,
+        |file| {
+            close_file(file, |file| {
+                #[cfg(unix)]
+                {
+                    // Transfer the owner once; retain native EINTR and other errors.
+                    nix::unistd::close(file).map_err(io::Error::from)
+                }
+                #[cfg(windows)]
+                {
+                    close_windows_file(file)
+                }
+                #[cfg(not(any(unix, windows)))]
+                {
+                    drop(file);
+                    Ok(())
+                }
+            })
+        },
+        chmod_temporary,
+    )
 }
 
 // Operation-local seams keep failure tests deterministic without global hooks.
@@ -565,22 +608,17 @@ fn atomic_write_with(
         .map_err(|error| error.error)
 }
 
-fn close_file(file: fs::File) -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        // Consume the owner exactly once. Do not retry a possibly closed fd
-        // or turn EINTR into success; both could conceal a close failure.
-        nix::unistd::close(file).map_err(io::Error::from)
-    }
-    #[cfg(windows)]
-    {
-        close_windows_file(file)
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        // A checked-close API for these targets remains an ID-005 blocker.
-        drop(file);
-        Ok(())
+fn close_file(file: fs::File, close: impl FnOnce(fs::File) -> io::Result<()>) -> io::Result<()> {
+    // Keep this operation-local boundary fallible. Native close operations
+    // remain unchanged; a failed close must prevent chmod and publication.
+    close(file)
+}
+
+fn directory_create_error(error: io::Error, is_file: impl FnOnce() -> bool) -> io::Error {
+    if error.kind() == io::ErrorKind::AlreadyExists && is_file() {
+        io::Error::from(io::ErrorKind::NotADirectory)
+    } else {
+        error
     }
 }
 
@@ -669,6 +707,54 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[test]
+    fn directory_error_translation_preserves_unrelated_errors_without_a_probe() {
+        for kind in [io::ErrorKind::PermissionDenied, io::ErrorKind::Interrupted] {
+            let error = directory_create_error(io::Error::new(kind, "original error"), || {
+                panic!("unrelated errors must not probe the path")
+            });
+            assert_eq!(error.kind(), kind);
+            assert_eq!(error.to_string(), "original error");
+        }
+        assert_eq!(
+            directory_create_error(io::Error::from(io::ErrorKind::AlreadyExists), || true).kind(),
+            io::ErrorKind::NotADirectory
+        );
+        assert_eq!(
+            directory_create_error(io::Error::from(io::ErrorKind::AlreadyExists), || false).kind(),
+            io::ErrorKind::AlreadyExists
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn real_kernel_close_error_prevents_token_replacement_and_keeps_the_old_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("consent-existing.json");
+        fs::write(&path, b"original consent sentinel").unwrap();
+        let mut closes = 0;
+        let error = atomic_write_with(
+            &path,
+            b"replacement",
+            fs::File::sync_all,
+            |file| {
+                close_file(file, |file| {
+                    // Close the valid owned file once. Then inject a real kernel
+                    // EBADF result using -1, without constructing a stale owner.
+                    nix::unistd::close(file).map_err(io::Error::from)?;
+                    closes += 1;
+                    nix::unistd::close(-1).map_err(io::Error::from)
+                })
+            },
+            |_| panic!("chmod must not follow a failed close"),
+        )
+        .unwrap_err();
+        assert_eq!(closes, 1);
+        assert_eq!(error.raw_os_error(), Some(nix::libc::EBADF));
+        assert_eq!(fs::read(&path).unwrap(), b"original consent sentinel");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
     fn store(directory: &Path) -> ConsentStore {
         ConsentStore::new(directory)
             .with_clock(|| 1_000_000)
@@ -745,6 +831,89 @@ mod tests {
             Err(ConsentError::NotFound)
         );
         assert_eq!(store.consume_token(&token), Ok(()));
+    }
+
+    #[test]
+    fn removal_races_ignore_only_missing_files_and_preserve_other_errors() {
+        for revoke in [false, true] {
+            for missing in [false, true] {
+                let directory = tempfile::tempdir().unwrap();
+                let store = store(directory.path());
+                let token = store.issue_token("delete", 60).unwrap();
+                let original = directory.path().join(token_filename(&token));
+                let original_bytes = fs::read(&original).unwrap();
+                // Replace/remove the real file between lookup and the actual
+                // removal syscall. No scheduler timing or permissions needed.
+                let remove = |path: PathBuf| {
+                    assert_eq!(path, original);
+                    fs::remove_file(&path).unwrap();
+                    if !missing {
+                        fs::create_dir(&path).unwrap();
+                        fs::write(path.join("sentinel"), &original_bytes).unwrap();
+                    }
+                    fs::remove_file(path)
+                };
+                let result = if revoke {
+                    store.revoke_token_with(&token, remove).map(|removed| {
+                        assert!(!removed, "another owner already removed the file");
+                    })
+                } else {
+                    store.consume_token_with(&token, remove)
+                };
+                if missing {
+                    assert_eq!(result, Ok(()));
+                    assert!(!original.exists());
+                } else {
+                    assert!(matches!(result, Err(ConsentError::Io(_))));
+                    assert_eq!(fs::read(original.join("sentinel")).unwrap(), original_bytes);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_rename_races_require_a_regular_destination_and_classify_missing() {
+        for destination_kind in ["file", "directory", "missing"] {
+            let directory = tempfile::tempdir().unwrap();
+            let store = store(directory.path());
+            let token = "legacy-race";
+            let legacy = directory.path().join(format!("consent_{token}.json"));
+            fs::write(&legacy, b"original legacy").unwrap();
+            let destination = directory.path().join(token_filename(token));
+            let result = store.find_token_file_with(token, |from, to| {
+                assert_eq!(from, legacy);
+                assert_eq!(to, destination);
+                if destination_kind == "missing" {
+                    fs::remove_file(from).unwrap();
+                    fs::rename(from, to)
+                } else {
+                    if destination_kind == "file" {
+                        fs::write(to, b"other owner's file").unwrap();
+                        fs::remove_file(from).unwrap();
+                    } else {
+                        fs::create_dir(to).unwrap();
+                    }
+                    // A failed OS rename can leave a concurrently published
+                    // destination. Only a real regular file is a fallback.
+                    fs::rename(from, to)
+                }
+            });
+            match destination_kind {
+                "file" => {
+                    assert_eq!(result.unwrap(), destination);
+                    assert_eq!(fs::read(&destination).unwrap(), b"other owner's file");
+                    assert!(!legacy.exists());
+                }
+                "directory" => {
+                    assert!(matches!(result, Err(ConsentError::Io(error))
+                        if error.raw_os_error().is_some()));
+                    assert!(destination.is_dir());
+                    assert_eq!(fs::read(&legacy).unwrap(), b"original legacy");
+                }
+                "missing" => assert_eq!(result, Err(ConsentError::NotFound)),
+                _ => unreachable!(),
+            }
+        }
     }
 
     #[test]

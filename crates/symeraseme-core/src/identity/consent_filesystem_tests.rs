@@ -345,7 +345,7 @@ fn id005_atomic_close_error_preserves_go_rollback() {
         b"replacement must not be published",
         fs::File::sync_all,
         |file| {
-            close_file(file)?;
+            portable_filesystem_tests::close_owned_file(file)?;
             // Safe Rust cannot retain a File after consuming its owner. Inject
             // an adapter failure after real close, not a native close fault.
             Err(io::Error::other(InjectedFailure("close")))
@@ -372,7 +372,7 @@ fn id005_atomic_chmod_matches_source_bound_go_fault() {
         &path,
         b"replacement must not be published",
         fs::File::sync_all,
-        close_file,
+        portable_filesystem_tests::close_owned_file,
         |temporary| {
             fs::remove_file(temporary).unwrap();
             // This calls native chmod, with no preceding metadata lookup.
@@ -395,7 +395,7 @@ fn id005_atomic_chmod_error_cleans_existing_temp_and_matches_go_rollback() {
         &path,
         replacement,
         fs::File::sync_all,
-        close_file,
+        portable_filesystem_tests::close_owned_file,
         |temporary| {
             assert_eq!(fs::read(temporary).unwrap(), replacement);
             owned_temporary = Some(temporary.to_path_buf());
