@@ -117,7 +117,14 @@ if [ "$DMG_ONLY" != "true" ]; then
             --development-region en \
             --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
             "$ICON_SOURCE" < /dev/null
-        cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
+        if [ -f "$ICON_BUILD_DIR/Assets.car" ]; then
+            cp "$ICON_BUILD_DIR/Assets.car" "$APP_BUNDLE/Contents/Resources/Assets.car"
+        elif [ "$REQUIRE_COMPILED_ICON" = "true" ]; then
+            echo "Release requires a compiled Assets.car; actool produced none." >&2
+            exit 1
+        else
+            echo "Warning: actool produced no Assets.car; keeping the approved ICNS fallback only." >&2
+        fi
         rm -rf "$ICON_BUILD_DIR"
     elif [ "$REQUIRE_COMPILED_ICON" = "true" ]; then
         echo "Release requires an Xcode 26+ actool that supports .icon; actool is unavailable." >&2
