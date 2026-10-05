@@ -13,6 +13,7 @@
 //! second install refusing to run. They are pinned as measured, not as desired.
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs;
@@ -24,37 +25,253 @@ use symeraseme_engine::scheduler::install::{
 use symeraseme_engine::scheduler::{Config, Platform};
 
 const FIXTURE: &str = include_str!("../../../tests/fixtures/scheduler-install/cases.json");
+const FROZEN_OBSERVATIONS: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/observations.json");
+const FROZEN_MAC: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/darwin.observations.json");
+const FROZEN_WINDOWS: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/windows.observations.json");
 
-/// Rebuilds the capture from the committed oracle and fails if it drifted, so
-/// this test cannot pass against a fixture that no longer describes Go.
-fn live_oracle_capture() -> &'static Value {
+#[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
+mod go_oracle;
+
+/// Linux, Windows and Mac use their actual source-bound native captures by default.
+/// Explicit live mode always rebuilds and runs the same twenty-case oracle.
+fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
     CAPTURE.get_or_init(|| {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let executable = std::env::temp_dir().join(format!(
-            "symeraseme-sched-install-oracle-{}{}",
-            std::process::id(),
-            std::env::consts::EXE_SUFFIX
-        ));
-        let build = std::process::Command::new("go")
-            .args(["build", "-o"])
-            .arg(&executable)
-            .arg("./rust-tests/parity/oracle/scheduler-install")
-            .current_dir(&root)
-            .status()
-            .expect("Go must be available for the scheduler install oracle");
-        assert!(build.success(), "Go oracle failed to build");
-
-        let output = std::process::Command::new(&executable)
-            .arg("-fixture")
-            .arg(executable.with_extension("json"))
-            .current_dir(&root)
-            .output()
-            .expect("run the Go oracle");
+        match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+            Ok("1") => {}
+            Ok("0") | Err(std::env::VarError::NotPresent) => {
+                if cfg!(target_os = "linux") {
+                    return verified_frozen_install(FROZEN_OBSERVATIONS);
+                }
+                if cfg!(windows) {
+                    let arch = match std::env::consts::ARCH {
+                        "x86_64" => "amd64",
+                        "aarch64" => "arm64",
+                        other => panic!("no actual Windows install capture for {other}"),
+                    };
+                    return verified_native_install(FROZEN_WINDOWS, "windows", arch);
+                }
+                if cfg!(target_os = "macos") {
+                    let arch = match std::env::consts::ARCH {
+                        "x86_64" => "amd64",
+                        "aarch64" => "arm64",
+                        other => panic!("no actual Mac install capture for {other}"),
+                    };
+                    return verified_native_install(FROZEN_MAC, "darwin", arch);
+                }
+            }
+            _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        }
+        let output = go_oracle::run_oracle("scheduler-install", None);
         assert!(output.status.success(), "Go oracle run failed");
-        let recorded = fs::read(executable.with_extension("json")).expect("oracle fixture");
-        serde_json::from_slice(&recorded).expect("oracle fixture is JSON")
+        assert!(output.stderr.is_empty(), "Go oracle emitted errors");
+        // Without -fixture the existing oracle emits its case-name summary,
+        // then the complete JSON document. Preserve all twenty recorded cases.
+        let start = output.stdout.iter().position(|byte| *byte == b'{').unwrap();
+        let document: Value = serde_json::from_slice(&output.stdout[start..]).unwrap();
+        assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+        document
     })
+}
+
+fn verified_frozen_install(bytes: &[u8]) -> Value {
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/scheduler-install/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "7ba198dab7c4a97efcddb1fa6aedbf2f9d9857d3"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["capture_umask"], "0022");
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["observations"]["bytes"], bytes.len());
+    assert_eq!(
+        manifest["observations"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    for (name, stream) in [
+        (
+            "stdout",
+            include_bytes!(
+                "../../../tests/fixtures/go-frozen/scheduler-install/scheduler-install.stdout"
+            )
+            .as_slice(),
+        ),
+        (
+            "stderr",
+            include_bytes!(
+                "../../../tests/fixtures/go-frozen/scheduler-install/scheduler-install.stderr"
+            )
+            .as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest[name]["bytes"], stream.len());
+        assert_eq!(
+            manifest[name]["sha256"],
+            hex::encode(Sha256::digest(stream))
+        );
+        if name == "stderr" {
+            assert!(stream.is_empty());
+        }
+    }
+    for (path, source) in [
+        (
+            "internal/scheduler/scheduler.go",
+            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/scheduler-install/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/scheduler-install/main.go")
+                .as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["source_revision"], manifest["source_revision"]);
+    assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+    document
+}
+
+fn verified_native_install(bytes: &[u8], os: &str, arch: &str) -> Value {
+    let manifest_bytes = match (os, arch) {
+        ("windows", "amd64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/windows-amd64.manifest.json"
+        )
+        .as_slice(),
+        ("windows", "arm64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/windows-arm64.manifest.json"
+        )
+        .as_slice(),
+        ("darwin", "amd64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/darwin-amd64.manifest.json"
+        )
+        .as_slice(),
+        ("darwin", "arm64") => include_bytes!(
+            "../../../tests/fixtures/go-frozen/scheduler-install/darwin-arm64.manifest.json"
+        )
+        .as_slice(),
+        other => panic!("no actual native install capture for {other:?}"),
+    };
+    let manifest: Value = serde_json::from_slice(manifest_bytes).unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"
+    );
+    assert_eq!(manifest["go_version"], "go1.26.6");
+    assert_eq!(manifest["native_target"], format!("{os}/{arch}"));
+    let capture = manifest["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|capture| capture["package"] == "scheduler-install")
+        .unwrap();
+    assert_eq!(capture["exit_status"], 0);
+    assert_eq!(capture["stderr"]["bytes"], 0);
+    assert_eq!(capture["stderr"]["sha256"], hex::encode(Sha256::digest([])));
+    assert_eq!(capture["fixture"]["bytes"], bytes.len());
+    assert_eq!(
+        capture["fixture"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    let build_info = capture["embedded_build_info"].as_str().unwrap();
+    assert!(build_info.contains("vcs.revision=30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"));
+    assert!(build_info.contains("vcs.modified=false"));
+    assert!(build_info.contains(&format!("\tGOOS={os}\n")));
+    assert!(build_info.contains(&format!("\tGOARCH={arch}\n")));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let sources = manifest["source_files"].as_object().unwrap();
+    assert_eq!(sources.len(), 65);
+    for (name, metadata) in sources {
+        let source = fs::read(root.join(name)).unwrap();
+        assert_eq!(metadata["bytes"], source.len(), "{name}");
+        assert_eq!(
+            metadata["sha256"],
+            hex::encode(Sha256::digest(source)),
+            "{name}"
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["source_revision"], manifest["source_revision"]);
+    assert_eq!(document["cases"].as_object().unwrap().len(), 20);
+    document
+}
+
+#[test]
+fn actual_native_windows_install_preserves_full_cases_and_rejects_unknown_architecture() {
+    let amd64 = verified_native_install(FROZEN_WINDOWS, "windows", "amd64");
+    assert_eq!(
+        amd64,
+        verified_native_install(FROZEN_WINDOWS, "windows", "arm64")
+    );
+    assert_eq!(amd64["cases"].as_object().unwrap().len(), 20);
+    let linux = verified_frozen_install(FROZEN_OBSERVATIONS);
+    assert_ne!(
+        amd64["cases"]["cron_install_writes_block"]["files"]["schedules/install.sh"],
+        linux["cases"]["cron_install_writes_block"]["files"]["schedules/install.sh"]
+    );
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(
+            FROZEN_WINDOWS,
+            "windows",
+            "unobserved"
+        ))
+        .is_err()
+    );
+    let mut changed = FROZEN_WINDOWS.to_vec();
+    changed[0] ^= 1;
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(&changed, "windows", "amd64")).is_err()
+    );
+}
+
+#[test]
+fn actual_native_mac_install_preserves_full_file_and_mode_effects() {
+    let amd64 = verified_native_install(FROZEN_MAC, "darwin", "amd64");
+    assert_eq!(
+        amd64,
+        verified_native_install(FROZEN_MAC, "darwin", "arm64")
+    );
+    let linux = verified_frozen_install(FROZEN_OBSERVATIONS);
+    assert_eq!(amd64["cases"], linux["cases"]);
+    let mut changed = FROZEN_MAC.to_vec();
+    changed[0] ^= 1;
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(&changed, "darwin", "amd64")).is_err()
+    );
+    assert!(
+        std::panic::catch_unwind(|| verified_native_install(FROZEN_MAC, "unobserved", "amd64"))
+            .is_err()
+    );
+}
+
+#[test]
+fn frozen_install_rejects_changed_bytes_and_missing_file_effects() {
+    let mut changed = FROZEN_OBSERVATIONS.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_install(&changed)).is_err());
+    let mut missing: Value = serde_json::from_slice(FROZEN_OBSERVATIONS).unwrap();
+    missing["cases"]["cron_install_writes_block"]["files"]
+        .as_object_mut()
+        .unwrap()
+        .remove("schedules/symeraseme-poll.sh")
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| verified_frozen_install(
+            &serde_json::to_vec(&missing).unwrap()
+        ))
+        .is_err()
+    );
 }
 
 /// Answers commands from the capture's own script, so both sides see the same
@@ -262,15 +479,28 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 
-/// A stable per-run root, so paths can be folded.
-fn run_root() -> PathBuf {
-    let root = std::env::temp_dir().join(format!(
-        "symeraseme-sched-install-rust-{}",
-        std::process::id()
-    ));
-    let _ = fs::remove_dir_all(&root);
-    fs::create_dir_all(&root).expect("create run root");
-    root
+/// Every test owns its root; a sibling test cannot remove live evidence.
+fn run_root() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix("symeraseme-sched-install-rust-")
+        .tempdir()
+        .expect("create owned run root")
+}
+
+#[test]
+fn scheduler_test_roots_preserve_sibling_evidence_and_cleanup_only_their_owner() {
+    let first = run_root();
+    let path = first.path().to_path_buf();
+    let sentinel = path.join("evidence.txt");
+    fs::write(&sentinel, b"owned first-test evidence").unwrap();
+    {
+        let second = run_root();
+        assert_ne!(first.path(), second.path());
+        assert_eq!(fs::read(&sentinel).unwrap(), b"owned first-test evidence");
+    }
+    assert_eq!(fs::read(&sentinel).unwrap(), b"owned first-test evidence");
+    drop(first);
+    assert!(!path.exists());
 }
 
 fn platform_of(value: &str) -> Option<Platform> {
@@ -374,7 +604,7 @@ fn windows_fixture_projection_keeps_unrelated_hashes_strict() {
 
 #[test]
 fn rust_install_status_uninstall_match_the_go_capture() {
-    let document = live_oracle_capture();
+    let document = selected_oracle_capture();
     let committed: Value = serde_json::from_str(FIXTURE).expect("committed fixture is JSON");
     assert_eq!(document["runner_script"], committed["runner_script"]);
     let live_cases = comparable_fixture_cases(&document["cases"], cfg!(windows));
@@ -403,7 +633,8 @@ fn rust_install_status_uninstall_match_the_go_capture() {
     let script: BTreeMap<String, String> =
         serde_json::from_value(document["runner_script"].clone()).expect("runner_script shape");
     let cases = document["cases"].as_object().expect("cases object");
-    let root = run_root();
+    let owned_root = run_root();
+    let root = owned_root.path().to_path_buf();
     let mut checked = 0;
 
     for (name, case) in cases {
@@ -566,7 +797,6 @@ fn rust_install_status_uninstall_match_the_go_capture() {
     }
 
     assert_eq!(checked, cases.len(), "every captured case was replayed");
-    let _ = fs::remove_dir_all(&root);
     let _ = &committed;
 }
 
@@ -655,7 +885,8 @@ impl Scenario {
 
 #[test]
 fn unsupported_platform_is_rejected_before_any_side_effect() {
-    let root = run_root();
+    let owned_root = run_root();
+    let root = owned_root.path().to_path_buf();
     let runner = RecordingRunner::new(&BTreeMap::new(), root.clone(), root.clone());
     let config = plain_config(Platform::Cron, root.join("schedules").to_str().unwrap());
     // Go validates the platform string before it does anything else; the Rust

@@ -18,6 +18,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import go_build_info
 
 REPO = Path(__file__).resolve().parents[2]
 LINUX_SANDBOX = Path(__file__).with_name('linux_store_sandbox.py').resolve()
@@ -312,7 +313,9 @@ sys.exit(0 if all(result.values()) else 1)
 '''
 
 
-def run(go, rust, go_tool, root):
+def run(go, rust, go_tool, root, published_go_release=False):
+    require(published_go_release != (go_tool is not None),
+            'choose published Go release or explicit Go SDK metadata verification')
     require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
             'unsupported: switchback confinement is available on macOS and Linux')
     if sys.platform.startswith('linux'):
@@ -335,7 +338,9 @@ def run(go, rust, go_tool, root):
         for name in ('data', 'home', 'config', 'cache', 'tmp', 'bin', 'empty-path'):
             (root / name).mkdir(mode=0o700)
         active, database = root / 'bin/symeraseme', root / 'data/symeraseme.db'
-        go, rust, go_tool = (p.resolve(strict=True) for p in (go, rust, go_tool))
+        go, rust = (p.resolve(strict=True) for p in (go, rust))
+        if go_tool is not None:
+            go_tool = go_tool.resolve(strict=True)
         report['artifacts'] = {'go': identity(go), 'rust': identity(rust)}
         require(identity(go)['sha256'] != identity(rust)['sha256'], 'Go and Rust artifacts must differ')
         fixture = REPO / 'tests/fixtures/event-store/golden-campaign.db'
@@ -359,26 +364,34 @@ def run(go, rust, go_tool, root):
             go_for_info = root / 'bin/go-candidate'
             shutil.copyfile(go, go_for_info)
             go_for_info.chmod(0o700)
-        if sys.platform.startswith('linux'):
+        if sys.platform.startswith('linux') and go_tool is not None:
             go_tool_for_info = root / 'bin/go-tool'
             shutil.copyfile(go_tool, go_tool_for_info)
             go_tool_for_info.chmod(0o700)
-        go_info_env = dict(env)
-        if sys.platform.startswith('linux'):
-            # A trimmed Go tool binary still reads its GOROOT at runtime.
-            # The helper grants this one explicit tree read-only.
-            go_info_env['GOROOT'] = str(Path(go_tool).resolve().parent.parent)
-        elif sys.platform == 'darwin':
-            # Hosted Go binaries are trimmed too; scope its runtime read to GOROOT.
-            go_info_env['GOROOT'] = str(go_tool.parent.parent)
-        command(root, 'go-build-info',
-                sandbox_command(root, 'go-build-info', go_tool_for_info,
-                                ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
-        metadata = (root / 'go-build-info.stdout').read_text()
-        require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
         arch = {'arm64': 'arm64', 'aarch64': 'arm64',
                 'x86_64': 'amd64'}[platform.machine().lower()]
         goos = 'darwin' if sys.platform == 'darwin' else 'linux'
+        go_info_env = dict(env)
+        if published_go_release:
+            parsed, release = go_build_info.verify_release(go_for_info, goos + '/' + arch)
+            metadata = parsed['sdk_style_output']
+            (root / 'go-artifact.metadata.txt').write_text(metadata)
+            report['retained_go_release'] = release
+            report['artifact_metadata_reader'] = 'bounded stdlib Python, no Go SDK process'
+            report['source_binding'] = 'actual published release binary SHA-256, clean Git VCS and native build metadata'
+        else:
+            if sys.platform.startswith('linux'):
+                # A trimmed Go tool binary still reads its GOROOT at runtime.
+                # The helper grants this one explicit tree read-only.
+                go_info_env['GOROOT'] = str(Path(go_tool).resolve().parent.parent)
+            elif sys.platform == 'darwin':
+                # Hosted Go binaries are trimmed too; scope its runtime read to GOROOT.
+                go_info_env['GOROOT'] = str(go_tool.parent.parent)
+            command(root, 'go-build-info',
+                    sandbox_command(root, 'go-build-info', go_tool_for_info,
+                                    ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
+            metadata = (root / 'go-build-info.stdout').read_text()
+        require('go1.26.6' in metadata.splitlines()[0].split(), 'expected artifact built with Go 1.26.6')
         settings = {line.strip() for line in metadata.splitlines()}
         require({'build\tCGO_ENABLED=0', 'build\tGOOS=' + goos, 'build\tGOARCH=' + arch} <= settings,
                 'Go artifact must be CGO-free and native')
@@ -520,10 +533,12 @@ def run(go, rust, go_tool, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for flag in ('go', 'rust', 'go-tool', 'output-dir'):
+    for flag in ('go', 'rust', 'output-dir'):
         parser.add_argument('--' + flag, type=Path, required=True)
+    parser.add_argument('--go-tool', type=Path)
+    parser.add_argument('--published-go-release', action='store_true')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.published_go_release)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 

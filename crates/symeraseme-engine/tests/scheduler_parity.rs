@@ -3,8 +3,8 @@
 //!
 //! Unlike the config oracle, `scheduler.Generate` reads no environment or
 //! filesystem state beyond its `Config` argument, so this test needs no
-//! isolated-process sandbox: it rebuilds and runs the committed oracle
-//! in-process-equivalent (a single bounded subprocess call, no child mode)
+//! isolated-process sandbox: it reads an actual source-bound Go capture,
+//! with explicitly selected bounded live execution available,
 //! to prove the frozen fixture below still matches current Go behavior, then
 //! compares the Rust port's output for the same named cases to that same
 //! frozen fixture. Case configs must stay in sync with
@@ -14,16 +14,17 @@
 
 use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
 use symeraseme_engine::scheduler::{self, Config, Platform};
+
+#[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
+mod go_oracle;
 
 const GO_FIXTURE: &str =
     include_str!("../../../rust-tests/parity/oracle/scheduler/scheduler_cases.json");
-const ORACLE_TIMEOUT: Duration = Duration::from_secs(30);
+const FROZEN_STDOUT: &[u8] =
+    include_bytes!("../../../tests/fixtures/go-frozen/scheduler/scheduler.stdout");
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct LegacyCaseFixture {
@@ -41,62 +42,84 @@ fn frozen_legacy_fixture() -> BTreeMap<String, LegacyCaseFixture> {
     serde_json::from_value(document["legacy_cases"].clone()).expect("fixture legacy_cases shape")
 }
 
-/// Rebuilds and runs the committed Go oracle, returning its full live output
-/// document (`cases` and `legacy_cases`) as one raw `Value` so a single
-/// oracle build/run covers both fixture comparisons below.
-/// `scheduler.Generate` and the fixed-content `DetectLegacyPythonUnit` calls
-/// perform no I/O beyond the oracle's own scratch temp dir, so a plain
-/// bounded-wait subprocess call is sufficient; there is no child process tree
-/// to isolate or kill.
+/// Returns the complete actual frozen Go document, or explicitly executes the
+/// committed oracle with the existing shared 120-second build/30-second
+/// runtime runner. Both modes cover all generator and legacy cases below.
 fn run_go_scheduler_oracle_document() -> Value {
-    let repo_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    let temp_root = std::env::temp_dir().join(format!(
-        "symeraseme-scheduler-oracle-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&temp_root);
-    std::fs::create_dir_all(&temp_root).expect("create oracle build directory");
-    let executable = temp_root.join(if cfg!(windows) {
-        "scheduler-oracle.exe"
-    } else {
-        "scheduler-oracle"
-    });
-
-    let build_status = Command::new("go")
-        .current_dir(repo_root)
-        .args(["build", "-o"])
-        .arg(&executable)
-        .arg("./rust-tests/parity/oracle/scheduler")
-        .status()
-        .expect("Go must be available for the committed scheduler oracle");
-    assert!(build_status.success(), "Go scheduler oracle build failed");
-
-    let child = Command::new(&executable)
-        .current_dir(repo_root)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start Go scheduler oracle");
-    let (tx, rx) = mpsc::channel();
-    // `scheduler.Generate` performs no I/O and cannot legitimately block;
-    // this bound only guards against an unexpected hang, so a background
-    // wait is enough — no process-group kill is needed for a program that
-    // spawns no children of its own.
-    thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    let output = rx
-        .recv_timeout(ORACLE_TIMEOUT)
-        .expect("Go scheduler oracle exceeded its bounded timeout")
-        .expect("run Go scheduler oracle");
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => {}
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            return verified_frozen_document(FROZEN_STDOUT);
+        }
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
+    let output = go_oracle::run_oracle("scheduler", None);
     assert!(
         output.status.success(),
         "Go scheduler oracle exited unsuccessfully"
     );
-    let document: Value =
-        serde_json::from_slice(&output.stdout).expect("Go scheduler oracle must emit valid JSON");
-    let _ = std::fs::remove_dir_all(&temp_root);
+    serde_json::from_slice(&output.stdout).expect("Go scheduler oracle must emit valid JSON")
+}
+
+fn verified_frozen_document(bytes: &[u8]) -> Value {
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/scheduler/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(
+        manifest["source_revision"],
+        "3a3e25079cc2ebcd1564cadc9ae78e6e85c51168"
+    );
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["stdin"]["bytes"], 0);
+    let stderr = include_bytes!("../../../tests/fixtures/go-frozen/scheduler/scheduler.stderr");
+    assert!(stderr.is_empty());
+    assert_eq!(manifest["stderr"]["bytes"], stderr.len());
+    assert_eq!(
+        manifest["stderr"]["sha256"],
+        hex::encode(Sha256::digest(stderr))
+    );
+    assert_eq!(manifest["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        manifest["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    for (path, source) in [
+        (
+            "internal/scheduler/scheduler.go",
+            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/scheduler/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/scheduler/main.go").as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["cases"].as_object().unwrap().len(), 6);
+    assert_eq!(document["legacy_cases"].as_object().unwrap().len(), 12);
     document
+}
+
+#[test]
+fn frozen_scheduler_rejects_changed_bytes_and_missing_generator_case() {
+    let mut changed = FROZEN_STDOUT.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_document(&changed)).is_err());
+    let mut shortened: Value = serde_json::from_slice(FROZEN_STDOUT).unwrap();
+    shortened["cases"]
+        .as_object_mut()
+        .unwrap()
+        .remove("all_backends_cron")
+        .unwrap();
+    let shortened = serde_json::to_vec(&shortened).unwrap();
+    assert!(std::panic::catch_unwind(|| verified_frozen_document(&shortened)).is_err());
 }
 
 /// Case configs mirroring `rust-tests/parity/oracle/scheduler/main.go`.

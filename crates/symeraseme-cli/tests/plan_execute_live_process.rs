@@ -10,6 +10,11 @@ use symeraseme_core::storage::{
     types::{EventType, Source},
 };
 
+#[path = "support/capture_plan_process.rs"]
+mod capture_plan_process;
+#[path = "support/frozen_plan_process.rs"]
+mod frozen_plan_process;
+
 fn prepare(root: &Path, email: bool) -> (PathBuf, PathBuf, PathBuf, String) {
     let home = root.join("home");
     let data = root.join("data");
@@ -244,7 +249,8 @@ fn persisted_effects(data: &Path) -> (String, Vec<EventRow>, Vec<TaskRow>) {
 #[test]
 fn consented_live_plan_execute_matches_source_bound_go_process() {
     let root = tempfile::tempdir().expect("temporary root");
-    let go = build_go_cli(root.path());
+    let frozen = frozen_plan_process::observation("web-form");
+    let go = frozen.is_none().then(|| build_go_cli(root.path()));
     let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
     fs::create_dir_all(&go_root).expect("Go fixture root");
@@ -253,7 +259,16 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
     let (rust_home, rust_data, rust_cwd, rust_token) = prepare(&rust_root, false);
     let resources = go_root.join("resources");
 
-    let go_output = run(&go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+    let (go_output, go_effects) = frozen.map_or_else(
+        || {
+            let go = go.as_ref().unwrap();
+            let output = run(go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+            let effects = persisted_effects(&go_data);
+            capture_plan_process::record("web-form", go, &output, &effects);
+            (output, effects)
+        },
+        |(output, effects)| (output, serde_json::from_value(effects).unwrap()),
+    );
     let rust_output = run(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_home,
@@ -285,7 +300,7 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
     let rust_json: Value = serde_json::from_slice(&rust_output.stdout).expect("Rust JSON stdout");
     assert_eq!(go_json, rust_json, "CLI JSON result");
     assert_eq!(
-        persisted_effects(&go_data),
+        go_effects,
         persisted_effects(&rust_data),
         "persisted live execution effects"
     );
@@ -294,7 +309,8 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
 #[test]
 fn consented_live_plan_execute_without_email_sender_matches_go_process() {
     let root = tempfile::tempdir().expect("temporary root");
-    let go = build_go_cli(root.path());
+    let frozen = frozen_plan_process::observation("senderless-email");
+    let go = frozen.is_none().then(|| build_go_cli(root.path()));
     let go_root = root.path().join("go-email");
     let rust_root = root.path().join("rust-email");
     fs::create_dir_all(&go_root).expect("Go email fixture root");
@@ -303,10 +319,21 @@ fn consented_live_plan_execute_without_email_sender_matches_go_process() {
     let (rust_home, rust_data, rust_cwd, rust_token) = prepare(&rust_root, true);
     let resources = go_root.join("resources");
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
-    init_profile(&go, &go_home, &go_data, &go_cwd);
+    if let Some(go) = &go {
+        init_profile(go, &go_home, &go_data, &go_cwd);
+    }
     init_profile(rust, &rust_home, &rust_data, &rust_cwd);
 
-    let go_output = run(&go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+    let (go_output, go_effects) = frozen.map_or_else(
+        || {
+            let go = go.as_ref().unwrap();
+            let output = run(go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+            let effects = persisted_effects(&go_data);
+            capture_plan_process::record("senderless-email", go, &output, &effects);
+            (output, effects)
+        },
+        |(output, effects)| (output, serde_json::from_value(effects).unwrap()),
+    );
     let rust_output = run(
         rust,
         &rust_home,
@@ -342,7 +369,6 @@ fn consented_live_plan_execute_without_email_sender_matches_go_process() {
         "campaign: email_sender is required for email-based requests"
     );
 
-    let go_effects = persisted_effects(&go_data);
     let rust_effects = persisted_effects(&rust_data);
     assert_eq!(
         go_effects, rust_effects,

@@ -1,6 +1,15 @@
 #[path = "support/migration_oracle.rs"]
 mod migration_oracle;
 
+#[path = "support/frozen_review_oracle.rs"]
+mod frozen_review_oracle;
+
+#[path = "support/frozen_grant_oracle.rs"]
+mod frozen_grant_oracle;
+
+#[path = "support/frozen_schedule_oracle.rs"]
+mod frozen_schedule_oracle;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -533,28 +542,56 @@ fn directory_entries(directory: &Path, context: &str) -> Vec<String> {
 }
 
 fn build_go_cli(root: &Path) -> PathBuf {
-    let program = root.join(if cfg!(windows) {
+    let go_binary = root.join(if cfg!(windows) {
         "symeraseme-go.exe"
     } else {
         "symeraseme-go"
     });
-    let built = Command::new("go")
+    let mut build_command = Command::new("go");
+    build_command
         .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .env("GOWORK", "off")
         .env("GOENV", "off")
-        .env("GOPROXY", "off")
         .env("GOTOOLCHAIN", "go1.26.6")
-        .args(["build", "-o"])
-        .arg(&program)
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .args(["build", "-mod=readonly", "-buildvcs=true", "-o"])
+        .arg(&go_binary)
         .arg("./cmd/symeraseme")
-        .output()
-        .expect("build source-bound Go CLI");
+        .stdin(Stdio::null());
+    let stdout_path = root.join("go-build.stdout");
+    let stderr_path = root.join("go-build.stderr");
+    build_command
+        .stdout(Stdio::from(fs::File::create(&stdout_path).unwrap()))
+        .stderr(Stdio::from(fs::File::create(&stderr_path).unwrap()));
+    configure_process_group(&mut build_command);
+    let mut child = build_command.spawn().expect("build live Go CLI");
+    let started = Instant::now();
+    let status = loop {
+        if capture_exceeded(&stdout_path, &stderr_path) {
+            terminate_bounded(&mut child).expect("Go build oversized-output cleanup");
+            panic!("Go review build exceeded output limit");
+        }
+        if let Some(status) = child.try_wait().expect("poll Go build") {
+            break status;
+        }
+        if started.elapsed() >= Duration::from_secs(120) {
+            terminate_bounded(&mut child).expect("Go build timeout cleanup");
+            panic!("Go review build exceeded the shared oracle build budget");
+        }
+        thread::sleep(Duration::from_millis(5));
+    };
+    let build = ProcessOutput {
+        status,
+        stdout: read_bounded(&stdout_path),
+        stderr: read_bounded(&stderr_path),
+    };
     assert!(
-        built.status.success(),
+        build.status.success(),
         "Go CLI build failed: {}",
-        String::from_utf8_lossy(&built.stderr)
+        String::from_utf8_lossy(&build.stderr)
     );
-    program
+    go_binary
 }
 
 fn replace_json_integer(text: &str, key: &str) -> String {
@@ -1250,26 +1287,13 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
     let original = b"Alice Example <alice@example.invalid>\n";
     fs::write(&input, original).expect("review input");
 
-    let go_binary = root.join(if cfg!(windows) {
-        "symeraseme-go.exe"
+    let live = frozen_review_oracle::live_review_required();
+    let go_binary = live.then(|| build_go_cli(&root));
+    let frozen = if live {
+        Vec::new()
     } else {
-        "symeraseme-go"
-    });
-    let build = Command::new("go")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .args(["build", "-o"])
-        .arg(&go_binary)
-        .arg("./cmd/symeraseme")
-        .output()
-        .expect("build live Go CLI");
-    assert!(
-        build.status.success(),
-        "Go CLI build failed: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
+        frozen_review_oracle::observations()
+    };
 
     let cases: &[&[&str]] = &[
         &["review"],
@@ -1288,18 +1312,37 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
         &["review", "--path", "missing.txt", "--output", "json"],
         &["review", "review.txt", "--output", "yaml"],
     ];
+    if !live {
+        assert_eq!(frozen.len(), cases.len());
+    }
     for (index, argv) in cases.iter().enumerate() {
-        let go =
-            run_program_with_resources(&go_binary, argv, &home, &cwd, &capture, index * 2, None);
+        let live_output = go_binary.as_ref().map(|program| {
+            run_program_with_resources(program, argv, &home, &cwd, &capture, index * 2, None)
+        });
+        let (status, stdout, stderr) = if let Some(output) = &live_output {
+            (
+                output.status.code(),
+                output.stdout.as_slice(),
+                output.stderr.as_slice(),
+            )
+        } else {
+            let observation = &frozen[index];
+            assert_eq!(observation.argv, *argv, "source-bound review argv");
+            (
+                Some(observation.status),
+                observation.stdout,
+                observation.stderr,
+            )
+        };
         let rust =
             run_program_with_resources(&binary(), argv, &home, &cwd, &capture, index * 2 + 1, None);
-        assert_eq!(rust.status.code(), go.status.code(), "{argv:?} status");
-        assert_eq!(rust.stdout, go.stdout, "{argv:?} stdout");
-        assert_eq!(rust.stderr, go.stderr, "{argv:?} stderr");
+        assert_eq!(rust.status.code(), status, "{argv:?} status");
+        assert_eq!(rust.stdout, stdout, "{argv:?} stdout");
+        assert_eq!(rust.stderr, stderr, "{argv:?} stderr");
         if matches!(index, 1 | 2 | 4 | 5) {
-            assert!(go.status.success(), "{argv:?} did not exercise redaction");
+            assert_eq!(status, Some(0), "{argv:?} did not exercise redaction");
             assert!(
-                !go.stdout
+                !stdout
                     .windows(b"alice@example.invalid".len())
                     .any(|window| { window == b"alice@example.invalid" }),
                 "{argv:?} exposed the input address"
@@ -1307,6 +1350,27 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
         }
     }
     assert_eq!(fs::read(input).expect("review input remains"), original);
+}
+
+#[test]
+fn review_frozen_stream_corruption_is_rejected() {
+    let observations = frozen_review_oracle::observations();
+    let expected = &observations[6];
+    let metadata = serde_json::json!({
+        "bytes": expected.stderr.len(),
+        "sha256": frozen_review_oracle::digest(expected.stderr),
+    });
+    assert!(frozen_review_oracle::valid_bytes(
+        &metadata,
+        expected.stderr
+    ));
+    let mut changed = expected.stderr.to_vec();
+    changed[0] ^= 1;
+    assert!(!frozen_review_oracle::valid_bytes(&metadata, &changed));
+    assert!(!frozen_review_oracle::valid_bytes(
+        &metadata,
+        &expected.stderr[..expected.stderr.len() - 1]
+    ));
 }
 
 #[test]
@@ -1546,10 +1610,8 @@ fn hash_tree(
     out
 }
 
-/// The frozen schedule bytes were recorded on Unix. On Windows, execute the
-/// same checked-in Go oracle rather than comparing against Unix path syntax.
-#[cfg(windows)]
-fn windows_schedule_fixture() -> Value {
+/// Explicit live mode and unrecorded Windows hosts execute the same Go oracle.
+fn live_schedule_fixture() -> Value {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated oracle capture root");
     let _cleanup = Cleanup(root.clone());
@@ -1561,6 +1623,10 @@ fn windows_schedule_fixture() -> Value {
     command
         .args(["run", "./rust-tests/parity/oracle/cli-schedule"])
         .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("GOWORK", "off")
+        .env("GOENV", "off")
+        .env("GOPROXY", "off")
+        .env("GOTOOLCHAIN", "go1.26.6")
         .env("TMP", &root)
         .env("TEMP", &root)
         .stdin(Stdio::null())
@@ -1588,7 +1654,7 @@ fn windows_schedule_fixture() -> Value {
         "Go schedule oracle failed: {}",
         String::from_utf8_lossy(&read_bounded(&stderr_path))
     );
-    serde_json::from_slice(&read_bounded(&stdout_path)).expect("Windows Go schedule fixture")
+    serde_json::from_slice(&read_bounded(&stdout_path)).expect("actual native Go schedule fixture")
 }
 
 /// `schedule install/uninstall/status` answer the Go oracle's recorded bytes.
@@ -1600,10 +1666,14 @@ fn windows_schedule_fixture() -> Value {
 /// exact everywhere else.
 #[test]
 fn schedule_commands_match_the_go_oracle() {
-    #[cfg(windows)]
-    let fixture = windows_schedule_fixture();
-    #[cfg(not(windows))]
-    let fixture: Value = serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture");
+    let fixture = frozen_schedule_oracle::fixture().unwrap_or_else(|| {
+        if cfg!(windows) || frozen_schedule_oracle::live_requested() {
+            live_schedule_fixture()
+        } else {
+            // Retain the existing Unix fixture until a Mac-native capture is read back.
+            serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture")
+        }
+    });
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.cli.v1");
     assert_eq!(
         fixture["source"],
@@ -2477,7 +2547,10 @@ fn events_and_grant_populated_paths_match_live_go() {
     fs::create_dir_all(&capture).expect("capture directory");
     fs::create_dir_all(&data_dir).expect("isolated data directory");
     fs::create_dir_all(&rust_grant_dir).expect("Rust grant data directory");
-    fs::create_dir_all(&go_grant_dir).expect("Go grant data directory");
+    let live = frozen_grant_oracle::live_required();
+    if live {
+        fs::create_dir_all(&go_grant_dir).expect("Go grant data directory");
+    }
     let _cleanup = Cleanup(root.clone());
     seed_store(&data_dir.join("symeraseme.db"));
 
@@ -2555,17 +2628,42 @@ fn events_and_grant_populated_paths_match_live_go() {
     );
 
     // Exercise the populated state machine in two independent data roots.
-    let go_binary = build_go_cli(&root);
+    let go_binary = live.then(|| build_go_cli(&root));
     let go_grant = |argv: &[&str], index: usize| {
-        run_program_with_data_dir(
-            &go_binary,
-            argv,
-            &home,
-            &cwd,
-            &capture,
-            index,
-            &go_grant_dir,
-        )
+        if let Some(program) = &go_binary {
+            let output = run_program_with_data_dir(
+                program,
+                argv,
+                &home,
+                &cwd,
+                &capture,
+                index,
+                &go_grant_dir,
+            );
+            frozen_grant_oracle::ExpectedOutput {
+                status: output.status.code().expect("live Go grant exits normally"),
+                stdout: output.stdout,
+                stderr: output.stderr,
+            }
+        } else {
+            let step = match index {
+                926 => 0,
+                928 => 1,
+                930 => 2,
+                932 => 3,
+                934 => 4,
+                936 => 5,
+                other => panic!("unobserved Go grant step {other}"),
+            };
+            frozen_grant_oracle::observation(step, argv)
+        }
+    };
+    let go_snapshot = |step: usize| {
+        if live {
+            consent_snapshot(&go_grant_dir)
+        } else {
+            frozen_grant_oracle::snapshot(step)
+        }
     };
     let rust_grant = |argv: &[&str], index: usize| {
         run_program_with_data_dir(
@@ -2581,7 +2679,7 @@ fn events_and_grant_populated_paths_match_live_go() {
 
     let go_issued = go_grant(&["grant", "--output", "json"], 926);
     let rust_issued = rust_grant(&["grant", "--output", "json"], 927);
-    assert_eq!(go_issued.status.code(), rust_issued.status.code());
+    assert_eq!(Some(go_issued.status), rust_issued.status.code());
     assert_eq!(go_issued.stderr, rust_issued.stderr);
     let go_first: Value = serde_json::from_slice(&go_issued.stdout).expect("Go issue payload");
     let rust_first: Value =
@@ -2594,16 +2692,13 @@ fn events_and_grant_populated_paths_match_live_go() {
         normalize_grant_bytes(&rust_issued.stdout, &[&rust_first_token]),
         "grant issue stable bytes"
     );
-    assert_eq!(
-        consent_snapshot(&go_grant_dir),
-        consent_snapshot(&rust_grant_dir)
-    );
+    assert_eq!(go_snapshot(0), consent_snapshot(&rust_grant_dir));
 
     // `--list` and `--list-tokens` are aliases. One token avoids unstable
     // ordering when two issue times land in the same second.
     let go_list = go_grant(&["grant", "--list", "--output", "json"], 928);
     let rust_list = rust_grant(&["grant", "--list-tokens", "--output", "json"], 929);
-    assert_eq!(go_list.status.code(), rust_list.status.code());
+    assert_eq!(Some(go_list.status), rust_list.status.code());
     assert_eq!(go_list.stderr, rust_list.stderr);
     assert_eq!(
         normalize_grant_bytes(&go_list.stdout, &[&go_first_token]),
@@ -2647,7 +2742,7 @@ fn events_and_grant_populated_paths_match_live_go() {
         ],
         931,
     );
-    assert_eq!(go_second.status.code(), rust_second.status.code());
+    assert_eq!(Some(go_second.status), rust_second.status.code());
     assert_eq!(go_second.stderr, rust_second.stderr);
     let go_second_payload: Value =
         serde_json::from_slice(&go_second.stdout).expect("Go issue payload");
@@ -2670,19 +2765,29 @@ fn events_and_grant_populated_paths_match_live_go() {
         ),
         "grant positional issue stable bytes"
     );
-    let go_files = consent_snapshot(&go_grant_dir);
+    let go_files = go_snapshot(2);
     let rust_files = consent_snapshot(&rust_grant_dir);
     assert_eq!(go_files, rust_files, "consent records after TTL issue");
     for record in [&go_listed, &rust_listed] {
         assert_eq!(record["count"], 1);
     }
-    for directory in [&go_grant_dir, &rust_grant_dir] {
-        let payloads = directory_entries(directory, "read consent directory");
-        assert_eq!(payloads.len(), 2, "two consent records were persisted");
-        let ttl_payload = payloads
+    let go_records = if live {
+        directory_entries(&go_grant_dir, "read consent directory")
             .iter()
-            .map(|name| fs::read(directory.join(name)).unwrap())
-            .map(|bytes| serde_json::from_slice::<Value>(&bytes).unwrap())
+            .map(|name| fs::read(go_grant_dir.join(name)).unwrap())
+            .collect::<Vec<_>>()
+    } else {
+        frozen_grant_oracle::records(2)
+    };
+    let rust_records = directory_entries(&rust_grant_dir, "read consent directory")
+        .iter()
+        .map(|name| fs::read(rust_grant_dir.join(name)).unwrap())
+        .collect::<Vec<_>>();
+    for records in [&go_records, &rust_records] {
+        assert_eq!(records.len(), 2, "two consent records were persisted");
+        let ttl_payload = records
+            .iter()
+            .map(|bytes| serde_json::from_slice::<Value>(bytes).unwrap())
             .find(|record| record["command"] == "send-removal")
             .expect("positional command reached the consent record");
         assert_eq!(
@@ -2701,29 +2806,26 @@ fn events_and_grant_populated_paths_match_live_go() {
         &["grant", "--revoke", &rust_first_token, "--output", "json"],
         933,
     );
-    assert_eq!(go_revoke.status.code(), rust_revoke.status.code());
+    assert_eq!(Some(go_revoke.status), rust_revoke.status.code());
     assert_eq!(go_revoke.stdout, rust_revoke.stdout);
     assert_eq!(go_revoke.stderr, rust_revoke.stderr);
-    assert_eq!(
-        consent_snapshot(&go_grant_dir),
-        consent_snapshot(&rust_grant_dir)
-    );
+    assert_eq!(go_snapshot(3), consent_snapshot(&rust_grant_dir));
 
     let go_revoke_all = go_grant(&["grant", "--revoke-all", "--output", "json"], 934);
     let rust_revoke_all = rust_grant(&["grant", "--revoke-all", "--output", "json"], 935);
-    assert_eq!(go_revoke_all.status.code(), rust_revoke_all.status.code());
+    assert_eq!(Some(go_revoke_all.status), rust_revoke_all.status.code());
     assert_eq!(go_revoke_all.stdout, rust_revoke_all.stdout);
     assert_eq!(go_revoke_all.stderr, rust_revoke_all.stderr);
     assert_eq!(
         go_revoke_all.stdout,
         b"{\"revoke_all\":true,\"revoked\":1,\"success\":true}\n"
     );
-    assert!(consent_snapshot(&go_grant_dir).is_empty());
+    assert!(go_snapshot(4).is_empty());
     assert!(consent_snapshot(&rust_grant_dir).is_empty());
 
     let go_empty = go_grant(&["grant", "--list-tokens", "--output", "json"], 936);
     let rust_empty = rust_grant(&["grant", "--list", "--output", "json"], 937);
-    assert_eq!(go_empty.status.code(), rust_empty.status.code());
+    assert_eq!(Some(go_empty.status), rust_empty.status.code());
     assert_eq!(go_empty.stdout, rust_empty.stdout);
     assert_eq!(go_empty.stderr, rust_empty.stderr);
     assert_eq!(
@@ -2736,4 +2838,34 @@ fn events_and_grant_populated_paths_match_live_go() {
         home_entries.is_empty(),
         "isolated home stayed clean: {home_entries:?}"
     );
+}
+
+#[test]
+fn frozen_grant_records_reject_changed_payload_names_and_modes() {
+    frozen_grant_oracle::verify_all_native_records_and_reject_changed_provenance();
+    let records = frozen_grant_oracle::records(0);
+    let metadata = frozen_grant_oracle::first_record_metadata();
+    assert!(frozen_grant_oracle::valid_record(metadata, &records[0]));
+    let mut changed = records[0].clone();
+    changed[0] ^= 1;
+    assert!(!frozen_grant_oracle::valid_record(metadata, &changed));
+    let mut wrong_name = metadata.clone();
+    wrong_name["name"] = Value::String("consent_wrong.json".into());
+    assert!(!frozen_grant_oracle::valid_record(&wrong_name, &records[0]));
+    let mut wrong_mode = metadata.clone();
+    wrong_mode["mode"] = Value::String("0644".into());
+    assert!(!frozen_grant_oracle::valid_record(&wrong_mode, &records[0]));
+    assert_eq!(frozen_grant_oracle::records(2).len(), 2);
+    assert!(frozen_grant_oracle::records(4).is_empty());
+    assert!(frozen_grant_oracle::records(5).is_empty());
+}
+
+#[test]
+fn frozen_review_native_records_reject_changed_frames() {
+    frozen_review_oracle::verify_all_native_records_and_reject_changed_frames();
+}
+
+#[test]
+fn frozen_schedule_native_records_reject_changed_frames_and_case_loss() {
+    frozen_schedule_oracle::verify_all_native_frames_and_reject_corruption();
 }

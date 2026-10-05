@@ -15,6 +15,9 @@ use symeraseme_core::config::{
     resolve_storage,
 };
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 const GO_FIXTURE: &str = include_str!("../../../rust-tests/parity/oracle/config/config_cases.json");
 
 struct TestTree {
@@ -81,6 +84,28 @@ const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[cfg(unix)]
 fn run_go_config_oracle() -> Value {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => {}
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            if cfg!(target_os = "linux") {
+                return verified_frozen_config(include_bytes!(
+                    "../../../tests/fixtures/go-frozen/config/config.stdout"
+                ));
+            }
+            if cfg!(target_os = "macos") {
+                let arch = match std::env::consts::ARCH {
+                    "x86_64" => "amd64",
+                    "aarch64" => "arm64",
+                    other => panic!("no actual Mac config capture for {other}"),
+                };
+                return verified_native_mac_config(
+                    include_bytes!("../../../tests/fixtures/go-frozen/config/darwin.stdout"),
+                    arch,
+                );
+            }
+        }
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
     let temp_root = std::env::temp_dir().join(format!(
         "symeraseme-config-oracle-{}-{}-{}",
@@ -132,6 +157,148 @@ fn run_go_config_oracle() -> Value {
         "Go config oracle exited unsuccessfully"
     );
     serde_json::from_slice(&output.stdout).expect("Go config oracle must emit valid JSON")
+}
+
+#[cfg(unix)]
+fn verified_frozen_config(bytes: &[u8]) -> Value {
+    use sha2::{Digest, Sha256};
+    let manifest: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/config/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "b4b5a56b26a2e0ecdeb7c1c0a84641ae2f967ae4"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["exit_status"], 0);
+    assert_eq!(manifest["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        manifest["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    let stderr = include_bytes!("../../../tests/fixtures/go-frozen/config/config.stderr");
+    assert!(stderr.is_empty());
+    assert_eq!(manifest["stderr"]["bytes"], stderr.len());
+    assert_eq!(
+        manifest["stderr"]["sha256"],
+        hex::encode(Sha256::digest(stderr))
+    );
+    for (path, source) in [
+        (
+            "internal/config/config.go",
+            include_bytes!("../../../internal/config/config.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/config/main.go",
+            include_bytes!("../../../rust-tests/parity/oracle/config/main.go").as_slice(),
+        ),
+        (
+            "rust-tests/parity/oracle/config/inputs.json",
+            include_bytes!("../../../rust-tests/parity/oracle/config/inputs.json").as_slice(),
+        ),
+    ] {
+        assert_eq!(manifest["source_files"][path]["bytes"], source.len());
+        assert_eq!(
+            manifest["source_files"][path]["sha256"],
+            hex::encode(Sha256::digest(source))
+        );
+    }
+    let document: Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document["cases"].as_object().unwrap().len(), 6);
+    document
+}
+
+#[cfg(unix)]
+fn verified_native_mac_config(bytes: &[u8], arch: &str) -> Value {
+    use sha2::{Digest, Sha256};
+    let manifest_bytes = match arch {
+        "amd64" => {
+            include_bytes!("../../../tests/fixtures/go-frozen/config/darwin-amd64.manifest.json")
+                .as_slice()
+        }
+        "arm64" => {
+            include_bytes!("../../../tests/fixtures/go-frozen/config/darwin-arm64.manifest.json")
+                .as_slice()
+        }
+        other => panic!("no actual native Mac config capture for {other}"),
+    };
+    let manifest: Value = serde_json::from_slice(manifest_bytes).unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"
+    );
+    assert_eq!(manifest["go_version"], "go1.26.6");
+    assert_eq!(manifest["native_target"], format!("darwin/{arch}"));
+    let capture = manifest["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|capture| capture["package"] == "config")
+        .unwrap();
+    assert_eq!(capture["exit_status"], 0);
+    assert_eq!(capture["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        capture["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    assert_eq!(capture["stderr"]["bytes"], 0);
+    assert_eq!(capture["stderr"]["sha256"], hex::encode(Sha256::digest([])));
+    let build_info = capture["embedded_build_info"].as_str().unwrap();
+    assert!(build_info.contains("vcs.revision=30eeb38f1e43c8f633d3537818d1de8b96ba9d6a"));
+    assert!(build_info.contains("vcs.modified=false"));
+    assert!(build_info.contains("\tGOOS=darwin\n"));
+    assert!(build_info.contains(&format!("\tGOARCH={arch}\n")));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let sources = manifest["source_files"].as_object().unwrap();
+    assert_eq!(sources.len(), 65);
+    for (name, metadata) in sources {
+        if !go_source_pin::current_tree_bound(name) {
+            continue;
+        }
+        let source = fs::read(root.join(name)).unwrap();
+        assert_eq!(metadata["bytes"], source.len(), "{name}");
+        assert_eq!(
+            metadata["sha256"],
+            hex::encode(Sha256::digest(source)),
+            "{name}"
+        );
+    }
+    verified_frozen_config(bytes)
+}
+
+#[cfg(unix)]
+#[test]
+fn actual_native_mac_config_rejects_changed_streams_and_unknown_architecture() {
+    let bytes = include_bytes!("../../../tests/fixtures/go-frozen/config/darwin.stdout");
+    assert_eq!(
+        verified_native_mac_config(bytes, "amd64"),
+        verified_native_mac_config(bytes, "arm64")
+    );
+    let mut changed = bytes.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_native_mac_config(&changed, "amd64")).is_err());
+    assert!(std::panic::catch_unwind(|| verified_native_mac_config(bytes, "unobserved")).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn frozen_config_rejects_changed_bytes_and_missing_storage_effects() {
+    let bytes = include_bytes!("../../../tests/fixtures/go-frozen/config/config.stdout");
+    let mut changed = bytes.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_config(&changed)).is_err());
+    let mut missing: Value = serde_json::from_slice(bytes).unwrap();
+    missing["cases"]
+        .as_object_mut()
+        .unwrap()
+        .remove("CFG-001")
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| verified_frozen_config(&serde_json::to_vec(&missing).unwrap()))
+            .is_err()
+    );
 }
 
 #[cfg(unix)]

@@ -8,6 +8,158 @@ and [docs/rust-port-contract-matrix.md](../../docs/rust-port-contract-matrix.md)
 
 ## 1. Structure
 
+### Frozen neutral and cryptography suite preparation (#1131)
+
+`make parity` now tests the neutral harness without building Go. Its time and
+confirmation differential loads actual Go 1.26.6 observations from
+`fixtures/frozen/go1.26.6/time-confirmation/`, including capture provenance,
+full-output SHA-256 and input SHA-256 checks. All 32 timestamp and eight ordered
+URL cases still run. Three corrupted-observation controls must fail: changed
+ISO output, a missing timestamp row and an added URL. The original harness
+mutation/process/filesystem/HTTP/SQLite checks remain selected.
+
+`make parity-live` explicitly rebuilds Go and selects the same cases with
+`SYMERASEME_PARITY_LIVE_GO=1`. Live observation requires Go 1.26.6 and uses
+private HOME/USERPROFILE/XDG/temp/data roots, regular capture files and child
+cleanup. Cache discovery, build and execution share the existing total
+30-second budget; the deadline is not increased. Default tests require no
+Go executable. The Go-free CI job checks this with a PATH containing no Go
+compiler executable and offline Rust dependency resolution after fetch.
+
+The core `identity_interop` and `encryption_parity` integration tests also
+default to actual recorded Go observations. The 15 complete requests, stdout,
+stderr and statuses in `tests/fixtures/go-frozen/identity-crypto/` include five
+rejected tampered envelopes and actual Rust-writer envelopes consumed by Go.
+The manifest pins the clean capture source, native Go version and every byte
+stream's length and SHA-256. Lookup requires an exact recorded request; an
+unknown ciphertext cannot receive a cached plaintext. All 17 encryption and
+four original identity tests remain selected, with an additional corpus
+control checking all 15 records, the five Rust rejections and an unknown key.
+
+Two private writer tests reproduce the complete observed Go/Rust envelopes
+using existing private nonce/salt/IV/clock helpers. Public encryption still
+uses fresh production randomness, and fresh-envelope round trips remain
+checked. Explicit `SYMERASEME_PARITY_LIVE_GO=1` retains live interoperability
+for these integrations. The Go-free workflow executes both integration files
+and the two writer tests as well as the neutral package; other core tests
+remain outside this preparation's Go-free claim.
+
+The core `triage_service` integration also defaults to the actual complete
+Go classify/rebuttal/fallback/error output in
+`tests/fixtures/go-frozen/triage-service/`. It verifies the captured raw
+length/digest and retains all original source hashes and persisted-effect
+comparisons. Five original tests and a byte-change/missing-operation control
+remain selected; explicit live mode runs the original Go service oracle.
+
+To collect new service and architecture-specific projection observations,
+dispatch existing Rust CI with `capture_frozen_oracles: true`. Its six native
+jobs run `scripts/capture-frozen-go-services.py` and upload immutable raw
+outputs with source/toolchain/native-target provenance. This capture does
+not overwrite fixtures or synthesize an unobserved target result. The regular
+native Rust suite still executes; capture success alone is not suite proof.
+
+The core `projection_oversized_parity` integration defaults to actual separate
+AMD64/ARM64 captures in `tests/fixtures/go-frozen/projection/`. Four native
+Linux/Windows artifacts verify seven cases and show exactly one architecture
+difference (`int64_max_payload`). Every original Rust comparison remains
+selected, with two added byte-change/missing-case controls in one test.
+Source/input pins and complete output digests guard both observed corpora.
+The Go-free workflow selects this integration too; Mac capture and complete
+corrected native suite acceptance still remain pending.
+
+Captured streams and raw neutral observations use explicit Git byte-preserving
+attributes; input JSON uses LF. This retains the strict hashes on Windows.
+The original 6ab9537 Windows CRLF failures and actual Git/Rust negative control
+remain documented rather than normalized away.
+
+The engine `scheduler_parity` integration likewise defaults to actual
+source-bound Go output in `tests/fixtures/go-frozen/scheduler/`, preserving
+six generator configurations, twelve legacy inputs and all six original
+Rust tests. An added byte-change/missing-case control checks integrity.
+Explicit live mode retains the real Go comparison through the shared
+bounded runner. Scheduler install/config and the complete engine suite
+are not covered by this family's Go-free claim.
+
+The `scheduler_install_parity` integration now defaults on Linux to a real
+Go 1.26.6 twenty-case capture at clean `7ba198d`, produced with the fixture's
+umask 022. All original file hashes, modes, errors and recorded commands are
+compared. The five existing tests plus a byte-change/missing-file control
+execute without Go on Linux. Mac retains live Go until its actual native
+captures are reviewed; no Unix fixture is presented as a
+Windows observation. Explicit live mode uses the existing bounded oracle
+runner. Native capture now records these twenty cases in addition to the
+eleven service/projection observations, including the complete JSON file.
+
+The Linux `config_parity` default also reads an actual six-case Go 1.26.6
+capture from clean `b4b5a56`. All eleven original tests remain selected,
+including subprocess output/timeout cleanup controls; an added corruption
+control rejects changed raw bytes and a missing configuration case. The
+existing provenance at `119ee9f` and original six Rust configuration
+comparisons remain unchanged. Mac retains live Go and Windows retains its
+original capability gate. Native capture now additionally collects these
+six configuration observations (37 total service/projection/install/config
+cases). These Linux family additions do not make the whole workspace Go-free.
+
+Linux campaign plan/execution tests also use real observations from clean
+`30eeb38`. The complete 6,341-byte execution document retains all nine result
+areas and eight stored events. The actual pinned-Go plan generator test ran
+once and verified the existing complete byte fixture unchanged; its raw
+JSON test log/status, fixture digest and 86 source-file hashes are recorded.
+The four existing Rust tests remain selected with two corruption controls.
+The original source pins, whole-byte plan/effect comparisons and complete
+execution equality are retained. Other OS defaults and explicit live mode
+run bounded Go; no native campaign acceptance is inferred from Linux data.
+
+The scheduler-install default now also uses the actual Windows document from
+run `37154503080` at clean `30eeb38`. Both native Windows architecture
+artifacts contain byte-identical twenty-case documents; their unchanged raw
+manifests and the four-target ZIP/source/stream readback are retained.
+Windows-specific wrapper hashes and observed Go permission values remain
+intact, and all original Rust payload/file/command comparisons are preserved.
+The existing Windows capability rule for POSIX mode comparison is unchanged.
+A native-corpus control verifies both observed architectures and rejects an
+unknown target or changed bytes. Local readback is not native execution of
+the new frozen Windows Rust path; that acceptance is still pending.
+
+Linux SQLite contract tests now read the real source-bound Go snapshot at
+clean `f13f405`, containing complete fresh/golden schema, pragmas, row counts
+and immutable provenance. The actual tagged Go test run includes three
+top-level controls and four quoted-literal subcases; its raw status/logs are
+verified. All ten existing Rust tests remain selected, including altered
+and co-altered fixture/provenance rejections and immutable Git-blob checks,
+plus a byte-change/missing-schema control. The Go-free checkout fetches full
+history for those unchanged fail-closed checks. Other OS defaults and
+explicit live mode retain the existing bounded tagged Go runner.
+
+The next opt-in native capture includes campaign execution, the actually
+executed plan-byte generator and tagged SQLite snapshot/control tests as
+well as the existing service/projection/install/config families. It records
+41 product observations, full plan/install documents and raw Go-control
+logs only after actual success. The original historical Python generator
+is bound as an archived Git blob, not a deleted current source file. This
+pipeline extension requires real native execution before those new target
+observations can be accepted; it never updates committed fixtures.
+
+The Linux LLM failure family also defaults to seven actual whole Go
+observations from clean `54acd9b`. Argument lookup is exact and every raw
+fixture/source/status hash remains strict. All ten original tests still run
+their real Rust loopback requests, retry/text/redaction comparisons and the
+unchanged 15-second active-fixture controls; one corruption/unobserved-args
+test is added. Other OS defaults and explicit live mode build the same Go
+oracle once into an owned temporary directory, use the existing shared
+120-second build/30-second execution limits, and retain all seven byte
+comparisons. No production retry/TLS/config or provider traffic is changed.
+The next native capture also runs these seven fixed LLM cases against owned
+loopback providers and verifies their complete output against the same
+fixtures. Together with prior families, it records 48 product observations;
+native acceptance still requires actual target execution and review.
+
+This is preparation for #1131. Other core/CLI/engine runtime oracles, the
+command-line harness's live `--go` interface, and switchback runners are still
+to be frozen. The suite-wide Go retirement, release prerequisites and actual
+seven-day observation remain open. No live-mode observation is fabricated,
+and no production randomness or Rust/Go comparator is relaxed.
+
 ```
 rust-tests/parity/
 ├── README.md               # This document: harness overview and baseline definitions

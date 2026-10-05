@@ -1,3 +1,5 @@
+#[path = "support/frozen_native_capture.rs"]
+mod frozen_native_capture;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
@@ -203,6 +205,19 @@ fn canonical_sql(sql: &str) -> String {
 }
 
 fn run_go_storage_oracle() -> serde_json::Value {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => {}
+        Ok("0") | Err(std::env::VarError::NotPresent) => {
+            if frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+                .is_some()
+            {
+                return verified_frozen_storage(include_bytes!(
+                    "../../../tests/fixtures/go-frozen/storage/storage.stdout"
+                ));
+            }
+        }
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+    }
     let build_cache = tempdir().expect("create isolated Go build cache");
     let repository = repository_root();
     // Both phases go through the shared bounded runner. `go run` recompiles the
@@ -242,6 +257,134 @@ fn run_go_storage_oracle() -> serde_json::Value {
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).expect("Go storage oracle must emit valid JSON")
+}
+
+fn verified_frozen_storage(bytes: &[u8]) -> serde_json::Value {
+    let native = frozen_native_capture::verify(
+        frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+            .expect("unrecorded native storage target must use the actual Go producer"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    );
+    let observed = native["observations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "storage")
+        .unwrap();
+    assert_eq!(observed["stdout"]["bytes"], bytes.len());
+    assert_eq!(
+        observed["stdout"]["sha256"],
+        hex::encode(Sha256::digest(bytes))
+    );
+    let native_controls = native["controls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["package"] == "storage-go-test")
+        .unwrap();
+    assert_eq!(native_controls["exit_status"], 0);
+    assert_eq!(native_controls["stderr"]["bytes"], 0);
+    let mut native_tests: Vec<&str> = native_controls["executed_pass_tests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap())
+        .collect();
+    native_tests.sort_unstable();
+    let manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/go-frozen/storage/manifest.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest["source_revision"],
+        "f13f4057a05635688db43cc61831924406a2a049"
+    );
+    assert_eq!(manifest["go_version"], "go version go1.26.6 linux/amd64");
+    assert_eq!(manifest["native_target"], "linux/amd64");
+    assert_eq!(manifest["exit_status"], 0);
+    for (metadata, stream) in [
+        (&manifest["stdout"], bytes),
+        (
+            &manifest["stderr"],
+            include_bytes!("../../../tests/fixtures/go-frozen/storage/storage.stderr").as_slice(),
+        ),
+        (
+            &manifest["go_test"]["stdout"],
+            include_bytes!("../../../tests/fixtures/go-frozen/storage/storage-go-test.stdout")
+                .as_slice(),
+        ),
+        (
+            &manifest["go_test"]["stderr"],
+            include_bytes!("../../../tests/fixtures/go-frozen/storage/storage-go-test.stderr")
+                .as_slice(),
+        ),
+    ] {
+        assert_eq!(metadata["bytes"], stream.len());
+        assert_eq!(metadata["sha256"], hex::encode(Sha256::digest(stream)));
+    }
+    assert_eq!(manifest["stderr"]["bytes"], 0);
+    assert_eq!(manifest["go_test"]["stderr"]["bytes"], 0);
+    assert_eq!(manifest["go_test"]["exit_status"], 0);
+    let go_tests =
+        include_bytes!("../../../tests/fixtures/go-frozen/storage/storage-go-test.stdout");
+    let records = go_tests
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert!(!records.iter().any(|record| record["Action"] == "fail"));
+    let mut executed = records
+        .iter()
+        .filter(|record| {
+            record["Action"] == "pass"
+                && record["Package"]
+                    == "github.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/storage"
+        })
+        .filter_map(|record| record["Test"].as_str())
+        .collect::<Vec<_>>();
+    executed.sort_unstable();
+    assert_eq!(native_tests, executed, "native Go storage controls");
+    assert_eq!(
+        executed,
+        [
+            "TestCanonicalSQLPreservesQuotedLiteralWhitespace",
+            "TestCanonicalSQLPreservesQuotedLiteralWhitespace/escaped_quotes",
+            "TestCanonicalSQLPreservesQuotedLiteralWhitespace/newlines",
+            "TestCanonicalSQLPreservesQuotedLiteralWhitespace/repeated_spaces",
+            "TestCanonicalSQLPreservesQuotedLiteralWhitespace/tabs",
+            "TestValidatePinnedSHA256AcceptsMatchingSourceHash",
+            "TestValidatePinnedSHA256RejectsWrongSourceHash",
+        ]
+    );
+    validate_immutable_database_sources(GOLDEN_DATABASE).unwrap();
+    assert_eq!(
+        manifest["source_files"][GO_EVENT_STORE_SOURCE_PATH]["sha256"],
+        hex::encode(Sha256::digest(GO_EVENT_STORE_SOURCE))
+    );
+    let document: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(document.as_object().unwrap().len(), 3);
+    document
+}
+
+#[test]
+fn frozen_storage_rejects_changed_bytes_and_missing_schema_entries() {
+    let bytes = include_bytes!("../../../tests/fixtures/go-frozen/storage/storage.stdout");
+    let mut changed = bytes.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| verified_frozen_storage(&changed)).is_err());
+    let mut missing: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    missing["golden"]["schema"]
+        .as_array_mut()
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| verified_frozen_storage(
+            &serde_json::to_vec(&missing).unwrap()
+        ))
+        .is_err()
+    );
 }
 
 fn oracle_schema_contract(snapshot: &serde_json::Value) -> Vec<(String, String, String)> {

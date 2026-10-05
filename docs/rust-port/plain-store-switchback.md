@@ -51,3 +51,55 @@ Harmless denial probes run before the real CLI. Commands have a
 Unsupported hosts fail explicitly. Native Linux/Windows confinement and cleanup,
 encrypted storage, crash/concurrent-writer recovery, installed or released
 artifacts, publication and production cutover remain separate unproved gates.
+
+## Published Go archive preparation — 2026-10-04
+
+`scripts/fetch-retained-go-release.py --output-dir /absolute/private/directory`
+fetches the pinned actual published `v0.12.1` archive for the current native
+target. It checks the measured release checksum file, archive and executable
+SHA-256, exact sizes, and native clean Go 1.26.6 build metadata without running
+a Go SDK. The six archive identities are pinned in
+`tests/fixtures/go-rollback/v0.12.1.json`. The bounded Python metadata reader's
+output independently matches actual Go SDK metadata for all six binaries.
+With Go actually absent from PATH, all six archive consumers pass and each
+rejects a symlink, foreign target, same-size corrupted binary and corrupted
+archive. These are archive/metadata checks; foreign binaries are not executed.
+
+The optional `--published-go-release` replaces `--go-tool` for metadata
+verification only. It preserves every existing host, confinement, real-process,
+six-case and complete-database assertion. Python metadata is recorded as
+`go-artifact.metadata.txt`, never as fabricated Go process stdout.
+
+The actual Linux amd64 release binary
+`31fc9c4dd33c76ed0b9fc443079af5d3542e7d5a3f31b76d4d8a2f75738d4099`
+reads the owned schema-v1 fixture successfully, but exits 1 against schema v2
+with `Go port supports up to 1`. Its clean source revision is
+`240bf67cefa05e643e32611a02e6e7ed87a033ea`. This private native compatibility
+probe is separate from confined switchback acceptance and agrees with the
+historical release-bound backup rehearsal. Consequently, this published
+archive cannot satisfy the preservation switchback gate. The workflow continues
+to build both implementations from the candidate; its result does not establish
+published-release compatibility. A compatible published fallback and native
+acceptance remain required before promoting the rollback/cutover rows. The
+archive preparation leaves issue #1131 open.
+
+The original `backend_fallback_process` test can also select this exact
+published rollback sibling with `SYMERASEME_ROLLBACK_GO_BINARY` set to the
+fetcher's binary path. It verifies the pinned whole manifest and native
+executable hash before staging the real sibling. Its original four CLI
+status/stdout/stderr comparisons, native/fallback MCP initialize comparison,
+missing-sibling failure and invalid-backend rejection remain unchanged.
+`SYMERASEME_PARITY_LIVE_GO=1` still builds and compares actual current Go.
+The Go SDK is absent in the default dedicated job; the published runtime stays
+outside PATH and is used only for this explicit rollback test until removal.
+The six-native verification script requires the same original case to execute
+with zero skips. Native acceptance of this new mode on five other hosts is
+pending; this fallback test does not exercise database upgrade or preservation.
+
+At clean `486165456bf328a45f09a6529e507953f92f7bfd`, the exact dedicated
+SDK-free workflow passes **376 tests, zero failures** on Linux amd64. The
+delegated consent parent executes all sixteen private cases. All twenty frozen
+native records and the published-release manifest remain byte-identical to Git
+blobs and an actual autocrlf checkout. Three actual compiled rejection runs
+prove the published sibling guard rejects a same-size changed binary, symlink
+and foreign native target before comparison.

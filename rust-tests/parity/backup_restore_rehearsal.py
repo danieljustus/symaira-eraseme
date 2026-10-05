@@ -210,9 +210,14 @@ def confinement_controls(root, env, windows_control):
                 'outside_markers_owned_and_removed': True}
 
 
-def run(go, rust, go_tool, output_dir, go_archive=None, sandbox_control=None):
+def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=False,
+        sandbox_control=None):
+    require(published_go_release != (go_tool is not None),
+            'choose published Go release or explicit Go SDK metadata verification')
     require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
             'unsupported native backup/restore platform')
+    require(not (published_go_release and sys.platform == 'win32'),
+            'published Go release verification supports macOS and Linux')
     if sys.platform.startswith('linux'):
         require(os.getuid() != 0 and os.getgid() != 0,
                 'Linux sandbox runner must start as an unprivileged user')
@@ -249,7 +254,9 @@ def run(go, rust, go_tool, output_dir, go_archive=None, sandbox_control=None):
             (root / name).mkdir(mode=0o700, parents=True)
         fixture_identity = gate.identity(FIXTURE)
         report['fixture'] = {'path': str(FIXTURE), **fixture_identity}
-        go, rust, go_tool = (Path(path).resolve(strict=True) for path in (go, rust, go_tool))
+        go, rust = (Path(path).resolve(strict=True) for path in (go, rust))
+        if go_tool is not None:
+            go_tool = Path(go_tool).resolve(strict=True)
         report['go_artifact_provenance']['path'] = str(go)
         suffix = '.exe' if sys.platform == 'win32' else ''
         staged_go, staged_rust = root / ('bin/retained-go' + suffix), root / ('bin/rust-candidate' + suffix)
@@ -284,23 +291,39 @@ def run(go, rust, go_tool, output_dir, go_archive=None, sandbox_control=None):
             'SYMERASEME_ENCRYPT_DB': 'false',
         }
         report['environment'] = env
-        if sys.platform == 'win32':
-            # go version -m only reads the staged executable; it needs no SDK.
-            env['SystemRoot'] = os.environ['SystemRoot']
-            env['APPDATA'] = str(root / 'config')
-            env['LOCALAPPDATA'] = str(root / 'cache')
-            staged_tool = root / 'bin/go-build-info.exe'
-            shutil.copyfile(go_tool, staged_tool)
-            require(gate.identity(staged_tool) == gate.identity(go_tool), 'staged Go tool differs')
-            go_info_env = dict(env, GOROOT=str(root / 'bin'))
+        if published_go_release:
+            architecture = {'arm64': 'arm64', 'aarch64': 'arm64',
+                            'x86_64': 'amd64'}[platform.machine().lower()]
+            operating_system = 'darwin' if sys.platform == 'darwin' else 'linux'
+            metadata, release = gate.go_build_info.verify_release(
+                staged_go, operating_system + '/' + architecture)
+            go_metadata = metadata['sdk_style_output']
+            (root / 'go-artifact.metadata.txt').write_text(go_metadata)
+            report['go_artifact_provenance'].update({
+                'release_identity_asserted_by_runner': True,
+                'retained_go_release': release,
+                'artifact_metadata_reader': 'bounded stdlib Python, no Go SDK process',
+                'note': 'Exact published binary SHA-256, module bytes and native clean Git build metadata verified against the pinned release manifest.',
+            })
         else:
-            staged_tool = go_tool
-            go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
+            if sys.platform == 'win32':
+                # go version -m only reads the staged executable; it needs no SDK.
+                env['SystemRoot'] = os.environ['SystemRoot']
+                env['APPDATA'] = str(root / 'config')
+                env['LOCALAPPDATA'] = str(root / 'cache')
+                staged_tool = root / 'bin/go-build-info.exe'
+                shutil.copyfile(go_tool, staged_tool)
+                require(gate.identity(staged_tool) == gate.identity(go_tool), 'staged Go tool differs')
+                go_info_env = dict(env, GOROOT=str(root / 'bin'))
+            else:
+                staged_tool = go_tool
+                go_info_env = dict(env, GOROOT=str(go_tool.parent.parent))
         if sys.platform.startswith('linux') or sys.platform == 'win32':
             report['native_confinement_controls'] = confinement_controls(root, env, sandbox_control)
-        invoke(root, 'go-build-info', staged_tool, ['version', '-m', str(staged_go)],
-               go_info_env, success=True, json_output=False)
-        go_metadata = (root / 'go-build-info.stdout').read_bytes().decode('utf-8', 'replace')
+        if not published_go_release:
+            invoke(root, 'go-build-info', staged_tool, ['version', '-m', str(staged_go)],
+                   go_info_env, success=True, json_output=False)
+            go_metadata = (root / 'go-build-info.stdout').read_bytes().decode('utf-8', 'replace')
         report['go_artifact_provenance']['build_metadata'] = go_metadata
         report['go_artifact_provenance']['source_revision'] = next(
             (line.split('=', 1)[1] for line in go_metadata.splitlines()
@@ -536,14 +559,17 @@ def main():
                         help='optional official Go archive; its sole symeraseme member must match --go')
     parser.add_argument('--rust', type=Path, required=True,
                         help='locally built Rust CLI candidate')
-    parser.add_argument('--go-tool', type=Path, required=True,
+    parser.add_argument('--go-tool', type=Path,
                         help='Go tool used to record retained artifact build metadata')
+    parser.add_argument('--published-go-release', action='store_true',
+                        help='verify the pinned actual published Go binary without a Go SDK')
     parser.add_argument('--output-dir', type=Path, required=True,
                         help='new disposable evidence directory; it must not exist')
     parser.add_argument('--sandbox-control', type=Path,
                         help='native compiled Windows kernel-denial control')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive, args.sandbox_control)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive,
+                 args.published_go_release, args.sandbox_control)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']),
                       'schema_versions': result['schema_versions'],

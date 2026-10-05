@@ -1,0 +1,71 @@
+name: Actual native HTTP wire recapture
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-cli/tests/mcp_http_process.rs
+      - crates/symeraseme-cli/tests/support/interrupted_read.rs
+      - crates/symeraseme-cli/tests/support/capture_http_wire.rs
+      - .github/workflows/frozen-http-wire-capture.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frozen-http-wire-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Actual Go HTTP wire / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.6'
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal --component clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Download actual Go modules and verify clean source
+        shell: bash
+        run: |
+          GOTOOLCHAIN=go1.26.6 go mod download
+          test -z "$(git status --porcelain --untracked-files=normal)"
+      - name: Read interruption controls and original real Rust HTTP parent
+        shell: bash
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --test mcp_http_process --locked interrupted_read -- --nocapture
+          cargo +1.98.0 test -p symeraseme-cli --test mcp_http_process --locked http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals -- --exact --nocapture
+      - name: Capture all ten original comparisons against actual native Go
+        shell: bash
+        env:
+          SYMERASEME_PARITY_LIVE_GO: '1'
+          SYMERASEME_CAPTURE_HTTP_WIRE: ${{ runner.temp }}/frozen-go-http-wire
+        run: |
+          cargo +1.98.0 test -p symeraseme-cli --test mcp_http_process --locked go_oracle_http_wire_transcripts_match -- --exact --nocapture
+      - name: Retain actual native original wire record
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: actual-http-wire-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/frozen-go-http-wire/wire.json
+          if-no-files-found: error
+          retention-days: 30

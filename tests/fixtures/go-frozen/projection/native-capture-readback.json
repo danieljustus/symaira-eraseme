@@ -1,0 +1,70 @@
+{
+  "run_id": 37150753738,
+  "source_revision": "6ab95372e69e6346d3929f709f9403321c642067",
+  "captures": [
+    {
+      "native_target": "linux/amd64",
+      "source_files_verified": 49,
+      "whole_streams_verified": 4,
+      "actual_cases": 11,
+      "source_checkout_differences": [],
+      "projection_stdout_sha256": "3531541e946d509eca1879de7008e9853987429b8de541d178606b5c0d7bc0bd",
+      "artifact_id": 11283751634,
+      "zip_sha256": "cd293c39fdcb4c8f357afd0c6a9d52e4ef04dfed5717e4cadae54968c5baabe7",
+      "zip_bytes": 7824
+    },
+    {
+      "native_target": "linux/arm64",
+      "source_files_verified": 49,
+      "whole_streams_verified": 4,
+      "actual_cases": 11,
+      "source_checkout_differences": [],
+      "projection_stdout_sha256": "1b817457a98c9067541576d47a0e81bf5be7e5731639879ba536c271d15a6af9",
+      "artifact_id": 11284415392,
+      "zip_sha256": "c67ad91e2dcbf1f06171453892b595c5976af2ec446af268e20f8cb210126c5a",
+      "zip_bytes": 7832
+    },
+    {
+      "native_target": "windows/amd64",
+      "source_files_verified": 49,
+      "whole_streams_verified": 4,
+      "actual_cases": 11,
+      "source_checkout_differences": [
+        {
+          "source": "rust-tests/parity/oracle/projection/cases.json",
+          "actual_Git_checkout_CRLF_bytes": 472,
+          "canonical_bytes": 463,
+          "captured_sha256": "65115b5b798097bb3c56b221bc7a8a9123460d86021ffc98cdd0b0c066d14a6c"
+        }
+      ],
+      "projection_stdout_sha256": "3531541e946d509eca1879de7008e9853987429b8de541d178606b5c0d7bc0bd",
+      "artifact_id": 11283852460,
+      "zip_sha256": "d4032c5ccfb09dc32932aa86dedaff36592c3eaf5a5f74348efed4f5937c9961",
+      "zip_bytes": 7909
+    },
+    {
+      "native_target": "windows/arm64",
+      "source_files_verified": 49,
+      "whole_streams_verified": 4,
+      "actual_cases": 11,
+      "source_checkout_differences": [
+        {
+          "source": "rust-tests/parity/oracle/projection/cases.json",
+          "actual_Git_checkout_CRLF_bytes": 472,
+          "canonical_bytes": 463,
+          "captured_sha256": "65115b5b798097bb3c56b221bc7a8a9123460d86021ffc98cdd0b0c066d14a6c"
+        }
+      ],
+      "projection_stdout_sha256": "1b817457a98c9067541576d47a0e81bf5be7e5731639879ba536c271d15a6af9",
+      "artifact_id": 11283628107,
+      "zip_sha256": "e5ea36930d5d7d9092e02c421c974c43e837d3414e644ffee38a510075c2ae44",
+      "zip_bytes": 7920
+    }
+  ],
+  "amd64_vs_arm64_different_cases": [
+    "int64_max_payload"
+  ],
+  "raw_observations_normalized": false,
+  "limits": "Four actual captures; Mac and complete suite acceptance pending. Windows JSON input uses measured CRLF; new attribute fix requires fresh native acceptance.",
+  "raw_projection_bytes_equal_across_Linux_Windows_per_architecture": true
+}

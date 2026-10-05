@@ -1,0 +1,75 @@
+{
+  "schema": "symeraseme.actual-published-go-release.v1",
+  "tag": "v0.12.1",
+  "source_revision": "240bf67cefa05e643e32611a02e6e7ed87a033ea",
+  "published_at_utc": "2026-09-01T09:34:51Z",
+  "go_version": "go1.26.6",
+  "checksums_asset": {
+    "id": 539320234,
+    "bytes": 717,
+    "sha256": "a3e7b606ff4f380bf324a81987754d28b78daa2d714d2a22419109954b8e33ad"
+  },
+  "native_archives": [
+    {
+      "asset_id": 539317862,
+      "archive": "symeraseme_0.12.1_darwin_amd64.tar.gz",
+      "archive_bytes": 6837118,
+      "archive_sha256": "3ff650cc1cab17e23f1c7264006b21b43d5e23a67ee6783daba84e39357869a1",
+      "native_target": "darwin/amd64",
+      "binary_bytes": 17623184,
+      "binary_sha256": "c5c0630862e63bfd1dce2f554970473020f895139682b17cf1ea5048d522027e",
+      "module_sha256": "4b5ad743591147d69df516a6e9f2e9aa1f82f2dddf876afd37cd5c19cf2213fc"
+    },
+    {
+      "asset_id": 539317860,
+      "archive": "symeraseme_0.12.1_darwin_arm64.tar.gz",
+      "archive_bytes": 6472923,
+      "archive_sha256": "7fa696829c9bf861ba902a65576d22013e4eeeb655150143975f961078dc906b",
+      "native_target": "darwin/arm64",
+      "binary_bytes": 16686738,
+      "binary_sha256": "b90ff3e0c16a5bfb6a9c751d79845f74983217b3f0af9d9f74faa3a255e325a3",
+      "module_sha256": "b2c13f4908bf3abeb288af6f0b239dc7aafb1718ad83d2a03cdadf861665b8a7"
+    },
+    {
+      "asset_id": 539317867,
+      "archive": "symeraseme_0.12.1_linux_amd64.tar.gz",
+      "archive_bytes": 6895950,
+      "archive_sha256": "f64bc2d8456f3e9b7e66763e4f90dc42b43c526df61593e228676a2663d43d15",
+      "native_target": "linux/amd64",
+      "binary_bytes": 17694882,
+      "binary_sha256": "31fc9c4dd33c76ed0b9fc443079af5d3542e7d5a3f31b76d4d8a2f75738d4099",
+      "module_sha256": "da8ee05cff072aa49557610aa684090044373ce20d2c63ff424a634df7873c54"
+    },
+    {
+      "asset_id": 539317866,
+      "archive": "symeraseme_0.12.1_linux_arm64.tar.gz",
+      "archive_bytes": 6386000,
+      "archive_sha256": "02613a59bd88657c436ee8d748f33cc0910ec0cafb07cd238f3e1fd520e74dfd",
+      "native_target": "linux/arm64",
+      "binary_bytes": 16646306,
+      "binary_sha256": "f2f6ed6d1efd1bee702ed9df36cbb12d2dc9a8816674e72a7365a65391398f2a",
+      "module_sha256": "bf6480f93a5ccf9c09143eaaa6bab2a5368c35d040ab19385f9e94cff8472d85"
+    },
+    {
+      "asset_id": 539317896,
+      "archive": "symeraseme_0.12.1_windows_amd64.zip",
+      "archive_bytes": 6907665,
+      "archive_sha256": "a4ff2c47c9ff1bc7d9e4becdf390dad398e3fe059ceab598e7e7bff1e1a4e54f",
+      "native_target": "windows/amd64",
+      "binary_bytes": 17757696,
+      "binary_sha256": "b4c547fd42637bfcfcc1fdf60772030395f5997406976bba205421a4b8721a95",
+      "module_sha256": "f087754a00d780c42e378454a1b4df9210a1d834a76e6c213ba8f855fd67490b"
+    },
+    {
+      "asset_id": 539317889,
+      "archive": "symeraseme_0.12.1_windows_arm64.zip",
+      "archive_bytes": 6296129,
+      "archive_sha256": "d2771bc8d8c68e636b5df2a82bf29ba583e38c26f56bf87af2c86ec825412d9b",
+      "native_target": "windows/arm64",
+      "binary_bytes": 16461312,
+      "binary_sha256": "b650fadec591e345ba2f2de39063788575ab09ff377d9db0df575915a65f2b8f",
+      "module_sha256": "a52ddcf87d1c3bf70aa56b4e836bdfab17a82efc4c6cf7e188cd50c088e68fec"
+    }
+  ],
+  "scope": "Last actual published Go release, retained only for rollback rehearsal until removal. Raw archive hashes match both GitHub asset digests and the actual checksums.txt. All six binary metadata records independently match Go SDK output; actual native runtime switchback gates remain separate."
+}

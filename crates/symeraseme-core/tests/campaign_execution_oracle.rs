@@ -3,7 +3,6 @@
 use std::{
     fs,
     path::PathBuf,
-    process::Command,
     sync::{Mutex, MutexGuard},
 };
 
@@ -19,6 +18,10 @@ use symeraseme_core::{
 use tempfile::tempdir;
 
 const ORACLE_DIR: &str = "rust-tests/parity/oracle/campaign-execution";
+#[path = "support/frozen_campaign_oracle.rs"]
+mod frozen_campaign_oracle;
+#[path = "support/go_oracle.rs"]
+mod go_oracle;
 static DATA_DIR_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug)]
@@ -33,8 +36,8 @@ impl DataDir {
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         let previous = std::env::var("SYMERASEME_DATA_DIR").ok();
-        // SAFETY: this integration-test binary has one test, and the mutex
-        // serializes all tests that write this process-wide variable.
+        // SAFETY: only the differential writes this variable; the mutation
+        // control does not read it, and the mutex serializes its writers.
         unsafe { std::env::set_var("SYMERASEME_DATA_DIR", path) };
         Self {
             _guard: guard,
@@ -174,17 +177,17 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         "Go implementation sources changed; review and repin the oracle"
     );
 
-    let output = Command::new("go")
-        .args(["run", &format!("./{ORACLE_DIR}")])
-        .current_dir(&root)
-        .output()
-        .expect("run local Go campaign oracle");
-    assert!(
-        output.status.success(),
-        "Go campaign oracle failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let expected: Value = serde_json::from_slice(&output.stdout).expect("parse Go oracle output");
+    let expected = if frozen_campaign_oracle::live_go_required() {
+        let output = go_oracle::run_oracle("campaign-execution", None);
+        assert!(
+            output.status.success(),
+            "Go campaign oracle failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).expect("parse Go oracle output")
+    } else {
+        frozen_campaign_oracle::execution(frozen_campaign_oracle::EXECUTION)
+    };
 
     let input: Value = serde_json::from_slice(&cases).expect("parse campaign oracle input");
     let campaign_id = input["campaign_id"].as_str().expect("campaign id");
@@ -375,4 +378,23 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         "fake_send_events": fake_send_events,
     });
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn frozen_campaign_execution_rejects_changed_bytes_and_missing_events() {
+    let mut changed = frozen_campaign_oracle::EXECUTION.to_vec();
+    changed[0] ^= 1;
+    assert!(std::panic::catch_unwind(|| frozen_campaign_oracle::execution(&changed)).is_err());
+    let mut missing: Value = serde_json::from_slice(frozen_campaign_oracle::EXECUTION).unwrap();
+    missing["fake_send_events"]
+        .as_array_mut()
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(|| frozen_campaign_oracle::execution(
+            &serde_json::to_vec(&missing).unwrap()
+        ))
+        .is_err()
+    );
 }

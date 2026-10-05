@@ -80,6 +80,26 @@ failure against the resulting schema-v2 database. It then restores the v1
 backup into a separate disposable data root and proves that Go again reads the
 same three baseline requests while the Rust-created request is absent.
 
+## SDK-free published archive preparation — 2026-10-04
+
+The runner additionally accepts `--published-go-release` in place of
+`--go-tool`. This verifies the exact pinned published `v0.12.1` binary,
+native target, clean Git revision and module bytes through the bounded
+stdlib Python reader. Use `scripts/fetch-retained-go-release.py` to retain
+the current host's checksum-verified official archive outside the checkout;
+continue supplying that archive through `--go-archive`.
+Metadata is recorded as `go-artifact.metadata.txt`, without inventing a
+Go SDK process result. The original eight real cases, native confinement,
+schema-v2 refusal, restore and incomplete-restore rejection are unchanged.
+
+All six actual archive consumers pass with Go absent from PATH, including
+24 corruption/symlink/foreign-target rejection controls. The five metadata
+unit controls use explicitly synthetic inputs; they do not establish release
+identity. The five existing archive/SQLite restore controls also pass.
+Native macOS and Linux aarch64 execution of this new SDK-free mode remains
+unverified. The existing workflow keeps its previously verified SDK path;
+this preparation does not promote any rollback or cutover acceptance row.
+
 ## Native Linux/Windows implementation — 2026-10-03 (#1122)
 
 `backup-restore-native.yml` selects all six native OS/architecture targets and

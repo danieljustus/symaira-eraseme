@@ -14,6 +14,7 @@ COVERAGE_FILE ?= coverage.out
 COVERAGE_THRESHOLD ?= 75
 GO_BUILD_DIR ?= build/go
 RUST_TARGET_DIR ?= build/rust
+PARITY_LIVE_GO ?= 0
 LDFLAGS ?= -s -w -X main.versionValue=$(VERSION)
 
 # Quote a make-expanded value as one literal POSIX shell word.
@@ -24,7 +25,7 @@ RUST_BINARY := $(RUST_TARGET_DIR)/debug/symeraseme-rust
 PARITY_BINARY := $(RUST_TARGET_DIR)/debug/parity
 
 .PHONY: build test test-race lint fmt-check vet coverage clean \
-	build-go go-gate build-rust rust-gate parity app-test release-dry-run
+	build-go go-gate build-rust rust-gate parity parity-live app-test release-dry-run
 
 build:
 	CGO_ENABLED=$(call shell_quote,$(CGO_ENABLED)) GOFLAGS=$(call shell_quote,$(GOFLAGS)) $(call shell_quote,$(GO)) build -trimpath -ldflags $(call shell_quote,$(LDFLAGS)) -o $(call shell_quote,$(BINARY)) ./cmd/symeraseme
@@ -58,7 +59,7 @@ rust-gate: build-rust
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --all-features --locked
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --doc --all-features --locked
 
-parity: build-go build-rust
+parity: build-rust
 	@if ! command -v $(call shell_quote,$(CARGO)) >/dev/null 2>&1; then \
 		printf '%s\n' 'parity requires cargo on PATH (or set CARGO=...).' >&2; \
 		exit 127; \
@@ -66,7 +67,10 @@ parity: build-go build-rust
 	@rm -f -- $(call shell_quote,$(PARITY_BINARY))
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) build -p parity --bin parity
 	@test -x $(call shell_quote,$(PARITY_BINARY))
-	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test -p parity --all-targets
+	SYMERASEME_PARITY_LIVE_GO=$(call shell_quote,$(PARITY_LIVE_GO)) CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test -p parity --all-targets
+
+parity-live: PARITY_LIVE_GO=1
+parity-live: build-go parity
 
 app-test:
 	@if ! command -v $(call shell_quote,$(SWIFT)) >/dev/null 2>&1; then \

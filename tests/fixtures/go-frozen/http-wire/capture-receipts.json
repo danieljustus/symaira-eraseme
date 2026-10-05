@@ -1,0 +1,39 @@
+{
+  "schema": "symeraseme.actual-go.http-wire-receipts.v1",
+  "source_revision": "a1a1af0569a59b6dcb33d08c9d6d0196479744be",
+  "artifacts": [
+    {
+      "artifact_id": 11306121449,
+      "artifact_name": "actual-http-wire-Linux-X64",
+      "native_target": "linux/amd64",
+      "run": 37209575551,
+      "archive_sha256": "cd5fe06cef8fd56b747acc0a18799453eda3b3a4870ba3e409e8c6af3d3d5515",
+      "record_sha256": "62ce83de28d769ac976dd94370625b2b96bde88cf701da10b5e1a186d2aff6ab"
+    },
+    {
+      "artifact_id": 11306715918,
+      "artifact_name": "actual-http-wire-Linux-ARM64",
+      "native_target": "linux/arm64",
+      "run": 37209575551,
+      "archive_sha256": "f2702fcb095810a856eaff6857ff5a1c4133f5f7044b72901dac16dfadc00ada",
+      "record_sha256": "e7e7aa418c76174f9286e03044252eb46f97928f2d89739cac3d8ed91c6efff5"
+    },
+    {
+      "artifact_id": 11310356322,
+      "artifact_name": "actual-http-wire-macOS-X64",
+      "native_target": "darwin/amd64",
+      "run": 37209575551,
+      "archive_sha256": "b03c8adc248b1881c2a6551bea27c7a759abe8a790fb6c2976fe551d7d027a99",
+      "record_sha256": "6a02797e65e254449de869118a4a6b99bb5f814a6debce4daa79efd671e5b3e3"
+    },
+    {
+      "artifact_id": 11308634277,
+      "artifact_name": "actual-http-wire-macOS-ARM64",
+      "native_target": "darwin/arm64",
+      "run": 37209575551,
+      "archive_sha256": "cedf72789e71336444de4c4d4b498d52a95d8f6e3aa5b72c8c00cd7ed9ea1cc9",
+      "record_sha256": "16c39b82f8824f8f3db4ec3c550eac255403af3921ef40a7c29163fea2228f2f"
+    }
+  ],
+  "acceptance": "Genuine native capture readback; refreshed full default and six-native workspace acceptance still required."
+}

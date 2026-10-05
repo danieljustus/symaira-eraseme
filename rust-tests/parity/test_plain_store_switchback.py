@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,27 @@ import plain_store_switchback as gate
 class SwitchbackControls(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS sandbox Go runtime control')
     def test_go_build_info_reads_only_explicit_goroot(self):
+        if shutil.which('go') is None:
+            retained = os.environ['SYMERASEME_ROLLBACK_GO_BINARY']
+            architecture = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'amd64'}[gate.platform.machine().lower()]
+            gate.go_build_info.verify_release(retained, 'darwin/' + architecture)
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                artifact = root / 'retained-go'
+                shutil.copyfile(retained, artifact)
+                helper = root / 'go_build_info.py'
+                shutil.copyfile(Path(gate.go_build_info.__file__), helper)
+                python = Path(sys.executable).resolve()
+                env = {'HOME': str(root), 'PATH': '', 'PYTHONDONTWRITEBYTECODE': '1'}
+                code = 'import importlib.util,sys; s=importlib.util.spec_from_file_location("info",sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.read(sys.argv[2])["source_revision"])'
+                gate.command(root, 'retained-go-metadata', gate.sandbox_command(root, 'retained-go-metadata', python,
+                             ['-c', code, str(helper), str(artifact)], env), env)
+                self.assertEqual((root / 'retained-go-metadata.stdout').read_text().strip(),
+                                 '240bf67cefa05e643e32611a02e6e7ed87a033ea')
+                policy = gate.sandbox(root, python)
+                self.assertIn('(deny network*)', policy)
+                self.assertNotIn('GOROOT', policy)
+            return
         go_tool = Path(subprocess.check_output(['which', 'go'], text=True).strip()).resolve()
         goroot = subprocess.check_output([str(go_tool), 'env', 'GOROOT'], text=True).strip()
         with tempfile.TemporaryDirectory() as directory:

@@ -8,6 +8,10 @@
 //! partial; an unknown name (including the legacy `status` alias) reproduces
 //! Go's switch default.
 
+#[cfg(test)]
+#[path = "../../tests/support/frozen_mcp_runtime.rs"]
+mod frozen_mcp_runtime;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -1810,22 +1814,26 @@ mod tests {
     #[test]
     fn auto_confirm_previews_then_creates_manual_task_without_clicking() {
         let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let oracle_process = std::process::Command::new("go")
-            .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
-            .current_dir(&repository_root)
-            .env("GOTOOLCHAIN", "go1.26.6")
-            .env("GOENV", "off")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .output()
-            .expect("run source-bound Go auto-confirm oracle");
-        assert!(
-            oracle_process.status.success(),
-            "Go oracle failed: {}",
-            String::from_utf8_lossy(&oracle_process.stderr)
-        );
-        let oracle: Value =
-            serde_json::from_slice(&oracle_process.stdout).expect("decode Go oracle output");
+        let raw = if super::frozen_mcp_runtime::live_required() {
+            let oracle_process = std::process::Command::new("go")
+                .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
+                .current_dir(&repository_root)
+                .env("GOTOOLCHAIN", "go1.26.6")
+                .env("GOENV", "off")
+                .env("GOPROXY", "off")
+                .env("GOSUMDB", "off")
+                .output()
+                .expect("run source-bound Go auto-confirm oracle");
+            assert!(
+                oracle_process.status.success(),
+                "Go oracle failed: {}",
+                String::from_utf8_lossy(&oracle_process.stderr)
+            );
+            oracle_process.stdout
+        } else {
+            super::frozen_mcp_runtime::observation("mcp-auto-confirm")
+        };
+        let oracle: Value = serde_json::from_slice(&raw).expect("decode actual Go oracle output");
         assert_eq!(
             oracle["source_revision"],
             "e8a8c969cb1a3b5a7f77dfe28f807e3707d0a8d8"
@@ -3098,116 +3106,122 @@ mod tests {
             format!("db_dir = {:?}\n", hostile_db.to_string_lossy()),
         )
         .expect("hostile project config");
-        let module_cache = std::process::Command::new("go")
-            .args(["env", "GOMODCACHE"])
-            .output()
-            .expect("resolve Go module cache");
-        assert!(module_cache.status.success(), "resolve Go module cache");
-        let module_cache = PathBuf::from(
-            String::from_utf8(module_cache.stdout)
-                .expect("Go module cache path")
-                .trim(),
-        );
-        assert!(!module_cache.as_os_str().is_empty(), "Go module cache path");
-        let build_cache = root.join("go-build");
-        let isolated_home = root.join("go-home");
-        fs::create_dir_all(&isolated_home).expect("Go home");
-        let oracle_binary = root.join(format!("mcp-clock-oracle{}", std::env::consts::EXE_SUFFIX));
-        let mut build = std::process::Command::new("go");
-        build
-            .args(["build", "-o"])
-            .arg(&oracle_binary)
-            .arg("./rust-tests/parity/oracle/mcp-clock")
-            .current_dir(&repository_root)
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-            .env("GOMODCACHE", &module_cache)
-            .env("GOCACHE", &build_cache)
-            .env("GOTMPDIR", &root)
-            .env("TMPDIR", &root)
-            .env("TEMP", &root)
-            .env("TMP", &root)
-            .env("GOENV", "off")
-            .env("GOWORK", "off")
-            .env("GOTOOLCHAIN", "local")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .env("HOME", &isolated_home)
-            .env("USERPROFILE", &isolated_home)
-            .env("XDG_CONFIG_HOME", isolated_home.join("config"))
-            .env("XDG_DATA_HOME", isolated_home.join("data"))
-            .env("XDG_STATE_HOME", isolated_home.join("state"))
-            .env("XDG_CACHE_HOME", isolated_home.join("cache"));
-        // Verify the compiler's actual environment, including overrides of
-        // hostile caller paths, before it creates any build temporary files.
-        let caller_temp = root.with_extension("caller-temp");
-        let temporary = std::process::Command::new(build.get_program())
-            .args(["env", "GOTMPDIR"])
-            .current_dir(&repository_root)
-            .env_clear()
-            .env("GOTMPDIR", &caller_temp)
-            .env("TMPDIR", &caller_temp)
-            .env("TEMP", &caller_temp)
-            .env("TMP", &caller_temp)
-            .envs(
-                build
-                    .get_envs()
-                    .filter_map(|(name, value)| value.map(|value| (name, value))),
-            )
-            .output()
-            .expect("resolve isolated compiler temporary directory");
-        assert!(
-            temporary.status.success(),
-            "resolve compiler temporary directory"
-        );
-        assert_eq!(
-            PathBuf::from(
-                String::from_utf8(temporary.stdout)
-                    .expect("Go temporary path")
-                    .trim()
-            ),
-            root,
-            "Go compiler temporary files escaped the owned root"
-        );
-        let build = build.output().expect("build current Go MCP clock oracle");
-        assert!(
-            build.status.success(),
-            "{}",
-            String::from_utf8_lossy(&build.stderr)
-        );
+        let raw = if super::frozen_mcp_runtime::live_required() {
+            let module_cache = std::process::Command::new("go")
+                .args(["env", "GOMODCACHE"])
+                .output()
+                .expect("resolve Go module cache");
+            assert!(module_cache.status.success(), "resolve Go module cache");
+            let module_cache = PathBuf::from(
+                String::from_utf8(module_cache.stdout)
+                    .expect("Go module cache path")
+                    .trim(),
+            );
+            assert!(!module_cache.as_os_str().is_empty(), "Go module cache path");
+            let build_cache = root.join("go-build");
+            let isolated_home = root.join("go-home");
+            fs::create_dir_all(&isolated_home).expect("Go home");
+            let oracle_binary =
+                root.join(format!("mcp-clock-oracle{}", std::env::consts::EXE_SUFFIX));
+            let mut build = std::process::Command::new("go");
+            build
+                .args(["build", "-o"])
+                .arg(&oracle_binary)
+                .arg("./rust-tests/parity/oracle/mcp-clock")
+                .current_dir(&repository_root)
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+                .env("GOMODCACHE", &module_cache)
+                .env("GOCACHE", &build_cache)
+                .env("GOTMPDIR", &root)
+                .env("TMPDIR", &root)
+                .env("TEMP", &root)
+                .env("TMP", &root)
+                .env("GOENV", "off")
+                .env("GOWORK", "off")
+                .env("GOTOOLCHAIN", "local")
+                .env("GOPROXY", "off")
+                .env("GOSUMDB", "off")
+                .env("HOME", &isolated_home)
+                .env("USERPROFILE", &isolated_home)
+                .env("XDG_CONFIG_HOME", isolated_home.join("config"))
+                .env("XDG_DATA_HOME", isolated_home.join("data"))
+                .env("XDG_STATE_HOME", isolated_home.join("state"))
+                .env("XDG_CACHE_HOME", isolated_home.join("cache"));
+            // Verify the compiler's actual environment, including overrides of
+            // hostile caller paths, before it creates any build temporary files.
+            let caller_temp = root.with_extension("caller-temp");
+            let temporary = std::process::Command::new(build.get_program())
+                .args(["env", "GOTMPDIR"])
+                .current_dir(&repository_root)
+                .env_clear()
+                .env("GOTMPDIR", &caller_temp)
+                .env("TMPDIR", &caller_temp)
+                .env("TEMP", &caller_temp)
+                .env("TMP", &caller_temp)
+                .envs(
+                    build
+                        .get_envs()
+                        .filter_map(|(name, value)| value.map(|value| (name, value))),
+                )
+                .output()
+                .expect("resolve isolated compiler temporary directory");
+            assert!(
+                temporary.status.success(),
+                "resolve compiler temporary directory"
+            );
+            assert_eq!(
+                PathBuf::from(
+                    String::from_utf8(temporary.stdout)
+                        .expect("Go temporary path")
+                        .trim()
+                ),
+                root,
+                "Go compiler temporary files escaped the owned root"
+            );
+            let build = build.output().expect("build current Go MCP clock oracle");
+            assert!(
+                build.status.success(),
+                "{}",
+                String::from_utf8_lossy(&build.stderr)
+            );
 
-        let oracle = std::process::Command::new(&oracle_binary)
-            .current_dir(&hostile_project)
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-            .env("HOME", &isolated_home)
-            .env("USERPROFILE", &isolated_home)
-            .env("XDG_CONFIG_HOME", isolated_home.join("config"))
-            .env("XDG_DATA_HOME", isolated_home.join("data"))
-            .env("XDG_STATE_HOME", isolated_home.join("state"))
-            .env("XDG_CACHE_HOME", isolated_home.join("cache"))
-            // Negative control: the Go helper must discard these caller-owned
-            // paths before resolving its config or opening the store.
-            .env("SYMERASEME_DB_DIR", hostile_env.join("db"))
-            .env("SYMERASEME_DATA_DIR", hostile_env.join("data"))
-            .output()
-            .expect("run current Go MCP clock oracle from hostile project cwd");
-        assert!(
-            oracle.status.success(),
-            "{}",
-            String::from_utf8_lossy(&oracle.stderr)
-        );
-        assert!(
-            !hostile_env.exists(),
-            "Go oracle touched an inherited storage path: {}",
-            hostile_env.display()
-        );
-        assert!(
-            !hostile_db.exists(),
-            "Go oracle read hostile project config and touched {}",
-            hostile_db.display()
-        );
-        let fixture: ClockFixture = serde_json::from_slice(&oracle.stdout).expect("clock oracle");
+            let oracle = std::process::Command::new(&oracle_binary)
+                .current_dir(&hostile_project)
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+                .env("HOME", &isolated_home)
+                .env("USERPROFILE", &isolated_home)
+                .env("XDG_CONFIG_HOME", isolated_home.join("config"))
+                .env("XDG_DATA_HOME", isolated_home.join("data"))
+                .env("XDG_STATE_HOME", isolated_home.join("state"))
+                .env("XDG_CACHE_HOME", isolated_home.join("cache"))
+                // Negative control: the Go helper must discard these caller-owned
+                // paths before resolving its config or opening the store.
+                .env("SYMERASEME_DB_DIR", hostile_env.join("db"))
+                .env("SYMERASEME_DATA_DIR", hostile_env.join("data"))
+                .output()
+                .expect("run current Go MCP clock oracle from hostile project cwd");
+            assert!(
+                oracle.status.success(),
+                "{}",
+                String::from_utf8_lossy(&oracle.stderr)
+            );
+            assert!(
+                !hostile_env.exists(),
+                "Go oracle touched an inherited storage path: {}",
+                hostile_env.display()
+            );
+            assert!(
+                !hostile_db.exists(),
+                "Go oracle read hostile project config and touched {}",
+                hostile_db.display()
+            );
+            oracle.stdout
+        } else {
+            super::frozen_mcp_runtime::observation("mcp-clock")
+        };
+        let fixture: ClockFixture = serde_json::from_slice(&raw).expect("actual clock oracle");
         assert_eq!(
             fixture.oracle_source,
             "live current-checkout Go ContractHandler"
@@ -3372,56 +3386,60 @@ mod tests {
             );
             fs::read(out).unwrap()
         };
-        let binary = root
-            .path()
-            .join(format!("mcp-tool-gaps{}", std::env::consts::EXE_SUFFIX));
-        let mut cache_query = Command::new("go");
-        cache_query
-            .args(["env", "GOMODCACHE"])
-            .env("GOTOOLCHAIN", "go1.26.6");
-        let cache = capture(
-            cache_query,
-            "go-module-cache",
-            Duration::from_secs(5),
-            64 * 1024,
-        );
-        let cache = PathBuf::from(String::from_utf8(cache).unwrap().trim());
-        assert!(
-            cache.is_dir(),
-            "pinned Go modules must be available offline"
-        );
-        let mut build = Command::new("go");
-        build
-            .args(["build", "-o"])
-            .arg(&binary)
-            .arg("./rust-tests/parity/oracle/mcp-tool-gaps")
-            .current_dir(&repository)
-            .env("GOTOOLCHAIN", "go1.26.6")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .env("GOMODCACHE", &cache)
-            .env("GOCACHE", root.path().join("go-build"))
-            .env("GOENV", "off")
-            .env_remove("GOFLAGS")
-            .env("GOWORK", "off")
-            .env("HOME", root.path())
-            .env("USERPROFILE", root.path())
-            .env("TMPDIR", root.path())
-            .env("TEMP", root.path())
-            .env("TMP", root.path());
-        capture(build, "go-build", Duration::from_secs(180), 64 * 1024);
-        let mut run = Command::new(&binary);
-        run.current_dir(&repository)
-            .env_clear()
-            .env("HOME", root.path())
-            .env("USERPROFILE", root.path())
-            .env("TMPDIR", root.path())
-            .env("TEMP", root.path())
-            .env("TMP", root.path());
-        if let Some(system_root) = std::env::var_os("SystemRoot") {
-            run.env("SystemRoot", system_root);
-        }
-        let raw = capture(run, "go-gaps", Duration::from_secs(30), 8 * 1024 * 1024);
+        let raw = if super::frozen_mcp_runtime::live_required() {
+            let binary = root
+                .path()
+                .join(format!("mcp-tool-gaps{}", std::env::consts::EXE_SUFFIX));
+            let mut cache_query = Command::new("go");
+            cache_query
+                .args(["env", "GOMODCACHE"])
+                .env("GOTOOLCHAIN", "go1.26.6");
+            let cache = capture(
+                cache_query,
+                "go-module-cache",
+                Duration::from_secs(5),
+                64 * 1024,
+            );
+            let cache = PathBuf::from(String::from_utf8(cache).unwrap().trim());
+            assert!(
+                cache.is_dir(),
+                "pinned Go modules must be available offline"
+            );
+            let mut build = Command::new("go");
+            build
+                .args(["build", "-o"])
+                .arg(&binary)
+                .arg("./rust-tests/parity/oracle/mcp-tool-gaps")
+                .current_dir(&repository)
+                .env("GOTOOLCHAIN", "go1.26.6")
+                .env("GOPROXY", "off")
+                .env("GOSUMDB", "off")
+                .env("GOMODCACHE", &cache)
+                .env("GOCACHE", root.path().join("go-build"))
+                .env("GOENV", "off")
+                .env_remove("GOFLAGS")
+                .env("GOWORK", "off")
+                .env("HOME", root.path())
+                .env("USERPROFILE", root.path())
+                .env("TMPDIR", root.path())
+                .env("TEMP", root.path())
+                .env("TMP", root.path());
+            capture(build, "go-build", Duration::from_secs(180), 64 * 1024);
+            let mut run = Command::new(&binary);
+            run.current_dir(&repository)
+                .env_clear()
+                .env("HOME", root.path())
+                .env("USERPROFILE", root.path())
+                .env("TMPDIR", root.path())
+                .env("TEMP", root.path())
+                .env("TMP", root.path());
+            if let Some(system_root) = std::env::var_os("SystemRoot") {
+                run.env("SystemRoot", system_root);
+            }
+            capture(run, "go-gaps", Duration::from_secs(30), 8 * 1024 * 1024)
+        } else {
+            super::frozen_mcp_runtime::observation("mcp-tool-gaps")
+        };
         let oracle: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(oracle["schema"], "symeraseme.go-oracle.mcp-tool-gaps.v1");
         assert_eq!(oracle["go_version"], "go1.26.6");

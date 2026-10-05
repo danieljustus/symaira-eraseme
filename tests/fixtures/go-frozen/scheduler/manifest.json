@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "source_revision": "3a3e25079cc2ebcd1564cadc9ae78e6e85c51168",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "captured_at_utc": "2026-10-03T20:42:37.407269+00:00",
+  "cases": [
+    "all_backends_cron",
+    "all_backends_launchd",
+    "all_backends_systemd",
+    "default_poll_hours_cron",
+    "deterministic_custom_cron",
+    "venv_activate_cron"
+  ],
+  "legacy_cases": [
+    "case_insensitive_python_marker",
+    "empty_content",
+    "go_wrapper_not_flagged",
+    "legacy_marker_no_go_suffix",
+    "legacy_marker_no_python",
+    "native_content_no_markers",
+    "python_keyword_only",
+    "site_packages_marker",
+    "symeraseme_core_scheduler_marker",
+    "turkish_dotted_i_marker",
+    "uv_run_marker",
+    "venv_activate_marker"
+  ],
+  "exit_status": 0,
+  "source_files": {
+    "internal/scheduler/scheduler.go": {
+      "bytes": 33472,
+      "sha256": "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138"
+    },
+    "rust-tests/parity/oracle/scheduler/main.go": {
+      "bytes": 6841,
+      "sha256": "71bc4890638ca33c385e06a4d03d3a45cdf4f746cda343a2a419ecab084409ed"
+    },
+    "rust-tests/parity/oracle/scheduler/scheduler_cases.json": {
+      "bytes": 24694,
+      "sha256": "1e8f3cf39b0ee3de4d9ba8381f1541aa9def47586a6e8ca430146101c59c0b64"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "embedded_build_info": "/workspace/scratch/frozen-go-scheduler-3a3e250/scheduler: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/scheduler\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003203219-3a3e25079cc2\t\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=3a3e25079cc2ebcd1564cadc9ae78e6e85c51168\n\tbuild\tvcs.time=2026-10-03T20:32:19Z\n\tbuild\tvcs.modified=false\n",
+  "limits": "One real native Linux capture; not a Go-free engine suite or all-six-target acceptance",
+  "stdin": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 24694,
+    "sha256": "1e8f3cf39b0ee3de4d9ba8381f1541aa9def47586a6e8ca430146101c59c0b64"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary": {
+    "bytes": 3369213,
+    "sha256": "021109b1ea2bb89403bee2997d485f442a8869ade11427a0c6d2b96c58a3c351"
+  }
+}

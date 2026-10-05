@@ -1,0 +1,45 @@
+{
+  "run_id": 37154503080,
+  "source_revision": "30eeb38f1e43c8f633d3537818d1de8b96ba9d6a",
+  "captures": [
+    {
+      "native_target": "windows/arm64",
+      "artifact_id": 11285590132,
+      "zip_digest": "sha256:6b1d33f1da94405254c15f90d5a366f4003a0ead0554d4f73c2e9f55665d3560",
+      "source_files_verified": 65,
+      "whole_runtime_streams_verified": 8,
+      "installation_document_verified": true,
+      "actual_cases": 37
+    },
+    {
+      "native_target": "windows/amd64",
+      "artifact_id": 11285390551,
+      "zip_digest": "sha256:7fdaa167f5a40cbf5675f69258a821cd988cfa442a89f271d941e15302863a4e",
+      "source_files_verified": 65,
+      "whole_runtime_streams_verified": 8,
+      "installation_document_verified": true,
+      "actual_cases": 37
+    },
+    {
+      "native_target": "linux/arm64",
+      "artifact_id": 11285023807,
+      "zip_digest": "sha256:9b6d04b17c33884c517356fd4beb0d6b20e4b2b02537ad88fa80081147d47a76",
+      "source_files_verified": 65,
+      "whole_runtime_streams_verified": 8,
+      "installation_document_verified": true,
+      "actual_cases": 37
+    },
+    {
+      "native_target": "linux/amd64",
+      "artifact_id": 11284973802,
+      "zip_digest": "sha256:a9564cd9767440b40a4d5755d52069ffc0a539622bac866a3f5024499f2a42a6",
+      "source_files_verified": 65,
+      "whole_runtime_streams_verified": 8,
+      "installation_document_verified": true,
+      "actual_cases": 37
+    }
+  ],
+  "same_os_cross_arch_install_config_byte_equal": true,
+  "raw_observations_normalized": false,
+  "limits": "Actual four native37-operation captures; full Rust suite and Mac acceptance checked separately."
+}

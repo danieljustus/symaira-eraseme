@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "source_revision": "f13f4057a05635688db43cc61831924406a2a049",
+  "go_version": "go version go1.26.6 linux/amd64",
+  "native_target": "linux/amd64",
+  "readback_at_utc": "2026-10-03T21:33:09.575990+00:00",
+  "source_files": {
+    "rust-tests/parity/oracle/storage/main.go": {
+      "bytes": 15471,
+      "sha256": "0c977aa2b939fcae4c86a7a1bb8c8bad96eb873c5624cf4da414d7016a51f94c"
+    },
+    "rust-tests/parity/oracle/storage/main_test.go": {
+      "bytes": 2118,
+      "sha256": "92c9a8f651be6a2630ce5b67489e7e8f6bf652766708087f6f9505169e50f7bc"
+    },
+    "internal/eventstore/store.go": {
+      "bytes": 20876,
+      "sha256": "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3"
+    },
+    "tests/fixtures/event-store/golden-campaign.db": {
+      "bytes": 102400,
+      "sha256": "595a4840dbe6a52324b40778c53016b0c809e01451ba4fa5f20c3fd3447e0120"
+    },
+    "go.mod": {
+      "bytes": 1135,
+      "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
+    },
+    "go.sum": {
+      "bytes": 8564,
+      "sha256": "4908f568bd9859b57c63a19fe179579bc3cba48260619eb72ea242141a3db5fa"
+    }
+  },
+  "archived_sources": {
+    "scripts/generate_event_store_fixture.py": {
+      "bytes": 6913,
+      "sha256": "2dff9a2ab364a4ec80674175fe8731ab9c6061a83960d50b04f184777be82e84",
+      "revision": "538f97070202fb1577db3c81d88ab908bd8671eb",
+      "git_blob": "28456fcfe96a27a32ee9be8eeb84089069f49f8e"
+    }
+  },
+  "exit_status": 0,
+  "stdout": {
+    "bytes": 12585,
+    "sha256": "bb2125582bcb9ded7478e7ab75ff0f2a142e6d32ff8b0067984396006e5b2ecc"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "embedded_build_info": "/workspace/scratch/frozen-go-storage-f13f405/storage: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/rust-tests/parity/oracle/storage\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.0.0-20261003213018-f13f4057a056\t\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\t-tags=storage_oracle\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=f13f4057a05635688db43cc61831924406a2a049\n\tbuild\tvcs.time=2026-10-03T21:30:18Z\n\tbuild\tvcs.modified=false\n",
+  "go_test": {
+    "exit_status": 0,
+    "stdout": {
+      "bytes": 10616,
+      "sha256": "b736b7660f0fddf462715187b3e930ce4db8457cfda4c2a0c59273b0e8173c82"
+    },
+    "stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "executed_pass_tests": [
+      "TestValidatePinnedSHA256RejectsWrongSourceHash",
+      "TestCanonicalSQLPreservesQuotedLiteralWhitespace/repeated_spaces",
+      "TestCanonicalSQLPreservesQuotedLiteralWhitespace/tabs",
+      "TestCanonicalSQLPreservesQuotedLiteralWhitespace/newlines",
+      "TestValidatePinnedSHA256AcceptsMatchingSourceHash",
+      "TestCanonicalSQLPreservesQuotedLiteralWhitespace/escaped_quotes",
+      "TestCanonicalSQLPreservesQuotedLiteralWhitespace"
+    ]
+  },
+  "limits": "Actual native Linux capture. The Python generator is an immutable archived blob, absent from current source. Initial metadata assembly failed by treating it as a current file; raw successful Go operations were retained and independently read back."
+}

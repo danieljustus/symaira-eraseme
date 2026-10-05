@@ -15,6 +15,11 @@ use symeraseme_core::email::smtp::{EmailMessage, NetSmtpTransport, SmtpConfig, s
 use symeraseme_core::identity::Profile;
 use symeraseme_core::storage::{EventType, Repository, Source, Store};
 
+#[path = "support/capture_smtp.rs"]
+mod capture_smtp;
+#[path = "support/frozen_smtp.rs"]
+mod frozen_smtp;
+
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -154,60 +159,72 @@ fn pin(store: &Store, ids: &[i64]) {
 #[test]
 fn real_smtp_campaign_bytes_events_and_projections_match_go() {
     let root = tempfile::tempdir().unwrap();
+    let frozen = frozen_smtp::observations("campaign");
     let helper = root.path().join(if cfg!(windows) {
         "smtp-go.exe"
     } else {
         "smtp-go"
     });
-    let mut build = Command::new("go");
-    build
-        .args(["build", "-o"])
-        .arg(&helper)
-        .arg("./rust-tests/parity/oracle/campaign-smtp")
-        .current_dir(repo())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off");
-    let built = capture(build, root.path(), "go-build", Duration::from_secs(180));
-    assert!(
-        built.status.success(),
-        "Go build: {}",
-        String::from_utf8_lossy(&built.stderr)
-    );
-    let go_root = root.path().join("go");
-    fs::create_dir(&go_root).unwrap();
-    let (port, go_server) = server();
-    let mut go = Command::new(helper);
-    go.env_clear()
-        .current_dir(&go_root)
-        .args([go_root.to_str().unwrap(), &port.to_string()])
-        .env("HOME", &go_root)
-        .env("USERPROFILE", &go_root)
-        .env("TMPDIR", &go_root)
-        .env("TEMP", &go_root)
-        .env("TMP", &go_root)
-        .env("TZ", "UTC")
-        .env("SYMERASEME_ORACLE_SOURCE_ROOT", repo());
-    for key in ["SystemRoot", "WINDIR"] {
-        if let Some(v) = std::env::var_os(key) {
-            go.env(key, v);
+    let (output, go_transcript) = if let Some(corpus) = &frozen {
+        corpus.observation("campaign", &[])
+    } else {
+        let mut build = Command::new("go");
+        build
+            .args(["build", "-o"])
+            .arg(&helper)
+            .arg("./rust-tests/parity/oracle/campaign-smtp")
+            .current_dir(repo())
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off");
+        let built = capture(build, root.path(), "go-build", Duration::from_secs(180));
+        assert!(
+            built.status.success(),
+            "Go build: {}",
+            String::from_utf8_lossy(&built.stderr)
+        );
+        let go_root = root.path().join("go");
+        fs::create_dir(&go_root).unwrap();
+        let (port, go_server) = server();
+        let mut go = Command::new(&helper);
+        go.env_clear()
+            .current_dir(&go_root)
+            .args([go_root.to_str().unwrap(), &port.to_string()])
+            .env("HOME", &go_root)
+            .env("USERPROFILE", &go_root)
+            .env("TMPDIR", &go_root)
+            .env("TEMP", &go_root)
+            .env("TMP", &go_root)
+            .env("TZ", "UTC")
+            .env("SYMERASEME_ORACLE_SOURCE_ROOT", repo());
+        for key in ["SystemRoot", "WINDIR"] {
+            if let Some(v) = std::env::var_os(key) {
+                go.env(key, v);
+            }
         }
-    }
-    for key in [
-        "XDG_CONFIG_HOME",
-        "XDG_DATA_HOME",
-        "XDG_CACHE_HOME",
-        "XDG_STATE_HOME",
-        "SYMERASEME_DATA_DIR",
-    ] {
-        go.env(key, &go_root);
-    }
-    let output = capture(go, root.path(), "go-campaign", Duration::from_secs(20));
-    assert!(
-        output.status.success(),
-        "Go campaign: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+        for key in [
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_STATE_HOME",
+            "SYMERASEME_DATA_DIR",
+        ] {
+            go.env(key, &go_root);
+        }
+        let output = capture(go, root.path(), "go-campaign", Duration::from_secs(20));
+        assert!(
+            output.status.success(),
+            "Go campaign: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let transcript = go_server.join().unwrap();
+        capture_smtp::record(
+            "campaign",
+            &helper,
+            &[capture_smtp::case("campaign", &output, &[], &transcript)],
+        );
+        (output, transcript)
+    };
     let expected: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(expected["schema"], "symeraseme.go-oracle.campaign-smtp.v1");
     assert_eq!(expected["go_version"], "go1.26.6");
@@ -308,7 +325,7 @@ fn real_smtp_campaign_bytes_events_and_projections_match_go() {
         Value::Object(get_plan(&store, "smtp-campaign", "").unwrap()),
         expected["plan"]
     );
-    assert_eq!(rust_server.join().unwrap(), go_server.join().unwrap());
+    assert_eq!(rust_server.join().unwrap(), go_transcript);
     eprintln!(
         "real SMTP campaign: rejected recipient then success; exact normalized wire, results, events and complete projected plan match real Go"
     );
