@@ -116,6 +116,37 @@ contract row, release/default switch or cutover task is promoted by this work.
 
 
 
+### Current-main offline backup oracle preparation (2026-10-04, #1122)
+
+Job `111323926955` failed before grant parity because the macOS Intel module
+cache was cold and its source-bound builder correctly refused network with
+`GOPROXY=off`. The native backup workflow now downloads modules against the
+committed checksum inventory and runs `go mod verify` before the unchanged
+offline CLI suite. Local module verification and the task graph check pass.
+The failed job remains retained; new six-target acceptance is pending.
+
+### Backup candidate Windows HTTP fixture reconciliation (2026-10-03)
+
+Fresh main-based #1154 head `04d33e700ed486b11a4aea4c0de1a83050269429`
+failed its Windows PR gate in run `37148405763`, job `111276980727` at clean
+PR merge `c77385167e3ee197b98510e57c9552c64b29e61a`. Five Windows process
+tests passed; `native_windows_http_matches_checked_out_go` received no
+complete HTTP headers and failed at the delimiter check. That fixture still
+wrote request headers and body separately, permitting a Windows reset during
+early authentication/origin rejection. The retained failure is not accepted
+proof, even though the separate backup rehearsal and earlier full native
+workspace run `37137774907` passed all six targets.
+
+Reuse the exact staged-request and bounded-response repair already present
+in SMTP source `cb3234c2291c8b243aeed8452e2bfce6f1938868`. The entire request
+is sent from one staged buffer, and the existing five-second bounded reader
+requires complete headers and the declared complete body on every response.
+No retry, deadline increase, response normalization, production server or
+backup confinement change is introduced. Local bounded/backpressure control,
+strict CLI all-target/all-feature Clippy, formatting and task-graph checks
+pass; these Linux checks do not execute the Windows-only fixture. Fresh
+candidate native Windows and required PR acceptance remain necessary.
+
 The task graph is reconciled against integrated `28e32a1c` and the current
 matrix. Phase 5 is complete (`last_completed = 5.4`); task 6.2 also has PASS
 evidence. Phases 6–8 are not complete. Closed historical phase issues
@@ -137,6 +168,24 @@ and CLI-024 restore rehearsal. The Rust signed-DMG gate now belongs to
 on 2026-10-02; the native Windows host-agent acceptance below now resolves #1121. Publication, production
 cutover and Go retirement remain separately gated; #1132 requires an actual
 stable release and seven days of observation before #1133.
+
+## Native migration backup/restore acceptance (2026-10-03, #1122)
+
+The new six-target `backup-restore-native.yml` binds historical Go v0.12.1
+archive bytes to release checksums/digests and executes the eight retained
+schema-v1 → Rust-v2 → restored-v1 cases. Linux amd64 uses the existing
+namespace/Landlock driver; Windows adds a no-capability AppContainer,
+child-creation restriction and owned suspended-start Job with native denial,
+exit and timeout controls, plus four dynamic package-SID-scoped WFP filters.
+Run `37137670878` at branch source
+`28f13ac1b09caf3b930c89714de27718ef3cdad0` passed all six targets with
+clean PR merge source `69c5724c32d64a66ffa71a7f91ddabb5ac1335e2`.
+Windows amd64 artifact `11279253544` additionally passed independent raw
+stream-hash and every-command Job/WFP/SID/profile cleanup readback.
+CLI-023/024 are PASS for their scoped native contracts; tasks 7.2/7.4 await
+final PR checks and verified integration. The accepted manual-confirmation deviation (#809)
+is now explicit in the release notes; no automatic browser executor is added.
+See `docs/rust-port/backup-restore-rehearsal.md` for the boundary and controls.
 
 ## Email platform-root repair (2026-10-03, #1119)
 
@@ -956,9 +1005,11 @@ artifact gates still require separate evidence.
 
 - **CLI-024 release acceptance.** The integrated native CI matrix passed on
   `3f133e75`, including the bounded registry build at 1024 descriptors
-  (#1034). The disposable switchbacks build Go from current source; a
-  retained older Go rollback binary reading schema v2 remains unproved
-  (#1035). Do not promote this row to cutover-ready based on CI alone.
+  (#1034). Run `37137670878` now establishes the separate official-Go
+  backup/restore boundary on all six native targets: v0.12.1 refuses schema
+  v2 and reads the original three requests only after restoring the pre-Rust
+  schema-v1 backup into a separate root. This loses post-backup writes and
+  does not establish in-place backward compatibility or production-data restore.
 - **MCP malformed-stream breadth.** Ten source-bound Go malformed/adjacent/
   truncated process cases and ten parse/size/depth mutations match Go 1.26.6;
   128 seeded mutations replay the live Go process byte-exactly, and the new
@@ -966,9 +1017,11 @@ artifact gates still require separate evidence.
   executions historically. The current-source six-target replay and the
   configured 120-second fuzz/mutation campaign now pass (checkpoint above).
   Exhaustive or differential fuzzing is not claimed by these bounded gates.
-- **`auto_confirm` with a stored reply (CLI-020).** Fails closed with an
-  explicit message where Go runs `confirmation.AutoConfirm` (browser
-  subsystem unported). The recorded case is the no-reply branch.
+- **Manual confirmation (CLI-023).** The accepted #809 deviation keeps browser
+  clicks as durable manual tasks. Retained stored-reply MCP fixtures cover
+  preview, manual fallback and no-link effects; the six-target #1122 gate
+  executes the actual CLI and consented manual-fallback contracts. This does
+  not claim an automated browser executor.
 - **`go_map_order` exemption (CLI-020).** `ToolHandler::call` sorts every
   result except `auto_confirm` (Go structs keep declaration order). Any
   future Go-struct-returning tool needs the same exemption — grep the
@@ -994,6 +1047,16 @@ artifact gates still require separate evidence.
   catches the cases it records.
 
 ## Decisions
+
+- 2026-10-03 — Fresh backup head `d46ef15` run `37150148562`, macOS Intel
+  job `111282134679`, failed before native tests when the anonymous official
+  release metadata API returned HTTP403 rate-limit exceeded. This failure
+  remains recorded. Preparation now uses the job's existing contents-read
+  token only for the exact fixed `v0.12.1` metadata URL, with authenticated
+  redirects refused and archive/checksum downloads still anonymous. Three
+  scope/redirect/bound controls and the five existing backup controls pass
+  locally. No digest, archive, restore, confinement or native acceptance
+  check is relaxed; the new head still needs current six-target acceptance.
 
 - 2026-09-22 — all three wave-1 worker results came back HTTP 429 (Codex
   quota); the coordinator implemented CLI-020/021/022 itself in the slice
@@ -1074,3 +1137,14 @@ Independent download and readback of all eleven raw archives now verifies
 700 actual mutants: 538 caught, 162 unviable, zero missed, zero timeouts.
 All ten existing outcome/campaign corruption controls pass. The original
 aggregate failure is retained; fresh current-head CI remains required.
+
+## Native backup CLI scheduling repair (2026-10-04, #1122)
+
+Current-head Intel macOS job `111394036537` in run `37188012522`
+passed the migration engine and 19 of 21 command-surface tests, then
+exceeded the existing ten-second child budget in two broker commands.
+The backup workflow now runs all 21 command-surface tests serially, avoiding
+concurrent full-registry parsing on the native runner. The ten-second process
+deadline, four-MiB capture limit, comparisons and all eight restore cases
+remain unchanged. Fresh six-target acceptance is required; the retained
+failed run is not completion evidence.
