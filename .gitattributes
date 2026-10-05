@@ -52,3 +52,13 @@ tests/fixtures/broker_replies/*.txt text eol=lf
 # Oracle-regenerated JSON fixtures compared byte-for-byte against live Go
 # output, which is always LF, including on Windows checkouts.
 tests/fixtures/provider-cancel/*.json text eol=lf
+
+# Native backup/restore measures the exact committed harness bytes on Windows.
+rust-tests/parity/backup_restore_rehearsal.py text eol=lf
+rust-tests/parity/plain_store_switchback.py text eol=lf
+rust-tests/parity/linux_store_sandbox.py text eol=lf
+rust-tests/parity/windows_store_sandbox.py text eol=lf
+rust-tests/parity/prepare_backup_restore.py text eol=lf
+rust-tests/parity/test_plain_backup_restore.py text eol=lf
+docs/rust-port/backup-restore-rehearsal.md text eol=lf
+.github/workflows/backup-restore-native.yml text eol=lf
