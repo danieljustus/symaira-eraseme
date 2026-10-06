@@ -258,6 +258,47 @@ def create_write_probe(root, label, host_share):
             'mountpoint': selected_mount[1], 'filesystem': selected_mount[2]}
 
 
+def host_share_present():
+    """A writable virtiofs host share exists only on VM hosts, not hosted CI runners."""
+    with open('/proc/self/mountinfo', encoding='utf-8') as stream:
+        for line in stream:
+            fields = line.split()
+            try:
+                filesystem = fields[fields.index('-') + 1]
+            except (ValueError, IndexError):
+                continue
+            if filesystem == 'virtiofs' and 'rw' in fields[5].split(','):
+                return True
+    return False
+
+
+def linux_write_probes(root, label):
+    """Owned outside-root probes; the host-share probe exists only with a host share."""
+    probes = {}
+    try:
+        if host_share_present():
+            probes['host_share_write_denied'] = create_write_probe(root, label, host_share=True)
+        probes['guest_local_write_denied'] = create_write_probe(root, label, host_share=False)
+    except BaseException:
+        for probe in probes.values():
+            remove_write_probe(probe)
+        raise
+    return probes
+
+
+def verify_linux_isolation(audit, probes):
+    required = ('mnt', 'net', 'pid')
+    # Every writable host share present must be read-only inside the child.
+    host_share = 'host_share_write_denied' in probes
+    require(audit['status'] == 'running' and audit['landlock_abi'] >= 4
+            and audit['no_new_privs'] is True and audit['uid'] == os.getuid()
+            and audit['gid'] == os.getgid()
+            and all(audit['caller_namespace_ids'][name] !=
+                    audit['sandbox_namespace_ids'][name] for name in required)
+            and bool(audit['read_only_virtiofs_mounts']) == host_share,
+            'Linux namespace or filesystem boundary was not enforced')
+
+
 def verify_write_probe(probe):
     path = Path(probe['path'])
     payload = path.read_bytes()
@@ -301,7 +342,8 @@ try:
  with open(sys.argv[3],'r+b'): pass
 except OSError as exc: result['outside_write_denied']=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
 else: result['outside_write_denied']=False
-for key,path in zip(('host_share_write_denied','guest_local_write_denied'),sys.argv[4:6]):
+for arg in sys.argv[4:]:
+ key,path=arg.split('=',1)
  try:
   with open(path,'r+b'): pass
  except OSError as exc: result[key]=exc.errno in (errno.EPERM,errno.EACCES,errno.EROFS)
@@ -466,13 +508,12 @@ def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=Non
             expected_controls = {'read_denied_0', 'home_directory_read_denied',
                                  'network_denied', 'udp_network_denied',
                                  'outside_write_denied', 'child_exec_denied'}
-            host_write_probe = guest_write_probe = None
+            probes = {}
             try:
                 if sys.platform.startswith('linux'):
-                    host_write_probe = create_write_probe(root, 'plain', host_share=True)
-                    guest_write_probe = create_write_probe(root, 'plain', host_share=False)
-                    probe_args.extend((host_write_probe['path'], guest_write_probe['path']))
-                    expected_controls.update(('host_share_write_denied', 'guest_local_write_denied'))
+                    probes = linux_write_probes(root, 'plain')
+                    probe_args.extend(key + '=' + probe['path'] for key, probe in probes.items())
+                    expected_controls.update(probes)
                 command(root, 'sandbox-negative',
                         sandbox_command(root, 'sandbox-negative', python,
                                         ['-I', '-S', '-c', PROBE, *probe_args], env), env)
@@ -481,23 +522,11 @@ def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=Non
                         and all(value is True for value in controls.values()), 'sandbox control failed')
             finally:
                 if sys.platform.startswith('linux'):
-                    report['outside_write_probes'] = {}
-                    if host_write_probe is not None:
-                        report['outside_write_probes']['host_share'] = {
-                            **host_write_probe, **remove_write_probe(host_write_probe)}
-                    if guest_write_probe is not None:
-                        report['outside_write_probes']['guest_local'] = {
-                            **guest_write_probe, **remove_write_probe(guest_write_probe)}
+                    report['outside_write_probes'] = {
+                        key: {**probe, **remove_write_probe(probe)} for key, probe in probes.items()}
             if sys.platform.startswith('linux'):
                 audit = json.loads((root / '.sandbox/sandbox-negative.audit.json').read_bytes())
-                required = ('mnt', 'net', 'pid')
-                require(audit['status'] == 'running' and audit['landlock_abi'] >= 4
-                        and audit['no_new_privs'] is True and audit['uid'] == os.getuid()
-                        and audit['gid'] == os.getgid()
-                        and all(audit['caller_namespace_ids'][name] !=
-                                audit['sandbox_namespace_ids'][name] for name in required)
-                        and audit['read_only_virtiofs_mounts'],
-                        'Linux namespace or filesystem boundary was not enforced')
+                verify_linux_isolation(audit, probes)
                 report['sandbox_isolation'] = audit
         report['sandbox_controls'] = controls
         policy = (record_windows_policy(root, active) if goos == 'windows'

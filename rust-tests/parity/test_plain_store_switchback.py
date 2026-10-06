@@ -75,7 +75,7 @@ try:
  with open(repo/'private','r+b'): pass
 except OSError: pass
 else: raise AssertionError('protected file is writable')
-for path in map(Path,sys.argv[4:]):
+for path in (Path(arg.split('=',1)[1]) for arg in sys.argv[4:]):
  try:
   with open(path,'r+b'): pass
  except OSError: pass
@@ -101,11 +101,9 @@ else:
                     env = {'HOME': str(root), 'PATH': '', 'LC_ALL': 'C'}
                     try:
                         if sys.platform.startswith('linux'):
-                            probes.append(gate.create_write_probe(base, 'control-' + parent.name,
-                                                                  host_share=True))
-                            probes.append(gate.create_write_probe(base, 'control-' + parent.name,
-                                                                  host_share=False))
-                            args.extend(probe['path'] for probe in probes)
+                            labelled = gate.linux_write_probes(base, 'control-' + parent.name)
+                            probes.extend(labelled.values())
+                            args.extend(key + '=' + probe['path'] for key, probe in labelled.items())
                         with patch.object(Path, 'home', return_value=home), patch.object(gate, 'REPO', repo):
                             gate.command(root, 'owned',
                                          gate.sandbox_command(root, 'owned', python,

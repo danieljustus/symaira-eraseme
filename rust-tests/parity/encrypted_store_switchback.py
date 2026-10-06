@@ -128,43 +128,29 @@ def run(go, rust, output, sandbox_control=None):
         gate.save(output / "sandbox-policy.json", policy)
         if os.sys.platform.startswith("linux"):
             python = Path(os.sys.executable).resolve()
-            host_write_probe = guest_write_probe = None
+            probes = {}
             try:
-                host_write_probe = gate.create_write_probe(output, "encrypted", host_share=True)
-                guest_write_probe = gate.create_write_probe(output, "encrypted", host_share=False)
+                probes = gate.linux_write_probes(output, "encrypted")
                 gate.command(
                     output, "sandbox-negative",
                     gate.sandbox_command(
                         output, "sandbox-negative", python,
                         ["-I", "-S", "-c", gate.PROBE,
                          str(gate.REPO / "Cargo.toml"), str(Path.home().resolve()),
-                         str(gate.REPO / "Cargo.toml"), host_write_probe["path"],
-                         guest_write_probe["path"]], env),
+                         str(gate.REPO / "Cargo.toml"),
+                         *(key + "=" + probe["path"] for key, probe in probes.items())], env),
                     env)
                 controls = json.loads((output / "sandbox-negative.stdout").read_bytes())
                 gate.require(set(controls) == {
                     "read_denied_0", "home_directory_read_denied", "network_denied",
-                    "udp_network_denied", "outside_write_denied", "host_share_write_denied",
-                    "guest_local_write_denied", "child_exec_denied"}
+                    "udp_network_denied", "outside_write_denied", "child_exec_denied", *probes}
                     and all(value is True for value in controls.values()),
                     "Linux sandbox control failed")
             finally:
-                report["outside_write_probes"] = {}
-                if host_write_probe is not None:
-                    report["outside_write_probes"]["host_share"] = {
-                        **host_write_probe, **gate.remove_write_probe(host_write_probe)}
-                if guest_write_probe is not None:
-                    report["outside_write_probes"]["guest_local"] = {
-                        **guest_write_probe, **gate.remove_write_probe(guest_write_probe)}
+                report["outside_write_probes"] = {
+                    key: {**probe, **gate.remove_write_probe(probe)} for key, probe in probes.items()}
             audit = json.loads((output / ".sandbox/sandbox-negative.audit.json").read_bytes())
-            required = ("mnt", "net", "pid")
-            gate.require(audit["status"] == "running" and audit["landlock_abi"] >= 4
-                         and audit["no_new_privs"] is True
-                         and audit["uid"] == os.getuid() and audit["gid"] == os.getgid()
-                         and all(audit["caller_namespace_ids"][name] !=
-                                 audit["sandbox_namespace_ids"][name] for name in required)
-                         and audit["read_only_virtiofs_mounts"],
-                         "Linux namespace or filesystem boundary was not enforced")
+            gate.verify_linux_isolation(audit, probes)
             report["sandbox_controls"] = controls
             report["sandbox_isolation"] = audit
 
