@@ -193,7 +193,7 @@ def checked(value, label):
     return value
 
 
-def command(root, label, argv, env, timeout=30):
+def command(root, label, argv, env, timeout=30, stdin_bytes=None):
     import plain_store_switchback as gate
     root = Path(root)
     record = {'argv': list(map(str, argv)), 'cwd': str(root), 'exit_code': None,
@@ -204,8 +204,15 @@ def command(root, label, argv, env, timeout=30):
                           'profile_deleted': False, 'root_sid_removed': False}}
     record['sandbox']['network'] = 'SID-scoped dynamic WFP socket-assignment and connect denial for IPv4 and IPv6'
     record['sandbox']['network_filters_removed'] = False
+    stdin_path = None
+    if stdin_bytes is not None:
+        # A retained private file is the child's only stdin; no pipe is shared.
+        stdin_path = root / (label + '.stdin')
+        with stdin_path.open('xb') as stream:
+            stream.write(stdin_bytes)
+        record['stdin'] = {'path': stdin_path.name, **gate.identity(stdin_path)}
     try:
-        return _command(root, label, argv, env, timeout, record)
+        return _command(root, label, argv, env, timeout, record, stdin_path)
     except BaseException as error:
         record['success'] = False
         record['failure_class'] = type(error).__name__
@@ -218,7 +225,7 @@ def command(root, label, argv, env, timeout=30):
         gate.save(root / (label + '.json'), record)
 
 
-def _command(root, label, argv, env, timeout, record):
+def _command(root, label, argv, env, timeout, record, stdin_path=None):
     if os.name != 'nt':
         raise ValueError('native Windows is required')
     import msvcrt
@@ -293,7 +300,7 @@ def _command(root, label, argv, env, timeout, record):
         checked(update_attr(attrs, 0, 0x20009, c.byref(caps), c.sizeof(caps), None, None), 'security capabilities')
         policy = DWORD(1)  # PROCESS_CREATION_CHILD_PROCESS_RESTRICTED
         checked(update_attr(attrs, 0, 0x2000e, c.byref(policy), c.sizeof(policy), None, None), 'child process restriction')
-        with open(os.devnull, 'rb') as inp, (root / (label + '.stdout')).open('xb') as out, \
+        with open(stdin_path or os.devnull, 'rb') as inp, (root / (label + '.stdout')).open('xb') as out, \
                 (root / (label + '.stderr')).open('xb') as err:
             handles = (w.HANDLE * 3)(*(msvcrt.get_osfhandle(stream.fileno()) for stream in (inp, out, err)))
             for handle in handles:
