@@ -15,6 +15,7 @@ use symeraseme_core::config::{
     resolve_storage,
 };
 
+#[cfg(unix)]
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
 

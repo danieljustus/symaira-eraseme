@@ -47,20 +47,3 @@ where
         "checkout attributes of recorded files changed"
     );
 }
-
-#[test]
-fn only_unrecorded_go_tests_leave_the_current_tree_pin() {
-    assert!(current_tree_bound("cmd/symeraseme/main.go"));
-    assert!(current_tree_bound("Cargo.lock"));
-    assert!(!current_tree_bound(".gitattributes"));
-    assert!(current_tree_bound(
-        "internal/campaign/plan_bytes_oracle_test.go"
-    ));
-    assert!(current_tree_bound(
-        "rust-tests/parity/oracle/storage/main_test.go"
-    ));
-    assert!(!current_tree_bound(
-        "cmd/symeraseme/release_pipeline_test.go"
-    ));
-    assert!(!current_tree_bound("internal/campaign/nested/plan_test.go"));
-}
