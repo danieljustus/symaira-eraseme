@@ -30,10 +30,13 @@ claimed.
 
 Both artifacts must differ. The actual Go build metadata must report Go 1.26.6,
 CGO disabled, and the native Darwin architecture. Artifact hashes alone do not
-prove source identity: retain independent build records. The dedicated
-`Plain-store switchback` workflow builds both binaries from its checked-out
-candidate, records the revision/clean state, runs all six cases and uploads raw
-observations even on failure. The local exploratory precedent is the independently
+prove source identity: retain independent build records. The `Native store switchback`
+workflow reuses the prerelease workflow to build and verify the six
+release-candidate archives, extracts each target's Rust `symeraseme` and
+packaged `symeraseme-go` after checking `checksums.txt`, runs the plain and
+encrypted runners on Linux, macOS and Windows (amd64 and arm64), and uploads
+raw observations even on failure. Linux creates the host-share write probe only
+when a writable virtiofs share exists (VM hosts); hosted runners have none. The local exploratory precedent is the independently
 reviewed capture at source `8986a3db3d60d37b89368d37e15f1e98c60672f2`, indexed by
 `ceae1721336d6a682345d51f1dd4bcd966a53845e3005c8f4a3ebf38e1582da1`;
 that capture is separate from this new repository gate.

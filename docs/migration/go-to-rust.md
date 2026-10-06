@@ -8,6 +8,22 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Six-target release-candidate switchback (2026-10-06, #1130)
+
+`plain-store-switchback.yml` now calls the prerelease workflow and runs the
+plain and encrypted switchback runners against each target's verified
+release-candidate archive (Rust `symeraseme` plus packaged `symeraseme-go`).
+Run `37449404238` at `d393bff01a658521dbceadcd3b96636d8459a387` passed on Linux amd64/arm64, macOS arm64/amd64 and
+Windows amd64/arm64: 12 reports, 72 cases, plain schema sequence 1,2,2,2,
+encrypted V3 envelope retained, and native denial controls on every target.
+The same run's release-candidate jobs matched the `SYMERASEME_BACKEND=go`
+version and MCP output on all six targets. CUT-001..003 are PASS on
+release-candidate archives. Task 10.1's gate (the same on published
+prerelease assets) stays open until #1128 publishes one. The first attempt
+failed on Linux because the runner required a VM virtiofs host share; that
+probe is now created only when such a share exists, while the guest-local
+Landlock probe and namespace checks stay mandatory.
+
 ## Native reply triage acceptance (2026-10-06, #1120)
 
 With #1119 (`ee03eb27`) and #1122 integrated, native reply-triage run
