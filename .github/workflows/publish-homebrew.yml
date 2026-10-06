@@ -1,8 +1,10 @@
 name: Publish Homebrew Formula
 
 on:
+  # `released` fires for a stable release and when a prerelease is promoted,
+  # never for a canary prerelease, so Homebrew users only receive stable builds.
   release:
-    types: [published]
+    types: [released]
   workflow_dispatch:
     inputs:
       version:
@@ -59,6 +61,7 @@ jobs:
               "$BASE_URL/symeraseme_${VERSION}_${target}.tar.gz" \
               --output "$archive"
             tar -tzf "$archive" | grep -Fx 'symeraseme' >/dev/null
+            tar -tzf "$archive" | grep -Fx 'symeraseme-go' >/dev/null
             sha256sum "$archive"
           done
 
@@ -105,7 +108,8 @@ jobs:
             end
 
             def install
-              bin.install "symeraseme"
+              # symeraseme-go is the explicit SYMERASEME_BACKEND=go rollback sibling.
+              bin.install "symeraseme", "symeraseme-go"
             end
 
             test do

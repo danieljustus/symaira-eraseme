@@ -45,7 +45,13 @@ symeraseme version
 
 Download the matching `symeraseme_<version>_<os>_<arch>` archive from the
 [latest GitHub release](https://github.com/danieljustus/symaira-eraseme/releases).
-The archives are static Go builds and do not require an external runtime.
+The archives are static builds and do not require an external runtime.
+
+Each archive contains `symeraseme` (the Rust implementation, the default) and
+`symeraseme-go`, the last Go implementation kept as an explicit rollback.
+Set `SYMERASEME_BACKEND=go` to run the Go backend instead; both read and write
+the same data. Canary builds are published as GitHub prereleases and reach
+Homebrew only once they are promoted to a stable release.
 
 ### macOS GUI
 
@@ -184,11 +190,16 @@ scripts/              Release and packaging scripts
 
 Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml):
 
-1. GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64
-   and creates the GitHub release.
-2. The macOS job builds the SwiftUI app and uploads the versioned DMG to that
-   release. Signing/notarization status is recorded explicitly.
-3. The Homebrew publisher downloads the exact release archives, verifies their
+1. The Rust prerelease workflow builds natively on Linux, macOS, and Windows
+   for amd64 and arm64, packages each Rust binary with its `symeraseme-go`
+   rollback sibling, and verifies the archives, `checksums.txt` and the
+   per-archive CycloneDX SBOMs.
+2. The publish job attests build provenance for the six archives and creates
+   the GitHub release as a prerelease (canary), then reads every asset back.
+3. The macOS job builds the SwiftUI app and uploads the versioned DMG to that
+   release. It is signed, notarized, stapled and attested.
+4. When a release is published as stable, or a canary is promoted to stable,
+   the Homebrew publisher downloads the exact release archives, verifies their
    checksums, and updates `danieljustus/homebrew-tap/Formula/symeraseme.rb`.
 
 The legacy package publisher is no longer tag-triggered. The archived tag
