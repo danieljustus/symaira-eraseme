@@ -170,7 +170,6 @@ jobs:
       - name: Install from a disposable local tap and run the formula test
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_FROM_API: '1'
         run: |
           set -euo pipefail
           brew tap-new --no-git local/symeraseme-check
