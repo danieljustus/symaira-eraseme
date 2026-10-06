@@ -1,0 +1,84 @@
+name: Actual native HTTP auxiliary recapture
+
+on:
+  pull_request:
+    paths:
+      - crates/symeraseme-cli/tests/mcp_http_process.rs
+      - crates/symeraseme-cli/tests/mcp_http_native_contract.rs
+      - crates/symeraseme-cli/tests/support/mcp_http_port.rs
+      - crates/symeraseme-cli/tests/support/capture_http_aux.rs
+      - .github/workflows/frozen-http-aux-capture.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frozen-http-aux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Actual Go HTTP auxiliary / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Download actual Go modules and verify clean source
+        shell: bash
+        run: |
+          GOTOOLCHAIN=go1.26.6 go mod download
+          test -z "$(git status --porcelain --untracked-files=normal)"
+      - name: Capture every auxiliary comparison against actual native Go
+        shell: bash
+        env:
+          SYMERASEME_PARITY_LIVE_GO: '1'
+          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/frozen-go-http-aux
+        run: |
+          # The six process comparators are Unix-only; the bind differential is native everywhere.
+          tests=(native_bind_failures_match_checked_out_go)
+          targets=(--test mcp_http_native_contract)
+          if [ "$RUNNER_OS" != Windows ]; then
+            tests+=(live_http_disconnect_cancels_and_reaps_host_agent_like_go
+                    live_http_disconnect_cancels_provider_request_like_go
+                    startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness
+                    occupied_bind_error_matches_go_for_ipv4_and_ipv6
+                    unavailable_local_address_error_matches_go
+                    obs_text_origin_rejection_matches_go_and_rust_processes)
+            targets+=(--test mcp_http_process)
+          fi
+          cargo +1.98.0 test -p symeraseme-cli "${targets[@]}" --locked -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/http-aux.log"
+          passed=$(awk '/^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;/ { sum += $4 } END { print sum + 0 }' "$RUNNER_TEMP/http-aux.log")
+          test "$passed" -eq "${#tests[@]}"
+          for test in "${tests[@]}"; do test -s "$SYMERASEME_CAPTURE_HTTP_AUX/$test.json"; done
+          test "$(find "$SYMERASEME_CAPTURE_HTTP_AUX" -type f | wc -l)" -eq "${#tests[@]}"
+      - name: Retain actual native auxiliary records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: actual-http-aux-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/frozen-go-http-aux/*.json
+          if-no-files-found: error
+          retention-days: 30

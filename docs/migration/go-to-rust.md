@@ -24,6 +24,23 @@ The older pending-integration statements below retain their historical scope.
 signed releases, candidate rollback and Go-free parity remain unfinished.
 No release or seven-day observation is inferred from this merge.
 
+## Auxiliary HTTP comparators: frozen reader and required recapture (2026-10-06, #1131)
+
+The seven remaining Go-dependent HTTP tests (both disconnect-cancellation
+parents, startup handoff, occupied and unavailable bind errors, obs-text
+Origin, and the native bind differential) now select a verified
+`symeraseme.actual-go.http-aux.v1` record when one exists for the native
+target and otherwise execute actual Go exactly as before. Capture/live modes
+(`SYMERASEME_CAPTURE_HTTP_AUX`, `SYMERASEME_PARITY_LIVE_GO=1`) always run Go.
+`frozen-http-aux-capture.yml` captures the six Unix parents on four Unix hosts
+and the bind differential on all six hosts. The reader's `RECORDS` table is
+empty: no observation has been imported, so no target is Go-free yet and the
+two targets are not in the Go-absent selection. Rust assertions are unchanged.
+
+`mcp_http_process.rs` is an archived wire generator, so this change makes the
+four committed wire records stale: `go_oracle_http_wire_transcripts_match`
+rejects them until the same head's wire and auxiliary captures are imported.
+
 ## Bounded interrupted HTTP reads and required native recapture (2026-10-04, #1131)
 
 Actual Linux arm64 job `111448045796` passes eleven original HTTP parents
