@@ -31,6 +31,7 @@ jobs:
     env:
       HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
+      DRY_RUN: ${{ inputs.dry_run || false }}
     steps:
       - name: Validate release and publisher credential
         run: |
@@ -39,7 +40,7 @@ jobs:
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "::error::Invalid release tag: $RELEASE_TAG"; exit 1 ;;
           esac
-          if [ -z "${HOMEBREW_TAP_GITHUB_TOKEN:-}" ]; then
+          if [ "${DRY_RUN:-false}" != true ] && [ -z "${HOMEBREW_TAP_GITHUB_TOKEN:-}" ]; then
             echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured."
             exit 1
           fi
@@ -48,7 +49,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: danieljustus/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          # The public tap is only read in a dry run; the write token is used to publish.
+          token: ${{ inputs.dry_run && github.token || secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           path: tap
           fetch-depth: 0
 
