@@ -8,6 +8,21 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Native reply triage acceptance (2026-10-06, #1120)
+
+With #1119 (`ee03eb27`) and #1122 integrated, native reply-triage run
+`37445056541` executed on integrated main
+`a1f4c2071abfad38032003b5ca68ca8c2ddc3614` and passed on all six targets:
+Linux amd64/arm64, macOS arm64/amd64 and Windows amd64/arm64. Every Unix job
+reported nine nonzero test groups and every Windows job seven (Unix-shell-agent
+cases are `cfg(unix)`); no group ran zero cases. The selection is the one from
+#1151: sixteen direct native CLI inputs, ten agent controls and eight complete
+MCP responses with persisted effects, compared against Go 1.26.6 in disposable
+roots. The Go-absent workflow (`37445148244`) also passed on the same head.
+DOM-004 and CLI-022 are now PASS; task 7.3's merge gate is met. This finite
+corpus does not claim every possible provider response, and no release,
+cutover or Go removal follows from it.
+
 ## Verified email integration (2026-10-04, #1119)
 
 PR #1146 at exact head `b07e81d02bcd35d424c5c75090992f1d1b8fe3c1`
