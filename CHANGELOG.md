@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [v0.13.0] - 2026-10-06
+
+Canary prerelease. The Rust implementation becomes the default `symeraseme`
+binary; the Go implementation ships alongside it only as an explicit rollback.
+
+- **Rust cutover**: Release archives contain the Rust `symeraseme` and the Go
+  `symeraseme-go`. `SYMERASEME_BACKEND=go` dispatches to the Go sibling; both
+  read and write the same plain and encrypted data (CUT-001..003, verified
+  Go -> Rust -> Go on six native targets, #1130).
+- **Release**: Tags build the six archives natively with the Rust prerelease
+  workflow instead of GoReleaser, attach per-archive CycloneDX SBOMs and GitHub
+  build-provenance attestations, and publish them as a prerelease. Homebrew is
+  updated only for stable releases or when a canary is promoted (#1128).
+- **macOS app**: The DMG bundles the Rust backend by default with the Go
+  rollback, and its provenance is attested (#1127, #1129).
+
 - **Rust migration**: Keep browser submission and confirmation clicks as manual
   tasks for the Rust cutover, as accepted in #809 on 2026-09-28. Dry-run previews,
   persisted manual tasks and confirmation fallback remain supported. The
