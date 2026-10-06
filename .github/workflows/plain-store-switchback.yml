@@ -1,7 +1,30 @@
-name: Plain-store switchback
+name: Native store switchback
 
+# CUT-002/CUT-003: the exact verified release-candidate archives (Rust
+# `symeraseme` plus its packaged `symeraseme-go` fallback) switch a plain and
+# an encrypted disposable store Go -> Rust -> Go on all six native targets.
 on:
   pull_request:
+    paths:
+      - .github/workflows/plain-store-switchback.yml
+      - .github/workflows/rust-prerelease.yml
+      - rust-tests/parity/plain_store_switchback.py
+      - rust-tests/parity/encrypted_store_switchback.py
+      - rust-tests/parity/test_plain_store_switchback.py
+      - rust-tests/parity/linux_store_sandbox.py
+      - rust-tests/parity/windows_store_sandbox.py
+      - rust-tests/parity/backup_restore_rehearsal.py
+      - rust-tests/parity/prepare_backup_restore.py
+      - rust-tests/parity/go_build_info.py
+      - rust-tests/parity/oracle/store-sandbox-control/**
+      - tests/fixtures/event-store/**
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**
+      - cmd/**
+      - internal/**
+      - go.mod
+      - go.sum
   workflow_dispatch:
 
 permissions:
@@ -16,64 +39,131 @@ env:
   GOTOOLCHAIN: go1.26.6
   GOWORK: 'off'
   PYTHONDONTWRITEBYTECODE: '1'
-  CARGO_TERM_COLOR: never
 
 jobs:
-  plain-store-switchback:
-    runs-on: macos-latest
+  release-candidate:
+    name: Release candidate
+    uses: ./.github/workflows/rust-prerelease.yml
+
+  switchback:
+    name: Store switchback / ${{ matrix.runner }}
+    needs: release-candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, os: linux, arch: amd64}
+          - {runner: ubuntu-24.04-arm, os: linux, arch: arm64}
+          - {runner: windows-2025, os: windows, arch: amd64}
+          - {runner: windows-11-arm, os: windows, arch: arm64}
+          - {runner: macos-14, os: darwin, arch: arm64}
+          - {runner: macos-15-intel, os: darwin, arch: amd64}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
-      - name: Prepare isolated paths
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/switchback-tmp" "$RUNNER_TEMP/switchback-logs" "$RUNNER_TEMP/switchback-binaries"
-          printf 'TMPDIR=%s\nCARGO_TARGET_DIR=%s\n' "$RUNNER_TEMP/switchback-tmp" "$RUNNER_TEMP/switchback-target" >> "$GITHUB_ENV"
       - name: Checkout candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up pinned Go
+      - name: Set up pinned Go (metadata reader and Windows denial control only)
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.6'
-      - name: Prepare isolated build and record source
+          cache: false
+      - name: Download verified release-candidate archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: symeraseme-rust-prerelease-archives
+          path: ${{ runner.temp }}/rc-dist
+      - name: Extract this target's Rust binary and packaged Go fallback
+        shell: bash
+        env:
+          ARCHIVE_OS: ${{ matrix.os }}
+          ARCHIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/switchback-logs" "$RUNNER_TEMP/switchback-binaries"
+          git rev-parse HEAD > "$RUNNER_TEMP/switchback-logs/source-revision.txt"
+          test -z "$(git status --porcelain=v1)"
+          python3 - <<'PY' | tee "$RUNNER_TEMP/switchback-logs/release-candidate.json"
+          import hashlib, json, os, pathlib, tarfile, zipfile
+          dist = pathlib.Path(os.environ['RUNNER_TEMP']) / 'rc-dist'
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'switchback-binaries'
+          system, arch = os.environ['ARCHIVE_OS'], os.environ['ARCHIVE_ARCH']
+          windows = system == 'windows'
+          suffix = '.zip' if windows else '.tar.gz'
+          matches = [p for p in dist.iterdir() if p.name.endswith('_' + system + '_' + arch + suffix)]
+          assert len(matches) == 1, matches
+          archive = matches[0]
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          sums = dict(reversed(line.split()) for line in (dist / 'checksums.txt').read_text().splitlines() if line.strip())
+          assert sums[archive.name] == digest, 'archive differs from checksums.txt'
+          exe = '.exe' if windows else ''
+          wanted = {'symeraseme' + exe: 'rust' + exe, 'symeraseme-go' + exe: 'go' + exe}
+          found = {}
+          if windows:
+              with zipfile.ZipFile(archive) as z:
+                  for name, target in wanted.items():
+                      (out / target).write_bytes(z.read(name)); found[name] = target
+          else:
+              with tarfile.open(archive) as t:
+                  for name, target in wanted.items():
+                      member = t.getmember(name)
+                      assert member.isfile(), name
+                      (out / target).write_bytes(t.extractfile(member).read()); found[name] = target
+          assert set(found) == set(wanted)
+          for target in wanted.values():
+              (out / target).chmod(0o755)
+          print(json.dumps({'archive': archive.name, 'sha256': digest, 'members': found,
+                            'binaries': {t: hashlib.sha256((out / t).read_bytes()).hexdigest() for t in wanted.values()}},
+                           indent=2, sort_keys=True))
+          PY
+      - name: Build native Windows denial control
+        if: runner.os == 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          git rev-parse HEAD > "$RUNNER_TEMP/switchback-logs/source-revision.txt"
-          git status --porcelain=v1 > "$RUNNER_TEMP/switchback-logs/source-before.txt"
-          test ! -s "$RUNNER_TEMP/switchback-logs/source-before.txt"
-          python3 --version
-          rustup show active-toolchain
-          cargo --version
-          go env GOVERSION CGO_ENABLED GOOS GOARCH > "$RUNNER_TEMP/switchback-logs/go-env.txt"
+          go build -mod=readonly -trimpath -buildvcs=true -o "$RUNNER_TEMP/switchback-binaries/sandbox-control.exe" ./rust-tests/parity/oracle/store-sandbox-control
       - name: Execute harness rejection and cleanup controls
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s rust-tests/parity -p test_plain_store_switchback.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/controls.log"
           python3 -m unittest discover -s rust-tests/parity -p test_go_build_info.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/retained-go-metadata-controls.log"
-      - name: Build both implementations from the candidate
+      - name: Execute plain and encrypted switchback with release-candidate binaries
         shell: bash
         run: |
           set -euo pipefail
-          go build -mod=readonly -trimpath -buildvcs=true -o "$RUNNER_TEMP/switchback-binaries/go" ./cmd/symeraseme 2>&1 | tee "$RUNNER_TEMP/switchback-logs/go-build.log"
-          go version -m "$RUNNER_TEMP/switchback-binaries/go" > "$RUNNER_TEMP/switchback-logs/go-build-info.txt"
-          python3 -c 'from pathlib import Path; import sys; settings={line.strip() for line in Path(sys.argv[1]).read_text().splitlines()}; revision=Path(sys.argv[2]).read_text().strip(); assert {"build\tvcs.revision="+revision,"build\tvcs.modified=false"} <= settings, "Go artifact does not match the clean checkout"' "$RUNNER_TEMP/switchback-logs/go-build-info.txt" "$RUNNER_TEMP/switchback-logs/source-revision.txt"
-          cargo build --locked -p symeraseme-cli --bin symeraseme-rust 2>&1 | tee "$RUNNER_TEMP/switchback-logs/rust-build.log"
-      - name: Execute all six real switchback cases
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 rust-tests/parity/plain_store_switchback.py --go "$RUNNER_TEMP/switchback-binaries/go" --rust "$CARGO_TARGET_DIR/debug/symeraseme-rust" --go-tool "$(command -v go)" --output-dir "$RUNNER_TEMP/switchback-evidence" | tee "$RUNNER_TEMP/switchback-logs/result.log"
-          git status --porcelain=v1 > "$RUNNER_TEMP/switchback-logs/source-after.txt"
-          test ! -s "$RUNNER_TEMP/switchback-logs/source-after.txt"
+          python3 - <<'PY' 2>&1 | tee "$RUNNER_TEMP/switchback-logs/result.log"
+          import json, os, pathlib, shutil, subprocess, sys
+          temp = pathlib.Path(os.environ['RUNNER_TEMP'])
+          bins = temp / 'switchback-binaries'
+          exe = '.exe' if sys.platform == 'win32' else ''
+          # Linux's system Python runtime is the explicitly read-only namespace runtime.
+          python = '/usr/bin/python3' if sys.platform.startswith('linux') else sys.executable
+          control = ['--sandbox-control', str(bins / 'sandbox-control.exe')] if sys.platform == 'win32' else []
+          go, rust = str(bins / ('go' + exe)), str(bins / ('rust' + exe))
+          subprocess.run([python, 'rust-tests/parity/plain_store_switchback.py', '--go', go, '--rust', rust,
+                          '--go-tool', shutil.which('go'), '--output-dir', str(temp / 'switchback-evidence/plain'),
+                          *control], check=True, timeout=900)
+          subprocess.run([python, 'rust-tests/parity/encrypted_store_switchback.py', '--go', go, '--rust', rust,
+                          '--output-dir', str(temp / 'switchback-evidence/encrypted'), *control],
+                         check=True, timeout=900)
+          plain = json.loads((temp / 'switchback-evidence/plain/report.json').read_text())
+          encrypted = json.loads((temp / 'switchback-evidence/encrypted/report.json').read_text())
+          assert plain['status'] == 'passed' and len(plain['steps']) == 6
+          assert plain['schema_sequence'] == [1, 2, 2, 2]
+          assert encrypted['status'] == 'passed' and len(encrypted['steps']) == 6
+          print(json.dumps({'plain': plain['scope'], 'encrypted': encrypted['scope'],
+                            'cases': len(plain['steps']) + len(encrypted['steps'])}))
+          PY
+          test -z "$(git status --porcelain=v1)"
       - name: Retain raw observations even on failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: plain-store-switchback-macos-${{ github.sha }}
+          name: store-switchback-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }}
           path: |
             ${{ runner.temp }}/switchback-logs
             ${{ runner.temp }}/switchback-evidence

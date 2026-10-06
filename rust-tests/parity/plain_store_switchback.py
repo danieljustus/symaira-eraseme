@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""macOS plain-store Go -> Rust -> Go regression, never release acceptance.
+"""Native plain-store Go -> Rust -> Go regression, never release acceptance.
 
 The caller supplies independently built artifacts. No production store, old
-fallback evidence, schema guard or installed executable is changed. Linux and
-Windows need their own confinement/cleanup proof before this gate supports them.
+fallback evidence, schema guard or installed executable is changed. macOS uses
+sandbox-exec, Linux private namespaces with Landlock, and Windows a
+capability-free AppContainer whose denial is proven by a compiled control.
 """
 import argparse
 from contextlib import closing
@@ -313,22 +314,62 @@ sys.exit(0 if all(result.values()) else 1)
 '''
 
 
-def run(go, rust, go_tool, root, published_go_release=False):
+def native_platform():
+    """Return (GOOS, GOARCH, scope prefix) for the native host kernel."""
+    if sys.platform == 'win32':
+        import prepare_backup_restore
+        arch = prepare_backup_restore.native_architecture()
+        require(arch in ('amd64', 'arm64'), 'unsupported native Windows architecture')
+        return 'windows', arch, 'windows-' + arch
+    arch = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'amd64',
+            'amd64': 'amd64'}.get(platform.machine().lower())
+    require(arch is not None, 'unsupported native architecture')
+    if sys.platform == 'darwin':
+        return 'darwin', arch, 'macos'
+    require(sys.platform.startswith('linux'), 'unsupported switchback platform')
+    return 'linux', arch, 'linux-' + {'arm64': 'aarch64', 'amd64': 'x86_64'}[arch]
+
+
+def native_env(root, env):
+    """Windows children need SystemRoot and per-user roots inside the run root."""
+    if sys.platform == 'win32':
+        env.update({'SystemRoot': os.environ['SystemRoot'],
+                    'APPDATA': str(Path(root) / 'config'),
+                    'LOCALAPPDATA': str(Path(root) / 'cache')})
+    return env
+
+
+def windows_controls(root, env, sandbox_control):
+    """Actual AppContainer read/write/network denial, exit and timeout controls."""
+    import backup_restore_rehearsal
+    return backup_restore_rehearsal.confinement_controls(root, env, sandbox_control)
+
+
+def record_windows_policy(root, executable):
+    return {'mechanism': 'native AppContainer without capabilities and Job Object',
+            'writable_root': str(Path(root).resolve()), 'child_creation': 'restricted',
+            'network': 'SID-scoped WFP denial', 'exec': str(Path(executable))}
+
+
+def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=None):
     require(published_go_release != (go_tool is not None),
             'choose published Go release or explicit Go SDK metadata verification')
-    require(sys.platform == 'darwin' or sys.platform.startswith('linux'),
-            'unsupported: switchback confinement is available on macOS and Linux')
+    require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
+            'unsupported: switchback confinement is available on macOS, Linux and Windows')
+    require(not (published_go_release and sys.platform == 'win32'),
+            'published Go release verification supports macOS and Linux')
+    require((sandbox_control is not None) == (sys.platform == 'win32'),
+            'the compiled sandbox control is required on, and only on, Windows')
     if sys.platform.startswith('linux'):
         require(os.getuid() != 0 and os.getgid() != 0,
                 'Linux sandbox runner must start as an unprivileged user')
-        require(platform.machine().lower() in ('aarch64', 'arm64'),
-                'Linux disposable switchback requires native aarch64')
+    goos, arch, prefix = native_platform()
     root = Path(root)
     require(not root.is_symlink(), 'switchback run root must not be a symlink')
     root = root.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
-    scope = ('linux-aarch64-plain-store-disposable-runtime-only'
-             if sys.platform.startswith('linux') else 'macos-plain-store-runtime-only')
+    scope = prefix + ('-plain-store-runtime-only' if goos == 'darwin'
+                      else '-plain-store-disposable-runtime-only')
     report = {'scope': scope, 'status': 'failed',
               'platform': {'system': platform.system(), 'machine': platform.machine()},
               'required_cases': list(CASES), 'steps': [], 'schema_sequence': [],
@@ -337,7 +378,8 @@ def run(go, rust, go_tool, root, published_go_release=False):
     try:
         for name in ('data', 'home', 'config', 'cache', 'tmp', 'bin', 'empty-path'):
             (root / name).mkdir(mode=0o700)
-        active, database = root / 'bin/symeraseme', root / 'data/symeraseme.db'
+        suffix = '.exe' if goos == 'windows' else ''
+        active, database = root / ('bin/symeraseme' + suffix), root / 'data/symeraseme.db'
         go, rust = (p.resolve(strict=True) for p in (go, rust))
         if go_tool is not None:
             go_tool = go_tool.resolve(strict=True)
@@ -358,19 +400,18 @@ def run(go, rust, go_tool, root, published_go_release=False):
                'GOTOOLCHAIN': 'local', 'GOWORK': 'off',
                'SYMERASEME_DATA_DIR': str(database.parent), 'SYMERASEME_DB_DIR': str(database.parent),
                'SYMERASEME_ENCRYPT_DB': 'false'}
+        native_env(root, env)
         report['environment'] = env
-        go_for_info, go_tool_for_info = go, go_tool
-        if sys.platform == 'darwin' or sys.platform.startswith('linux'):
-            go_for_info = root / 'bin/go-candidate'
-            shutil.copyfile(go, go_for_info)
-            go_for_info.chmod(0o700)
-        if sys.platform.startswith('linux') and go_tool is not None:
-            go_tool_for_info = root / 'bin/go-tool'
+        go_tool_for_info = go_tool
+        go_for_info = root / ('bin/go-candidate' + suffix)
+        shutil.copyfile(go, go_for_info)
+        go_for_info.chmod(0o700)
+        if goos in ('linux', 'windows') and go_tool is not None:
+            # Windows executes only staged executables under the owned root.
+            go_tool_for_info = root / ('bin/go-tool' + suffix)
             shutil.copyfile(go_tool, go_tool_for_info)
             go_tool_for_info.chmod(0o700)
-        arch = {'arm64': 'arm64', 'aarch64': 'arm64',
-                'x86_64': 'amd64'}[platform.machine().lower()]
-        goos = 'darwin' if sys.platform == 'darwin' else 'linux'
+            require(identity(go_tool_for_info) == identity(go_tool), 'staged Go tool differs')
         go_info_env = dict(env)
         if published_go_release:
             parsed, release = go_build_info.verify_release(go_for_info, goos + '/' + arch)
@@ -387,6 +428,9 @@ def run(go, rust, go_tool, root, published_go_release=False):
             elif sys.platform == 'darwin':
                 # Hosted Go binaries are trimmed too; scope its runtime read to GOROOT.
                 go_info_env['GOROOT'] = str(go_tool.parent.parent)
+            else:
+                # go version -m only reads the staged executable; it needs no SDK tree.
+                go_info_env['GOROOT'] = str(root / 'bin')
             command(root, 'go-build-info',
                     sandbox_command(root, 'go-build-info', go_tool_for_info,
                                     ['version', '-m', str(go_for_info)], go_info_env), go_info_env)
@@ -395,62 +439,69 @@ def run(go, rust, go_tool, root, published_go_release=False):
         settings = {line.strip() for line in metadata.splitlines()}
         require({'build\tCGO_ENABLED=0', 'build\tGOOS=' + goos, 'build\tGOARCH=' + arch} <= settings,
                 'Go artifact must be CGO-free and native')
-        try:
-            command(root, 'wrapper-negative',
-                    sandbox_command(root, 'wrapper-negative', '/usr/bin/false', [], env), env)
-        except ValueError:
-            failed = json.loads((root / 'wrapper-negative.json').read_bytes())
-            require(failed['exit_code'] == 1 and failed['timed_out'] is False, 'invalid wrapper control')
+        if goos == 'windows':
+            native = windows_controls(root, env, sandbox_control)
+            report['native_confinement_controls'] = native
+            report['wrapper_control'] = True
+            controls = native['checks']
         else:
-            raise ValueError('wrapper masked a failing exit')
-        report['wrapper_control'] = True
-        python = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
-        python = (python if python.is_file() else Path(sys.executable)).resolve()
-        negative_policy = sandbox(root, python)
-        if sys.platform == 'darwin':
-            negative_policy += '\n(allow file-read* (subpath ' + json.dumps(str(Path(sys.base_prefix).resolve())) + '))'
-        save(root / 'sandbox-negative-policy.json', negative_policy)
-        # Harmless checked-in paths only; never probe credential contents.
-        probe_args = [str(REPO / 'Cargo.toml'), str(Path.home().resolve()),
-                      str(REPO / 'Cargo.toml')]
-        expected_controls = {'read_denied_0', 'home_directory_read_denied',
-                             'network_denied', 'udp_network_denied',
-                             'outside_write_denied', 'child_exec_denied'}
-        host_write_probe = guest_write_probe = None
-        try:
+            try:
+                command(root, 'wrapper-negative',
+                        sandbox_command(root, 'wrapper-negative', '/usr/bin/false', [], env), env)
+            except ValueError:
+                failed = json.loads((root / 'wrapper-negative.json').read_bytes())
+                require(failed['exit_code'] == 1 and failed['timed_out'] is False, 'invalid wrapper control')
+            else:
+                raise ValueError('wrapper masked a failing exit')
+            report['wrapper_control'] = True
+            python = Path(sys.base_prefix) / 'Resources/Python.app/Contents/MacOS/Python'
+            python = (python if python.is_file() else Path(sys.executable)).resolve()
+            negative_policy = sandbox(root, python)
+            if sys.platform == 'darwin':
+                negative_policy += '\n(allow file-read* (subpath ' + json.dumps(str(Path(sys.base_prefix).resolve())) + '))'
+            save(root / 'sandbox-negative-policy.json', negative_policy)
+            # Harmless checked-in paths only; never probe credential contents.
+            probe_args = [str(REPO / 'Cargo.toml'), str(Path.home().resolve()),
+                          str(REPO / 'Cargo.toml')]
+            expected_controls = {'read_denied_0', 'home_directory_read_denied',
+                                 'network_denied', 'udp_network_denied',
+                                 'outside_write_denied', 'child_exec_denied'}
+            host_write_probe = guest_write_probe = None
+            try:
+                if sys.platform.startswith('linux'):
+                    host_write_probe = create_write_probe(root, 'plain', host_share=True)
+                    guest_write_probe = create_write_probe(root, 'plain', host_share=False)
+                    probe_args.extend((host_write_probe['path'], guest_write_probe['path']))
+                    expected_controls.update(('host_share_write_denied', 'guest_local_write_denied'))
+                command(root, 'sandbox-negative',
+                        sandbox_command(root, 'sandbox-negative', python,
+                                        ['-I', '-S', '-c', PROBE, *probe_args], env), env)
+                controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
+                require(set(controls) == expected_controls
+                        and all(value is True for value in controls.values()), 'sandbox control failed')
+            finally:
+                if sys.platform.startswith('linux'):
+                    report['outside_write_probes'] = {}
+                    if host_write_probe is not None:
+                        report['outside_write_probes']['host_share'] = {
+                            **host_write_probe, **remove_write_probe(host_write_probe)}
+                    if guest_write_probe is not None:
+                        report['outside_write_probes']['guest_local'] = {
+                            **guest_write_probe, **remove_write_probe(guest_write_probe)}
             if sys.platform.startswith('linux'):
-                host_write_probe = create_write_probe(root, 'plain', host_share=True)
-                guest_write_probe = create_write_probe(root, 'plain', host_share=False)
-                probe_args.extend((host_write_probe['path'], guest_write_probe['path']))
-                expected_controls.update(('host_share_write_denied', 'guest_local_write_denied'))
-            command(root, 'sandbox-negative',
-                    sandbox_command(root, 'sandbox-negative', python,
-                                    ['-I', '-S', '-c', PROBE, *probe_args], env), env)
-            controls = json.loads((root / 'sandbox-negative.stdout').read_bytes())
-            require(set(controls) == expected_controls
-                    and all(value is True for value in controls.values()), 'sandbox control failed')
-        finally:
-            if sys.platform.startswith('linux'):
-                report['outside_write_probes'] = {}
-                if host_write_probe is not None:
-                    report['outside_write_probes']['host_share'] = {
-                        **host_write_probe, **remove_write_probe(host_write_probe)}
-                if guest_write_probe is not None:
-                    report['outside_write_probes']['guest_local'] = {
-                        **guest_write_probe, **remove_write_probe(guest_write_probe)}
+                audit = json.loads((root / '.sandbox/sandbox-negative.audit.json').read_bytes())
+                required = ('mnt', 'net', 'pid')
+                require(audit['status'] == 'running' and audit['landlock_abi'] >= 4
+                        and audit['no_new_privs'] is True and audit['uid'] == os.getuid()
+                        and audit['gid'] == os.getgid()
+                        and all(audit['caller_namespace_ids'][name] !=
+                                audit['sandbox_namespace_ids'][name] for name in required)
+                        and audit['read_only_virtiofs_mounts'],
+                        'Linux namespace or filesystem boundary was not enforced')
+                report['sandbox_isolation'] = audit
         report['sandbox_controls'] = controls
-        if sys.platform.startswith('linux'):
-            audit = json.loads((root / '.sandbox/sandbox-negative.audit.json').read_bytes())
-            required = ('mnt', 'net', 'pid')
-            require(audit['status'] == 'running' and audit['landlock_abi'] >= 4
-                    and audit['no_new_privs'] is True and audit['uid'] == os.getuid()
-                    and audit['gid'] == os.getgid()
-                    and all(audit['caller_namespace_ids'][name] !=
-                            audit['sandbox_namespace_ids'][name] for name in required)
-                    and audit['read_only_virtiofs_mounts'],
-                    'Linux namespace or filesystem boundary was not enforced')
-            report['sandbox_isolation'] = audit
-        policy = sandbox(root, active)
+        policy = (record_windows_policy(root, active) if goos == 'windows'
+                  else sandbox(root, active))
         save(root / 'sandbox-policy.json', policy)
         missing_profile = root / 'home/absent-profile.enc'
 
@@ -537,8 +588,11 @@ def main():
         parser.add_argument('--' + flag, type=Path, required=True)
     parser.add_argument('--go-tool', type=Path)
     parser.add_argument('--published-go-release', action='store_true')
+    parser.add_argument('--sandbox-control', type=Path,
+                        help='compiled Windows denial control (required on Windows)')
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.published_go_release)
+    result = run(args.go, args.rust, args.go_tool, args.output_dir, args.published_go_release,
+                 args.sandbox_control)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 
