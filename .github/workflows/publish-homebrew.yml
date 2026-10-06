@@ -11,6 +11,11 @@ on:
         description: "Release version to publish (for example, v0.12.1)"
         required: true
         type: string
+      dry_run:
+        description: "Render and install-test the formula without pushing it to the tap"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -121,7 +126,16 @@ jobs:
           git -C tap diff --check
           grep -q "version \"$VERSION\"" "$FORMULA"
 
+      - name: Retain the rendered Formula
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: homebrew-formula
+          path: tap/Formula/symeraseme.rb
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Publish updated Formula
+        if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
           git -C tap config user.name "github-actions[bot]"
@@ -134,3 +148,38 @@ jobs:
           git -C tap commit -m "Update symeraseme to $RELEASE_TAG"
           git -C tap push origin main
           git -C tap ls-remote origin refs/heads/main
+
+  install-check:
+    name: Install rendered Formula / ${{ matrix.os }}
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@dc7099b3e807f1e2ecc61f3ecabc840eedd5586a # main
+      - name: Download the rendered Formula
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: homebrew-formula
+          path: ${{ runner.temp }}/formula
+      - name: Install from a disposable local tap and run the formula test
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_FROM_API: '1'
+        run: |
+          set -euo pipefail
+          brew tap-new --no-git local/symeraseme-check
+          cp "$RUNNER_TEMP/formula/symeraseme.rb" "$(brew --repository local/symeraseme-check)/Formula/"
+          brew install --formula local/symeraseme-check/symeraseme
+          brew test local/symeraseme-check/symeraseme
+          prefix="$(brew --prefix)"
+          version="${RELEASE_TAG#v}"
+          test "$("$prefix/bin/symeraseme" --version)" = "symeraseme version $version"
+          # The documented rollback must work from a Homebrew install.
+          test "$(HOME="$RUNNER_TEMP" SYMERASEME_BACKEND=go "$prefix/bin/symeraseme" --version)" = "symeraseme version $version"
+          test -x "$prefix/bin/symeraseme-go"
+    env:
+      RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
