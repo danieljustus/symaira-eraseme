@@ -108,10 +108,6 @@ jobs:
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success')) }}
     runs-on: macos-26
     environment: release
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
     env:
       RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
     steps:
@@ -358,11 +354,6 @@ jobs:
           printf '%s\n' 'The GUI DMG was signed with Developer ID Application, notarized, and stapled. Gatekeeper assessment and published checksum verified.' >> "$NOTES"
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
 
-      - name: Attest build provenance for the published DMG
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: ${{ env.DMG_PATH }}
-
       - name: Clean up signing material
         if: always()
         run: |
@@ -372,3 +363,29 @@ jobs:
           fi
           rm -f "$KEYCHAIN"
           rm -f "$RUNNER_TEMP"/*.p12 "$RUNNER_TEMP"/*.p8 "$RUNNER_TEMP"/*.zip "$RUNNER_TEMP"/*notary*.json "$RUNNER_TEMP"/*response*.json
+
+  attest-dmg:
+    name: Release / Attest published DMG
+    needs: release-gui
+    if: ${{ always() && needs.release-gui.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+    steps:
+      - name: Download the published DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dmg"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Symaira-EraseMe-*-macos.dmg' --dir "$RUNNER_TEMP/dmg"
+          test "$(find "$RUNNER_TEMP/dmg" -name '*.dmg' | wc -l)" -eq 1
+
+      - name: Attest build provenance for the published DMG
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/dmg/*.dmg
