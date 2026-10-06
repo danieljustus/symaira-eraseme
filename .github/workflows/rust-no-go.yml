@@ -47,6 +47,9 @@ on:
       - crates/symeraseme-cli/tests/support/capture_plan_process.rs
       - crates/symeraseme-cli/tests/support/migration_oracle.rs
       - crates/symeraseme-cli/tests/frozen_http_aux.rs
+      - crates/symeraseme-cli/tests/mcp_http_process.rs
+      - crates/symeraseme-cli/tests/mcp_http_native_contract.rs
+      - crates/symeraseme-cli/tests/support/frozen_http_wire.rs
       - crates/symeraseme-cli/tests/support/capture_http_aux.rs
       - crates/symeraseme-cli/tests/support/frozen_http_aux.rs
       - crates/symeraseme-core/tests/support/frozen_campaign_oracle.rs
@@ -153,17 +156,15 @@ jobs:
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "backend_fallback_process",
                               "--locked", "--offline"], env=environment, check=True)
+              # Every mcp_http_process comparator, including the original wire
+              # parent and the six auxiliary families, now replays measured Go.
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "mcp_http_process",
-                              "--locked", "--offline", "go_oracle_http_wire_transcripts_match", "--", "--exact"],
+                              "--test", "mcp_http_native_contract", "--locked", "--offline"],
                              env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "mcp_http_headers_process",
                               "--locked", "--offline"], env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "frozen_http_aux",
                               "--locked", "--offline"], env=environment, check=True)
-              # The seven auxiliary HTTP comparators in mcp_http_process and
-              # mcp_http_native_contract join this Go-absent selection only once
-              # frozen-http-aux-capture.yml records are imported for every target;
-              # until then they correctly fall back to actual Go.
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "campaign_smtp",
                               "--test", "smtp_transport", "--locked", "--offline"], env=environment, check=True)
               # The consent child probe is intentionally not launched directly
