@@ -6,6 +6,8 @@ on:
       - crates/symeraseme-cli/src/mcp/**
       - crates/symeraseme-cli/tests/mcp_http*.rs
       - crates/symeraseme-cli/tests/support/mcp_*
+      - crates/symeraseme-cli/tests/frozen_http_aux.rs
+      - crates/symeraseme-cli/tests/support/*_http_aux.rs
       - cmd/symeraseme/**
       - internal/mcp/**
       - scripts/check-mcp-conformance.py
@@ -109,7 +111,7 @@ jobs:
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked \
-            --test mcp_http_headers_process --test mcp_http_native_contract -- --nocapture
+            --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux -- --nocapture
       - name: Native Windows console, auth, rotation, timeout and disconnect contracts
         if: runner.os == 'Windows'
         shell: bash

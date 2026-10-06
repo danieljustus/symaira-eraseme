@@ -55,6 +55,37 @@ The older pending-integration statements below retain their historical scope.
 signed releases, candidate rollback and Go-free parity remain unfinished.
 No release or seven-day observation is inferred from this merge.
 
+## Auxiliary HTTP comparators replay measured Go; workspace Go-free (2026-10-06, #1131)
+
+A Go-absent full-workspace diagnostic at `a1f4c207` (macOS arm64) failed only
+seven HTTP tests that still started actual Go: both disconnect-cancellation
+parents, startup handoff, occupied and unavailable bind errors, obs-text
+Origin (`mcp_http_process`) and the native bind differential
+(`mcp_http_native_contract`), plus the explicit fallback test when
+`SYMERASEME_ROLLBACK_GO_BINARY` is unset (CI sets it from the retained
+published release). Each of the seven now records its Go observation as
+`symeraseme.actual-go.http-aux.v1` under `SYMERASEME_CAPTURE_HTTP_AUX`, and a
+verified record (whole-record SHA-256, revision, 173 source pins, archived
+generators, clean native VCS) replaces the Go process by default. Live and
+capture modes still run actual Go; every Rust assertion is unchanged.
+
+Capture run `37446911742` at `67d3b61f8c8cb943a6830e7310fc2c018c7bf081`
+produced all 30 records: the six Unix parents on Linux amd64/arm64 and macOS
+arm64/amd64, and the bind differential on those four plus Windows amd64/arm64.
+Because `mcp_http_process.rs` is an archived wire generator, wire run
+`37446911752` recaptured all four Unix wire records at the same head. Its
+first macOS arm64 attempt failed when `set_read_timeout` returned EINVAL on a
+peer-closed socket; the unchanged rerun passed and produced the record. All
+34 records were independently read back before import to
+`tests/fixtures/go-frozen/http-aux-67d3/` and `http-wire/`.
+
+With Go removed from PATH, both HTTP targets pass locally (16 tests), and the
+complete workspace passes 664 tests with only the explicit fallback test
+failing for want of the retained rollback binary. The Go-absent workflow now
+runs `mcp_http_process` and `mcp_http_native_contract` completely. No release,
+cutover or Go removal follows from this; CUT-005 (#1133) still requires its
+own approval.
+
 ## Bounded interrupted HTTP reads and required native recapture (2026-10-04, #1131)
 
 Actual Linux arm64 job `111448045796` passes eleven original HTTP parents

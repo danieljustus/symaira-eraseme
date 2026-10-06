@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.actual-go.http-wire.v1",
-  "source_revision": "a1a1af0569a59b6dcb33d08c9d6d0196479744be",
+  "source_revision": "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
   "source_files": {
     "cmd/symeraseme/command_additional_test.go": {
       "bytes": 9590,
@@ -31,8 +31,8 @@
       "sha256": "2314f8ec87e9468c81402016d442195f1fd942d9b93c969b1e5fb2ad1df3deab"
     },
     "cmd/symeraseme/release_pipeline_test.go": {
-      "bytes": 15201,
-      "sha256": "b3ee3c4c424c6509fdae8f857bc89c734e0ce27cbf60596c64016708bfdd5f3c"
+      "bytes": 15245,
+      "sha256": "d213fe4e48c3d5fccf9ede01a99e1705536dfeb102ffe42b774bc57d3b648507"
     },
     "cmd/symeraseme/storage_wiring_test.go": {
       "bytes": 3245,
@@ -689,8 +689,8 @@
   },
   "archived_generators": {
     "crates/symeraseme-cli/tests/mcp_http_process.rs": {
-      "bytes": 52902,
-      "sha256": "b4759512101358d75a58d37cf6793191aa2fa8818623e63d7e05df9c31478309"
+      "bytes": 60909,
+      "sha256": "e49f3b1b612b0d7eacb23b706a2a2a2cc37aa74a1e315b868896d5253391dd46"
     },
     "crates/symeraseme-cli/tests/support/capture_http_wire.rs": {
       "bytes": 6638,
@@ -707,7 +707,7 @@
   },
   "native_target": "darwin/arm64",
   "go_version": "go1.26.6",
-  "embedded_build_info": "/var/folders/s6/5hzmn6lx4dz5nxs7k_0slzph0000gn/T/symeraseme-mcp-http-3803-1791132187881890000-0/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.2-0.20261004143120-a1a1af0569a5\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=arm64\n\tbuild\tGOOS=darwin\n\tbuild\tGOARM64=v8.0\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=a1a1af0569a59b6dcb33d08c9d6d0196479744be\n\tbuild\tvcs.time=2026-10-04T14:31:20Z\n\tbuild\tvcs.modified=false\n",
+  "embedded_build_info": "/var/folders/s6/5hzmn6lx4dz5nxs7k_0slzph0000gn/T/symeraseme-mcp-http-4348-1791282020322697000-0/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.2-0.20261006095903-67d3b61f8c8c\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=arm64\n\tbuild\tGOOS=darwin\n\tbuild\tGOARM64=v8.0\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=67d3b61f8c8cb943a6830e7310fc2c018c7bf081\n\tbuild\tvcs.time=2026-10-06T09:59:03Z\n\tbuild\tvcs.modified=false\n",
   "server_exit_status": 0,
   "cases": [
     {
