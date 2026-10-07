@@ -105,7 +105,7 @@ class ArtifactSbomControls(unittest.TestCase):
             archive_paths = []
             for system, arch, extension, rust_name in sbom.TARGETS:
                 payload = ('rust-' + system + '-' + arch).encode()
-                binary = binaries / ('binary-' + system + '-' + arch)
+                binary = binaries / ('rust-binary-' + system + '-' + arch)
                 binary.write_bytes(payload)
                 archive = dist / ('symeraseme_' + version + '_' + system + '_' + arch + '.' + extension)
                 members = [(rust_name, payload, 0o755), ('LICENSE', b'license-fixture', 0o644),

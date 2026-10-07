@@ -187,7 +187,7 @@ def generate(dist, binaries, extractor, source_revision):
     outputs = []
     for system, arch, extension, _ in TARGETS:
         archive = dist / ('symeraseme_' + version + '_' + system + '_' + arch + '.' + extension)
-        binary = binaries / ('binary-' + system + '-' + arch)
+        binary = binaries / ('rust-binary-' + system + '-' + arch)
         verify_archive_binary(archive, binary, system)
         inventory = read_inventory(binary, extractor)
         root_package = next(item for item in inventory['packages'] if item.get('root') is True)
