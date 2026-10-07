@@ -42,7 +42,7 @@ jobs:
           ref: 21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0 # 0.1.16, immutable upstream source
           path: official-conformance
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24.19.0'
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
