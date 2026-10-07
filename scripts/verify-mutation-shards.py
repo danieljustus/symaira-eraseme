@@ -36,9 +36,9 @@ def verify_group(documents, scope, denominator, head):
         ] if scope == "HTTP auth" else []
         if scope == "consent":
             expected_inactive = [
-                r'consent\.rs:628:5: replace close_windows_file .* with Ok\(\(\)\)$',
-                r'consent\.rs:640:5: replace checked_windows_close .* with Ok\(\(\)\)$',
-                r'consent\.rs:644:39: replace != with == in checked_windows_close$',
+                r'consent\.rs:627:5: replace close_windows_file .* with Ok\(\(\)\)$',
+                r'consent\.rs:639:5: replace checked_windows_close .* with Ok\(\(\)\)$',
+                r'consent\.rs:643:39: replace != with == in checked_windows_close$',
             ]
         assert receipt["inactive_target_exclusions"] == expected_inactive, "unexpected platform exclusions"
         index, total = map(int, receipt["shard"].split("/"))
