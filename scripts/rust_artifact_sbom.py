@@ -3,11 +3,14 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import selectors
+import signal
 import subprocess
-import tempfile
 import tarfile
+import time
 import zipfile
 from urllib.parse import quote
 
@@ -15,6 +18,7 @@ from stage_rust_release_archives import TARGETS
 
 MAX_INVENTORY_BYTES = 8 * 1024 * 1024
 MAX_EXTRACTOR_STDERR_BYTES = 65536
+EXTRACTOR_TIMEOUT_SECONDS = 30
 
 
 def require(condition, message):
@@ -83,16 +87,45 @@ def validate_inventory(value):
 
 
 def read_inventory(binary, extractor):
-    with tempfile.TemporaryDirectory(prefix='rust-artifact-inventory-') as directory:
-        out, err = Path(directory) / 'out.json', Path(directory) / 'err.txt'
-        with out.open('xb') as stdout, err.open('xb') as stderr:
-            result = subprocess.run([str(extractor), str(binary)], stdin=subprocess.DEVNULL,
-                                    stdout=stdout, stderr=stderr, check=False, timeout=30)
-        require(result.returncode == 0, 'auditable extractor rejected release binary')
-        require(out.stat().st_size <= MAX_INVENTORY_BYTES
-                and err.stat().st_size <= MAX_EXTRACTOR_STDERR_BYTES,
-                'auditable extractor output exceeded bounds')
-        value = json.loads(out.read_bytes())
+    # Extraction runs on the POSIX archive assembler, for all six native formats.
+    require(os.name == 'posix', 'inventory extraction requires POSIX owned process groups')
+    command = [str(extractor), str(binary)]
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, bufsize=0, start_new_session=True)
+    assert process.stdout is not None and process.stderr is not None
+    output, errors = bytearray(), bytearray()
+    deadline = time.monotonic() + EXTRACTOR_TIMEOUT_SECONDS
+    try:
+        with selectors.DefaultSelector() as streams:
+            streams.register(process.stdout, selectors.EVENT_READ, (output, MAX_INVENTORY_BYTES))
+            streams.register(process.stderr, selectors.EVENT_READ, (errors, MAX_EXTRACTOR_STDERR_BYTES))
+            while streams.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, EXTRACTOR_TIMEOUT_SECONDS)
+                for key, _ in streams.select(remaining):
+                    buffer, limit = key.data
+                    block = os.read(key.fd, min(65536, limit - len(buffer) + 1))
+                    if not block:
+                        streams.unregister(key.fileobj)
+                    else:
+                        require(len(buffer) + len(block) <= limit,
+                                'auditable extractor output exceeded bounds')
+                        buffer.extend(block)
+        process.wait(timeout=max(0, deadline - time.monotonic()))
+        require(process.returncode == 0, 'auditable extractor rejected release binary')
+    finally:
+        try:
+            # Kill descendants holding the pipes even if the extractor has exited.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=2)
+        finally:
+            process.stdout.close()
+            process.stderr.close()
+    value = json.loads(output)
     validate_inventory(value)
     return value
 

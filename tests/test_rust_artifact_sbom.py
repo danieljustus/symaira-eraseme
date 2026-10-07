@@ -6,10 +6,13 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
@@ -26,6 +29,39 @@ RUST_FIXTURE_SHA256 = 'c17e279d7bc91a54b9e97153c4b0b11139b97ce590b8b06c1a733fbb8
 
 
 class ArtifactSbomControls(unittest.TestCase):
+    def test_extractor_output_caps_and_deadline_stop_the_owned_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / 'binary'
+            binary.write_bytes(b'fixture')
+            extractor = root / 'extractor'
+            marker = root / 'completed'
+            for descriptor in (1, 2):
+                with self.subTest(descriptor=descriptor):
+                    extractor.write_text(
+                        '#!/usr/bin/env python3\nimport os\nfrom pathlib import Path\n'
+                        f'os.write({descriptor}, b"x" * (1024 * 1024))\n'
+                        f'Path({str(marker)!r}).touch()\n')
+                    extractor.chmod(0o755)
+                    with patch.object(sbom, 'MAX_INVENTORY_BYTES', 1024), \
+                            patch.object(sbom, 'MAX_EXTRACTOR_STDERR_BYTES', 256):
+                        with self.assertRaisesRegex(ValueError, 'output exceeded bounds'):
+                            sbom.read_inventory(binary, extractor)
+                    self.assertFalse(marker.exists(), 'producer completed before the cap was enforced')
+
+            pid_file = root / 'pid'
+            extractor.write_text(
+                '#!/usr/bin/env python3\nimport os, time\nfrom pathlib import Path\n'
+                f'Path({str(pid_file)!r}).write_text(str(os.getpid()))\n'
+                'time.sleep(60)\n')
+            started = time.monotonic()
+            with patch.object(sbom, 'EXTRACTOR_TIMEOUT_SECONDS', 1):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    sbom.read_inventory(binary, extractor)
+            self.assertLess(time.monotonic() - started, 5)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pid_file.read_text()), 0)
+
     def test_embedded_graph_rejects_cycle_roots_bad_indexes_and_unreachable_packages(self):
         cycle = copy.deepcopy(INVENTORY)
         cycle['packages'][1]['dependencies'] = [0]

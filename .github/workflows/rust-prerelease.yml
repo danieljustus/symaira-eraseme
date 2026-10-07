@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/rust-prerelease.yml
+      - .github/workflows/release.yml
       - Cargo.toml
       - Cargo.lock
       - crates/**
@@ -17,6 +18,7 @@ on:
       - scripts/rust_artifact_sbom.py
       - scripts/verify_rust_artifact_sbom.py
       - tests/test_rust_artifact_sbom.py
+      - tests/test_rust_release_workflow.py
       - scripts/verify_windows_dll_dependencies.py
       - tests/verify_release_archives.py
       - README.md
@@ -237,6 +239,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Verify release immutability and attestation controls
+        shell: bash
+        run: python3 -m unittest discover -s tests -p test_rust_release_workflow.py -v
 
       - name: Read release version
         shell: bash
