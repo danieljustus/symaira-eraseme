@@ -8,6 +8,25 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## Published canary prerelease v0.13.0 (2026-10-06, #1128, #1129)
+
+Tag `v0.13.0` on `780512f17d4dd434676d62539f81550ce048f77e` ran release
+`37475999775`: six native archive builds, staging/verification, the
+prerelease publish with build-provenance attestations, the signed and
+notarized DMG, and the DMG attestation all passed. Independent readback:
+the release is a prerelease (stable `latest` stays `v0.12.1`); all six archives
+and the DMG verify against `checksums.txt`, and every SBOM sidecar against
+`sbom-checksums.txt`. `gh attestation verify` passes for all seven
+artifacts. Each archive root holds `LICENSE`, `README.md`, `symeraseme` and
+`symeraseme-go`. The DMG and app are stapled and accepted by Gatekeeper as
+Notarized Developer ID, and both nested backends satisfy their Designated
+Requirement (team `M4744F3TAA`). Homebrew dry run `37496131697` installed the formula rendered
+from these assets on four native hosts without touching the public tap.
+REL-001..010 are PASS for the published canary. The tap write token
+(`HOMEBREW_TAP_GITHUB_TOKEN`) must be rotated before stable promotion. The
+canary also starts CUT-004 (#1132): stable promotion and the seven-day
+observation remain open.
+
 ## Six-target release-candidate switchback (2026-10-06, #1130)
 
 `plain-store-switchback.yml` now calls the prerelease workflow and runs the
