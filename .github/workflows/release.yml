@@ -33,7 +33,11 @@ jobs:
       - name: Checkout tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Verify pinned CLI release source
+        run: bash scripts/verify-release-source.sh
 
       - name: Require the tag to match the package version
         run: |
@@ -75,6 +79,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           cd "$RUNNER_TEMP/dist"
           NOTES="$RUNNER_TEMP/notes.md"
           cat > "$NOTES" <<EOF
@@ -117,7 +122,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify immutable release source
+        run: bash scripts/verify-release-source.sh
 
       - name: Refuse to replace an existing GUI asset
         env:
@@ -296,6 +305,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           gh release upload "$RELEASE_TAG" "$DMG_PATH" --repo "$GITHUB_REPOSITORY"
 
       - name: Verify published DMG asset and record release
@@ -303,6 +313,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           ASSET_NAME="$(basename "$DMG_PATH")"
           DOWNLOAD_DIR="$RUNNER_TEMP/published-release"
           mkdir -p "$DOWNLOAD_DIR"
@@ -382,11 +393,18 @@ jobs:
     env:
       RELEASE_TAG: ${{ github.ref_name }}
     steps:
+      - name: Checkout attested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Download the published DMG
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           mkdir -p "$RUNNER_TEMP/dmg"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Symaira-EraseMe-*-macos.dmg' --dir "$RUNNER_TEMP/dmg"
           test "$(find "$RUNNER_TEMP/dmg" -name '*.dmg' | wc -l)" -eq 1

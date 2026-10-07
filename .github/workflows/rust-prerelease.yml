@@ -19,6 +19,7 @@ on:
       - scripts/verify_rust_artifact_sbom.py
       - tests/test_rust_artifact_sbom.py
       - tests/test_rust_release_workflow.py
+      - scripts/verify-release-source.sh
       - scripts/verify_windows_dll_dependencies.py
       - tests/verify_release_archives.py
       - README.md
@@ -89,6 +90,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Read release version
@@ -238,6 +240,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Verify release immutability and attestation controls

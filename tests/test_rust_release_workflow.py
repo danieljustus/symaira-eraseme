@@ -22,6 +22,13 @@ class ReleaseWorkflowControls(unittest.TestCase):
 
         self.assertNotIn('workflow_dispatch', workflow)
         self.assertNotIn('github.event.inputs', workflow)
+        self.assertIn('ref: ${{ github.sha }}', step('Checkout workflow source'))
+        for name in ('Checkout tagged source', 'Checkout attested source'):
+            self.assertIn('ref: ${{ github.sha }}', step(name))
+        archives = (ROOT / '.github/workflows/rust-prerelease.yml').read_text()
+        self.assertEqual(archives.count('uses: actions/checkout@'), 2)
+        self.assertEqual(archives.count('ref: ${{ github.sha }}'), 2)
+        self.assertIn('      - scripts/verify-release-source.sh', archives)
         self.assertIn("github.event_name == 'push' && needs.release-cli.result == 'success'", workflow)
         self.assertNotIn('--clobber', step('Upload GUI DMG to release'))
         preflight = step('Refuse to replace an existing GUI asset')
@@ -71,6 +78,67 @@ class ReleaseWorkflowControls(unittest.TestCase):
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
                     self.assertEqual(result.returncode == 0, accepted, result.stderr.decode())
                     self.assertEqual(json.loads(calls.read_text())[:3], ['release', 'view', tag])
+
+        # Use real disposable Git repositories to exercise the exact source guard.
+        guard = ROOT / 'scripts/verify-release-source.sh'
+        self.assertIn('bash scripts/verify-release-source.sh', step('Verify immutable release source'))
+        self.assertLess(workflow.index('      - name: Verify immutable release source'),
+                        workflow.index('      - name: Import Developer ID certificate'))
+        for name in ('Publish the prerelease and read every asset back',
+                     'Upload GUI DMG to release', 'Verify published DMG asset and record release',
+                     'Download the published DMG'):
+            guarded = step(name)
+            self.assertIn('bash scripts/verify-release-source.sh', guarded)
+            self.assertLess(guarded.index('bash scripts/verify-release-source.sh'),
+                            guarded.index('gh release'))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository = root / 'build'
+            remote = root / 'origin.git'
+            env = {'PATH': os.environ['PATH'], 'HOME': str(root), 'GIT_CONFIG_NOSYSTEM': '1',
+                   'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_AUTHOR_NAME': 'Fixture',
+                   'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
+                   'GIT_COMMITTER_NAME': 'Fixture', 'GIT_COMMITTER_EMAIL': 'fixture@example.invalid'}
+
+            def git(*args):
+                return subprocess.run(['git', '-C', str(repository), *args], env=env, check=True,
+                                      capture_output=True, text=True, timeout=5).stdout.strip()
+
+            subprocess.run(['git', 'init', '--bare', str(remote)], env=env, check=True,
+                           capture_output=True, timeout=5)
+            subprocess.run(['git', 'init', str(repository)], env=env, check=True,
+                           capture_output=True, timeout=5)
+            git('remote', 'add', 'origin', str(remote))
+            git('commit', '--allow-empty', '-m', 'event source')
+            source = git('rev-parse', 'HEAD')
+            git('commit', '--allow-empty', '-m', 'different source')
+            moved = git('rev-parse', 'HEAD')
+            git('checkout', '--detach', source)
+            env.update(GITHUB_SHA=source, GITHUB_REF='refs/tags/v0.13.1',
+                       RELEASE_TAG='v0.13.1', GITHUB_REF_PROTECTED='true')
+            for annotated in (False, True):
+                with self.subTest(annotated=annotated):
+                    tag_args = ['-f', '-a', '-m', 'fixture'] if annotated else ['-f']
+                    git('tag', *tag_args, 'v0.13.1', source)
+                    git('push', '--force', 'origin', 'refs/tags/v0.13.1')
+                    for case in ('matching', 'moved-tag', 'wrong-checkout', 'deleted-tag',
+                                 'unprotected-tag', 'wrong-event-ref'):
+                        with self.subTest(case=case):
+                            case_env = env.copy()
+                            git('checkout', '--detach', moved if case == 'wrong-checkout' else source)
+                            git('tag', *tag_args, 'v0.13.1', moved if case == 'moved-tag' else source)
+                            git('push', '--force', 'origin', 'refs/tags/v0.13.1')
+                            if case == 'deleted-tag':
+                                git('push', 'origin', ':refs/tags/v0.13.1')
+                            if case == 'unprotected-tag':
+                                case_env['GITHUB_REF_PROTECTED'] = 'false'
+                            if case == 'wrong-event-ref':
+                                case_env['GITHUB_REF'] = 'refs/tags/v0.13.0'
+                            result = subprocess.run(['bash', str(guard)], cwd=repository, env=case_env,
+                                                    capture_output=True, text=True, timeout=5)
+                            self.assertEqual(result.returncode == 0, case == 'matching', result.stderr)
+                            self.assertEqual(git('rev-parse', 'HEAD'),
+                                             moved if case == 'wrong-checkout' else source)
 
 
 if __name__ == '__main__':
