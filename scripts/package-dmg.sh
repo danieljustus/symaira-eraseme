@@ -94,7 +94,7 @@ if [ "$DMG_ONLY" != "true" ]; then
 
     BUILD_DIR="$SWIFT_BIN_PATH"
 
-    echo "Building the default Rust MCP server and explicit Go fallback..."
+    echo "Building the self-contained Rust MCP server..."
     "$REPO_ROOT/scripts/build-app-backends.sh" "$BUILD_DIR" release
 
     echo "Creating App Bundle structure..."
@@ -133,11 +133,10 @@ if [ "$DMG_ONLY" != "true" ]; then
         echo "Warning: actool unavailable; keeping the approved ICNS fallback only." >&2
     fi
 
-    echo "Copying Swift, Rust and explicit Go fallback binaries..."
+    echo "Copying Swift and Rust binaries..."
     cp "$BUILD_DIR/SymairaEraseMe" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     cp "$BUILD_DIR/symeraseme" "$APP_BUNDLE/Contents/MacOS/symeraseme"
-    cp "$BUILD_DIR/symeraseme-go" "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
-    chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme" "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
+    chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
     test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
 
     echo "Writing Info.plist..."
@@ -180,8 +179,8 @@ EOF
     # Sign nested binary with hardened runtime, then sign app bundle with hardened runtime.
     if [ -n "${CODESIGN_IDENTITY:-}" ]; then
         echo "Signing app bundle with identity: $CODESIGN_IDENTITY"
-        # Sign both nested executables before signing the containing app.
-        for backend in symeraseme symeraseme-go; do
+        # Sign the Rust backend before signing the containing app.
+        for backend in symeraseme; do
             codesign --remove-signature "$APP_BUNDLE/Contents/MacOS/$backend" || true
             codesign --force --timestamp --options runtime \
                 ${CODESIGN_KEYCHAIN_ARGS[@]+"${CODESIGN_KEYCHAIN_ARGS[@]}"} \

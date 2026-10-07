@@ -83,10 +83,9 @@ jobs:
           and is not offered through Homebrew until it is promoted to a stable release.
 
           - \`symeraseme\` in every archive is the Rust implementation and the default backend.
-          - \`symeraseme-go\` is the last Go implementation, shipped only as an explicit rollback:
-            run with \`SYMERASEME_BACKEND=go\` to dispatch to it. It reads and writes the same data.
+          - No Go backend is bundled; the former backend selector is retired.
           - Each archive has a CycloneDX SBOM (\`*.cdx.json\`) built from the dependency graph
-            embedded in both binaries; \`sbom-checksums.txt\` lists their digests.
+            embedded in the Rust binary; \`sbom-checksums.txt\` lists their digests.
           - Build provenance for the six archives is attested by GitHub; verify with
             \`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`.
 
@@ -133,12 +132,6 @@ jobs:
             echo "::error::Expected Xcode 26 or newer, got: $XCODE_VERSION"
             exit 1
           fi
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-          cache: true
 
       - name: Install pinned Rust backend toolchain
         run: |
@@ -202,10 +195,9 @@ jobs:
           test -d "$APP_PATH"
           test -x "$APP_PATH/Contents/MacOS/Symaira EraseMe"
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
-          test -x "$APP_PATH/Contents/MacOS/symeraseme-go"
+          test ! -e "$APP_PATH/Contents/MacOS/symeraseme-go"
           test "$("$APP_PATH/Contents/MacOS/symeraseme" --version)" = "symeraseme version ${RELEASE_TAG#v}"
-          test "$("$APP_PATH/Contents/MacOS/symeraseme-go" version)" = "symeraseme ${RELEASE_TAG#v}"
-          for backend in symeraseme symeraseme-go; do
+          for backend in symeraseme; do
             codesign --verify --strict --verbose=2 "$APP_PATH/Contents/MacOS/$backend"
           done
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'

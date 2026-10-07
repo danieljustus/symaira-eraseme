@@ -109,12 +109,6 @@ jobs:
           cargo +"$RUST_TOOLCHAIN" install cargo-auditable --version 0.7.7 --locked --root "$RUNNER_TEMP/artifact-audit-tools"
           printf '%s\n' "$RUNNER_TEMP/artifact-audit-tools/bin" >> "$GITHUB_PATH"
 
-      - name: Install Go oracle toolchain
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-          cache: false
-
       - name: Install static Linux linker
         if: runner.os == 'Linux'
         shell: bash
@@ -211,111 +205,11 @@ jobs:
 
           cp "$binary" "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
 
-      - name: Build matching Go fallback and probe both dispatch paths
-        shell: bash
-        env:
-          ARCHIVE_OS: ${{ matrix.os }}
-          ARCHIVE_ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          export GOWORK=off GOENV=off GOTOOLCHAIN=local CGO_ENABLED=0
-          go_binary="$RUNNER_TEMP/go-binary-$ARCHIVE_OS-$ARCHIVE_ARCH"
-          pair="$RUNNER_TEMP/fallback-probe-$ARCHIVE_OS-$ARCHIVE_ARCH"
-          rust_name=symeraseme
-          go_name=symeraseme-go
-          mkdir -p "$pair/home" "$pair/data"
-          if [[ "$RUNNER_OS" == Windows ]]; then
-            rust_name+=".exe"
-            go_name+=".exe"
-          fi
-          probe_command() {
-            local stage="$1"
-            shift
-            local stdout="$pair/$stage.stdout"
-            local stderr="$pair/$stage.stderr"
-            printf 'fallback_probe_stage=%s\n' "$stage"
-            if "$@" >"$stdout" 2>"$stderr"; then
-              printf 'fallback_probe_result=%s status=passed\n' "$stage"
-            else
-              local status=$?
-              printf '::error title=Fallback probe failed::stage=%s exit=%s\n' "$stage" "$status"
-              printf '%s stdout:\n' "$stage" >&2
-              cat "$stdout" >&2
-              printf '%s stderr:\n' "$stage" >&2
-              cat "$stderr" >&2
-              return "$status"
-            fi
-          }
-
-          compare_probe() {
-            local stage="$1"
-            local expected="$2"
-            local actual="$3"
-            printf 'fallback_probe_stage=%s\n' "$stage"
-            if cmp -s "$expected" "$actual"; then
-              printf 'fallback_probe_result=%s status=matched\n' "$stage"
-            else
-              local diff_status=0
-              diff -u "$expected" "$actual" >"$pair/$stage.diff" || diff_status=$?
-              if [[ "$diff_status" -gt 1 ]]; then
-                printf 'fallback_probe_diff_status=%s\n' "$diff_status" >&2
-              fi
-              printf '::error title=Fallback probe mismatch::stage=%s\n' "$stage"
-              cat "$pair/$stage.diff" >&2
-              return 1
-            fi
-          }
-
-          probe_command go-build go build -buildvcs=true -trimpath -ldflags "-s -w -X main.versionValue=$RELEASE_VERSION" -o "$go_binary" ./cmd/symeraseme
-          go version -m "$go_binary" > "$RUNNER_TEMP/go-build-info-$ARCHIVE_OS-$ARCHIVE_ARCH.txt"
-
-          rust_pair="$pair/$rust_name"
-          go_pair="$pair/$go_name"
-          probe_command stage-rust-binary cp "$RUNNER_TEMP/rust-binary-$ARCHIVE_OS-$ARCHIVE_ARCH" "$rust_pair"
-          probe_command stage-go-fallback cp "$go_binary" "$go_pair"
-
-          probe_command go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
-            "$go_pair" version --json
-          python3 - "$pair/go-version.stdout" <<'PY'
-          import json, os, sys
-          with open(sys.argv[1], encoding='utf-8') as source:
-              observed = json.load(source)
-          expected = {'tool': 'symeraseme', 'version': os.environ['RELEASE_VERSION'], 'schema_version': 1}
-          if observed != expected:
-              raise SystemExit('native Go fallback version differs from the Rust release identity')
-          PY
-          probe_command rust-go-version env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
-            "$rust_pair" version --json
-          compare_probe version-output "$pair/go-version.stdout" "$pair/rust-go-version.stdout"
-
-          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"archive-fallback-probe","version":"1"}}}' > "$pair/initialize.json"
-          probe_command go-mcp env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" \
-            "$go_pair" mcp --stdio < "$pair/initialize.json"
-          probe_command rust-go-mcp env HOME="$pair/home" SYMERASEME_DATA_DIR="$pair/data" SYMERASEME_BACKEND=go \
-            "$rust_pair" mcp --stdio < "$pair/initialize.json"
-          compare_probe mcp-output "$pair/go-mcp.stdout" "$pair/rust-go-mcp.stdout"
-
       - name: Upload native binary for same-run archive verification
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rust-prerelease-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/rust-binary-${{ matrix.os }}-${{ matrix.arch }}
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload matching Go fallback for same-run archive verification
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: rust-prerelease-go-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ runner.temp }}/go-binary-${{ matrix.os }}-${{ matrix.arch }}
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload native Go fallback embedded dependency identity
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: rust-prerelease-go-info-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ runner.temp }}/go-build-info-${{ matrix.os }}-${{ matrix.arch }}.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -337,12 +231,6 @@ jobs:
           from pathlib import Path
           print("RELEASE_VERSION=" + tomllib.loads(Path("Cargo.toml").read_text())["workspace"]["package"]["version"])
           PY
-
-      - name: Install pinned native Go build-info reader
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
-        with:
-          go-version: '1.26.6'
-          cache: false
 
       - name: Download same-run native binaries
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -366,16 +254,10 @@ jobs:
             --linux-amd64 "$BINARIES/rust-binary-linux-amd64" \
             --linux-arm64 "$BINARIES/rust-binary-linux-arm64" \
             --windows-amd64 "$BINARIES/rust-binary-windows-amd64" \
-            --windows-arm64 "$BINARIES/rust-binary-windows-arm64" \
-            --go-darwin-amd64 "$BINARIES/go-binary-darwin-amd64" \
-            --go-darwin-arm64 "$BINARIES/go-binary-darwin-arm64" \
-            --go-linux-amd64 "$BINARIES/go-binary-linux-amd64" \
-            --go-linux-arm64 "$BINARIES/go-binary-linux-arm64" \
-            --go-windows-amd64 "$BINARIES/go-binary-windows-amd64" \
-            --go-windows-arm64 "$BINARIES/go-binary-windows-arm64"
-          python3 tests/verify_release_archives.py "$DIST" --require-go-fallback
+            --windows-arm64 "$BINARIES/rust-binary-windows-arm64"
+          python3 tests/verify_release_archives.py "$DIST"
 
-      - name: Generate artifact-level Rust and Go CycloneDX SBOMs
+      - name: Generate artifact-level Rust CycloneDX SBOMs
         shell: bash
         env:
           BINARIES: ${{ runner.temp }}/rust-prerelease-binaries
@@ -386,7 +268,7 @@ jobs:
           cargo +"$RUST_TOOLCHAIN" install rust-audit-info --version 0.5.4 --locked --root "$RUNNER_TEMP/artifact-audit-tools"
           python3 -m unittest discover -s tests -p test_rust_artifact_sbom.py -v
           python3 scripts/rust_artifact_sbom.py --dist "$DIST" --binaries "$BINARIES" --extractor "$RUNNER_TEMP/artifact-audit-tools/bin/rust-audit-info" --source-revision "$(git rev-parse HEAD)"
-          python3 scripts/verify_rust_artifact_sbom.py --dist "$DIST" --extractor "$RUNNER_TEMP/artifact-audit-tools/bin/rust-audit-info" --go-tool "$(command -v go)" --source-revision "$(git rev-parse HEAD)"
+          python3 scripts/verify_rust_artifact_sbom.py --dist "$DIST" --extractor "$RUNNER_TEMP/artifact-audit-tools/bin/rust-audit-info" --source-revision "$(git rev-parse HEAD)"
 
       - name: Upload verified shadow archives
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

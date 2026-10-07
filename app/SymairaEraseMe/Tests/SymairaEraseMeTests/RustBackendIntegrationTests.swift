@@ -23,7 +23,7 @@ final class RustBackendIntegrationTests: XCTestCase {
         let resources = app.appendingPathComponent("Contents/Resources", isDirectory: true)
         let binary = app.appendingPathComponent("Contents/MacOS/symeraseme").path
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: binary))
-        XCTAssertTrue(FileManager.default.isExecutableFile(atPath:
+        XCTAssertFalse(FileManager.default.fileExists(atPath:
             app.appendingPathComponent("Contents/MacOS/symeraseme-go").path))
         XCTAssertEqual(ServerManager.bundledBinaryPath(resourceURL: resources), binary)
         try await exerciseBackend(binary: binary, resourceURL: resources)

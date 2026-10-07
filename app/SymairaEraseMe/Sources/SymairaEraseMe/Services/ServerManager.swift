@@ -194,8 +194,7 @@ final class ServerManager: ObservableObject {
     ///    app's safe Homebrew-compatible directory scan.
     ///
     /// There is deliberately no Python or `uv` fallback. The bundled Rust backend is
-    /// self-contained. SYMERASEME_BACKEND=go selects its explicit sibling
-    /// symeraseme-go during the reversible transition.
+    /// self-contained and does not select a legacy runtime.
     private func resolveLaunchPlan() -> LaunchPlan {
         let mcpArguments = ["mcp", "--host", host, "--port", "\(port)"]
 

@@ -210,18 +210,22 @@ test_package_dmg_modes() {
     python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert p.get("CFBundleIconName")=="AppIcon"; assert p.get("CFBundleIconFile")=="AppIcon.icns"' "$APP_BUNDLE/Contents/Info.plist"
     test ! -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
 
-    # Both backends are executable; the default is the Rust output.
+    # Only the Rust backend is bundled; no Go compiler is needed.
     test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
-    test -x "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
+    test ! -e "$APP_BUNDLE/Contents/MacOS/symeraseme-go"
     cmp "$TEST_DIR/mock_rust_bin/symeraseme-rust" "$APP_BUNDLE/Contents/MacOS/symeraseme"
     grep -q 'cargo build --locked -p symeraseme-cli --bin symeraseme-rust --release' "$MOCK_LOG"
-    # Verify both nested binaries are signed before the outer app bundle.
+    if grep -q '^go ' "$MOCK_LOG"; then
+        echo "FAIL: Rust-only app packaging invoked Go" >&2
+        return 1
+    fi
+    # Verify the Rust backend is signed before the outer app bundle.
     python3 - "$MOCK_LOG" "$APP_BUNDLE" <<'PYCODE'
 import pathlib, sys
 lines = pathlib.Path(sys.argv[1]).read_text().splitlines()
 app = sys.argv[2]
 outer = next(i for i, line in enumerate(lines) if line.startswith('codesign --deep --force') and line.endswith(app))
-for name in ('symeraseme', 'symeraseme-go'):
+for name in ('symeraseme',):
     nested = next(i for i, line in enumerate(lines) if line.startswith('codesign --force') and line.endswith(app + '/Contents/MacOS/' + name))
     assert nested < outer
 PYCODE

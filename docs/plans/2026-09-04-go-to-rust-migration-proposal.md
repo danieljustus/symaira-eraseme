@@ -1,15 +1,22 @@
 # Go-to-Rust migration proposal
 
-> **Status:** proposal — implementation is blocked until Daniel answers only `go`
+> **Status:** implementation accepted; Rust-only distribution and scoped Windows FFI review approved with `ok go` on 2026-10-07. Stable gates remain open.
 > **Depends on:** #794–#800 and #816–#817, approval of this document and the implementation plan
 > **Produces:** code, tests, release artifacts, migration documentation
 
 ## 1. Why this change
 
-Symaira EraseMe is currently a working, CGO-free Go 1.26.6 application with a
+At the proposal baseline, Symaira EraseMe was a working, CGO-free Go 1.26.6 application with a
 SwiftUI client. Rust is therefore not a rescue operation. The rewrite is only
 worth shipping if it preserves every observable contract and yields measured
-operational value without weakening portability or rollback.
+operational value without weakening portability, backups or data compatibility.
+
+The accepted 2026-10-07 distribution change supersedes the original bundled
+Go rollback requirement: new CLI archives and the app contain only Rust.
+`v0.13.0` remains an immutable historical dual-backend canary. The updated
+candidate must pass its own gates; earlier artifact evidence is not reused
+as proof of changed contents. Go source remains a development oracle until
+the separately reviewed CUT-005 retirement, not a distributed fallback.
 
 Baseline captured from `v0.12.1` / commit
 `240bf67cefa05e643e32611a02e6e7ed87a033ea` on 2026-09-04:
@@ -32,8 +39,11 @@ is not itself a success metric.
 
 Cutover value gate:
 
-- zero first-party `unsafe` and fuzz/property coverage at every untrusted
-  parser/protocol boundary;
+- first-party `unsafe` remains denied by default. Only the explicitly approved
+  Windows file-replacement, fallible handle-close and fixed-buffer error-format
+  boundaries may receive function-local exceptions, after independent review
+  and native Windows amd64/arm64 acceptance (#1173). No blanket allowance is
+  approved. Fuzz/property coverage remains required at untrusted boundaries;
 - no unexplained regression above 20% in p95 startup, maximum RSS, unpacked
   binary size or release archive size;
 - at least one measured 15% improvement in p95 startup or maximum RSS, **or**
@@ -58,7 +68,7 @@ Cutover value gate:
 | External boundaries | SMTP, IMAP, OAuth2, LLM providers and the production inbox/web-form behavior corrected by #799/#800 |
 | SwiftUI app | No protocol changes required; it still launches `symeraseme mcp` and reads `mcp_token` |
 | Distribution | Same archive names/layout, checksums, Homebrew installation, DMG layout/signing and supported targets |
-| Rollback | Last known-good Go backend remains runnable and shippable through one stable Rust release |
+| Recovery and compatibility | Backups, historical releases and copied-store compatibility remain verified; no Go binary is bundled in new releases |
 
 ### Out of scope
 
@@ -70,25 +80,24 @@ Cutover value gate:
 | New browser automation | Current Go default/manual fallback is the oracle; a new `symbrowse` protocol needs a separate proposal |
 | Template wording changes | Legal output must remain byte-stable |
 | SwiftUI redesign | The app is a consumer, not part of the language port |
-| Deleting Go during implementation | Go remains the executable oracle and rollback path |
+| Deleting Go during implementation | Go remains the development oracle until separate CUT-005 retirement, never a bundled runtime |
 | A cross-repository Cargo workspace | Violates repository independence |
 
 ## 3. Delivery model
 
 The repository becomes a temporary dual-language repository:
 
-1. Go remains the default `symeraseme` implementation.
+1. Rust is the default and only distributed `symeraseme` implementation.
 2. Rust builds as `target/.../symeraseme`; parity tooling copies it to an
    isolated name/path so both binaries can run in one test.
 3. Every vertical slice adds black-box Go↔Rust comparisons.
-4. A prerelease ships Rust as the primary `symeraseme` plus a sibling
-   `symeraseme-go` fallback.
-5. `SYMERASEME_BACKEND=go` makes the Rust entrypoint replace itself with the
-   sibling fallback on Unix and spawn/wait with inherited stdio plus exact exit
-   propagation on Windows. The fallback is documented, tested and never
-   selected silently.
+4. New prereleases ship only `symeraseme` (`symeraseme.exe` on Windows),
+   `LICENSE` and `README.md`; the app bundles only the Rust MCP backend.
+5. The former `SYMERASEME_BACKEND` selector is retired. Copied-store Go↔Rust
+   compatibility tests build a separate development oracle outside the
+   archives and app; they do not depend on a packaged fallback.
 6. After one stable Rust release without unexplained parity defects, Go removal
-   is a separate reviewed PR. The last Go tag and rollback instructions remain.
+   is a separate reviewed PR. Historical tags and downloadable artifacts remain.
 
 The SwiftUI app keeps the same subprocess and MCP boundary. Only build/package
 scripts change from `go build` to Cargo after cutover.
@@ -206,11 +215,11 @@ the companion implementation plan.
    tests, Swift app integration.
 8. **Release shadowing** — native six-target artifacts, SBOM/audit/deny,
    Homebrew/DMG dry runs, signed/notarized test artifact.
-9. **Reversible cutover** — prerelease, bundled Go fallback, explicit canary,
-   stable Rust release.
+9. **Rust-only cutover** — new immutable prerelease, explicit canary,
+   verified stable Rust release and seven-day observation.
 10. **Retirement** — remove Go only in a later PR after the observation gate.
 
-Each stage is mergeable while the Go product remains fully working.
+The development oracle remains runnable until its separately reviewed retirement.
 
 ## 7. Gates
 
@@ -220,12 +229,14 @@ Each stage is mergeable while the Go product remains fully working.
   formatting, Clippy and affected native tests. Mismatches are defects until
   explicitly classified.
 - **Escalation gate:** any intended contract change, unsupported platform,
-  unsafe Rust, schema change or weaker secret handling returns to Daniel.
+  additional unsafe Rust beyond the approved reviewed Windows boundaries,
+  schema change or weaker secret handling returns to Daniel.
 - **Abort gate:** inability to read existing encrypted data, corruption or loss
-  risk, stdout pollution, reduced release targets, or no credible rollback.
+  risk, stdout pollution, reduced release targets, or unverified backup/recovery.
 - **Cutover gate:** all rows in `docs/rust-port-contract-matrix.md` are green,
-  full local/CI/release gates pass, Swift app works against Rust, and fallback
-  has been exercised.
+  full local/CI/release gates pass, Swift app works against Rust without Go,
+  backups and copied-store interoperability have been exercised, and the
+  independently reviewed Windows exceptions pass native acceptance.
 
 ## 8. Risks
 

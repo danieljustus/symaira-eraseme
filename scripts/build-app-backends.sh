@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the default Rust app backend and its explicit, transitional Go sibling.
+# Build the self-contained Rust app backend.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,7 +30,4 @@ PY
 )"
 test -x "$RUST_BINARY"
 cp "$RUST_BINARY" "$DESTINATION/symeraseme"
-CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X main.versionValue=${VERSION:-dev}" \
-    -o "$DESTINATION/symeraseme-go" ./cmd/symeraseme
-chmod 0755 "$DESTINATION/symeraseme" "$DESTINATION/symeraseme-go"
+chmod 0755 "$DESTINATION/symeraseme"

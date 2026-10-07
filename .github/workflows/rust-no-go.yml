@@ -22,6 +22,7 @@ on:
       - crates/symeraseme-core/tests/campaign_execution_oracle.rs
       - crates/symeraseme-core/tests/campaign_plan_contract.rs
       - crates/symeraseme-cli/tests/command_surface.rs
+      - crates/symeraseme-cli/src/main.rs
       - crates/symeraseme-cli/tests/support/frozen_review_oracle.rs
       - crates/symeraseme-cli/src/mcp/**
       - crates/symeraseme-cli/tests/support/frozen_mcp_runtime.rs
@@ -91,7 +92,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          import json
           import pathlib
           import shutil
           import subprocess
@@ -118,13 +118,6 @@ jobs:
               cargo = shutil.which("cargo", path=str(tools))
               assert cargo is not None
               print("Verified: go absent from PATH; default frozen suite selected", flush=True)
-              retained = json.loads(subprocess.check_output(
-                  [shutil.which("python3", path=str(tools)), "scripts/fetch-retained-go-release.py",
-                   "--output-dir", str(tools.resolve() / "published-rollback")], env=environment))
-              assert retained["sdk_required"] is False
-              environment["SYMERASEME_ROLLBACK_GO_BINARY"] = retained["binary"]
-              assert shutil.which("go", path=str(tools)) is None
-              print("Actual published Go rollback sibling retained outside PATH; SDK absent", flush=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "parity", "--all-targets", "--locked", "--offline"],
                              env=environment, check=True)
               subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "identity_interop",

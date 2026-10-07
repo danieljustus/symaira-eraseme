@@ -38,9 +38,6 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
         with:
           xcode-version: ${{ matrix.xcode }}
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
-        with:
-          go-version: '1.26.6'
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.98.0 --profile minimal
       - name: Verify packaging controls
@@ -48,17 +45,18 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/test_release_dmg.sh 2>&1 | tee "$RUNNER_TEMP/packaging-controls.log"
-      - name: Stage actual app with default Rust and explicit Go sibling
+      - name: Stage actual Rust-only app
         shell: bash
         run: |
           set -euo pipefail
           export PATH="$HOME/.cargo/bin:$PATH"
-          export VERSION="$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
+          VERSION="$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
+          export VERSION
           export STAGE_DIR="$RUNNER_TEMP/rust-app-stage"
           scripts/package-dmg.sh --app-only --non-release-test
           app="$STAGE_DIR/Symaira EraseMe.app"
           test "$("$app/Contents/MacOS/symeraseme" --version)" = "symeraseme version $VERSION"
-          test "$("$app/Contents/MacOS/symeraseme-go" version)" = "symeraseme $VERSION"
+          test ! -e "$app/Contents/MacOS/symeraseme-go"
           printf 'SYMERASEME_RUST_TEST_APP_BUNDLE=%s\n' "$app" >> "$GITHUB_ENV"
           printf 'SYMERASEME_RUST_TEST_BINARY=%s\n' "$GITHUB_WORKSPACE/target/release/symeraseme-rust" >> "$GITHUB_ENV"
       - name: Full Swift suite including actual bundled discovery, auth and shutdown

@@ -7,7 +7,8 @@
 
 **Goal:** Replace the Go backend with an idiomatic Rust backend while preserving
 all CLI, MCP, data, security, SwiftUI and release contracts, with a tested Go
-fallback through the first stable Rust release.
+development oracle, backups and copied-store interoperability. The accepted
+2026-10-07 change removes the bundled Go fallback from new releases.
 
 **Architecture:** A three-crate internal Cargo workspace separates deterministic
 core behavior, external adapters/orchestration and the executable surface. Go
@@ -18,10 +19,16 @@ language-neutral black-box harness before integration.
 RustCrypto, Tokio/Axum/Reqwest-rustls, tracing, Nextest, llvm-cov, audit, deny,
 proptest/fuzzing; existing Go 1.26.6 and Swift 5.10/Xcode gates remain active.
 
-**Approval trigger:** Daniel's next reply `go` authorizes the full execution
+**Original approval trigger:** Daniel's reply `go` authorizes the full execution
 workflow below: branches/worktrees, local commits, pushes, PRs, CI repair and
 verified squash merges. It does not authorize contract changes, secret access,
 real-email sends, live broker submissions or destructive testing on real data.
+
+**2026-10-07 amendment:** `ok go` approves Rust-only distribution, obsolete
+Python inventory cleanup and independent review of the three function-local
+Windows FFI boundaries (#1171–#1173). Crate-wide unsafe denial, privacy/auth
+guards, real native tests, backup/data compatibility and seven-day stable
+observation remain mandatory. Existing `v0.13.0` assets are not overwritten.
 
 **Machine-readable DAG:**
 `docs/plans/2026-09-04-go-to-rust-task-graph.json` owns task dependencies,
@@ -896,28 +903,26 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 
 ---
 
-## Phase 10 — reversible cutover and retirement
+## Phase 10 — Rust-only cutover and oracle retirement
 
-### Task 10.1: Ship a dual-backend prerelease
+### Task 10.1: Ship a Rust-only prerelease
 
 **Files:**
-- Create: Rust fallback dispatch in CLI entrypoint
+- Remove: legacy runtime fallback dispatch in CLI entrypoint
 - Modify: `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `TROUBLESHOOTING.md`,
   release packaging and agent-skill wording that currently promises a Go
   backend
 
 **Steps:**
-- [ ] Package Rust as `symeraseme` and last-known-good Go as `symeraseme-go`.
-- [ ] Implement explicit `SYMERASEME_BACKEND=go`: Unix process replacement;
-      Windows spawn/wait with inherited stdio and exact exit propagation. Test
-      argument, env and cwd preservation plus platform-appropriate signals.
-- [ ] Test fallback absence and version mismatch loudly.
+- [ ] Package only Rust as `symeraseme`; no Go sibling in CLI archives or app.
+- [ ] Retire `SYMERASEME_BACKEND` dispatch and prove a legacy selector/sibling
+      cannot redirect the Rust runtime.
+- [ ] Test exact Rust-only archive/app contents and embedded dependency identity.
 - [ ] Publish a prerelease; never overwrite stable assets.
-- [ ] Document the dual-backend prerelease honestly: Rust is primary, Go is an
-      explicit rollback backend, and historical Go-port documents stay marked
-      as history rather than being silently rewritten.
-- [ ] Run clean-install, upgrade, encrypted/plain DB and rollback smoke tests on
-      macOS, Linux and Windows.
+- [ ] Document Rust-only distribution honestly; Go remains a development oracle,
+      while historical dual-backend releases keep their original records.
+- [ ] Run clean-install, upgrade, backups and encrypted/plain copied-store
+      compatibility tests on macOS, Linux and Windows with a separate oracle.
 - [ ] Pass `CUT-001..003`.
 
 ### Task 10.2: Canary and stable Rust release
@@ -932,9 +937,11 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - [ ] Record final binary size/startup/RSS and honest regressions/gains.
 - [ ] Enforce the proposal's value gate: no unexplained >20% regression and a
       15% p95-startup or RSS gain, otherwise stop for an explicit exception.
-- [ ] Keep `symeraseme-go` and rollback docs through this stable release.
+- [ ] Verify no Go runtime is bundled; preserve backups and historical artifacts.
+- [ ] Verify independent review and native Windows amd64/arm64 acceptance of
+      the three approved local FFI exceptions; no blanket unsafe allowance.
 - [ ] Schedule a durable release+7-day follow-up that rechecks open defects,
-      release assets and rollback evidence before Task 10.4 starts.
+      release assets and recovery/compatibility evidence before Task 10.4 starts.
 - [ ] Pass `CUT-004`.
 
 ### Task 10.3: Final integration review
@@ -945,7 +952,8 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
       dependency and platform risk.
 - [ ] Security reviewer: crypto, keyring, consent, auth, path handling,
       redaction and release provenance.
-- [ ] Release reviewer: archives, Homebrew, DMG, signing/notarization, rollback.
+- [ ] Release reviewer: Rust-only archives/app, Homebrew, DMG,
+      signing/notarization, backups and compatibility.
 
 **Coordinator verification:**
 
@@ -980,12 +988,14 @@ pause is introduced.
 - [ ] Classify every Go test file as ported, contract-replaced or intentionally
       retired, with exact Rust test/fixture evidence; no unclassified test may
       disappear.
-- [ ] Verify rollback from Rust-created plain and encrypted data once more.
+- [ ] Verify backup/recovery and retained-oracle compatibility from copied
+      Rust-created plain and encrypted data once more.
 - [ ] Remove Go source, `go.mod`, `go.sum`, Go CI and GoReleaser only in this PR.
 - [ ] Update branch protection in safe order: prove the Rust aggregate check,
       require it, remove Go-only required contexts, read protection back, and
       only then delete workflows that emitted the old contexts.
-- [ ] Remove fallback binary/env path and stale Go wording.
+- [ ] Verify the already retired fallback binary/env path stays absent; remove
+      remaining development-only Go references and stale wording.
 - [ ] Keep historical contract docs and migration records.
 - [ ] Re-run every Rust/app/release gate.
 - [ ] Update `AGENTS.md`, README, CONTRIBUTING, TROUBLESHOOTING and ecosystem
@@ -998,8 +1008,8 @@ pause is introduced.
 
 - [ ] Every required row in `docs/rust-port-contract-matrix.md` is PASS.
 - [ ] Go and Rust match on deterministic success, error and side-effect cases.
-- [ ] Existing plain/encrypted databases and identity profiles work both ways
-      through the rollback window.
+- [ ] Existing plain/encrypted databases and identity profiles remain compatible;
+      backups and retained-oracle comparisons are verified before retirement.
 - [ ] `cargo fmt`, check, Clippy `-D warnings`, Nextest, doctests, feature checks,
       llvm-cov, audit and deny pass.
 - [ ] Rust coverage is at least 80% overall and 90% in the critical
@@ -1011,6 +1021,7 @@ pause is introduced.
       SBOMs and Homebrew behavior are verified from real artifacts.
 - [ ] Final performance measurements are published against the Go baseline;
       regressions are explicit, not massaged away.
-- [ ] Rollback is documented and exercised before Go retirement.
+- [ ] Backup/recovery and historical artifact availability are documented and
+      exercised before Go retirement; no Go runtime is bundled.
 - [ ] Repository is clean, `main` is synchronized, worktrees are removed and
       the final merged/released state is read back and verified.
