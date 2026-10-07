@@ -4,8 +4,15 @@ on:
   pull_request:
     paths:
       - app/SymairaEraseMe/**
+      - crates/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - .cargo/**
+      - assets/branding/**
       - scripts/build-app-backends.sh
       - scripts/package-dmg.sh
+      - scripts/verify-app-icon.sh
       - tests/test_release_dmg.sh
       - .github/workflows/app-rust-native.yml
       - .github/workflows/release.yml
