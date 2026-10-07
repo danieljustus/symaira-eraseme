@@ -1,6 +1,6 @@
 {
   "schema": "symeraseme.actual-go.http-wire.v1",
-  "source_revision": "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
+  "source_revision": "286d43fd9b448c574007ad98534125193f7e732d",
   "source_files": {
     "cmd/symeraseme/command_additional_test.go": {
       "bytes": 9590,
@@ -689,16 +689,16 @@
   },
   "archived_generators": {
     "crates/symeraseme-cli/tests/mcp_http_process.rs": {
-      "bytes": 60909,
-      "sha256": "e49f3b1b612b0d7eacb23b706a2a2a2cc37aa74a1e315b868896d5253391dd46"
+      "bytes": 60913,
+      "sha256": "dde36377165e895ec6edc1e30f41832ed052b86f49f13d2959faf8951c8369e4"
     },
     "crates/symeraseme-cli/tests/support/capture_http_wire.rs": {
       "bytes": 6638,
       "sha256": "527163f464515e456bbbdc12f59b880729cd8457054f76b72605eed71e1b7b3f"
     },
     "crates/symeraseme-cli/tests/support/interrupted_read.rs": {
-      "bytes": 2211,
-      "sha256": "d48673d5edc59878f0ebcfda104679061020980a0282c83b723bce1b8106382f"
+      "bytes": 4599,
+      "sha256": "71599f61d17969e1809d02aaf4a9265487ddfd7f7bdbe0ebb354ad4d053db1fc"
     },
     "Cargo.lock": {
       "bytes": 82067,
@@ -707,7 +707,7 @@
   },
   "native_target": "linux/amd64",
   "go_version": "go1.26.6",
-  "embedded_build_info": "/tmp/symeraseme-mcp-http-3629-1791280945670419858-0/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.12.2-0.20261006095903-67d3b61f8c8c\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/godbus/dbus/v5\tv5.2.2\th1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=67d3b61f8c8cb943a6830e7310fc2c018c7bf081\n\tbuild\tvcs.time=2026-10-06T09:59:03Z\n\tbuild\tvcs.modified=false\n",
+  "embedded_build_info": "/tmp/symeraseme-mcp-http-3414-1791356621921077682-0/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.13.1-0.20261007070151-286d43fd9b44\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/godbus/dbus/v5\tv5.2.2\th1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=286d43fd9b448c574007ad98534125193f7e732d\n\tbuild\tvcs.time=2026-10-07T07:01:51Z\n\tbuild\tvcs.modified=false\n",
   "server_exit_status": 0,
   "cases": [
     {

@@ -13,26 +13,26 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
-        "0408e0af288a9070c97a34a148ea2cd5749ac74ce0c87c57227f053a12d5e31e",
+        "286d43fd9b448c574007ad98534125193f7e732d",
+        "300437d9b2aa6dbf62b7a3a40f17108ffb69a2684bf41ccf1d948d9073dba896",
         include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/darwin-amd64/wire.json"),
     ),
     (
         "darwin/arm64",
-        "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
-        "f7fd04a723d6660f10c74ac57c97f7f7f44640d71d36e44181c80799223216c1",
+        "286d43fd9b448c574007ad98534125193f7e732d",
+        "10036884b9c1477dc15a63c515a2cc13beec561d9c04eb1efd367af614a359f5",
         include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/darwin-arm64/wire.json"),
     ),
     (
         "linux/amd64",
-        "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
-        "d65e7c935372d9b41f0bfbe82dc2a47907e9a1233a09fac083825d1d3304b7a9",
+        "286d43fd9b448c574007ad98534125193f7e732d",
+        "cd28aad474d32b963545ffe7188d4b3ff03dfe717f2342da06a3d6092f445d95",
         include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/linux-amd64/wire.json"),
     ),
     (
         "linux/arm64",
-        "67d3b61f8c8cb943a6830e7310fc2c018c7bf081",
-        "e1f5b89291b2594c80c55722e1495737e4920c17065c4c54e59a8f140509fc20",
+        "286d43fd9b448c574007ad98534125193f7e732d",
+        "f05e58e7849cd33761ed4e75144c207747b011ef4f60bdcadc4d164a1bd3dfbd",
         include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/linux-arm64/wire.json"),
     ),
 ];

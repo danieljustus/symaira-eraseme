@@ -8,6 +8,26 @@ Single resumption entrypoint. Detailed per-slice write-ups live in
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
 - Crates: `symeraseme-core`, `symeraseme-engine`, `symeraseme-cli`, `rust-tests/parity`
 
+## macOS reset-socket read timeout and HTTP recapture (2026-10-07, #1164)
+
+`go_oracle_http_wire_transcripts_match` failed twice on macOS with EINVAL
+from `read_response_chunk`. Reproduced on macOS arm64: once the peer resets a
+connection, XNU rejects `SO_RCVTIMEO` with EINVAL, although the response bytes
+already received are still readable. `interrupted_read::rearm` now keeps the
+previously armed timeout (never larger than the original budget) in that one
+macOS case and drains those bytes; every other error is unchanged. A
+real-socket control reproduces the reset on every platform. No comparison,
+status check or budget is relaxed.
+
+Both changed files are archived generators, so capture runs `37584863739`
+(auxiliary, six hosts) and `37584863687` (wire, four Unix hosts) recaptured
+all 34 records at `286d43fd9b448c574007ad98534125193f7e732d`. Each record was
+independently checked for revision, Go 1.26.6 and clean VCS before import to
+`tests/fixtures/go-frozen/http-aux-286d/` and `http-wire/`; the superseded
+`http-aux-67d3` records are removed and stay reachable through the
+`frozen-go-captures/pr-1162` tag. With Go absent, both HTTP targets pass
+locally (17 + 1 tests).
+
 ## Published canary prerelease v0.13.0 (2026-10-06, #1128, #1129)
 
 Tag `v0.13.0` on `780512f17d4dd434676d62539f81550ce048f77e` ran release

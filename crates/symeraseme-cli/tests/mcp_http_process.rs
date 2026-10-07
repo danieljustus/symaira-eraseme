@@ -562,10 +562,10 @@ fn read_response_chunk(stream: &mut TcpStream, chunk: &mut [u8]) -> std::io::Res
         .read_timeout()?
         .expect("HTTP read requires its original finite timeout");
     let result = interrupted_read::retry_until(Instant::now() + budget, |remaining| {
-        stream.set_read_timeout(Some(remaining))?;
+        interrupted_read::rearm(stream, remaining)?;
         stream.read(chunk)
     });
-    stream.set_read_timeout(Some(budget))?;
+    interrupted_read::rearm(stream, budget)?;
     result
 }
 
