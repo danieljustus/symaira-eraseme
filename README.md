@@ -1,18 +1,22 @@
 # Symaira EraseMe
 
-> **Accepted product direction — implementation pending:** EraseMe remains an independent privacy product. Browse/Operate becoming optional Brain modules and credential UI moving to Brain must not introduce a mandatory Brain dependency into privacy workflows. Existing capabilities and installation instructions below remain unchanged. See [PB-2026-09-09](docs/product-boundaries.md).
+> **Accepted product direction — implementation pending:** EraseMe remains an independent privacy product. Browse/Operate becoming optional Brain modules and credential UI moving to Brain must not introduce a mandatory Brain dependency into privacy workflows. See [PB-2026-09-09](docs/product-boundaries.md).
 
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/symaira-eraseme/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/symaira-eraseme/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/danieljustus/symaira-eraseme?label=Release&logo=github)](https://github.com/danieljustus/symaira-eraseme/releases)
 [![License](https://img.shields.io/github/license/danieljustus/symaira-eraseme?label=License)](LICENSE)
-[![Go](https://img.shields.io/badge/go-1.26%2B-00ADD8)](https://go.dev)
+[![Rust](https://img.shields.io/badge/rust-1.98.0-orange)](https://www.rust-lang.org)
 [![Swift](https://img.shields.io/badge/swift-5.10%2B-F05138)](https://swift.org)
 
 ![Symaira EraseMe social preview](docs/assets/social-preview.png)
 
 Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
-data brokers. It is a local-first, static Go CLI with a native SwiftUI macOS
-app and an authenticated MCP JSON-RPC interface.
+data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
+an authenticated MCP JSON-RPC interface.
+
+**Runtime:** Rust-only CLI and native SwiftUI macOS app. The Go implementation
+remains temporarily as a development oracle for conformance checks until the
+separate CUT-005 retirement; it is not a distributed runtime.
 
 **Status:** Beta. Core planning, event tracking, deadline handling, registry
 validation, inbox triage, reports, and the MCP/CLI contracts are implemented.
@@ -26,10 +30,10 @@ Some broker-specific web flows still require manual review.
   rebuttals, scheduling, reports, and manual fallback tasks.
 - Explicit web-form previews and durable manual fallback tasks; browser execution
   is an injected boundary and is not a compile-time dependency.
-- Shared LLM provider layer for reply classification and rebuttal generation.
+- Shared Rust LLM provider layer for reply classification and rebuttal generation.
 - Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
 - AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.
-- Native SwiftUI dashboard for macOS. Release DMGs contain the Go MCP server.
+- Native SwiftUI dashboard for macOS. Rust-only release DMGs contain the Rust MCP server.
 
 ## Install
 
@@ -43,21 +47,22 @@ symeraseme version
 
 ### Windows and other platforms
 
-Download the matching `symeraseme_<version>_<os>_<arch>` archive from the
-[latest GitHub release](https://github.com/danieljustus/symaira-eraseme/releases).
-The archives are static builds and do not require an external runtime.
-
-Each archive contains `symeraseme` (the Rust implementation, the default) and
-`symeraseme-go`, the last Go implementation kept as an explicit rollback.
-Set `SYMERASEME_BACKEND=go` to run the Go backend instead; both read and write
-the same data. Canary builds are published as GitHub prereleases and reach
-Homebrew only once they are promoted to a stable release.
+Download the matching `symeraseme_<version>_<os>_<arch>` archive for the
+Rust-only candidate or release from the
+[GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases).
+These archives are static builds and do not require an external runtime. Each
+includes the Rust `symeraseme` executable, without a Go runtime or Go-backend
+switch. Previously published `v0.13.0` prerelease
+assets are immutable; the new Rust-only candidate will be published separately.
+Canary builds are published as GitHub prereleases and reach Homebrew only once
+they are promoted to a stable release.
 
 ### macOS GUI
 
 The versioned `Symaira-EraseMe-<version>-macos.dmg` is attached to the same
-GitHub release. The release notes state whether Developer ID signing,
-notarization, and stapling were completed.
+GitHub release and bundles the Rust CLI/MCP server. The release notes state
+whether Developer ID signing, notarization, and stapling were completed. No
+GUI Homebrew cask is configured; install the macOS app from its DMG.
 
 ### Migration from the pre-cutover installation
 
@@ -68,7 +73,7 @@ removing the old runtime:
 ```bash
 symeraseme migrate \
   --source /path/to/old-state \
-  --destination /path/to/go-state \
+  --destination /path/to/rust-state \
   --dry-run
 ```
 
@@ -138,52 +143,62 @@ private temporary directory during use; switching modes is atomic.
 
 Credentials should be referenced through the canonical `symvault://` form or a
 platform secure store; resolved values are never logged. Provider-specific
-configuration is consumed by the shared Go LLM layer.
+configuration is consumed by the shared Rust LLM provider layer.
 
 ## Development
 
-Requirements: Go 1.26.6 or newer. A full Xcode installation is required for
-the macOS GUI.
+Requirements: Rust 1.98.0 (pinned in `rust-toolchain.toml`). Go 1.26.6 is needed
+only for the temporary Go reference/oracle checks (`make go-gate` and live
+`make parity-live`); it is not needed to build or run the Rust product. A full
+Xcode installation is required for the macOS GUI.
 
 ```bash
-# Go CLI
-make build
-make test
-make test-race
-make lint
-make vet
-make coverage                 # exact 75% statement gate
+# Rust CLI and frozen-observation conformance suite
+make build-rust
+make rust-gate
+make parity
+
+# Temporary Go reference checks (development only, not a product runtime)
+make go-gate
+make parity-live
 
 # macOS app
+make app-test
 ./app/SymairaEraseMe/build.sh
-VERSION=0.12.1 ./scripts/package-dmg.sh
+
+# Local development packaging example only; not a release-version claim
+VERSION=0.13.0 ./scripts/package-dmg.sh
 ```
 
-The coverage gate reports exact profile counts rather than rounded package
-percentages. CI runs the same gate on Linux and checks the complete Go matrix.
+`make parity` uses recorded Go observations by default and does not require a
+Go executable; `make parity-live` rebuilds and runs the Go oracle. `make go-gate`
+is the retained Go reference quality/build gate, including its exact 75%
+statement-coverage threshold. The Go implementation and tooling remain only for
+development/conformance work until the separately scoped CUT-005 retirement.
 
 ### Registry contributions
 
 Add a verified YAML broker entry under `registry/brokers/`, then run:
 
 ```bash
-make build
-./symeraseme registry validate
+make build-rust
+./build/rust/debug/symeraseme-rust registry validate
 ```
 
 Do not fabricate endpoints or include personal data. The registry is embedded
-and read by the Go loader; it is not rewritten by normal CLI operation.
+in the Rust CLI and is not rewritten by normal CLI operation.
 
 ### Project layout
 
 ```text
-cmd/symeraseme/       CLI entrypoint and command surface
-internal/              Go domain packages and MCP handlers
-registry/              Embedded broker/law/schema data
-skills/                Agent skill bundle and workflow documentation
-app/SymairaEraseMe/   SwiftUI macOS client
-scripts/              Release and packaging scripts
-.goreleaser.yml       Static archive build matrix
+crates/                 Rust CLI, core, and engine
+rust-tests/parity/      Conformance suite and frozen Go observations
+cmd/symeraseme/,        Temporary Go reference implementation and packages
+internal/               (development oracle only until CUT-005)
+registry/               Broker/law/schema source data
+skills/                 Agent skill bundle and workflow documentation
+app/SymairaEraseMe/      SwiftUI macOS client
+scripts/                 Build, packaging, and verification tools
 ```
 
 ## Releases
@@ -191,20 +206,20 @@ scripts/              Release and packaging scripts
 Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml):
 
 1. The Rust prerelease workflow builds natively on Linux, macOS, and Windows
-   for amd64 and arm64, packages each Rust binary with its `symeraseme-go`
-   rollback sibling, and verifies the archives, `checksums.txt` and the
-   per-archive CycloneDX SBOMs.
+   for amd64 and arm64, packages six static Rust CLI archives, and verifies the
+   archives, `checksums.txt` and the per-archive CycloneDX SBOMs.
 2. The publish job attests build provenance for the six archives and creates
    the GitHub release as a prerelease (canary), then reads every asset back.
-3. The macOS job builds the SwiftUI app and uploads the versioned DMG to that
-   release. It is signed, notarized, stapled and attested.
+3. The macOS job builds the SwiftUI app with the Rust CLI/MCP server and uploads
+   the versioned DMG to that release. It is signed, notarized, stapled and attested.
 4. When a release is published as stable, or a canary is promoted to stable,
    the Homebrew publisher downloads the exact release archives, verifies their
    checksums, and updates `danieljustus/homebrew-tap/Formula/symeraseme.rb`.
 
-The legacy package publisher is no longer tag-triggered. The archived tag
-`python-final` remains available for historical recovery; new distribution
-work is binary-first.
+No GUI Homebrew cask is configured; the macOS GUI is distributed as a DMG.
+Previously published `v0.13.0` prerelease assets remain unchanged; the next
+candidate and subsequent releases use the Rust-only package layout. The
+historical `python-final` tag remains available for migration and recovery.
 
 ## Documentation
 
@@ -213,7 +228,7 @@ work is binary-first.
 - [MCP contract](docs/mcp-contract.md)
 - [Event-store contract](docs/event-store.md)
 - [Registry contract](docs/registry-contract.md)
-- [Go test classification](docs/go-test-port-classification.md)
+- [Historical Python test classification](docs/go-test-port-classification.md)
 - [Agent skill bundle](skills/SKILL.md)
 
 ## License
