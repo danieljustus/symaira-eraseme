@@ -80,11 +80,11 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
                 archive.status.success(),
                 "immutable HTTP producer must remain verifiable"
             );
-            let current = go_source_pin::current_tree_bound(name)
-                .then(|| std::fs::read(Path::new(ROOT).join(path)).unwrap());
-            for bytes in std::iter::once(&archive.stdout).chain(&current) {
-                assert_eq!(recorded["bytes"], bytes.len(), "{name}");
-                assert_eq!(recorded["sha256"], digest(bytes), "{name}");
+            assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
+            assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
+            if go_source_pin::current_tree_bound(name) {
+                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+                go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
         }
     }
