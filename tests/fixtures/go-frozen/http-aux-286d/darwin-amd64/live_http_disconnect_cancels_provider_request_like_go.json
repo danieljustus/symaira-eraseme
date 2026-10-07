@@ -1,5 +1,5 @@
 {
-  "schema": "symeraseme.actual-go.http-wire.v1",
+  "schema": "symeraseme.actual-go.http-aux.v1",
   "source_revision": "286d43fd9b448c574007ad98534125193f7e732d",
   "source_files": {
     "cmd/symeraseme/command_additional_test.go": {
@@ -678,6 +678,14 @@
       "bytes": 341,
       "sha256": "d24484530370e7ccd8f2bd597c15ec0dfe72bd8a6b818efb1d0d209096f08840"
     },
+    "rust-tests/parity/oracle/agent-cancel/main.go": {
+      "bytes": 4372,
+      "sha256": "95192072f0ea021fd9f7dc68d86e9b75fede35d6ed748e95a96866c09b10c935"
+    },
+    "rust-tests/parity/oracle/provider-cancel/main.go": {
+      "bytes": 3683,
+      "sha256": "f68e6f37a2555fbec8f32ce649ab6d712f7fc8f16cff94659839372fdeab2030"
+    },
     "go.mod": {
       "bytes": 1135,
       "sha256": "bc9c6c502f1ad4f1672e995bf831b4b4d9486561afb3b5b3a22e6086df46803f"
@@ -692,286 +700,43 @@
       "bytes": 60913,
       "sha256": "dde36377165e895ec6edc1e30f41832ed052b86f49f13d2959faf8951c8369e4"
     },
-    "crates/symeraseme-cli/tests/support/capture_http_wire.rs": {
-      "bytes": 6638,
-      "sha256": "527163f464515e456bbbdc12f59b880729cd8457054f76b72605eed71e1b7b3f"
+    "crates/symeraseme-cli/tests/support/mcp_http_port.rs": {
+      "bytes": 9054,
+      "sha256": "d481d4d507f09305b3b3ad84cb37d1a38896ee8dac99c4b150d26aef80fbd1fc"
     },
-    "crates/symeraseme-cli/tests/support/interrupted_read.rs": {
-      "bytes": 4599,
-      "sha256": "71599f61d17969e1809d02aaf4a9265487ddfd7f7bdbe0ebb354ad4d053db1fc"
+    "crates/symeraseme-cli/tests/support/capture_http_aux.rs": {
+      "bytes": 7283,
+      "sha256": "04d9b5cca6665e5625a0a2b15a63964ecb0e289175f04613dd81c1dff63aa81f"
     },
     "Cargo.lock": {
       "bytes": 82067,
       "sha256": "406322469cc13d76d7459fb21f6a195393d826f57a97f29861cb8ab47ee014d8"
     }
   },
+  "checkout_autocrlf": "false",
   "native_target": "darwin/amd64",
   "go_version": "go1.26.6",
-  "embedded_build_info": "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/symeraseme-mcp-http-19968-1791356709461082000-0/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.13.1-0.20261007070151-286d43fd9b44\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=darwin\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=286d43fd9b448c574007ad98534125193f7e732d\n\tbuild\tvcs.time=2026-10-07T07:01:51Z\n\tbuild\tvcs.modified=false\n",
-  "server_exit_status": 0,
-  "cases": [
-    {
-      "index": 0,
-      "request": {
-        "method": "GET",
-        "body_base64": "",
-        "body": {
-          "bytes": 0,
-          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        },
-        "headers": []
-      },
-      "response": {
-        "status": 405,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiUE9TVCByZXF1aXJlZCJ9LCJpZCI6bnVsbH0K",
-        "body": {
-          "bytes": 78,
-          "sha256": "cba7e70ff2010c69da78dda7f6042b4c9be6368182b58e1157854a5a5541f94d"
-        }
-      }
+  "embedded_build_info": "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/symeraseme-mcp-http-8121-1791356807234521000-1/symeraseme-go-oracle: go1.26.6\n\tpath\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme\n\tmod\tgithub.com/danieljustus/symaira-eraseme\tv0.13.1-0.20261007070151-286d43fd9b44\t\n\tdep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\n\tdep\tgithub.com/danieljustus/symaira-corekit\tv0.16.2\th1:oZ6GUjfkkiNwc+Ql0JNi7JTkCWPzd0ljQSiVvMeui1E=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/emersion/go-imap\tv1.2.1\th1:+s9ZjMEjOB8NzZMVTM3cCenz2JrQIGGo5j1df19WjTA=\n\tdep\tgithub.com/emersion/go-sasl\tv0.0.0-20241020182733-b788ff22d5a6\th1:oP4q0fw+fOSWn3DfFi4EXdT+B+gTtzx8GC9xsc26Znk=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/spf13/cobra\tv1.10.2\th1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=\n\tdep\tgithub.com/spf13/pflag\tv1.0.9\th1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=\n\tdep\tgithub.com/zalando/go-keyring\tv0.2.8\th1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tgopkg.in/yaml.v3\tv3.0.1\th1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=\n\tdep\tmodernc.org/libc\tv1.74.4\th1:fX1Omw4o2/1C2iRkkIsrQTasJQldLhRmuPreXLoWs9k=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.57.0\th1:qNQP6xnx5M0ISNtlnxoOX0+cD5bJ0/gr9aMmndFczzg=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=1\n\tbuild\tCGO_CFLAGS=\n\tbuild\tCGO_CPPFLAGS=\n\tbuild\tCGO_CXXFLAGS=\n\tbuild\tCGO_LDFLAGS=\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=darwin\n\tbuild\tGOAMD64=v1\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=286d43fd9b448c574007ad98534125193f7e732d\n\tbuild\tvcs.time=2026-10-07T07:01:51Z\n\tbuild\tvcs.modified=false\n",
+  "test_file": "crates/symeraseme-cli/tests/mcp_http_process.rs",
+  "test": "live_http_disconnect_cancels_provider_request_like_go",
+  "observation": {
+    "oracle_fixture": {
+      "bytes": 1368,
+      "sha256": "c41b5dd44a1062016840ca4610e6cdc2359483d4bbf74fb19b20c2c1359cc53b",
+      "base64": "ewogICJzY2hlbWEiOiAic3ltZXJhc2VtZS5nby1vcmFjbGUucHJvdmlkZXItY2FuY2VsLnYxIiwKICAiZ29fdmVyc2lvbiI6ICJnbzEuMjYuNiIsCiAgInNvdXJjZXNfc2hhMjU2IjogewogICAgImNtZC9zeW1lcmFzZW1lL21haW4uZ28iOiAiZjdmZDk1Mzc2YWU1ODdkY2VmMWFhZmViYTc0YjlkM2E3YWE0YzQ3YWM1MjBjZDJiODI5MDM3NzdjZWZlOGJmNyIsCiAgICAiZ28ubW9kIjogImJjOWM2YzUwMmYxYWQ0ZjE2NzJlOTk1YmY4MzFiNGI0ZDk0ODY1NjFhZmIzYjViM2EyMmU2MDg2ZGY0NjgwM2YiLAogICAgImdvLnN1bSI6ICI0OTA4ZjU2OGJkOTg1OWI1N2M2M2ExOWZlMTc5NTc5YmMzY2JhNDgyNjA2MTllYjcyZWEyNDIxNDFhM2RiNWZhIiwKICAgICJpbnRlcm5hbC9ldmVudHN0b3JlL3N0b3JlLmdvIjogImZkMWRkNDE2NjA2ZjI5YWE0NzI2YTYyZmZlNmFkODNlZjlkN2M5ZWI2YzZmNDJkODFlODc5ODc5MTM5NjhkZjMiLAogICAgImludGVybmFsL2xsbS9mYWN0b3J5LmdvIjogIjgxODA3MTNkMzQ2Y2NlMWY3ZjE5NWZkYWRkMDA0MGViZTRmYjk2ZjFiZjdhNzI1MTcwODE5ZGUxMGY0NTk2YjQiLAogICAgImludGVybmFsL2xsbS9sbG0uZ28iOiAiNTM3Y2IyMmYwYzE1MzZhOWUzMzgwMGEwMThmNDcxNDAyZTJmMDY4OGE4NzNjYmVlOTY0MDJmZWY5ZDk2YjcxNyIsCiAgICAiaW50ZXJuYWwvbGxtL2xsbWtpdC5nbyI6ICI2MjljNjQzYTYxNjc0YzhmNGVkNmRlNmI0N2U5NmUxNzY0ZTc1MjVlZDljNjkzZWI5NjE1YmU0Y2ViZDEwM2U3IiwKICAgICJpbnRlcm5hbC9tY3AvY29udHJhY3RfaGFuZGxlci5nbyI6ICI3Y2I1MWYzNjdmZTAwMzYyMWY2OTFhZTVkY2RhYjczMWE4OGEwMWZhOTliYTZkYzY0MDNkZGFmZjg5ZWRlZWY4IiwKICAgICJpbnRlcm5hbC9tY3Avc2VydmVyLmdvIjogIjczNWU5MGZhMDJiZThjYmJmODIyOWVlNDU3ZGFhNjlkZjU0YTMzMzk3YjFmMjExZDgxMWIyNDRlNTA2ZGI1MmIiLAogICAgImludGVybmFsL3JlcGxpZXMvc2VydmljZS5nbyI6ICI4MTQ0Yjk0MDdlNDBkN2UxYzlhYTk3NTI4ZGNiMmVmN2I4MTRmYWU2NmIyZjI3YTQ5MDJmYjg1M2ZlN2UwMjgxIiwKICAgICJpbnRlcm5hbC90cmlhZ2UvY2xhc3NpZmllci5nbyI6ICI2MGFkYWRjZTAyN2MyOTVhMmZmZWQzM2JhZWFlMmQ5NjhhNmIzZjRhN2Q5YTEyYTQ5MTMxYzMwNTA3NTZmYzk3IiwKICAgICJydXN0LXRlc3RzL3Bhcml0eS9vcmFjbGUvcHJvdmlkZXItY2FuY2VsL21haW4uZ28iOiAiZjY4ZTZmMzdhMjU1NWZiZWM4ZjMyY2U2NDlhYjZkNzEyZjdmYzhmMTZjZmY5NDY1OTgzOTM3MmZkZWFiMjAzMCIKICB9LAogICJwcm92aWRlcl9jYW5jZWxlZCI6IHRydWUsCiAgImNsaWVudF9kaXNjb25uZWN0ZWQiOiB0cnVlCn0K"
     },
-    {
-      "index": 1,
-      "request": {
-        "method": "POST",
-        "body_base64": "e30=",
-        "body": {
-          "bytes": 2,
-          "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
-        },
-        "headers": []
-      },
-      "response": {
-        "status": 401,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiVW5hdXRob3JpemVkIn0sImlkIjpudWxsfQo=",
-        "body": {
-          "bytes": 77,
-          "sha256": "b1e5c6bd8e2a4b7db4d984d66d91ca899bcbbefb8ccdd1b46ad4492e76d447e3"
-        }
-      }
-    },
-    {
-      "index": 2,
-      "request": {
-        "method": "POST",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQ==",
-        "body": {
-          "bytes": 46,
-          "sha256": "e6920f516a44e920ce3750fea22a2f41d1e00abb77ff9eecf35b03a5e4a1ad74"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          },
-          {
-            "name": "Origin",
-            "value": "https://evil.example"
-          }
-        ]
-      },
-      "response": {
-        "status": 403,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyMDAwLCJtZXNzYWdlIjoiRm9yYmlkZGVuOiBkaXNhbGxvd2VkIE9yaWdpbiJ9LCJpZCI6bnVsbH0K",
-        "body": {
-          "bytes": 93,
-          "sha256": "205f13cbdf8026c1026ddb02a03ac40f470b0b7d27c791306edbbe82f87d3a06"
-        }
-      }
-    },
-    {
-      "index": 3,
-      "request": {
-        "method": "POST",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQ==",
-        "body": {
-          "bytes": 46,
-          "sha256": "e6920f516a44e920ce3750fea22a2f41d1e00abb77ff9eecf35b03a5e4a1ad74"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          },
-          {
-            "name": "Origin",
-            "value": ""
-          }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
-        "body": {
-          "bytes": 146,
-          "sha256": "2f729d94bf618f5bb576f703ed43b00552823e108ed1fe857a9ddbef79fd6b7c"
-        }
-      }
-    },
-    {
-      "index": 4,
-      "request": {
-        "method": "POST",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiaWQiOjEsIm1ldGhvZCI6ImluaXRpYWxpemUifQ==",
-        "body": {
-          "bytes": 46,
-          "sha256": "e6920f516a44e920ce3750fea22a2f41d1e00abb77ff9eecf35b03a5e4a1ad74"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          },
-          {
-            "name": "Origin",
-            "value": "http://[::1]:8000"
-          }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwicmVzdWx0Ijp7ImNhcGFiaWxpdGllcyI6eyJ0b29scyI6e319LCJwcm90b2NvbFZlcnNpb24iOiIyMDI1LTA2LTE4Iiwic2VydmVySW5mbyI6eyJuYW1lIjoic3ltZXJhc2VtZSIsInZlcnNpb24iOiJkZXYifX0sImlkIjoxfQo=",
-        "body": {
-          "bytes": 146,
-          "sha256": "2f729d94bf618f5bb576f703ed43b00552823e108ed1fe857a9ddbef79fd6b7c"
-        }
-      }
-    },
-    {
-      "index": 5,
-      "request": {
-        "method": "POST",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoiaW5pdGlhbGl6ZSJ9",
-        "body": {
-          "bytes": 39,
-          "sha256": "1620dc3efa7fa853b7ae70a85594061ce349dfd2b66d191a71a4b75b9bd8df4b"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          }
-        ]
-      },
-      "response": {
-        "status": 204,
-        "content_type": "",
-        "body_base64": "",
-        "body": {
-          "bytes": 0,
-          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        }
-      }
-    },
-    {
-      "index": 6,
-      "request": {
-        "method": "POST",
-        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0seyJqc29ucnBjIjoiMi4wIiwibWV0aG9kIjoibm90aWZpY2F0aW9ucy9pbml0aWFsaXplZCJ9XQ==",
-        "body": {
-          "bytes": 103,
-          "sha256": "6d961bca1b8d641fb0aa05d8113728602f8da3e5bca25a44744977f3f233f22a"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "content_type": "application/json",
-        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsInJlc3VsdCI6eyJjYXBhYmlsaXRpZXMiOnsidG9vbHMiOnt9fSwicHJvdG9jb2xWZXJzaW9uIjoiMjAyNS0wNi0xOCIsInNlcnZlckluZm8iOnsibmFtZSI6InN5bWVyYXNlbWUiLCJ2ZXJzaW9uIjoiZGV2In19LCJpZCI6MX1dCg==",
-        "body": {
-          "bytes": 148,
-          "sha256": "f5a4ead6827474b169ba0b0dcc7269590ff519539ceba5684d8cd9cc9e610de6"
-        }
-      }
-    },
-    {
-      "index": 7,
-      "request": {
-        "method": "POST",
-        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsIm1ldGhvZCI6Im5vdGlmaWNhdGlvbnMvaW5pdGlhbGl6ZWQifV0=",
-        "body": {
-          "bytes": 56,
-          "sha256": "1d5f86151e907de71a9a76966d999622369b860f7c6719c798f460d3caf7b95f"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          }
-        ]
-      },
-      "response": {
-        "status": 204,
-        "content_type": "",
-        "body_base64": "",
-        "body": {
-          "bytes": 0,
-          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        }
-      }
-    },
-    {
-      "index": 8,
-      "request": {
-        "method": "POST",
-        "body_base64": "W10=",
-        "body": {
-          "bytes": 2,
-          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "content_type": "application/json",
-        "body_base64": "eyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfQo=",
-        "body": {
-          "bytes": 80,
-          "sha256": "56b3f981c902baa1acd91661551a1541f3a5062618d07cb40f18c1c5289523c6"
-        }
-      }
-    },
-    {
-      "index": 9,
-      "request": {
-        "method": "POST",
-        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsImlkIjoxLCJtZXRob2QiOiJpbml0aWFsaXplIn0sN10=",
-        "body": {
-          "bytes": 50,
-          "sha256": "d2311504b8ef7a87275599792b0382bae19bbb7a79337a88bf217e4c2f4d7a73"
-        },
-        "headers": [
-          {
-            "name": "Authorization",
-            "role": "private-native-bearer-token"
-          }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "content_type": "application/json",
-        "body_base64": "W3sianNvbnJwYyI6IjIuMCIsInJlc3VsdCI6eyJjYXBhYmlsaXRpZXMiOnsidG9vbHMiOnt9fSwicHJvdG9jb2xWZXJzaW9uIjoiMjAyNS0wNi0xOCIsInNlcnZlckluZm8iOnsibmFtZSI6InN5bWVyYXNlbWUiLCJ2ZXJzaW9uIjoiZGV2In19LCJpZCI6MX0seyJqc29ucnBjIjoiMi4wIiwiZXJyb3IiOnsiY29kZSI6LTMyNjAwLCJtZXNzYWdlIjoiaW52YWxpZCByZXF1ZXN0In0sImlkIjpudWxsfV0K",
-        "body": {
-          "bytes": 228,
-          "sha256": "f4168b86c479545578e0531b4d6bdb30fbbf28dd62b0b52a0165055e34646f95"
-        }
-      }
+    "process": {
+      "provider_request_line": "POST /chat/completions HTTP/1.1",
+      "provider_authorization": "Bearer synthetic-cancel-key",
+      "provider_model": "oracle-model",
+      "provider_roles": [
+        "system",
+        "user"
+      ],
+      "provider_saw_disconnect": true,
+      "server_running_after_disconnect": true,
+      "classification": null
     }
-  ],
-  "scope": "All ten original HTTP process comparisons: actual status, Content-Type and complete body bytes. Ephemeral native authorization tokens are represented as input roles, exactly as the original Go/Rust request-token substitution. Other response headers and process stdout/stderr are not part of that original comparator."
+  },
+  "scope": "The Go side of one original auxiliary HTTP process comparator: exactly the statuses, port-normalized startup diagnostics, HTTP replies, process effects and regenerated cancellation oracle bytes that the original test compared against Rust. Timing, pids and ephemeral ports/tokens are not retained."
 }
