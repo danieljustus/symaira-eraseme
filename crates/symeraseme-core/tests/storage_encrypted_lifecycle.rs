@@ -18,6 +18,28 @@ static TEST_LOCK: Mutex<()> = Mutex::new(());
 const KEY: [u8; 32] = [0x42; 32];
 
 #[test]
+fn atomic_transition_rejects_nul_paths_before_mutation() {
+    let dir = tempdir().unwrap();
+    let prefix = dir.path().join("prefix.db");
+    fs::write(&prefix, b"original sentinel").unwrap();
+    for target in [prefix.clone(), dir.path().join("new-parent").join("new.db")] {
+        let mut invalid = target.into_os_string();
+        invalid.push("\0ignored-suffix");
+        let error = symeraseme_core::storage::atomic_transition_with_recovery(
+            Path::new(&invalid),
+            b"replacement",
+        )
+        .expect_err("NUL must not retarget the replacement");
+        assert!(matches!(error, EncryptedStoreError::Io(ref error)
+            if error.kind() == std::io::ErrorKind::InvalidInput));
+        assert_eq!(fs::read(&prefix).unwrap(), b"original sentinel");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+    symeraseme_core::storage::atomic_transition_with_recovery(&prefix, b"replacement").unwrap();
+    assert_eq!(fs::read(prefix).unwrap(), b"replacement");
+}
+
+#[test]
 fn encrypted_open_uses_canonical_path_and_private_sqlite_temp() {
     let _guard = TEST_LOCK.lock().unwrap();
     set_master_key(KEY);

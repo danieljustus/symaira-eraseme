@@ -623,7 +623,6 @@ fn directory_create_error(error: io::Error, is_file: impl FnOnce() -> bool) -> i
 }
 
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn close_windows_file(file: fs::File) -> io::Result<()> {
     use std::os::windows::io::IntoRawHandle;
 
