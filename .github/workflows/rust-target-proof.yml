@@ -81,4 +81,5 @@ jobs:
             binary="target/${{ matrix.target }}/release/symeraseme-rust"
           fi
           test -f "$binary"
-          test "$("$binary" --version)" = "symeraseme version 0.13.0"
+          expected_version="$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
+          test "$("$binary" --version)" = "symeraseme version $expected_version"
