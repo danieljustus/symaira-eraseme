@@ -22,6 +22,53 @@ pub fn current_tree_bound(name: &str) -> bool {
         })
 }
 
+/// Call only after authenticating the archived bytes against the producer's
+/// recorded size and digest. Go sources and capture generators stay byte-exact.
+/// The four local release labels cannot change the Go observation; every other
+/// lock byte, including dependencies, checksums and line endings, stays pinned.
+#[allow(dead_code)] // Only verifiers that compare authenticated archives call this.
+pub fn assert_current_matches_archive(name: &str, archived: &[u8], current: &[u8]) {
+    if name != "Cargo.lock" {
+        assert!(current == archived, "current producer input: {name}");
+        return;
+    }
+    let mut expected = std::str::from_utf8(archived)
+        .expect("authenticated Cargo.lock must be UTF-8")
+        .to_owned();
+    let newline = if expected.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    for package in [
+        "parity",
+        "symeraseme-cli",
+        "symeraseme-core",
+        "symeraseme-engine",
+    ] {
+        let name_line = format!("name = \"{package}\"");
+        assert_eq!(
+            expected.lines().filter(|line| *line == name_line).count(),
+            1,
+            "exactly one local package stanza: {package}"
+        );
+        let prefix = format!("[[package]]{newline}{name_line}{newline}version = \"");
+        let start = expected
+            .find(&prefix)
+            .expect("canonical local package stanza")
+            + prefix.len();
+        let end = start
+            + expected[start..]
+                .find(&format!("\"{newline}"))
+                .expect("complete local package version line");
+        expected.replace_range(start..end, env!("CARGO_PKG_VERSION"));
+    }
+    assert!(
+        current == expected.as_bytes(),
+        "only local release versions may differ in Cargo.lock"
+    );
+}
+
 // Only the verifiers that record `.gitattributes` call this.
 #[allow(dead_code)]
 pub fn assert_checkout_attributes_unchanged<I>(root: &str, revision: &str, names: I)

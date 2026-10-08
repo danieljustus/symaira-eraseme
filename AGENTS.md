@@ -7,6 +7,12 @@
 **Symaira EraseMe** supports all major AI coding agents through standardized
 skill formats and adapter files.
 
+New distributions use the Rust CLI and a native SwiftUI macOS app, without a
+bundled Go backend or backend selector. Rust 1.98.0 is required for development;
+the Go implementation remains a temporary development oracle until the separate
+CUT-005 retirement after stable-release observation. Historical `v0.13.0` assets
+stay immutable; Rust-only candidates require fresh native and release evidence.
+
 ## Ecosystem Guidance
 
 - Before changing cross-tool integrations, shared conventions, or product
@@ -304,7 +310,7 @@ To add support for a new agent:
   (local builds need `DEVELOPER_DIR` pointing at a full Xcode installation).
 - Depends on the shared **symaira-appkit** package, pinned exact in
   `Package.swift`: SymairaTheme and SymairaToolKit.
-- `ServerManager` launches the bundled or development `symeraseme mcp` Go
+- `ServerManager` launches the bundled or development `symeraseme mcp` Rust
   binary over HTTP; Homebrew/configured Binary Path is the fallback.
 - Migration context: see `../docs/go-test-port-classification.md` and
   `TROUBLESHOOTING.md`.

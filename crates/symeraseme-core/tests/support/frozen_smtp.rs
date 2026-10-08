@@ -177,11 +177,11 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             } else {
                 archive.stdout
             };
-            let current = go_source_pin::current_tree_bound(name)
-                .then(|| std::fs::read(Path::new(ROOT).join(path)).unwrap());
-            for bytes in std::iter::once(&archived_bytes).chain(&current) {
-                assert_eq!(recorded["bytes"], bytes.len(), "{name}");
-                assert_eq!(recorded["sha256"], digest(bytes), "{name}");
+            assert_eq!(recorded["bytes"], archived_bytes.len(), "{name}");
+            assert_eq!(recorded["sha256"], digest(&archived_bytes), "{name}");
+            if go_source_pin::current_tree_bound(name) {
+                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+                go_source_pin::assert_current_matches_archive(name, &archived_bytes, &current);
             }
         }
     }

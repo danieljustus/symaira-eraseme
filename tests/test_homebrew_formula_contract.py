@@ -49,7 +49,7 @@ def main(formula_path: Path) -> None:
         fail(f"expected four macOS/Linux architecture URLs, got {sorted(urls)}")
     if len(versions) != 1:
         fail(f"formula mixes release versions: {sorted(versions)}")
-    if not re.search(r'(?ms)^  def install\n.*?^    bin\.install "symeraseme"(, "symeraseme-go")?\n.*?^  end$', source):
+    if not re.search(r'(?ms)^  def install\n.*?^    bin\.install "symeraseme"\n.*?^  end$', source):
         fail('install must place the archive root binary with bin.install "symeraseme"')
     if not re.search(r'(?ms)^  test do\n.*?^    system "#\{bin\}/symeraseme", "version"\n.*?^  end$', source):
         fail('test block must run the installed symeraseme version command')

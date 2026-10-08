@@ -3,9 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[path = "support/retained_go_release.rs"]
-mod retained_go_release;
-
 struct Scratch(PathBuf);
 
 impl Scratch {
@@ -14,9 +11,8 @@ impl Scratch {
             .duration_since(UNIX_EPOCH)
             .expect("system clock")
             .as_nanos();
-        let nonce = format!("{nonce}-{}", unique_seq());
         let path = std::env::temp_dir().join(format!(
-            "symeraseme-backend-fallback-{}-{nonce}",
+            "symeraseme-rust-only-{}-{nonce}",
             std::process::id()
         ));
         fs::create_dir(&path).expect("create isolated test directory");
@@ -30,52 +26,25 @@ impl Drop for Scratch {
     }
 }
 
-fn build_go_cli(directory: &Path) -> PathBuf {
-    let binary = directory.join(if cfg!(windows) {
-        "symeraseme-go.exe"
-    } else {
-        "symeraseme-go"
-    });
-    if std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() != Ok("1")
-        && let Some(retained) =
-            std::env::var_os("SYMERASEME_ROLLBACK_GO_BINARY").filter(|value| !value.is_empty())
-    {
-        // This comparator exercises the real explicitly selected rollback
-        // sibling. It must execute the actual published binary, not a shim.
-        retained_go_release::stage(Path::new(&retained), &binary);
-        return binary;
-    }
-    let output = Command::new("go")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .args(["build", "-o"])
-        .arg(&binary)
-        .arg("./cmd/symeraseme")
-        .output()
-        .expect("build source-bound Go CLI");
-    assert!(
-        output.status.success(),
-        "Go CLI build failed:\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    binary
-}
-
-fn run(binary: &Path, cwd: &Path, args: &[&str], stdin: &[u8]) -> Output {
-    let mut child = Command::new(binary)
+fn run(binary: &Path, cwd: &Path, args: &[&str], stdin: &[u8], backend: Option<&str>) -> Output {
+    let mut command = Command::new(binary);
+    command
         .args(args)
         .current_dir(cwd)
         .env("HOME", cwd.join("home"))
+        .env("USERPROFILE", cwd.join("home"))
+        .env("XDG_CONFIG_HOME", cwd.join("config"))
+        .env("XDG_DATA_HOME", cwd.join("data"))
         .env("SYMERASEME_DATA_DIR", cwd.join("data"))
+        .env_remove("SYMERASEME_RESOURCES")
         .env_remove("SYMERASEME_BACKEND")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start CLI process");
+        .stderr(Stdio::piped());
+    if let Some(value) = backend {
+        command.env("SYMERASEME_BACKEND", value);
+    }
+    let mut child = command.spawn().expect("start Rust CLI process");
     use std::io::Write;
     child
         .stdin
@@ -83,93 +52,56 @@ fn run(binary: &Path, cwd: &Path, args: &[&str], stdin: &[u8]) -> Output {
         .expect("child stdin")
         .write_all(stdin)
         .expect("write child stdin");
-    child.wait_with_output().expect("wait for CLI process")
-}
-
-fn run_go_backend(binary: &Path, cwd: &Path, args: &[&str], stdin: &[u8]) -> Output {
-    let mut child = Command::new(binary)
-        .args(args)
-        .current_dir(cwd)
-        .env("HOME", cwd.join("home"))
-        .env("SYMERASEME_DATA_DIR", cwd.join("data"))
-        .env("SYMERASEME_BACKEND", "go")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start Rust fallback");
-    use std::io::Write;
-    child
-        .stdin
-        .take()
-        .expect("child stdin")
-        .write_all(stdin)
-        .expect("write fallback stdin");
-    child.wait_with_output().expect("wait for fallback process")
+    child.wait_with_output().expect("wait for Rust CLI process")
 }
 
 #[test]
-fn explicit_go_backend_matches_live_go_process_and_requires_sibling() {
+fn retired_backend_override_never_dispatches_a_go_sibling() {
     let scratch = Scratch::new();
-    let go = build_go_cli(&scratch.0);
     let project = scratch.0.join("project");
     fs::create_dir(&project).expect("create project working directory");
     fs::write(project.join(".symeraseme.toml"), "port = 8123\n").expect("write project config");
     let rust = scratch.0.join(if cfg!(windows) {
-        "symeraseme-rust.exe"
+        "symeraseme.exe"
     } else {
-        "symeraseme-rust"
+        "symeraseme"
     });
-    fs::copy(env!("CARGO_BIN_EXE_symeraseme-rust"), &rust).expect("stage Rust shadow binary");
+    fs::copy(env!("CARGO_BIN_EXE_symeraseme-rust"), &rust).expect("stage Rust binary");
+    let sibling = scratch.0.join(if cfg!(windows) {
+        "symeraseme-go.exe"
+    } else {
+        "symeraseme-go"
+    });
+    let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"rust-only-test","version":"1"}}}"#;
 
-    for (args, stdin) in [
-        (vec!["version", "--json"], b"".as_slice()),
-        (vec!["mcp", "--help"], b"".as_slice()),
-        (vec!["config", "show", "--output", "json"], b"".as_slice()),
-        (vec!["no-such-command"], b"".as_slice()),
-    ] {
-        let expected = run(&go, &project, &args, stdin);
-        let actual = run_go_backend(&rust, &project, &args, stdin);
-        assert_eq!(actual.status, expected.status, "status for {args:?}");
-        assert_eq!(actual.stdout, expected.stdout, "stdout for {args:?}");
-        assert_eq!(actual.stderr, expected.stderr, "stderr for {args:?}");
+    for present in [false, true] {
+        if present {
+            fs::write(&sibling, b"This retired sibling must never be executed")
+                .expect("stage invalid legacy sibling");
+        }
+        for (args, stdin) in [
+            (vec!["version", "--json"], b"".as_slice()),
+            (vec!["mcp", "--help"], b"".as_slice()),
+            (vec!["config", "show", "--output", "json"], b"".as_slice()),
+            (vec!["no-such-command"], b"".as_slice()),
+            (vec!["mcp", "--stdio"], request.as_slice()),
+        ] {
+            let expected = run(&rust, &project, &args, stdin, None);
+            for backend in ["go", "rust", "unknown"] {
+                let actual = run(&rust, &project, &args, stdin, Some(backend));
+                assert_eq!(
+                    actual.status, expected.status,
+                    "status for {args:?}/{backend}"
+                );
+                assert_eq!(
+                    actual.stdout, expected.stdout,
+                    "stdout for {args:?}/{backend}"
+                );
+                assert_eq!(
+                    actual.stderr, expected.stderr,
+                    "stderr for {args:?}/{backend}"
+                );
+            }
+        }
     }
-
-    let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"parity-test","version":"1"}}}"#;
-    let args = ["mcp", "--stdio"];
-    let expected = run(&go, &project, &args, request);
-    let native = run(&rust, &project, &args, request);
-    let fallback = run_go_backend(&rust, &project, &args, request);
-    for (label, actual) in [("Rust", native), ("Rust Go fallback", fallback)] {
-        assert_eq!(actual.status, expected.status, "{label} MCP exit status");
-        assert_eq!(actual.stdout, expected.stdout, "{label} MCP stdout");
-        assert_eq!(actual.stderr, expected.stderr, "{label} MCP stderr");
-    }
-
-    let missing_directory = scratch.0.join("without-fallback");
-    fs::create_dir(&missing_directory).expect("create no-fallback directory");
-    let missing_rust = missing_directory.join(rust.file_name().expect("Rust binary name"));
-    fs::copy(&rust, &missing_rust).expect("stage Rust binary without Go sibling");
-    let missing = Command::new(missing_rust)
-        .env("SYMERASEME_BACKEND", "go")
-        .arg("version")
-        .output()
-        .expect("run missing-fallback case");
-    assert_eq!(missing.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&missing.stderr).contains("Go fallback is missing"));
-
-    let invalid = Command::new(&rust)
-        .env("SYMERASEME_BACKEND", "unknown")
-        .arg("version")
-        .output()
-        .expect("run invalid-backend case");
-    assert_eq!(invalid.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&invalid.stderr).contains("unsupported SYMERASEME_BACKEND"));
-}
-
-/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
-/// collides when parallel tests create their directories at the same instant.
-fn unique_seq() -> u64 {
-    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

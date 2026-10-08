@@ -249,9 +249,9 @@ jobs:
               ]
           elif os.environ["MUTATION_SCOPE"] == "consent":
               inactive = [
-                  r'consent\.rs:628:5: replace close_windows_file .* with Ok\(\(\)\)$',
-                  r'consent\.rs:640:5: replace checked_windows_close .* with Ok\(\(\)\)$',
-                  r'consent\.rs:644:39: replace != with == in checked_windows_close$',
+                  r'consent\.rs:627:5: replace close_windows_file .* with Ok\(\(\)\)$',
+                  r'consent\.rs:639:5: replace checked_windows_close .* with Ok\(\(\)\)$',
+                  r'consent\.rs:643:39: replace != with == in checked_windows_close$',
               ]
           for pattern in inactive:
               command += ["--exclude-re", pattern]

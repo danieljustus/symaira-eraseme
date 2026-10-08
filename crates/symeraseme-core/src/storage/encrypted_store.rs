@@ -16,6 +16,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::{Duration, SystemTime};
 
+fn validate_replacement_path(path: &Path) -> io::Result<()> {
+    if path.as_os_str().as_encoded_bytes().contains(&0) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "replacement path contains NUL",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 #[allow(unsafe_code)]
 fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
@@ -25,9 +35,13 @@ fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
         fn MoveFileExW(source: *const u16, target: *const u16, flags: u32) -> i32;
         fn GetLastError() -> u32;
     }
+    validate_replacement_path(source)?;
+    validate_replacement_path(target)?;
     let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
     let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
     // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH.
+    // SAFETY: Both paths reject interior NULs. The terminated UTF-16 buffers
+    // remain alive throughout the call, and the flags preserve atomic replacement.
     let ok = unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), 0x1 | 0x8) };
     if ok != 0 {
         Ok(())
@@ -98,6 +112,33 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{Duration, SystemTime};
     use tempfile::tempdir;
+
+    #[cfg(windows)]
+    #[test]
+    fn replace_file_rejects_nul_in_both_paths_without_touching_sentinels() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("source.db");
+        let target = dir.path().join("target.db");
+        std::fs::write(&source, b"source sentinel").unwrap();
+        std::fs::write(&target, b"target sentinel").unwrap();
+        for invalid_source in [false, true] {
+            let mut invalid = if invalid_source { &source } else { &target }
+                .as_os_str()
+                .to_os_string();
+            invalid.push("\0ignored-suffix");
+            let invalid = PathBuf::from(invalid);
+            let error = if invalid_source {
+                super::replace_file(&invalid, &target)
+            } else {
+                super::replace_file(&source, &invalid)
+            }
+            .unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+            assert_eq!(std::fs::read(&source).unwrap(), b"source sentinel");
+            assert_eq!(std::fs::read(&target).unwrap(), b"target sentinel");
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
+        }
+    }
 
     #[test]
     fn default_temp_dir_is_user_scoped() {
@@ -814,6 +855,8 @@ pub fn atomic_transition_with_recovery(
     target: &Path,
     ciphertext: &[u8],
 ) -> Result<(), EncryptedStoreError> {
+    // Reject invalid paths before creating parents or temporary ciphertext.
+    validate_replacement_path(target)?;
     let parent = target
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())

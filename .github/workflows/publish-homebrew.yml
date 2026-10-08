@@ -68,7 +68,7 @@ jobs:
               "$BASE_URL/symeraseme_${VERSION}_${target}.tar.gz" \
               --output "$archive"
             tar -tzf "$archive" | grep -Fx 'symeraseme' >/dev/null
-            tar -tzf "$archive" | grep -Fx 'symeraseme-go' >/dev/null
+            test "$(tar -tzf "$archive" | LC_ALL=C sort)" = "$(printf '%s\n' LICENSE README.md symeraseme | LC_ALL=C sort)"
             sha256sum "$archive"
           done
 
@@ -115,8 +115,7 @@ jobs:
             end
 
             def install
-              # symeraseme-go is the explicit SYMERASEME_BACKEND=go rollback sibling.
-              bin.install "symeraseme", "symeraseme-go"
+              bin.install "symeraseme"
             end
 
             test do
@@ -179,8 +178,6 @@ jobs:
           prefix="$(brew --prefix)"
           version="${RELEASE_TAG#v}"
           test "$("$prefix/bin/symeraseme" --version)" = "symeraseme version $version"
-          # The documented rollback must work from a Homebrew install.
-          test "$(HOME="$RUNNER_TEMP" SYMERASEME_BACKEND=go "$prefix/bin/symeraseme" --version)" = "symeraseme version $version"
-          test -x "$prefix/bin/symeraseme-go"
+          test ! -e "$prefix/bin/symeraseme-go"
     env:
       RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}

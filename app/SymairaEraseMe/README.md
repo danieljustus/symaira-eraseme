@@ -7,17 +7,20 @@ self-contained Rust MCP JSON-RPC server (`symeraseme mcp`) over HTTP.
 
 - macOS 14+ (Sonoma)
 - Swift 5.10+ with Xcode or Xcode-beta installed (SwiftUI macro plugins required)
-- Rust 1.98.0 and Go 1.26.6 for development builds (the app bundles Rust as `symeraseme` and the transitional Go fallback as `symeraseme-go`)
+- Rust 1.98.0 for the bundled CLI/MCP server
+
+Go 1.26.6 is not needed to build or run the app. It is retained only for the
+repository's temporary Go reference/oracle development checks until the
+separate CUT-005 retirement.
 
 ## Build
 
 ```bash
-# Using the build script (builds Swift + Rust and the explicit Go fallback)
+# Build the Swift app and stage its Rust CLI/MCP server
 ./build.sh
 
-# Or manually with Xcode, then build the matching backend siblings
+# Or build the SwiftUI app by itself when using an existing Rust server
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
-../../scripts/build-app-backends.sh "$(swift build --show-bin-path)" debug
 
 # Or open in Xcode
 open Package.swift
@@ -48,7 +51,7 @@ Sources/SymairaEraseMe/
 │   └── Profile.swift        IdentityProfile, ExecuteResponse
 ├── Services/
 │   ├── MCPClient.swift      JSON-RPC 2.0 HTTP actor (tools/call, tools/list)
-│   └── ServerManager.swift  Bundled/Dev/Homebrew backend process manager
+│   └── ServerManager.swift  Bundled/Dev/Homebrew Rust server process manager
 ├── ViewModels/     @MainActor ObservableObject view models
 │   ├── DashboardViewModel.swift
 │   ├── CampaignsViewModel.swift
@@ -74,7 +77,7 @@ Sources/SymairaEraseMe/
 ## How It Works
 
 1. The app starts and shows the sidebar navigation.
-2. Go to **Settings** and click **Start Server** to spawn the bundled `symeraseme mcp` binary.
+2. Go to **Settings** and click **Start Server** to spawn the bundled Rust `symeraseme mcp` binary.
 3. The app connects to `http://127.0.0.1:8000` via JSON-RPC 2.0.
 4. Each view fetches data from the appropriate MCP tool.
 5. The app parses `result.content[0].text` → JSON → Swift models.
@@ -96,9 +99,8 @@ Sources/SymairaEraseMe/
 - SwiftUI apps require Xcode (or Xcode-beta) for the macro plugins that power
   `@State`, `@StateObject`, `@Binding`, etc. Building with plain `swift build`
   from CommandLineTools alone will fail.
-- Release bundles include the Rust MCP server and need no Python installation
-  or external runtime. Development builds stage the same Rust discovery path
-  through `build.sh`. The transitional `symeraseme-go` sibling permits explicit
-  rollback; a Homebrew `symeraseme` or configured Binary Path is also supported.
+- Rust-only release bundles include the Rust MCP server and need no Go, Python,
+  or other external runtime. Development builds stage the Rust server through
+  `build.sh`; a Homebrew `symeraseme` or configured Binary Path is also supported.
 - No external Swift dependencies beyond the Symaira AppKit packages declared
   in `Package.swift`.

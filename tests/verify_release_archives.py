@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the current GoReleaser archive and checksum contract."""
+"""Verify Rust-only release archives; explicit legacy mode reads old dual archives."""
 
 import hashlib
 import json

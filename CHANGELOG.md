@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- New CLI archives and the macOS app distribute only the Rust backend. The
+  former Go sibling and runtime selector are retired; Go remains temporarily
+  as a development oracle for copied-store compatibility checks.
+- Release provenance and archive verification bind the Rust-only payload and
+  its embedded dependency inventory. Historical `v0.13.0` assets are unchanged.
+- Removed the obsolete root Python Dependabot updater. The removed Python
+  product's `virtualenv` alerts were verified and dismissed as unused, not as
+  accepted runtime risk.
+- The Rust unsafe policy remains deny-by-default, with only the three scoped
+  Windows FFI boundaries eligible for independent review and native acceptance.
+
 ## [v0.13.0] - 2026-10-06
 
 Canary prerelease. The Rust implementation becomes the default `symeraseme`

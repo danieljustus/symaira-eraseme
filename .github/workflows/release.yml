@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Existing release tag to build the GUI DMG for'
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -39,7 +33,11 @@ jobs:
       - name: Checkout tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Verify pinned CLI release source
+        run: bash scripts/verify-release-source.sh
 
       - name: Require the tag to match the package version
         run: |
@@ -71,11 +69,17 @@ jobs:
         with:
           subject-checksums: ${{ runner.temp }}/dist/checksums.txt
 
+      - name: Attest the twelve SBOM sidecar digests
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/dist/sbom-checksums.txt
+
       - name: Publish the prerelease and read every asset back
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           cd "$RUNNER_TEMP/dist"
           NOTES="$RUNNER_TEMP/notes.md"
           cat > "$NOTES" <<EOF
@@ -83,10 +87,9 @@ jobs:
           and is not offered through Homebrew until it is promoted to a stable release.
 
           - \`symeraseme\` in every archive is the Rust implementation and the default backend.
-          - \`symeraseme-go\` is the last Go implementation, shipped only as an explicit rollback:
-            run with \`SYMERASEME_BACKEND=go\` to dispatch to it. It reads and writes the same data.
+          - No Go backend is bundled; the former backend selector is retired.
           - Each archive has a CycloneDX SBOM (\`*.cdx.json\`) built from the dependency graph
-            embedded in both binaries; \`sbom-checksums.txt\` lists their digests.
+            embedded in the Rust binary; \`sbom-checksums.txt\` lists their digests.
           - Build provenance for the six archives is attested by GitHub; verify with
             \`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`.
 
@@ -100,22 +103,41 @@ jobs:
           for asset in "${assets[@]}"; do
             cmp "$asset" "$RUNNER_TEMP/readback/$asset"
           done
+          gh attestation verify "$RUNNER_TEMP/readback/sbom-checksums.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-digest "$GITHUB_SHA" --source-ref "$GITHUB_REF"
           test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)" = true
 
   release-gui:
     name: Release / macOS GUI DMG
     needs: release-cli
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || (github.event_name == 'push' && needs.release-cli.result == 'success')) }}
+    if: ${{ github.event_name == 'push' && needs.release-cli.result == 'success' }}
     runs-on: macos-26
     environment: release
     env:
-      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.release_tag || github.ref }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify immutable release source
+        run: bash scripts/verify-release-source.sh
+
+      - name: Refuse to replace an existing GUI asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets,isPrerelease > "$RUNNER_TEMP/gui-release-preflight.json"
+          jq -e --arg asset "Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg" \
+            '.isPrerelease == true and (.assets | type == "array") and all(.assets[]; (.name | type == "string") and .name != $asset)' \
+            "$RUNNER_TEMP/gui-release-preflight.json"
 
       - name: Select Xcode 26
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
@@ -133,12 +155,6 @@ jobs:
             echo "::error::Expected Xcode 26 or newer, got: $XCODE_VERSION"
             exit 1
           fi
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-          cache: true
 
       - name: Install pinned Rust backend toolchain
         run: |
@@ -202,10 +218,9 @@ jobs:
           test -d "$APP_PATH"
           test -x "$APP_PATH/Contents/MacOS/Symaira EraseMe"
           test -x "$APP_PATH/Contents/MacOS/symeraseme"
-          test -x "$APP_PATH/Contents/MacOS/symeraseme-go"
+          test ! -e "$APP_PATH/Contents/MacOS/symeraseme-go"
           test "$("$APP_PATH/Contents/MacOS/symeraseme" --version)" = "symeraseme version ${RELEASE_TAG#v}"
-          test "$("$APP_PATH/Contents/MacOS/symeraseme-go" version)" = "symeraseme ${RELEASE_TAG#v}"
-          for backend in symeraseme symeraseme-go; do
+          for backend in symeraseme; do
             codesign --verify --strict --verbose=2 "$APP_PATH/Contents/MacOS/$backend"
           done
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Contents/Info.plist" | grep -Fx 'com.symaira.eraseme'
@@ -290,13 +305,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" "$DMG_PATH" --repo "$GITHUB_REPOSITORY" --clobber
+          bash scripts/verify-release-source.sh
+          gh release upload "$RELEASE_TAG" "$DMG_PATH" --repo "$GITHUB_REPOSITORY"
 
       - name: Verify published DMG asset and record release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           ASSET_NAME="$(basename "$DMG_PATH")"
           DOWNLOAD_DIR="$RUNNER_TEMP/published-release"
           mkdir -p "$DOWNLOAD_DIR"
@@ -374,13 +391,20 @@ jobs:
       id-token: write
       attestations: write
     env:
-      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
+      - name: Checkout attested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Download the published DMG
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          bash scripts/verify-release-source.sh
           mkdir -p "$RUNNER_TEMP/dmg"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Symaira-EraseMe-*-macos.dmg' --dir "$RUNNER_TEMP/dmg"
           test "$(find "$RUNNER_TEMP/dmg" -name '*.dmg' | wc -l)" -eq 1

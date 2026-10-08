@@ -2,6 +2,16 @@
   "schema_version": 1,
   "plan": "docs/plans/2026-09-04-go-to-rust-implementation-plan.md",
   "approval_trigger": "go",
+  "distribution_amendment": {
+    "approved_on": "2026-10-07",
+    "approval_command": "ok go",
+    "runtime": "Rust only; no bundled Go sibling or backend selector",
+    "immutable_canary": "v0.13.0",
+    "go_source": "development oracle until separately reviewed CUT-005 retirement",
+    "unsafe_policy": "deny by default; three scoped Windows FFI boundaries require independent review and native amd64/arm64 acceptance",
+    "candidate_acceptance": "fresh Rust-only archive, SBOM, Swift, native compatibility and release evidence required",
+    "stable_observation": "seven days after verified stable publication; not started"
+  },
   "integration_branch": "main",
   "worktree_root": ".worktrees",
   "github_tracking": {
@@ -116,9 +126,9 @@
       "evidence": [
         "stable Rust GitHub release publishedAt is at least seven days old",
         "no open issue labelled parity-regression for that release",
-        "release assets, Homebrew install and rollback smoke evidence re-read from exact targets"
+        "Rust-only release assets, Homebrew install and backup/compatibility evidence re-read from exact targets"
       ],
-      "failure": "leave Go fallback/source intact and reschedule the gate"
+      "failure": "retain development oracle/source and reschedule; never reintroduce a bundled fallback"
     }
   },
   "tasks": [
@@ -176,9 +186,9 @@
     {"id":"9.2","name":"Replace release build plumbing","depends_on":["9.1","0.3"],"writer_scope":["scripts/package-dmg.sh","scripts/package-rust-release.sh",".github/workflows/release.yml",".github/workflows/publish-homebrew.yml",".goreleaser.yml"],"merge_gate":"REL-001..010 pass in dry run"},
     {"id":"9.3","name":"Verify Homebrew and release consumers","depends_on":["9.2"],"writer_scope":["separate homebrew-tap worktree after immutable prerelease exists"],"merge_gate":"syntax/style/audit/install/version checks pass from real assets"},
 
-    {"id":"10.1","name":"Ship dual-backend prerelease","depends_on":["9.3"],"writer_scope":["fallback dispatch","release packaging","README.md","AGENTS.md","CONTRIBUTING.md","TROUBLESHOOTING.md","skills/**"],"merge_gate":"CUT-001..003 pass on real prerelease assets"},
+    {"id":"10.1","name":"Ship Rust-only prerelease","depends_on":["9.3"],"writer_scope":["retired fallback dispatch","release packaging","README.md","AGENTS.md","CONTRIBUTING.md","TROUBLESHOOTING.md","skills/**"],"merge_gate":"CUT-001..003 pass on real Rust-only prerelease assets with a separate development oracle"},
     {"id":"10.2","name":"Canary and stable Rust release","depends_on":["10.1"],"writer_scope":["release metadata and evidence only"],"merge_gate":"all required matrix rows pass; value gate passes or explicit exception"},
     {"id":"10.3","name":"Final integration review","depends_on":["10.2"],"writer_scope":["review fixes only, each in isolated worktree"],"merge_gate":"contract, quality, security and release reviewers approve"},
-    {"id":"10.4","name":"Retire Go separately","depends_on":["10.3"],"external_gate":"stable-release-plus-7-days","writer_scope":["docs/go-test-rust-port-classification.md","Go source/modules/workflows","fallback removal","final docs"],"merge_gate":"CUT-005, full Rust/app/release gates and verified rollback pass"}
+    {"id":"10.4","name":"Retire Go separately","depends_on":["10.3"],"external_gate":"stable-release-plus-7-days","writer_scope":["docs/go-test-rust-port-classification.md","Go source/modules/workflows","verify retired fallback remains absent","final docs"],"merge_gate":"CUT-005, full Rust/app/release gates and verified backup/compatibility pass"}
   ]
 }

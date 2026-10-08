@@ -3,6 +3,17 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
+- Current decision (2026-10-07, #1171–#1173): Daniel approved Rust-only
+  distribution with `ok go`. New archives/app must contain no Go backend;
+  the former runtime selector is retired. Go source remains a separate
+  development oracle until CUT-005. The narrow Windows FFI exceptions need
+  independent review and final native acceptance, not a blanket unsafe waiver.
+  Root Python product manifests were removed by `b1fda026`; all four obsolete
+  `virtualenv` alerts now read back dismissed as `not_used`, with zero open
+  Dependabot alerts. Updater cleanup and dependency-graph readback remain
+  integration work. `v0.13.0` stays immutable. A changed candidate needs fresh
+  artifact/Swift/native evidence before stable promotion; seven-day observation
+  has not started. Older entries below describe their own historical revisions.
 - Integrated status (2026-09-24): the proof branch landed on GitHub `main` as `3f133e75`. Its exact-head Go CI, Rust CI (including the native OS matrix), general CI and CodeQL completed successfully. No release, cutover, Go removal or paid provider is authorized. The older slice notes below are historical; a green integrated CI run does not prove a retained older Go rollback binary can read schema v2 (see #1035).
 - Native shadow archive gate (2026-09-27): migration PR #1066 at `79ef6a85` passed all eight checks: six native Rust release builds, same-run archive/checksum validation, and plain-store switchback. The archives are unsigned one-day workflow artifacts. Production release routing remains Go; this result does not establish signed publication or user-data cutover. The consolidated main-based PR head needs its own exact-head CI.
 - Toolchain: go1.27.1, rustc 1.98.0 (oracle capture pinned at go1.26.6, commit `4e582f28`)
