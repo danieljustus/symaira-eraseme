@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/plain-store-switchback.yml
+      - .github/workflows/release.yml
       - .github/workflows/rust-prerelease.yml
       - rust-tests/parity/plain_store_switchback.py
       - rust-tests/parity/encrypted_store_switchback.py
@@ -26,6 +27,7 @@ on:
       - go.mod
       - go.sum
   workflow_dispatch:
+  workflow_call: {}
 
 permissions:
   contents: read
@@ -64,6 +66,7 @@ jobs:
       - name: Checkout candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Set up pinned Go development oracle and native denial control
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

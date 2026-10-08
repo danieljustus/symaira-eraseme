@@ -15,8 +15,9 @@ concurrency:
 jobs:
   release-archives:
     if: github.event_name == 'push'
-    name: Release / Rust CLI archives
-    uses: ./.github/workflows/rust-prerelease.yml
+    name: Release / Rust CLI archives and native stores
+    # Publish only the same-run archives that passed native copied-store tests.
+    uses: ./.github/workflows/plain-store-switchback.yml
 
   release-cli:
     if: github.event_name == 'push'

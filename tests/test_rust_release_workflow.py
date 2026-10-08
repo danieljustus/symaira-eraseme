@@ -10,6 +10,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowControls(unittest.TestCase):
+    def test_release_tests_the_same_six_archives_before_publication(self):
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        archives = workflow.split('\n  release-archives:\n', 1)[1].split('\n  release-cli:\n', 1)[0]
+        self.assertIn('uses: ./.github/workflows/plain-store-switchback.yml', archives)
+        self.assertNotIn('uses: ./.github/workflows/rust-prerelease.yml', archives)
+        publisher = workflow.split('\n  release-cli:\n', 1)[1].split('\n  release-gui:\n', 1)[0]
+        self.assertIn('    needs: release-archives\n', publisher)
+        self.assertIn('name: symeraseme-rust-prerelease-archives', publisher)
+        self.assertNotIn('run-id:', publisher)
+        self.assertNotIn('cargo ', publisher)
+
+        stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
+        self.assertIn('  workflow_call: {}\n', stores)
+        self.assertIn('      - .github/workflows/release.yml\n', stores)
+        self.assertEqual(stores.count('uses: ./.github/workflows/rust-prerelease.yml'), 1)
+        self.assertIn('    needs: release-candidate\n', stores)
+        self.assertIn('          ref: ${{ github.sha }}\n', stores)
+        self.assertIn('name: symeraseme-rust-prerelease-archives', stores)
+        self.assertNotIn('run-id:', stores)
+        for target in ('darwin, arch: arm64', 'darwin, arch: amd64',
+                       'linux, arch: arm64', 'linux, arch: amd64',
+                       'windows, arch: arm64', 'windows, arch: amd64'):
+            self.assertIn(target, stores)
+        for guard in ("sums[archive.name] == digest", "hashlib.sha256((out / t).read_bytes())",
+                      "plain['status'] == 'passed'", "encrypted['status'] == 'passed'"):
+            self.assertIn(guard, stores)
+
     def test_release_guards_and_attested_sbom_manifest(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
 
