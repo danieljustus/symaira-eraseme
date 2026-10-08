@@ -10,6 +10,45 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowControls(unittest.TestCase):
+    def test_reusable_store_gate_isolates_caller_concurrency(self):
+        stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
+        concurrency = stores.split('\nconcurrency:\n', 1)[1].split('\nenv:\n', 1)[0]
+        group = concurrency.split('  group: ', 1)[1].splitlines()[0]
+        self.assertEqual(group, 'plain-store-switchback-${{ github.workflow }}-${{ github.ref }}')
+        self.assertIn('  cancel-in-progress: true', concurrency)
+        # Structural control: the same tag must not collide across callers.
+        groups = [group.replace('${{ github.workflow }}', caller)
+                  .replace('${{ github.ref }}', 'refs/tags/v0.14.0')
+                  for caller in ('Release', 'Native store switchback')]
+        self.assertNotEqual(*groups)
+
+    def test_release_tests_the_same_six_archives_before_publication(self):
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        archives = workflow.split('\n  release-archives:\n', 1)[1].split('\n  release-cli:\n', 1)[0]
+        self.assertIn('uses: ./.github/workflows/plain-store-switchback.yml', archives)
+        self.assertNotIn('uses: ./.github/workflows/rust-prerelease.yml', archives)
+        publisher = workflow.split('\n  release-cli:\n', 1)[1].split('\n  release-gui:\n', 1)[0]
+        self.assertIn('    needs: release-archives\n', publisher)
+        self.assertIn('name: symeraseme-rust-prerelease-archives', publisher)
+        self.assertNotIn('run-id:', publisher)
+        self.assertNotIn('cargo ', publisher)
+
+        stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
+        self.assertIn('  workflow_call: {}\n', stores)
+        self.assertIn('      - .github/workflows/release.yml\n', stores)
+        self.assertEqual(stores.count('uses: ./.github/workflows/rust-prerelease.yml'), 1)
+        self.assertIn('    needs: release-candidate\n', stores)
+        self.assertIn('          ref: ${{ github.sha }}\n', stores)
+        self.assertIn('name: symeraseme-rust-prerelease-archives', stores)
+        self.assertNotIn('run-id:', stores)
+        for target in ('darwin, arch: arm64', 'darwin, arch: amd64',
+                       'linux, arch: arm64', 'linux, arch: amd64',
+                       'windows, arch: arm64', 'windows, arch: amd64'):
+            self.assertIn(target, stores)
+        for guard in ("sums[archive.name] == digest", "hashlib.sha256((out / t).read_bytes())",
+                      "plain['status'] == 'passed'", "encrypted['status'] == 'passed'"):
+            self.assertIn(guard, stores)
+
     def test_release_guards_and_attested_sbom_manifest(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
 

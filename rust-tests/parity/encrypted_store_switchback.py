@@ -157,12 +157,7 @@ def run(go, rust, output, sandbox_control=None):
         def execute(label, artifact, args):
             step = {"id": label, "success": False}
             report["steps"].append(step)
-            stage = active.with_suffix(".next")
-            shutil.copyfile(artifact, stage)
-            stage.chmod(0o700)
-            gate.require(gate.identity(stage) == gate.identity(artifact), "staged executable mismatch")
-            os.replace(stage, active)
-            step["installed"] = gate.identity(active)
+            step["installed"] = gate.install_artifact(artifact, active)
             try:
                 gate.command(output, label,
                              gate.sandbox_command(output, label, active, args, env), env)
