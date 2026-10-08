@@ -4,7 +4,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
-const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
 #[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
 pub mod go_source_pin;
 
@@ -14,7 +14,7 @@ pub fn manifest_bytes(os: &str, arch: &str) -> Option<&'static [u8]> {
     macro_rules! recorded {
         ($target:literal) => {
             include_bytes!(concat!(
-                "../../../../tests/fixtures/go-frozen/native-0d/e8/",
+                "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/",
                 $target,
                 "/manifest.json"
             ))

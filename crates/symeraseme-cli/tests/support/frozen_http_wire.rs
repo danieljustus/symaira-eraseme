@@ -13,27 +13,35 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "286d43fd9b448c574007ad98534125193f7e732d",
-        "300437d9b2aa6dbf62b7a3a40f17108ffb69a2684bf41ccf1d948d9073dba896",
-        include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/darwin-amd64/wire.json"),
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "53425039e41f698cf26b2fdf6d11abb054e30daa9212fa1a8f4cdeda9487cdd8",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-wire/darwin-amd64/wire.json"
+        ),
     ),
     (
         "darwin/arm64",
-        "286d43fd9b448c574007ad98534125193f7e732d",
-        "10036884b9c1477dc15a63c515a2cc13beec561d9c04eb1efd367af614a359f5",
-        include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/darwin-arm64/wire.json"),
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "0e62888c017f925082019c07012ab0c6f248ecf7bb48d1a5ed3c949c53c2cdee",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-wire/darwin-arm64/wire.json"
+        ),
     ),
     (
         "linux/amd64",
-        "286d43fd9b448c574007ad98534125193f7e732d",
-        "cd28aad474d32b963545ffe7188d4b3ff03dfe717f2342da06a3d6092f445d95",
-        include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/linux-amd64/wire.json"),
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "24a99eddee891d2ef5fb6d989a1e659eda85f33879f7a776295b60e4f39a4717",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-wire/linux-amd64/wire.json"
+        ),
     ),
     (
         "linux/arm64",
-        "286d43fd9b448c574007ad98534125193f7e732d",
-        "f05e58e7849cd33761ed4e75144c207747b011ef4f60bdcadc4d164a1bd3dfbd",
-        include_bytes!("../../../../tests/fixtures/go-frozen/http-wire/linux-arm64/wire.json"),
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "7c6931f02c52152485144db0d0c543c4414235f5387e6da6a44be2d44fa79645",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-wire/linux-arm64/wire.json"
+        ),
     ),
 ];
 

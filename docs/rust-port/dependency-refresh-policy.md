@@ -32,5 +32,39 @@ retirement is authorized by this policy.
 
 The first candidate includes the complete lockfile change proposed by
 Dependabot PR #1185, including signal-hook 0.4.4 to 0.4.5 and its recorded
-Windows dependency-resolution changes. Capture and reader acceptance are
-pending; this document is not evidence of executed native tests.
+Windows dependency-resolution changes. Genuine captures are retained from
+Rust CI run `37796278728` and HTTP auxiliary run `37796706488`, both bound to
+`411b5c10eb041f0233e0e86710a3dd733b0012e2`. Refreshed candidate native acceptance
+remains pending; this document alone is not evidence of executed native tests.
+
+## Publication privacy derivation
+
+The retained native grant captures contain randomly issued local consent
+identifiers. All six captures revoke their isolated grants and record an empty
+final grant store, but archived issuance and consent-record copies still contain
+those identifiers. Publish privacy-derived genuine captures, not raw copies.
+
+`scripts/derive_frozen_grant_privacy.py` consumes the independently reviewed
+selection and requires its explicit SHA-256. It replaces only the two random
+grant identifiers per native target with same-length public test identifiers,
+consistently updating revoke arguments, issuance/list outputs, consent-record
+tokens, token-derived filenames and dependent frame digests. Recursive JSON
+checks preserve keys, types, case counts, commands, times, modes, source/build
+identities and all other behavior-relevant values. Non-grant bytes are unchanged.
+It rejects altered input digests and emits original/derived hashes and changed
+JSON paths in `privacy-derivation.json`; original capture ZIPs, selected raw bytes
+and historical repository fixtures remain unchanged. This publication step does
+not approve native replay or relax the strict Cargo-lock/source-binding rule.
+
+The initial derivation starts from capture commit
+`411b5c10eb041f0233e0e86710a3dd733b0012e2` and reviewed selection digest
+`e5d75af3feeebcc7cff13dbbdf65493bc0c03c38147119412823f0e63314ea31`.
+The 202 selected files include 54 privacy-changed grant files and 148 unchanged
+files. Independent publication review approved these exact derived bytes and
+the twelve reader proposals before integration. The committed sidecar is
+`tests/fixtures/go-frozen/refresh-411b5c10/privacy-derivation.json`, SHA-256
+`b863b850df548f745ecd68967c52fc0fb4f74cfb4cd53ed59f09fe74ee9b94c0`.
+It records each artifact ID, ZIP digest, original member, native target and
+original/derived file digest. Raw ZIPs remain retained outside the repository.
+Publication privacy approval does not clear the unchanged frozen/native
+acceptance gates, which must execute on the integrated candidate.
