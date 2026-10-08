@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: plain-store-switchback-${{ github.ref }}
+  group: plain-store-switchback-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:

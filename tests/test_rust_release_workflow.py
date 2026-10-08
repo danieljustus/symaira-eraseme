@@ -10,6 +10,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowControls(unittest.TestCase):
+    def test_reusable_store_gate_isolates_caller_concurrency(self):
+        stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
+        concurrency = stores.split('\nconcurrency:\n', 1)[1].split('\nenv:\n', 1)[0]
+        group = concurrency.split('  group: ', 1)[1].splitlines()[0]
+        self.assertEqual(group, 'plain-store-switchback-${{ github.workflow }}-${{ github.ref }}')
+        self.assertIn('  cancel-in-progress: true', concurrency)
+        # Structural control: the same tag must not collide across callers.
+        groups = [group.replace('${{ github.workflow }}', caller)
+                  .replace('${{ github.ref }}', 'refs/tags/v0.14.0')
+                  for caller in ('Release', 'Native store switchback')]
+        self.assertNotEqual(*groups)
+
     def test_release_tests_the_same_six_archives_before_publication(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
         archives = workflow.split('\n  release-archives:\n', 1)[1].split('\n  release-cli:\n', 1)[0]
