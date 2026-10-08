@@ -37,7 +37,7 @@ Activate this rule when the user wants to:
 
 - `symeraseme init-profile` — Create identity
 - `symeraseme plan create --campaign <id>` — Plan campaign
-- `symeraseme plan execute --campaign <id> --consent <token>` — Send requests (needs consent)
+- `symeraseme plan execute --campaign <id> --consent <token>` — Run the plan; the Rust-only candidate has no outbound email/browser adapters by default
 - `symeraseme tick` — Check deadlines
 - `symeraseme poll-inbox` — Fetch replies
 - `symeraseme classify-reply <id>` — Classify with LLM
@@ -53,4 +53,5 @@ Activate this rule when the user wants to:
 
 ## Environment
 
-Requires: `ANTHROPIC_API_KEY`, `SYMERASEME_DATA_DIR`
+`ANTHROPIC_API_KEY` is required only for LLM calls using Anthropic.
+`SYMERASEME_DATA_DIR` is an optional data-directory override.

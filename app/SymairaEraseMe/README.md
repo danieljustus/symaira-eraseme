@@ -13,6 +13,7 @@ stable release.
 - macOS 14+ (Sonoma)
 - Swift 5.10+ with Xcode or Xcode-beta installed (SwiftUI macro plugins required)
 - Rust 1.98.0 for the bundled CLI/MCP server
+- Python 3 for the local backend-staging script
 
 Go 1.26.6 is not needed to build or run the app. It is retained only for the
 repository's temporary Go reference/oracle development checks until the
@@ -105,8 +106,8 @@ Sources/SymairaEraseMe/
   `@State`, `@StateObject`, `@Binding`, etc. Building with plain `swift build`
   from CommandLineTools alone will fail.
 - The current Rust-only source-tree candidate stages its Rust MCP server through
-  `build.sh`; no Go, Python, or other external runtime is needed to build this
-  candidate. This does not describe the already-published dual-backend
+  `build.sh`, which uses Python 3 to locate the compiler output. Running the staged
+  Rust backend requires no Go or Python runtime. This does not describe the already-published dual-backend
   `v0.13.0` prerelease assets.
 - No external Swift dependencies beyond the Symaira AppKit packages declared
   in `Package.swift`.

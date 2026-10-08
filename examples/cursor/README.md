@@ -21,7 +21,8 @@ ln -sf /path/to/symaira-eraseme/skills ~/.cursor/skills/symaira-eraseme
 
 ### Option 3: Auto-Discovery via .agents/
 
-Cursor also discovers skills from `.agents/skills/` (already configured in this repo).
+Cursor also discovers skills from `.agents/skills/`. The symlink is untracked;
+create it with `./scripts/setup-agents.sh --agent codex`.
 
 ## Rules (Optional Enhancement)
 
@@ -66,6 +67,9 @@ Cursor will automatically load the skill when your message matches the descripti
 4. Select the skills directory
 
 ## Environment Variables
+
+These overrides are optional. `ANTHROPIC_API_KEY` is needed only for LLM calls
+using the Anthropic provider; `SYMERASEME_DATA_DIR` changes the default data directory.
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."

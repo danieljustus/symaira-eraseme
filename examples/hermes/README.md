@@ -71,7 +71,9 @@ Hermes uses three levels of disclosure:
 
 ## Environment Variables
 
-Set these before running Hermes:
+These EraseMe overrides are optional, not prerequisites for running Hermes.
+`ANTHROPIC_API_KEY` is needed only for LLM calls using the Anthropic provider;
+`SYMERASEME_DATA_DIR` changes the default data directory.
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
