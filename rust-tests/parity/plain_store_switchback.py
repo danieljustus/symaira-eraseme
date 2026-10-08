@@ -52,6 +52,21 @@ def identity(path):
     return {'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
 
 
+def install_artifact(artifact, active):
+    """Reuse a byte-verified active image; still perform real Go/Rust switches."""
+    expected = identity(artifact)
+    if active.exists() and identity(active) == expected:
+        return expected
+    stage = active.with_suffix('.next')
+    shutil.copyfile(artifact, stage)
+    stage.chmod(0o700)
+    require(identity(stage) == expected, 'staged executable mismatch')
+    os.replace(stage, active)
+    installed = identity(active)
+    require(installed == expected, 'installed executable mismatch')
+    return installed
+
+
 def command(root, label, argv, env, timeout=30):
     """Retain failures and raw bytes; bound file growth and the owned process group."""
     if sys.platform == 'win32':
@@ -538,11 +553,7 @@ def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=Non
             step = {'id': label, 'success': False}
             report['steps'].append(step)
             if artifact is not None:
-                stage = active.with_suffix('.next')
-                shutil.copyfile(artifact, stage)
-                stage.chmod(0o700)
-                require(identity(stage) == identity(artifact), 'staged executable mismatch')
-                os.replace(stage, active)
+                install_artifact(artifact, active)
             step['installed'] = identity(active)
             try:
                 step['command'] = command(root, label,

@@ -16,6 +16,27 @@ import plain_store_switchback as gate
 
 
 class SwitchbackControls(unittest.TestCase):
+    def test_install_reuses_verified_image_but_switches_different_artifacts(self):
+        # Structural Windows image-lock control, not native Windows evidence.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            go, rust, active = (root / name for name in ('go', 'rust', 'active'))
+            go.write_bytes(b'synthetic Go image')
+            rust.write_bytes(b'synthetic Rust image')
+            self.assertEqual(gate.install_artifact(go, active), gate.identity(go))
+            self.assertEqual(gate.install_artifact(rust, active), gate.identity(rust))
+            with patch.object(gate.os, 'replace', side_effect=PermissionError('locked image')) as replace:
+                self.assertEqual(gate.install_artifact(rust, active), gate.identity(rust))
+                replace.assert_not_called()
+                with self.assertRaises(PermissionError):
+                    gate.install_artifact(go, active)
+            self.assertEqual(gate.identity(active), gate.identity(rust))
+            self.assertEqual(gate.install_artifact(go, active), gate.identity(go))
+            active.unlink()
+            active.symlink_to(rust)
+            with self.assertRaisesRegex(ValueError, 'regular file'):
+                gate.install_artifact(rust, active)
+
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS sandbox Go runtime control')
     def test_go_build_info_reads_only_explicit_goroot(self):
         if shutil.which('go') is None:
