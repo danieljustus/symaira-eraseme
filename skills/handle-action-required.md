@@ -7,56 +7,44 @@ rejections, and other action-required scenarios.
 
 - [Reply classified](triage-broker-replies.md) as `VERIFICATION_REQUIRED`,
   `REJECTED`, or `AUTO_CONFIRM`
-- LLM provider configured for the Go shared provider layer
-- No browser automation dependency is required. `auto-confirm` and complex
-  web forms use the durable manual-task fallback when no executor is injected.
+- The current Rust CLI/MCP path does not inject a browser executor, so a
+  manual task is the default. Configure an LLM provider only for rebuttal
+  generation.
 
 ## Scenario 1: Auto-confirmation links
 
-Many brokers send a confirmation link that needs to be clicked. EraseMe only
-claims a click when an executor is explicitly available. Otherwise it creates a
-linked manual task with `step=manual_confirmation_required`; complete that task
-in a user-controlled browser and then mark it completed.
-
-```bash
-symeraseme auto-confirm 1
-```
+Many brokers send a confirmation link. The default Rust CLI/MCP path has no
+browser executor: `auto-confirm` creates a linked durable manual task with
+`step=manual_confirmation_required` and does not click the link. A host that
+explicitly injects a supported executor may perform a click; do not assume one
+is available.
 
 ### Dry-run first
 
 ```bash
+# Preview the trusted link; no click is attempted
 symeraseme auto-confirm 1 --dry-run
-# Output: [DRY RUN] Would click: https://broker.com/verify?token=abc
 ```
 
-### Headless vs headed mode
+### Default manual-task path
 
 ```bash
-# Default: headless (no visible browser)
 symeraseme auto-confirm 1
-
-# Show browser for debugging
-symeraseme auto-confirm 1 --headed
+symeraseme manual-tasks list
+symeraseme manual-tasks show <task-id>
 ```
 
-### JSON output
+The JSON response from the default path reports
+`manual_confirmation_required`; it does not claim a successful click. Complete
+the task only after the user has manually followed the link and verified the
+result:
 
 ```bash
-symeraseme auto-confirm 1 --output json
+symeraseme manual-tasks complete <task-id> --notes "Confirmed manually"
 ```
 
-```json
-{
-  "request_id": 1,
-  "success": true,
-  "step": "click_confirm",
-  "clicked_url": "https://broker.com/verify?token=abc",
-  "error": null,
-  "dry_run": false,
-  "screenshot_before": null,
-  "screenshot_after": "/tmp/screenshots/confirm_1_after.png"
-}
-```
+`--headed` and `--screenshot-dir` are executor options; they do not add browser
+execution to the default Rust CLI/MCP path.
 
 ## Scenario 2: Generate a rebuttal
 
@@ -97,64 +85,52 @@ symeraseme generate-rebuttal 1 --output json
 }
 ```
 
-### Review before sending
+### Review the draft
 
-The rebuttal text is printed to stdout. Review it with the user, then send
-via email using the configured email adapter.
+The rebuttal text is printed to stdout. Review it with the user. The default
+Rust CLI does not send email; the user may copy the draft into their chosen mail
+client or use a separately injected email sender.
 
 ## Scenario 3: Manual fallback for complex web forms
 
-Some web forms are too complex for automated handling. Use the manual
-fallback system:
+The current Rust CLI/MCP path does not inject a browser executor. A dry run
+previews the registry form; a non-dry run creates a durable manual task with
+`reason=dynamic_form` and does not open a browser or submit the form.
 
 ```bash
-# List pending manual tasks
+# Preview only
+symeraseme run-web-form <broker-id> --dry-run
+
+# Create and review the manual task
+symeraseme run-web-form <broker-id>
 symeraseme manual-tasks list
-
-# Show details of a specific task
-symeraseme manual-tasks show 1
-
-# Mark as completed after manual action
-symeraseme manual-tasks complete 1 --notes "Completed opt-out via manual browser session"
+symeraseme manual-tasks show <task-id>
 ```
 
-### JSON output
+Mark the task complete only after the user has performed and confirmed the
+manual action:
 
 ```bash
-symeraseme manual-tasks list --output json
-```
-
-```json
-[
-  {
-    "id": 1,
-    "broker_name": "Spokeo",
-    "broker_id": "spokeo",
-    "form_url": "https://spokeo.com/opt-out",
-    "reason": "multi_step_form_with_captcha",
-    "status": "pending",
-    "created_at": "2026-05-19T10:00:00",
-    "instructions": "Navigate to URL and fill in the opt-out form..."
-  }
-]
+symeraseme manual-tasks complete <task-id> --notes "Completed opt-out manually"
 ```
 
 ## Best practices
 
-1. **Auto-confirm first**: Try `auto-confirm` before any manual handling.
+1. **Confirmation links**: `auto-confirm` previews or creates the default manual task; it does not click links without an injected executor.
 2. **Check confidence**: Rebuttals with `confidence < 0.7` or
    `needs_human_review: true` should be reviewed by the user.
 3. **Manual tasks**: Always review the instructions with the user and offer
    to open the URL in their browser.
-4. **Save screenshots**: Use `--screenshots /tmp/oe-screenshots` with
-   `auto-confirm` and `run-web-form` for debugging.
+4. **Executor diagnostics**: Use `--headed` and `--screenshot-dir <path>` only
+   with a host that explicitly injects a browser executor; the default CLI does
+   not run a browser.
 
 ## Error handling
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `No unclassified inbox reply found` | Already classified or no reply | Check `events show <id>` |
-| `Failed: ...` | Browser automation error | Retry with `--headed` to debug |
+| `manual_confirmation_required` | No browser executor is injected in the default Rust CLI/MCP path | Review the durable manual task and perform the action yourself; use an injected executor only when a host explicitly provides one |
 | `Manual task not found` | Invalid task ID | Run `manual-tasks list` to find valid IDs |
-| `Anthropic API not available` | API key missing | Set `ANTHROPIC_API_KEY` |
+| LLM provider authentication error | Credential/configuration missing for the selected provider | Configure that provider only if using rebuttal generation; the Rust provider defaults to Anthropic (`ANTHROPIC_API_KEY`) |
 | `Could not find confirmation link` | No link in the reply | Check the reply body manually |

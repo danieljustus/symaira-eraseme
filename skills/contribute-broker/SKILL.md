@@ -82,7 +82,7 @@ verification:
 ### 4. Validate the file
 
 ```bash
-# Validate the embedded registry with the Go CLI
+# Validate with the current Rust CLI
 symeraseme registry validate
 ```
 
@@ -114,7 +114,7 @@ If the broker exists but information is outdated:
 # Update only the changed fields
 # Add a note about what changed
 
-# Validate the embedded registry with the Go CLI
+# Validate with the current Rust CLI
 symeraseme registry validate
 
 # Commit with descriptive message
@@ -130,7 +130,7 @@ Source: <where you verified this>"
 
 1. **Never fabricate data**: Only add brokers you have verified from a reliable source
 2. **Always include source**: The `source` field must reference where you found the broker
-3. **Validate before PR**: Run `--validate-all` to ensure schema compliance
+3. **Validate before PR**: Run `symeraseme registry validate` to check the embedded registry
 4. **One broker per PR**: Keep PRs focused on a single broker addition or update
 5. **Respect existing format**: Match the style of existing broker YAML files
 6. **Privacy first**: Never include personal data in broker definitions

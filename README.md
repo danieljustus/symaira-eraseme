@@ -14,9 +14,11 @@ Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
 an authenticated MCP JSON-RPC interface.
 
-**Runtime:** Rust-only CLI and native SwiftUI macOS app. The Go implementation
-remains temporarily as a development oracle for conformance checks until the
-separate CUT-005 retirement; it is not a distributed runtime.
+**Current source tree:** Rust-only CLI and native SwiftUI macOS app candidate.
+This Rust-only package layout is not yet a published release. The published
+`v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the latest stable
+release. The Go implementation remains temporarily as a development oracle for
+conformance checks until the separate CUT-005 retirement.
 
 **Status:** Beta. Core planning, event tracking, deadline handling, registry
 validation, inbox triage, reports, and the MCP/CLI contracts are implemented.
@@ -33,7 +35,7 @@ Some broker-specific web flows still require manual review.
 - Shared Rust LLM provider layer for reply classification and rebuttal generation.
 - Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
 - AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.
-- Native SwiftUI dashboard for macOS. Rust-only release DMGs contain the Rust MCP server.
+- Native SwiftUI dashboard for macOS. The unreleased Rust-only candidate DMG stages the Rust CLI/MCP server.
 
 ## Install
 
@@ -47,22 +49,21 @@ symeraseme version
 
 ### Windows and other platforms
 
-Download the matching `symeraseme_<version>_<os>_<arch>` archive for the
-Rust-only candidate or release from the
+Download the archive for the published version you choose from
 [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases).
-These archives are static builds and do not require an external runtime. Each
-includes the Rust `symeraseme` executable, without a Go runtime or Go-backend
-switch. Previously published `v0.13.0` prerelease
-assets are immutable; the new Rust-only candidate will be published separately.
-Canary builds are published as GitHub prereleases and reach Homebrew only once
-they are promoted to a stable release.
+The published `v0.13.0` prerelease is dual-backend; `v0.12.1` is the latest
+stable release. The Rust-only archive layout describes the unreleased candidate
+in this source tree, not an available release asset. Previously published
+`v0.13.0` assets are immutable. Canary builds reach Homebrew only after they
+are promoted to a stable release.
 
 ### macOS GUI
 
-The versioned `Symaira-EraseMe-<version>-macos.dmg` is attached to the same
-GitHub release and bundles the Rust CLI/MCP server. The release notes state
-whether Developer ID signing, notarization, and stapling were completed. No
-GUI Homebrew cask is configured; install the macOS app from its DMG.
+The current source checkout's versioned `Symaira-EraseMe-<version>-macos.dmg`
+build stages the Rust CLI/MCP server for the unreleased candidate. This does not
+change the already-published `v0.13.0` assets. Release notes identify whether
+Developer ID signing, notarization, and stapling were completed. No GUI
+Homebrew cask is configured; install the macOS app from its DMG.
 
 ### Migration from the pre-cutover installation
 
@@ -217,9 +218,11 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
    checksums, and updates `danieljustus/homebrew-tap/Formula/symeraseme.rb`.
 
 No GUI Homebrew cask is configured; the macOS GUI is distributed as a DMG.
-Previously published `v0.13.0` prerelease assets remain unchanged; the next
-candidate and subsequent releases use the Rust-only package layout. The
-historical `python-final` tag remains available for migration and recovery.
+Previously published `v0.13.0` dual-backend prerelease assets remain unchanged;
+`v0.12.1` is the latest stable release. The Rust-only source-tree candidate has
+not been published, and future release assets will use its Rust-only package
+layout. The historical `python-final` tag remains available for migration and
+recovery.
 
 ## Documentation
 

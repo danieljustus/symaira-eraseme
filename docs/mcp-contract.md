@@ -2,11 +2,15 @@
 
 **Status:** pinned · **Tools:** 26 · **Scope:** milestone v1.0.0 (Go port)
 
-This document freezes the MCP tool surface the SwiftUI app
-(`app/SymairaEraseMe`) talks to. The Go server is the production
-implementation; the pre-cutover implementation is preserved at the
-`python-final` tag for historical comparison. Nothing here is invented —
-every schema is extracted from and verified against the committed contract.
+This document freezes the MCP tool surface used by the SwiftUI app and records
+the Go-port baseline for milestone v1.0.0. It is a historical interface
+contract, not a statement that the Go server is the current product runtime.
+The current source-tree implementation is Rust; Go remains only as a development
+oracle for conformance checks. The published `v0.13.0` prerelease remains
+dual-backend, and the Rust-only package is an unreleased candidate. The
+pre-cutover implementation is preserved at the `python-final` tag for
+historical comparison. Nothing here is invented — every schema is extracted
+from and verified against the committed contract.
 
 ## 1. Transport and protocol
 

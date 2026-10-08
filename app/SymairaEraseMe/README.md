@@ -1,7 +1,12 @@
 # SymairaEraseMe
 
 Native SwiftUI macOS app for the Symaira EraseMe dashboard. Connects to the
-self-contained Rust MCP JSON-RPC server (`symeraseme mcp`) over HTTP.
+self-contained Rust MCP JSON-RPC server (`symeraseme mcp`) over HTTP in this
+source checkout.
+
+This Rust-backed app and CLI describe the unreleased Rust-only candidate. The
+published `v0.13.0` prerelease remains dual-backend; `v0.12.1` is the latest
+stable release.
 
 ## Requirements
 
@@ -99,8 +104,9 @@ Sources/SymairaEraseMe/
 - SwiftUI apps require Xcode (or Xcode-beta) for the macro plugins that power
   `@State`, `@StateObject`, `@Binding`, etc. Building with plain `swift build`
   from CommandLineTools alone will fail.
-- Rust-only release bundles include the Rust MCP server and need no Go, Python,
-  or other external runtime. Development builds stage the Rust server through
-  `build.sh`; a Homebrew `symeraseme` or configured Binary Path is also supported.
+- The current Rust-only source-tree candidate stages its Rust MCP server through
+  `build.sh`; no Go, Python, or other external runtime is needed to build this
+  candidate. This does not describe the already-published dual-backend
+  `v0.13.0` prerelease assets.
 - No external Swift dependencies beyond the Symaira AppKit packages declared
   in `Package.swift`.

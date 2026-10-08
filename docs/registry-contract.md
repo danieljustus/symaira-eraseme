@@ -4,8 +4,9 @@
 
 This document is the language-neutral contract for the data broker registry.
 These behaviors are part of the committed registry contract and are verified
-by the Go loader. The pre-cutover loader and tests are preserved only at the
-`python-final` tag for historical comparison.
+by the current Rust production loader and the retained Go development oracle.
+The pre-cutover loader and tests are preserved only at the `python-final` tag
+for historical comparison.
 
 ## 1. Versioning
 

@@ -3,26 +3,26 @@
 ## Quick start
 
 1. Clone the repository and create a feature branch.
-2. Build and verify the Go CLI:
+2. Build and verify the Rust CLI candidate:
 
    ```bash
-   make build
-   make test
-   make lint
-   make coverage
+   make build-rust
+   make rust-gate
    ```
 
 3. For the macOS GUI, use a full Xcode installation:
 
    ```bash
+   make app-test
    ./app/SymairaEraseMe/build.sh
    ```
 
 4. Open a pull request with a focused change and the relevant issue reference.
 
-The supported runtime is the static `symeraseme` binary. The macOS GUI is a
-Swift Package Manager application that starts the Go MCP server bundled in the
-release app. No external runtime is required for released artifacts.
+The current source tree is the Rust-only candidate and is not yet a published
+release. Published `v0.13.0` remains a dual-backend prerelease; `v0.12.1` is the
+latest stable release. Go is retained only as a development oracle for
+conformance checks until the separately scoped CUT-005 retirement.
 
 ## Adding a data broker
 
@@ -59,16 +59,18 @@ opt_out:
 Validate the embedded registry before opening the pull request:
 
 ```bash
-make build
-./symeraseme registry validate
+make build-rust
+./build/rust/debug/symeraseme-rust registry validate
 ```
 
 ## Code contributions
 
-- Go code must remain CGO-free (`CGO_ENABLED=0`) and compile on Linux, macOS,
-  and Windows for the supported architectures.
-- Use `gofmt`, `go vet`, and the configured `golangci-lint` checks.
-- Preserve the CLI and MCP contracts in `docs/mcp-contract.md`.
+- Rust is the current source-tree product implementation. Keep CLI and MCP
+  behavior compatible with `docs/mcp-contract.md` and use `make rust-gate` for
+  the full Rust check.
+- Go code is retained as a development oracle. Keep it CGO-free and use
+  `make go-gate`; use `make parity-live` when a change needs comparison with the
+  live Go oracle.
 - Keep secrets as references or environment configuration. Never log resolved
   secret values or commit credentials.
 - Use the existing event-store and registry abstractions instead of adding
@@ -80,13 +82,13 @@ make build
 
 | Area | Command | Scope |
 |---|---|---|
-| Go unit tests | `make test` | All Go packages |
-| Go race tests | `make test-race` | All Go packages with the race detector |
-| Go coverage | `make coverage` | Exact 75% statement gate |
-| Go static checks | `make lint && make vet` | Formatting, lint, and vet |
-| CLI cross-build | `GOOS=windows GOARCH=amd64 go build ./cmd/symeraseme` | Platform compilation |
-| macOS GUI | `cd app/SymairaEraseMe && swift test` | Swift package tests |
-| macOS packaging | `VERSION=0.12.0 ./scripts/package-dmg.sh` | App bundle and DMG path |
+| Rust CLI build | `make build-rust` | Build the current Rust CLI candidate |
+| Rust full gate | `make rust-gate` | Format, workspace check, Clippy, tests, and doctests |
+| Frozen-observation parity | `make parity` | Compare Rust behavior with recorded Go observations |
+| Live oracle parity | `make parity-live` | Rebuild and compare with the Go development oracle |
+| Go oracle checks | `make go-gate` | Go format, tests, lint, vet, 75% coverage, and oracle build |
+| macOS GUI tests | `make app-test` | Swift package tests with full Xcode |
+| macOS app build | `./app/SymairaEraseMe/build.sh` | Build the app and stage its Rust CLI/MCP server |
 
 Do not weaken an assertion to make a test pass. When a test reveals a
 compatibility or byte-format mismatch, fix the implementation or document the
@@ -107,12 +109,11 @@ permissions.
 
 ## Release changes
 
-Release configuration lives in `.goreleaser.yml` and
-`.github/workflows/release.yml`. GoReleaser produces static CLI archives; the
-Homebrew workflow writes `Formula/symeraseme.rb` from the exact published
-archives and checksums. The macOS job builds the versioned DMG and records
-whether Developer ID signing, notarization, and stapling were completed.
-
-Do not create or move a release tag from a feature branch. Use the repository's
-release gate and verify the GitHub release assets and Homebrew Formula after
-publication.
+Release configuration for the current Rust-only candidate lives in
+`.github/workflows/release.yml`; it builds Rust CLI archives and the macOS app.
+The published `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
+latest stable release. `.goreleaser.yml` and `make release-dry-run` are retained
+legacy Go packaging/oracle tooling, not the current release path. The Homebrew
+publisher consumes exact published archives and checksums. Do not create or move
+a release tag from a feature branch; use the repository's release gate and
+verify the release assets and Homebrew Formula after publication.
