@@ -5,8 +5,8 @@ use std::path::{Component, Path};
 use std::sync::OnceLock;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const DIRECTORY: &str = "tests/fixtures/go-frozen/native-0d/e8";
-const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+const DIRECTORY: &str = "tests/fixtures/go-frozen/refresh-411b5c10/services";
+const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
 const TARGETS: [&str; 6] = [
     "linux-amd64",
     "linux-arm64",

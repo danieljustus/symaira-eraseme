@@ -8,7 +8,7 @@ mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
-const NATIVE_REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
+const NATIVE_REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
 const MANIFEST: &[u8] =
     include_bytes!("../../../../tests/fixtures/go-frozen/mcp-runtime/manifest.json");
 
@@ -17,7 +17,7 @@ fn native_manifest(os: &str, arch: &str) -> Option<(&'static [u8], &'static str)
         ($directory:literal, $target:literal) => {
             Some((
                 include_bytes!(concat!(
-                    "../../../../tests/fixtures/go-frozen/native-0d/e8/",
+                    "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/",
                     $directory,
                     "/manifest.json"
                 ))
