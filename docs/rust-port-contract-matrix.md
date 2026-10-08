@@ -1,6 +1,6 @@
 # Go → Rust executable contract matrix
 
-## Current Rust-only candidate scope (2026-10-07, #1171–#1173)
+## Current Rust-only candidate scope (2026-10-08, #1171–#1173)
 
 The maintainer approved `ok go`: new CLI archives/app contain no Go sibling,
 and the legacy backend selector is retired. CUT-001 now proves that a legacy
@@ -8,14 +8,33 @@ selector or sibling cannot redirect Rust; CUT-002/CUT-003 retain copied-store
 compatibility using a separately built development oracle, not a bundled
 rollback. Go source retirement stays separate under CUT-005 after observation.
 
-APP-001 and CUT-001 below track the changed candidate and remain non-PASS until
-their fresh native acceptance. Existing REL-001..010 PASS entries certify only
-the immutable historical `v0.13.0` assets. They do not approve changed archive,
-SBOM, app, formula or signing contents: every release row requires fresh
-candidate-bound execution/readback before stable publication. The three local
-Windows FFI exceptions additionally require independent review and native
-amd64/arm64 acceptance (#1173); crate-wide unsafe denial remains intact.
-Historical preparation/capture notes below keep their original source scope.
+The candidate root/app README, AGENTS, migration proposal and migration-status docs were
+byte-identical to reviewed documentation source
+`da43ec384f626be2937870735dd69b8ec078d467` before this reconciliation. The current
+instructions distinguish Rust-only distribution, the temporary Go development oracle,
+immutable `v0.13.0` rollback assets and the historical Python recovery tag.
+
+APP-001 now passes candidate-bound native app acceptance on exact source
+`4e33d57475f286e2add83324b30c66dbad801111` in [run 37653688590](https://github.com/danieljustus/symaira-eraseme/actions/runs/37653688590):
+both native Mac jobs executed all 42 Swift tests with zero failures. The merged commit
+`8d2db345a2e8cbaf13d2a2864eeeb38747fda37a` has the same Git tree
+(`056f5c4837ff4a0b04ad113d0cd4cbf2d1908311`). This diagnostic app run is not
+signing/notarization, production DMG or full release evidence; CUT-001 remains
+non-PASS pending its separate candidate acceptance.
+
+The scoped #1173 Windows boundary acceptance also passes for this candidate. The three
+narrowly approved FFI boundaries were independently reviewed at
+`d43cc9e15380a3416d58e033c55855b3ec2ce37c` ([review record](https://github.com/danieljustus/symaira-eraseme/issues/1173#issuecomment-6038056502));
+all three production FFI source blobs are unchanged at
+`4e33d57475f286e2add83324b30c66dbad801111`. [Native consent run 37653688502](https://github.com/danieljustus/symaira-eraseme/actions/runs/37653688502)
+passed on Windows amd64 and arm64 (22 passed, zero failed, one helper entry ignored
+per architecture); logs confirm real Go consent/DACL comparisons, `CloseHandle` error 6
+propagation, one owner close, preserved old token/unrelated sentinel and temporary
+cleanup. [Full Rust native run 37654259723](https://github.com/danieljustus/symaira-eraseme/actions/runs/37654259723)
+passed all six targets, including the named NUL-path and retired-selector regressions.
+No broader unsafe exception is approved; crate-wide unsafe denial remains intact.
+
+Existing REL-001..010 PASS entries certify only the immutable historical `v0.13.0` assets. They do not approve changed archive, SBOM, app, formula or signing contents: every release row requires fresh candidate-bound execution/readback before stable publication. CUT-004 stable publication/seven-day observation and CUT-005 separate Go-retirement approval remain open. Historical preparation/capture notes below keep their original source scope.
 
 The subsequent HTTP EINTR repair preserves the original read timeout and
 all twelve original parents, with three additional bounded-error controls.
@@ -903,7 +922,7 @@ SQLite, network transcript or process behavior.
 | MCP-014 | MCP stdio | Consecutive JSON values separated by whitespace — **not** newline frames (measured: a value may span lines, three values may sit on one line); one response per request, notifications silent, nothing else on stdout | Go `ServeStdio`; `tests/fixtures/mcp-contract/mcp-stream/cases.json` (13 measured cases) | `crates/symeraseme-cli/src/mcp/stream.rs`, raw stream comparator | byte | all | PASS (native CI: workspace suite and doctests green on all six targets at `5b5ce7c8`, run 36467919816; unix-gated cases ran on the four Unix targets). `mcp_stdio_process.rs` launches the real Rust shadow executable over a live pipe, checks responses arrive before EOF and asserts stdout contains only JSON-RPC frames; the source-bound 13-case Go stream fixture and 3 focused process tests pass. |
 | MCP-015 | MCP stdio | Malformed, truncated and multiple values in one stream | same oracle fixture (adjacent, truncated, junk, scalar and string cases) | `stream.rs` error cases; seeded mutations; `fuzz/fuzz_targets/mcp_stdio.rs` | byte+exit | all | PASS (six-target source-bound parser replay and bounded hardening; see checkpoint above). `mcp_stdio_process.rs` replays ten source-bound Go 1.26.6 malformed/adjacent/truncated cases with exact process exit, stdout and stderr; the fixtures live under `rust-tests/parity/oracle/mcp-stdio-errors/`. Six parse cases, four size/depth boundaries, and 128 deterministic seeded byte mutations replay the real Go 1.26.6 process byte-exactly. The new in-process libFuzzer target includes the production `protocol.rs` and `stream.rs` directly (only tool dispatch is stubbed), consumes only the input bytes, and has no filesystem/state dependency. Its ten checked-in seeds are copied from the source-bound Go error corpus; a current-source macOS arm64 run completed 330,402 executions in five seconds without a crash (`-max_len=65536`). This bounded run adds parser robustness evidence, not Go differential or native-platform proof. |
 | APP-000 | SwiftUI | `listTools()` parses raw `result.tools`, not call content envelope | exact Go response; issue #797 | `MCPClientToolsListTests` | semantic | macOS | PASS |
-| APP-001 | SwiftUI | Rust-only bundled binary discovery order and name | Swift unit tests | `RustBackendIntegrationTests` and staged app | side-effect | macOS arm64/amd64 | PARTIAL (Rust-only candidate). The build/package helper stages and signs only Rust as `symeraseme`; packaging controls assert no Go invocation/sibling, and bundled-discovery integration rejects a Go sibling. Local packaging controls pass. Both actual native Mac jobs must pass on the integrated candidate, including explicit and bundled discovery, authenticated MCP operations and shutdown. Earlier dual-backend discovery evidence applies only to its historical source/assets. |
+| APP-001 | SwiftUI | Rust-only bundled binary discovery order and name | Swift unit tests | `RustBackendIntegrationTests` and staged app | side-effect | macOS arm64/amd64 | PASS (candidate-bound native app). Exact source `4e33d57475f286e2add83324b30c66dbad801111`: [run 37653688590](https://github.com/danieljustus/symaira-eraseme/actions/runs/37653688590) stages the Rust-only app, asserts no `symeraseme-go`, and executes 42 Swift tests with zero failures on both macOS 26 arm64 and macOS 15 Intel. `testDefaultBundledRustLaunchAuthToolsAndShutdown` and `testExplicitRustBinaryLaunchAuthToolsAndShutdown` pass on both. Integrated merge `8d2db345a2e8cbaf13d2a2864eeeb38747fda37a` has the exact candidate tree `056f5c4837ff4a0b04ad113d0cd4cbf2d1908311`. This diagnostic app run does not establish signing/notarization, production DMG or other release-row acceptance. |
 | APP-002 | SwiftUI | launch `mcp --host --port` | supervisor test | Rust E2E | side-effect | macOS | PASS (local). The opt-in Swift E2E launches the integrated Rust HTTP binary through `ServerManager` on an isolated ephemeral port; the full 41-test Swift suite including this case passed again on the integrated `49eb79a8` Rust debug binary. |
 | APP-003 | SwiftUI | token read + authenticated tools/list/call | app tests | Rust E2E | semantic | macOS | PASS (local). The Swift E2E checks 401 without a bearer token, reads the per-run token through `MCPClient`, lists tools, calls `list_brokers` raw and typed, and verifies 1,273 active brokers. This found and fixed the client assumption that every valid tool result includes `success` and the model's `total`/`count` mismatch (`026c383`). |
 | APP-004 | SwiftUI | app shutdown terminates backend cleanly | app/supervisor test | Rust E2E | side-effect | macOS | PASS (local). The Swift E2E stops `ServerManager`, waits for process exit and restores shared app settings; 41 Swift tests passed again with the integrated `49eb79a8` Rust debug binary. |

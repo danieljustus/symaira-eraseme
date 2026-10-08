@@ -4,7 +4,7 @@ Guide an AI agent or user through creating and managing their identity vault.
 
 ## Prerequisites
 
-- Go binary `symeraseme` is on PATH
+- Symaira EraseMe CLI (`symeraseme`) is available on PATH
 - No existing identity profile (run `symeraseme show-profile` to check)
 
 ## Creating an identity profile
@@ -75,7 +75,7 @@ Update the profile when:
 |---------|-------|-----|
 | `No identity profile found` | Profile not yet created | Run `init-profile` |
 | `File exists` error | Profile already exists | Use `show-profile` to view; update via `init-profile` (overwrites) |
-| Keyring errors | No system keyring available | Set `SYMERASEME_DATA_DIR` to a writable path |
+| Keyring errors | No system keyring available | Restore OS keyring access; `SYMERASEME_DATA_DIR` changes storage location but does not configure a keyring |
 
 ## Troubleshooting
 
@@ -97,18 +97,24 @@ A: Re-run `init-profile` with the correct information. It overwrites the
 Symaira EraseMe supports canonical `symvault://` URIs for credentials.
 
 ```bash
-# Store secrets in Symaira Vault
+# Store credentials needed by the selected provider
 symvault set anthropic/prod-key "sk-ant-..."
-symvault set captcha/capsolver "CAP-..."
 symvault set email/imap-password "your-imap-password"
 ```
 
-Then set environment variables to point at the vault:
+Reference only the credentials used by the selected features:
 
 ```bash
+# Optional: required for LLM calls when using the Anthropic provider
 export ANTHROPIC_API_KEY="symvault://anthropic/prod-key"
-export CAPSOLVER_API_KEY="symvault://captcha/capsolver"
+# Optional: required for inbox polling
 export IMAP_PASSWORD="symvault://email/imap-password"
 ```
 
-**Resolution order**: `symvault://` → environment → platform secure store.
+EraseMe supports provider-specific LLM configuration: the default is Anthropic
+(`ANTHROPIC_API_KEY`); select another provider with
+`SYMERASEME_LLM_PROVIDER`. OpenAI uses `OPENAI_API_KEY`, Ollama can use
+`OLLAMA_HOST`, and `openai-compatible` requires `SYMERASEME_LLM_BASE_URL`. These settings are
+needed only when invoking LLM-backed features. Browser execution and CAPTCHA
+solving are not provided by the current CLI/MCP path, so no CAPTCHA API key is
+required; web forms use durable manual tasks by default.

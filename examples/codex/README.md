@@ -6,11 +6,11 @@
 
 ### Option 1: Project-Level (Recommended)
 
-The repository includes a pre-configured `.agents/skills/` directory:
+Create the untracked `.agents/skills/` symlink:
 
 ```bash
 cd /path/to/symaira-eraseme
-# Already configured: .agents/skills/symaira-eraseme -> ../../skills/
+./scripts/setup-agents.sh --agent codex
 ```
 
 ### Option 2: User-Level
@@ -72,6 +72,9 @@ codex "Help me remove my data from data brokers using Symaira EraseMe"
 ```
 
 ## Environment Variables
+
+These overrides are optional. `ANTHROPIC_API_KEY` is needed only for LLM calls
+using the Anthropic provider; `SYMERASEME_DATA_DIR` changes the default data directory.
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."

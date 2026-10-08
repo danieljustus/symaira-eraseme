@@ -30,6 +30,21 @@ Windows FFI boundaries (#1171–#1173). Crate-wide unsafe denial, privacy/auth
 guards, real native tests, backup/data compatibility and seven-day stable
 observation remain mandatory. Existing `v0.13.0` assets are not overwritten.
 
+**2026-10-08 candidate evidence (#1171/#1173):** APP-001 passes on exact source
+`4e33d57475f286e2add83324b30c66dbad801111` in [native app run 37653688590](https://github.com/danieljustus/symaira-eraseme/actions/runs/37653688590):
+both Mac architectures executed 42 Swift tests with zero failures, including bundled
+and explicit Rust launch/auth/tools/shutdown. Merge
+`8d2db345a2e8cbaf13d2a2864eeeb38747fda37a` has the identical tree. The diagnostic app
+evidence is not a signed/notarized production artifact. For #1173, the independent
+review approved the three narrow boundaries at
+`d43cc9e15380a3416d58e033c55855b3ec2ce37c` ([review](https://github.com/danieljustus/symaira-eraseme/issues/1173#issuecomment-6038056502));
+the reviewed production FFI blobs are unchanged at the candidate. Native consent run
+[37653688502](https://github.com/danieljustus/symaira-eraseme/actions/runs/37653688502)
+passed on Windows amd64/arm64, and full native Rust run
+[37654259723](https://github.com/danieljustus/symaira-eraseme/actions/runs/37654259723)
+passed all six targets. These results authorize no broader unsafe use. CUT-004 stable
+publication/seven-day observation and CUT-005 separate Go-retirement approval remain open.
+
 **Machine-readable DAG:**
 `docs/plans/2026-09-04-go-to-rust-task-graph.json` owns task dependencies,
 writer scopes and merge gates. This document owns task details; contradictions
@@ -856,10 +871,12 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 
 **Steps:**
 - [ ] Place Rust `symeraseme` next to the Swift debug executable.
-- [ ] Test binary discovery, startup, token read, tools/list, representative
-      calls, error display and shutdown.
-- [ ] Do not change Swift protocol code to accommodate a Rust mismatch.
-- [ ] Pass `APP-001..004`.
+- [x] Test binary discovery, startup, token read, tools/list, representative
+      calls, error display and shutdown. Exact-source native run 37653688590
+      passed both bundled and explicit Rust backend integration cases on both Mac targets.
+- [x] Do not change Swift protocol code to accommodate a Rust mismatch; the
+      candidate diff changes `ServerManager.swift` and its integration test only.
+- [x] Pass `APP-001..004` on the candidate; see the source-bound evidence above.
 
 ### Task 9.2: Replace release build plumbing while preserving assets
 
@@ -938,8 +955,10 @@ with repository rulesets; a PR runs both Go and Rust fast gates.
 - [ ] Enforce the proposal's value gate: no unexplained >20% regression and a
       15% p95-startup or RSS gain, otherwise stop for an explicit exception.
 - [ ] Verify no Go runtime is bundled; preserve backups and historical artifacts.
-- [ ] Verify independent review and native Windows amd64/arm64 acceptance of
+- [x] Verify independent review and native Windows amd64/arm64 acceptance of
       the three approved local FFI exceptions; no blanket unsafe allowance.
+      Review at `d43cc9e` is recorded in #1173; current-source runs 37653688502
+      (native Windows amd64/arm64) and 37654259723 (all six targets) pass.
 - [ ] Schedule a durable release+7-day follow-up that rechecks open defects,
       release assets and recovery/compatibility evidence before Task 10.4 starts.
 - [ ] Pass `CUT-004`.
@@ -975,9 +994,13 @@ reading the PR and main branch back from GitHub.
 ### Task 10.4: Retire Go in a separate reviewed change
 
 **Prerequisite:** one stable Rust release has operated for at least seven days
-without unexplained parity defects. The initial `go` already authorizes this
-separate retirement PR once that gate is proven; no avoidable second approval
-pause is introduced.
+without unexplained parity defects.
+
+**Approval gate:** CUT-005 explicit approval for Go-source retirement remains
+OPEN. The prior `go` and `ok go` approvals cover the Rust-only candidate and
+its distribution, not deletion of Go source, modules or workflows. Do not begin
+retirement edits until the stable-release observation gate passes and separate
+explicit Go-retirement approval is recorded.
 
 **Files:**
 - Create: `docs/go-test-rust-port-classification.md`

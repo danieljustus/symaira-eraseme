@@ -7,9 +7,9 @@
     "approval_command": "ok go",
     "runtime": "Rust only; no bundled Go sibling or backend selector",
     "immutable_canary": "v0.13.0",
-    "go_source": "development oracle until separately reviewed CUT-005 retirement",
-    "unsafe_policy": "deny by default; three scoped Windows FFI boundaries require independent review and native amd64/arm64 acceptance",
-    "candidate_acceptance": "fresh Rust-only archive, SBOM, Swift, native compatibility and release evidence required",
+    "go_source": "development oracle; CUT-005 explicit Go-retirement approval remains OPEN",
+    "unsafe_policy": "deny by default; only the three narrow Windows FFI boundaries are approved after independent review at d43cc9e15380a3416d58e033c55855b3ec2ce37c (https://github.com/danieljustus/symaira-eraseme/issues/1173#issuecomment-6038056502); their production source blobs are unchanged at candidate 4e33d57475f286e2add83324b30c66dbad801111; native consent run 37653688502 passed on Windows amd64/arm64 and full Rust native run 37654259723 passed all six targets; no blanket allowance",
+    "candidate_acceptance": "APP-001 PASS at exact source 4e33d57475f286e2add83324b30c66dbad801111 in native app run 37653688590: both Mac architectures executed 42 tests with zero failures; merged commit 8d2db345a2e8cbaf13d2a2864eeeb38747fda37a has the same tree 056f5c4837ff4a0b04ad113d0cd4cbf2d1908311. This diagnostic app evidence is not signing or production-release acceptance; stable publication, production signing/notarization and CUT-004 observation remain open",
     "stable_observation": "seven days after verified stable publication; not started"
   },
   "integration_branch": "main",

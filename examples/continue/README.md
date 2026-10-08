@@ -47,7 +47,7 @@ Use Symaira EraseMe when the user wants to:
 - `symeraseme requests list` — List requests
 
 ### Execution
-- `symeraseme plan execute --campaign <id> --batch-size 5 --consent <token>` — Send requests
+- `symeraseme plan execute --campaign <id> --batch-size 5 --consent <token>` — Run the plan; the Rust-only candidate has no outbound email/browser adapters by default
 - `symeraseme grant execute --ttl 3600` — Issue consent token
 
 ### Triage
@@ -70,8 +70,8 @@ Use Symaira EraseMe when the user wants to:
 
 ## Environment Variables
 
-- `ANTHROPIC_API_KEY` — Required for LLM triage
-- `SYMERASEME_DATA_DIR` — Data directory path
+- `ANTHROPIC_API_KEY` — Required only for LLM calls using Anthropic
+- `SYMERASEME_DATA_DIR` — Optional data-directory override
 ```
 
 ### Option 2: Project Config
@@ -102,6 +102,9 @@ Create `.continuerc.json`:
 Continue automatically applies rules when relevant context is detected.
 
 ## Environment Variables
+
+These overrides are optional. Configure credentials only for the selected LLM
+provider and features; other CLI commands do not require an Anthropic API key.
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."

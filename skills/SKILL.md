@@ -8,8 +8,7 @@ version: 1.0.0
 author: Symaira
 license: Apache-2.0
 platforms: [macos, linux, windows]
-required_environment_variables:
-  - SYMERASEME_DATA_DIR
+required_environment_variables: []
 metadata:
   hermes:
     tags: [privacy, gdpr, ccpa, data-brokers, automation]
@@ -52,9 +51,9 @@ Use this skill when the user wants to:
 │    symeraseme plan show                                 │
 │    [review plan with user]                               │
 ├──────────────────────────────────────────────────────────┤
-│ 3. EXECUTE REMOVALS                                      │
-│    symeraseme plan execute --campaign <id>               │
-│    [explicit consent token required for sending]         │
+│ 3. RUN THE PLAN                                          │
+│    symeraseme plan execute --campaign <id> --dry-run     │
+│    [Rust CLI has no outbound email/browser executor]     │
 ├──────────────────────────────────────────────────────────┤
 │ 4. TRIAGE REPLIES (daily)                                │
 │    symeraseme poll-inbox --username <email> ...         │
@@ -82,12 +81,12 @@ Use this skill when the user wants to:
 | `symeraseme init-profile` | Create encrypted identity profile |
 | `symeraseme show-profile` | Display current identity |
 
-Configure outgoing mail with `SYMERASEME_SMTP_HOST`, `SYMERASEME_SMTP_PORT`,
-`SYMERASEME_SMTP_USER`, `SYMERASEME_SMTP_PASSWORD`, `SYMERASEME_SMTP_TLS`, and
-`SYMERASEME_SMTP_FROM`. Inbox polling uses `IMAP_*` settings or the documented
-`poll-inbox` overrides. Keep resolved credentials out of versioned files.
-There is no account-management command group or separate database-init command;
-store-backed commands open and initialize the configured store.
+Inbox polling uses `IMAP_*` settings or the documented `poll-inbox` overrides.
+The default Rust CLI does not inject an SMTP sender into `plan execute`, so
+outgoing SMTP environment variables do not enable email sending; email-based
+execution requires a separately injected sender. There is no account-management
+command group or separate database-init command; store-backed commands open and
+initialize the configured store.
 
 ### Campaign Planning
 
@@ -102,8 +101,8 @@ store-backed commands open and initialize the configured store.
 
 | Command | Description |
 |---------|-------------|
-| `symeraseme plan execute --campaign <id> --consent <token>` | Send removal requests |
-| `symeraseme grant <command>` | Issue consent token for destructive ops |
+| `symeraseme plan execute --campaign <id> [--dry-run]` | Dry-run previews; the default CLI has no outbound adapters—email requests need an injected sender, while web forms become manual tasks |
+| `symeraseme grant <command>` | Issue consent token for non-dry execution |
 | `symeraseme render-template <name>` | Preview a template |
 
 ### Inbox & Triage
@@ -113,7 +112,7 @@ store-backed commands open and initialize the configured store.
 | `symeraseme poll-inbox` | Fetch and match inbox replies |
 | `symeraseme classify-reply <id>` | Classify a broker reply via LLM |
 | `symeraseme generate-rebuttal <id>` | Generate a rebuttal for a rejection |
-| `symeraseme auto-confirm <id>` | Auto-click confirmation links |
+| `symeraseme auto-confirm <request_id>` | Create a manual confirmation task unless a browser executor is explicitly injected |
 
 ### Web Forms & CAPTCHAs
 
@@ -157,16 +156,24 @@ symeraseme requests list --status PENDING --output json
 
 ## Error handling
 
-- **Consent required**: `plan execute` requires an explicit `execute` consent token unless `--dry-run` is set. Issue one with `grant execute`, then supply `--consent` or `--consent-file`; there is no `--yes` bypass or implicit prompt.
+- **Consent required**: `plan execute` requires an explicit `execute` consent token unless `--dry-run` is set. Issue one with `grant execute`, then supply `--consent` or `--consent-file`; there is no `--yes` bypass or implicit prompt. The default Rust CLI still has no outbound email/browser adapters.
 - **No profile**: Run `init-profile` first if commands fail with "No identity profile found."
-- **No database**: Store-backed commands initialize the configured database when opening it; check the data-directory and encryption-key configuration if opening fails.
-- **API key missing**: `classify-reply` and `generate-rebuttal` need `ANTHROPIC_API_KEY`.
+- **No database**: Store-backed commands initialize the database on first use.
+  The Rust CLI defaults to `~/.local/share/symeraseme`; `SYMERASEME_DATA_DIR`
+  is an optional base-directory override. Check directory permissions if open
+  fails.
+- **LLM configuration:** Needed only for LLM-backed features. The Rust provider
+  defaults to Anthropic (`ANTHROPIC_API_KEY`); select another backend with
+  `SYMERASEME_LLM_PROVIDER`. OpenAI uses `OPENAI_API_KEY`, Ollama can use
+  `OLLAMA_HOST`, and `openai-compatible` requires `SYMERASEME_LLM_BASE_URL`.
+  The `agent` provider uses a configured local agent backend. These credentials
+  are not prerequisites for other CLI commands.
 - **IMAP errors**: Check credentials and app-specific password for Gmail/Outlook.
 - **Web form failures**: Use `manual-tasks list` to find fallback tasks, then complete them.
 
 ## Best practices
 
-1. **Always dry-run first**: Use `--dry-run` with `plan execute` and `tick` before real execution.
+1. **Always dry-run first**: Preview with `--dry-run`. The default Rust CLI does not send email or submit forms; web-form requests become manual tasks.
 2. **Batch sizes**: Start with `--batch-size 3` to avoid rate limits; increase gradually.
 3. **Consent tokens**: Issue short-lived tokens with `grant execute --ttl 3600` for automation.
 4. **Daily triage**: Run `poll-inbox` + `classify-reply` daily to catch broker responses.

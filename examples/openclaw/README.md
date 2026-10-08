@@ -56,7 +56,7 @@ commands:
 
   # Execution
   execute:
-    description: Send removal requests
+    description: Run a campaign; the default Rust CLI has no outbound email/browser adapters, so web forms become manual tasks
     command: >
       symeraseme plan execute
       --campaign "{{ campaign_id }}"
@@ -105,7 +105,7 @@ commands:
 
   # Actions
   auto_confirm:
-    description: Auto-click confirmation link
+    description: Preview confirmation handling; without an injected browser executor, a non-dry run creates a manual task instead of clicking
     command: >
       symeraseme auto-confirm {{ request_id }}
       {% if dry_run %}--dry-run{% endif %}
@@ -152,6 +152,11 @@ openclaw skill list
 
 ## Example workflow
 
+For the Rust-only source-tree candidate, the default CLI has no outbound email
+sender or browser executor. Non-dry web-form and confirmation operations create
+manual tasks, not successful submissions or clicks. Complete a manual task only
+after the user has performed and confirmed its action.
+
 ```bash
 # 1. Initialize identity
 openclaw run symeraseme.init_profile
@@ -167,7 +172,7 @@ openclaw run symeraseme.plan_show
 openclaw run symeraseme.execute \
   --inputs '{"campaign_id": "initial", "dry_run": true}'
 
-# 5. Real execution (requires consent)
+# 5. Non-dry execution (requires consent; no outbound adapters by default)
 openclaw run symeraseme.grant \
   --inputs '{"command": "execute", "ttl": 3600}'
 
@@ -175,6 +180,7 @@ openclaw run symeraseme.execute \
   --inputs '{
     "campaign_id": "initial",
     "batch_size": 5,
+    "dry_run": false,
     "consent_token": "<token from grant>"
   }'
 
