@@ -5,6 +5,10 @@ use symeraseme_core::registry::{
     Broker, Channel, RegistryError, load_from_dir, load_reporting_from_dir,
 };
 
+#[cfg(unix)]
+#[path = "support/unix_socket.rs"]
+mod unix_socket;
+
 const FIXTURE_ROOT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/registry-contract"
@@ -359,11 +363,9 @@ fn loader_rejects_non_regular_yaml_entries_and_enforces_file_caps() {
 
     #[cfg(unix)]
     {
-        use std::os::unix::net::UnixListener;
         let socket = tempfile_root();
         fs::create_dir_all(socket.path().join("brokers/us")).unwrap();
-        let socket_path = socket.path().join("brokers/us/socket.yaml");
-        let _listener = UnixListener::bind(&socket_path).unwrap();
+        unix_socket::create(socket.path(), "brokers/us/socket.yaml");
         assert!(load_from_dir(socket.path()).is_err());
     }
 
