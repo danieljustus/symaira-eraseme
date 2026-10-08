@@ -10,6 +10,10 @@ use symeraseme_core::identity::{
     load_profile, profile_exists,
 };
 
+#[cfg(unix)]
+#[path = "support/unix_socket.rs"]
+mod unix_socket;
+
 const ORACLE: &str = "0108b37a8b1c9a69871aa7b7c73040dc28d8f4fd";
 const PROFILE_CASES: usize = 62;
 
@@ -211,7 +215,7 @@ fn malformed_nonce_is_error_not_go_panic() {
 fn special_file_is_rejected_before_key_lookup() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("profile");
-    let _socket = std::os::unix::net::UnixListener::bind(&path).unwrap();
+    unix_socket::create(directory.path(), "profile");
     let keyring = FakeKeyring::new();
     let mut keys = MasterKeyResolver::new(keyring.clone());
     assert!(profile_exists(&path, &ProfilePaths::default()));
