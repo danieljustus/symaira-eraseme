@@ -94,6 +94,16 @@ Do not weaken an assertion to make a test pass. When a test reveals a
 compatibility or byte-format mismatch, fix the implementation or document the
 intentional contract change.
 
+## CI icon compilation
+
+Pull requests classify the inputs listed in `.github/workflows/ci.yml` on Linux
+before requesting a macOS runner for `app icon compile`. Changes to the native
+icon package, `.icns` file, checksum manifest, icon test/verifier scripts, or
+that workflow still run native compilation. Confirmed unrelated changes, such
+as documentation edits, skip only this icon job. Missing history, selector
+failure, or unknown output does not authorize a skip. Main pushes, manual runs,
+and scheduled runs retain native icon compilation; other CI gates are unchanged.
+
 ## Pull requests
 
 PR descriptions should state:
