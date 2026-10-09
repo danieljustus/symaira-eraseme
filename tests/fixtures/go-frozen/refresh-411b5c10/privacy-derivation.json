@@ -1,0 +1,3092 @@
+{
+  "source_revision": "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+  "runs": [
+    37796278728,
+    37796706488
+  ],
+  "original_selection_sha256": "e5d75af3feeebcc7cff13dbbdf65493bc0c03c38147119412823f0e63314ea31",
+  "derivation": "two random consent IDs per target replaced with public test identifiers; dependent token filenames and grant-frame SHA256 fields updated; other bytes unchanged",
+  "selected": {
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "linux-amd64",
+      "sha256": "94da5477455c33afafafc054317731e813952e46d44a9c75c2d1e2a336788ebe",
+      "bytes": 101,
+      "original_sha256": "608eead09c61872369dbf13045a99826177adb3c5608833123aaaa96b53c03c8",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-0.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-0.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-0.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-0.stdout",
+      "target": "linux-amd64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "8a02357182b8285bad3344e768067812ebf4e5eaa6a4fc1d0a292adc30317cd0",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "linux-amd64",
+      "sha256": "94da5477455c33afafafc054317731e813952e46d44a9c75c2d1e2a336788ebe",
+      "bytes": 101,
+      "original_sha256": "608eead09c61872369dbf13045a99826177adb3c5608833123aaaa96b53c03c8",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-1.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-1.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-1.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-1.stdout",
+      "target": "linux-amd64",
+      "sha256": "0778e52cc0a28b22c452a71aad8a16262a504fb96eb9f788a4f23db47a817052",
+      "bytes": 140,
+      "original_sha256": "db290f0fdef72d7c11c9ee55b9e356b7a486c04e028ac770cf9a81ef1d03de5d",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "linux-amd64",
+      "sha256": "1fb95cc854eb4e79e565235d3c023903ed305471b891e166401b3cb07552e84c",
+      "bytes": 106,
+      "original_sha256": "185ca5d4c5ed3224e410a17102bcfa27b2608c4e52a137be9bfdd1f8e29f5e2f",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "linux-amd64",
+      "sha256": "94da5477455c33afafafc054317731e813952e46d44a9c75c2d1e2a336788ebe",
+      "bytes": 101,
+      "original_sha256": "608eead09c61872369dbf13045a99826177adb3c5608833123aaaa96b53c03c8",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-2.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-2.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-2.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-2.stdout",
+      "target": "linux-amd64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "f3116b4884265b5c5508800ea91f2957ae46b73865089d2cc200b4ed2fe5c22f",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "linux-amd64",
+      "sha256": "1fb95cc854eb4e79e565235d3c023903ed305471b891e166401b3cb07552e84c",
+      "bytes": 106,
+      "original_sha256": "185ca5d4c5ed3224e410a17102bcfa27b2608c4e52a137be9bfdd1f8e29f5e2f",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-3.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-3.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-3.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-3.stdout",
+      "target": "linux-amd64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-4.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-4.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-4.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-4.stdout",
+      "target": "linux-amd64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-5.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-5.stderr",
+      "target": "linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-grant-case-5.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-grant-case-5.stdout",
+      "target": "linux-amd64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-schedule.stderr": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-schedule.stderr",
+      "target": "linux-amd64",
+      "sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "bytes": 1003,
+      "original_sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/cli-schedule.stdout": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "cli-schedule.stdout",
+      "target": "linux-amd64",
+      "sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "bytes": 22208,
+      "original_sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/manifest.json": {
+      "artifact_id": 11559215438,
+      "run_id": 37796278728,
+      "zip_sha256": "8f94691a67ff832e71bbacdb3bde9b8c9215f9daf9c331dcc3a0ad528535072e",
+      "member": "manifest.json",
+      "target": "linux-amd64",
+      "sha256": "70ee632e3e08420bf9d16716b71e54fe55fc502313891eea942f55fd503924e7",
+      "bytes": 294377,
+      "original_sha256": "4bd2bbaaa376f350f42464700463e270b79b95d3b0c0098ebf54b9e4816618cf",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "windows-arm64",
+      "sha256": "bc990c28541d3b504d008a6aa675114307dc0063ec04a2637a9ee2ec6a823d02",
+      "bytes": 101,
+      "original_sha256": "60a3bd34c1018d5bdaba991f64e24906238fe9fe783848a6cafa55cd50c44913",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-0.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-0.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-0.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-0.stdout",
+      "target": "windows-arm64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "8a37310255fde234e168ebe91efc43233afc67d396ceb583f9d92bea8333a2af",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "windows-arm64",
+      "sha256": "bc990c28541d3b504d008a6aa675114307dc0063ec04a2637a9ee2ec6a823d02",
+      "bytes": 101,
+      "original_sha256": "60a3bd34c1018d5bdaba991f64e24906238fe9fe783848a6cafa55cd50c44913",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-1.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-1.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-1.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-1.stdout",
+      "target": "windows-arm64",
+      "sha256": "fcadd598386fccca646221d2689ee4e1acab8bea3300a0fec2d1a1921234b433",
+      "bytes": 140,
+      "original_sha256": "a4d7338919620170d6e8a1ee6e981c99163ba3f917c78e2c912156672417cfa6",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "windows-arm64",
+      "sha256": "5d6099257c1995d5430c30f5163d3a8caae158520506dddd3146e7a2116a5c16",
+      "bytes": 106,
+      "original_sha256": "00d8489e4a3e96487ce5b50868dd3a19a876878bfe7628aa2c1e656e5a16f3ca",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "windows-arm64",
+      "sha256": "bc990c28541d3b504d008a6aa675114307dc0063ec04a2637a9ee2ec6a823d02",
+      "bytes": 101,
+      "original_sha256": "60a3bd34c1018d5bdaba991f64e24906238fe9fe783848a6cafa55cd50c44913",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-2.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-2.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-2.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-2.stdout",
+      "target": "windows-arm64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "bf9f4941ce18fc44992b79e8a9687d32e5b3e91ebae3cf94295b3bd92492b83b",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "windows-arm64",
+      "sha256": "5d6099257c1995d5430c30f5163d3a8caae158520506dddd3146e7a2116a5c16",
+      "bytes": 106,
+      "original_sha256": "00d8489e4a3e96487ce5b50868dd3a19a876878bfe7628aa2c1e656e5a16f3ca",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-3.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-3.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-3.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-3.stdout",
+      "target": "windows-arm64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-4.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-4.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-4.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-4.stdout",
+      "target": "windows-arm64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-5.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-5.stderr",
+      "target": "windows-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-grant-case-5.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-grant-case-5.stdout",
+      "target": "windows-arm64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-schedule.stderr": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-schedule.stderr",
+      "target": "windows-arm64",
+      "sha256": "0306399ecb21d2ee1781e11662e353c21fe0b59647b70d7e8bb9aa81b4f5457d",
+      "bytes": 1005,
+      "original_sha256": "0306399ecb21d2ee1781e11662e353c21fe0b59647b70d7e8bb9aa81b4f5457d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/cli-schedule.stdout": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "cli-schedule.stdout",
+      "target": "windows-arm64",
+      "sha256": "68bfaed66c5ff5b3c3fc5312f79989c2b3f9f930894b86512374183781adeb90",
+      "bytes": 22234,
+      "original_sha256": "68bfaed66c5ff5b3c3fc5312f79989c2b3f9f930894b86512374183781adeb90",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-arm64/manifest.json": {
+      "artifact_id": 11558388993,
+      "run_id": 37796278728,
+      "zip_sha256": "36f22f5564fd335d005cef45394666a452adc24283f397e45cabe1b2f76932f1",
+      "member": "manifest.json",
+      "target": "windows-arm64",
+      "sha256": "1c0167a142547722d71e1e233afba8fcba4f6b98d3948a67adce9c8179bd6755",
+      "bytes": 293295,
+      "original_sha256": "f7d142cc2351e948ef2e9e7b2cf8b8f4dbab233adacad93baed0d04bc68cc2ba",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "linux-arm64",
+      "sha256": "03acd1cfa3b369588c66d3755e9243b17e753254f06d325fdd45063c8a817fa6",
+      "bytes": 101,
+      "original_sha256": "3d00a9aa0e45c374e70990f571eb672f4e09afeea07c8da6f58581d5dbb67933",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-0.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-0.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-0.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-0.stdout",
+      "target": "linux-arm64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "3adc8be144f8e4278732c516d59d1a9ef423bde3ac3e30c5fd9884cb5755a3c4",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "linux-arm64",
+      "sha256": "03acd1cfa3b369588c66d3755e9243b17e753254f06d325fdd45063c8a817fa6",
+      "bytes": 101,
+      "original_sha256": "3d00a9aa0e45c374e70990f571eb672f4e09afeea07c8da6f58581d5dbb67933",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-1.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-1.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-1.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-1.stdout",
+      "target": "linux-arm64",
+      "sha256": "e59d0f1ae7753bab5d2390d642557accba8bffe45ea061c0abd9217f3fc16d1c",
+      "bytes": 140,
+      "original_sha256": "9b5893780b3317b7c7ba2c6d26a87d397f68e85961e4cea0d03d957d8ff6e946",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "linux-arm64",
+      "sha256": "3c41610c19e33970e5a2753439ea6c04599a23673ca70f5e3c7fe9e118dd2c21",
+      "bytes": 106,
+      "original_sha256": "012c23e3e3573902fea7d19e1ebdd4689aedaaa5f7aa651db09897f0de8a4c42",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "linux-arm64",
+      "sha256": "03acd1cfa3b369588c66d3755e9243b17e753254f06d325fdd45063c8a817fa6",
+      "bytes": 101,
+      "original_sha256": "3d00a9aa0e45c374e70990f571eb672f4e09afeea07c8da6f58581d5dbb67933",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-2.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-2.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-2.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-2.stdout",
+      "target": "linux-arm64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "b21cb2cbd651e2435f5a6abeeafce87fd99f93c81762e97f51bd45d29fdb0fac",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "linux-arm64",
+      "sha256": "3c41610c19e33970e5a2753439ea6c04599a23673ca70f5e3c7fe9e118dd2c21",
+      "bytes": 106,
+      "original_sha256": "012c23e3e3573902fea7d19e1ebdd4689aedaaa5f7aa651db09897f0de8a4c42",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-3.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-3.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-3.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-3.stdout",
+      "target": "linux-arm64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-4.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-4.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-4.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-4.stdout",
+      "target": "linux-arm64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-5.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-5.stderr",
+      "target": "linux-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-grant-case-5.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-grant-case-5.stdout",
+      "target": "linux-arm64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-schedule.stderr": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-schedule.stderr",
+      "target": "linux-arm64",
+      "sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "bytes": 1003,
+      "original_sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/cli-schedule.stdout": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "cli-schedule.stdout",
+      "target": "linux-arm64",
+      "sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "bytes": 22208,
+      "original_sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/manifest.json": {
+      "artifact_id": 11558199277,
+      "run_id": 37796278728,
+      "zip_sha256": "dff7c8c9a32605b6fb2d235353eb1b99f196fb078a64082810b90e683421b316",
+      "member": "manifest.json",
+      "target": "linux-arm64",
+      "sha256": "b9050d8bfb6c1e78ce8c208950bee98cdf92ab74830ce23799119efbf45e7581",
+      "bytes": 294411,
+      "original_sha256": "309cd131a7c68037f8d08115cad33a539b6ce9eb717c1adeeb2e7989dd141c9f",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "windows-amd64",
+      "sha256": "6bcdb89cc0aa2999a123a06fde54c09c8b1fac93172c7ec9060b3cdca087704b",
+      "bytes": 101,
+      "original_sha256": "65bf70b954ee0c09866aff73b7858551fb90602b15fea335a3423fd50957728b",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-0.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-0.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-0.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-0.stdout",
+      "target": "windows-amd64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "5fe499e9e4e0f78cfba095ce3868bbffedcae59b45e19eec4a0ca4e6cf538ed8",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "windows-amd64",
+      "sha256": "6bcdb89cc0aa2999a123a06fde54c09c8b1fac93172c7ec9060b3cdca087704b",
+      "bytes": 101,
+      "original_sha256": "65bf70b954ee0c09866aff73b7858551fb90602b15fea335a3423fd50957728b",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-1.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-1.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-1.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-1.stdout",
+      "target": "windows-amd64",
+      "sha256": "d5eca58ba1912f510520b55c7ac1df242d6446ef8da392593ffe1b9c7a2a6ebc",
+      "bytes": 140,
+      "original_sha256": "14aeefe9e670d2940ea53ca6b03c6c7da8629aa99a22d4ccf1969bf340c55ea1",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "windows-amd64",
+      "sha256": "2b562a292b55c461de825c5c435940c2098e42074853efb8b17b988386f04075",
+      "bytes": 106,
+      "original_sha256": "ee095d3f5c1c96bade92c020f3630b1afc57f1182a087411bd97d6b39ccaffe9",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "windows-amd64",
+      "sha256": "6bcdb89cc0aa2999a123a06fde54c09c8b1fac93172c7ec9060b3cdca087704b",
+      "bytes": 101,
+      "original_sha256": "65bf70b954ee0c09866aff73b7858551fb90602b15fea335a3423fd50957728b",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-2.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-2.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-2.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-2.stdout",
+      "target": "windows-amd64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "32b26214c3240887f6d287eeb983c4105321a7ddd88b4d62c96f155a6a321010",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "windows-amd64",
+      "sha256": "2b562a292b55c461de825c5c435940c2098e42074853efb8b17b988386f04075",
+      "bytes": 106,
+      "original_sha256": "ee095d3f5c1c96bade92c020f3630b1afc57f1182a087411bd97d6b39ccaffe9",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-3.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-3.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-3.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-3.stdout",
+      "target": "windows-amd64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-4.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-4.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-4.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-4.stdout",
+      "target": "windows-amd64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-5.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-5.stderr",
+      "target": "windows-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-grant-case-5.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-grant-case-5.stdout",
+      "target": "windows-amd64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-schedule.stderr": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-schedule.stderr",
+      "target": "windows-amd64",
+      "sha256": "0306399ecb21d2ee1781e11662e353c21fe0b59647b70d7e8bb9aa81b4f5457d",
+      "bytes": 1005,
+      "original_sha256": "0306399ecb21d2ee1781e11662e353c21fe0b59647b70d7e8bb9aa81b4f5457d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/cli-schedule.stdout": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "cli-schedule.stdout",
+      "target": "windows-amd64",
+      "sha256": "68bfaed66c5ff5b3c3fc5312f79989c2b3f9f930894b86512374183781adeb90",
+      "bytes": 22234,
+      "original_sha256": "68bfaed66c5ff5b3c3fc5312f79989c2b3f9f930894b86512374183781adeb90",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/windows-amd64/manifest.json": {
+      "artifact_id": 11558104792,
+      "run_id": 37796278728,
+      "zip_sha256": "ca6df5b9a6a13bf306523c0c276e85d630130f4307fe02d3d546c09107523595",
+      "member": "manifest.json",
+      "target": "windows-amd64",
+      "sha256": "d572a5080998f76fd1dd7eaadb8704943369bda50464852455fe61ef11dd60da",
+      "bytes": 293267,
+      "original_sha256": "55762fbce10bdb0554ad5bfeaf29e76e19ce4738fa8c3e058a5435f7ba9091ac",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/windows-arm64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11559471244,
+      "run_id": 37796706488,
+      "zip_sha256": "aec8355aa52bc3733f3557dace816c820b19cf368c4a755ce585ef1be27d6fe2",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "windows-arm64",
+      "sha256": "52e744e55720e8b669737a22c20cf103b58c46a36fd5c1cea7ca8d54609d2a67",
+      "bytes": 31601,
+      "original_sha256": "52e744e55720e8b669737a22c20cf103b58c46a36fd5c1cea7ca8d54609d2a67",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "live_http_disconnect_cancels_and_reaps_host_agent_like_go.json",
+      "target": "linux-amd64",
+      "sha256": "af22a596a9e7c28bbfde9ef22ef1fa4bb5ac58dc641437e2a9b0e8b21e02eb24",
+      "bytes": 32700,
+      "original_sha256": "af22a596a9e7c28bbfde9ef22ef1fa4bb5ac58dc641437e2a9b0e8b21e02eb24",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/live_http_disconnect_cancels_provider_request_like_go.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "live_http_disconnect_cancels_provider_request_like_go.json",
+      "target": "linux-amd64",
+      "sha256": "794a93177750324ac59e2e48cd6b7ad943d8d81705bf59d61858b3bbd93dc068",
+      "bytes": 32959,
+      "original_sha256": "794a93177750324ac59e2e48cd6b7ad943d8d81705bf59d61858b3bbd93dc068",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "linux-amd64",
+      "sha256": "b7237220f71370583c475f72dc8c6c04e73cb6c65ea3012b10803736eb4d19c4",
+      "bytes": 31191,
+      "original_sha256": "b7237220f71370583c475f72dc8c6c04e73cb6c65ea3012b10803736eb4d19c4",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/obs_text_origin_rejection_matches_go_and_rust_processes.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "obs_text_origin_rejection_matches_go_and_rust_processes.json",
+      "target": "linux-amd64",
+      "sha256": "e4469820edd00e321b0344e27b66de7cf6977a811e83d5326a332248daacf62f",
+      "bytes": 30932,
+      "original_sha256": "e4469820edd00e321b0344e27b66de7cf6977a811e83d5326a332248daacf62f",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "occupied_bind_error_matches_go_for_ipv4_and_ipv6.json",
+      "target": "linux-amd64",
+      "sha256": "9f4be7727bdefe570f03d525dcbef7e0ba2fdda6a2c45cf66cd6a3d2167eea26",
+      "bytes": 30910,
+      "original_sha256": "9f4be7727bdefe570f03d525dcbef7e0ba2fdda6a2c45cf66cd6a3d2167eea26",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json",
+      "target": "linux-amd64",
+      "sha256": "fdc1a1fe367e7e54fd8fbb32eee54b8805e5b4c6cd135516520f5282ce3e32ce",
+      "bytes": 30730,
+      "original_sha256": "fdc1a1fe367e7e54fd8fbb32eee54b8805e5b4c6cd135516520f5282ce3e32ce",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-amd64/unavailable_local_address_error_matches_go.json": {
+      "artifact_id": 11559290981,
+      "run_id": 37796706488,
+      "zip_sha256": "cecea429065e40b2c031f02c0a3990df6d368c85c9025745b9a07c67855eeeb7",
+      "member": "unavailable_local_address_error_matches_go.json",
+      "target": "linux-amd64",
+      "sha256": "5bf564e06069dfffd0f46bc982a83c29287a82dab5549606324e69e45f5dfe63",
+      "bytes": 30773,
+      "original_sha256": "5bf564e06069dfffd0f46bc982a83c29287a82dab5549606324e69e45f5dfe63",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "live_http_disconnect_cancels_and_reaps_host_agent_like_go.json",
+      "target": "linux-arm64",
+      "sha256": "0bdaf6c1125d0f2e5e85de9a817dc584fad1499091252406f95a53a1754d1668",
+      "bytes": 32701,
+      "original_sha256": "0bdaf6c1125d0f2e5e85de9a817dc584fad1499091252406f95a53a1754d1668",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/live_http_disconnect_cancels_provider_request_like_go.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "live_http_disconnect_cancels_provider_request_like_go.json",
+      "target": "linux-arm64",
+      "sha256": "19ef28bb42b5edb4a9a86c6436eaabbe03d68cbd89e93451124f253ea5460b41",
+      "bytes": 32960,
+      "original_sha256": "19ef28bb42b5edb4a9a86c6436eaabbe03d68cbd89e93451124f253ea5460b41",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "linux-arm64",
+      "sha256": "8438bd8d1503135e5e6b8495147a372d5cd9883c3999c70877332c0797d7fa1e",
+      "bytes": 31193,
+      "original_sha256": "8438bd8d1503135e5e6b8495147a372d5cd9883c3999c70877332c0797d7fa1e",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "obs_text_origin_rejection_matches_go_and_rust_processes.json",
+      "target": "linux-arm64",
+      "sha256": "497b0b697b01ea4a8ae843c708492db082822abd4ba80b8db9bdf40658b0d8f2",
+      "bytes": 30933,
+      "original_sha256": "497b0b697b01ea4a8ae843c708492db082822abd4ba80b8db9bdf40658b0d8f2",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "occupied_bind_error_matches_go_for_ipv4_and_ipv6.json",
+      "target": "linux-arm64",
+      "sha256": "4bfbc48093febfe87094073e53d05d1de3b5763bf9145505b8f3cea7ac389ceb",
+      "bytes": 30911,
+      "original_sha256": "4bfbc48093febfe87094073e53d05d1de3b5763bf9145505b8f3cea7ac389ceb",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json",
+      "target": "linux-arm64",
+      "sha256": "10566525c175558e2259fcb1d6f0e95dc4731090a9c2797c9e5a76f0fe21e83d",
+      "bytes": 30731,
+      "original_sha256": "10566525c175558e2259fcb1d6f0e95dc4731090a9c2797c9e5a76f0fe21e83d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/linux-arm64/unavailable_local_address_error_matches_go.json": {
+      "artifact_id": 11559195914,
+      "run_id": 37796706488,
+      "zip_sha256": "e0b0096118b91beb8b1cce282eafad311264efe3a2fd31ce813c7584a5f7e09e",
+      "member": "unavailable_local_address_error_matches_go.json",
+      "target": "linux-arm64",
+      "sha256": "a19558589f36e980382adecf443da4d5d00696541406eac83c135a540e888cf1",
+      "bytes": 30774,
+      "original_sha256": "a19558589f36e980382adecf443da4d5d00696541406eac83c135a540e888cf1",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/windows-amd64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11558812547,
+      "run_id": 37796706488,
+      "zip_sha256": "2f3328169af10a5a1c05d997445b84b59b50b817815d5b94fa3e21d63ff23e4d",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "windows-amd64",
+      "sha256": "224e79a5247dd525d8d41d023a680316e024d7fc2d955a3342800b8d341fd857",
+      "bytes": 31599,
+      "original_sha256": "224e79a5247dd525d8d41d023a680316e024d7fc2d955a3342800b8d341fd857",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/windows-arm64/headers.json": {
+      "artifact_id": 11560310636,
+      "run_id": 37796278728,
+      "zip_sha256": "3fe4980b9d856a1c0536d985e55b2fc4d943002c378a4abccdc6174b4daefffc",
+      "member": "headers.json",
+      "target": "windows-arm64",
+      "sha256": "2300b45e989db9141afe30a9f8731c812345eb4d263a4f63cd0adb72bd5a1110",
+      "bytes": 39454,
+      "original_sha256": "2300b45e989db9141afe30a9f8731c812345eb4d263a4f63cd0adb72bd5a1110",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/windows-arm64/agent-error.json": {
+      "artifact_id": 11560215831,
+      "run_id": 37796278728,
+      "zip_sha256": "70f7d86e6b4ef181781bf15c895fffb2cb5698876120c389bd00ac100c49b668",
+      "member": "agent-error.json",
+      "target": "windows-arm64",
+      "sha256": "c0fc55cf750268a926a293f06981eb9d9dbd289d0479012ff48e705ff8e3b26c",
+      "bytes": 32274,
+      "original_sha256": "c0fc55cf750268a926a293f06981eb9d9dbd289d0479012ff48e705ff8e3b26c",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-arm64/senderless-email.json": {
+      "artifact_id": 11560215824,
+      "run_id": 37796278728,
+      "zip_sha256": "4ebddc93e8053f495b6958aa18d22d6d775983b229195b71bc20574f7afebe34",
+      "member": "senderless-email.json",
+      "target": "windows-arm64",
+      "sha256": "4ec3d0c43383617797bfd3dc9f388113d2f743c878213c8defafe40b79d135f1",
+      "bytes": 31093,
+      "original_sha256": "4ec3d0c43383617797bfd3dc9f388113d2f743c878213c8defafe40b79d135f1",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-arm64/web-form.json": {
+      "artifact_id": 11560215824,
+      "run_id": 37796278728,
+      "zip_sha256": "4ebddc93e8053f495b6958aa18d22d6d775983b229195b71bc20574f7afebe34",
+      "member": "web-form.json",
+      "target": "windows-arm64",
+      "sha256": "cff1f1e3deb46829c5581cbc8132ed861e3b28957cea4d1fb87c846fd80f75a0",
+      "bytes": 32026,
+      "original_sha256": "cff1f1e3deb46829c5581cbc8132ed861e3b28957cea4d1fb87c846fd80f75a0",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/windows-arm64/campaign.json": {
+      "artifact_id": 11560007458,
+      "run_id": 37796278728,
+      "zip_sha256": "a81af46fb9c59b0802c74c7f419f11999a9c48e298a5653e9dc476c2c3cb4ea6",
+      "member": "campaign.json",
+      "target": "windows-arm64",
+      "sha256": "79120cfdcd9fdc7a011eabe496cb05fc31fda8170c1e9f5b3e6c06145034eec6",
+      "bytes": 35349,
+      "original_sha256": "79120cfdcd9fdc7a011eabe496cb05fc31fda8170c1e9f5b3e6c06145034eec6",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/windows-arm64/transport.json": {
+      "artifact_id": 11560007458,
+      "run_id": 37796278728,
+      "zip_sha256": "a81af46fb9c59b0802c74c7f419f11999a9c48e298a5653e9dc476c2c3cb4ea6",
+      "member": "transport.json",
+      "target": "windows-arm64",
+      "sha256": "3fff284a1b6571336acbe31f4254b245b8fa6fc05c540764647ed3720c492a4a",
+      "bytes": 42749,
+      "original_sha256": "3fff284a1b6571336acbe31f4254b245b8fa6fc05c540764647ed3720c492a4a",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/linux-arm64/agent-error.json": {
+      "artifact_id": 11559910919,
+      "run_id": 37796278728,
+      "zip_sha256": "3e7809279bfe4755d2de3198d614f92e95696982035c7fe597d63e4f4fafcd7d",
+      "member": "agent-error.json",
+      "target": "linux-arm64",
+      "sha256": "62ed11f344ad687b50d698ed85b02c1183b7e962e8cbc8cd04726e2e12eaae53",
+      "bytes": 32122,
+      "original_sha256": "62ed11f344ad687b50d698ed85b02c1183b7e962e8cbc8cd04726e2e12eaae53",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/linux-amd64/agent-error.json": {
+      "artifact_id": 11559856591,
+      "run_id": 37796278728,
+      "zip_sha256": "8fa2c803919112f78aea08f92fda0bae17ff0d0d8cd5d0da702f385cb234c651",
+      "member": "agent-error.json",
+      "target": "linux-amd64",
+      "sha256": "efb23f7199907978a119f74e74fd8c5d90e0d109d6d235ff4c3b2a5fdc5c4bd9",
+      "bytes": 32120,
+      "original_sha256": "efb23f7199907978a119f74e74fd8c5d90e0d109d6d235ff4c3b2a5fdc5c4bd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-arm64/cli.json": {
+      "artifact_id": 11559778037,
+      "run_id": 37796278728,
+      "zip_sha256": "db4114f272caa6f9132bb0a977b20d2aa5f58e3cdc2ce2c4b47e74b860a9957a",
+      "member": "cli.json",
+      "target": "windows-arm64",
+      "sha256": "21d766c36e3e2a76d0bed52eef61f0d10194e9be178535509bb87ccce59cbb40",
+      "bytes": 47445,
+      "original_sha256": "21d766c36e3e2a76d0bed52eef61f0d10194e9be178535509bb87ccce59cbb40",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-arm64/mcp.json": {
+      "artifact_id": 11559778037,
+      "run_id": 37796278728,
+      "zip_sha256": "db4114f272caa6f9132bb0a977b20d2aa5f58e3cdc2ce2c4b47e74b860a9957a",
+      "member": "mcp.json",
+      "target": "windows-arm64",
+      "sha256": "714e4e258f1ca58c510949ff21e362bea47d24e3176651456c18a40622393596",
+      "bytes": 46187,
+      "original_sha256": "714e4e258f1ca58c510949ff21e362bea47d24e3176651456c18a40622393596",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/linux-amd64/campaign.json": {
+      "artifact_id": 11559736784,
+      "run_id": 37796278728,
+      "zip_sha256": "39e359a93cacdf809c14807d9680ec4017e41d4ba0c78c220f02b340e8232d45",
+      "member": "campaign.json",
+      "target": "linux-amd64",
+      "sha256": "8a85db7ae36f2080e6638467c88be4228a0a23650bc02a3c8c70a0d41ad70369",
+      "bytes": 35195,
+      "original_sha256": "8a85db7ae36f2080e6638467c88be4228a0a23650bc02a3c8c70a0d41ad70369",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/linux-amd64/transport.json": {
+      "artifact_id": 11559736784,
+      "run_id": 37796278728,
+      "zip_sha256": "39e359a93cacdf809c14807d9680ec4017e41d4ba0c78c220f02b340e8232d45",
+      "member": "transport.json",
+      "target": "linux-amd64",
+      "sha256": "182ad34c2635ba73b61699c35dfea9bd264850f79d495f53edca0da220ac84cc",
+      "bytes": 42595,
+      "original_sha256": "182ad34c2635ba73b61699c35dfea9bd264850f79d495f53edca0da220ac84cc",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-arm64/cli.json": {
+      "artifact_id": 11559726313,
+      "run_id": 37796278728,
+      "zip_sha256": "651273d513229a99ae89bd38302572b009cbac7af4f7cd94e3382a28c329c063",
+      "member": "cli.json",
+      "target": "linux-arm64",
+      "sha256": "676475689dc4e8db04c6f6130828a8b4e6af4846d924425326f49bc28fdf6135",
+      "bytes": 47196,
+      "original_sha256": "676475689dc4e8db04c6f6130828a8b4e6af4846d924425326f49bc28fdf6135",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-arm64/mcp.json": {
+      "artifact_id": 11559726313,
+      "run_id": 37796278728,
+      "zip_sha256": "651273d513229a99ae89bd38302572b009cbac7af4f7cd94e3382a28c329c063",
+      "member": "mcp.json",
+      "target": "linux-arm64",
+      "sha256": "af46c0703c576640813c65ef7129574ae6c6e8c57bc06dd7c3ba2624c54c9b14",
+      "bytes": 45938,
+      "original_sha256": "af46c0703c576640813c65ef7129574ae6c6e8c57bc06dd7c3ba2624c54c9b14",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/linux-arm64/headers.json": {
+      "artifact_id": 11559457015,
+      "run_id": 37796278728,
+      "zip_sha256": "e2193fe74a3c859bc5bc8589dcdd07c1de6606107393adc38754fd08a849a2af",
+      "member": "headers.json",
+      "target": "linux-arm64",
+      "sha256": "2bb0d6ca7dea12aed15df78f85bbb625b6ed2cd1d91321277112702e5c391300",
+      "bytes": 39204,
+      "original_sha256": "2bb0d6ca7dea12aed15df78f85bbb625b6ed2cd1d91321277112702e5c391300",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-arm64/senderless-email.json": {
+      "artifact_id": 11559237261,
+      "run_id": 37796278728,
+      "zip_sha256": "4b1680f2fb8b8cde7275b9fc76320d9d25e1b2d7091a2405cb55c6dc4c15ba0a",
+      "member": "senderless-email.json",
+      "target": "linux-arm64",
+      "sha256": "a278bee446215d349b6155024f1278da771fa93d4a1b320442b74a2ebd051d4c",
+      "bytes": 30843,
+      "original_sha256": "a278bee446215d349b6155024f1278da771fa93d4a1b320442b74a2ebd051d4c",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-arm64/web-form.json": {
+      "artifact_id": 11559237261,
+      "run_id": 37796278728,
+      "zip_sha256": "4b1680f2fb8b8cde7275b9fc76320d9d25e1b2d7091a2405cb55c6dc4c15ba0a",
+      "member": "web-form.json",
+      "target": "linux-arm64",
+      "sha256": "2b80539e316a2bac8941bf2801f9695ce35f5d70b0cbff0e7b6f4635ac6ac64e",
+      "bytes": 31776,
+      "original_sha256": "2b80539e316a2bac8941bf2801f9695ce35f5d70b0cbff0e7b6f4635ac6ac64e",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/linux-arm64/campaign.json": {
+      "artifact_id": 11559162435,
+      "run_id": 37796278728,
+      "zip_sha256": "d0ea65dea44a17e3237d38502c624525ee9246197cf6d7c5c0109525a535e25c",
+      "member": "campaign.json",
+      "target": "linux-arm64",
+      "sha256": "2ce16b2afd687397a593ffa49ae9d1ed71190bd1f36191888b0e96caf084205f",
+      "bytes": 35197,
+      "original_sha256": "2ce16b2afd687397a593ffa49ae9d1ed71190bd1f36191888b0e96caf084205f",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/linux-arm64/transport.json": {
+      "artifact_id": 11559162435,
+      "run_id": 37796278728,
+      "zip_sha256": "d0ea65dea44a17e3237d38502c624525ee9246197cf6d7c5c0109525a535e25c",
+      "member": "transport.json",
+      "target": "linux-arm64",
+      "sha256": "dbef30e83f2aa1f12d17dcdcdde43fda9159896728623a3c768499bf8549951b",
+      "bytes": 42597,
+      "original_sha256": "dbef30e83f2aa1f12d17dcdcdde43fda9159896728623a3c768499bf8549951b",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-wire/linux-arm64/wire.json": {
+      "artifact_id": 11559102380,
+      "run_id": 37796278728,
+      "zip_sha256": "90a60593be9704f0a4f2e30343e75794e71c28d89ee65693e871a639f6def859",
+      "member": "wire.json",
+      "target": "linux-arm64",
+      "sha256": "7c6931f02c52152485144db0d0c543c4414235f5387e6da6a44be2d44fa79645",
+      "bytes": 38554,
+      "original_sha256": "7c6931f02c52152485144db0d0c543c4414235f5387e6da6a44be2d44fa79645",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-wire/linux-amd64/wire.json": {
+      "artifact_id": 11558873578,
+      "run_id": 37796278728,
+      "zip_sha256": "b2c5292d386641ea99be3d189eea8d37e5f42a5dcc26a6399c9d34d85cc0d763",
+      "member": "wire.json",
+      "target": "linux-amd64",
+      "sha256": "24a99eddee891d2ef5fb6d989a1e659eda85f33879f7a776295b60e4f39a4717",
+      "bytes": 38552,
+      "original_sha256": "24a99eddee891d2ef5fb6d989a1e659eda85f33879f7a776295b60e4f39a4717",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-amd64/cli.json": {
+      "artifact_id": 11558833697,
+      "run_id": 37796278728,
+      "zip_sha256": "6bdab3e4aa2d3776248a03e79e6c55e19f87927997c8c3e558d9d736676bf97e",
+      "member": "cli.json",
+      "target": "linux-amd64",
+      "sha256": "6e9977c87765815b9dda1d002e480e0afaf2f8c52e20613eb5a066877fc45165",
+      "bytes": 47194,
+      "original_sha256": "6e9977c87765815b9dda1d002e480e0afaf2f8c52e20613eb5a066877fc45165",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-amd64/mcp.json": {
+      "artifact_id": 11558833697,
+      "run_id": 37796278728,
+      "zip_sha256": "6bdab3e4aa2d3776248a03e79e6c55e19f87927997c8c3e558d9d736676bf97e",
+      "member": "mcp.json",
+      "target": "linux-amd64",
+      "sha256": "f496a825555de50f4081880919aac89a932b1e7c5784cd4b3f622d071c783c85",
+      "bytes": 45936,
+      "original_sha256": "f496a825555de50f4081880919aac89a932b1e7c5784cd4b3f622d071c783c85",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/linux-amd64/headers.json": {
+      "artifact_id": 11558669562,
+      "run_id": 37796278728,
+      "zip_sha256": "1a1bd9a2231d2f2580ba83da3e0ec4f3cc9467fca12d3715d23c7a9a2f79fc9f",
+      "member": "headers.json",
+      "target": "linux-amd64",
+      "sha256": "a5fa9553dd22590c3145ca611dbc394d5f109a9dd727a67c8c226e33bccbea2c",
+      "bytes": 39202,
+      "original_sha256": "a5fa9553dd22590c3145ca611dbc394d5f109a9dd727a67c8c226e33bccbea2c",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-amd64/senderless-email.json": {
+      "artifact_id": 11558524905,
+      "run_id": 37796278728,
+      "zip_sha256": "4b509a4016b38782d09942ba8286e8754d6dc9e007a492ced7960ca2453d3c48",
+      "member": "senderless-email.json",
+      "target": "linux-amd64",
+      "sha256": "e61f3fe794f4d062816952c330bc62dfa5f26c53a28b1c02d11cab10c61f48c7",
+      "bytes": 30841,
+      "original_sha256": "e61f3fe794f4d062816952c330bc62dfa5f26c53a28b1c02d11cab10c61f48c7",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-amd64/web-form.json": {
+      "artifact_id": 11558524905,
+      "run_id": 37796278728,
+      "zip_sha256": "4b509a4016b38782d09942ba8286e8754d6dc9e007a492ced7960ca2453d3c48",
+      "member": "web-form.json",
+      "target": "linux-amd64",
+      "sha256": "8cc6885308feb01d07044cb21ca63862aabec72a8212ee7a6bd81e6ae791ce24",
+      "bytes": 31774,
+      "original_sha256": "8cc6885308feb01d07044cb21ca63862aabec72a8212ee7a6bd81e6ae791ce24",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "darwin-amd64",
+      "sha256": "59f25a04e43afa4b4aa3e814aca92d33bcc9567d6e1bfbca78be7862899a1cbd",
+      "bytes": 101,
+      "original_sha256": "3c5a21d3ec3193be872a4128ccd913f5cfea7df64be9ec463ac8b5cb15ee870d",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-0.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-0.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-0.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-0.stdout",
+      "target": "darwin-amd64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "845f01c5ea34877fce436f0ac3733823bec2495719c56b85a7e7072ebffb200e",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "darwin-amd64",
+      "sha256": "59f25a04e43afa4b4aa3e814aca92d33bcc9567d6e1bfbca78be7862899a1cbd",
+      "bytes": 101,
+      "original_sha256": "3c5a21d3ec3193be872a4128ccd913f5cfea7df64be9ec463ac8b5cb15ee870d",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-1.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-1.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-1.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-1.stdout",
+      "target": "darwin-amd64",
+      "sha256": "627c46b52ad0ea614e5156cb7da0475759e5abc774549789623d7d23580f684d",
+      "bytes": 140,
+      "original_sha256": "9300b52f83e6309e71ed26b6ec73c46e717f1166c19c742b7cfd91cd774856ca",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "darwin-amd64",
+      "sha256": "208e3eb106969f8d7e0afd809bf57b00e93af8ed5ee231dd9f32b435846e07fd",
+      "bytes": 106,
+      "original_sha256": "428af8993b684db30b46799a27af6ad1cc5102ea6b1c74817317a13ed78b3429",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "darwin-amd64",
+      "sha256": "59f25a04e43afa4b4aa3e814aca92d33bcc9567d6e1bfbca78be7862899a1cbd",
+      "bytes": 101,
+      "original_sha256": "3c5a21d3ec3193be872a4128ccd913f5cfea7df64be9ec463ac8b5cb15ee870d",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-2.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-2.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-2.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-2.stdout",
+      "target": "darwin-amd64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "8d275a27228c626dbd2f172e8b1e8e921c932ae581ec5457030d9d16484843d5",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "darwin-amd64",
+      "sha256": "208e3eb106969f8d7e0afd809bf57b00e93af8ed5ee231dd9f32b435846e07fd",
+      "bytes": 106,
+      "original_sha256": "428af8993b684db30b46799a27af6ad1cc5102ea6b1c74817317a13ed78b3429",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-3.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-3.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-3.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-3.stdout",
+      "target": "darwin-amd64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-4.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-4.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-4.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-4.stdout",
+      "target": "darwin-amd64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-5.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-5.stderr",
+      "target": "darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-grant-case-5.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-grant-case-5.stdout",
+      "target": "darwin-amd64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-schedule.stderr": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-schedule.stderr",
+      "target": "darwin-amd64",
+      "sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "bytes": 1003,
+      "original_sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/cli-schedule.stdout": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "cli-schedule.stdout",
+      "target": "darwin-amd64",
+      "sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "bytes": 22208,
+      "original_sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/manifest.json": {
+      "artifact_id": 11558509615,
+      "run_id": 37796278728,
+      "zip_sha256": "b229fd8df991cd0b7561872737b55bfbf179ec9640aef704e260720f8b5c19df",
+      "member": "manifest.json",
+      "target": "darwin-amd64",
+      "sha256": "88b5846932e0775c6bc07b3e58fa75221a0be423a6a525a7a103181c4c15daa8",
+      "bytes": 295868,
+      "original_sha256": "eaeb1ca0bb812a9578884690f6f1010f3afd67828fe724bb556ac40df21b6d25",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-amd64/senderless-email.json": {
+      "artifact_id": 11560361099,
+      "run_id": 37796278728,
+      "zip_sha256": "afe6e153e6e3e114d860d3d57dd11c3fd0855904e5cee7dca0ad23547eb0236f",
+      "member": "senderless-email.json",
+      "target": "windows-amd64",
+      "sha256": "88775aef4b81b72ddf6d14ce5f33f5b9f5d49c21e3d685f2d1fb3978c4a27312",
+      "bytes": 31091,
+      "original_sha256": "88775aef4b81b72ddf6d14ce5f33f5b9f5d49c21e3d685f2d1fb3978c4a27312",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-amd64/web-form.json": {
+      "artifact_id": 11560361099,
+      "run_id": 37796278728,
+      "zip_sha256": "afe6e153e6e3e114d860d3d57dd11c3fd0855904e5cee7dca0ad23547eb0236f",
+      "member": "web-form.json",
+      "target": "windows-amd64",
+      "sha256": "08ea1f4f2e545f570e41cc0ae6b40f87a408644f1b093d4ad70b607cf55e515f",
+      "bytes": 32024,
+      "original_sha256": "08ea1f4f2e545f570e41cc0ae6b40f87a408644f1b093d4ad70b607cf55e515f",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/windows-amd64/headers.json": {
+      "artifact_id": 11560291212,
+      "run_id": 37796278728,
+      "zip_sha256": "5215d94b47a857b424cea7664dcd96673df5b0b3181e02de8b308cd8c5a8c4a2",
+      "member": "headers.json",
+      "target": "windows-amd64",
+      "sha256": "9570876cb08bd8eb727398c28606b2f0046f6a8b1b3fd88d4fd0f82e01a3bc86",
+      "bytes": 39452,
+      "original_sha256": "9570876cb08bd8eb727398c28606b2f0046f6a8b1b3fd88d4fd0f82e01a3bc86",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-amd64/cli.json": {
+      "artifact_id": 11560186455,
+      "run_id": 37796278728,
+      "zip_sha256": "8fef784088f3f353b06d6a1f72879ba24571e3ca11a2122a5cfe23da1c4120d2",
+      "member": "cli.json",
+      "target": "windows-amd64",
+      "sha256": "c7cd8116199c5c1f73350ef2d3ed44ec0595be177a13c3924715dd1c9f6abca5",
+      "bytes": 47443,
+      "original_sha256": "c7cd8116199c5c1f73350ef2d3ed44ec0595be177a13c3924715dd1c9f6abca5",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-amd64/mcp.json": {
+      "artifact_id": 11560186455,
+      "run_id": 37796278728,
+      "zip_sha256": "8fef784088f3f353b06d6a1f72879ba24571e3ca11a2122a5cfe23da1c4120d2",
+      "member": "mcp.json",
+      "target": "windows-amd64",
+      "sha256": "6a8deee5f0e488da8a66383cfb2f93feb01ab218cb5535f949133f68120b6c0c",
+      "bytes": 46185,
+      "original_sha256": "6a8deee5f0e488da8a66383cfb2f93feb01ab218cb5535f949133f68120b6c0c",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/windows-amd64/campaign.json": {
+      "artifact_id": 11559878419,
+      "run_id": 37796278728,
+      "zip_sha256": "905f6f0b8aba6a6f2c17614e9e4c466084237236d26bf9a3a8a80baf66834504",
+      "member": "campaign.json",
+      "target": "windows-amd64",
+      "sha256": "663ee1870584076fa1ef764f84ae30a3fdd21c0fa3bf65fc1f2f5e28b05d420d",
+      "bytes": 35347,
+      "original_sha256": "663ee1870584076fa1ef764f84ae30a3fdd21c0fa3bf65fc1f2f5e28b05d420d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/windows-amd64/transport.json": {
+      "artifact_id": 11559878419,
+      "run_id": 37796278728,
+      "zip_sha256": "905f6f0b8aba6a6f2c17614e9e4c466084237236d26bf9a3a8a80baf66834504",
+      "member": "transport.json",
+      "target": "windows-amd64",
+      "sha256": "c0695389cbb28e6a171ce3ece7644a89844cd4852ac73034da9cd197e16ad875",
+      "bytes": 42747,
+      "original_sha256": "c0695389cbb28e6a171ce3ece7644a89844cd4852ac73034da9cd197e16ad875",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/windows-amd64/agent-error.json": {
+      "artifact_id": 11559793460,
+      "run_id": 37796278728,
+      "zip_sha256": "e0d24c117a697e61239b130b236296d09f7fe1d43ddb23715e4ba342ba0194fb",
+      "member": "agent-error.json",
+      "target": "windows-amd64",
+      "sha256": "9c62582862c06ed7d20b49f28535d94db5544501c4ccc732114a34a53c9b5e04",
+      "bytes": 32271,
+      "original_sha256": "9c62582862c06ed7d20b49f28535d94db5544501c4ccc732114a34a53c9b5e04",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-0-consent-0.observations.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-0-consent-0.observations.json",
+      "target": "darwin-arm64",
+      "sha256": "ce6c15a31035315617908b7a64ec63b32d6b89110fa3d5f2dc0160edf721ce39",
+      "bytes": 101,
+      "original_sha256": "389bdf8ebdc9e00ca1037288bc80d087c2bb5589375a379bd8ebde407695fcee",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-0.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-0.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-0.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-0.stdout",
+      "target": "darwin-arm64",
+      "sha256": "9739e1cc6b165517ced05cbdebca18756d8181df1bbe117d643c9fe3b3ed2743",
+      "bytes": 50,
+      "original_sha256": "1ae90c81217d079379f0f66ae5030aaa4f037962905c0c15b69bb9864a505458",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-1-consent-0.observations.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-1-consent-0.observations.json",
+      "target": "darwin-arm64",
+      "sha256": "ce6c15a31035315617908b7a64ec63b32d6b89110fa3d5f2dc0160edf721ce39",
+      "bytes": 101,
+      "original_sha256": "389bdf8ebdc9e00ca1037288bc80d087c2bb5589375a379bd8ebde407695fcee",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-1.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-1.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-1.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-1.stdout",
+      "target": "darwin-arm64",
+      "sha256": "cc7b41ed5f36660dbe39eed55a49066b30875b65b2097dd74349f61342c60a0a",
+      "bytes": 140,
+      "original_sha256": "8e8c4db34475948603087c53a5b567e49704e42b8083976b9ef068f118a5fa1e",
+      "changed_json_paths": [
+        [
+          "tokens",
+          0,
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-2-consent-0.observations.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-2-consent-0.observations.json",
+      "target": "darwin-arm64",
+      "sha256": "ce6c15a31035315617908b7a64ec63b32d6b89110fa3d5f2dc0160edf721ce39",
+      "bytes": 101,
+      "original_sha256": "389bdf8ebdc9e00ca1037288bc80d087c2bb5589375a379bd8ebde407695fcee",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-2-consent-1.observations.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-2-consent-1.observations.json",
+      "target": "darwin-arm64",
+      "sha256": "98345763d7c4ab4b2d0c1131fcc6bf57b71d0c75adf498e21bd679b04e786f58",
+      "bytes": 106,
+      "original_sha256": "338715bd83540ef7d3ca4a985c48be817177586831cbf762bf5de87b12e8669a",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-2.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-2.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-2.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-2.stdout",
+      "target": "darwin-arm64",
+      "sha256": "4836fc9b9e78428544d60238bd5e7efc7daa8c3d32a451668686d3efc2993f49",
+      "bytes": 50,
+      "original_sha256": "eed33faf2fb02123e4cf98a77f2df83b8315e3cb00b4f0d554cf50f7096e615f",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-3-consent-0.observations.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-3-consent-0.observations.json",
+      "target": "darwin-arm64",
+      "sha256": "98345763d7c4ab4b2d0c1131fcc6bf57b71d0c75adf498e21bd679b04e786f58",
+      "bytes": 106,
+      "original_sha256": "338715bd83540ef7d3ca4a985c48be817177586831cbf762bf5de87b12e8669a",
+      "changed_json_paths": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-3.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-3.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-3.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-3.stdout",
+      "target": "darwin-arm64",
+      "sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "bytes": 29,
+      "original_sha256": "ecd2ab5ab058991c558416c2d7441e133deb6f2107e04486ca3bf0a0fd34a812",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-4.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-4.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-4.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-4.stdout",
+      "target": "darwin-arm64",
+      "sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "bytes": 47,
+      "original_sha256": "b333747c045a67a09090574bc41e95a04cbdfca197a3e31680977977ec30cabd",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-5.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-5.stderr",
+      "target": "darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-grant-case-5.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-grant-case-5.stdout",
+      "target": "darwin-arm64",
+      "sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "bytes": 41,
+      "original_sha256": "e140eab238b563029812b8f1347d8828aa47dcc0b83601c671d52653ddc74dd9",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-schedule.stderr": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-schedule.stderr",
+      "target": "darwin-arm64",
+      "sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "bytes": 1003,
+      "original_sha256": "3cc7e0bca14384dec655caebcd692a3132ea299c0ce22d7cdba357531ac4d168",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/cli-schedule.stdout": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "cli-schedule.stdout",
+      "target": "darwin-arm64",
+      "sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "bytes": 22208,
+      "original_sha256": "7f9eaf415223ba99e39166cfefa4b8a550be2da2395412dd2d45787ff05468eb",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/manifest.json": {
+      "artifact_id": 11560526107,
+      "run_id": 37796278728,
+      "zip_sha256": "b97d0c8e4adc656400a14cde0b3438fca3aa5839c544e9fe7ccf433239d62182",
+      "member": "manifest.json",
+      "target": "darwin-arm64",
+      "sha256": "4f71bc5395e18303c7271083a4f099eef31c758804e89dafd713f2150ac90e94",
+      "bytes": 295902,
+      "original_sha256": "7c4000c65e445f8ea2e6f33270f9a0b95c05b8bfe816f46c66234f4925899676",
+      "changed_json_paths": [
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          0,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          1,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          0,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          2,
+          "consent_records",
+          1,
+          "sha256"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "argv",
+          2
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "name"
+        ],
+        [
+          "cli_grants",
+          "cases",
+          3,
+          "consent_records",
+          0,
+          "sha256"
+        ]
+      ]
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "live_http_disconnect_cancels_and_reaps_host_agent_like_go.json",
+      "target": "darwin-amd64",
+      "sha256": "15a640e7ba66098b625741aa2d10a5720551b085674f3fd5277a22d827221e28",
+      "bytes": 32844,
+      "original_sha256": "15a640e7ba66098b625741aa2d10a5720551b085674f3fd5277a22d827221e28",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/live_http_disconnect_cancels_provider_request_like_go.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "live_http_disconnect_cancels_provider_request_like_go.json",
+      "target": "darwin-amd64",
+      "sha256": "a3977f905701eea723e471666dc78390af908c26857e271a7f8f4abe15ae8d6f",
+      "bytes": 33103,
+      "original_sha256": "a3977f905701eea723e471666dc78390af908c26857e271a7f8f4abe15ae8d6f",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "darwin-amd64",
+      "sha256": "1a1a0baea113b6dbce5027a24a05fbf547315aa9db406f444aa311aabae2f095",
+      "bytes": 31334,
+      "original_sha256": "1a1a0baea113b6dbce5027a24a05fbf547315aa9db406f444aa311aabae2f095",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/obs_text_origin_rejection_matches_go_and_rust_processes.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "obs_text_origin_rejection_matches_go_and_rust_processes.json",
+      "target": "darwin-amd64",
+      "sha256": "cb72d6108e62be52c3df16a9d59f761f331354f2b3cbf9a4b4db2a4e14e5be9d",
+      "bytes": 31076,
+      "original_sha256": "cb72d6108e62be52c3df16a9d59f761f331354f2b3cbf9a4b4db2a4e14e5be9d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "occupied_bind_error_matches_go_for_ipv4_and_ipv6.json",
+      "target": "darwin-amd64",
+      "sha256": "ec481ed7e3cefe8c2e2f54691312c144e29e00f612a5fc1f643e8fa2ecab1d88",
+      "bytes": 31054,
+      "original_sha256": "ec481ed7e3cefe8c2e2f54691312c144e29e00f612a5fc1f643e8fa2ecab1d88",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json",
+      "target": "darwin-amd64",
+      "sha256": "5ad9eea182106b68c8d3b788257a5b0fdabc0e2ec32f5a718c19e55f25366654",
+      "bytes": 30874,
+      "original_sha256": "5ad9eea182106b68c8d3b788257a5b0fdabc0e2ec32f5a718c19e55f25366654",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-amd64/unavailable_local_address_error_matches_go.json": {
+      "artifact_id": 11560556054,
+      "run_id": 37796706488,
+      "zip_sha256": "93e8933d3782286779a95481700d4f6d7eb63e46cd08c0e64d4e6e178728105b",
+      "member": "unavailable_local_address_error_matches_go.json",
+      "target": "darwin-amd64",
+      "sha256": "439db11407209ce7acde2c31101f356d0bafbbbcf416aaf3bbe6084fff9c66ee",
+      "bytes": 30916,
+      "original_sha256": "439db11407209ce7acde2c31101f356d0bafbbbcf416aaf3bbe6084fff9c66ee",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "live_http_disconnect_cancels_and_reaps_host_agent_like_go.json",
+      "target": "darwin-arm64",
+      "sha256": "46bea024a6cb34f8754c122075d75e5fce78d4a08a271d6fc0333a476a6434e3",
+      "bytes": 32846,
+      "original_sha256": "46bea024a6cb34f8754c122075d75e5fce78d4a08a271d6fc0333a476a6434e3",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/live_http_disconnect_cancels_provider_request_like_go.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "live_http_disconnect_cancels_provider_request_like_go.json",
+      "target": "darwin-arm64",
+      "sha256": "9a01f84c67e6f58b34d5e4f5de8a7a45817ccf256626bcc347a5c207df9bcf73",
+      "bytes": 33105,
+      "original_sha256": "9a01f84c67e6f58b34d5e4f5de8a7a45817ccf256626bcc347a5c207df9bcf73",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/native_bind_failures_match_checked_out_go.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "native_bind_failures_match_checked_out_go.json",
+      "target": "darwin-arm64",
+      "sha256": "30e776173bfdfbb10743d646b6c976a2352e3e6a3ace74dc6b91849daae09f6b",
+      "bytes": 31336,
+      "original_sha256": "30e776173bfdfbb10743d646b6c976a2352e3e6a3ace74dc6b91849daae09f6b",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "obs_text_origin_rejection_matches_go_and_rust_processes.json",
+      "target": "darwin-arm64",
+      "sha256": "52a76f946944456cefb3d2d0919d2f67b98583743edbe840898a7c459ed52dca",
+      "bytes": 31078,
+      "original_sha256": "52a76f946944456cefb3d2d0919d2f67b98583743edbe840898a7c459ed52dca",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "occupied_bind_error_matches_go_for_ipv4_and_ipv6.json",
+      "target": "darwin-arm64",
+      "sha256": "767d71ced4c032957c7829ff9221095479a30bf20b2808f8b37b582e95d768be",
+      "bytes": 31056,
+      "original_sha256": "767d71ced4c032957c7829ff9221095479a30bf20b2808f8b37b582e95d768be",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json",
+      "target": "darwin-arm64",
+      "sha256": "03f014a72e74d009d95a20d0c9d9a7bb26b4263970f6f76dc5dcd1f7115c1db4",
+      "bytes": 30876,
+      "original_sha256": "03f014a72e74d009d95a20d0c9d9a7bb26b4263970f6f76dc5dcd1f7115c1db4",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-aux/darwin-arm64/unavailable_local_address_error_matches_go.json": {
+      "artifact_id": 11560188310,
+      "run_id": 37796706488,
+      "zip_sha256": "3c8958c4a37f2fdc920e2a30ff74ea9405515d84879a04804568e28b927f289e",
+      "member": "unavailable_local_address_error_matches_go.json",
+      "target": "darwin-arm64",
+      "sha256": "b2087186dafc389e819f614984bb62df944ba5e91ddb311926b06234d51bbe5e",
+      "bytes": 30918,
+      "original_sha256": "b2087186dafc389e819f614984bb62df944ba5e91ddb311926b06234d51bbe5e",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/darwin-arm64/campaign.json": {
+      "artifact_id": 11561860771,
+      "run_id": 37796278728,
+      "zip_sha256": "e74a053134b6719fa6ea3927664edb83a44009ad8f14a10d36b78d035a646dba",
+      "member": "campaign.json",
+      "target": "darwin-arm64",
+      "sha256": "643a9e2f50727e8b63fc434f077ecbaa99a766860d1856b1ce4a307de87bd33d",
+      "bytes": 35341,
+      "original_sha256": "643a9e2f50727e8b63fc434f077ecbaa99a766860d1856b1ce4a307de87bd33d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/darwin-arm64/transport.json": {
+      "artifact_id": 11561860771,
+      "run_id": 37796278728,
+      "zip_sha256": "e74a053134b6719fa6ea3927664edb83a44009ad8f14a10d36b78d035a646dba",
+      "member": "transport.json",
+      "target": "darwin-arm64",
+      "sha256": "2221b86b526bb04a6ad05b4aa503a10632997d811af3e069fa786b178129de20",
+      "bytes": 42741,
+      "original_sha256": "2221b86b526bb04a6ad05b4aa503a10632997d811af3e069fa786b178129de20",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/darwin-amd64/agent-error.json": {
+      "artifact_id": 11561855253,
+      "run_id": 37796278728,
+      "zip_sha256": "49e56412b9183b16c72874e471be7d3330f28e170492b852e794e60fb7064bcc",
+      "member": "agent-error.json",
+      "target": "darwin-amd64",
+      "sha256": "e2466409c9177b2edba5fed5ac9dd347c1ed3a3037eb198c1180724f7a5498a6",
+      "bytes": 32265,
+      "original_sha256": "e2466409c9177b2edba5fed5ac9dd347c1ed3a3037eb198c1180724f7a5498a6",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/darwin-amd64/campaign.json": {
+      "artifact_id": 11561845299,
+      "run_id": 37796278728,
+      "zip_sha256": "d33fc54118c759568b28be98ec35148af53122bfed693706bd8fc38da301caed",
+      "member": "campaign.json",
+      "target": "darwin-amd64",
+      "sha256": "9e8f521074d20d22466547a2065afbaae7cd2074c22c8ee3ffcab49b2d782386",
+      "bytes": 35339,
+      "original_sha256": "9e8f521074d20d22466547a2065afbaae7cd2074c22c8ee3ffcab49b2d782386",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/smtp/darwin-amd64/transport.json": {
+      "artifact_id": 11561845299,
+      "run_id": 37796278728,
+      "zip_sha256": "d33fc54118c759568b28be98ec35148af53122bfed693706bd8fc38da301caed",
+      "member": "transport.json",
+      "target": "darwin-amd64",
+      "sha256": "ade251346009ed37ea217738f3e4ec5611fb6b4169004d9156d65217d9a5ca89",
+      "bytes": 42739,
+      "original_sha256": "ade251346009ed37ea217738f3e4ec5611fb6b4169004d9156d65217d9a5ca89",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-amd64/senderless-email.json": {
+      "artifact_id": 11561691109,
+      "run_id": 37796278728,
+      "zip_sha256": "68da9dea544fb73853d9f4785b091c9e4635ec324cf0267900132b15f4e8ed16",
+      "member": "senderless-email.json",
+      "target": "darwin-amd64",
+      "sha256": "55c6a510f177c3e514918c3d0bae23b4ad1c35c283fae645d47c4b8814f2d953",
+      "bytes": 30985,
+      "original_sha256": "55c6a510f177c3e514918c3d0bae23b4ad1c35c283fae645d47c4b8814f2d953",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-amd64/web-form.json": {
+      "artifact_id": 11561691109,
+      "run_id": 37796278728,
+      "zip_sha256": "68da9dea544fb73853d9f4785b091c9e4635ec324cf0267900132b15f4e8ed16",
+      "member": "web-form.json",
+      "target": "darwin-amd64",
+      "sha256": "16cab4e196bfca3067bfb202549c123b5f56fac8ecb6e8688176721b978b048d",
+      "bytes": 31918,
+      "original_sha256": "16cab4e196bfca3067bfb202549c123b5f56fac8ecb6e8688176721b978b048d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/darwin-amd64/headers.json": {
+      "artifact_id": 11561626240,
+      "run_id": 37796278728,
+      "zip_sha256": "51195397e75f21773abaa2dff6fc5872dee8e3f24d603c0a4b683846b37e57f1",
+      "member": "headers.json",
+      "target": "darwin-amd64",
+      "sha256": "bc023c7f4918d0af629d4bdd686067a92e81c0a1ae44c459fc3f14c73bbd798d",
+      "bytes": 39346,
+      "original_sha256": "bc023c7f4918d0af629d4bdd686067a92e81c0a1ae44c459fc3f14c73bbd798d",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-wire/darwin-amd64/wire.json": {
+      "artifact_id": 11561626237,
+      "run_id": 37796278728,
+      "zip_sha256": "22f81820d0cd2374c8776be0c74cfb2029dc5606beca799f916754260db313c5",
+      "member": "wire.json",
+      "target": "darwin-amd64",
+      "sha256": "53425039e41f698cf26b2fdf6d11abb054e30daa9212fa1a8f4cdeda9487cdd8",
+      "bytes": 38696,
+      "original_sha256": "53425039e41f698cf26b2fdf6d11abb054e30daa9212fa1a8f4cdeda9487cdd8",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-arm64/senderless-email.json": {
+      "artifact_id": 11561616855,
+      "run_id": 37796278728,
+      "zip_sha256": "39ae7deb3297da5dbe02600d0b2d3bb0d4ef413434ae0a752629705438bdf282",
+      "member": "senderless-email.json",
+      "target": "darwin-arm64",
+      "sha256": "a19aaca0873dac0a2453eb74c62db2c98cb61a24ae0162f14f630a17ba9c5046",
+      "bytes": 30987,
+      "original_sha256": "a19aaca0873dac0a2453eb74c62db2c98cb61a24ae0162f14f630a17ba9c5046",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-arm64/web-form.json": {
+      "artifact_id": 11561616855,
+      "run_id": 37796278728,
+      "zip_sha256": "39ae7deb3297da5dbe02600d0b2d3bb0d4ef413434ae0a752629705438bdf282",
+      "member": "web-form.json",
+      "target": "darwin-arm64",
+      "sha256": "8f62d4543d37828dde3779af4ad3c15863ba593e1076976bc40b1445ca619028",
+      "bytes": 31920,
+      "original_sha256": "8f62d4543d37828dde3779af4ad3c15863ba593e1076976bc40b1445ca619028",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/agent-error/darwin-arm64/agent-error.json": {
+      "artifact_id": 11561062562,
+      "run_id": 37796278728,
+      "zip_sha256": "4ee1684bcfb8248ea9110f23dd21c0fd6a5927e30f6b15b1cc0f67acc9f056d7",
+      "member": "agent-error.json",
+      "target": "darwin-arm64",
+      "sha256": "24b158a4f77c4bf9dd55cac408d71918dad1117af32b7f8d374c797dddb37821",
+      "bytes": 32266,
+      "original_sha256": "24b158a4f77c4bf9dd55cac408d71918dad1117af32b7f8d374c797dddb37821",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-amd64/cli.json": {
+      "artifact_id": 11560951966,
+      "run_id": 37796278728,
+      "zip_sha256": "91c64ef033147a20ae486431ee00b54b0284a54172000cdd64e2dbb09bf4c39c",
+      "member": "cli.json",
+      "target": "darwin-amd64",
+      "sha256": "b95315462e1e60a6bd542db4efa9513d07931b7e7fe48032bd920d450a82eed0",
+      "bytes": 47338,
+      "original_sha256": "b95315462e1e60a6bd542db4efa9513d07931b7e7fe48032bd920d450a82eed0",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-amd64/mcp.json": {
+      "artifact_id": 11560951966,
+      "run_id": 37796278728,
+      "zip_sha256": "91c64ef033147a20ae486431ee00b54b0284a54172000cdd64e2dbb09bf4c39c",
+      "member": "mcp.json",
+      "target": "darwin-amd64",
+      "sha256": "6d3c2c539404d6095da9860800ee527252a0ccf8185d7a8b6dbe6ed451447e1a",
+      "bytes": 46080,
+      "original_sha256": "6d3c2c539404d6095da9860800ee527252a0ccf8185d7a8b6dbe6ed451447e1a",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-arm64/cli.json": {
+      "artifact_id": 11560732845,
+      "run_id": 37796278728,
+      "zip_sha256": "f1ed4142d9fc07933246f3042dfeec81e22b9e2f287bd7d3aa5b8d7346c105d3",
+      "member": "cli.json",
+      "target": "darwin-arm64",
+      "sha256": "2538992712b771b3d37c58b027cecfec61d7852d06c2c6e874595e52f3994ad8",
+      "bytes": 47340,
+      "original_sha256": "2538992712b771b3d37c58b027cecfec61d7852d06c2c6e874595e52f3994ad8",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-arm64/mcp.json": {
+      "artifact_id": 11560732845,
+      "run_id": 37796278728,
+      "zip_sha256": "f1ed4142d9fc07933246f3042dfeec81e22b9e2f287bd7d3aa5b8d7346c105d3",
+      "member": "mcp.json",
+      "target": "darwin-arm64",
+      "sha256": "fa84e56bc39b333f96043043354c3a2caad1dd98d234fba4ce5865732a3778af",
+      "bytes": 46082,
+      "original_sha256": "fa84e56bc39b333f96043043354c3a2caad1dd98d234fba4ce5865732a3778af",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-wire/darwin-arm64/wire.json": {
+      "artifact_id": 11560568119,
+      "run_id": 37796278728,
+      "zip_sha256": "a9cb4974a051bc13c35a81acf99cad59d3179fc17b94d0e27cf1d3aee7cdc374",
+      "member": "wire.json",
+      "target": "darwin-arm64",
+      "sha256": "0e62888c017f925082019c07012ab0c6f248ecf7bb48d1a5ed3c949c53c2cdee",
+      "bytes": 38698,
+      "original_sha256": "0e62888c017f925082019c07012ab0c6f248ecf7bb48d1a5ed3c949c53c2cdee",
+      "changed_json_paths": []
+    },
+    "tests/fixtures/go-frozen/refresh-411b5c10/http-headers/darwin-arm64/headers.json": {
+      "artifact_id": 11560438628,
+      "run_id": 37796278728,
+      "zip_sha256": "8416c5dae02ca8f7bf5f476d578adb10ea0fe9bb70e7da415bfb7e11c9cafd7e",
+      "member": "headers.json",
+      "target": "darwin-arm64",
+      "sha256": "0165c741ec62d9b4f3a4a5746d5d64bc3dbd71fb6295d5276d17193126b04637",
+      "bytes": 39348,
+      "original_sha256": "0165c741ec62d9b4f3a4a5746d5d64bc3dbd71fb6295d5276d17193126b04637",
+      "changed_json_paths": []
+    }
+  },
+  "native_replay_approved": false
+}

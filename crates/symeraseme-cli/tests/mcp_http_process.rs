@@ -1464,9 +1464,9 @@ fn startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness() {
         std::fs::create_dir_all(&data).unwrap();
         std::fs::write(data.join("mcp_token"), "stale-token").unwrap();
 
-        let mut port = free_port();
-        let occupied = TcpListener::bind(("127.0.0.1", port)).unwrap();
-        let occupied_port = occupied.local_addr().unwrap().port();
+        let occupied = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let mut port = occupied.local_addr().unwrap().port();
+        let occupied_port = port;
         let foreign = start_stale_token_listener(occupied);
         let stale_probe_deadline = Instant::now() + Duration::from_secs(5);
         while !accepts_current_token(port, case.path()) {
