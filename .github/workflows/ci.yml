@@ -17,8 +17,76 @@ permissions:
   contents: read
 
 jobs:
+  icon-inputs:
+    name: Icon compile input selector
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.icon-inputs.outputs.run }}
+    steps:
+      - name: Checkout PR history for exact base/head comparison
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify icon compilation inputs
+        id: icon-inputs
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # ICON_INPUT_SELECTOR_BEGIN
+          set -euo pipefail
+          : "${BASE_SHA:?pull_request base SHA is required}"
+          : "${HEAD_SHA:?pull_request head SHA is required}"
+          : "${GITHUB_OUTPUT:?GitHub output file is required}"
+          : "${RUNNER_TEMP:?runner temp directory is required}"
+
+          for sha in "$BASE_SHA" "$HEAD_SHA"; do
+            if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              printf 'Invalid pull_request commit SHA: %s\n' "$sha" >&2
+              exit 1
+            fi
+            if ! git cat-file -e "${sha}^{commit}"; then
+              printf 'Missing pull_request commit object: %s\n' "$sha" >&2
+              exit 1
+            fi
+          done
+
+          changed_paths="$(mktemp "$RUNNER_TEMP/icon-inputs.XXXXXX")"
+          trap 'rm -f "$changed_paths"' EXIT
+          if ! git diff --no-renames --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"; then
+            printf 'Could not classify pull_request icon inputs.\n' >&2
+            exit 1
+          fi
+
+          run_icon_compile=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              assets/branding/AppIcon.icon/*|\
+              assets/branding/AppIcon.icns|\
+              assets/branding/AppIcon.sha256|\
+              scripts/test-app-icon.sh|\
+              scripts/verify-app-icon.sh|\
+              .github/workflows/ci.yml)
+                run_icon_compile=true
+                break
+                ;;
+            esac
+          done < "$changed_paths"
+
+          printf 'run=%s\n' "$run_icon_compile" >> "$GITHUB_OUTPUT"
+          # ICON_INPUT_SELECTOR_END
+
   icon-compile:
     name: app icon compile
+    needs: [icon-inputs]
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' ||
+       needs.icon-inputs.result != 'success' ||
+       needs.icon-inputs.outputs.run != 'false')
     runs-on: macos-26
     steps:
       - name: Checkout
