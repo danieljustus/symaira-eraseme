@@ -50,7 +50,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          go-version: '1.26.9'
       - name: Install golangci-lint
         # Without this the lint target would fall back to `go vet` and the
         # linters configured in .golangci.yml would never run.
@@ -69,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          go-version: '1.26.9'
       - name: Build and test
         run: |
           make build
@@ -85,7 +85,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          go-version: '1.26.9'
       - name: Validate embedded registry
         run: |
           make build
@@ -102,7 +102,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          go-version: '1.26.9'
       - name: Audit Go dependencies
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 

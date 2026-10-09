@@ -28,7 +28,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: '1.26.6'
+  GO_VERSION: '1.26.9'
   CGO_ENABLED: '0'
   # Pinned so the lint gate cannot drift from the configuration in .golangci.yml.
   GOLANGCI_LINT_VERSION: 'v2.13.2'

@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          go-version: '1.26.9'
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal
@@ -49,7 +49,7 @@ jobs:
       - name: Download actual Go modules and verify clean source
         shell: bash
         run: |
-          GOTOOLCHAIN=go1.26.6 go mod download
+          GOTOOLCHAIN=go1.26.9 go mod download
           test -z "$(git status --porcelain --untracked-files=normal)"
       - name: Capture every auxiliary comparison against actual native Go
         shell: bash
