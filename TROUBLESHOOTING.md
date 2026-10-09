@@ -12,8 +12,10 @@ symeraseme version
 ```
 
 For a source build of the current Rust-only candidate, run `make build-rust` from
-the repository root. The binary is `build/rust/debug/symeraseme-rust`; this
-candidate is not yet a published Rust-only release.
+the repository root. The binary is `build/rust/debug/symeraseme-rust`. Published
+Rust-only binaries are available in the
+[`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0);
+`v0.12.1` remains the latest stable release and Homebrew version.
 
 ## MCP server cannot start
 
@@ -120,8 +122,9 @@ files for diagnosis.
 
 The GUI requires a full Xcode installation, not Command Line Tools alone. For a
 local DMG from the current source-tree candidate, the package version in
-`Cargo.toml` is `0.14.0`; this is an unreleased candidate version, not a claim
-that `v0.14.0` has shipped. Build from the repository root with full Xcode:
+`Cargo.toml` is `0.14.0`. A Rust-only canary DMG is published in the
+[`v0.14.0` prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
+To produce a local build instead, run from the repository root with full Xcode:
 
 ```bash
 ./app/SymairaEraseMe/build.sh
@@ -129,9 +132,11 @@ VERSION=0.14.0 ./scripts/package-dmg.sh
 ```
 
 The current candidate app bundle contains `Symaira EraseMe.app/Contents/MacOS/symeraseme`.
-A local build may be ad-hoc signed; the release workflow records whether Developer
-ID signing, notarization, and stapling were completed. An ad-hoc DMG is not
-Gatekeeper-ready.
+A local build may be ad-hoc signed. The published `v0.14.0` canary DMG completed
+Developer ID signing, notarization, stapling and attestation in the release
+workflow; an ad-hoc local DMG is not Gatekeeper-ready. Canary publication does
+not complete stable acceptance, the seven-day post-stable observation or the
+separate Go-source retirement approval.
 
 ## Windows source build
 
