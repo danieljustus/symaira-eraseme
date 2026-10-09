@@ -15,10 +15,12 @@ data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
 an authenticated MCP JSON-RPC interface.
 
 **Current source tree:** Rust-only CLI and native SwiftUI macOS app candidate.
-This Rust-only package layout is not yet a published release. The published
-`v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the latest stable
-release. The Go implementation remains temporarily as a development oracle for
-conformance checks until the separate CUT-005 retirement.
+The Rust-only package layout is published in the
+[`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
+The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
+latest stable release. Stable acceptance and the seven-day post-stable
+observation remain open under CUT-004. The Go implementation remains temporarily
+as a development oracle until the separately approved CUT-005 retirement.
 
 **Status:** Beta. Core planning, event tracking, deadline handling, registry
 validation, inbox triage, reports, and the MCP/CLI contracts are implemented.
@@ -35,7 +37,7 @@ Some broker-specific web flows still require manual review.
 - Shared Rust LLM provider layer for reply classification and rebuttal generation.
 - Local MCP HTTP JSON-RPC server with 26 catalogued tools and Bearer-token auth.
 - AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.
-- Native SwiftUI dashboard for macOS. The unreleased Rust-only candidate DMG stages the Rust CLI/MCP server.
+- Native SwiftUI dashboard for macOS. The published `v0.14.0` canary DMG bundles the Rust CLI/MCP server.
 
 ## Install
 
@@ -51,19 +53,20 @@ symeraseme version
 
 Download the archive for the published version you choose from
 [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases).
-The published `v0.13.0` prerelease is dual-backend; `v0.12.1` is the latest
-stable release. The Rust-only archive layout describes the unreleased candidate
-in this source tree, not an available release asset. Previously published
-`v0.13.0` assets are immutable. Canary builds reach Homebrew only after they
-are promoted to a stable release.
+The `v0.14.0` canary archives contain only the Rust CLI; no Go rollback binary
+or legacy backend selector is distributed. The historical `v0.13.0` prerelease
+is dual-backend and its assets are immutable; `v0.12.1` is the latest stable
+release. Canary builds reach Homebrew only after stable promotion and the
+release gates pass.
 
 ### macOS GUI
 
-The current source checkout's versioned `Symaira-EraseMe-<version>-macos.dmg`
-build stages the Rust CLI/MCP server for the unreleased candidate. This does not
-change the already-published `v0.13.0` assets. Release notes identify whether
-Developer ID signing, notarization, and stapling were completed. No GUI
-Homebrew cask is configured; install the macOS app from its DMG.
+Install the macOS app from the
+[`v0.14.0` canary DMG](https://github.com/danieljustus/symaira-eraseme/releases/download/v0.14.0/Symaira-EraseMe-0.14.0-macos.dmg).
+It bundles only the Rust CLI/MCP server and was Developer ID signed, notarized,
+stapled and attested by the release workflow. Local builds may be ad-hoc signed
+and are not equivalent to that published artifact. Historical `v0.13.0` assets
+remain unchanged. No GUI Homebrew cask is configured.
 
 ### Migration from the pre-cutover installation
 
@@ -219,10 +222,11 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
 
 No GUI Homebrew cask is configured; the macOS GUI is distributed as a DMG.
 Previously published `v0.13.0` dual-backend prerelease assets remain unchanged;
-`v0.12.1` is the latest stable release. The Rust-only source-tree candidate has
-not been published, and future release assets will use its Rust-only package
-layout. The historical `python-final` tag remains available for migration and
-recovery.
+`v0.12.1` is the latest stable release. The published `v0.14.0` canary uses the
+Rust-only package layout. Canary publication does not complete CUT-004 stable
+acceptance and its seven-day observation, or authorize CUT-005 Go-source
+retirement. The historical `python-final` tag remains available for migration
+and recovery.
 
 ## Documentation
 

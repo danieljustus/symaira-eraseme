@@ -6,9 +6,12 @@ This document freezes the MCP tool surface used by the SwiftUI app and records
 the Go-port baseline for milestone v1.0.0. It is a historical interface
 contract, not a statement that the Go server is the current product runtime.
 The current source-tree implementation is Rust; Go remains only as a development
-oracle for conformance checks. The published `v0.13.0` prerelease remains
-dual-backend, and the Rust-only package is an unreleased candidate. The
-pre-cutover implementation is preserved at the `python-final` tag for
+oracle for conformance checks. The Rust-only package is published as the
+[`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
+The historical `v0.13.0` prerelease remains dual-backend and immutable;
+`v0.12.1` is the latest stable release. Canary publication does not complete
+stable acceptance, seven-day post-stable observation or separate Go-source
+retirement approval. The pre-cutover implementation is preserved at the `python-final` tag for
 historical comparison. Nothing here is invented — every schema is extracted
 from and verified against the committed contract.
 
