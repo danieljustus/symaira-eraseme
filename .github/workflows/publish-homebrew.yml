@@ -34,12 +34,34 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run || false }}
     steps:
       - name: Validate release and publisher credential
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           case "$RELEASE_TAG" in
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "::error::Invalid release tag: $RELEASE_TAG"; exit 1 ;;
           esac
+          if [ "${DRY_RUN:-false}" != true ]; then
+            if [ -z "${GH_TOKEN:-}" ]; then
+              echo "::error::GITHUB_TOKEN is required to verify the release state."
+              exit 1
+            fi
+            if ! release_json="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"; then
+              echo "::error::Unable to read GitHub release $RELEASE_TAG."
+              exit 1
+            fi
+            if ! jq --exit-status --arg expected_tag "$RELEASE_TAG" '
+              type == "object"
+              and .tag_name == $expected_tag
+              and .draft == false
+              and .prerelease == false
+              and .immutable == true
+            ' <<<"$release_json" >/dev/null; then
+              echo "::error::Release $RELEASE_TAG must be the exact stable immutable release."
+              exit 1
+            fi
+          fi
           if [ "${DRY_RUN:-false}" != true ] && [ -z "${HOMEBREW_TAP_GITHUB_TOKEN:-}" ]; then
             echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is not configured."
             exit 1
