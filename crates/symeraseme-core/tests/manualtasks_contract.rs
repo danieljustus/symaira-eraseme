@@ -5,10 +5,10 @@
 //! and the resulting request state, list filtering, completion notes, and the
 //! cleanup counts.
 //!
-//! `SYMERASEME_DATA_DIR` is process-wide, so the tests that redirect the
-//! artifact directory take a mutex and restore the previous value.
+//! `SYMERASEME_DATA_DIR` is process-wide, so tests that redirect the artifact
+//! directory run in an isolated child with the variable set before it starts.
 
-use std::sync::{Mutex, MutexGuard};
+use std::process::Command;
 
 use chrono::{DateTime, Utc};
 use symeraseme_core::manualtasks::{
@@ -19,39 +19,30 @@ use symeraseme_core::storage::repository::Repository;
 use symeraseme_core::storage::store::Store;
 use tempfile::{TempDir, tempdir};
 
-static DATA_DIR_LOCK: Mutex<()> = Mutex::new(());
+const DATA_DIR_CHILD: &str = "SYMERASEME_MANUALTASKS_DATA_DIR_CHILD";
 
-/// Redirects the artifact directory for the duration of one test.
-struct DataDir {
-    _guard: MutexGuard<'static, ()>,
-    previous: Option<String>,
-}
-
-impl DataDir {
-    fn set(path: &std::path::Path) -> Self {
-        let guard = DATA_DIR_LOCK
-            .lock()
-            .unwrap_or_else(|error| error.into_inner());
-        let previous = std::env::var("SYMERASEME_DATA_DIR").ok();
-        // SAFETY: the mutex serialises every test that touches this variable.
-        unsafe { std::env::set_var("SYMERASEME_DATA_DIR", path) };
-        Self {
-            _guard: guard,
-            previous,
-        }
+/// Runs the selected test in a child that owns its artifact-directory env.
+fn run_in_data_dir_child(test_name: &str) -> bool {
+    if std::env::var_os(DATA_DIR_CHILD).is_some() {
+        return true;
     }
-}
 
-impl Drop for DataDir {
-    fn drop(&mut self) {
-        // SAFETY: see `set`.
-        unsafe {
-            match &self.previous {
-                Some(value) => std::env::set_var("SYMERASEME_DATA_DIR", value),
-                None => std::env::remove_var("SYMERASEME_DATA_DIR"),
-            }
-        }
-    }
+    let directory = tempdir().expect("data dir fixture");
+    let executable = std::env::current_exe().expect("current test executable");
+    let output = Command::new(executable)
+        .args(["--exact", test_name, "--nocapture"])
+        .env(DATA_DIR_CHILD, "1")
+        .env("SYMERASEME_DATA_DIR", directory.path())
+        .output()
+        .unwrap_or_else(|error| panic!("spawn manualtasks test child `{test_name}`: {error}"));
+    assert!(
+        output.status.success(),
+        "manualtasks test child `{test_name}` failed with {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    false
 }
 
 fn pinned_now() -> DateTime<Utc> {
@@ -99,8 +90,10 @@ fn mode_of(path: &str) -> u32 {
 
 #[test]
 fn create_persists_redacted_task_and_human_action() {
-    let (tree, store, request_id) = store_with_request();
-    let _data_dir = DataDir::set(tree.path());
+    if !run_in_data_dir_child("create_persists_redacted_task_and_human_action") {
+        return;
+    }
+    let (_tree, store, request_id) = store_with_request();
 
     let task = create(
         &store,
@@ -155,8 +148,10 @@ fn create_persists_redacted_task_and_human_action() {
 
 #[test]
 fn list_filters_and_complete_appends_note() {
-    let (tree, store, request_id) = store_with_request();
-    let _data_dir = DataDir::set(tree.path());
+    if !run_in_data_dir_child("list_filters_and_complete_appends_note") {
+        return;
+    }
+    let (_tree, store, request_id) = store_with_request();
 
     let first = create(
         &store,
@@ -232,8 +227,9 @@ fn cleanup_dry_run_then_apply() {
 
 #[test]
 fn save_screenshot_ignores_empty_and_writes_private_files() {
-    let tree = tempdir().expect("temp dir");
-    let _data_dir = DataDir::set(tree.path());
+    if !run_in_data_dir_child("save_screenshot_ignores_empty_and_writes_private_files") {
+        return;
+    }
 
     assert_eq!(
         save_screenshot(&[], pinned_now()).expect("empty screenshot"),
