@@ -29,13 +29,13 @@ jobs:
     name: Prepare Homebrew CLI Formula
     runs-on: ubuntu-latest
     env:
-      HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
       DRY_RUN: ${{ inputs.dry_run || false }}
     steps:
       - name: Validate release and publisher credential
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: &verify_release |
           set -euo pipefail
           case "$RELEASE_TAG" in
@@ -71,8 +71,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: danieljustus/homebrew-tap
-          # The public tap is only read in a dry run; the write token is used to publish.
-          token: ${{ inputs.dry_run && github.token || secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          # Preparation only reads the public tap; no write credential is needed.
+          token: ${{ github.token }}
+          persist-credentials: false
           path: tap
           fetch-depth: 0
 
@@ -195,7 +196,6 @@ jobs:
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       TAP_REPOSITORY: danieljustus/homebrew-tap
       RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
     steps:
@@ -219,6 +219,8 @@ jobs:
           path: ${{ runner.temp }}/formula
       - name: Publish updated Formula
         if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cp "$RUNNER_TEMP/formula/symeraseme.rb" tap/Formula/symeraseme.rb

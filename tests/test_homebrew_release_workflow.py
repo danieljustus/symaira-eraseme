@@ -155,8 +155,9 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         checkout_start = self.workflow.index(checkout_marker)
         checkout_end = self.workflow.find("\n      - name:", checkout_start + len(checkout_marker))
         checkout_step = self.workflow[checkout_start:checkout_end]
-        self.assertIn("token: ${{ inputs.dry_run && github.token || secrets.HOMEBREW_TAP_GITHUB_TOKEN }}",
-                      checkout_step)
+        self.assertIn("token: ${{ github.token }}", checkout_step)
+        self.assertIn("persist-credentials: false", checkout_step)
+        self.assertNotIn("secrets.HOMEBREW_TAP_GITHUB_TOKEN", checkout_step)
 
         publish_marker = "      - name: Publish updated Formula\n"
         publish_start = self.workflow.index(publish_marker)
@@ -184,12 +185,18 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         # Labelled local git/gh fixtures; no actual repository or API writes.
         prepare, publication = self.workflow.split("\n  publish-tap:\n", 1)
         self.assertNotIn("git -C tap push", prepare)
+        self.assertNotIn("secrets.HOMEBREW_TAP_GITHUB_TOKEN", prepare.split("    steps:\n", 1)[0])
+        self.assertEqual(prepare.count("secrets.HOMEBREW_TAP_GITHUB_TOKEN"), 1)
+        self.assertIn("HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}",
+                      self.validation_step)
+        self.assertNotIn("secrets.HOMEBREW_TAP_GITHUB_TOKEN", publication.split("    steps:\n", 1)[0])
         self.assertIn("    needs: install-check\n", publication)
         self.assertIn("        os: [macos-14, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
         self.assertIn("    if: ${{ !inputs.dry_run }}\n", publication)
         self.assertIn("          DRY_RUN: 'false'\n        run: *verify_release\n", publication)
         self.assertLess(publication.index("run: *verify_release"), publication.index("Checkout tap"))
         step = publication.split("      - name: Publish updated Formula\n", 1)[1]
+        self.assertIn("GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}", step)
         shell = step.split("        run: |\n", 1)[1]
         script = "\n".join(line[10:] if line else "" for line in shell.splitlines())
         (self.root / "tap/Formula").mkdir(parents=True)
