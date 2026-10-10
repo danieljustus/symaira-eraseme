@@ -1,7 +1,9 @@
 """Executable guards for Homebrew release publication."""
+import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 from typing import Optional
@@ -170,6 +172,48 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         download_end = self.workflow.find("\n      - name:", download_start + len(download_marker))
         download_step = self.workflow[download_start:download_end]
         self.assertIn("releases/download/${RELEASE_TAG}", download_step)
+
+    def test_renderer_avoids_redundant_version_and_native_checks_audit_it(self):
+        # Labelled local byte fixtures exercise the actual renderer, not release assets.
+        assets = self.root / "symeraseme-assets"
+        assets.mkdir()
+        expected = {}
+        for target in ("darwin_arm64", "darwin_amd64", "linux_arm64", "linux_amd64"):
+            name = f"symeraseme_0.14.1_{target}.tar.gz"
+            data = f"labelled renderer fixture: {target}\n".encode()
+            (assets / name).write_bytes(data)
+            expected[name] = hashlib.sha256(data).hexdigest()
+        # shasum is the native macOS equivalent of the runner's sha256sum.
+        checksum = self.bin / "sha256sum"
+        checksum.write_text('#!/bin/sh\nexec shasum -a 256 "$@"\n')
+        checksum.chmod(0o755)
+        env = {"PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+               "HOME": str(self.root), "RUNNER_TEMP": str(self.root),
+               "TMPDIR": os.environ.get("TMPDIR", str(self.root)),
+               "RELEASE_TAG": "v0.14.1", "GITHUB_REPOSITORY": "danieljustus/symaira-eraseme"}
+        subprocess.run(["git", "init", "--quiet", "tap"], cwd=self.root, env=env,
+                       check=True, capture_output=True, timeout=5)
+        render = self.workflow.split("      - name: Render and validate Formula\n", 1)[1]
+        render = render.split("      - name: Retain the rendered Formula\n", 1)[0]
+        shell = render.split("        run: |\n", 1)[1]
+        script = "\n".join(line[10:] if line else "" for line in shell.splitlines())
+        result = subprocess.run(["bash", "-c", script], cwd=self.root, env=env,
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        formula = (self.root / "tap/Formula/symeraseme.rb").read_text()
+        self.assertNotRegex(formula, r"(?m)^\s*version\s")
+        self.assertIn('system bin/"symeraseme", "version"', formula)
+        pairs = re.findall(r'url "([^\"]+)"\s+sha256 "([0-9a-f]{64})"', formula)
+        base = "https://github.com/danieljustus/symaira-eraseme/releases/download/v0.14.1/"
+        self.assertEqual(len(pairs), 4)
+        self.assertEqual(set(pairs), {(base + name, digest) for name, digest in expected.items()})
+        install = self.workflow.split("  install-check:\n", 1)[1].split("  publish-tap:\n", 1)[0]
+        audit = "brew audit --strict --formula local/symeraseme-check/symeraseme"
+        self.assertIn(audit, install)
+        self.assertLess(install.index(audit), install.index("brew install --formula"))
+        self.assertIn("brew info --json=v2 --formula local/symeraseme-check/symeraseme", install)
+        self.assertIn(".formulae[0].versions.stable", install)
+        self.assertIn('= "$version"', install)
 
     def test_release_state_guard_runs_before_any_tap_checkout(self):
         checkout_index = self.workflow.index("      - name: Checkout Homebrew tap\n")

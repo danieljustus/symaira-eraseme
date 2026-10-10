@@ -114,7 +114,6 @@ jobs:
           class Symeraseme < Formula
             desc "Automated GDPR/CCPA data broker removal CLI"
             homepage "https://github.com/danieljustus/symaira-eraseme"
-            version "$VERSION"
             license "Apache-2.0"
 
             on_macos do
@@ -142,13 +141,12 @@ jobs:
             end
 
             test do
-              system "#{bin}/symeraseme", "version"
+              system bin/"symeraseme", "version"
             end
           end
           EOF
           ruby -c "$FORMULA"
           git -C tap diff --check
-          grep -q "version \"$VERSION\"" "$FORMULA"
 
       - name: Retain the rendered Formula
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -181,10 +179,12 @@ jobs:
           set -euo pipefail
           brew tap-new --no-git local/symeraseme-check
           cp "$RUNNER_TEMP/formula/symeraseme.rb" "$(brew --repository local/symeraseme-check)/Formula/"
+          brew audit --strict --formula local/symeraseme-check/symeraseme
+          version="${RELEASE_TAG#v}"
+          test "$(brew info --json=v2 --formula local/symeraseme-check/symeraseme | jq -r '.formulae[0].versions.stable')" = "$version"
           brew install --formula local/symeraseme-check/symeraseme
           brew test local/symeraseme-check/symeraseme
           prefix="$(brew --prefix)"
-          version="${RELEASE_TAG#v}"
           test "$("$prefix/bin/symeraseme" --version)" = "symeraseme version $version"
           test ! -e "$prefix/bin/symeraseme-go"
     env:
