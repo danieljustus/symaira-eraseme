@@ -188,8 +188,10 @@ impl<K: KeyringBackend> MasterKeyResolver<K> {
     /// Key creation is explicit initialization only; persistence is mandatory,
     /// so a keyring failure fails closed without caching the new key.
     pub fn init(&mut self) -> Result<MasterKey, MasterKeyError> {
-        if let Ok(key) = self.resolve_existing() {
-            return Ok(key);
+        match self.resolve_existing() {
+            Ok(key) => return Ok(key),
+            Err(MasterKeyError::Missing) => {}
+            Err(error) => return Err(error),
         }
         let key = generate_master_key();
         self.keyring
