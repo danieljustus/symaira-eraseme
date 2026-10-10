@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.14.1] - 2026-10-10
+
+Security and release-safety patch on the Rust-only line. Publication starts as
+a canary; stable promotion requires candidate-bound acceptance. The seven-day
+post-stable observation and separate Go-source retirement are not implied.
+
+### Security
+
+- Preserve an existing identity key when configured key material is invalid;
+  create a key only when the source is genuinely missing (#1208).
+- Serialize consent-token consumption with a native lock on the existing token
+  file so overlapping authorizations cannot both succeed (#1208).
+
+### Fixed
+
+- Complete CLI archives, the signed macOS DMG, checksum manifests and
+  attestations in a draft before publishing the immutable canary. Publication
+  checks remain active with Python optimization enabled (#1213).
+- Require the exact stable, immutable release before non-dry-run Homebrew
+  publication; malformed or unavailable release state fails closed (#1210).
+- Isolate manual-task test environments in child processes without changing
+  production behavior or weakening private-file assertions (#1209).
+
+Historical `v0.13.0` and `v0.14.0` assets remain unchanged. The Go implementation
+continues only as a development oracle pending separately approved retirement.
+
 ## [v0.14.0] - 2026-10-09
 
 Canary prerelease.
