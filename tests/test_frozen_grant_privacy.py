@@ -2,8 +2,11 @@
 import copy
 import importlib.util
 import json
+import sys
+import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('privacy', ROOT / 'scripts/derive_frozen_grant_privacy.py')
@@ -12,8 +15,8 @@ privacy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(privacy)
 
 
-def synthetic_group():
-    tokens = [name.ljust(22, '0') for name in ('synthetic-grant-first', 'synthetic-grant-next')]
+def synthetic_group(label=''):
+    tokens = [name.ljust(22, '0') for name in (f'synthetic{label}-grant-first', f'synthetic{label}-grant-next')]
     assert all(len(t) == 22 for t in tokens)
     files = {}
     cases = []
@@ -36,6 +39,34 @@ def synthetic_group():
                                        'cli_grants': {'cases': cases}}, indent=2).encode()
     files['cli-schedule.stdout'] = b'{"measurement":42}\r\n'
     return files
+
+
+def synthetic_selection(directory):
+    source = directory / 'source'
+    source.mkdir()
+    selected = {}
+    for target in range(6):
+        service = f'linux-amd64/services/synthetic-{target}'
+        for name, raw in synthetic_group(str(target)).items():
+            relative = f'{service}/{name}'
+            path = source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            selected[relative] = {'bytes': len(raw), 'sha256': privacy.digest(raw)}
+    selection = json.dumps({'source_revision': 'b' * 40, 'runs': ['synthetic-run'],
+                            'selected': selected}, separators=(',', ':')).encode()
+    selection_path = directory / 'selection.json'
+    selection_path.write_bytes(selection)
+    return source, selection_path, selection, privacy.digest(selection)
+
+
+def run_main(source, selection, selection_sha, output):
+    with patch.object(sys, 'argv', ['derive_frozen_grant_privacy.py',
+                                    '--source', str(source),
+                                    '--selection', str(selection),
+                                    '--selection-sha256', selection_sha,
+                                    '--output', str(output)]):
+        privacy.main()
 
 
 class PrivacyDerivationControl(unittest.TestCase):
@@ -66,6 +97,85 @@ class PrivacyDerivationControl(unittest.TestCase):
             privacy.changed_paths({'cases': [1]}, {'cases': []})
         with self.assertRaises(ValueError):
             privacy.changed_paths({'source': 1}, {'other': 1})
+
+    def test_fail_closed_selection_and_cli_guards(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, selection_path, selection_bytes, selection_sha = synthetic_selection(root)
+
+            broken = copy.deepcopy(synthetic_group())
+            manifest = json.loads(broken['manifest.json'])
+            manifest['cli_grants']['cases'][0]['stdout']['sha256'] = '0' * 64
+            broken['manifest.json'] = json.dumps(manifest, indent=2).encode()
+            with self.assertRaises(AssertionError):
+                privacy.derive_service(broken)
+
+            with self.assertRaisesRegex(AssertionError, 'unreviewed selection manifest'):
+                privacy.derive_selection(source, selection_bytes, '0' * 64)
+
+            selected = json.loads(selection_bytes)
+            first = next(iter(selected['selected']))
+            (source / first).write_bytes((source / first).read_bytes() + b'corrupt')
+            with self.assertRaises(AssertionError):
+                privacy.derive_selection(source, selection_bytes, selection_sha)
+            (source / first).write_bytes(synthetic_group('0')[Path(first).name])
+
+            outside = root / 'outside.bin'
+            outside.write_bytes(b'synthetic outside')
+            link = source / 'source-link'
+            link.symlink_to(outside)
+            symlink_selection = json.dumps({**selected, 'selected': {
+                'source-link': {'bytes': len(outside.read_bytes()), 'sha256': privacy.digest(outside.read_bytes())}}},
+                separators=(',', ':')).encode()
+            with self.assertRaises(AssertionError):
+                privacy.derive_selection(source, symlink_selection, privacy.digest(symlink_selection))
+            link.unlink()
+
+            traversal_selection = json.dumps({**selected, 'selected': {
+                '../outside.bin': {'bytes': len(outside.read_bytes()), 'sha256': privacy.digest(outside.read_bytes())}}},
+                separators=(',', ':')).encode()
+            with self.assertRaises(AssertionError):
+                privacy.derive_selection(source, traversal_selection, privacy.digest(traversal_selection))
+
+            with self.assertRaises(AssertionError):
+                run_main(source, selection_path, selection_sha, source)
+
+            expected, receipt = privacy.derive_selection(source, selection_bytes, selection_sha)
+            valid_output = root / 'valid-output'
+            run_main(source, selection_path, selection_sha, valid_output)
+            self.assertEqual((valid_output / first).read_bytes(), expected[first])
+            self.assertEqual(set(receipt), {'source_revision', 'runs', 'original_selection_sha256',
+                                            'derivation', 'selected', 'native_replay_approved'})
+            self.assertEqual(json.loads((valid_output / 'privacy-derivation.json').read_bytes()),
+                             json.loads(json.dumps(receipt)))
+            run_main(source, selection_path, selection_sha, valid_output)
+
+            collision_output = root / 'collision-output'
+            collision = collision_output / first
+            collision.parent.mkdir(parents=True)
+            collision.write_bytes(b'preserve this synthetic file')
+            with self.assertRaises(AssertionError):
+                run_main(source, selection_path, selection_sha, collision_output)
+            self.assertEqual(collision.read_bytes(), b'preserve this synthetic file')
+
+            symlink_output = root / 'symlink-output'
+            symlink_output.mkdir()
+            protected = symlink_output / 'protected-file'
+            protected.write_bytes(b'preserve this synthetic target')
+            linked_destination = symlink_output / first
+            linked_destination.parent.mkdir(parents=True)
+            linked_destination.symlink_to(protected)
+            with self.assertRaises(AssertionError):
+                run_main(source, selection_path, selection_sha, symlink_output)
+            self.assertEqual(protected.read_bytes(), b'preserve this synthetic target')
+
+            escaped_output = root / 'escaped-output'
+            escaped_output.mkdir()
+            escaped_output.joinpath('linux-amd64').symlink_to(root / 'outside-output')
+            (root / 'outside-output').mkdir()
+            with self.assertRaises(AssertionError):
+                run_main(source, selection_path, selection_sha, escaped_output)
+            self.assertEqual(list((root / 'outside-output').iterdir()), [])
 
 
 if __name__ == '__main__':
