@@ -289,6 +289,21 @@ impl ConsentStore {
         Ok(())
     }
 
+    /// Serialize authorization on the existing token inode across processes.
+    pub(super) fn lock_token(&self, token: &str) -> Result<fs::File, ConsentError> {
+        let path = self.find_token_file(token)?;
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .map_err(|error| match error.kind() {
+                io::ErrorKind::NotFound => ConsentError::NotFound,
+                _ => ConsentError::Io(error),
+            })?;
+        file.lock()?;
+        Ok(file)
+    }
+
     /// Remove a token after successful use. Missing tokens are ignored.
     pub fn consume_token(&self, token: &str) -> Result<(), ConsentError> {
         self.consume_token_with(token, fs::remove_file)
