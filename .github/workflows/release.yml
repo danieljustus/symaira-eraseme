@@ -433,22 +433,28 @@ jobs:
                       for arch in ('amd64', 'arm64')}
           expected = archives | {name + suffix for name in archives for suffix in ('.cdx.json', '.rust-audit.json')}
           expected |= {'checksums.txt', 'sbom-checksums.txt', f'Symaira-EraseMe-{version}-macos.dmg'}
-          assert release['tag_name'] == tag and release['draft'] is True and release['prerelease'] is True
+          if release['tag_name'] != tag or release['draft'] is not True or release['prerelease'] is not True:
+              raise SystemExit('Expected the exact draft prerelease')
           assets = release['assets']
-          assert len(assets) == len(expected) and {a['name'] for a in assets} == expected
-          assert all(a['state'] == 'uploaded' for a in assets)
+          if len(assets) != len(expected) or {a['name'] for a in assets} != expected:
+              raise SystemExit('Release asset set is incomplete or duplicated')
+          if any(a['state'] != 'uploaded' for a in assets):
+              raise SystemExit('Release asset upload is incomplete')
           PY
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/complete-release"
           cd "$RUNNER_TEMP/complete-release"
           python3 - "$RUNNER_TEMP/release.json" <<'PY'
           import json, pathlib, re, sys
           names = {p.name for p in pathlib.Path('.').iterdir()}
-          assert names == {a['name'] for a in json.load(open(sys.argv[1]))['assets']}
+          if names != {a['name'] for a in json.load(open(sys.argv[1]))['assets']}:
+              raise SystemExit('Downloaded assets differ from the complete release')
           for manifest, suffixes in [('checksums.txt', ('.tar.gz', '.zip', '.dmg')), ('sbom-checksums.txt', ('.json',))]:
               entries = [line.split() for line in pathlib.Path(manifest).read_text().splitlines()]
               expected = {name for name in names if name.endswith(suffixes)}
-              assert entries and all(len(row) == 2 and re.fullmatch(r'[0-9a-f]{64}', row[0]) for row in entries)
-              assert len(entries) == len(expected) and {row[1] for row in entries} == expected
+              if not entries or any(len(row) != 2 or not re.fullmatch(r'[0-9a-f]{64}', row[0]) for row in entries):
+                  raise SystemExit(f'Malformed checksum manifest: {manifest}')
+              if len(entries) != len(expected) or {row[1] for row in entries} != expected:
+                  raise SystemExit(f'Incomplete or duplicated checksum manifest: {manifest}')
           PY
           sha256sum --check --strict checksums.txt
           sha256sum --check --strict sbom-checksums.txt

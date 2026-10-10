@@ -1,5 +1,6 @@
 """Execute the final publication step against labelled, local API fixtures."""
 import hashlib
+from itertools import product
 import json
 import os
 from pathlib import Path
@@ -25,12 +26,12 @@ class ImmutableReleasePublication(unittest.TestCase):
         self.assertIn('    needs: release-gui\n', attest)
         self.assertIn('      contents: write\n', attest)
 
-        for case in ('complete', 'published', 'stable', 'wrong-tag', 'missing-field',
+        for case, optimize in product(('complete', 'published', 'stable', 'wrong-tag', 'missing-field',
                      'missing-asset', 'duplicate-asset', 'upload-pending', 'corrupt-asset',
                      'missing-checksum', 'duplicate-checksum', 'download-omission',
                      'malformed-json', 'api-error', 'edit-error', 'mutable-readback',
-                     'wrong-tag-readback'):
-            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                     'wrong-tag-readback'), ('0', '1')):
+            with self.subTest(case=case, optimize=optimize), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 assets = root / 'assets'
                 assets.mkdir()
@@ -85,7 +86,8 @@ if args == ['api', '--method', 'GET', 'repos/fixture/product/releases/tags/v0.14
     if case == 'api-error': raise SystemExit(1)
     print('not-json' if case == 'malformed-json' else state.read_text())
 elif args[:3] == ['release', 'download', 'v0.14.1']:
-    assert args[3:] == ['--repo', 'fixture/product', '--dir', str(root / 'complete-release')]
+    if args[3:] != ['--repo', 'fixture/product', '--dir', str(root / 'complete-release')]:
+        raise SystemExit(91)
     shutil.copytree(root / 'assets', root / 'complete-release', dirs_exist_ok=True)
     if case == 'download-omission':
         (root / 'complete-release/Symaira-EraseMe-0.14.1-macos.dmg').unlink()
@@ -102,6 +104,7 @@ else:
                 env = {'PATH': str(root) + os.pathsep + os.environ['PATH'], 'HOME': str(root),
                        'RUNNER_TEMP': str(root), 'RELEASE_TAG': 'v0.14.1',
                        'GITHUB_REPOSITORY': 'fixture/product', 'GH_TOKEN': 'fixture-token',
+                       'PYTHONOPTIMIZE': optimize,
                        'FIXTURE_ROOT': str(root), 'FIXTURE_CASE': case}
                 result = subprocess.run(['bash', '-c', script], cwd=root, env=env,
                                         capture_output=True, text=True, timeout=10)
