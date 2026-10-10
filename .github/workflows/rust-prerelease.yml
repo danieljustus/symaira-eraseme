@@ -19,6 +19,8 @@ on:
       - scripts/verify_rust_artifact_sbom.py
       - tests/test_rust_artifact_sbom.py
       - tests/test_rust_release_workflow.py
+      - tests/test_immutable_release_publication.py
+      - tests/test_homebrew_release_workflow.py
       - scripts/verify-release-source.sh
       - scripts/verify_windows_dll_dependencies.py
       - tests/verify_release_archives.py
@@ -245,7 +247,7 @@ jobs:
 
       - name: Verify release immutability and attestation controls
         shell: bash
-        run: python3 -m unittest discover -s tests -p test_rust_release_workflow.py -v
+        run: python3 -m unittest discover -s tests -p 'test_*release*.py' -v
 
       - name: Read release version
         shell: bash

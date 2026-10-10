@@ -21,7 +21,7 @@ jobs:
 
   release-cli:
     if: github.event_name == 'push'
-    name: Release / Publish CLI prerelease
+    name: Release / Stage CLI draft prerelease
     needs: release-archives
     runs-on: ubuntu-latest
     permissions:
@@ -75,7 +75,7 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/dist/sbom-checksums.txt
 
-      - name: Publish the prerelease and read every asset back
+      - name: Stage the prerelease and read every asset back
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -97,7 +97,7 @@ jobs:
           Use a copy of your data while evaluating this canary.
           EOF
           mapfile -t assets < <(ls -1 symeraseme_* checksums.txt sbom-checksums.txt)
-          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
             --title "symeraseme $VERSION (canary)" --notes-file "$NOTES" "${assets[@]}"
           mkdir "$RUNNER_TEMP/readback"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/readback"
@@ -108,7 +108,8 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --source-digest "$GITHUB_SHA" --source-ref "$GITHUB_REF"
-          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)" = true
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease \
+            --jq '.isDraft == true and .isPrerelease == true' | grep -Fx true
 
   release-gui:
     name: Release / macOS GUI DMG
@@ -135,9 +136,9 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --json assets,isPrerelease > "$RUNNER_TEMP/gui-release-preflight.json"
-          jq -e --arg asset "Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg" \
-            '.isPrerelease == true and (.assets | type == "array") and all(.assets[]; (.name | type == "string") and .name != $asset)' \
+            --json tagName,assets,isDraft,isPrerelease > "$RUNNER_TEMP/gui-release-preflight.json"
+          jq -e --arg tag "$RELEASE_TAG" --arg asset "Symaira-EraseMe-${RELEASE_TAG#v}-macos.dmg" \
+            '.tagName == $tag and .isDraft == true and .isPrerelease == true and (.assets | type == "array") and all(.assets[]; (.name | type == "string") and .name != $asset)' \
             "$RUNNER_TEMP/gui-release-preflight.json"
 
       - name: Select Xcode 26
@@ -309,7 +310,7 @@ jobs:
           bash scripts/verify-release-source.sh
           gh release upload "$RELEASE_TAG" "$DMG_PATH" --repo "$GITHUB_REPOSITORY"
 
-      - name: Verify published DMG asset and record release
+      - name: Verify staged DMG asset and record release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -383,12 +384,12 @@ jobs:
           rm -f "$RUNNER_TEMP"/*.p12 "$RUNNER_TEMP"/*.p8 "$RUNNER_TEMP"/*.zip "$RUNNER_TEMP"/*notary*.json "$RUNNER_TEMP"/*response*.json
 
   attest-dmg:
-    name: Release / Attest published DMG
+    name: Release / Attest DMG and publish immutable prerelease
     needs: release-gui
     if: ${{ always() && needs.release-gui.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
       attestations: write
     env:
@@ -400,7 +401,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Download the published DMG
+      - name: Download the staged DMG
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -410,7 +411,49 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Symaira-EraseMe-*-macos.dmg' --dir "$RUNNER_TEMP/dmg"
           test "$(find "$RUNNER_TEMP/dmg" -name '*.dmg' | wc -l)" -eq 1
 
-      - name: Attest build provenance for the published DMG
+      - name: Attest build provenance for the staged DMG
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ runner.temp }}/dmg/*.dmg
+
+      - name: Publish complete immutable prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify-release-source.sh
+          gh api --method GET "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release.json"
+          python3 - "$RUNNER_TEMP/release.json" "$RELEASE_TAG" <<'PY'
+          import json, sys
+          release = json.load(open(sys.argv[1]))
+          tag = sys.argv[2]
+          version = tag.removeprefix('v')
+          archives = {f'symeraseme_{version}_{system}_{arch}.{extension}'
+                      for system, extension in [('darwin', 'tar.gz'), ('linux', 'tar.gz'), ('windows', 'zip')]
+                      for arch in ('amd64', 'arm64')}
+          expected = archives | {name + suffix for name in archives for suffix in ('.cdx.json', '.rust-audit.json')}
+          expected |= {'checksums.txt', 'sbom-checksums.txt', f'Symaira-EraseMe-{version}-macos.dmg'}
+          assert release['tag_name'] == tag and release['draft'] is True and release['prerelease'] is True
+          assets = release['assets']
+          assert len(assets) == len(expected) and {a['name'] for a in assets} == expected
+          assert all(a['state'] == 'uploaded' for a in assets)
+          PY
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/complete-release"
+          cd "$RUNNER_TEMP/complete-release"
+          python3 - "$RUNNER_TEMP/release.json" <<'PY'
+          import json, pathlib, re, sys
+          names = {p.name for p in pathlib.Path('.').iterdir()}
+          assert names == {a['name'] for a in json.load(open(sys.argv[1]))['assets']}
+          for manifest, suffixes in [('checksums.txt', ('.tar.gz', '.zip', '.dmg')), ('sbom-checksums.txt', ('.json',))]:
+              entries = [line.split() for line in pathlib.Path(manifest).read_text().splitlines()]
+              expected = {name for name in names if name.endswith(suffixes)}
+              assert entries and all(len(row) == 2 and re.fullmatch(r'[0-9a-f]{64}', row[0]) for row in entries)
+              assert len(entries) == len(expected) and {row[1] for row in entries} == expected
+          PY
+          sha256sum --check --strict checksums.txt
+          sha256sum --check --strict sbom-checksums.txt
+          # Enable repository immutable releases before tagging. The workflow
+          # token has no Administration permission to query that setting.
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+          gh api --method GET "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" |
+            jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .prerelease == true and .immutable == true'
