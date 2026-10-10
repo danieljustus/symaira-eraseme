@@ -212,11 +212,15 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
 1. The Rust prerelease workflow builds natively on Linux, macOS, and Windows
    for amd64 and arm64, packages six static Rust CLI archives, and verifies the
    archives, `checksums.txt` and the per-archive CycloneDX SBOMs.
-2. The publish job attests build provenance for the six archives and creates
-   the GitHub release as a prerelease (canary), then reads every asset back.
+2. The staging job attests build provenance for the six archives and creates
+   a draft prerelease, then reads every asset back without publishing it.
 3. The macOS job builds the SwiftUI app with the Rust CLI/MCP server and uploads
-   the versioned DMG to that release. It is signed, notarized, stapled and attested.
-4. When a release is published as stable, or a canary is promoted to stable,
+   the versioned DMG to that draft. It is signed, notarized, stapled and attested.
+4. After all assets and attestations are complete, the final job verifies both
+   checksum manifests, publishes the canary and requires GitHub to report it as
+   immutable. Enable the repository's **Immutable releases** setting before
+   pushing a new tag. Published releases can no longer accept asset changes.
+5. When an immutable canary is promoted to stable after its acceptance checks,
    the Homebrew publisher downloads the exact release archives, verifies their
    checksums, and updates `danieljustus/homebrew-tap/Formula/symeraseme.rb`.
 

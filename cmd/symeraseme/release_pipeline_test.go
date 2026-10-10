@@ -129,7 +129,7 @@ func TestReleaseWorkflowContract(t *testing.T) {
 			"Notarize DMG",
 			"Staple and Gatekeeper-verify DMG",
 			"Upload GUI DMG to release",
-			"Verify published DMG asset and record release",
+			"Verify staged DMG asset and record release",
 			"Clean up signing material",
 		}
 		if !reflect.DeepEqual(stepNames, expectedOrder) {
@@ -271,8 +271,8 @@ func TestReleaseWorkflowContract(t *testing.T) {
 		}
 	})
 
-	t.Run("VerifyPublishedDMGAssetAndRecordRelease", func(t *testing.T) {
-		step := getWorkflowStep(t, guiJob.Steps, "Verify published DMG asset and record release")
+	t.Run("VerifyStagedDMGAssetAndRecordRelease", func(t *testing.T) {
+		step := getWorkflowStep(t, guiJob.Steps, "Verify staged DMG asset and record release")
 		for _, expected := range []string{
 			"gh release download",
 			`cmp -s "$DMG_PATH" "$PUBLISHED_PATH"`,
@@ -359,7 +359,7 @@ func TestReleaseWorkflowContract(t *testing.T) {
 	})
 
 	t.Run("NoChecksumManifestFallback", func(t *testing.T) {
-		step := getWorkflowStep(t, guiJob.Steps, "Verify published DMG asset and record release")
+		step := getWorkflowStep(t, guiJob.Steps, "Verify staged DMG asset and record release")
 		if strings.Contains(step.Run, "checksums.txt") && strings.Contains(step.Run, "|| true") {
 			t.Errorf("step %q contains forbidden '|| true' fallback for checksums download", step.Name)
 		}

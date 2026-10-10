@@ -74,8 +74,8 @@ class ReleaseWorkflowControls(unittest.TestCase):
         self.assertLess(workflow.index(preflight), workflow.index('      - name: Import Developer ID certificate'))
         attestation = step('Attest the twelve SBOM sidecar digests')
         self.assertIn('subject-path: ${{ runner.temp }}/dist/sbom-checksums.txt', attestation)
-        self.assertLess(workflow.index(attestation), workflow.index('      - name: Publish the prerelease'))
-        publication = step('Publish the prerelease and read every asset back')
+        self.assertLess(workflow.index(attestation), workflow.index('      - name: Stage the prerelease'))
+        publication = step('Stage the prerelease and read every asset back')
         self.assertIn('gh attestation verify "$RUNNER_TEMP/readback/sbom-checksums.txt"', publication)
         for policy in ('--signer-workflow', '--source-digest "$GITHUB_SHA"', '--source-ref "$GITHUB_REF"'):
             self.assertIn(policy, publication)
@@ -95,16 +95,18 @@ class ReleaseWorkflowControls(unittest.TestCase):
                 'print(Path(os.environ["GH_FIXTURE"]).read_text())\n')
             gh.chmod(0o755)
             cases = [
-                ('new-prerelease', 'v0.13.1', True, [], 0, True),
-                ('historical-dmg', 'v0.13.0', True,
+                ('new-draft', 'v0.13.1', True, True, [], 0, True),
+                ('published-prerelease', 'v0.13.1', False, True, [], 0, False),
+                ('historical-dmg', 'v0.13.0', True, True,
                  [{'name': 'Symaira-EraseMe-0.13.0-macos.dmg'}], 0, False),
-                ('stable-release', 'v0.12.1', False, [], 0, False),
-                ('lookup-failure', 'v0.13.1', True, [], 1, False),
+                ('stable-release', 'v0.12.1', False, False, [], 0, False),
+                ('lookup-failure', 'v0.13.1', True, True, [], 1, False),
             ]
-            for name, tag, prerelease, assets, lookup_exit, accepted in cases:
+            for name, tag, draft, prerelease, assets, lookup_exit, accepted in cases:
                 with self.subTest(name=name):
                     fixture = root / (name + '.json')
-                    fixture.write_text(json.dumps({'isPrerelease': prerelease, 'assets': assets}))
+                    fixture.write_text(json.dumps({'tagName': tag, 'isDraft': draft,
+                                                   'isPrerelease': prerelease, 'assets': assets}))
                     calls = root / (name + '-calls.json')
                     env = {
                         'PATH': str(root) + os.pathsep + os.environ['PATH'],
@@ -123,9 +125,9 @@ class ReleaseWorkflowControls(unittest.TestCase):
         self.assertIn('bash scripts/verify-release-source.sh', step('Verify immutable release source'))
         self.assertLess(workflow.index('      - name: Verify immutable release source'),
                         workflow.index('      - name: Import Developer ID certificate'))
-        for name in ('Publish the prerelease and read every asset back',
-                     'Upload GUI DMG to release', 'Verify published DMG asset and record release',
-                     'Download the published DMG'):
+        for name in ('Stage the prerelease and read every asset back',
+                     'Upload GUI DMG to release', 'Verify staged DMG asset and record release',
+                     'Download the staged DMG'):
             guarded = step(name)
             self.assertIn('bash scripts/verify-release-source.sh', guarded)
             self.assertLess(guarded.index('bash scripts/verify-release-source.sh'),
