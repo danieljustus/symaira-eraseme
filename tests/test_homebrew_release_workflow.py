@@ -21,9 +21,10 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         start = cls.workflow.index(marker)
         end = cls.workflow.find("\n      - name:", start + len(marker))
         cls.validation_step = cls.workflow[start:end if end != -1 else len(cls.workflow)]
-        if "        run: |\n" not in cls.validation_step:
+        run_marker = "        run: &verify_release |\n"
+        if run_marker not in cls.validation_step:
             raise AssertionError("validation step has no literal shell script")
-        shell = cls.validation_step.split("        run: |\n", 1)[1]
+        shell = cls.validation_step.split(run_marker, 1)[1]
         lines = []
         for line in shell.splitlines():
             if line and not line.startswith("          "):
@@ -178,6 +179,80 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         for field in (".tag_name == $expected_tag", ".draft == false",
                       ".prerelease == false", ".immutable == true"):
             self.assertIn(field, self.script)
+
+    def test_protected_tap_publication_follows_native_checks_and_fails_closed(self):
+        # Labelled local git/gh fixtures; no actual repository or API writes.
+        prepare, publication = self.workflow.split("\n  publish-tap:\n", 1)
+        self.assertNotIn("git -C tap push", prepare)
+        self.assertIn("    needs: install-check\n", publication)
+        self.assertIn("        os: [macos-14, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
+        self.assertIn("    if: ${{ !inputs.dry_run }}\n", publication)
+        self.assertIn("          DRY_RUN: 'false'\n        run: *verify_release\n", publication)
+        self.assertLess(publication.index("run: *verify_release"), publication.index("Checkout tap"))
+        step = publication.split("      - name: Publish updated Formula\n", 1)[1]
+        shell = step.split("        run: |\n", 1)[1]
+        script = "\n".join(line[10:] if line else "" for line in shell.splitlines())
+        (self.root / "tap/Formula").mkdir(parents=True)
+        (self.root / "formula").mkdir()
+        (self.root / "formula/symeraseme.rb").write_text("verified fixture Formula\n")
+        calls_path = self.root / "publication-calls.jsonl"
+        mock = (
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "tool, args = Path(sys.argv[0]).name, sys.argv[1:]\n"
+            "with Path(os.environ['PUBLICATION_CALLS']).open('a') as out:\n"
+            "    out.write(json.dumps([tool, args]) + '\\n')\n"
+            "case = os.environ['PUBLICATION_CASE']\n"
+            "if tool == 'git':\n"
+            "    if args[:2] != ['-C', 'tap']: raise SystemExit(91)\n"
+            "    args = args[2:]\n"
+            "    if args == ['diff', '--quiet', '--', 'Formula/symeraseme.rb']:\n"
+            "        raise SystemExit(0 if case == 'unchanged' else 1)\n"
+            "    if args == ['rev-parse', 'HEAD']: print('a' * 40)\n"
+            "    if args[:2] == ['push', 'origin']:\n"
+            "        if args[2] == 'main' or case == 'push-error': raise SystemExit(1)\n"
+            "elif tool == 'gh':\n"
+            "    if args[:2] == ['pr', 'create']:\n"
+            "        if case == 'pr-error': raise SystemExit(1)\n"
+            "        print('https://github.com/fixture/tap/pull/17')\n"
+            "    elif args[:2] == ['pr', 'merge']:\n"
+            "        if case == 'merge-error': raise SystemExit(1)\n"
+            "    else: raise SystemExit(92)\n"
+            "else: raise SystemExit(93)\n"
+        )
+        for tool in ("git", "gh"):
+            path = self.bin / tool
+            path.write_text(mock)
+            path.chmod(0o755)
+        for case in ("changed", "unchanged", "push-error", "pr-error", "merge-error"):
+            with self.subTest(case=case):
+                calls_path.write_text("")
+                env = {"PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+                       "HOME": str(self.root), "RUNNER_TEMP": str(self.root),
+                       "RELEASE_TAG": "v0.14.1", "TAP_REPOSITORY": "fixture/tap",
+                       "GITHUB_RUN_ID": "4242", "GITHUB_RUN_ATTEMPT": "1",
+                       "PUBLICATION_CASE": case, "PUBLICATION_CALLS": str(calls_path)}
+                result = subprocess.run(["bash", "-c", script], cwd=self.root, env=env,
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(result.returncode == 0, case in ("changed", "unchanged"), result.stderr)
+                calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
+                pushes = [args for tool, args in calls if tool == "git" and args[2:4] == ["push", "origin"]]
+                creates = [args for tool, args in calls if tool == "gh" and args[:2] == ["pr", "create"]]
+                merges = [args for tool, args in calls if tool == "gh" and args[:2] == ["pr", "merge"]]
+                self.assertEqual(pushes, [] if case == "unchanged" else
+                                 [["-C", "tap", "push", "origin", "homebrew/symeraseme-v0.14.1-4242-1"]])
+                self.assertEqual(len(creates), int(case not in ("unchanged", "push-error")))
+                self.assertEqual(len(merges), int(case in ("changed", "merge-error")))
+                if creates:
+                    self.assertEqual(creates[0][:10], ["pr", "create", "--repo", "fixture/tap", "--base",
+                                                     "main", "--head", "homebrew/symeraseme-v0.14.1-4242-1",
+                                                     "--title", "Update symeraseme to v0.14.1"])
+                if merges:
+                    self.assertEqual(merges[0], ["pr", "merge", "https://github.com/fixture/tap/pull/17",
+                                                "--repo", "fixture/tap", "--squash", "--auto",
+                                                "--match-head-commit", "a" * 40])
+                self.assertTrue(all("--admin" not in args and "--force" not in args for _, args in calls))
 
 
 if __name__ == "__main__":
