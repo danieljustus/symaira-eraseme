@@ -26,8 +26,8 @@ rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 signal-hook.workspace = true
-symeraseme-core = { path = "../symeraseme-core", version = "0.14.0" }
-symeraseme-engine = { path = "../symeraseme-engine", version = "0.14.0" }
+symeraseme-core = { path = "../symeraseme-core", version = "0.14.1" }
+symeraseme-engine = { path = "../symeraseme-engine", version = "0.14.1" }
 subtle.workspace = true
 tokio.workspace = true
 

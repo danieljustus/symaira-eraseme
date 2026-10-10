@@ -4,13 +4,16 @@ Native SwiftUI macOS app for the Symaira EraseMe dashboard. Connects to the
 self-contained Rust MCP JSON-RPC server (`symeraseme mcp`) over HTTP in this
 source checkout.
 
-The Rust-backed app and CLI are published in the
+This source prepares the Rust-backed app and CLI at version 0.14.1.
+Choose a published version and its channel on
+[GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases).
+The Rust-only layout was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 Its DMG completed Developer ID signing, notarization, stapling and attestation;
 local builds below may be ad-hoc signed. The historical `v0.13.0` prerelease
-remains dual-backend and immutable; `v0.12.1` is the latest stable release.
-Stable acceptance, seven-day post-stable observation and separate Go-source
-retirement approval remain open.
+remains dual-backend and unchanged; `v0.12.1` is the last Go-only stable release.
+Canary publication does not complete stable acceptance, seven-day post-stable
+observation or separate Go-source retirement approval.
 
 ## Requirements
 
