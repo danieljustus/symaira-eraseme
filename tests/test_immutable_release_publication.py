@@ -29,7 +29,7 @@ class ImmutableReleasePublication(unittest.TestCase):
         for case, optimize in product(('complete', 'published', 'stable', 'wrong-tag', 'missing-field',
                      'missing-asset', 'duplicate-asset', 'upload-pending', 'corrupt-asset',
                      'missing-checksum', 'duplicate-checksum', 'download-omission',
-                     'malformed-json', 'api-error', 'edit-error', 'mutable-readback',
+                     'malformed-json', 'lookup-error', 'api-error', 'edit-error', 'mutable-readback',
                      'wrong-tag-readback'), ('0', '1')):
             with self.subTest(case=case, optimize=optimize), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -82,9 +82,17 @@ args = sys.argv[1:]
 with (root / 'calls.jsonl').open('a') as out:
     out.write(json.dumps(args) + '\\n')
 state = root / 'api-state.json'
-if args == ['api', '--method', 'GET', 'repos/fixture/product/releases/tags/v0.14.1']:
+if args == ['release', 'view', 'v0.14.1', '--repo', 'fixture/product', '--json', 'apiUrl', '--jq', '.apiUrl']:
+    if case == 'lookup-error': raise SystemExit(1)
+    print('https://api.github.com/repos/fixture/product/releases/123')
+elif args == ['api', '--method', 'GET', 'https://api.github.com/repos/fixture/product/releases/123']:
     if case == 'api-error': raise SystemExit(1)
     print('not-json' if case == 'malformed-json' else state.read_text())
+elif args == ['api', '--method', 'GET', 'repos/fixture/product/releases/tags/v0.14.1']:
+    # GitHub resolves this endpoint only after the draft is published.
+    if json.loads(state.read_text()).get('draft', True):
+        raise SystemExit('gh: Not Found (HTTP 404)')
+    print(state.read_text())
 elif args[:3] == ['release', 'download', 'v0.14.1']:
     if args[3:] != ['--repo', 'fixture/product', '--dir', str(root / 'complete-release')]:
         raise SystemExit(91)
@@ -110,6 +118,9 @@ else:
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode == 0, case == 'complete', result.stderr)
                 calls = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
+                if case == 'lookup-error':
+                    self.assertEqual(calls, [['release', 'view', 'v0.14.1', '--repo', 'fixture/product',
+                                             '--json', 'apiUrl', '--jq', '.apiUrl']])
                 edits = [args for args in calls if args[:2] == ['release', 'edit']]
                 self.assertEqual(len(edits), int(case in ('complete', 'edit-error', 'mutable-readback', 'wrong-tag-readback')))
                 self.assertTrue(all(args[:2] not in (['release', 'upload'], ['release', 'delete']) for args in calls))
