@@ -118,6 +118,9 @@ else:
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode == 0, case == 'complete', result.stderr)
                 calls = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
+                if case == 'lookup-error':
+                    self.assertEqual(calls, [['release', 'view', 'v0.14.1', '--repo', 'fixture/product',
+                                             '--json', 'apiUrl', '--jq', '.apiUrl']])
                 edits = [args for args in calls if args[:2] == ['release', 'edit']]
                 self.assertEqual(len(edits), int(case in ('complete', 'edit-error', 'mutable-readback', 'wrong-tag-readback')))
                 self.assertTrue(all(args[:2] not in (['release', 'upload'], ['release', 'delete']) for args in calls))
