@@ -58,7 +58,15 @@ impl ConsentStore {
 
     fn verify_and_consume(&self, command: &str, token: &str) -> Result<(), ConsentError> {
         self.verify_token(command, token)?;
-        self.consume_token(token)
+        // Some filesystems can report success for overlapping unlink calls.
+        // Keep the native inode lock until this caller's removal has completed.
+        let _token_lock = self.lock_token(token)?;
+        // Only the caller that removes the token owns this authorization.
+        if self.revoke_token(token)? {
+            Ok(())
+        } else {
+            Err(ConsentError::NotFound)
+        }
     }
 
     fn authorize_file(&self, command: &str, path: &str) -> Result<(), ConsentError> {
