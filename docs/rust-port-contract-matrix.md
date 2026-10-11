@@ -1,6 +1,32 @@
 # Go → Rust executable contract matrix
 
-## Current Rust-only candidate scope (2026-10-08, #1171–#1173)
+## Current published Rust-only acceptance (2026-10-11)
+
+The [current release-bound reconciliation](rust-port/handoffs/2026-10-11-published-rust-only-reconciliation.md)
+supersedes the historical statuses below for #1131, REL-001..010 and CUT-001..005.
+It binds stable immutable `v0.14.1` to
+`587e9e0e3aaa4d4bbacdd28a7087d17ac2748548` and current native reader acceptance to
+main `89a0fbcdef745714950ca1994ceb11c0e8b832ab`. Original captures and historical
+`v0.13.0` evidence remain unchanged.
+
+| Rows | Current verdict | Evidence boundary |
+| --- | --- | --- |
+| #1131 | PASS within its frozen-parity scope | Current six-target native readers and scoped Go-absent cases; retained dedicated Linux Go-absent run: 430 passed, two helper entries ignored. Reuse is supported by the tracked-source/configuration comparison, not complete compiler/environment closure, a new native run or blanket six-target SDK-absent workspace proof. |
+| REL-001..005 | PASS for published v0.14.1 | All six Rust-only archive roots, 21 public asset digests, original native smoke/linkage, four native Homebrew installations and exact current tap Formula readback. |
+| REL-006 | PASS for the existing public v0.14.1 DMG | Literal read-only `hdiutil` mount on Mac Mini/macOS 15.8.1/x86_64: ten checks, 25 unique manifest entries, successful detach and independent parent cleanup readback. The linked reconciliation binds release `409043734`, asset `628363023` and its exact SHA-256. Earlier local failures remain historical; no HFS-alternative waiver. |
+| REL-007..010 | PASS for published v0.14.1 | Actual app/helper/DMG signatures, stapling/Gatekeeper, same-run packed SBOM verification, eight fresh exact-source/tag/workflow attestations and source-equivalent audit/deny evidence. |
+| CUT-001..003 | PASS within current contracts | Six-native retired-selector tests; original same-run public Rust binaries and separate Go development oracle: 72 copied-store/switchback cases, 144 raw streams. Not older published Go schema-v2 compatibility. |
+| CUT-004 | OPEN | Stable observation starts at `2026-10-10T17:38:53.187732+00:00`; earliest seven-day review `2026-10-17T17:38:53.187732+00:00`, with genuine observation evidence required. |
+| CUT-005 | OPEN | Observation and separate explicit Go-source/toolchain retirement approval remain required. |
+
+The detailed receipt preserves successful jobs separately from the original
+release workflow's failed final publication step. No release/CI rerun, production
+data operation, Go deletion or historical-evidence rewrite occurred. Prior R1/R2
+corrections passed independent delta review. This publication-safe documentation
+candidate and its full intended push history await fresh independent
+SPEC/evidence and QUALITY/security review.
+
+## Historical Rust-only candidate scope (2026-10-08, #1171–#1173)
 
 The maintainer approved `ok go`: new CLI archives/app contain no Go sibling,
 and the legacy backend selector is retired. CUT-001 now proves that a legacy

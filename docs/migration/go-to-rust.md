@@ -3,7 +3,47 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-- Current decision (2026-10-07, #1171–#1173): Daniel approved Rust-only
+## Current published-candidate checkpoint (2026-10-11)
+
+- Stable immutable `v0.14.1` is published at
+  `587e9e0e3aaa4d4bbacdd28a7087d17ac2748548`; current code/main is
+  `89a0fbcdef745714950ca1994ceb11c0e8b832ab`. All 21 original public assets,
+  eight source/tag/workflow-bound attestations and the current Homebrew Formula
+  were read back. The original release run's final publication failure is
+  preserved, not relabeled green.
+- #1131 reader acceptance is verified against current six-native Rust CI
+  `38083487544` and the applicable source-equivalent 430-test Linux Go-absent
+  selection `38059031343`. Reuse rests on a tracked-source/configuration
+  comparison, not complete compiler/environment closure or a new native run.
+  CUT-001..003 pass the Rust-only distribution and
+  same-run native development-oracle switchback contracts: 72 cases and 144
+  verified raw streams. No bundled Go fallback is restored.
+- REL-001..005 and REL-007..010 have current release-bound evidence.
+  REL-006's literal read-only mounted-manifest gate is PASS for the existing
+  public `v0.14.1` DMG: native Mac Mini/macOS 15.8.1/x86_64 `hdiutil` capture,
+  ten checks, 25 unique entries and successful detach, with independent parent
+  cleanup readback. The linked reconciliation binds the exact asset and proof.
+  Earlier local permission denial and 45-second `diskutil` timeout remain
+  historical evidence; HFS extraction is supporting evidence, not a waiver.
+- CUT-004 remains open. Original stable readback starts observation at
+  `2026-10-10T17:38:53.187732+00:00`; earliest seven-day review is
+  `2026-10-17T17:38:53.187732+00:00`. Genuine observations are required, not
+  elapsed time alone. CUT-005 source/toolchain retirement still needs separate
+  authorization after its prerequisites. No Go deletion or new release occurred.
+- Evidence, exact case inventories, source-equivalence scope, limitations and
+  the next action are in the
+  [published Rust-only reconciliation](../rust-port/handoffs/2026-10-11-published-rust-only-reconciliation.md).
+  Prior R1/R2 corrections passed independent delta review. This publication-safe
+  documentation candidate and its full intended push history await fresh
+  independent SPEC/evidence and QUALITY/security review; the coordinator owns
+  publication. Protected AGENTS follow-up #1214 is separate.
+
+## Historical decisions and acceptance below
+
+Earlier pending/release statements retain their original dated scope; the
+checkpoint above supersedes them only for the explicitly reconciled gates.
+
+- Historical decision (2026-10-07, #1171–#1173): Daniel approved Rust-only
   distribution with `ok go`. New archives/app must contain no Go backend;
   the former runtime selector is retired. Go source remains a separate
   development oracle until CUT-005. The narrow Windows FFI exceptions need
