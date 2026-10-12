@@ -35,7 +35,7 @@ hmac = { version = "0.13.0", features = ["zeroize"] }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["backup", "bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-serde_yaml = "0.9.34"
+serde_yaml = { package = "yaml_serde", version = "=0.10.7" }
 symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "27177f25f551cecefa7bd6c4524abf175b3a75c7" }
 symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "0f441fb27872da7edd65244e4fcbd0890f0b7174" }
 symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", rev = "04d1411adb57aa602b992509121011aa7666ff1a" }

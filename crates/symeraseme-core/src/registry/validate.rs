@@ -340,10 +340,11 @@ pub(crate) fn decode(file_stem: &str, source: &str) -> Result<Broker, RegistryEr
 
 fn decode_with_metrics(file_stem: &str, source: &str) -> Result<(Broker, usize), RegistryError> {
     preflight_source(source)?;
-    // #844 boundary: serde_yaml remains the schema decoder for parity. The
+    // #844 boundary: the maintained yaml_serde package (aliased as serde_yaml)
+    // remains the schema decoder for parity. The
     // public yaml-rust2 scanner above fully bounds bytes, nodes, depth, anchors,
-    // aliases, and document count before this deprecated dependency is called;
-    // it is isolated, not replaced. yaml-rust2 itself is pure Rust.
+    // aliases, and document count before schema decoding; replacing the
+    // unmaintained backend does not remove these resource limits.
     let raw: Value = serde_yaml::from_str(source).map_err(RegistryError::Yaml)?;
     let nodes = check_value_budget(&raw)?;
     reject_explicit_nulls(&raw)?;

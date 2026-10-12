@@ -1,0 +1,13 @@
+install-dry-run-text                     exit=0 stdout=8B stderr=0B files=0
+install-dry-run-json                     exit=0 stdout=8841B stderr=0B files=0
+install-unsupported-platform             exit=1 stdout=0B stderr=30B files=0
+install-launchd-without-launchctl        exit=1 stdout=0B stderr=100B files=11
+install-launchd-refuses-python-legacy    exit=1 stdout=0B stderr=63B files=3
+install-launchd-replaces-python-legacy   exit=1 stdout=0B stderr=100B files=11
+status-launchd-without-launchctl         exit=0 stdout=8B stderr=0B files=3
+status-launchd-json                      exit=0 stdout=516B stderr=0B files=3
+status-unsupported-platform              exit=1 stdout=0B stderr=30B files=0
+status-invalid-output                    exit=1 stdout=0B stderr=46B files=0
+uninstall-launchd-without-launchctl      exit=0 stdout=8B stderr=0B files=0
+uninstall-launchd-json                   exit=0 stdout=17B stderr=0B files=0
+uninstall-unsupported-platform           exit=1 stdout=0B stderr=30B files=0
