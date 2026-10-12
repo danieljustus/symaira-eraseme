@@ -6,6 +6,9 @@ mod frozen_go_oracle;
 #[path = "support/go_oracle.rs"]
 mod go_oracle;
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use symeraseme_core::storage::encryption::{
     EncryptionError, V1_HEADER, V2_HEADER, V2_SALT_LEN, V3_HEADER, V3_SALT_LEN, decrypt_v1,
     decrypt_v2, decrypt_v3, is_legacy_go_envelope,
@@ -518,8 +521,9 @@ fn cry006_table_consumes_every_pinned_go_oracle_case() {
         "rust-tests/parity/oracle/cry006/main.go"
     );
     assert_eq!(
-        hex::encode(Sha256::digest(include_bytes!(
-            "../../../rust-tests/parity/oracle/cry006/main.go"
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),
+            "rust-tests/parity/oracle/cry006/main.go"
         ))),
         document["generator_sha256"].as_str().unwrap()
     );

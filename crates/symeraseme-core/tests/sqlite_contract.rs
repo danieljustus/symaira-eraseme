@@ -46,7 +46,12 @@ const GO_EVENT_STORE_SOURCE_PATH: &str = "internal/eventstore/store.go";
 const GO_EVENT_STORE_SOURCE_GIT_BLOB: &str = "2201ac9ffd929f871fbd54f9e7e77eb59749c5a6";
 const GO_EVENT_STORE_SOURCE_SHA256: &str =
     "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3";
-const GO_EVENT_STORE_SOURCE: &[u8] = include_bytes!("../../../internal/eventstore/store.go");
+fn go_event_store_source() -> Vec<u8> {
+    frozen_native_capture::go_source_pin::current_source(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),
+        GO_EVENT_STORE_SOURCE_PATH,
+    )
+}
 const STORAGE_ORACLE_SCHEMA: &str = "symaira-eraseme.storage-parity.v1";
 
 fn golden_database() -> &'static [u8] {
@@ -122,10 +127,8 @@ fn validate_immutable_database_sources(database: &[u8]) -> Result<(), String> {
         &immutable_go_source,
         GO_EVENT_STORE_SOURCE_SHA256,
     )?;
-    if immutable_go_source != GO_EVENT_STORE_SOURCE {
-        return Err(
-            "working-tree Go event-store source differs from immutable Go provenance".into(),
-        );
+    if immutable_go_source != go_event_store_source() {
+        return Err("retired Go event-store source differs from immutable Go provenance".into());
     }
     Ok(())
 }
@@ -360,7 +363,7 @@ fn verified_frozen_storage(bytes: &[u8]) -> serde_json::Value {
     validate_immutable_database_sources(GOLDEN_DATABASE).unwrap();
     assert_eq!(
         manifest["source_files"][GO_EVENT_STORE_SOURCE_PATH]["sha256"],
-        hex::encode(Sha256::digest(GO_EVENT_STORE_SOURCE))
+        hex::encode(Sha256::digest(go_event_store_source()))
     );
     let document: serde_json::Value = serde_json::from_slice(bytes).unwrap();
     assert_eq!(document.as_object().unwrap().len(), 3);

@@ -1,5 +1,8 @@
 //! Replays actual Go llmkit requests against local-only fake HTTP providers.
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use std::collections::HashMap;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -21,13 +24,15 @@ fn fixture() -> Value {
     serde_json::from_str(FIXTURE).expect("Go transport fixture parses")
 }
 
-fn source_bytes(path: &str) -> &'static [u8] {
+fn source_bytes(path: &str) -> Vec<u8> {
     match path {
-        "internal/llm/factory.go" => include_bytes!("../../../internal/llm/factory.go"),
-        "internal/llm/llmkit.go" => include_bytes!("../../../internal/llm/llmkit.go"),
-        "internal/llm/llm.go" => include_bytes!("../../../internal/llm/llm.go"),
-        "go.mod" => include_bytes!("../../../go.mod"),
-        "go.sum" => include_bytes!("../../../go.sum"),
+        "internal/llm/factory.go"
+        | "internal/llm/llmkit.go"
+        | "internal/llm/llm.go"
+        | "go.mod"
+        | "go.sum" => {
+            go_source_pin::current_source(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."), path)
+        }
         _ => panic!("unexpected source path {path}"),
     }
 }

@@ -1,4 +1,9 @@
 //! Language-neutral fixtures captured by the pinned production migration.Run.
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, fs, path::Path, process::Command};
 use symeraseme_engine::migration::{self, Options};
@@ -218,8 +223,9 @@ fn migration_json_provenance() {
     );
     assert_eq!(
         fixture["source_sha256"]["internal/migration/migration.go"],
-        hex::encode(Sha256::digest(include_bytes!(
-            "../../../internal/migration/migration.go"
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            "internal/migration/migration.go"
         )))
     );
     for (name, bytes) in [
@@ -230,7 +236,11 @@ fn migration_json_provenance() {
         ),
         (
             "probe.go",
-            include_bytes!("../../../rust-tests/parity/oracle/migration-state/probe.go").as_slice(),
+            go_source_pin::current_source(
+                ROOT,
+                "rust-tests/parity/oracle/migration-state/probe.go",
+            )
+            .as_slice(),
         ),
     ] {
         assert_eq!(

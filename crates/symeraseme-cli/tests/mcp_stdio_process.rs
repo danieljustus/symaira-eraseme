@@ -1,5 +1,10 @@
 //! The actual stdio process must answer before EOF and keep stdout protocol-only.
 
+#[path = "support/go_source_pin.rs"]
+mod go_source_pin;
+
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
 #[cfg(unix)]
 #[allow(dead_code)] // The shared IMAP fixture also supports modes unused by this process test.
 #[path = "../../symeraseme-core/tests/support/imap_server.rs"]
@@ -526,9 +531,10 @@ fn scheduler_tools_match_source_bound_go_with_private_crontab() {
         ])
     );
     let source_bytes = [
-        include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
-        include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
-    ];
+        "internal/mcp/contract_handler.go",
+        "internal/scheduler/scheduler.go",
+    ]
+    .map(|path| go_source_pin::current_source(ROOT, path));
     for (source, bytes) in fixture["source_files"]
         .as_array()
         .expect("source file metadata")
@@ -669,11 +675,11 @@ fn scheduler_uninstall_and_status_stdio_match_source_bound_go() {
     );
     let source_checks = [
         (
-            include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
+            go_source_pin::current_source(ROOT, "internal/mcp/contract_handler.go"),
             "7cb51f367fe003621f691ae5dcdab731a88a01fa99ba6dc6403ddaff89edeef8",
         ),
         (
-            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
+            go_source_pin::current_source(ROOT, "internal/scheduler/scheduler.go"),
             "46b18551267d75eeeeb675f1f6af00e3201c63e3db64307a174ccc5f327c3138",
         ),
     ];
@@ -907,14 +913,15 @@ fn campaign_tools_match_source_bound_go_with_private_profile_store_and_consent()
         ])
     );
     let source_bytes = [
-        include_bytes!("../../../internal/mcp/contract_handler.go").as_slice(),
-        include_bytes!("../../../internal/campaign/campaign.go").as_slice(),
-        include_bytes!("../../../internal/campaign/planning.go").as_slice(),
-        include_bytes!("../../../internal/campaign/execution.go").as_slice(),
-        include_bytes!("../../../internal/campaign/webform.go").as_slice(),
-        include_bytes!("../../../internal/identity/profile.go").as_slice(),
-        include_bytes!("../../../internal/identity/gate.go").as_slice(),
-    ];
+        "internal/mcp/contract_handler.go",
+        "internal/campaign/campaign.go",
+        "internal/campaign/planning.go",
+        "internal/campaign/execution.go",
+        "internal/campaign/webform.go",
+        "internal/identity/profile.go",
+        "internal/identity/gate.go",
+    ]
+    .map(|path| go_source_pin::current_source(ROOT, path));
     for (source, bytes) in fixture["source_files"]
         .as_array()
         .expect("source file metadata")

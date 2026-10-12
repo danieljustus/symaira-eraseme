@@ -43,6 +43,41 @@ fn retired_go_source_bytes_come_from_the_pinned_commit() {
 }
 
 #[test]
+fn retired_template_and_source_do_not_depend_on_checkout_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("checkout");
+    let clone = std::process::Command::new("git")
+        .args(["clone", "--shared", "--no-checkout", ROOT])
+        .arg(&root)
+        .output()
+        .unwrap();
+    assert!(clone.status.success(), "clone immutable source objects");
+    let root = root.to_str().unwrap();
+    for name in [
+        "cmd/symeraseme/main.go",
+        "internal/templating/templates/report.html.gotmpl",
+    ] {
+        let path = std::path::Path::new(root).join(name);
+        assert!(!path.exists());
+        let archived = go_source_pin::retired_go_source(ROOT, name).unwrap();
+        assert_eq!(go_source_pin::current_source(root, name), archived);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"not the recorded Go source").unwrap();
+        assert_eq!(go_source_pin::current_source(root, name), archived);
+    }
+    // Non-Go inputs remain bound to the actual candidate, not the historical pin.
+    std::fs::write(
+        std::path::Path::new(root).join("Cargo.lock"),
+        b"candidate lock",
+    )
+    .unwrap();
+    assert_eq!(
+        go_source_pin::current_source(root, "Cargo.lock"),
+        b"candidate lock"
+    );
+}
+
+#[test]
 fn retired_go_source_rejects_unsafe_or_non_go_paths() {
     for name in [
         "",

@@ -3,6 +3,8 @@
 #[path = "support/frozen_unix_process.rs"]
 mod frozen_unix_process;
 
+use frozen_unix_process::go_source_pin;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -52,28 +54,19 @@ fn mcp_json_normalizes_raw_host_agent_error_like_go() {
     );
     for (path, expected) in &fixture.sources_sha256 {
         let source = match path.as_str() {
-            "go.mod" => include_bytes!("../../../go.mod").as_slice(),
-            "internal/mcp/server.go" => {
-                include_bytes!("../../../internal/mcp/server.go").as_slice()
-            }
-            "internal/mcp/contract_handler.go" => {
-                include_bytes!("../../../internal/mcp/contract_handler.go").as_slice()
-            }
-            "internal/llm/agent.go" => include_bytes!("../../../internal/llm/agent.go").as_slice(),
-            "internal/llm/llm.go" => include_bytes!("../../../internal/llm/llm.go").as_slice(),
-            "internal/triage/classifier.go" => {
-                include_bytes!("../../../internal/triage/classifier.go").as_slice()
-            }
-            "internal/eventstore/store.go" => {
-                include_bytes!("../../../internal/eventstore/store.go").as_slice()
-            }
-            "rust-tests/parity/oracle/mcp-agent-error-json/main.go" => {
-                include_bytes!("../../../rust-tests/parity/oracle/mcp-agent-error-json/main.go")
-                    .as_slice()
+            "go.mod"
+            | "internal/mcp/server.go"
+            | "internal/mcp/contract_handler.go"
+            | "internal/llm/agent.go"
+            | "internal/llm/llm.go"
+            | "internal/triage/classifier.go"
+            | "internal/eventstore/store.go"
+            | "rust-tests/parity/oracle/mcp-agent-error-json/main.go" => {
+                go_source_pin::current_source(ROOT, path)
             }
             other => panic!("unexpected pinned source {other}"),
         };
-        assert_eq!(sha256(source), *expected, "Go source changed: {path}");
+        assert_eq!(sha256(&source), *expected, "Go source changed: {path}");
     }
 
     let observed = frozen_unix_process::observation("mcp-agent-error-json").unwrap_or_else(|| {

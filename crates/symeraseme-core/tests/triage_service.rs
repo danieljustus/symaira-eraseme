@@ -15,14 +15,7 @@ mod go_oracle;
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
 
-const CLASSIFIER_GO: &[u8] = include_bytes!("../../../internal/triage/classifier.go");
-const REBUTTAL_GO: &[u8] = include_bytes!("../../../internal/triage/rebuttal.go");
-const REPLIES_SERVICE_GO: &[u8] = include_bytes!("../../../internal/replies/service.go");
-const REPLIES_REPOSITORY_GO: &[u8] = include_bytes!("../../../internal/replies/repository.go");
-const LLM_GO: &[u8] = include_bytes!("../../../internal/llm/llm.go");
-const EVENTSTORE_GO: &[u8] = include_bytes!("../../../internal/eventstore/store.go");
-const PROJECTION_GO: &[u8] = include_bytes!("../../../internal/eventstore/projection.go");
-const ORACLE_GO: &[u8] = include_bytes!("../../../rust-tests/parity/oracle/triage-service/main.go");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 #[derive(Deserialize)]
 struct GoOracle {
@@ -135,45 +128,37 @@ fn frozen_service_output_rejects_byte_changes_and_missing_operations() {
 fn go_executable_is_source_bound_and_records_persisted_service_effects() {
     let output = go_output();
     let oracle: GoOracle = serde_json::from_slice(&output).expect("valid Go oracle output");
-    for (name, source, expected_digest) in [
+    for (name, expected_digest) in [
         (
             "internal/triage/classifier.go",
-            CLASSIFIER_GO,
             "60adadce027c295a2ffed33baeae2d968a6b3f4a7d9a12a49131c3050756fc97",
         ),
         (
             "internal/triage/rebuttal.go",
-            REBUTTAL_GO,
             "232c6850ed8514a6cad5f36eaa165a92b4d3dbaad61ec69fa1ad5d03ffbae3aa",
         ),
         (
             "internal/replies/service.go",
-            REPLIES_SERVICE_GO,
             "8144b9407e40d7e1c9aa97528dcb2ef7b814fae66b2f27a4902fb853fe7e0281",
         ),
         (
             "internal/replies/repository.go",
-            REPLIES_REPOSITORY_GO,
             "725369fd4a9527004870ab757cbfbb95b6d61e02015ff6debd7e3685cc753e7f",
         ),
         (
             "internal/llm/llm.go",
-            LLM_GO,
             "537cb22f0c1536a9e33800a018f471402e2f0688a873cbee96402fef9d96b717",
         ),
         (
             "internal/eventstore/store.go",
-            EVENTSTORE_GO,
             "fd1dd416606f29aa4726a62ffe6ad83ef9d7c9eb6c6f42d81e87987913968df3",
         ),
         (
             "internal/eventstore/projection.go",
-            PROJECTION_GO,
             "edfa14b15261c65672ca5a35eb05c16190a0d55bd07f9ce3df267b531295c43a",
         ),
         (
             "rust-tests/parity/oracle/triage-service/main.go",
-            ORACLE_GO,
             "05f8e0ae89644c4dfd420b3b37afb950f19e1dea94b3160d484bb8c21c2b8810",
         ),
     ] {
@@ -182,7 +167,9 @@ fn go_executable_is_source_bound_and_records_persisted_service_effects() {
             "Go oracle source drift: {name}"
         );
         assert_eq!(
-            sha256_hex(source),
+            sha256_hex(&frozen_native_capture::go_source_pin::current_source(
+                ROOT, name
+            )),
             expected_digest,
             "pinned source changed: {name}"
         );

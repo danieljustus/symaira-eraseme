@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 #[path = "go_source_pin.rs"]
-mod go_source_pin;
+pub mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";

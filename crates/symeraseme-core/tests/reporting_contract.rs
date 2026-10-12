@@ -9,6 +9,9 @@
 //! while not failing on float formatting differences: the golden carries Python
 //! floats (`100.0`) while Go would marshal the same value as `100`.
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use std::fs;
 
 use chrono::{DateTime, Utc};
@@ -26,14 +29,12 @@ const GOLDEN_REPORTING_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting.json"
 );
-const GO_REPORTING_SOURCE: &[u8] = include_bytes!("../../../internal/reporting/reporting.go");
-const GO_BYTES_ORACLE_TEST: &[u8] =
-    include_bytes!("../../../internal/reporting/reporting_json_oracle_test.go");
-const GO_REPORTING_EXPORT_TEST: &[u8] =
-    include_bytes!("../../../internal/reporting/reporting_export_oracle_test.go");
-const GO_REPORT_TEMPLATE: &[u8] =
-    include_bytes!("../../../internal/templating/templates/report.html.gotmpl");
-const GO_TEMPLATING_SOURCE: &[u8] = include_bytes!("../../../internal/templating/templating.go");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+const GO_REPORTING_SOURCE: &str = "internal/reporting/reporting.go";
+const GO_BYTES_ORACLE_TEST: &str = "internal/reporting/reporting_json_oracle_test.go";
+const GO_REPORTING_EXPORT_TEST: &str = "internal/reporting/reporting_export_oracle_test.go";
+const GO_REPORT_TEMPLATE: &str = "internal/templating/templates/report.html.gotmpl";
+const GO_TEMPLATING_SOURCE: &str = "internal/templating/templating.go";
 const GO_REPORTING_BYTES_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting-bytes.json"
@@ -134,11 +135,17 @@ fn reporting_surfaces_match_go_encoding_json_bytes() {
     .expect("Go byte fixture parses");
     assert_eq!(
         fixture.source_sha256,
-        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_REPORTING_SOURCE
+        ))),
         "Go reporting implementation changed; regenerate and review byte fixture"
     );
     assert_eq!(
-        hex::encode(Sha256::digest(GO_BYTES_ORACLE_TEST)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_BYTES_ORACLE_TEST
+        ))),
         "1cf4d3929a39d5ddc11f0e1f081af4ee6bf724813ed8190cffcd8f7719e87871",
         "Go reporting byte generator changed; review and repin it"
     );
@@ -179,21 +186,33 @@ fn generated_report_exports_match_go() {
     .expect("Go export fixture parses");
     assert_eq!(
         fixture.reporting_source_sha256,
-        hex::encode(Sha256::digest(GO_REPORTING_SOURCE)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_REPORTING_SOURCE
+        ))),
         "Go reporting implementation changed; regenerate and review export fixture"
     );
     assert_eq!(
         fixture.template_source_sha256,
-        hex::encode(Sha256::digest(GO_REPORT_TEMPLATE)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_REPORT_TEMPLATE
+        ))),
         "Go report template changed; regenerate and review export fixture"
     );
     assert_eq!(
         fixture.templating_source_sha256,
-        hex::encode(Sha256::digest(GO_TEMPLATING_SOURCE)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_TEMPLATING_SOURCE
+        ))),
         "Go templating helpers changed; regenerate and review export fixture"
     );
     assert_eq!(
-        hex::encode(Sha256::digest(GO_REPORTING_EXPORT_TEST)),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            ROOT,
+            GO_REPORTING_EXPORT_TEST
+        ))),
         "f4a94713c8bb36ce0cb905a7dbbe2dd25675a676285ba2481c25a51c396a10a7",
         "Go export oracle changed; review and repin it"
     );

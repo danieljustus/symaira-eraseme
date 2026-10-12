@@ -1,5 +1,8 @@
 //! Byte-exact Go process oracle for malformed and boundary MCP stdio inputs.
 
+#[path = "support/go_source_pin.rs"]
+mod go_source_pin;
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -12,8 +15,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 const FIXTURE: &str =
     include_str!("../../../rust-tests/parity/oracle/mcp-stdio-mutations/cases.json");
 const INITIALIZE: &str = include_str!("../../../tests/fixtures/mcp-contract/initialize_cases.json");
-const GO_MAIN: &[u8] = include_bytes!("../../../cmd/symeraseme/main.go");
-const GO_SERVER: &[u8] = include_bytes!("../../../internal/mcp/server.go");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GENERATOR: &[u8] =
     include_bytes!("../../../rust-tests/parity/oracle/mcp-stdio-mutations/generate.py");
 const INITIALIZE_BYTES: &[u8] =
@@ -152,8 +154,20 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
     assert!(fixture["go_version"].as_str().unwrap().contains("go1.26.6"));
     assert_eq!(fixture["source_files"][0]["path"], "cmd/symeraseme/main.go");
     assert_eq!(fixture["source_files"][1]["path"], "internal/mcp/server.go");
-    assert_eq!(fixture["source_files"][0]["sha256"], sha256(GO_MAIN));
-    assert_eq!(fixture["source_files"][1]["sha256"], sha256(GO_SERVER));
+    assert_eq!(
+        fixture["source_files"][0]["sha256"],
+        sha256(&go_source_pin::current_source(
+            ROOT,
+            "cmd/symeraseme/main.go"
+        ))
+    );
+    assert_eq!(
+        fixture["source_files"][1]["sha256"],
+        sha256(&go_source_pin::current_source(
+            ROOT,
+            "internal/mcp/server.go"
+        ))
+    );
     assert_eq!(
         fixture["initialize_fixture_sha256"],
         sha256(INITIALIZE_BYTES)

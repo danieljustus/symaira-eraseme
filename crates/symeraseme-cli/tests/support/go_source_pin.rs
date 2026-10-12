@@ -22,7 +22,7 @@ pub const RETIREMENT_SOURCE_REVISION: &str = "22615ae67325c581fbe60cb0f2d3d2b213
 
 #[allow(dead_code)]
 fn is_go_source(name: &str) -> bool {
-    name.ends_with(".go") || name == "go.mod" || name == "go.sum"
+    name.ends_with(".go") || name.ends_with(".gotmpl") || name == "go.mod" || name == "go.sum"
 }
 
 /// Immutable bytes of a former Go source. Missing objects fail; nothing fetches.
