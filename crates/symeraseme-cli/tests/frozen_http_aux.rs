@@ -16,7 +16,9 @@ use std::panic::catch_unwind;
 use std::process::Command;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const FILE: &str = "crates/symeraseme-cli/tests/mcp_http_process.rs";
+// Exercise the current-tree rule with a producer that is not retired. The
+// retired-producer binding has its own real-byte mutation regression.
+const FILE: &str = "crates/symeraseme-cli/tests/mcp_http_native_contract.rs";
 const TEST: &str = "reader_control";
 
 fn pin(raw: &[u8]) -> String {

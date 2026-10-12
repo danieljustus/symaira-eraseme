@@ -19,8 +19,7 @@ use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 
 #[path = "support/capture_http_aux.rs"]
 mod capture_http_aux;
-#[path = "support/capture_http_wire.rs"]
-mod capture_http_wire;
+
 #[path = "support/frozen_http_aux.rs"]
 mod frozen_http_aux;
 #[path = "support/frozen_http_wire.rs"]
@@ -1255,30 +1254,15 @@ fn many_sequential_http_connections_complete_cleanly() {
 #[cfg(unix)]
 fn go_oracle_http_wire_transcripts_match() {
     // Reproduction: cargo test -p symeraseme-cli --test mcp_http_process go_oracle_http_wire_transcripts_match -- --exact
-    // Unrecorded hosts and explicit capture/live modes execute the checked-out Go CLI.
+    // Replay the authenticated native Go capture; never build the retired producer.
     let root = TestDir::new();
     let frozen = frozen_http_wire::observations();
-    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
-
-    let mut go_port = free_port();
     let mut rust_port = free_port();
-    let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
-    std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
-    let mut go = oracle
-        .as_ref()
-        .map(|binary| start_binary(binary, &go_root, &mut go_port, "127.0.0.1", false));
     let mut rust = start(&rust_root, &mut rust_port, "127.0.0.1", false);
-    if let Some(child) = go.as_mut() {
-        wait_ready(child, go_port, &go_root);
-    }
     wait_ready(&mut rust, rust_port, &rust_root);
-    let go_token = if go.is_some() {
-        std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap()
-    } else {
-        "recorded-private-native-bearer-token".to_owned()
-    };
+    let go_token = "recorded-private-native-bearer-token";
     let rust_token = token(&rust_root);
 
     let cases: [OracleCase<'_>; 10] = [
@@ -1334,20 +1318,9 @@ fn go_oracle_http_wire_transcripts_match() {
             vec![("Authorization", format!("Bearer {go_token}"))],
         ),
     ];
-    let mut measured = Vec::new();
     for (index, (method, body, headers)) in cases.into_iter().enumerate() {
-        let request = capture_http_wire::request(method, body, &headers);
-        let go_headers: Vec<_> = headers
-            .iter()
-            .map(|(name, value)| (*name, value.as_str()))
-            .collect();
-        let go_reply = if let Some(corpus) = &frozen {
-            corpus.reply(index, &request)
-        } else {
-            let reply = exchange(go_port, method, body, &go_headers);
-            measured.push(capture_http_wire::case(index, request, &reply));
-            reply
-        };
+        let request = frozen_http_wire::request(method, body, &headers);
+        let go_reply = frozen.reply(index, &request);
         let rust_headers: Vec<_> = headers
             .iter()
             .map(|(name, value)| {
@@ -1370,11 +1343,6 @@ fn go_oracle_http_wire_transcripts_match() {
             rust_reply, go_reply,
             "wire transcript differs for {method} {body:?}"
         );
-    }
-    if let Some(child) = go.as_mut() {
-        signal(child, "TERM");
-        let status = child.try_wait().unwrap().unwrap().code().unwrap();
-        capture_http_wire::record(oracle.as_ref().unwrap(), status, &measured);
     }
     signal(&mut rust, "TERM");
 }

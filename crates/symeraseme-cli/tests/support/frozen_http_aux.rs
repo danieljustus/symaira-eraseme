@@ -399,7 +399,12 @@ pub fn verify(
             ]);
             assert_eq!(recorded["bytes"], archive.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive), "{name}");
-            if go_source_pin::current_tree_bound(name) {
+            let retired_producer = field == "archived_generators"
+                && name == "crates/symeraseme-cli/tests/mcp_http_process.rs";
+            if retired_producer {
+                let producer = git(&["cat-file", "blob", &format!("{revision}:{name}")]);
+                go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &producer);
+            } else if go_source_pin::current_tree_bound(name) {
                 let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archive, &current);
             }

@@ -29,6 +29,7 @@ fn retired_capture_producers_reject_changed_bytes_and_unapproved_paths() {
         "crates/symeraseme-core/tests/campaign_smtp.rs",
         "crates/symeraseme-core/tests/smtp_transport.rs",
         "crates/symeraseme-cli/tests/mcp_http_headers_process.rs",
+        "crates/symeraseme-cli/tests/mcp_http_process.rs",
     ] {
         let archived = std::process::Command::new("git")
             .current_dir(ROOT)
