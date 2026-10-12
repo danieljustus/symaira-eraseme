@@ -147,6 +147,22 @@ fn canonical_generic_numbers_match_go_float64_rules() {
 }
 
 #[test]
+fn retired_live_go_opt_in_fails_instead_of_claiming_frozen_success() {
+    let result = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "canonical_generic_numbers_match_go_float64_rules",
+        ])
+        .env("SYMERASEME_PARITY_LIVE_GO", "1")
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    let output = String::from_utf8_lossy(&result.stdout);
+    assert!(output.contains("SYMERASEME_PARITY_LIVE_GO=1 is unsupported"));
+    assert!(output.contains("0 passed; 1 failed"));
+}
+
+#[test]
 fn frozen_go_corpus_rejects_all_recorded_tampering_and_unknown_requests() {
     let mut rejected = 0;
     let mut observations = 0;
