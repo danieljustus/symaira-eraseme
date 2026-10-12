@@ -125,7 +125,7 @@ def harness_identity():
     }
 
 
-def verify_go_archive(archive, binary, member=None):
+def verify_go_archive(archive, binary):
     archive = Path(archive).resolve(strict=True)
     binary = Path(binary).resolve(strict=True)
     archive_identity = gate.identity(archive)
@@ -133,7 +133,7 @@ def verify_go_archive(archive, binary, member=None):
     with ExitStack() as opened:
         if zipfile.is_zipfile(archive):
             container = opened.enter_context(zipfile.ZipFile(archive))
-            member_name = member or 'symeraseme.exe'
+            member_name = 'symeraseme.exe'
             matches = [item for item in container.infolist() if item.filename == member_name]
             require(len(matches) == 1 and not matches[0].is_dir()
                     and stat.S_IFMT(matches[0].external_attr >> 16) in (0, stat.S_IFREG),
@@ -144,7 +144,7 @@ def verify_go_archive(archive, binary, member=None):
             stream = opened.enter_context(container.open(matches[0]))
         else:
             container = opened.enter_context(tarfile.open(archive, mode='r:*'))
-            member_name = member or 'symeraseme'
+            member_name = 'symeraseme'
             matches = [item for item in container.getmembers() if item.name == member_name]
             require(len(matches) == 1 and matches[0].isfile(),
                     'Go archive must contain exactly one regular symeraseme member')
@@ -211,12 +211,11 @@ def confinement_controls(root, env, windows_control):
 
 
 def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=False,
-        sandbox_control=None, published_go_tag=gate.go_build_info.DEFAULT_TAG):
+        sandbox_control=None):
     require(published_go_release != (go_tool is not None),
             'choose published Go release or explicit Go SDK metadata verification')
-    require(published_go_tag in gate.go_build_info.SUPPORTED_TAGS, 'unsupported retained Go release tag')
-    require(published_go_release or published_go_tag == gate.go_build_info.DEFAULT_TAG,
-            'a non-default retained Go release tag requires --published-go-release')
+    # This v1 restore rehearsal requires the schema-incompatible v0.12.1
+    # fallback. v0.13.0 belongs to the separate successful switchback gate.
     require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
             'unsupported native backup/restore platform')
     if sys.platform.startswith('linux'):
@@ -277,10 +276,10 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
         require(report['artifacts']['retained_go']['identity'] !=
                 report['artifacts']['rust']['identity'], 'Go and Rust artifact bytes must differ')
         target_goos, target_arch, _ = gate.native_platform()
-        go_member = gate.go_build_info.binary_member(published_go_tag, target_goos + '/' + target_arch) \
-            if published_go_release else None
+        if target_goos is None or target_arch is None:
+            raise ValueError('unsupported native retained-release target')
         if go_archive is not None:
-            report['go_archive'] = verify_go_archive(go_archive, go, go_member)
+            report['go_archive'] = verify_go_archive(go_archive, go)
 
         env = {
             'HOME': str(root / 'home'), 'USERPROFILE': str(root / 'home'),
@@ -298,7 +297,7 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
         report['environment'] = env
         if published_go_release:
             metadata, release = gate.go_build_info.verify_release(
-                staged_go, target_goos + '/' + target_arch, published_go_tag)
+                staged_go, target_goos + '/' + target_arch)
             go_metadata = metadata['sdk_style_output']
             (root / 'go-artifact.metadata.txt').write_text(go_metadata)
             report['go_artifact_provenance'].update({
@@ -562,15 +561,13 @@ def main():
                         help='Go tool used to record retained artifact build metadata')
     parser.add_argument('--published-go-release', action='store_true',
                         help='verify the pinned actual published Go binary without a Go SDK')
-    parser.add_argument('--published-go-tag', default=gate.go_build_info.DEFAULT_TAG,
-                        choices=gate.go_build_info.SUPPORTED_TAGS)
     parser.add_argument('--output-dir', type=Path, required=True,
                         help='new disposable evidence directory; it must not exist')
     parser.add_argument('--sandbox-control', type=Path,
                         help='native compiled Windows kernel-denial control')
     args = parser.parse_args()
     result = run(args.go, args.rust, args.go_tool, args.output_dir, args.go_archive,
-                 args.published_go_release, args.sandbox_control, args.published_go_tag)
+                 args.published_go_release, args.sandbox_control)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']),
                       'schema_versions': result['schema_versions'],
