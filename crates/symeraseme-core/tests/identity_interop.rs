@@ -1,7 +1,5 @@
 #[path = "support/frozen_go_oracle.rs"]
 mod frozen_go_oracle;
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
 
 use symeraseme_core::identity::{
     Profile, ProfileAddress, ProfileError, canonical_generic_json, canonical_json,
@@ -9,16 +7,7 @@ use symeraseme_core::identity::{
 };
 
 fn go_oracle(request: &[u8]) -> Vec<u8> {
-    if !frozen_go_oracle::live_mode() {
-        return frozen_go_oracle::run("identity", request);
-    }
-    let run = go_oracle::run_oracle("identity", Some(request));
-    assert!(
-        run.status.success(),
-        "Go oracle failed: {}",
-        String::from_utf8_lossy(&run.stderr)
-    );
-    run.stdout
+    frozen_go_oracle::run("identity", request)
 }
 
 fn profile() -> Profile {
@@ -48,21 +37,17 @@ fn rust_writer_is_readable_by_go_and_hashes_match() {
     let plaintext = serde_json::to_vec(&value).expect("serialize profile");
     let fresh = encrypt_profile(&plaintext, &key).expect("encrypt");
     assert_eq!(decrypt_profile_with_key(&fresh, &key).unwrap().0, plaintext);
-    let envelope = if frozen_go_oracle::live_mode() {
-        fresh
-    } else {
-        let recorded = frozen_go_oracle::case("identity-original-rust-writer-go-decrypt");
-        assert_eq!(&recorded.request[1..33], &key);
-        assert_eq!(recorded.stdout, plaintext);
-        assert_ne!(
-            fresh,
-            recorded.request[33..],
-            "production nonce must remain fresh"
-        );
-        // Only this actual recorded Rust envelope is replayed to its measured
-        // Go reader result. The private writer unit test reproduces all bytes.
-        recorded.request[33..].to_vec()
-    };
+    let recorded = frozen_go_oracle::case("identity-original-rust-writer-go-decrypt");
+    assert_eq!(&recorded.request[1..33], &key);
+    assert_eq!(recorded.stdout, plaintext);
+    assert_ne!(
+        fresh,
+        recorded.request[33..],
+        "production nonce must remain fresh"
+    );
+    // Only this actual recorded Rust envelope is replayed to its measured
+    // Go reader result. The private writer unit test reproduces all bytes.
+    let envelope = recorded.request[33..].to_vec();
 
     let mut request = vec![b'd'];
     request.extend_from_slice(&key);

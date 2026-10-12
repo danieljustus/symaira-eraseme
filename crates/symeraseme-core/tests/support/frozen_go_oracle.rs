@@ -57,11 +57,16 @@ const OBSERVATIONS: &[Observation] = &[
     ),
 ];
 
-pub fn live_mode() -> bool {
+/// Live Go dispatch was removed: this suite only replays recorded captures.
+/// `=1` is rejected instead of silently claiming a live comparison.
+fn reject_live_go_opt_in() {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => false,
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
+        Ok("1") => panic!(
+            "SYMERASEME_PARITY_LIVE_GO=1 is unsupported: Go is no longer executed by Rust tests; \
+             only recorded frozen captures are checked"
+        ),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
 }
 
@@ -82,6 +87,7 @@ fn provenance() -> &'static serde_json::Value {
 }
 
 fn verify(observation: &'static Observation) -> &'static Observation {
+    reject_live_go_opt_in();
     let recorded = provenance()["observations"]
         .as_array()
         .unwrap()
