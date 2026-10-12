@@ -1,7 +1,5 @@
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
 
 use std::{
     fs,
@@ -209,63 +207,17 @@ fn canonical_sql(sql: &str) -> String {
 
 fn run_go_storage_oracle() -> serde_json::Value {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => {}
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            if frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-                .is_some()
-            {
-                return verified_frozen_storage(include_bytes!(
-                    "../../../tests/fixtures/go-frozen/storage/storage.stdout"
-                ));
-            }
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => verified_frozen_storage(include_bytes!(
+            "../../../tests/fixtures/go-frozen/storage/storage.stdout"
+        )),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
-    let build_cache = tempdir().expect("create isolated Go build cache");
-    let repository = repository_root();
-    // Both phases go through the shared bounded runner. `go run` recompiles the
-    // oracle on every call, so the compile cost came out of the runtime budget
-    // here too — the same defect #912 fixed for the other three call sites.
-    let scratch = tempdir().expect("oracle output scratch");
-    let mut go_test = go_oracle::go_command(&repository, build_cache.path());
-    go_test.args([
-        "test",
-        "-tags",
-        "storage_oracle",
-        "./rust-tests/parity/oracle/storage",
-    ]);
-    let test_output = go_oracle::run_bounded(
-        go_test,
-        None,
-        &scratch.path().join("go-test.stdout"),
-        &scratch.path().join("go-test.stderr"),
-        go_oracle::ORACLE_BUILD_TIMEOUT,
-    )
-    .expect("run the committed Go storage oracle negative controls");
-    assert!(
-        test_output.status.success(),
-        "Go storage oracle negative controls failed: {}",
-        String::from_utf8_lossy(&test_output.stderr)
-    );
-
-    let output = go_oracle::run_oracle_with_tags(
-        "storage",
-        &["storage_oracle"],
-        build_cache.path(),
-        &repository,
-    );
-    assert!(
-        output.status.success(),
-        "Go storage oracle failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("Go storage oracle must emit valid JSON")
 }
 
 fn verified_frozen_storage(bytes: &[u8]) -> serde_json::Value {
     let native = frozen_native_capture::verify(
         frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-            .expect("unrecorded native storage target must use the actual Go producer"),
+            .expect("no recorded native storage capture for this target; live Go is retired"),
         std::env::consts::OS,
         std::env::consts::ARCH,
     );

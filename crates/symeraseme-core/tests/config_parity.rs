@@ -9,7 +9,7 @@ use std::process::{Child, Command, Stdio};
 #[cfg(unix)]
 use std::thread;
 #[cfg(unix)]
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use symeraseme_core::config::{
     Config, ConfigContext, ConfigError, Storage, default_encrypted_temp_dir, defaults, load,
     resolve_storage,
@@ -86,7 +86,6 @@ const ORACLE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 #[cfg(unix)]
 fn run_go_config_oracle() -> Value {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => {}
         Ok("0") | Err(std::env::VarError::NotPresent) => {
             if cfg!(target_os = "linux") {
                 return verified_frozen_config(include_bytes!(
@@ -105,59 +104,9 @@ fn run_go_config_oracle() -> Value {
                 );
             }
         }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let temp_root = std::env::temp_dir().join(format!(
-        "symeraseme-config-oracle-{}-{}-{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock")
-            .as_nanos(),
-        unique_seq()
-    ));
-    fs::create_dir(&temp_root).expect("create isolated oracle build directory");
-    let _cleanup = TempRootGuard(temp_root.clone());
-    let executable = temp_root.join(if cfg!(windows) {
-        "config-oracle.exe"
-    } else {
-        "config-oracle"
-    });
-
-    let mut build = Command::new("go");
-    build
-        .args(["build", "-o"])
-        .arg(&executable)
-        .arg("./rust-tests/parity/oracle/config")
-        .current_dir(&root)
-        .env("GOWORK", "off");
-    let build_output = run_file_backed(
-        &mut build,
-        &temp_root.join("build.stdout"),
-        &temp_root.join("build.stderr"),
-        ORACLE_TIMEOUT,
-    )
-    .expect("Go must be available for the committed config oracle");
-    assert!(
-        build_output.status.success(),
-        "Go config oracle build failed"
-    );
-
-    let mut oracle = Command::new(&executable);
-    oracle.current_dir(&root).env_clear();
-    let output = run_file_backed(
-        &mut oracle,
-        &temp_root.join("oracle.stdout"),
-        &temp_root.join("oracle.stderr"),
-        ORACLE_TIMEOUT,
-    )
-    .expect("Go config oracle execution must complete within its bounded timeout");
-    assert!(
-        output.status.success(),
-        "Go config oracle exited unsuccessfully"
-    );
-    serde_json::from_slice(&output.stdout).expect("Go config oracle must emit valid JSON")
+    panic!("no recorded native config capture for this target; live Go is retired")
 }
 
 #[cfg(unix)]
@@ -293,16 +242,6 @@ fn frozen_config_rejects_changed_bytes_and_missing_storage_effects() {
         std::panic::catch_unwind(|| verified_frozen_config(&serde_json::to_vec(&missing).unwrap()))
             .is_err()
     );
-}
-
-#[cfg(unix)]
-struct TempRootGuard(PathBuf);
-
-#[cfg(unix)]
-impl Drop for TempRootGuard {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
 }
 
 #[cfg(unix)]
@@ -538,6 +477,25 @@ fn oracle_runner_timeout_helper() {
 
 // These probes require tree-safe termination and therefore remain Unix-only
 // until the documented Windows Job Object capability is implemented.
+#[cfg(unix)]
+#[test]
+fn run_file_backed_accepts_bounded_rust_output() {
+    let tree = TestTree::new("runner-success");
+    let mut command = Command::new(std::env::current_exe().expect("current test executable"));
+    command.args(["--exact", "oracle_runner_timeout_helper"]);
+    command.env_remove("SYMERASEME_CONFIG_ORACLE_TIMEOUT_HELPER");
+    let output = run_file_backed(
+        &mut command,
+        &tree.root.join("stdout"),
+        &tree.root.join("stderr"),
+        ORACLE_TIMEOUT,
+    )
+    .expect("bounded Rust helper succeeds without Go");
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed; 0 failed"));
+    assert!(output._stderr.is_empty());
+}
+
 #[cfg(unix)]
 #[test]
 fn run_file_backed_enforces_live_output_limit() {
@@ -813,12 +771,4 @@ fn cfg_006_relative_xdg_falls_back_and_temp_dir_is_user_scoped() {
         normalized_result(&tree.root, &config, &storage),
         fixture("CFG-006")
     );
-}
-
-/// Per-process sequence: macOS clocks tick in microseconds, so pid+nanos alone
-/// collides when parallel tests create their directories at the same instant.
-#[cfg(unix)]
-fn unique_seq() -> u64 {
-    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

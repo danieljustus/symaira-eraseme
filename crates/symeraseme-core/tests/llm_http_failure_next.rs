@@ -1,7 +1,6 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -40,21 +39,18 @@ const FIXTURE_MALFORMED_CHOICE: &str = include_str!(concat!(
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
 
 #[test]
 fn llm_failure_fixtures_regenerate_from_pinned_go_oracle() {
-    let live = if live_go_required() {
-        Some(build_live_oracle())
-    } else {
-        None
-    };
-    let binary = live.as_ref().map(|root| {
-        root.path()
-            .join(format!("llm-failure{}", std::env::consts::EXE_SUFFIX))
-    });
-    let executable = binary.as_deref();
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+    }
+    assert!(
+        frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
+            .is_some(),
+        "no recorded native LLM capture for this target; live Go is retired"
+    );
     let cases = [
         (FIXTURE, &[][..]),
         (FIXTURE_404, &["--status", "404"][..]),
@@ -72,7 +68,7 @@ fn llm_failure_fixtures_regenerate_from_pinned_go_oracle() {
     ];
     thread::scope(|scope| {
         let checks = cases.map(|(fixture, args)| {
-            scope.spawn(move || assert_oracle_fixture_matches(fixture, args, executable))
+            scope.spawn(move || verify_frozen_llm_fixture(fixture.as_bytes(), args))
         });
         for check in checks {
             check.join().expect("Go fixture comparison thread");
@@ -206,84 +202,6 @@ fn go_source(path: &str) -> Vec<u8> {
         }
         _ => panic!("unexpected Go source {path}"),
     }
-}
-
-fn live_go_required() -> bool {
-    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-                .is_none()
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
-    }
-}
-
-fn build_live_oracle() -> tempfile::TempDir {
-    let root = tempfile::tempdir().unwrap();
-    let executable = root
-        .path()
-        .join(format!("llm-failure{}", std::env::consts::EXE_SUFFIX));
-    let mut command = Command::new("go");
-    command
-        .args(["build", "-mod=readonly", "-buildvcs=true", "-o"])
-        .arg(executable)
-        .arg("./rust-tests/parity/oracle/llm-failures-next")
-        .current_dir(ROOT)
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off");
-    let output = go_oracle::run_bounded(
-        command,
-        None,
-        &root.path().join("build.stdout"),
-        &root.path().join("build.stderr"),
-        go_oracle::ORACLE_BUILD_TIMEOUT,
-    )
-    .unwrap();
-    assert!(
-        output.status.success(),
-        "Go LLM build failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    root
-}
-
-fn assert_oracle_fixture_matches(
-    fixture_json: &str,
-    args: &[&str],
-    executable: Option<&std::path::Path>,
-) {
-    let Some(executable) = executable else {
-        verify_frozen_llm_fixture(fixture_json.as_bytes(), args);
-        return;
-    };
-    static NEXT_INVOCATION: AtomicU64 = AtomicU64::new(0);
-    let index = NEXT_INVOCATION.fetch_add(1, Ordering::Relaxed);
-    let root = executable.parent().unwrap();
-    let mut command = Command::new(executable);
-    command
-        .args(args)
-        .current_dir(ROOT)
-        .env_remove("LLM_FAILURES_NEXT_FIXTURE");
-    let output = go_oracle::run_bounded(
-        command,
-        None,
-        &root.join(format!("run-{index}.stdout")),
-        &root.join(format!("run-{index}.stderr")),
-        go_oracle::ORACLE_TIMEOUT,
-    )
-    .unwrap();
-    assert!(
-        output.status.success(),
-        "Go LLM fixture failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        output.stdout,
-        fixture_json.as_bytes(),
-        "complete pinned Go fixture drifted"
-    );
 }
 
 fn verify_frozen_llm_fixture(fixture: &[u8], args: &[&str]) {
