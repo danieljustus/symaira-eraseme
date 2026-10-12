@@ -13,34 +13,34 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
-        "24d87bcfe0ac6e624da9bbe48189a3a52e735175344e96ee564c1f1e6c7d2d50",
+        "13ddc6a43036d6b34706db2b82bbb5a13c40d6de",
+        "9a61eab0fddc64bbb042460573968f8fc09b4d9e56421513e1f77d780d4bb5da",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/darwin-amd64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/http-wire/darwin-amd64/wire.json"
         ),
     ),
     (
         "darwin/arm64",
-        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
-        "f23f8e1c5e8e0df47a12a360874a46c9a878d4d58cccde9703c7b009d5fa3c09",
+        "13ddc6a43036d6b34706db2b82bbb5a13c40d6de",
+        "6873ac6b7591b04e3635a84129dcc9a56e6eb52286429b3ab51d168b0410bb46",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/darwin-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/http-wire/darwin-arm64/wire.json"
         ),
     ),
     (
         "linux/amd64",
-        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
-        "8ef6d8285d3b51e0b2ec1885333d44b666b2e435b8eb6bd5c07aae2419472c43",
+        "13ddc6a43036d6b34706db2b82bbb5a13c40d6de",
+        "2a8ceb88755e2f10a7aeac87b0093d3bb23c36f2846ebeff1bacb6cd24f81af6",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/linux-amd64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/http-wire/linux-amd64/wire.json"
         ),
     ),
     (
         "linux/arm64",
-        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
-        "0cbdff2d346f7e947259406402748fe6c00cdfb2f321c08bdb52148153ee798e",
+        "13ddc6a43036d6b34706db2b82bbb5a13c40d6de",
+        "ceff509aaa9df6b62cde31016929bfef23729942556a99d9895f181da659d5ef",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/linux-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/http-wire/linux-arm64/wire.json"
         ),
     ),
 ];

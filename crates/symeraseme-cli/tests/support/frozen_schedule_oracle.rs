@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::path::{Component, Path};
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
+const REVISION: &str = "13ddc6a43036d6b34706db2b82bbb5a13c40d6de";
 const TARGETS: [&str; 6] = [
     "linux-amd64",
     "linux-arm64",
@@ -78,7 +78,7 @@ fn verify(target: &str, manifest: &Value, bytes: &[u8]) -> Value {
     assert_eq!(recorded["stdin"]["bytes"], 0);
     assert_eq!(recorded["stdin"]["sha256"], digest(&[]));
     assert!(valid_bytes(&recorded["stdout"], bytes));
-    let stderr = read("refresh-411b5c10/services", target, "cli-schedule.stderr");
+    let stderr = read("refresh-13ddc6a4/services", target, "cli-schedule.stderr");
     assert!(valid_bytes(&recorded["stderr"], &stderr));
     let info = recorded["embedded_build_info"].as_str().unwrap();
     for expected in [
@@ -112,7 +112,7 @@ fn verify(target: &str, manifest: &Value, bytes: &[u8]) -> Value {
 }
 
 fn manifest(target: &str) -> Value {
-    serde_json::from_slice(&read("refresh-411b5c10/services", target, "manifest.json")).unwrap()
+    serde_json::from_slice(&read("refresh-13ddc6a4/services", target, "manifest.json")).unwrap()
 }
 
 pub fn fixture() -> Option<Value> {
@@ -120,14 +120,14 @@ pub fn fixture() -> Option<Value> {
         return None;
     }
     let target = target(std::env::consts::OS, std::env::consts::ARCH)?;
-    let bytes = read("refresh-411b5c10/services", target, "cli-schedule.stdout");
+    let bytes = read("refresh-13ddc6a4/services", target, "cli-schedule.stdout");
     Some(verify(target, &manifest(target), &bytes))
 }
 
 pub fn verify_all_native_frames_and_reject_corruption() {
     for target in TARGETS {
         let manifest = manifest(target);
-        let bytes = read("refresh-411b5c10/services", target, "cli-schedule.stdout");
+        let bytes = read("refresh-13ddc6a4/services", target, "cli-schedule.stdout");
         verify(target, &manifest, &bytes);
         let mut changed = bytes.clone();
         changed[0] ^= 1;
