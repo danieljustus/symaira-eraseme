@@ -27,14 +27,13 @@ macro_rules! streams {
     };
 }
 
-// Review has measured native records on all six targets.
-pub fn live_review_required() -> bool {
+// Live Go producer mode is retired. SYMERASEME_PARITY_LIVE_GO=1 is rejected.
+pub fn reject_retired_live_go() {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-                .is_none()
-        }
+        Ok("1") => panic!(
+            "SYMERASEME_PARITY_LIVE_GO=1 is retired: live Go builds were removed; use the recorded native captures"
+        ),
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
         _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
 }
@@ -58,9 +57,10 @@ pub struct Observation {
 }
 
 pub fn observations() -> Vec<Observation> {
+    reject_retired_live_go();
     let native = frozen_native_capture::verify(
         frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-            .expect("unrecorded native review target must use the actual Go producer"),
+            .expect("unsupported target: no native review capture (live Go is retired)"),
         std::env::consts::OS,
         std::env::consts::ARCH,
     );

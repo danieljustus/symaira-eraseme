@@ -1,4 +1,4 @@
-//! Actual six-target grant captures. Unrecorded runtime targets use real Go.
+//! Actual six-target grant captures. Unsupported targets are rejected, never replayed.
 use super::frozen_review_oracle::{digest, go_source_pin, valid_bytes};
 use serde_json::Value;
 use std::path::{Component, Path};
@@ -28,19 +28,9 @@ fn recorded_target(os: &str, arch: &str) -> Option<&'static str> {
     }
 }
 
-pub fn live_required() -> bool {
-    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            recorded_target(std::env::consts::OS, std::env::consts::ARCH).is_none()
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
-    }
-}
-
 fn control_target() -> &'static str {
     // Corruption controls inspect recorded files even on unrecorded hosts.
-    // live_required() keeps their runtime parity comparator on actual Go.
+    // observation() rejects unrecorded hosts before any comparison.
     recorded_target(std::env::consts::OS, std::env::consts::ARCH).unwrap_or("linux-amd64")
 }
 
@@ -128,6 +118,7 @@ fn verify(manifest: &Value, target: &str) {
 fn manifest() -> &'static Value {
     static MANIFEST: OnceLock<Value> = OnceLock::new();
     MANIFEST.get_or_init(|| {
+        super::frozen_review_oracle::reject_retired_live_go();
         let manifest = serde_json::from_slice(&read(control_target(), "manifest.json")).unwrap();
         verify(&manifest, control_target());
         manifest
@@ -142,8 +133,8 @@ pub struct ExpectedOutput {
 
 pub fn observation(index: usize, argv: &[&str]) -> ExpectedOutput {
     assert!(
-        !live_required(),
-        "unrecorded target must execute the live Go producer"
+        recorded_target(std::env::consts::OS, std::env::consts::ARCH).is_some(),
+        "unsupported target: no native grant capture (live Go is retired)"
     );
     let case = &manifest()["cli_grants"]["cases"][index];
     assert_eq!(

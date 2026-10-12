@@ -541,59 +541,6 @@ fn directory_entries(directory: &Path, context: &str) -> Vec<String> {
         .collect()
 }
 
-fn build_go_cli(root: &Path) -> PathBuf {
-    let go_binary = root.join(if cfg!(windows) {
-        "symeraseme-go.exe"
-    } else {
-        "symeraseme-go"
-    });
-    let mut build_command = Command::new("go");
-    build_command
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .args(["build", "-mod=readonly", "-buildvcs=true", "-o"])
-        .arg(&go_binary)
-        .arg("./cmd/symeraseme")
-        .stdin(Stdio::null());
-    let stdout_path = root.join("go-build.stdout");
-    let stderr_path = root.join("go-build.stderr");
-    build_command
-        .stdout(Stdio::from(fs::File::create(&stdout_path).unwrap()))
-        .stderr(Stdio::from(fs::File::create(&stderr_path).unwrap()));
-    configure_process_group(&mut build_command);
-    let mut child = build_command.spawn().expect("build live Go CLI");
-    let started = Instant::now();
-    let status = loop {
-        if capture_exceeded(&stdout_path, &stderr_path) {
-            terminate_bounded(&mut child).expect("Go build oversized-output cleanup");
-            panic!("Go review build exceeded output limit");
-        }
-        if let Some(status) = child.try_wait().expect("poll Go build") {
-            break status;
-        }
-        if started.elapsed() >= Duration::from_secs(120) {
-            terminate_bounded(&mut child).expect("Go build timeout cleanup");
-            panic!("Go review build exceeded the shared oracle build budget");
-        }
-        thread::sleep(Duration::from_millis(5));
-    };
-    let build = ProcessOutput {
-        status,
-        stdout: read_bounded(&stdout_path),
-        stderr: read_bounded(&stderr_path),
-    };
-    assert!(
-        build.status.success(),
-        "Go CLI build failed: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
-    go_binary
-}
-
 fn replace_json_integer(text: &str, key: &str) -> String {
     let marker = format!("\"{key}\":");
     let mut output = String::with_capacity(text.len());
@@ -1287,13 +1234,7 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
     let original = b"Alice Example <alice@example.invalid>\n";
     fs::write(&input, original).expect("review input");
 
-    let live = frozen_review_oracle::live_review_required();
-    let go_binary = live.then(|| build_go_cli(&root));
-    let frozen = if live {
-        Vec::new()
-    } else {
-        frozen_review_oracle::observations()
-    };
+    let frozen = frozen_review_oracle::observations();
 
     let cases: &[&[&str]] = &[
         &["review"],
@@ -1312,28 +1253,13 @@ fn review_positional_and_path_aliases_match_the_live_go_cli() {
         &["review", "--path", "missing.txt", "--output", "json"],
         &["review", "review.txt", "--output", "yaml"],
     ];
-    if !live {
-        assert_eq!(frozen.len(), cases.len());
-    }
+    assert_eq!(frozen.len(), cases.len());
     for (index, argv) in cases.iter().enumerate() {
-        let live_output = go_binary.as_ref().map(|program| {
-            run_program_with_resources(program, argv, &home, &cwd, &capture, index * 2, None)
-        });
-        let (status, stdout, stderr) = if let Some(output) = &live_output {
-            (
-                output.status.code(),
-                output.stdout.as_slice(),
-                output.stderr.as_slice(),
-            )
-        } else {
-            let observation = &frozen[index];
-            assert_eq!(observation.argv, *argv, "source-bound review argv");
-            (
-                Some(observation.status),
-                observation.stdout,
-                observation.stderr,
-            )
-        };
+        let observation = &frozen[index];
+        assert_eq!(observation.argv, *argv, "source-bound review argv");
+        let status = Some(observation.status);
+        let stdout = observation.stdout;
+        let stderr = observation.stderr;
         let rust =
             run_program_with_resources(&binary(), argv, &home, &cwd, &capture, index * 2 + 1, None);
         assert_eq!(rust.status.code(), status, "{argv:?} status");
@@ -1470,6 +1396,7 @@ fn render_template_accepts_go_double_prefix_normalization() {
     assert_eq!(double_prefix.stderr, canonical.stderr);
 }
 
+#[cfg(windows)]
 const SCHEDULE_FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/cli-schedule/cases.json"
@@ -1610,53 +1537,6 @@ fn hash_tree(
     out
 }
 
-/// Explicit live mode and unrecorded Windows hosts execute the same Go oracle.
-fn live_schedule_fixture() -> Value {
-    let root = unique_root();
-    fs::create_dir_all(&root).expect("isolated oracle capture root");
-    let _cleanup = Cleanup(root.clone());
-    let stdout_path = root.join("go-schedule.stdout");
-    let stderr_path = root.join("go-schedule.stderr");
-    let stdout = fs::File::create(&stdout_path).expect("create Go stdout capture");
-    let stderr = fs::File::create(&stderr_path).expect("create Go stderr capture");
-    let mut command = Command::new("go");
-    command
-        .args(["run", "./rust-tests/parity/oracle/cli-schedule"])
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("TMP", &root)
-        .env("TEMP", &root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr));
-    configure_process_group(&mut command);
-    let mut child = command.spawn().expect("pinned Go oracle starts");
-    let started = Instant::now();
-    let status = loop {
-        if capture_exceeded(&stdout_path, &stderr_path) {
-            terminate_bounded(&mut child).expect("oversized Go oracle cleanup");
-            panic!("Go schedule oracle exceeded the capture limit");
-        }
-        if let Some(status) = child.try_wait().expect("poll Go oracle") {
-            break status;
-        }
-        if started.elapsed() >= Duration::from_secs(180) {
-            terminate_bounded(&mut child).expect("timed-out Go oracle cleanup");
-            panic!("Go schedule oracle exceeded 180 seconds");
-        }
-        thread::sleep(Duration::from_millis(25));
-    };
-    assert!(
-        status.success(),
-        "Go schedule oracle failed: {}",
-        String::from_utf8_lossy(&read_bounded(&stderr_path))
-    );
-    serde_json::from_slice(&read_bounded(&stdout_path)).expect("actual native Go schedule fixture")
-}
-
 /// `schedule install/uninstall/status` answer the Go oracle's recorded bytes.
 ///
 /// PATH is cleared so no real `launchctl`, `systemctl` or `crontab` can be
@@ -1666,14 +1546,8 @@ fn live_schedule_fixture() -> Value {
 /// exact everywhere else.
 #[test]
 fn schedule_commands_match_the_go_oracle() {
-    let fixture = frozen_schedule_oracle::fixture().unwrap_or_else(|| {
-        if cfg!(windows) || frozen_schedule_oracle::live_requested() {
-            live_schedule_fixture()
-        } else {
-            // Retain the existing Unix fixture until a Mac-native capture is read back.
-            serde_json::from_str(SCHEDULE_FIXTURE).expect("schedule fixture")
-        }
-    });
+    let fixture = frozen_schedule_oracle::fixture()
+        .expect("unsupported target: no native schedule capture (live Go is retired)");
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.cli.v1");
     assert_eq!(
         fixture["source"],
@@ -2541,16 +2415,12 @@ fn events_and_grant_populated_paths_match_live_go() {
     let capture = root.join("capture");
     let data_dir = root.join("data");
     let rust_grant_dir = root.join("rust-grant-data");
-    let go_grant_dir = root.join("go-grant-data");
     fs::create_dir_all(&home).expect("isolated home");
     fs::create_dir_all(&cwd).expect("isolated cwd");
     fs::create_dir_all(&capture).expect("capture directory");
     fs::create_dir_all(&data_dir).expect("isolated data directory");
     fs::create_dir_all(&rust_grant_dir).expect("Rust grant data directory");
-    let live = frozen_grant_oracle::live_required();
-    if live {
-        fs::create_dir_all(&go_grant_dir).expect("Go grant data directory");
-    }
+    frozen_review_oracle::reject_retired_live_go();
     let _cleanup = Cleanup(root.clone());
     seed_store(&data_dir.join("symeraseme.db"));
 
@@ -2627,43 +2497,18 @@ fn events_and_grant_populated_paths_match_live_go() {
         "invalid request ID stderr"
     );
 
-    // Exercise the populated state machine in two independent data roots.
-    let go_binary = live.then(|| build_go_cli(&root));
+    // The Go side replays the recorded native grant captures.
     let go_grant = |argv: &[&str], index: usize| {
-        if let Some(program) = &go_binary {
-            let output = run_program_with_data_dir(
-                program,
-                argv,
-                &home,
-                &cwd,
-                &capture,
-                index,
-                &go_grant_dir,
-            );
-            frozen_grant_oracle::ExpectedOutput {
-                status: output.status.code().expect("live Go grant exits normally"),
-                stdout: output.stdout,
-                stderr: output.stderr,
-            }
-        } else {
-            let step = match index {
-                926 => 0,
-                928 => 1,
-                930 => 2,
-                932 => 3,
-                934 => 4,
-                936 => 5,
-                other => panic!("unobserved Go grant step {other}"),
-            };
-            frozen_grant_oracle::observation(step, argv)
-        }
-    };
-    let go_snapshot = |step: usize| {
-        if live {
-            consent_snapshot(&go_grant_dir)
-        } else {
-            frozen_grant_oracle::snapshot(step)
-        }
+        let step = match index {
+            926 => 0,
+            928 => 1,
+            930 => 2,
+            932 => 3,
+            934 => 4,
+            936 => 5,
+            other => panic!("unobserved Go grant step {other}"),
+        };
+        frozen_grant_oracle::observation(step, argv)
     };
     let rust_grant = |argv: &[&str], index: usize| {
         run_program_with_data_dir(
@@ -2692,7 +2537,10 @@ fn events_and_grant_populated_paths_match_live_go() {
         normalize_grant_bytes(&rust_issued.stdout, &[&rust_first_token]),
         "grant issue stable bytes"
     );
-    assert_eq!(go_snapshot(0), consent_snapshot(&rust_grant_dir));
+    assert_eq!(
+        frozen_grant_oracle::snapshot(0),
+        consent_snapshot(&rust_grant_dir)
+    );
 
     // `--list` and `--list-tokens` are aliases. One token avoids unstable
     // ordering when two issue times land in the same second.
@@ -2765,20 +2613,13 @@ fn events_and_grant_populated_paths_match_live_go() {
         ),
         "grant positional issue stable bytes"
     );
-    let go_files = go_snapshot(2);
+    let go_files = frozen_grant_oracle::snapshot(2);
     let rust_files = consent_snapshot(&rust_grant_dir);
     assert_eq!(go_files, rust_files, "consent records after TTL issue");
     for record in [&go_listed, &rust_listed] {
         assert_eq!(record["count"], 1);
     }
-    let go_records = if live {
-        directory_entries(&go_grant_dir, "read consent directory")
-            .iter()
-            .map(|name| fs::read(go_grant_dir.join(name)).unwrap())
-            .collect::<Vec<_>>()
-    } else {
-        frozen_grant_oracle::records(2)
-    };
+    let go_records = frozen_grant_oracle::records(2);
     let rust_records = directory_entries(&rust_grant_dir, "read consent directory")
         .iter()
         .map(|name| fs::read(rust_grant_dir.join(name)).unwrap())
@@ -2809,7 +2650,10 @@ fn events_and_grant_populated_paths_match_live_go() {
     assert_eq!(Some(go_revoke.status), rust_revoke.status.code());
     assert_eq!(go_revoke.stdout, rust_revoke.stdout);
     assert_eq!(go_revoke.stderr, rust_revoke.stderr);
-    assert_eq!(go_snapshot(3), consent_snapshot(&rust_grant_dir));
+    assert_eq!(
+        frozen_grant_oracle::snapshot(3),
+        consent_snapshot(&rust_grant_dir)
+    );
 
     let go_revoke_all = go_grant(&["grant", "--revoke-all", "--output", "json"], 934);
     let rust_revoke_all = rust_grant(&["grant", "--revoke-all", "--output", "json"], 935);
@@ -2820,7 +2664,7 @@ fn events_and_grant_populated_paths_match_live_go() {
         go_revoke_all.stdout,
         b"{\"revoke_all\":true,\"revoked\":1,\"success\":true}\n"
     );
-    assert!(go_snapshot(4).is_empty());
+    assert!(frozen_grant_oracle::snapshot(4).is_empty());
     assert!(consent_snapshot(&rust_grant_dir).is_empty());
 
     let go_empty = go_grant(&["grant", "--list-tokens", "--output", "json"], 936);
