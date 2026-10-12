@@ -21,8 +21,10 @@ use symeraseme_core::triage_contract::select_fallback_template;
 use symeraseme_core::triage_prompts::build_user_prompt;
 
 const FIXTURE: &str = include_str!("../../../tests/fixtures/triage-corpus/dom004c.json");
-const CLASSIFIER_GO: &[u8] = include_bytes!("../../../internal/triage/classifier.go");
-const REBUTTAL_GO: &[u8] = include_bytes!("../../../internal/triage/rebuttal.go");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+#[allow(dead_code)] // This comparator only needs the historical source reader.
+mod go_source_pin;
 const CORPUS_ACK: &[u8] = include_bytes!("../../../tests/fixtures/broker_replies/ack_gdpr.txt");
 const CORPUS_OOTO: &[u8] =
     include_bytes!("../../../tests/fixtures/broker_replies/autoresponder_ooto.txt");
@@ -91,11 +93,17 @@ fn fixture_pins_the_go_sources_it_was_generated_from() {
     );
     assert_eq!(
         fixture.source_sha256["internal/triage/classifier.go"],
-        sha256_hex(CLASSIFIER_GO)
+        sha256_hex(&go_source_pin::current_source(
+            ROOT,
+            "internal/triage/classifier.go"
+        ))
     );
     assert_eq!(
         fixture.source_sha256["internal/triage/rebuttal.go"],
-        sha256_hex(REBUTTAL_GO)
+        sha256_hex(&go_source_pin::current_source(
+            ROOT,
+            "internal/triage/rebuttal.go"
+        ))
     );
 }
 

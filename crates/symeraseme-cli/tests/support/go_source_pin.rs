@@ -9,10 +9,60 @@
 //! recorded files, so it is compared through those attributes instead.
 
 use std::ffi::OsStr;
+use std::path::{Component, Path};
 use std::process::Command;
 
 const RECORDED_GO_TEST_PACKAGES: [&str; 2] =
     ["internal/campaign/", "rust-tests/parity/oracle/storage/"];
+
+/// Last commit that still contains the Go sources retired by the Rust cutover.
+/// Recorded Go bytes are read from this immutable commit, never from the checkout.
+#[allow(dead_code)] // Not every test binary that includes this module reads sources.
+pub const RETIREMENT_SOURCE_REVISION: &str = "22615ae67325c581fbe60cb0f2d3d2b2139cf900";
+
+#[allow(dead_code)]
+fn is_go_source(name: &str) -> bool {
+    name.ends_with(".go") || name == "go.mod" || name == "go.sum"
+}
+
+/// Immutable bytes of a former Go source. Missing objects fail; nothing fetches.
+#[allow(dead_code)]
+pub fn retired_go_source(root: &str, name: &str) -> Result<Vec<u8>, String> {
+    let relative = Path::new(name);
+    if name.is_empty()
+        || name.contains('\\')
+        || relative.is_absolute()
+        || !relative
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+        || !is_go_source(name)
+    {
+        return Err(format!("not a retired Go source path: {name:?}"));
+    }
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "blob"])
+        .arg(format!("{RETIREMENT_SOURCE_REVISION}:{name}"))
+        .output()
+        .map_err(|error| format!("git unavailable: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "retired Go source {name} is not in {RETIREMENT_SOURCE_REVISION}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(output.stdout)
+}
+
+/// Former Go sources come from history; every other pinned input keeps its checkout bytes.
+#[allow(dead_code)]
+pub fn current_source(root: &str, name: &str) -> Vec<u8> {
+    if is_go_source(name) {
+        retired_go_source(root, name).unwrap_or_else(|error| panic!("{error}"))
+    } else {
+        std::fs::read(Path::new(root).join(name)).unwrap()
+    }
+}
 
 pub fn current_tree_bound(name: &str) -> bool {
     name != ".gitattributes" && !name.ends_with("_test.go")

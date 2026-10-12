@@ -5,8 +5,10 @@ use symeraseme_core::redaction::RedactionProfile;
 use symeraseme_core::triage_prompts::{build_rebuttal_classifier_prompt, build_user_prompt};
 
 const FIXTURE: &str = include_str!("../../../tests/fixtures/triage-prompts/dom004b.json");
-const CLASSIFIER_GO: &[u8] = include_bytes!("../../../internal/triage/classifier.go");
-const REBUTTAL_GO: &[u8] = include_bytes!("../../../internal/triage/rebuttal.go");
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+#[allow(dead_code)] // This comparator only needs the historical source reader.
+mod go_source_pin;
 
 #[derive(Debug, Deserialize)]
 struct Fixture {
@@ -76,11 +78,17 @@ fn fixture_is_bound_to_the_reviewed_go_prompt_oracle() {
     );
     assert_eq!(
         fixture.source_sha256["internal/triage/classifier.go"],
-        sha256_hex(CLASSIFIER_GO)
+        sha256_hex(&go_source_pin::current_source(
+            ROOT,
+            "internal/triage/classifier.go"
+        ))
     );
     assert_eq!(
         fixture.source_sha256["internal/triage/rebuttal.go"],
-        sha256_hex(REBUTTAL_GO)
+        sha256_hex(&go_source_pin::current_source(
+            ROOT,
+            "internal/triage/rebuttal.go"
+        ))
     );
     assert_eq!(fixture.cases.len(), 9);
 }

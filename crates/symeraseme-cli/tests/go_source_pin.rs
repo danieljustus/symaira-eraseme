@@ -21,6 +21,54 @@ fn only_unrecorded_go_tests_leave_the_current_tree_pin() {
     assert!(!current_tree_bound("internal/campaign/nested/plan_test.go"));
 }
 
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+#[test]
+fn retired_go_source_bytes_come_from_the_pinned_commit() {
+    // Independent of the checkout: the digest is the recorded producer's sha256 for cmd/symeraseme/main.go.
+    let bytes = go_source_pin::retired_go_source(ROOT, "cmd/symeraseme/main.go").unwrap();
+    assert_eq!(bytes.len(), 5489);
+    let digest: String = <sha2::Sha256 as sha2::Digest>::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        digest,
+        "f7fd95376ae587dcef1aafeba74b9d3a7aa4c47ac520cd2b82903777cefe8bf7"
+    );
+    assert_eq!(
+        go_source_pin::current_source(ROOT, "go.mod"),
+        go_source_pin::retired_go_source(ROOT, "go.mod").unwrap()
+    );
+}
+
+#[test]
+fn retired_go_source_rejects_unsafe_or_non_go_paths() {
+    for name in [
+        "",
+        "/etc/passwd.go",
+        "../outside.go",
+        "internal/../x.go",
+        "internal\\mcp\\server.go",
+        "Cargo.lock",
+        "tests/fixtures/x.json",
+    ] {
+        assert!(
+            go_source_pin::retired_go_source(ROOT, name).is_err(),
+            "accepted {name:?}"
+        );
+    }
+}
+
+#[test]
+fn retired_go_source_missing_object_fails_clearly() {
+    let error = go_source_pin::retired_go_source(ROOT, "internal/does/not/exist.go").unwrap_err();
+    assert!(
+        error.contains("is not in 22615ae67325c581fbe60cb0f2d3d2b2139cf900"),
+        "{error}"
+    );
+}
+
 #[test]
 fn only_first_party_release_lock_versions_may_differ() {
     // Synthetic reader controls, never Go observations or replacement captures.
