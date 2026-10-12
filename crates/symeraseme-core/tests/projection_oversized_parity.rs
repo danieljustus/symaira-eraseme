@@ -83,20 +83,15 @@ fn frozen_output(bytes: &[u8]) -> OracleOutput {
     );
     assert_eq!(manifest["go_version"], "go1.26.6");
     assert_eq!(manifest["native_target"], target);
-    for (path, source) in [
-        (
-            "rust-tests/parity/oracle/projection/cases.json",
-            CASES.as_bytes(),
-        ),
-        (
-            "rust-tests/parity/oracle/projection/main.go",
-            include_bytes!("../../../rust-tests/parity/oracle/projection/main.go").as_slice(),
-        ),
-        (
-            "internal/eventstore/projection.go",
-            include_bytes!("../../../internal/eventstore/projection.go").as_slice(),
-        ),
+    for path in [
+        "rust-tests/parity/oracle/projection/cases.json",
+        "rust-tests/parity/oracle/projection/main.go",
+        "internal/eventstore/projection.go",
     ] {
+        let source = frozen_native_capture::go_source_pin::current_source(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),
+            path,
+        );
         assert_eq!(manifest["source_files"][path]["bytes"], source.len());
         assert_eq!(
             manifest["source_files"][path]["sha256"],

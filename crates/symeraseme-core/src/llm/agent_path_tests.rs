@@ -1,3 +1,6 @@
+#[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/agent-path/current-relative-entry.json"
@@ -10,9 +13,10 @@ fn go_fixture() -> serde_json::Value {
         serde_json::from_str(FIXTURE).expect("Go agent path fixture parses");
     assert_eq!(fixture["schema"], "symeraseme.go-oracle.agent-path.v1");
     for (path, expected) in fixture["sources_sha256"].as_object().unwrap() {
-        let source: &[u8] = match path.as_str() {
-            "internal/llm/agent.go" => include_bytes!("../../../../internal/llm/agent.go"),
-            "go.mod" => include_bytes!("../../../../go.mod"),
+        let source = match path.as_str() {
+            "internal/llm/agent.go" | "go.mod" => {
+                go_source_pin::current_source(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."), path)
+            }
             other => panic!("unexpected source {other}"),
         };
         assert_eq!(
