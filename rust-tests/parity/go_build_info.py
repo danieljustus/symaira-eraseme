@@ -1,8 +1,10 @@
 """Read bounded inline Go build metadata without installing or executing Go.
 
-The retained Go 1.26.6 release uses the documented inline build-info format.
+The retained Go 1.26.6 releases use the documented inline build-info format.
 Older pointer-based formats are rejected. Artifact identity and native target
 must be verified separately; metadata alone does not establish source identity.
+Release tags are an allowlist; each manifest is pinned by its own SHA-256 digest
+and source revision here, not by values read from the manifest itself.
 """
 import hashlib
 import json
@@ -11,24 +13,45 @@ import pathlib
 MAGIC = b"\xff Go buildinf:"
 MODULE_START = bytes.fromhex("3077af0c9274080241e1c107e6d618e6")
 MODULE_END = bytes.fromhex("f932433186182072008242104116d8f2")
-MANIFEST = pathlib.Path(__file__).resolve().parents[2] / "tests/fixtures/go-rollback/v0.12.1.json"
-MANIFEST_SHA256 = "98cc9e2b0ec1e9c9d363363cef8302e806235294048d611b2271a3d5538b162f"
+FIXTURE_DIR = pathlib.Path(__file__).resolve().parents[2] / "tests/fixtures/go-rollback"
+DEFAULT_TAG = "v0.12.1"
+RELEASES = {
+    "v0.12.1": {"manifest_sha256": "98cc9e2b0ec1e9c9d363363cef8302e806235294048d611b2271a3d5538b162f",
+                "source_revision": "240bf67cefa05e643e32611a02e6e7ed87a033ea", "member": "symeraseme"},
+    # v0.13.0 archives also carry the Rust CLI as "symeraseme"; the Go binary is "symeraseme-go".
+    "v0.13.0": {"manifest_sha256": "987815ffeb0a7a89b628395100530829d27ac4e68b5cb8ac5bbbd3e0e8c3302d",
+                "source_revision": "780512f17d4dd434676d62539f81550ce048f77e", "member": "symeraseme-go"},
+}
+SUPPORTED_TAGS = tuple(RELEASES)
 
 
-def release_manifest():
-    raw = MANIFEST.read_bytes()
-    assert len(raw) <= 16384 and hashlib.sha256(raw).hexdigest() == MANIFEST_SHA256, "actual published release manifest changed"
+def release_manifest(tag=DEFAULT_TAG):
+    assert tag in RELEASES, "unsupported retained release tag"
+    pin = RELEASES[tag]
+    raw = (FIXTURE_DIR / (tag + ".json")).read_bytes()
+    assert len(raw) <= 16384 and hashlib.sha256(raw).hexdigest() == pin["manifest_sha256"], "actual published release manifest changed"
     document = json.loads(raw)
     assert document["schema"] == "symeraseme.actual-published-go-release.v1"
-    assert document["tag"] == "v0.12.1" and document["go_version"] == "go1.26.6"
-    assert document["source_revision"] == "240bf67cefa05e643e32611a02e6e7ed87a033ea"
+    assert document["tag"] == tag and document["go_version"] == "go1.26.6"
+    assert document["source_revision"] == pin["source_revision"]
     assert len(document["native_archives"]) == 6
+    assert len({r["native_target"] for r in document["native_archives"]}) == 6
+    for record in document["native_archives"]:
+        expected = binary_member(tag, record["native_target"])
+        assert record.get("binary_member", expected) == expected, "unexpected Go binary member"
     return document
 
 
-def verify_release(path, native_target):
-    """Verify the actual last-release binary identity before using its metadata."""
-    document = release_manifest()
+def binary_member(tag, native_target):
+    """Archive member (and extracted file name) of the Go binary for a tag and target."""
+    assert tag in RELEASES, "unsupported retained release tag"
+    base = RELEASES[tag]["member"]
+    return base + ".exe" if native_target.startswith("windows/") else base
+
+
+def verify_release(path, native_target, tag=DEFAULT_TAG):
+    """Verify the actual release binary identity before using its metadata."""
+    document = release_manifest(tag)
     records = [r for r in document["native_archives"] if r["native_target"] == native_target]
     assert len(records) == 1, "unrecorded retained release target"
     record = records[0]

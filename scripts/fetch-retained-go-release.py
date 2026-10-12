@@ -18,8 +18,9 @@ info = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(info)
 
 
-def fetch(directory, native_target):
-    document = info.release_manifest()
+def fetch(directory, native_target, tag=info.DEFAULT_TAG):
+    assert tag in info.SUPPORTED_TAGS, "unsupported retained release tag"
+    document = info.release_manifest(tag)
     records = [r for r in document["native_archives"] if r["native_target"] == native_target]
     assert len(records) == 1
     record = records[0]
@@ -28,7 +29,7 @@ def fetch(directory, native_target):
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     directory = directory.resolve()
     assert not directory.is_relative_to(REPO.resolve()), "retained binary must stay outside source"
-    base = "https://github.com/danieljustus/symaira-eraseme/releases/download/v0.12.1/"
+    base = "https://github.com/danieljustus/symaira-eraseme/releases/download/" + tag + "/"
 
     def download(name, size, digest):
         assert pathlib.PurePosixPath(name).name == name
@@ -54,7 +55,7 @@ def fetch(directory, native_target):
         checksums[name] = digest
     assert checksums[record["archive"]] == record["archive_sha256"]
     archive = download(record["archive"], record["archive_bytes"], record["archive_sha256"])
-    name = "symeraseme.exe" if native_target.startswith("windows/") else "symeraseme"
+    name = info.binary_member(tag, native_target)
     binary = directory / name
     assert not binary.is_symlink()
     if not binary.exists():
@@ -74,8 +75,8 @@ def fetch(directory, native_target):
         with binary.open("xb") as stream:
             stream.write(raw)
         binary.chmod(0o700)
-    metadata, provenance = info.verify_release(binary, native_target)
-    result = {"binary": str(binary), "native_target": native_target,
+    metadata, provenance = info.verify_release(binary, native_target, tag)
+    result = {"binary": str(binary), "native_target": native_target, "tag": tag,
               "scope": "actual last published Go archive for rollback rehearsal only",
               "sdk_required": False, "source_revision": metadata["source_revision"], "release": provenance}
     (directory / "retained-release.json").write_text(json.dumps(result, indent=2) + "\n")
@@ -85,7 +86,8 @@ def fetch(directory, native_target):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--tag", default=info.DEFAULT_TAG, choices=info.SUPPORTED_TAGS)
     args = parser.parse_args()
     operating_system = {"darwin": "darwin", "linux": "linux", "win32": "windows"}[sys.platform]
     architecture = {"x86_64": "amd64", "AMD64": "amd64", "aarch64": "arm64", "arm64": "arm64", "ARM64": "arm64"}[platform.machine()]
-    print(json.dumps(fetch(args.output_dir, operating_system + "/" + architecture)))
+    print(json.dumps(fetch(args.output_dir, operating_system + "/" + architecture, args.tag)))

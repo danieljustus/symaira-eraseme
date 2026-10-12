@@ -408,13 +408,15 @@ def record_windows_policy(root, executable):
             'network': 'SID-scoped WFP denial', 'exec': str(Path(executable))}
 
 
-def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=None):
+def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=None,
+        published_go_tag=go_build_info.DEFAULT_TAG):
     require(published_go_release != (go_tool is not None),
             'choose published Go release or explicit Go SDK metadata verification')
+    require(published_go_tag in go_build_info.SUPPORTED_TAGS, 'unsupported retained Go release tag')
+    require(published_go_release or published_go_tag == go_build_info.DEFAULT_TAG,
+            'a non-default retained Go release tag requires --published-go-release')
     require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
             'unsupported: switchback confinement is available on macOS, Linux and Windows')
-    require(not (published_go_release and sys.platform == 'win32'),
-            'published Go release verification supports macOS and Linux')
     require((sandbox_control is not None) == (sys.platform == 'win32'),
             'the compiled sandbox control is required on, and only on, Windows')
     if sys.platform.startswith('linux'):
@@ -471,7 +473,7 @@ def run(go, rust, go_tool, root, published_go_release=False, sandbox_control=Non
             require(identity(go_tool_for_info) == identity(go_tool), 'staged Go tool differs')
         go_info_env = dict(env)
         if published_go_release:
-            parsed, release = go_build_info.verify_release(go_for_info, goos + '/' + arch)
+            parsed, release = go_build_info.verify_release(go_for_info, goos + '/' + arch, published_go_tag)
             metadata = parsed['sdk_style_output']
             (root / 'go-artifact.metadata.txt').write_text(metadata)
             report['retained_go_release'] = release
@@ -628,11 +630,13 @@ def main():
         parser.add_argument('--' + flag, type=Path, required=True)
     parser.add_argument('--go-tool', type=Path)
     parser.add_argument('--published-go-release', action='store_true')
+    parser.add_argument('--published-go-tag', default=go_build_info.DEFAULT_TAG,
+                        choices=go_build_info.SUPPORTED_TAGS)
     parser.add_argument('--sandbox-control', type=Path,
                         help='compiled Windows denial control (required on Windows)')
     args = parser.parse_args()
     result = run(args.go, args.rust, args.go_tool, args.output_dir, args.published_go_release,
-                 args.sandbox_control)
+                 args.sandbox_control, args.published_go_tag)
     print(json.dumps({'status': result['status'], 'scope': result['scope'],
                       'executed_cases': len(result['steps']), 'schema_sequence': result['schema_sequence']}))
 
