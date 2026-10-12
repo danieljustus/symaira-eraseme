@@ -1,5 +1,4 @@
-#[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
-mod go_source_pin;
+use super::go_source_pin;
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),

@@ -194,15 +194,15 @@ fn assert_failure_matches_go(fixture_json: &str, expected_status: u16) {
     );
 }
 
-fn go_source(path: &str) -> &'static [u8] {
+fn go_source(path: &str) -> Vec<u8> {
     match path {
-        "internal/llm/factory.go" => include_bytes!("../../../internal/llm/factory.go"),
-        "internal/llm/llmkit.go" => include_bytes!("../../../internal/llm/llmkit.go"),
-        "internal/llm/llm.go" => include_bytes!("../../../internal/llm/llm.go"),
-        "go.mod" => include_bytes!("../../../go.mod"),
-        "go.sum" => include_bytes!("../../../go.sum"),
-        "rust-tests/parity/oracle/llm-failures-next/main.go" => {
-            include_bytes!("../../../rust-tests/parity/oracle/llm-failures-next/main.go")
+        "internal/llm/factory.go"
+        | "internal/llm/llmkit.go"
+        | "internal/llm/llm.go"
+        | "go.mod"
+        | "go.sum"
+        | "rust-tests/parity/oracle/llm-failures-next/main.go" => {
+            frozen_native_capture::go_source_pin::current_source(ROOT, path)
         }
         _ => panic!("unexpected Go source {path}"),
     }
