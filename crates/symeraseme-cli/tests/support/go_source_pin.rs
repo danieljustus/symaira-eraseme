@@ -54,6 +54,34 @@ pub fn retired_go_source(root: &str, name: &str) -> Result<Vec<u8>, String> {
     Ok(output.stdout)
 }
 
+/// Authenticate a retired Rust capture producer against the independent Go-era pin.
+#[allow(dead_code)] // Only SMTP/HTTP replay readers use this shared boundary.
+pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived: &[u8]) {
+    assert!(
+        matches!(
+            name,
+            "crates/symeraseme-core/tests/campaign_smtp.rs"
+                | "crates/symeraseme-core/tests/smtp_transport.rs"
+                | "crates/symeraseme-cli/tests/mcp_http_headers_process.rs"
+        ),
+        "not a retired capture producer: {name}"
+    );
+    let pinned = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "blob"])
+        .arg(format!("{RETIREMENT_SOURCE_REVISION}:{name}"))
+        .output()
+        .expect("read independently pinned capture producer");
+    assert!(
+        pinned.status.success(),
+        "retired capture producer unavailable: {name}"
+    );
+    assert!(
+        archived == pinned.stdout,
+        "retired capture producer mismatch: {name}"
+    );
+}
+
 /// Former Go sources come from history; every other pinned input keeps its checkout bytes.
 #[allow(dead_code)]
 pub fn current_source(root: &str, name: &str) -> Vec<u8> {

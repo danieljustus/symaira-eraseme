@@ -174,18 +174,10 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
                         | "crates/symeraseme-core/tests/smtp_transport.rs"
                 );
             if retired_producer {
-                let pinned = Command::new("git")
-                    .args([
-                        "show",
-                        &format!("{}:{name}", go_source_pin::RETIREMENT_SOURCE_REVISION),
-                    ])
-                    .current_dir(ROOT)
-                    .output()
-                    .unwrap();
-                assert!(pinned.status.success(), "retired SMTP producer unavailable");
-                assert_eq!(
-                    archive.stdout, pinned.stdout,
-                    "retired SMTP producer: {name}"
+                go_source_pin::assert_retired_generator_matches_archive(
+                    ROOT,
+                    name,
+                    &archive.stdout,
                 );
             }
             let archived_bytes = if field == "archived_generators" && target.starts_with("windows/")

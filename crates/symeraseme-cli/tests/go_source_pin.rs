@@ -24,6 +24,42 @@ fn only_unrecorded_go_tests_leave_the_current_tree_pin() {
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 #[test]
+fn retired_capture_producers_reject_changed_bytes_and_unapproved_paths() {
+    for name in [
+        "crates/symeraseme-core/tests/campaign_smtp.rs",
+        "crates/symeraseme-core/tests/smtp_transport.rs",
+        "crates/symeraseme-cli/tests/mcp_http_headers_process.rs",
+    ] {
+        let archived = std::process::Command::new("git")
+            .current_dir(ROOT)
+            .args(["cat-file", "blob"])
+            .arg(format!("13ddc6a43036d6b34706db2b82bbb5a13c40d6de:{name}"))
+            .output()
+            .unwrap();
+        assert!(archived.status.success());
+        go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &archived.stdout);
+        let mut changed = archived.stdout.clone();
+        changed.push(b'!');
+        for bytes in [&changed[..], &archived.stdout[..archived.stdout.len() - 1]] {
+            let error = std::panic::catch_unwind(|| {
+                go_source_pin::assert_retired_generator_matches_archive(ROOT, name, bytes);
+            })
+            .expect_err("the actual producer binding must reject changed bytes");
+            let message = error.downcast_ref::<String>().unwrap();
+            assert!(message.contains("retired capture producer mismatch"));
+        }
+    }
+    for name in ["Cargo.lock", "../outside.rs", "unapproved.rs"] {
+        assert!(
+            std::panic::catch_unwind(|| {
+                go_source_pin::assert_retired_generator_matches_archive(ROOT, name, b"");
+            })
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn retired_go_source_bytes_come_from_the_pinned_commit() {
     // Independent of the checkout: the digest is the recorded producer's sha256 for cmd/symeraseme/main.go.
     let bytes = go_source_pin::retired_go_source(ROOT, "cmd/symeraseme/main.go").unwrap();
