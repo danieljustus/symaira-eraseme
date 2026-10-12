@@ -28,6 +28,21 @@ fn is_denied(error: Option<&io::Error>) -> bool {
     error.is_some_and(|e| matches!(e.raw_os_error(), Some(ERROR_ACCESS_DENIED | WSAEACCES)))
 }
 
+#[test]
+fn only_kernel_access_denials_count_as_network_confinement() {
+    for code in [ERROR_ACCESS_DENIED, WSAEACCES] {
+        assert!(is_denied(Some(&io::Error::from_raw_os_error(code))));
+    }
+    for code in [0, ERROR_CHILD_PROCESS_BLOCKED, 10060, 10061] {
+        assert!(!is_denied(Some(&io::Error::from_raw_os_error(code))));
+    }
+    assert!(!is_denied(None));
+    assert!(!is_denied(Some(&io::Error::new(
+        ErrorKind::PermissionDenied,
+        "not a native error code",
+    ))));
+}
+
 fn denied_permission<T>(result: io::Result<T>) -> bool {
     matches!(result, Err(error) if error.kind() == ErrorKind::PermissionDenied)
 }
