@@ -64,6 +64,7 @@ pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived
                 | "crates/symeraseme-core/tests/smtp_transport.rs"
                 | "crates/symeraseme-cli/tests/mcp_http_headers_process.rs"
                 | "crates/symeraseme-cli/tests/mcp_http_process.rs"
+                | "crates/symeraseme-cli/tests/mcp_http_native_contract.rs"
         ),
         "not a retired capture producer: {name}"
     );

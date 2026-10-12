@@ -1,7 +1,9 @@
 //! Actual Go/Rust bind failures and Windows token DACLs in disposable roots.
 use std::fs;
 use std::net::TcpListener;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(windows)]
+use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
@@ -9,15 +11,14 @@ use std::time::{Duration, Instant};
 #[allow(dead_code)] // Windows-only controls use additional shared process helpers.
 mod mcp_http_port;
 use mcp_http_port::StartedChild;
-#[path = "support/capture_http_aux.rs"]
-#[allow(dead_code)] // Only the Unix process comparators retain raw HTTP bodies.
-mod capture_http_aux;
+
 #[path = "support/frozen_http_aux.rs"]
 #[allow(dead_code)]
 mod frozen_http_aux;
 
 const THIS_FILE: &str = "crates/symeraseme-cli/tests/mcp_http_native_contract.rs";
 
+#[cfg(windows)]
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -82,6 +83,7 @@ fn capture(mut command: Command, logs: &Path, label: &str, budget: Duration) -> 
     }
 }
 
+#[cfg(windows)]
 fn oracle(logs: &Path) -> PathBuf {
     let binary = logs.join("go-mcp.exe");
     let mut command = Command::new("go");
@@ -129,48 +131,24 @@ fn failed_start(
     result
 }
 
-/// Actual Go startup failure, or the recorded one with this run's port.
-fn go_failed_start(
-    recorded: Option<&serde_json::Value>,
-    go: Option<&Path>,
-    measured: &mut Vec<serde_json::Value>,
-    root: &Path,
-    host: &str,
-    port: u16,
-    case: &str,
-) -> (Option<i32>, Vec<u8>) {
+/// Recorded native Go startup failure with this run's port.
+fn go_failed_start(recorded: &serde_json::Value, port: u16, case: &str) -> (Option<i32>, Vec<u8>) {
     let label = format!("go-{case}");
-    if let Some(recorded) = recorded {
-        // failed_start's actual-Go side effects, as measured.
-        assert_eq!(recorded["stdout_bytes"], 0);
-        assert_eq!(recorded["token_bytes"], 43);
-        let (code, stderr) = frozen_http_aux::startup_failure(recorded, case, port);
-        assert_ne!(code, Some(0), "{label} unexpectedly listened");
-        return (code, stderr);
-    }
-    let result = failed_start(go.unwrap(), &root.join(&label), host, port, root, &label);
-    let mut observation =
-        capture_http_aux::startup_failure(case, port, result.status.code(), &result.stderr);
-    observation["stdout_bytes"] = result.stdout.len().into();
-    observation["token_bytes"] = fs::read(root.join(&label).join("data/mcp_token"))
-        .unwrap()
-        .len()
-        .into();
-    measured.push(observation);
-    (result.status.code(), result.stderr)
+    assert_eq!(recorded["stdout_bytes"], 0);
+    assert_eq!(recorded["token_bytes"], 43);
+    let (code, stderr) = frozen_http_aux::startup_failure(recorded, case, port);
+    assert_ne!(code, Some(0), "{label} unexpectedly listened");
+    (code, stderr)
 }
 
 #[test]
 fn native_bind_failures_match_checked_out_go() {
     const TEST: &str = "native_bind_failures_match_checked_out_go";
     let root = tempfile::tempdir().unwrap();
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
-    if let Some(record) = &frozen {
-        assert_eq!(record["cases"].as_array().unwrap().len(), 3);
-    }
-    let recorded = |index: usize| frozen.as_ref().map(|record| &record["cases"][index]);
-    let go = frozen.is_none().then(|| oracle(root.path()));
-    let mut measured = Vec::new();
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
+        .expect("live Go is retired; recorded native bind failures are required");
+    assert_eq!(frozen["cases"].as_array().unwrap().len(), 3);
+    let recorded = |index: usize| &frozen["cases"][index];
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     // IPv6 is a required native control, never an optional zero-case skip.
     for (index, (case, host)) in [("ipv4", "127.0.0.1"), ("ipv6", "::1")]
@@ -179,15 +157,7 @@ fn native_bind_failures_match_checked_out_go() {
     {
         let listener = TcpListener::bind((host, 0)).expect("native loopback listener");
         let port = listener.local_addr().unwrap().port();
-        let (go_code, go_stderr) = go_failed_start(
-            recorded(index),
-            go.as_deref(),
-            &mut measured,
-            root.path(),
-            host,
-            port,
-            case,
-        );
+        let (go_code, go_stderr) = go_failed_start(recorded(index), port, case);
         let rust_result = failed_start(
             rust,
             &root.path().join(format!("rust-{case}")),
@@ -212,15 +182,7 @@ fn native_bind_failures_match_checked_out_go() {
     let probe = TcpListener::bind((host, 0)).unwrap_err();
     assert_eq!(probe.kind(), std::io::ErrorKind::AddrNotAvailable);
     let port = mcp_http_port::free_port();
-    let (go_code, go_stderr) = go_failed_start(
-        recorded(2),
-        go.as_deref(),
-        &mut measured,
-        root.path(),
-        host,
-        port,
-        "unavailable",
-    );
+    let (go_code, go_stderr) = go_failed_start(recorded(2), port, "unavailable");
     let rust_result = failed_start(
         rust,
         &root.path().join("rust-unavailable"),
@@ -239,9 +201,6 @@ fn native_bind_failures_match_checked_out_go() {
             .unwrap()
             .contains(&format!("listen tcp {host}:{port}: bind: "))
     );
-    if let Some(go) = &go {
-        capture_http_aux::record(go, THIS_FILE, TEST, serde_json::json!({"cases": measured}));
-    }
     eprintln!("native bind differential executed IPv4, IPv6 and TEST-NET controls");
 }
 

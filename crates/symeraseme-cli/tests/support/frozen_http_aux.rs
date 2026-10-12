@@ -400,7 +400,11 @@ pub fn verify(
             assert_eq!(recorded["bytes"], archive.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive), "{name}");
             let retired_producer = field == "archived_generators"
-                && name == "crates/symeraseme-cli/tests/mcp_http_process.rs";
+                && matches!(
+                    name.as_str(),
+                    "crates/symeraseme-cli/tests/mcp_http_process.rs"
+                        | "crates/symeraseme-cli/tests/mcp_http_native_contract.rs"
+                );
             if retired_producer {
                 let producer = git(&["cat-file", "blob", &format!("{revision}:{name}")]);
                 go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &producer);
