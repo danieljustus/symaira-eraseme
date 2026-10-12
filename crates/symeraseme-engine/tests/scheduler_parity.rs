@@ -21,6 +21,9 @@ use symeraseme_engine::scheduler::{self, Config, Platform};
 #[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
 mod go_oracle;
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 const GO_FIXTURE: &str =
     include_str!("../../../rust-tests/parity/oracle/scheduler/scheduler_cases.json");
 const FROZEN_STDOUT: &[u8] =
@@ -85,16 +88,12 @@ fn verified_frozen_document(bytes: &[u8]) -> Value {
         manifest["stdout"]["sha256"],
         hex::encode(Sha256::digest(bytes))
     );
-    for (path, source) in [
-        (
-            "internal/scheduler/scheduler.go",
-            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
-        ),
-        (
-            "rust-tests/parity/oracle/scheduler/main.go",
-            include_bytes!("../../../rust-tests/parity/oracle/scheduler/main.go").as_slice(),
-        ),
+    for path in [
+        "internal/scheduler/scheduler.go",
+        "rust-tests/parity/oracle/scheduler/main.go",
     ] {
+        let source =
+            go_source_pin::current_source(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."), path);
         assert_eq!(manifest["source_files"][path]["bytes"], source.len());
         assert_eq!(
             manifest["source_files"][path]["sha256"],

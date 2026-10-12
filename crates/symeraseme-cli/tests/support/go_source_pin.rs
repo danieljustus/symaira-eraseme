@@ -64,6 +64,7 @@ pub fn current_source(root: &str, name: &str) -> Vec<u8> {
     }
 }
 
+#[allow(dead_code)] // Source-only consumers do not check whole capture inventories.
 pub fn current_tree_bound(name: &str) -> bool {
     name != ".gitattributes" && !name.ends_with("_test.go")
         || RECORDED_GO_TEST_PACKAGES.iter().any(|package| {

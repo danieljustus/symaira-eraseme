@@ -186,20 +186,13 @@ fn verified_frozen_config(bytes: &[u8]) -> Value {
         manifest["stderr"]["sha256"],
         hex::encode(Sha256::digest(stderr))
     );
-    for (path, source) in [
-        (
-            "internal/config/config.go",
-            include_bytes!("../../../internal/config/config.go").as_slice(),
-        ),
-        (
-            "rust-tests/parity/oracle/config/main.go",
-            include_bytes!("../../../rust-tests/parity/oracle/config/main.go").as_slice(),
-        ),
-        (
-            "rust-tests/parity/oracle/config/inputs.json",
-            include_bytes!("../../../rust-tests/parity/oracle/config/inputs.json").as_slice(),
-        ),
+    for path in [
+        "internal/config/config.go",
+        "rust-tests/parity/oracle/config/main.go",
+        "rust-tests/parity/oracle/config/inputs.json",
     ] {
+        let source =
+            go_source_pin::current_source(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."), path);
         assert_eq!(manifest["source_files"][path]["bytes"], source.len());
         assert_eq!(
             manifest["source_files"][path]["sha256"],
@@ -258,7 +251,7 @@ fn verified_native_mac_config(bytes: &[u8], arch: &str) -> Value {
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let source = fs::read(root.join(name)).unwrap();
+        let source = go_source_pin::current_source(root.to_str().unwrap(), name);
         assert_eq!(metadata["bytes"], source.len(), "{name}");
         assert_eq!(
             metadata["sha256"],

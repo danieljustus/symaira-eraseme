@@ -35,6 +35,9 @@ const FROZEN_WINDOWS: &[u8] =
 #[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
 mod go_oracle;
 
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 /// Linux, Windows and Mac use their actual source-bound native captures by default.
 /// Explicit live mode always rebuilds and runs the same twenty-case oracle.
 fn selected_oracle_capture() -> &'static Value {
@@ -120,17 +123,12 @@ fn verified_frozen_install(bytes: &[u8]) -> Value {
             assert!(stream.is_empty());
         }
     }
-    for (path, source) in [
-        (
-            "internal/scheduler/scheduler.go",
-            include_bytes!("../../../internal/scheduler/scheduler.go").as_slice(),
-        ),
-        (
-            "rust-tests/parity/oracle/scheduler-install/main.go",
-            include_bytes!("../../../rust-tests/parity/oracle/scheduler-install/main.go")
-                .as_slice(),
-        ),
+    for path in [
+        "internal/scheduler/scheduler.go",
+        "rust-tests/parity/oracle/scheduler-install/main.go",
     ] {
+        let source =
+            go_source_pin::current_source(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."), path);
         assert_eq!(manifest["source_files"][path]["bytes"], source.len());
         assert_eq!(
             manifest["source_files"][path]["sha256"],
@@ -193,7 +191,7 @@ fn verified_native_install(bytes: &[u8], os: &str, arch: &str) -> Value {
     let sources = manifest["source_files"].as_object().unwrap();
     assert_eq!(sources.len(), 65);
     for (name, metadata) in sources {
-        let source = fs::read(root.join(name)).unwrap();
+        let source = go_source_pin::current_source(root.to_str().unwrap(), name);
         assert_eq!(metadata["bytes"], source.len(), "{name}");
         assert_eq!(
             metadata["sha256"],
