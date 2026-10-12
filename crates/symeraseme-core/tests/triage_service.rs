@@ -9,9 +9,6 @@ use symeraseme_core::triage_service::{
 };
 use tempfile::tempdir;
 
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
-
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
 
@@ -75,19 +72,10 @@ fn verify_native_output(output: &[u8], os: &str, arch: &str) {
 
 fn go_output() -> Vec<u8> {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => {
-            let run = go_oracle::run_oracle("triage-service", None);
-            assert!(
-                run.status.success(),
-                "Go service oracle failed: {}",
-                String::from_utf8_lossy(&run.stderr)
-            );
-            run.stdout
-        }
         Ok("0") | Err(std::env::VarError::NotPresent) => {
             verified_frozen_output(FROZEN_GO_STDOUT).to_vec()
         }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
 }
 

@@ -4,8 +4,7 @@
 //! Unlike the config oracle, `scheduler.Generate` reads no environment or
 //! filesystem state beyond its `Config` argument, so this test needs no
 //! isolated-process sandbox: it reads an actual source-bound Go capture,
-//! with explicitly selected bounded live execution available,
-//! to prove the frozen fixture below still matches current Go behavior, then
+//! to authenticate the recorded fixture, then
 //! compares the Rust port's output for the same named cases to that same
 //! frozen fixture. Case configs must stay in sync with
 //! `rust-tests/parity/oracle/scheduler/main.go`'s `cases` map; both sides
@@ -17,9 +16,6 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use symeraseme_engine::scheduler::{self, Config, Platform};
-
-#[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
-mod go_oracle;
 
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
@@ -45,23 +41,12 @@ fn frozen_legacy_fixture() -> BTreeMap<String, LegacyCaseFixture> {
     serde_json::from_value(document["legacy_cases"].clone()).expect("fixture legacy_cases shape")
 }
 
-/// Returns the complete actual frozen Go document, or explicitly executes the
-/// committed oracle with the existing shared 120-second build/30-second
-/// runtime runner. Both modes cover all generator and legacy cases below.
+/// Returns the authenticated frozen Go document with all generator and legacy cases.
 fn run_go_scheduler_oracle_document() -> Value {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => {}
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            return verified_frozen_document(FROZEN_STDOUT);
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => verified_frozen_document(FROZEN_STDOUT),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
-    let output = go_oracle::run_oracle("scheduler", None);
-    assert!(
-        output.status.success(),
-        "Go scheduler oracle exited unsuccessfully"
-    );
-    serde_json::from_slice(&output.stdout).expect("Go scheduler oracle must emit valid JSON")
 }
 
 fn verified_frozen_document(bytes: &[u8]) -> Value {

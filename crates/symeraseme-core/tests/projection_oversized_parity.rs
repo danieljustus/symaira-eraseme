@@ -4,10 +4,7 @@
 //! nanosecond arithmetic, so values at the duration boundary and at the int64
 //! payload limits wrap instead of being rejected. The committed DB-004 fixture
 //! only covers ordinary fractional and negative values, so this test pins the
-//! boundary behaviour against actual native Go observations, with explicit live mode.
-
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
+//! boundary behaviour against actual recorded native Go observations.
 
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
@@ -34,19 +31,9 @@ struct OracleOutput {
 
 fn run_go_oracle() -> OracleOutput {
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => {}
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            return frozen_output(frozen_bytes());
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        Ok("0") | Err(std::env::VarError::NotPresent) => frozen_output(frozen_bytes()),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
-    let run = go_oracle::run_oracle("projection", None);
-    assert!(
-        run.status.success(),
-        "Go projection oracle failed: {}",
-        String::from_utf8_lossy(&run.stderr)
-    );
-    serde_json::from_slice(&run.stdout).expect("Go projection oracle must emit JSON")
 }
 
 fn frozen_bytes() -> &'static [u8] {

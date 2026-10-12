@@ -32,19 +32,14 @@ const FROZEN_MAC: &[u8] =
 const FROZEN_WINDOWS: &[u8] =
     include_bytes!("../../../tests/fixtures/go-frozen/scheduler-install/windows.observations.json");
 
-#[path = "../../symeraseme-core/tests/support/go_oracle.rs"]
-mod go_oracle;
-
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
 
-/// Linux, Windows and Mac use their actual source-bound native captures by default.
-/// Explicit live mode always rebuilds and runs the same twenty-case oracle.
+/// Linux, Windows and Mac require their actual source-bound native captures.
 fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
     CAPTURE.get_or_init(|| {
         match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-            Ok("1") => {}
             Ok("0") | Err(std::env::VarError::NotPresent) => {
                 if cfg!(target_os = "linux") {
                     return verified_frozen_install(FROZEN_OBSERVATIONS);
@@ -66,17 +61,11 @@ fn selected_oracle_capture() -> &'static Value {
                     return verified_native_install(FROZEN_MAC, "darwin", arch);
                 }
             }
-            _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+            _ => {
+                panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset")
+            }
         }
-        let output = go_oracle::run_oracle("scheduler-install", None);
-        assert!(output.status.success(), "Go oracle run failed");
-        assert!(output.stderr.is_empty(), "Go oracle emitted errors");
-        // Without -fixture the existing oracle emits its case-name summary,
-        // then the complete JSON document. Preserve all twenty recorded cases.
-        let start = output.stdout.iter().position(|byte| *byte == b'{').unwrap();
-        let document: Value = serde_json::from_slice(&output.stdout[start..]).unwrap();
-        assert_eq!(document["cases"].as_object().unwrap().len(), 20);
-        document
+        panic!("no recorded native scheduler install capture for this target")
     })
 }
 
