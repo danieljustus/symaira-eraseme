@@ -12,7 +12,11 @@ Base code commit: `22615ae67325c581fbe60cb0f2d3d2b2139cf900`, the already public
 
 Read `docs/rust-port/handoffs/2026-10-11-published-rust-only-reconciliation.md` for the public versioned acceptance record. The existing `v0.14.1` release is immutable; do not repeat release/signing or mutate assets. Development Go oracle retention is distinct from Rust-only distributed artifacts.
 
-## Concrete next task
+## Historical next task at the preservation checkpoint
+
+The wait described in this historical section was superseded by the later
+[maintainer decision](../rust-port/handoffs/2026-10-12-observation-waiver.md).
+For continuation, use that decision and the current migration ledger instead.
 
 Preserve the genuine observation record for CUT-004 and review it only after its recorded eligible date, 2026-10-17T17:38:53.187732Z. Elapsed time alone is insufficient; require actual defect/usage observations and the documented rollback proof. CUT-005 Go retirement remains separately authorized. No daily observations may be invented.
 

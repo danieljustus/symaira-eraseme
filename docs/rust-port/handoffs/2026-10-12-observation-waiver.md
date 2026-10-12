@@ -42,8 +42,10 @@ reports stable/immutable `v0.14.1`; all 21 retained public asset files were
 rehash-checked against its unchanged asset identities, sizes and SHA-256 digests.
 The retained mount probe, native report and manifest match their recorded hashes;
 the current public Homebrew Formula matches the native-tested Formula bytes.
-Original native/frozen-reader/Homebrew runs `38083487544`, `38059031343` and
-`38085163720` still report success; current-main Rust CI `38167547029` and native
+Original native/Homebrew runs `38083487544` and `38085163720` at
+`89a0fbcdef745714950ca1994ceb11c0e8b832ab`, and frozen-reader run `38059031343`
+at `5850fa0d3a08c2f849748713d3c9fe5238798c25`, still report success;
+current-main Rust CI `38167547029` and native
 target proof `38167547032` also report success. The full tracked diff from the
 retained evidence base `89a0fbcd` to public main contains only three documents.
 No open issue carries `parity-regression` in the complete intake.
