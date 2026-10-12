@@ -103,6 +103,25 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
                 archive.status.success(),
                 "immutable HTTP producer must remain verifiable"
             );
+            // This former producer now only replays the capture against Rust.
+            // Its original generator bytes remain bound to an independent pin.
+            let retired_producer = field == "archived_generators"
+                && name == "crates/symeraseme-cli/tests/mcp_http_headers_process.rs";
+            if retired_producer {
+                let pinned = Command::new("git")
+                    .args([
+                        "show",
+                        &format!("{}:{name}", go_source_pin::RETIREMENT_SOURCE_REVISION),
+                    ])
+                    .current_dir(ROOT)
+                    .output()
+                    .unwrap();
+                assert!(pinned.status.success(), "retired HTTP producer unavailable");
+                assert_eq!(
+                    archive.stdout, pinned.stdout,
+                    "retired HTTP producer: {name}"
+                );
+            }
             let archived_bytes = if field == "archived_generators" && target.starts_with("windows/")
             {
                 assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
@@ -119,7 +138,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
             };
             assert_eq!(recorded["bytes"], archived_bytes.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archived_bytes), "{name}");
-            if go_source_pin::current_tree_bound(name) {
+            if !retired_producer && go_source_pin::current_tree_bound(name) {
                 let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archived_bytes, &current);
             }
@@ -159,14 +178,14 @@ impl Corpus {
     }
 }
 
-pub fn observations() -> Option<Corpus> {
-    if std::env::var_os("SYMERASEME_CAPTURE_HTTP_HEADERS").is_some_and(|value| !value.is_empty()) {
-        return None;
-    }
+pub fn observations() -> Corpus {
+    assert!(
+        !std::env::var_os("SYMERASEME_CAPTURE_HTTP_HEADERS").is_some_and(|value| !value.is_empty()),
+        "live Go capture is retired; use the immutable historical capture producer"
+    );
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -175,9 +194,12 @@ pub fn observations() -> Option<Corpus> {
         ("windows", "aarch64") => "windows/arm64",
         ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => return None,
+        _ => panic!("no recorded native HTTP header capture for this target; live Go is retired"),
     };
-    let (_, revision, pin, raw) = RECORDS.iter().find(|record| record.0 == target)?;
+    let (_, revision, pin, raw) = RECORDS
+        .iter()
+        .find(|record| record.0 == target)
+        .expect("no recorded HTTP headers for the native target");
     let record = verify(raw, pin, revision, target);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -196,5 +218,20 @@ pub fn observations() -> Option<Corpus> {
         ))
         .is_err()
     );
-    Some(Corpus(record))
+    Corpus(record)
+}
+
+// Same request encoding as the historical capture producer, including token roles.
+pub fn request(method: &str, body: &[u8], headers: &[(&str, String)]) -> Value {
+    serde_json::json!({
+        "method": method,
+        "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
+        "body": {"bytes": body.len(), "sha256": digest(body)},
+        "headers": headers.iter().map(|(name, value)| {
+            if name.eq_ignore_ascii_case("authorization") {
+                assert!(value.starts_with("Bearer "));
+                serde_json::json!({"name": name, "role": "private-native-bearer-token"})
+            } else { serde_json::json!({"name": name, "value": value}) }
+        }).collect::<Vec<_>>()
+    })
 }
