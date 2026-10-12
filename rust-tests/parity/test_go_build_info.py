@@ -1,6 +1,10 @@
 """Synthetic rejection controls; these are not published/native acceptance."""
 import hashlib
+import importlib.util
+import io
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -167,6 +171,47 @@ class RetainedReleaseControls(unittest.TestCase):
                 info.verify_release(binary, 'darwin/amd64', 'v0.13.0')
             with self.assertRaises(AssertionError):
                 info.verify_release(binary, 'darwin/amd64', 'v0.12.1')
+
+
+class FetcherControls(unittest.TestCase):
+    def test_invalid_destinations_and_download_bytes_fail_closed(self):
+        script = Path(__file__).resolve().parents[2] / 'scripts/fetch-retained-go-release.py'
+        spec = importlib.util.spec_from_file_location('retained_fetcher', script)
+        if spec is None or spec.loader is None:
+            raise RuntimeError('retained fetcher module cannot be loaded')
+        fetcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fetcher)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alias = root / 'alias'
+            alias.symlink_to(root, target_is_directory=True)
+            with patch.object(fetcher.urllib.request, 'urlopen') as network:
+                for invalid in (Path('relative'), alias, fetcher.REPO):
+                    with self.subTest(destination=str(invalid)), self.assertRaises(AssertionError):
+                        fetcher.fetch(invalid, 'darwin/arm64', 'v0.13.0')
+                network.assert_not_called()
+            # Deliberately invalid download bytes, never native release evidence.
+            with patch.object(fetcher.urllib.request, 'urlopen', return_value=io.BytesIO(b'bad')):
+                with self.assertRaisesRegex(AssertionError, 'actual published archive changed'):
+                    fetcher.fetch(root, 'darwin/arm64', 'v0.13.0')
+            self.assertFalse((root / 'checksums.txt').exists())
+            size = info.release_manifest('v0.13.0')['checksums_asset']['bytes']
+            (root / 'checksums.txt').write_bytes(b'x' * size)
+            with patch.object(fetcher.urllib.request, 'urlopen') as network:
+                with self.assertRaises(AssertionError):
+                    fetcher.fetch(root, 'darwin/arm64', 'v0.13.0')
+                network.assert_not_called()
+
+
+class OptimizationControls(unittest.TestCase):
+    def test_integrity_controls_with_optimized_python(self):
+        result = subprocess.run(
+            [sys.executable, '-E', '-O', str(Path(__file__).resolve()),
+             'BuildInfoControls', 'RetainedReleaseControls', 'FetcherControls'],
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Ran 11 tests', result.stderr)
 
 
 if __name__ == '__main__':

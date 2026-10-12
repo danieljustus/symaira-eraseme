@@ -25,26 +25,32 @@ RELEASES = {
 SUPPORTED_TAGS = tuple(RELEASES)
 
 
+def require(condition, message="invalid retained Go artifact"):
+    # Integrity checks must remain active under python -O and PYTHONOPTIMIZE.
+    if not condition:
+        raise AssertionError(message)
+
+
 def release_manifest(tag=DEFAULT_TAG):
-    assert tag in RELEASES, "unsupported retained release tag"
+    require(tag in RELEASES, "unsupported retained release tag")
     pin = RELEASES[tag]
     raw = (FIXTURE_DIR / (tag + ".json")).read_bytes()
-    assert len(raw) <= 16384 and hashlib.sha256(raw).hexdigest() == pin["manifest_sha256"], "actual published release manifest changed"
+    require(len(raw) <= 16384 and hashlib.sha256(raw).hexdigest() == pin["manifest_sha256"], "actual published release manifest changed")
     document = json.loads(raw)
-    assert document["schema"] == "symeraseme.actual-published-go-release.v1"
-    assert document["tag"] == tag and document["go_version"] == "go1.26.6"
-    assert document["source_revision"] == pin["source_revision"]
-    assert len(document["native_archives"]) == 6
-    assert len({r["native_target"] for r in document["native_archives"]}) == 6
+    require(document["schema"] == "symeraseme.actual-published-go-release.v1")
+    require(document["tag"] == tag and document["go_version"] == "go1.26.6")
+    require(document["source_revision"] == pin["source_revision"])
+    require(len(document["native_archives"]) == 6)
+    require(len({r["native_target"] for r in document["native_archives"]}) == 6)
     for record in document["native_archives"]:
         expected = binary_member(tag, record["native_target"])
-        assert record.get("binary_member", expected) == expected, "unexpected Go binary member"
+        require(record.get("binary_member", expected) == expected, "unexpected Go binary member")
     return document
 
 
 def binary_member(tag, native_target):
     """Archive member (and extracted file name) of the Go binary for a tag and target."""
-    assert tag in RELEASES, "unsupported retained release tag"
+    require(tag in RELEASES, "unsupported retained release tag")
     base = RELEASES[tag]["member"]
     return base + ".exe" if native_target.startswith("windows/") else base
 
@@ -53,69 +59,69 @@ def verify_release(path, native_target, tag=DEFAULT_TAG):
     """Verify the actual release binary identity before using its metadata."""
     document = release_manifest(tag)
     records = [r for r in document["native_archives"] if r["native_target"] == native_target]
-    assert len(records) == 1, "unrecorded retained release target"
+    require(len(records) == 1, "unrecorded retained release target")
     record = records[0]
     path = pathlib.Path(path)
-    assert path.is_file() and not path.is_symlink(), "regular retained binary required"
-    assert path.stat().st_size == record["binary_bytes"]
-    assert hashlib.sha256(path.read_bytes()).hexdigest() == record["binary_sha256"], "published binary changed"
+    require(path.is_file() and not path.is_symlink(), "regular retained binary required")
+    require(path.stat().st_size == record["binary_bytes"])
+    require(hashlib.sha256(path.read_bytes()).hexdigest() == record["binary_sha256"], "published binary changed")
     metadata = read(path)
-    assert metadata["native_target"] == native_target, "retained binary is not native"
-    assert metadata["source_revision"] == document["source_revision"]
-    assert hashlib.sha256(metadata["module"].encode()).hexdigest() == record["module_sha256"]
+    require(metadata["native_target"] == native_target, "retained binary is not native")
+    require(metadata["source_revision"] == document["source_revision"])
+    require(hashlib.sha256(metadata["module"].encode()).hexdigest() == record["module_sha256"])
     return metadata, {"tag": document["tag"], "source_revision": document["source_revision"],
                       "archive": record, "published_checksums": document["checksums_asset"]}
 
 
 def read(path):
     path = pathlib.Path(path)
-    assert path.is_file() and not path.is_symlink(), "regular Go artifact required"
-    assert 0 < path.stat().st_size <= 32 * 1024 * 1024, "bounded Go artifact"
+    require(path.is_file() and not path.is_symlink(), "regular Go artifact required")
+    require(0 < path.stat().st_size <= 32 * 1024 * 1024, "bounded Go artifact")
     data = path.read_bytes()
     offset = data.find(MAGIC)
-    assert offset >= 0 and offset % 16 == 0, "aligned Go build-info header missing"
-    assert data[offset + 14:offset + 32] == bytes([8, 2]) + bytes(16), "unsupported Go build-info format"
+    require(offset >= 0 and offset % 16 == 0, "aligned Go build-info header missing")
+    require(data[offset + 14:offset + 32] == bytes([8, 2]) + bytes(16), "unsupported Go build-info format")
     cursor = offset + 32
 
     def string(limit):
         nonlocal cursor
         length = 0
         for shift in range(0, 70, 7):
-            assert cursor < len(data), "truncated build-info length"
+            require(cursor < len(data), "truncated build-info length")
             byte = data[cursor]
             cursor += 1
-            assert shift != 63 or byte <= 1, "overflowing build-info length"
+            require(shift != 63 or byte <= 1, "overflowing build-info length")
             length |= (byte & 127) << shift
             if byte < 128:
                 break
         else:
             raise AssertionError("unterminated build-info length")
-        assert 0 < length <= limit and cursor + length <= len(data), "bounded complete build-info string"
+        require(0 < length <= limit and cursor + length <= len(data), "bounded complete build-info string")
         value = data[cursor:cursor + length]
         cursor += length
         return value
 
     version = string(128).decode("ascii")
-    assert version == "go1.26.6", "unexpected retained release toolchain"
+    require(version == "go1.26.6", "unexpected retained release toolchain")
     framed = string(1024 * 1024)
-    assert framed.startswith(MODULE_START) and framed.endswith(MODULE_END), "invalid module-info frame"
+    require(framed.startswith(MODULE_START) and framed.endswith(MODULE_END), "invalid module-info frame")
     module = framed[16:-16].decode("utf-8")
-    assert module.endswith("\n"), "complete module metadata required"
+    require(module.endswith("\n"), "complete module metadata required")
     lines = module.splitlines()
-    assert lines[0] == "path\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme", "unexpected Go entrypoint"
-    assert lines[1].startswith("mod\tgithub.com/danieljustus/symaira-eraseme\t"), "unexpected Go module"
+    require(lines[0] == "path\tgithub.com/danieljustus/symaira-eraseme/cmd/symeraseme", "unexpected Go entrypoint")
+    require(lines[1].startswith("mod\tgithub.com/danieljustus/symaira-eraseme\t"), "unexpected Go module")
     settings = {}
     for line in lines:
         if line.startswith("build\t"):
             key, value = line[6:].split("=", 1)
-            assert key not in settings, "duplicate Go build setting"
+            require(key not in settings, "duplicate Go build setting")
             settings[key] = value
-    assert settings["CGO_ENABLED"] == "0", "retained Go artifact must be CGO-free"
-    assert settings["GOOS"] in ("darwin", "linux", "windows")
-    assert settings["GOARCH"] in ("amd64", "arm64")
-    assert settings["vcs"] == "git" and settings["vcs.modified"] == "false", "clean Git artifact required"
+    require(settings["CGO_ENABLED"] == "0", "retained Go artifact must be CGO-free")
+    require(settings["GOOS"] in ("darwin", "linux", "windows"))
+    require(settings["GOARCH"] in ("amd64", "arm64"))
+    require(settings["vcs"] == "git" and settings["vcs.modified"] == "false", "clean Git artifact required")
     revision = settings["vcs.revision"]
-    assert len(revision) == 40 and all(c in "0123456789abcdef" for c in revision)
+    require(len(revision) == 40 and all(c in "0123456789abcdef" for c in revision))
     return {"version": version, "module": module, "settings": settings,
             "source_revision": revision, "native_target": settings["GOOS"] + "/" + settings["GOARCH"],
             "sdk_style_output": str(path) + ": " + version + "\n" + "".join("\t" + line + "\n" for line in lines)}
