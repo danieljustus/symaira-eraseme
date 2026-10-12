@@ -1813,26 +1813,7 @@ mod tests {
     /// without attempting a browser action.
     #[test]
     fn auto_confirm_previews_then_creates_manual_task_without_clicking() {
-        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let raw = if super::frozen_mcp_runtime::live_required() {
-            let oracle_process = std::process::Command::new("go")
-                .args(["run", "./rust-tests/parity/oracle/mcp-auto-confirm"])
-                .current_dir(&repository_root)
-                .env("GOTOOLCHAIN", "go1.26.6")
-                .env("GOENV", "off")
-                .env("GOPROXY", "off")
-                .env("GOSUMDB", "off")
-                .output()
-                .expect("run source-bound Go auto-confirm oracle");
-            assert!(
-                oracle_process.status.success(),
-                "Go oracle failed: {}",
-                String::from_utf8_lossy(&oracle_process.stderr)
-            );
-            oracle_process.stdout
-        } else {
-            super::frozen_mcp_runtime::observation("mcp-auto-confirm")
-        };
+        let raw = super::frozen_mcp_runtime::observation("mcp-auto-confirm");
         let oracle: Value = serde_json::from_slice(&raw).expect("decode actual Go oracle output");
         assert_eq!(
             oracle["source_revision"],
@@ -1843,10 +1824,13 @@ mod tests {
         assert_eq!(sources.len(), 7);
         for (path, expected) in sources {
             use sha2::{Digest, Sha256};
-            let actual = Sha256::digest(fs::read(repository_root.join(path)).unwrap())
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect::<String>();
+            let actual = Sha256::digest(super::frozen_mcp_runtime::go_source_pin::current_source(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),
+                path,
+            ))
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
             assert_eq!(expected.as_str().unwrap(), actual, "{path}");
         }
         let oracle_response = |key: &str| -> Value {
@@ -3095,132 +3079,9 @@ mod tests {
             cases: Vec<ClockCase>,
         }
 
-        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let root = workspace("clock-parity");
-        let hostile_project = root.join("hostile-project");
-        let hostile_db = root.join("hostile-project-db");
-        let hostile_env = root.join("hostile-inherited-env");
-        fs::create_dir_all(&hostile_project).expect("hostile project dir");
-        fs::write(
-            hostile_project.join(".symeraseme.toml"),
-            format!("db_dir = {:?}\n", hostile_db.to_string_lossy()),
-        )
-        .expect("hostile project config");
-        let raw = if super::frozen_mcp_runtime::live_required() {
-            let module_cache = std::process::Command::new("go")
-                .args(["env", "GOMODCACHE"])
-                .output()
-                .expect("resolve Go module cache");
-            assert!(module_cache.status.success(), "resolve Go module cache");
-            let module_cache = PathBuf::from(
-                String::from_utf8(module_cache.stdout)
-                    .expect("Go module cache path")
-                    .trim(),
-            );
-            assert!(!module_cache.as_os_str().is_empty(), "Go module cache path");
-            let build_cache = root.join("go-build");
-            let isolated_home = root.join("go-home");
-            fs::create_dir_all(&isolated_home).expect("Go home");
-            let oracle_binary =
-                root.join(format!("mcp-clock-oracle{}", std::env::consts::EXE_SUFFIX));
-            let mut build = std::process::Command::new("go");
-            build
-                .args(["build", "-o"])
-                .arg(&oracle_binary)
-                .arg("./rust-tests/parity/oracle/mcp-clock")
-                .current_dir(&repository_root)
-                .env_clear()
-                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-                .env("GOMODCACHE", &module_cache)
-                .env("GOCACHE", &build_cache)
-                .env("GOTMPDIR", &root)
-                .env("TMPDIR", &root)
-                .env("TEMP", &root)
-                .env("TMP", &root)
-                .env("GOENV", "off")
-                .env("GOWORK", "off")
-                .env("GOTOOLCHAIN", "local")
-                .env("GOPROXY", "off")
-                .env("GOSUMDB", "off")
-                .env("HOME", &isolated_home)
-                .env("USERPROFILE", &isolated_home)
-                .env("XDG_CONFIG_HOME", isolated_home.join("config"))
-                .env("XDG_DATA_HOME", isolated_home.join("data"))
-                .env("XDG_STATE_HOME", isolated_home.join("state"))
-                .env("XDG_CACHE_HOME", isolated_home.join("cache"));
-            // Verify the compiler's actual environment, including overrides of
-            // hostile caller paths, before it creates any build temporary files.
-            let caller_temp = root.with_extension("caller-temp");
-            let temporary = std::process::Command::new(build.get_program())
-                .args(["env", "GOTMPDIR"])
-                .current_dir(&repository_root)
-                .env_clear()
-                .env("GOTMPDIR", &caller_temp)
-                .env("TMPDIR", &caller_temp)
-                .env("TEMP", &caller_temp)
-                .env("TMP", &caller_temp)
-                .envs(
-                    build
-                        .get_envs()
-                        .filter_map(|(name, value)| value.map(|value| (name, value))),
-                )
-                .output()
-                .expect("resolve isolated compiler temporary directory");
-            assert!(
-                temporary.status.success(),
-                "resolve compiler temporary directory"
-            );
-            assert_eq!(
-                PathBuf::from(
-                    String::from_utf8(temporary.stdout)
-                        .expect("Go temporary path")
-                        .trim()
-                ),
-                root,
-                "Go compiler temporary files escaped the owned root"
-            );
-            let build = build.output().expect("build current Go MCP clock oracle");
-            assert!(
-                build.status.success(),
-                "{}",
-                String::from_utf8_lossy(&build.stderr)
-            );
-
-            let oracle = std::process::Command::new(&oracle_binary)
-                .current_dir(&hostile_project)
-                .env_clear()
-                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-                .env("HOME", &isolated_home)
-                .env("USERPROFILE", &isolated_home)
-                .env("XDG_CONFIG_HOME", isolated_home.join("config"))
-                .env("XDG_DATA_HOME", isolated_home.join("data"))
-                .env("XDG_STATE_HOME", isolated_home.join("state"))
-                .env("XDG_CACHE_HOME", isolated_home.join("cache"))
-                // Negative control: the Go helper must discard these caller-owned
-                // paths before resolving its config or opening the store.
-                .env("SYMERASEME_DB_DIR", hostile_env.join("db"))
-                .env("SYMERASEME_DATA_DIR", hostile_env.join("data"))
-                .output()
-                .expect("run current Go MCP clock oracle from hostile project cwd");
-            assert!(
-                oracle.status.success(),
-                "{}",
-                String::from_utf8_lossy(&oracle.stderr)
-            );
-            assert!(
-                !hostile_env.exists(),
-                "Go oracle touched an inherited storage path: {}",
-                hostile_env.display()
-            );
-            assert!(
-                !hostile_db.exists(),
-                "Go oracle read hostile project config and touched {}",
-                hostile_db.display()
-            );
-            oracle.stdout
-        } else {
-            super::frozen_mcp_runtime::observation("mcp-clock")
-        };
+        // The authenticated native record includes both hostile-path controls.
+        let raw = super::frozen_mcp_runtime::observation("mcp-clock");
         let fixture: ClockFixture = serde_json::from_slice(&raw).expect("actual clock oracle");
         assert_eq!(
             fixture.oracle_source,
@@ -3334,119 +3195,25 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// Record the real Go server rather than reconstructing its result envelope.
+    /// Replay the real Go server capture, including its complete result envelope.
     #[test]
     fn remaining_tool_responses_match_current_go_bytes() {
         use sha2::{Digest, Sha256};
         use std::collections::BTreeMap;
-        use std::process::{Command, Stdio};
-        use std::time::{Duration, Instant};
         use symeraseme_core::config::ConfigContext;
-
-        struct ChildGuard(std::process::Child);
-        impl Drop for ChildGuard {
-            fn drop(&mut self) {
-                if self.0.try_wait().ok().flatten().is_none() {
-                    let _ = self.0.kill();
-                }
-                let _ = self.0.wait();
-            }
-        }
         let root = tempfile::tempdir().unwrap();
-        let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let capture = |mut command: Command, label: &str, budget: Duration, limit: u64| {
-            let out = root.path().join(format!("{label}.stdout"));
-            let err = root.path().join(format!("{label}.stderr"));
-            let mut child = ChildGuard(
-                command
-                    .stdin(Stdio::null())
-                    .stdout(fs::File::create(&out).unwrap())
-                    .stderr(fs::File::create(&err).unwrap())
-                    .spawn()
-                    .unwrap(),
-            );
-            let deadline = Instant::now() + budget;
-            let status = loop {
-                if let Some(status) = child.0.try_wait().unwrap() {
-                    break status;
-                }
-                assert!(
-                    Instant::now() < deadline,
-                    "{label} exceeded its bounded deadline"
-                );
-                std::thread::sleep(Duration::from_millis(20));
-            };
-            child.0.wait().unwrap();
-            assert!(fs::metadata(&out).unwrap().len() <= limit);
-            assert!(fs::metadata(&err).unwrap().len() <= 64 * 1024);
-            assert!(
-                status.success(),
-                "{label}: {}",
-                String::from_utf8_lossy(&fs::read(&err).unwrap())
-            );
-            fs::read(out).unwrap()
-        };
-        let raw = if super::frozen_mcp_runtime::live_required() {
-            let binary = root
-                .path()
-                .join(format!("mcp-tool-gaps{}", std::env::consts::EXE_SUFFIX));
-            let mut cache_query = Command::new("go");
-            cache_query
-                .args(["env", "GOMODCACHE"])
-                .env("GOTOOLCHAIN", "go1.26.6");
-            let cache = capture(
-                cache_query,
-                "go-module-cache",
-                Duration::from_secs(5),
-                64 * 1024,
-            );
-            let cache = PathBuf::from(String::from_utf8(cache).unwrap().trim());
-            assert!(
-                cache.is_dir(),
-                "pinned Go modules must be available offline"
-            );
-            let mut build = Command::new("go");
-            build
-                .args(["build", "-o"])
-                .arg(&binary)
-                .arg("./rust-tests/parity/oracle/mcp-tool-gaps")
-                .current_dir(&repository)
-                .env("GOTOOLCHAIN", "go1.26.6")
-                .env("GOPROXY", "off")
-                .env("GOSUMDB", "off")
-                .env("GOMODCACHE", &cache)
-                .env("GOCACHE", root.path().join("go-build"))
-                .env("GOENV", "off")
-                .env_remove("GOFLAGS")
-                .env("GOWORK", "off")
-                .env("HOME", root.path())
-                .env("USERPROFILE", root.path())
-                .env("TMPDIR", root.path())
-                .env("TEMP", root.path())
-                .env("TMP", root.path());
-            capture(build, "go-build", Duration::from_secs(180), 64 * 1024);
-            let mut run = Command::new(&binary);
-            run.current_dir(&repository)
-                .env_clear()
-                .env("HOME", root.path())
-                .env("USERPROFILE", root.path())
-                .env("TMPDIR", root.path())
-                .env("TEMP", root.path())
-                .env("TMP", root.path());
-            if let Some(system_root) = std::env::var_os("SystemRoot") {
-                run.env("SystemRoot", system_root);
-            }
-            capture(run, "go-gaps", Duration::from_secs(30), 8 * 1024 * 1024)
-        } else {
-            super::frozen_mcp_runtime::observation("mcp-tool-gaps")
-        };
+        let raw = super::frozen_mcp_runtime::observation("mcp-tool-gaps");
         let oracle: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(oracle["schema"], "symeraseme.go-oracle.mcp-tool-gaps.v1");
         assert_eq!(oracle["go_version"], "go1.26.6");
         let sources = oracle["sources_sha256"].as_object().unwrap();
         assert_eq!(sources.len(), 9);
         for (source, digest) in sources {
-            let expected = Sha256::digest(fs::read(repository.join(source)).unwrap())
+            let expected =
+                Sha256::digest(super::frozen_mcp_runtime::go_source_pin::current_source(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),
+                    source,
+                ))
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>();
@@ -3495,7 +3262,7 @@ mod tests {
             );
         }
         eprintln!(
-            "25 current-Go tool gap cases match complete response bytes; nine source digests verified"
+            "25 recorded Go tool gap cases match complete response bytes; nine source digests verified"
         );
     }
 

@@ -1,10 +1,10 @@
-//! Immutable actual six-target Go observations; unrecorded hosts remain live.
+//! Immutable actual six-target Go observations; unrecorded hosts fail closed.
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 
 #[path = "go_source_pin.rs"]
-mod go_source_pin;
+pub(crate) mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const REVISION: &str = "e8bb6643cbc2a05dbc19f3ad3749513887095ac9";
@@ -37,16 +37,6 @@ fn native_manifest(os: &str, arch: &str) -> Option<(&'static [u8], &'static str)
     }
 }
 
-pub fn live_required() -> bool {
-    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            native_manifest(std::env::consts::OS, std::env::consts::ARCH).is_none()
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
-    }
-}
-
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -55,6 +45,10 @@ fn digest(bytes: &[u8]) -> String {
 }
 
 pub fn observation(family: &str) -> Vec<u8> {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+    }
     macro_rules! captured {
         ($name:literal) => {
             include_bytes!(concat!(
@@ -72,10 +66,8 @@ pub fn observation(family: &str) -> Vec<u8> {
         _ => panic!("unobserved MCP family cannot receive a cached answer"),
     };
     verify(MANIFEST, family, bytes);
-    // Unrecorded hosts only inspect the Linux capture in corruption controls;
-    // live_required() keeps their runtime comparator on the actual producer.
     let (native, target) = native_manifest(std::env::consts::OS, std::env::consts::ARCH)
-        .unwrap_or_else(|| native_manifest("linux", "x86_64").unwrap());
+        .expect("no recorded native MCP capture for this target; live Go is retired");
     verify_for_target(native, family, bytes, NATIVE_REVISION, target);
     bytes.to_vec()
 }
