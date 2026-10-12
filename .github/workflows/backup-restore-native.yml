@@ -7,7 +7,9 @@ on:
       - 'rust-tests/parity/*backup*'
       - 'rust-tests/parity/*store*sandbox*'
       - 'rust-tests/parity/plain_store_switchback.py'
-      - 'rust-tests/parity/oracle/store-sandbox-control/**'
+      - 'rust-tests/parity/src/bin/store_sandbox_control.rs'
+      - 'rust-tests/parity/go_build_info.py'
+      - 'tests/fixtures/go-rollback/**'
       - 'docs/rust-port/backup-restore-rehearsal.md'
   workflow_dispatch:
 
@@ -20,9 +22,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: never
-  GOTOOLCHAIN: go1.26.6
-  GOWORK: 'off'
-  CGO_ENABLED: '0'
+
   PYTHONDONTWRITEBYTECODE: '1'
 
 jobs:
@@ -51,9 +51,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
-        with:
-          go-version: '1.26.6'
+
       - name: Pin native build paths and source
         shell: bash
         run: |
@@ -66,13 +64,7 @@ jobs:
           rustup toolchain install 1.98.0 --profile minimal
           rustup override set 1.98.0
           test "$(rustc -vV | sed -n 's/^host: //p')" = "${{ matrix.target }}"
-          go env GOVERSION GOOS GOARCH > "$RUNNER_TEMP/restore-logs/go-native-env.txt"
-      - name: Prepare checksum-verified Go modules for offline CLI parity
-        shell: bash
-        run: |
-          set -euo pipefail
-          go mod download 2>&1 | tee "$RUNNER_TEMP/restore-logs/go-modules.log"
-          go mod verify 2>&1 | tee "$RUNNER_TEMP/restore-logs/go-modules-verify.log"
+
       - name: Verify immutable official native Go release inputs
         shell: bash
         env:
@@ -88,8 +80,8 @@ jobs:
           set -euo pipefail
           cargo build --locked -p symeraseme-cli --bin symeraseme-rust 2>&1 | tee "$RUNNER_TEMP/restore-logs/rust-build.log"
           if [[ "$RUNNER_OS" == Windows ]]; then
-            go build -mod=readonly -trimpath -buildvcs=true -o "$RUNNER_TEMP/restore-binaries/sandbox-control.exe" ./rust-tests/parity/oracle/store-sandbox-control
-            go version -m "$RUNNER_TEMP/restore-binaries/sandbox-control.exe" > "$RUNNER_TEMP/restore-logs/control-build-info.txt"
+            cargo build --locked -p parity --bin store_sandbox_control 2>&1 | tee "$RUNNER_TEMP/restore-logs/control-build.log"
+            cp "$CARGO_TARGET_DIR/debug/store_sandbox_control.exe" "$RUNNER_TEMP/restore-binaries/sandbox-control.exe"
           fi
       - name: Execute migration CLI and accepted manual web-form contracts
         shell: bash
@@ -115,7 +107,7 @@ jobs:
           args = [python, 'rust-tests/parity/backup_restore_rehearsal.py',
                   '--go', release['executable'], '--go-archive', release['archive'],
                   '--rust', str(root/('restore-target/debug/symeraseme-rust'+suffix)),
-                  '--go-tool', __import__('shutil').which('go'),
+                  '--published-go-release',
                   '--output-dir', str(root/'restore-evidence')]
           if sys.platform == 'win32':
               args.extend(['--sandbox-control', str(root/'restore-binaries/sandbox-control.exe')])

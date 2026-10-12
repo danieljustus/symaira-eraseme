@@ -10,6 +10,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseWorkflowControls(unittest.TestCase):
+    def test_native_store_gates_use_retained_releases_without_go_sdk(self):
+        stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
+        restore = (ROOT / '.github/workflows/backup-restore-native.yml').read_text()
+        for workflow in (stores, restore):
+            for retired in ('actions/setup-go@',
+                            'GOTOOLCHAIN:', "'--go-tool'"):
+                self.assertNotIn(retired, workflow)
+            self.assertNotRegex(workflow, r'\bgo (?:build|mod)\b')
+            self.assertIn('--locked -p parity --bin store_sandbox_control', workflow)
+            self.assertIn("'--published-go-release'", workflow)
+            self.assertIn("'--sandbox-control'", workflow)
+            self.assertIn('if: always()', workflow)
+        self.assertIn('--tag v0.13.0', stores)
+        self.assertIn("'--published-go-tag', 'v0.13.0'", stores)
+        self.assertIn("plain['schema_sequence'] == [1, 2, 2, 2]", stores)
+        self.assertIn("len(plain['steps']) == 6", stores)
+        self.assertIn("len(encrypted['steps']) == 6", stores)
+        # The incompatible schema-v1 restoration remains distinct from switchback.
+        self.assertIn('prepare_backup_restore.py', restore)
+        self.assertIn("len(report['steps']) == 8", restore)
+        self.assertIn("{'pre_rust':1, 'post_rust':2, 'restored':1}", restore)
+        self.assertIn("'\\tmod\\tgithub.com/danieljustus/symaira-eraseme\\tv0.12.1\\t'", restore)
+
     def test_reusable_store_gate_isolates_caller_concurrency(self):
         stores = (ROOT / '.github/workflows/plain-store-switchback.yml').read_text()
         concurrency = stores.split('\nconcurrency:\n', 1)[1].split('\nenv:\n', 1)[0]
