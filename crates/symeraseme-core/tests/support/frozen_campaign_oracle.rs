@@ -1,24 +1,13 @@
 #![allow(dead_code)] // Included separately by the execution and plan integrations.
 
 #[path = "frozen_native_capture.rs"]
-mod frozen_native_capture;
+pub mod frozen_native_capture;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 pub const EXECUTION: &[u8] =
     include_bytes!("../../../../tests/fixtures/go-frozen/campaign/campaign-execution.stdout");
-
-pub fn live_go_required() -> bool {
-    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(std::env::VarError::NotPresent) => {
-            frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-                .is_none()
-        }
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
-    }
-}
 
 fn manifest() -> Value {
     let manifest: Value = serde_json::from_slice(include_bytes!(
@@ -120,9 +109,13 @@ pub fn verify_plan_capture(fixture: &[u8]) {
 }
 
 fn native_capture() -> Value {
+    match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("0") | Err(std::env::VarError::NotPresent) => {}
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+    }
     frozen_native_capture::verify(
         frozen_native_capture::manifest_bytes(std::env::consts::OS, std::env::consts::ARCH)
-            .expect("unrecorded native campaign target must use the actual Go producer"),
+            .expect("no recorded native campaign capture for this target"),
         std::env::consts::OS,
         std::env::consts::ARCH,
     )

@@ -20,8 +20,7 @@ use tempfile::tempdir;
 const ORACLE_DIR: &str = "rust-tests/parity/oracle/campaign-execution";
 #[path = "support/frozen_campaign_oracle.rs"]
 mod frozen_campaign_oracle;
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
+use frozen_campaign_oracle::frozen_native_capture::go_source_pin;
 static DATA_DIR_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug)]
@@ -123,7 +122,10 @@ fn assert_pinned_timestamps(plan: &Value) {
 fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
     let root = repo_root();
     let oracle_dir = root.join(ORACLE_DIR);
-    let go_oracle = fs::read(oracle_dir.join("main.go")).expect("read Go oracle source");
+    let go_oracle = go_source_pin::current_source(
+        root.to_str().unwrap(),
+        "rust-tests/parity/oracle/campaign-execution/main.go",
+    );
     let cases = fs::read(oracle_dir.join("cases.json")).expect("read oracle cases");
     let go_sources = [
         "internal/campaign/batch.go",
@@ -141,8 +143,7 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
     ];
     let mut provenance = Vec::new();
     for path in go_sources {
-        let source =
-            fs::read(root.join(path)).unwrap_or_else(|error| panic!("read {path}: {error}"));
+        let source = go_source_pin::current_source(root.to_str().unwrap(), path);
         provenance.push(json!({
             "path": path,
             "sha256": hex::encode(Sha256::digest(source)),
@@ -177,17 +178,7 @@ fn get_plan_and_execution_transitions_match_source_bound_go_oracle() {
         "Go implementation sources changed; review and repin the oracle"
     );
 
-    let expected = if frozen_campaign_oracle::live_go_required() {
-        let output = go_oracle::run_oracle("campaign-execution", None);
-        assert!(
-            output.status.success(),
-            "Go campaign oracle failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        serde_json::from_slice(&output.stdout).expect("parse Go oracle output")
-    } else {
-        frozen_campaign_oracle::execution(frozen_campaign_oracle::EXECUTION)
-    };
+    let expected = frozen_campaign_oracle::execution(frozen_campaign_oracle::EXECUTION);
 
     let input: Value = serde_json::from_slice(&cases).expect("parse campaign oracle input");
     let campaign_id = input["campaign_id"].as_str().expect("campaign id");

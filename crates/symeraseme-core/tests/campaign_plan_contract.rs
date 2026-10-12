@@ -34,8 +34,7 @@ const BYTES_ORACLE_PATH: &str = concat!(
 const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 #[path = "support/frozen_campaign_oracle.rs"]
 mod frozen_campaign_oracle;
-#[path = "support/go_oracle.rs"]
-mod go_oracle;
+use frozen_campaign_oracle::frozen_native_capture::go_source_pin;
 
 #[test]
 fn frozen_campaign_plan_rejects_changed_bytes_and_missing_persisted_events() {
@@ -280,15 +279,14 @@ fn go_campaign_plan_bytes_oracle() {
     let oracle: BytesOracle = serde_json::from_slice(&raw_fixture).expect("bytes oracle parses");
     assert_eq!(oracle.schema, "symeraseme.campaign.plan-bytes-oracle.v1");
 
-    let generator_path = Path::new(REPO_ROOT).join("internal/campaign/plan_bytes_oracle_test.go");
-    let generator = fs::read(&generator_path).expect("Go oracle generator readable");
+    let generator =
+        go_source_pin::current_source(REPO_ROOT, "internal/campaign/plan_bytes_oracle_test.go");
     assert_eq!(
         hex::encode(Sha256::digest(&generator)),
         oracle.generator_sha256
     );
     for source in &oracle.sources {
-        let bytes = fs::read(Path::new(REPO_ROOT).join(&source.path))
-            .unwrap_or_else(|error| panic!("read Go source {}: {error}", source.path));
+        let bytes = go_source_pin::current_source(REPO_ROOT, &source.path);
         assert_eq!(
             hex::encode(Sha256::digest(bytes)),
             source.sha256,
@@ -296,35 +294,7 @@ fn go_campaign_plan_bytes_oracle() {
             source.path
         );
     }
-    if frozen_campaign_oracle::live_go_required() {
-        let scratch = tempdir().unwrap();
-        let mut command = std::process::Command::new("go");
-        command
-            .args([
-                "test",
-                "./internal/campaign",
-                "-run",
-                "^TestCampaignPlanBytesOracle$",
-                "-count=1",
-            ])
-            .current_dir(REPO_ROOT);
-        let go = go_oracle::run_bounded(
-            command,
-            None,
-            &scratch.path().join("go-test.stdout"),
-            &scratch.path().join("go-test.stderr"),
-            go_oracle::ORACLE_BUILD_TIMEOUT,
-        )
-        .unwrap();
-        assert!(
-            go.status.success(),
-            "Go oracle failed:\n{}\n{}",
-            String::from_utf8_lossy(&go.stdout),
-            String::from_utf8_lossy(&go.stderr)
-        );
-    } else {
-        frozen_campaign_oracle::verify_plan_capture(&raw_fixture);
-    }
+    frozen_campaign_oracle::verify_plan_capture(&raw_fixture);
 
     let registry_tree = mini_registry();
     let brokers = load_from_dir(registry_tree.path()).expect("load mini registry");
