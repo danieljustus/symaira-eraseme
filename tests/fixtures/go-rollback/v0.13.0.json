@@ -1,0 +1,94 @@
+{
+  "schema": "symeraseme.actual-published-go-release.v1",
+  "tag": "v0.13.0",
+  "source_revision": "780512f17d4dd434676d62539f81550ce048f77e",
+  "go_version": "go1.26.6",
+  "release_id": 404829550,
+  "immutable": false,
+  "prerelease": true,
+  "checksums_asset": {
+    "id": 615868512,
+    "bytes": 717,
+    "sha256": "68b6a5f87af2530f099d9de32c398d4eba86d3da0fa9cd0a5621d36e112532e2"
+  },
+  "native_archives": [
+    {
+      "native_target": "darwin/amd64",
+      "archive": "symeraseme_0.13.0_darwin_amd64.tar.gz",
+      "archive_asset_id": 615768342,
+      "archive_bytes": 12936906,
+      "archive_sha256": "48135a83944f11e0a3ca7e903d20b44e72b7809dda426aefa843d30d9b3e1d18",
+      "binary_member": "symeraseme-go",
+      "binary_bytes": 18354288,
+      "binary_sha256": "d3ba9680df4da29c72576ea22fbe1f7453b1bc0ebeae7a8a5c3be1af0add694d",
+      "module_sha256": "33d03a73aa65d3fe96a356f561987a3a75c8b9b88fac23eb54189d63ec7f1c75",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    },
+    {
+      "native_target": "darwin/arm64",
+      "archive": "symeraseme_0.13.0_darwin_arm64.tar.gz",
+      "archive_asset_id": 615768370,
+      "archive_bytes": 11962691,
+      "archive_sha256": "4fa14e6705b04340903169945c496026eb41af399c3d192d9a4dd5542083361d",
+      "binary_member": "symeraseme-go",
+      "binary_bytes": 17345106,
+      "binary_sha256": "289b34b1d76db45973d56f9a9ad20c4465b62b4faffe582520a34cf2626bee9f",
+      "module_sha256": "a8760063efd115df920800e3037b273db94ea88ecf67afc2c938a48f27f506ba",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    },
+    {
+      "native_target": "linux/amd64",
+      "archive": "symeraseme_0.13.0_linux_amd64.tar.gz",
+      "archive_asset_id": 615768402,
+      "archive_bytes": 13347231,
+      "archive_sha256": "b166856dceb29d4407f478fd20b1fe2b42b4f3ecdd7218f9b65a74600202f1e5",
+      "binary_member": "symeraseme-go",
+      "binary_bytes": 18407586,
+      "binary_sha256": "1d423079b6eec33c0ab4dda691feebf774316b10b96804f7361f2123d63f6e47",
+      "module_sha256": "0005480c3c650d72c95bd98481ea923b465cc10034828a66ebbc076714bff650",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    },
+    {
+      "native_target": "linux/arm64",
+      "archive": "symeraseme_0.13.0_linux_arm64.tar.gz",
+      "archive_asset_id": 615768436,
+      "archive_bytes": 12217899,
+      "archive_sha256": "139d5c4bced0305d28f7316b8515bd5ce86f989999877960be7aea7eb76cff34",
+      "binary_member": "symeraseme-go",
+      "binary_bytes": 17367202,
+      "binary_sha256": "fd14b58933fc793f77b96877bbd4af44d4a4afd153df9205d42f574d9b2b9a93",
+      "module_sha256": "b7a0e63d79b52fbdd1ebae4b701af5d2543c5505401a86de62f35cf9ce890066",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    },
+    {
+      "native_target": "windows/amd64",
+      "archive": "symeraseme_0.13.0_windows_amd64.zip",
+      "archive_asset_id": 615768457,
+      "archive_bytes": 12708189,
+      "archive_sha256": "45b0a87d3cd52c939fcf2009de5e108e9dbca9577ea6c3ec7fbf8716a3a1f708",
+      "binary_member": "symeraseme-go.exe",
+      "binary_bytes": 18506752,
+      "binary_sha256": "42908594130c81d7eed046df8c83e9f07265a8a16770f96422884a65e9e5bcac",
+      "module_sha256": "770bd62208016001a6104caa2e091db171cc5b2d46326c20467161c8ed475e7a",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    },
+    {
+      "native_target": "windows/arm64",
+      "archive": "symeraseme_0.13.0_windows_arm64.zip",
+      "archive_asset_id": 615768492,
+      "archive_bytes": 11711970,
+      "archive_sha256": "9b2daa708e82acaa76db2c97bc05667a2bc18e82f78ffa5e44b37a89038956da",
+      "binary_member": "symeraseme-go.exe",
+      "binary_bytes": 17127936,
+      "binary_sha256": "9969f724cddb74507c7d5ea940b82f8fbf180d171a1976c3e6fea0166b45063e",
+      "module_sha256": "cf482ff7491950603983bed9190f999d55d94c0c0b8aa3d3aa1312541b4a2c84",
+      "go_version": "go1.26.6",
+      "source_revision": "780512f17d4dd434676d62539f81550ce048f77e"
+    }
+  ]
+}

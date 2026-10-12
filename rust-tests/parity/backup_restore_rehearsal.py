@@ -214,10 +214,10 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
         sandbox_control=None):
     require(published_go_release != (go_tool is not None),
             'choose published Go release or explicit Go SDK metadata verification')
+    # This v1 restore rehearsal requires the schema-incompatible v0.12.1
+    # fallback. v0.13.0 belongs to the separate successful switchback gate.
     require(sys.platform in ('darwin', 'win32') or sys.platform.startswith('linux'),
             'unsupported native backup/restore platform')
-    require(not (published_go_release and sys.platform == 'win32'),
-            'published Go release verification supports macOS and Linux')
     if sys.platform.startswith('linux'):
         require(os.getuid() != 0 and os.getgid() != 0,
                 'Linux sandbox runner must start as an unprivileged user')
@@ -275,6 +275,9 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
         }
         require(report['artifacts']['retained_go']['identity'] !=
                 report['artifacts']['rust']['identity'], 'Go and Rust artifact bytes must differ')
+        target_goos, target_arch, _ = gate.native_platform()
+        if target_goos is None or target_arch is None:
+            raise ValueError('unsupported native retained-release target')
         if go_archive is not None:
             report['go_archive'] = verify_go_archive(go_archive, go)
 
@@ -290,13 +293,11 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
             'SYMERASEME_DB_DIR': str(root / 'original/data'),
             'SYMERASEME_ENCRYPT_DB': 'false',
         }
+        gate.native_env(root, env)
         report['environment'] = env
         if published_go_release:
-            architecture = {'arm64': 'arm64', 'aarch64': 'arm64',
-                            'x86_64': 'amd64'}[platform.machine().lower()]
-            operating_system = 'darwin' if sys.platform == 'darwin' else 'linux'
             metadata, release = gate.go_build_info.verify_release(
-                staged_go, operating_system + '/' + architecture)
+                staged_go, target_goos + '/' + target_arch)
             go_metadata = metadata['sdk_style_output']
             (root / 'go-artifact.metadata.txt').write_text(go_metadata)
             report['go_artifact_provenance'].update({
@@ -308,9 +309,6 @@ def run(go, rust, go_tool, output_dir, go_archive=None, published_go_release=Fal
         else:
             if sys.platform == 'win32':
                 # go version -m only reads the staged executable; it needs no SDK.
-                env['SystemRoot'] = os.environ['SystemRoot']
-                env['APPDATA'] = str(root / 'config')
-                env['LOCALAPPDATA'] = str(root / 'cache')
                 staged_tool = root / 'bin/go-build-info.exe'
                 shutil.copyfile(go_tool, staged_tool)
                 require(gate.identity(staged_tool) == gate.identity(go_tool), 'staged Go tool differs')

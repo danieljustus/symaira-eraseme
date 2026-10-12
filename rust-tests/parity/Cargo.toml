@@ -25,3 +25,7 @@ windows-sys = { version = "0.61.2", features = [
 [[bin]]
 name = "parity"
 path = "src/main.rs"
+
+[[bin]]
+name = "store_sandbox_control"
+path = "src/bin/store_sandbox_control.rs"
