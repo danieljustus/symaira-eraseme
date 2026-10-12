@@ -1,5 +1,10 @@
 # Rust-only distribution observation continuation
 
+> Historical source-preservation checkpoint. Later on 2026-10-12 the maintainer
+> [waived the observation period and explicitly authorized Go retirement](../rust-port/handoffs/2026-10-12-observation-waiver.md).
+> That decision supersedes the wait and authorization blockers below, not the
+> technical evidence, provenance, privacy or independent-review requirements.
+
 ## Goal and source identity
 
 Repository: `danieljustus/symaira-eraseme`. Remote branch: `handoff/20261012-rust-wip`.

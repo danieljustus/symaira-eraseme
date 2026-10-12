@@ -3,7 +3,17 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-## Current published-candidate checkpoint (2026-10-11)
+## Current authorization checkpoint (2026-10-12)
+
+The maintainer explicitly waived the seven-day stable observation period and
+separately approved CUT-005 Go-source/toolchain retirement, subject to all other
+technical gates. See the [dated decision and unchanged boundaries](../rust-port/handoffs/2026-10-12-observation-waiver.md).
+This is risk acceptance, not completed observation. CUT-004 retained technical
+readback passes within its documented scope; independent review and merge remain
+required. CUT-005 implementation/acceptance remains pending; no Go removal is claimed.
+The following checkpoint retains its historical evidence and waiting state.
+
+## Published-candidate checkpoint (2026-10-11)
 
 - Stable immutable `v0.14.1` is published at
   `587e9e0e3aaa4d4bbacdd28a7087d17ac2748548`; current code/main is

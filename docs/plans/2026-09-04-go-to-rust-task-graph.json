@@ -2,6 +2,13 @@
   "schema_version": 1,
   "plan": "docs/plans/2026-09-04-go-to-rust-implementation-plan.md",
   "approval_trigger": "go",
+  "retirement_amendment": {
+    "approved_on": "2026-10-12",
+    "observation": "seven-day period explicitly waived, not completed",
+    "go_retirement": "explicitly authorized after remaining technical gates; not yet implemented",
+    "evidence": "docs/rust-port/handoffs/2026-10-12-observation-waiver.md",
+    "historical_records": "prior approval and execution snapshots below retain their dated scope"
+  },
   "distribution_amendment": {
     "approved_on": "2026-10-07",
     "approval_command": "ok go",
@@ -124,7 +131,7 @@
       "owner": "coordinator",
       "required_by": "10.4",
       "evidence": [
-        "stable Rust GitHub release publishedAt is at least seven days old",
+        "stable Rust GitHub release is verified; seven-day period waived by the 2026-10-12 retirement_amendment, not represented as elapsed observation",
         "no open issue labelled parity-regression for that release",
         "Rust-only release assets, Homebrew install and backup/compatibility evidence re-read from exact targets"
       ],

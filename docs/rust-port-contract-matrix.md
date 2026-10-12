@@ -1,6 +1,15 @@
 # Go → Rust executable contract matrix
 
-## Current published Rust-only acceptance (2026-10-11)
+## Current authorization and readback (2026-10-12)
+
+The [maintainer's dated amendment](rust-port/handoffs/2026-10-12-observation-waiver.md)
+waives the seven-day observation period and explicitly authorizes Go retirement.
+CUT-004 retained technical readback passes within the documented evidence scope;
+independent review and merge remain required. Observation is WAIVED, not observed.
+CUT-005 remains OPEN until implementation and all technical gates pass. Frozen
+captures, original failures and historical release assets remain unchanged.
+
+## Published Rust-only acceptance (2026-10-11, historical checkpoint)
 
 The [current release-bound reconciliation](rust-port/handoffs/2026-10-11-published-rust-only-reconciliation.md)
 supersedes the historical statuses below for #1131, REL-001..010 and CUT-001..005.

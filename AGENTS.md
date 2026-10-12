@@ -7,10 +7,12 @@
 **Symaira EraseMe** supports all major AI coding agents through standardized
 skill formats and adapter files.
 
-The unreleased 0.14.0 candidate uses the Rust CLI and a native SwiftUI macOS app,
+The current source uses the Rust CLI and a native SwiftUI macOS app,
 without a bundled Go backend or backend selector. Rust 1.98.0 is required for development;
 the Go implementation remains a temporary development oracle until the separate
-CUT-005 retirement after stable-release observation. Historical `v0.13.0` assets
+CUT-005 retirement. The maintainer waived the seven-day stable observation period
+and authorized retirement on 2026-10-12; all technical acceptance gates remain.
+Historical `v0.13.0` assets
 stay immutable; Rust-only candidates require fresh native and release evidence.
 
 ## Ecosystem Guidance
