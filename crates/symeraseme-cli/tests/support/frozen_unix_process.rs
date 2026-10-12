@@ -7,40 +7,40 @@ use std::path::{Component, Path};
 mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
+const REVISION: &str = "13ddc6a43036d6b34706db2b82bbb5a13c40d6de";
 fn native_manifest() -> Option<(&'static str, &'static [u8], &'static str)> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => Some((
             "linux/amd64",
             include_bytes!(
-                "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/linux-amd64/manifest.json"
+                "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/services/linux-amd64/manifest.json"
             )
             .as_slice(),
-            "70ee632e3e08420bf9d16716b71e54fe55fc502313891eea942f55fd503924e7",
+            "eb4102b99a2d91ffc57e8c146f310800e239281ca7581b485c3f3f0bc4a1907d",
         )),
         ("linux", "aarch64") => Some((
             "linux/arm64",
             include_bytes!(
-                "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/linux-arm64/manifest.json"
+                "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/services/linux-arm64/manifest.json"
             )
             .as_slice(),
-            "b9050d8bfb6c1e78ce8c208950bee98cdf92ab74830ce23799119efbf45e7581",
+            "044574d5769184b857f9efd43a308e5123179e7f8480ac8689d72ad51ec1c6a9",
         )),
         ("macos", "x86_64") => Some((
             "darwin/amd64",
             include_bytes!(
-                "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-amd64/manifest.json"
+                "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/services/darwin-amd64/manifest.json"
             )
             .as_slice(),
-            "88b5846932e0775c6bc07b3e58fa75221a0be423a6a525a7a103181c4c15daa8",
+            "a5f8fb7d6efc243c7826caa998c3e8a500f48b3535d64dce67cb938e38170b8a",
         )),
         ("macos", "aarch64") => Some((
             "darwin/arm64",
             include_bytes!(
-                "../../../../tests/fixtures/go-frozen/refresh-411b5c10/services/darwin-arm64/manifest.json"
+                "../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/services/darwin-arm64/manifest.json"
             )
             .as_slice(),
-            "4f71bc5395e18303c7271083a4f099eef31c758804e89dafd713f2150ac90e94",
+            "2931475358634b51c258018aaffcb717ddeb781ebd3028bb23d0480db9bac226",
         )),
         _ => None,
     }
