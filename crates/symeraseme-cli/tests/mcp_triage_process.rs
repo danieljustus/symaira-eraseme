@@ -13,26 +13,11 @@ use serde_json::{Value, json};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
 
-const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const AGENT: &str = include_str!("../../../rust-tests/parity/oracle/mcp-triage/agent.sh");
 
 #[test]
 fn mcp_triage_matches_live_go_handler_with_local_agent() {
-    let observed = frozen_unix_process::observation("mcp-triage").unwrap_or_else(|| {
-        let go = Command::new("go")
-            .args(["run", "./rust-tests/parity/oracle/mcp-triage"])
-            .current_dir(ROOT)
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .output()
-            .expect("run Go MCP triage oracle");
-        assert!(
-            go.status.success(),
-            "{}",
-            String::from_utf8_lossy(&go.stderr)
-        );
-        go.stdout
-    });
+    let observed = frozen_unix_process::observation("mcp-triage");
     let cases: Vec<Value> = serde_json::from_slice(&observed).expect("Go observations");
     assert_eq!(cases.len(), 4);
 

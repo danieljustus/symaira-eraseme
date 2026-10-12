@@ -69,22 +69,7 @@ fn mcp_json_normalizes_raw_host_agent_error_like_go() {
         assert_eq!(sha256(&source), *expected, "Go source changed: {path}");
     }
 
-    let observed = frozen_unix_process::observation("mcp-agent-error-json").unwrap_or_else(|| {
-        let oracle = Command::new("go")
-            .args(["run", "./rust-tests/parity/oracle/mcp-agent-error-json"])
-            .current_dir(ROOT)
-            .env("GOTOOLCHAIN", "go1.26.6")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .output()
-            .expect("run Go MCP JSON oracle");
-        assert!(
-            oracle.status.success(),
-            "Go oracle failed: {}",
-            String::from_utf8_lossy(&oracle.stderr)
-        );
-        oracle.stdout
-    });
+    let observed = frozen_unix_process::observation("mcp-agent-error-json");
     assert_eq!(observed, FIXTURE.as_bytes(), "Go fixture drifted");
 
     let request = base64::engine::general_purpose::STANDARD

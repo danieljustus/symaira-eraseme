@@ -99,23 +99,7 @@ fn cli_triage_matches_source_bound_go_oracle() {
         );
     }
 
-    let observed = frozen_unix_process::observation("cli-triage").unwrap_or_else(|| {
-        let go = Command::new("go")
-            .args(["run", "./rust-tests/parity/oracle/cli-triage"])
-            .current_dir(REPO_ROOT)
-            .env("GOTOOLCHAIN", "go1.26.6")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off")
-            .output()
-            .expect("run source-bound Go CLI oracle");
-        assert!(
-            go.status.success(),
-            "Go CLI oracle failed:\n{}\n{}",
-            String::from_utf8_lossy(&go.stdout),
-            String::from_utf8_lossy(&go.stderr)
-        );
-        go.stdout
-    });
+    let observed = frozen_unix_process::observation("cli-triage");
     assert_eq!(observed, fixture_bytes, "Go CLI oracle fixture drifted");
 
     for case in &fixture.cases {
