@@ -59,7 +59,7 @@ pub fn verify(bytes: &[u8], os: &str, arch: &str) -> Value {
         if !go_source_pin::current_tree_bound(path) {
             continue;
         }
-        let source = std::fs::read(Path::new(ROOT).join(relative)).expect("captured source file");
+        let source = go_source_pin::current_source(ROOT, path);
         assert_eq!(metadata["bytes"], source.len(), "{path}");
         assert_eq!(metadata["sha256"], digest(&source), "{path}");
     }

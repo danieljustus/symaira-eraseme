@@ -39,7 +39,7 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let bytes = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        let bytes = go_source_pin::current_source(ROOT, name);
         assert_eq!(pin["bytes"], bytes.len(), "{name}");
         assert_eq!(pin["sha256"], digest(&bytes), "{name}");
     }
@@ -79,7 +79,7 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         assert_eq!(pin["sha256"], digest(&bytes));
         // Changed generators or dependency bytes outside local release labels
         // require actual recapture, even when their immutable archive is available.
-        let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        let current = go_source_pin::current_source(ROOT, name);
         go_source_pin::assert_current_matches_archive(name, &bytes, &current);
     }
     let build = record["embedded_build_info"].as_str().unwrap();

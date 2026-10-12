@@ -174,7 +174,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
             if go_source_pin::current_tree_bound(name) {
-                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+                let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
         }

@@ -64,10 +64,7 @@ fn verify(target: &str, manifest: &Value, bytes: &[u8]) -> Value {
             continue;
         }
         assert!(
-            valid_bytes(
-                metadata,
-                &std::fs::read(Path::new(ROOT).join(path)).unwrap()
-            ),
+            valid_bytes(metadata, &go_source_pin::current_source(ROOT, name)),
             "schedule source drift: {name}"
         );
     }

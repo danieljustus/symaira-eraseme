@@ -105,7 +105,7 @@ fn verify_for_target(
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let actual = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        let actual = go_source_pin::current_source(ROOT, name);
         assert_eq!(record["bytes"], actual.len(), "{name}");
         assert_eq!(record["sha256"], digest(&actual), "{name}");
     }

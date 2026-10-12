@@ -96,7 +96,7 @@ fn verify(manifest: &[u8], pin: &str, target: &str, family: &str, stdout: &[u8],
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let bytes = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        let bytes = go_source_pin::current_source(ROOT, name);
         assert_eq!(record["bytes"], bytes.len(), "{name}");
         assert_eq!(record["sha256"], digest(&bytes), "{name}");
     }

@@ -91,7 +91,7 @@ fn verify(manifest: &Value, target: &str) {
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let source = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        let source = go_source_pin::current_source(ROOT, name);
         assert!(valid_bytes(metadata, &source), "grant source drift: {name}");
     }
     let info = manifest["cli_grants"]["embedded_build_info"]

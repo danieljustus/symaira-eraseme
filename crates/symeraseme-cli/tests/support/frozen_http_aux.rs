@@ -400,7 +400,7 @@ pub fn verify(
             assert_eq!(recorded["bytes"], archive.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive), "{name}");
             if go_source_pin::current_tree_bound(name) {
-                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+                let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archive, &current);
             }
         }

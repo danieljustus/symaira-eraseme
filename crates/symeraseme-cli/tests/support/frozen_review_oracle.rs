@@ -3,7 +3,6 @@ mod frozen_native_capture;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::path::Path;
 
 pub use frozen_native_capture::go_source_pin;
 
@@ -99,7 +98,7 @@ pub fn observations() -> Vec<Observation> {
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let bytes = std::fs::read(Path::new(ROOT).join(name)).unwrap();
+        let bytes = go_source_pin::current_source(ROOT, name);
         assert!(valid_bytes(expected, &bytes), "Go source drift: {name}");
     }
     let streams = [
