@@ -1,5 +1,8 @@
 //! Native Windows files, DACLs and atomic replacement compared with real Go.
-#![cfg(windows)]
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
+
+#[path = "support/capture_consent_acl.rs"]
+mod capture_consent_acl;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -73,7 +76,13 @@ fn private(command: &mut Command, root: &Path) {
     }
 }
 
-fn acl(path: &Path, mode: &str, logs: &Path, label: &str) -> Value {
+fn acl(
+    path: &Path,
+    mode: &str,
+    logs: &Path,
+    label: &str,
+    recorder: &mut Option<capture_consent_acl::Recorder>,
+) -> Value {
     let executable = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");
     let mut command = Command::new(executable);
@@ -98,9 +107,22 @@ fn acl(path: &Path, mode: &str, logs: &Path, label: &str) -> Value {
         "ACL observation: {}",
         String::from_utf8_lossy(&result.stderr)
     );
+    capture_consent_acl::note_acl(recorder, label, &result);
     serde_json::from_slice(&result.stdout).unwrap()
 }
 
+#[cfg(not(windows))]
+#[test]
+fn consent_acl_capture_fails_off_windows_when_requested() {
+    assert!(
+        std::env::var_os("SYMERASEME_CAPTURE_CONSENT_ACL")
+            .filter(|v| !v.is_empty())
+            .is_none(),
+        "SYMERASEME_CAPTURE_CONSENT_ACL requires native Windows; refusing to record"
+    );
+}
+
+#[cfg(windows)]
 #[test]
 fn native_consent_files_and_dacls_match_checked_out_go() {
     let root = tempfile::tempdir().unwrap();
@@ -120,6 +142,7 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
         "Go consent build: {}",
         String::from_utf8_lossy(&result.stderr)
     );
+    let mut recorder = capture_consent_acl::Recorder::from_env(&helper);
 
     for (case, protect, readonly_dir, readonly_token) in [
         ("inherited", false, false, false),
@@ -131,8 +154,17 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
         fs::create_dir(&parent).unwrap();
         if protect {
             assert_eq!(
-                acl(&parent, "protect", root.path(), case)["protected"],
+                acl(&parent, "protect", root.path(), case, &mut recorder)["protected"],
                 true
+            );
+        }
+        if recorder.is_some() {
+            acl(
+                &parent,
+                "read",
+                root.path(),
+                &format!("parent-{case}"),
+                &mut recorder,
             );
         }
         let go_dir = parent.join("go");
@@ -167,6 +199,7 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
             "Go consent observation: {}",
             String::from_utf8_lossy(&result.stderr)
         );
+        capture_consent_acl::note_go_run(&mut recorder, case, &result);
         let observation: Value = serde_json::from_slice(&result.stdout).unwrap();
         assert_eq!(
             observation["schema"],
@@ -192,6 +225,13 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
                 sources[source].as_str().unwrap()
             );
         }
+        let go_names: Vec<String> = observation["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|name| name.as_str().unwrap().to_owned())
+            .collect();
+        capture_consent_acl::note_go_files(&mut recorder, case, &go_dir, &go_names);
         let store = ConsentStore::new(&rust_dir)
             .with_clock(|| 1000)
             .with_random_source(|length| Ok(vec![7; length]));
@@ -218,9 +258,22 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
             observation["error_class"],
             if failed { "permission" } else { "ok" }
         );
+        capture_consent_acl::note_outcome(&mut recorder, case, &observation, failed);
         assert_eq!(
-            acl(&rust_dir, "read", root.path(), &format!("rust-dir-{case}")),
-            acl(&go_dir, "read", root.path(), &format!("go-dir-{case}"))
+            acl(
+                &rust_dir,
+                "read",
+                root.path(),
+                &format!("rust-dir-{case}"),
+                &mut recorder
+            ),
+            acl(
+                &go_dir,
+                "read",
+                root.path(),
+                &format!("go-dir-{case}"),
+                &mut recorder
+            )
         );
         let mut names = fs::read_dir(&rust_dir)
             .unwrap()
@@ -240,9 +293,16 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
                     &rust,
                     "read",
                     root.path(),
-                    &format!("rust-file-{case}-{name}")
+                    &format!("rust-file-{case}-{name}"),
+                    &mut recorder
                 ),
-                acl(&go, "read", root.path(), &format!("go-file-{case}-{name}"))
+                acl(
+                    &go,
+                    "read",
+                    root.path(),
+                    &format!("go-file-{case}-{name}"),
+                    &mut recorder
+                )
             );
             // Undo only our own read-only control before checked cleanup.
             for path in [go, rust] {
@@ -254,9 +314,11 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
                 }
             }
         }
+        capture_consent_acl::note_case_complete(&mut recorder, case);
         eprintln!(
             "native consent {case}: real Go bytes, owner/group/DACL, read-only state, full owned tree and sentinel matched"
         );
     }
+    capture_consent_acl::finish(recorder);
     root.close().unwrap();
 }
