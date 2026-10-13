@@ -248,6 +248,8 @@ fn verified_primary_group(logs: &Path, arch: &str) -> String {
     let identity_command = || {
         let mut command = Command::new(&powershell);
         private(&mut command, logs);
+        // PowerShell needs PATHEXT to resolve the verifier's bare `git` command.
+        command.env("PATHEXT", ".EXE");
         // Both commands use exactly the same isolated environment: PATH for Git,
         // PSModulePath for CIM, ProgramFiles for the shared verifier's Git Bash.
         for key in ["PATH", "PSModulePath", "ProgramFiles"] {

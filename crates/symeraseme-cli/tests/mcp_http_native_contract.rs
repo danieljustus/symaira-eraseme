@@ -301,6 +301,8 @@ mod windows_acl {
         let script_bytes = fs::read(&script).unwrap();
         let mut command = Command::new(pwsh);
         private(&mut command, root);
+        // PowerShell needs PATHEXT to resolve the verifier's bare `git` command.
+        command.env("PATHEXT", ".EXE");
         for key in ["PATH", "PSModulePath", "ProgramFiles"] {
             if let Some(path) = std::env::var_os(key) {
                 command.env(key, path);
