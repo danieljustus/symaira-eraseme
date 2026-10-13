@@ -1,0 +1,187 @@
+{
+  "producer": "735ae51ed9c49ca6df88f78c108df8b83f928877",
+  "run": 38414186336,
+  "records": [
+    {
+      "test": "native_windows_disconnect_cancels_provider_request_like_go",
+      "case_success": true,
+      "member": "native_windows_disconnect_cancels_provider_request_like_go.json",
+      "bytes": 248169,
+      "sha256": "af4b876ae9454162cffa10bbc2165c1737b856f12c0cb88ca5533fde7eb39e92",
+      "verified_encoded_streams": 1,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_ctrl_break_shutdown_matches_go",
+      "case_success": true,
+      "member": "native_windows_ctrl_break_shutdown_matches_go.json",
+      "bytes": 246125,
+      "sha256": "42bc2a9ed43d4868b8dc095d5b383f837ecf6afc6053dca364c7ad5844d87ab2",
+      "verified_encoded_streams": 0,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_disconnect_reaps_host_agent_like_go",
+      "case_success": true,
+      "member": "native_windows_disconnect_reaps_host_agent_like_go.json",
+      "bytes": 248103,
+      "sha256": "9fcf1bc505e3d21cc7a26f493e9cb0b1f8d60e37228e0bd702e0d36c4eb2f84c",
+      "verified_encoded_streams": 2,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_ctrl_c_shutdown_matches_go",
+      "case_success": true,
+      "member": "native_windows_ctrl_c_shutdown_matches_go.json",
+      "bytes": 246105,
+      "sha256": "cddc9fcebcd471001f83fb4db6612c37719b069b5563ebe640baec6e2628627c",
+      "verified_encoded_streams": 0,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_http_matches_checked_out_go",
+      "case_success": true,
+      "member": "native_windows_http_matches_checked_out_go.json",
+      "bytes": 247120,
+      "sha256": "1021705e34fe01737b0977fc3dd06293b5fe16d2ca71506591a7a3c78033601d",
+      "verified_encoded_streams": 4,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_pathext_availability_matches_live_go",
+      "case_success": true,
+      "member": "native_windows_pathext_availability_matches_live_go.json",
+      "bytes": 249214,
+      "sha256": "ee235e1e520f951b6b989c22a40f350a532e5f5c9a4018df87946f6bebe0ce05",
+      "verified_encoded_streams": 0,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_slow_header_timeout_matches_go",
+      "case_success": true,
+      "member": "native_windows_slow_header_timeout_matches_go.json",
+      "bytes": 246148,
+      "sha256": "2d59f22021341c50e0975fd63a5df3fab0645a43555cdd2e1969ea608a512918",
+      "verified_encoded_streams": 1,
+      "target": "windows/amd64",
+      "archive": "X64-original.zip",
+      "archive_sha256": "b6a51314ebbe3d03ff453b34a667ccdabc28947cceda708bcdd98dfc15e2536f"
+    },
+    {
+      "test": "native_windows_ctrl_break_shutdown_matches_go",
+      "case_success": true,
+      "member": "native_windows_ctrl_break_shutdown_matches_go.json",
+      "bytes": 246127,
+      "sha256": "d1379a02ec211dfb48e080af11aa3cf39d6c2475978303128293f931a718ffe1",
+      "verified_encoded_streams": 0,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_ctrl_c_shutdown_matches_go",
+      "case_success": true,
+      "member": "native_windows_ctrl_c_shutdown_matches_go.json",
+      "bytes": 246107,
+      "sha256": "ee69e6084b6a9f5c6c7338fbceff3ab79b9140f613df403b8c4de119d866dc96",
+      "verified_encoded_streams": 0,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_disconnect_cancels_provider_request_like_go",
+      "case_success": true,
+      "member": "native_windows_disconnect_cancels_provider_request_like_go.json",
+      "bytes": 248171,
+      "sha256": "891eecebbfeed26183c5feb6c5c3d9f3c844414b905e174e1eac07c7919e212e",
+      "verified_encoded_streams": 1,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_disconnect_reaps_host_agent_like_go",
+      "case_success": true,
+      "member": "native_windows_disconnect_reaps_host_agent_like_go.json",
+      "bytes": 248107,
+      "sha256": "1b61accc1e5b41143b785790d62a49a602e5a1fc9e0338b748586c63ad098958",
+      "verified_encoded_streams": 2,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_http_matches_checked_out_go",
+      "case_success": true,
+      "member": "native_windows_http_matches_checked_out_go.json",
+      "bytes": 247122,
+      "sha256": "be0d8f2c87498bea7999229017371efcecc089ef62e854f6e6425acea221bd11",
+      "verified_encoded_streams": 4,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_pathext_availability_matches_live_go",
+      "case_success": true,
+      "member": "native_windows_pathext_availability_matches_live_go.json",
+      "bytes": 249216,
+      "sha256": "929f9baa7c95eda5e0550c29673a4a39c4d48c6815ca3dabf47a3dd6b48cf7fc",
+      "verified_encoded_streams": 0,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    },
+    {
+      "test": "native_windows_slow_header_timeout_matches_go",
+      "case_success": true,
+      "member": "native_windows_slow_header_timeout_matches_go.json",
+      "bytes": 246150,
+      "sha256": "7769f0458568491b682dbbc36662093a93b7b92d79c43be6c644186c14c98e5a",
+      "verified_encoded_streams": 1,
+      "target": "windows/arm64",
+      "archive": "ARM64-original.zip",
+      "archive_sha256": "d8801391c93a4a42da86730b0d17d738ec77c119025841679f2d9c7452ec1b38"
+    }
+  ],
+  "source_files_per_record": 1478,
+  "generator_inputs_per_record": 10,
+  "git_confirmed_crlf_paths": 13,
+  "negative_controls_rejected": [
+    "incomplete",
+    "wrong-target",
+    "wrong-revision",
+    "missing-source",
+    "corrupt-source",
+    "boolean-version"
+  ],
+  "privacy_scan_findings": [
+    {
+      "field": "windows/amd64/native_windows_http_matches_checked_out_go/observations/http/2/origin",
+      "category": "private_path"
+    },
+    {
+      "field": "windows/arm64/native_windows_http_matches_checked_out_go/observations/http/2/origin",
+      "category": "private_path"
+    }
+  ],
+  "status": "source-authenticated-awaiting-independent-privacy-review",
+  "limitations": [
+    "Recorded binary digests are not retained executable bytes.",
+    "Pattern scan is not independent publication clearance.",
+    "Rust-only runtime replay remains pending."
+  ]
+}
