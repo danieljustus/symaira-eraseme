@@ -2,6 +2,10 @@
 
 //! Deterministic domain foundations for Symaira EraseMe.
 
+#[cfg(test)]
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 pub mod campaign;
 pub mod config;
 pub mod confirmation;

@@ -1,5 +1,7 @@
 //! ID-005 destination-conflict cleanup, without Unix-only APIs or subprocesses.
 //! Native modes and error codes remain covered by the separate platform gates.
+use crate::go_source_pin;
+
 use super::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -38,7 +40,10 @@ fn fixture_case(name: &str) -> Value {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (path, expected) in fixture["source_sha256"].as_object().unwrap() {
         assert_eq!(
-            hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap())),
+            hex::encode(Sha256::digest(go_source_pin::current_source(
+                root.to_str().unwrap(),
+                path
+            ))),
             expected.as_str().unwrap(),
             "Go oracle drift: {path}"
         );
@@ -78,7 +83,10 @@ fn id005_fault_fixture_is_bound_to_source_and_probe() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (path, expected) in document["source_sha256"].as_object().unwrap() {
         assert_eq!(
-            hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap())),
+            hex::encode(Sha256::digest(go_source_pin::current_source(
+                root.to_str().unwrap(),
+                path
+            ))),
             expected.as_str().unwrap(),
             "Go oracle drift: {path}"
         );

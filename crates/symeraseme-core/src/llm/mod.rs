@@ -1087,8 +1087,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../../../symeraseme-cli/tests/support/go_source_pin.rs"]
-mod go_source_pin;
+use crate::go_source_pin;
 
 #[cfg(test)]
 #[path = "agent_path_tests.rs"]

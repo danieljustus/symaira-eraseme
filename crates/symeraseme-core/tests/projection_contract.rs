@@ -1,3 +1,6 @@
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use chrono::{TimeZone, Utc};
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -145,8 +148,8 @@ fn fixtures() -> (InputFixture, ContractFixture) {
     );
 
     for source in &input.oracle.sources {
-        let contents = fs::read(repository_root().join(&source.path))
-            .unwrap_or_else(|error| panic!("read Go oracle source {}: {error}", source.path));
+        let contents =
+            go_source_pin::current_source(repository_root().to_str().unwrap(), &source.path);
         assert_eq!(
             hex::encode(Sha256::digest(contents)),
             source.sha256,

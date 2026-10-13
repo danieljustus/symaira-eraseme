@@ -1,3 +1,6 @@
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
@@ -106,7 +109,7 @@ fn profile_corpus_matches_go() {
             capture.validator_sha256,
         ),
     ] {
-        let bytes = fs::read(root.join(path)).unwrap();
+        let bytes = go_source_pin::current_source(root.to_str().unwrap(), path);
         // Tracked helper text is LF on every native checkout (see attributes).
         assert_eq!(hex::encode(Sha256::digest(&bytes)), expected, "{path}");
     }

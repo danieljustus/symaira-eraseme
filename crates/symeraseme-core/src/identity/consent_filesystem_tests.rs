@@ -1,5 +1,6 @@
 //! ID-005 side effects captured from Go; Unix mode/umask assertions run natively.
 use super::*;
+use crate::go_source_pin;
 use serde_json::{Value, json};
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -257,7 +258,10 @@ fn id005_rejects_changed_oracle_modes_and_source() {
     let document = fixture();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (path, expected) in document["source_sha256"].as_object().unwrap() {
-        let actual = hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap()));
+        let actual = hex::encode(Sha256::digest(go_source_pin::current_source(
+            root.to_str().unwrap(),
+            path,
+        )));
         assert_eq!(
             actual,
             expected.as_str().unwrap(),
