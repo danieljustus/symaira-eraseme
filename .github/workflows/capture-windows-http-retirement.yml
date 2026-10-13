@@ -1,0 +1,110 @@
+name: Capture remaining native Windows HTTP contracts
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capture-windows-http-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: Windows HTTP observations / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-11-arm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+      - name: Prepare pinned native toolchains
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOTOOLCHAIN=go1.26.6 go mod download
+          rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Verify portable recorder controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.98.0 test -p symeraseme-cli --locked --test windows_http_capture_contract
+      - name: Capture all original native comparisons
+        shell: bash
+        env:
+          SYMERASEME_CAPTURE_WINDOWS_HTTP: ${{ runner.temp }}/windows-http-capture
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
+          tests=(
+            native_windows_http_matches_checked_out_go
+            native_windows_disconnect_reaps_host_agent_like_go
+            native_windows_pathext_availability_matches_live_go
+            native_windows_disconnect_cancels_provider_request_like_go
+            native_windows_slow_header_timeout_matches_go
+            native_windows_ctrl_break_shutdown_matches_go
+            native_windows_ctrl_c_shutdown_matches_go
+          )
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process \
+            -- "${tests[@]}" --exact --nocapture --test-threads=1 \
+            2>&1 | tee "$RUNNER_TEMP/windows-http-capture.log"
+          grep -Eq '^running 7 tests$' "$RUNNER_TEMP/windows-http-capture.log"
+          grep -Eq 'test result: ok\. 7 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/windows-http-capture.log"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Verify complete source-bound observation inventory
+        shell: python
+        env:
+          CAPTURE_ROOT: ${{ runner.temp }}/windows-http-capture
+          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_ARCH: ${{ runner.arch }}
+        run: |
+          import json
+          import os
+          import pathlib
+          import re
+          source = pathlib.Path('crates/symeraseme-cli/tests/support/capture_windows_http_process.rs').read_text()
+          declaration = re.search(r'pub const CASES: \[&str; 7\] = \[(.*?)\];', source, re.S)
+          assert declaration is not None
+          tests = re.findall(r'"([a-z0-9_]+)"', declaration.group(1))
+          assert len(tests) == len(set(tests)) == 7
+          root = pathlib.Path(os.environ['CAPTURE_ROOT'])
+          files = list(root.glob('*.json'))
+          assert {p.name for p in files} == {test + '.json' for test in tests}
+          target = {'X64': 'windows/amd64', 'ARM64': 'windows/arm64'}[os.environ['EXPECTED_ARCH']]
+          for path in files:
+              raw = path.read_bytes()
+              assert len(raw) <= 4 * 1024 * 1024
+              record = json.loads(raw)
+              assert record['schema'] == 'symeraseme.actual-go.windows-http-process.v1'
+              assert record['test'] == path.stem
+              assert record['outcome'] == 'completed'
+              assert record['source_revision'] == os.environ['EXPECTED_SHA']
+              assert record['native_target'] == target
+              assert record['case_inventory'] == tests
+              assert record['observations']
+          print('Verified seven completed native observation records for ' + target)
+      - name: Retain measured observations only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-http-observations-${{ runner.arch }}
+          path: ${{ runner.temp }}/windows-http-capture/*.json
+          if-no-files-found: error
+          retention-days: 30
