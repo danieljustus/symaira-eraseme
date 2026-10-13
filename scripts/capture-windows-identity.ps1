@@ -31,6 +31,7 @@ using System.Runtime.InteropServices;
 public static class SymWinIdentity
 {
     const uint TOKEN_QUERY = 0x0008;
+    const int TokenUser = 1;
     const int TokenPrimaryGroup = 5;
     const int ERROR_INSUFFICIENT_BUFFER = 122;
 
@@ -66,7 +67,8 @@ public static class SymWinIdentity
         finally { LocalFree(text); }
     }
 
-    public static string CurrentPrimaryGroupSid()
+    // TOKEN_USER and TOKEN_PRIMARY_GROUP both begin with their PSID pointer.
+    static string CurrentTokenSid(int infoClass)
     {
         IntPtr token;
         if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -74,16 +76,16 @@ public static class SymWinIdentity
         try
         {
             int needed;
-            if (GetTokenInformation(token, TokenPrimaryGroup, IntPtr.Zero, 0, out needed))
+            if (GetTokenInformation(token, infoClass, IntPtr.Zero, 0, out needed))
                 throw new InvalidOperationException("size probe unexpectedly succeeded");
             int probeError = Marshal.GetLastWin32Error();
             if (probeError != ERROR_INSUFFICIENT_BUFFER || needed <= 0) throw new Win32Exception(probeError);
             buffer = Marshal.AllocHGlobal(needed);
             int returned;
-            if (!GetTokenInformation(token, TokenPrimaryGroup, buffer, needed, out returned))
+            if (!GetTokenInformation(token, infoClass, buffer, needed, out returned))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             IntPtr sid = Marshal.ReadIntPtr(buffer, 0);
-            if (sid == IntPtr.Zero) throw new InvalidOperationException("token has no primary group");
+            if (sid == IntPtr.Zero) throw new InvalidOperationException("token has no requested SID");
             return SidToString(sid);
         }
         finally
@@ -92,6 +94,9 @@ public static class SymWinIdentity
             CloseHandle(token);
         }
     }
+
+    public static string CurrentUserSid() { return CurrentTokenSid(TokenUser); }
+    public static string CurrentPrimaryGroupSid() { return CurrentTokenSid(TokenPrimaryGroup); }
 
     public static string AliasSid(string alias)
     {
@@ -140,6 +145,7 @@ Check ($processMachine -eq 0 -and $nativeMachine -eq $expectedMachine -and [IntP
 
 # Identity from the process token and the runner user, not from Rust or Go output.
 $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+Check ($userSid -eq [SymWinIdentity]::CurrentUserSid()) 'user_matches_launch_process_token'
 $primaryGroupSid = [SymWinIdentity]::CurrentPrimaryGroupSid()
 Check ($userSid -match '^S-1-5-[0-9-]+$') 'user_sid_observed'
 Check ($primaryGroupSid -match '^S-1-5-[0-9-]+$') 'primary_group_sid_observed'
@@ -154,14 +160,18 @@ Check ($laSid -eq $rid500[0]) 'rid500_matches_sddl_la'
 
 if ($Mode -eq 'Verify') {
     if (-not (Test-Path -LiteralPath $ArtifactPath -PathType Leaf)) { Fail 'baseline artifact missing' }
+    if ((Get-Item -LiteralPath $ArtifactPath).Length -gt 16384) { Fail 'baseline artifact too large' }
     $raw = [System.IO.File]::ReadAllText($ArtifactPath, [System.Text.Encoding]::UTF8)
     if ($raw.Length -gt 16384) { Fail 'baseline artifact too large' }
     $baseline = $raw | ConvertFrom-Json
     Check ($baseline.schema -eq $schema) 'baseline_schema'
     Check ($baseline.source_revision -eq $ExpectedRevision) 'baseline_revision_matches'
+    Check ($baseline.script_sha256 -eq (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'baseline_script_matches'
+    Check ($baseline.host.platform -eq 'Windows' -and $baseline.host.expected_arch -eq $ExpectedArch -and $baseline.host.native_machine -eq ('0x{0:X4}' -f $nativeMachine) -and $baseline.host.process_machine -eq '0x0000' -and $baseline.host.pointer_size -eq [IntPtr]::Size) 'baseline_native_host_matches'
     Check ($baseline.process.user_sid -eq $userSid) 'user_sid_matches_baseline'
     Check ($baseline.process.primary_group_sid -eq $primaryGroupSid) 'primary_group_sid_matches_baseline'
     Check ($baseline.local_admin.rid500_sid -eq $rid500[0]) 'rid500_sid_matches_baseline'
+    Check ($baseline.local_admin.sddl_la_sid -eq $laSid) 'sddl_la_matches_baseline'
     Write-Output "windows identity verify: $($checks.Count) checks passed"
     exit 0
 }
@@ -173,7 +183,7 @@ $tempFull = [System.IO.Path]::GetFullPath($runnerTemp).TrimEnd('\')
 $repoFull = [System.IO.Path]::GetFullPath($repo).TrimEnd('\')
 $outFull = [System.IO.Path]::GetFullPath($ArtifactPath)
 Check ($outFull.StartsWith($tempFull + '\', [System.StringComparison]::OrdinalIgnoreCase)) 'artifact_under_runner_temp'
-Check (-not $tempFull.StartsWith($repoFull + '\', [System.StringComparison]::OrdinalIgnoreCase)) 'runner_temp_outside_repo'
+Check ($tempFull -ne $repoFull -and -not $tempFull.StartsWith($repoFull + '\', [System.StringComparison]::OrdinalIgnoreCase)) 'runner_temp_outside_repo'
 Check (-not (Test-Path -LiteralPath $outFull)) 'output_does_not_exist'
 
 $record = [ordered]@{

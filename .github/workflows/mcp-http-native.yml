@@ -146,21 +146,19 @@ jobs:
           path: ${{ runner.temp }}/identity-baseline/windows-identity-baseline.json
           retention-days: 7
           if-no-files-found: error
-      - name: Verify identity baseline against the tested process
-        if: runner.os == 'Windows' && inputs.capture_token_originals
+      - name: Capture original native token ACL and rotation observations
+        if: inputs.capture_token_originals
         shell: pwsh
         env:
           EXPECTED_ARCH: ${{ runner.arch }}
           EXPECTED_REVISION: ${{ github.sha }}
+          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/token-acl-originals
         run: |
           $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
           ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
-      - name: Capture original native token ACL and rotation observations
-        if: inputs.capture_token_originals
-        shell: bash
-        env:
-          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/token-acl-originals
-        run: |
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The verified process launches bash/cargo with its inherited token.
+          & bash -e -o pipefail -c @'
           set -euo pipefail
           test "$RUNNER_OS" = Windows
           test -z "$(git status --porcelain)"
@@ -170,6 +168,8 @@ jobs:
           grep -Eq '^running 1 test$' "$RUNNER_TEMP/token-acl-capture.log"
           grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/token-acl-capture.log"
           test -s "$SYMERASEME_CAPTURE_HTTP_AUX/native_windows_token_dacl_and_rotation_match_go.json"
+          '@
+          exit $LASTEXITCODE
       - name: Retain original token ACL observations
         if: success() && inputs.capture_token_originals
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
