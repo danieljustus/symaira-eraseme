@@ -486,6 +486,7 @@ fn native_windows_disconnect_reaps_host_agent_like_go() {
             "native host-agent {name}: live before disconnect, terminated afterwards, server healthy, no classification"
         );
     }
+    capture.finish();
 }
 
 #[test]
