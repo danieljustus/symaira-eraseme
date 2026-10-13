@@ -1,5 +1,7 @@
 //! CLI-024: replay recorded migration inputs, output bytes and filesystem state.
 
+#[cfg(windows)]
+use super::capture_windows_migration::Recorder;
 #[cfg(not(windows))]
 use super::run;
 use super::{Cleanup, binary, fold_root, hex_digest, unique_root};
@@ -343,6 +345,8 @@ fn run_native_migration_case(
     id: &str,
     case: &Value,
     program: &Path,
+    recorder: &mut Option<Recorder>,
+    side: &str,
 ) -> (Vec<NativeProcess>, RootManifests) {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated native migration root");
@@ -383,6 +387,8 @@ fn run_native_migration_case(
     });
     processes.push(&case["process"]);
     let mut outputs = Vec::with_capacity(processes.len());
+    let mut process_records = Vec::with_capacity(processes.len());
+    let mut snapshots = Vec::new();
     for (index, process) in processes.into_iter().enumerate() {
         let argv: Vec<_> = process["argv"]
             .as_array()
@@ -390,7 +396,7 @@ fn run_native_migration_case(
             .iter()
             .map(|arg| arg.as_str().expect("string argument"))
             .collect();
-        let output = super::run_program_with_resources(
+        let raw = super::run_program_with_resources(
             program,
             &argv,
             &root.join("home"),
@@ -399,7 +405,10 @@ fn run_native_migration_case(
             index,
             None,
         );
-        let output = native_process(&output, &root);
+        process_records.push(recorder.as_mut().map_or(Value::Null, |recorder| {
+            recorder.process(side, id, index, &root, &raw)
+        }));
+        let output = native_process(&raw, &root);
         assert_eq!(
             output.status,
             process["exit_code"].as_i64().map(|code| code as i32),
@@ -426,6 +435,9 @@ fn run_native_migration_case(
             .strip_prefix("<ORACLE_ROOT>/")
             .expect("isolated recorded root");
         let path = input_path(&root, relative);
+        if let (Some(recorder), "go") = (recorder.as_mut(), side) {
+            snapshots.push(recorder.snapshot(id, name, &path));
+        }
         manifests.insert(name.clone(), manifest(&path, &root));
         let expected: BTreeMap<_, _> = case["manifests"][name]
             .as_array()
@@ -481,6 +493,17 @@ fn run_native_migration_case(
         manifests["source"], source_before,
         "{id}: native source changed"
     );
+    if let Some(recorder) = recorder.as_mut() {
+        recorder.record_side(
+            id,
+            side,
+            serde_json::json!({
+                "processes": process_records,
+                "manifests": manifests,
+                "snapshots": snapshots,
+            }),
+        );
+    }
     (outputs, manifests)
 }
 
@@ -517,10 +540,13 @@ fn migration_filesystem_matches_pinned_native_go() {
     let _cleanup = Cleanup(oracle_root.clone());
     let go_binary = super::pinned_go_binary(&oracle_root, "4e582f28");
     let rust_binary = binary();
+    let mut recorder = Recorder::from_env(&go_binary, &oracle_root.join("go-oracle"), &rust_binary);
     let mut negative_control_done = false;
     for (id, case) in cases {
-        let (go, go_manifests) = run_native_migration_case(id, case, &go_binary);
-        let (rust, rust_manifests) = run_native_migration_case(id, case, &rust_binary);
+        let (go, go_manifests) =
+            run_native_migration_case(id, case, &go_binary, &mut recorder, "go");
+        let (rust, rust_manifests) =
+            run_native_migration_case(id, case, &rust_binary, &mut recorder, "rust");
         assert_eq!(rust.len(), go.len(), "{id}: Go/Rust process count");
         for (index, (go, rust)) in go.iter().zip(&rust).enumerate() {
             assert_native_processes_equal(&format!("{id}: process {index}"), go, rust);
@@ -568,6 +594,9 @@ fn migration_filesystem_matches_pinned_native_go() {
         negative_control_done,
         "migration differential negative controls ran"
     );
+    if let Some(recorder) = recorder.as_ref() {
+        recorder.finish_family("filesystem", 5);
+    }
 }
 
 fn write_input(path: &Path, content: &str, mode: u32) {

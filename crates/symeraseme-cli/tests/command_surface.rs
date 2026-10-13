@@ -10,6 +10,9 @@ mod frozen_grant_oracle;
 #[path = "support/frozen_schedule_oracle.rs"]
 mod frozen_schedule_oracle;
 
+#[path = "support/capture_windows_migration.rs"]
+mod capture_windows_migration;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
@@ -62,7 +65,7 @@ fn binary() -> PathBuf {
 }
 
 #[derive(Debug)]
-struct ProcessOutput {
+pub(crate) struct ProcessOutput {
     status: ExitStatus,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
@@ -813,6 +816,10 @@ fn is_exact_case(case: &Value) -> bool {
 
 #[test]
 fn frozen_command_surface_matches_phase_two_contract() {
+    capture_windows_migration::opt_in_dir(
+        std::env::var_os(capture_windows_migration::ENV).as_deref(),
+    )
+    .expect("windows migration capture opt-in");
     let surface: Value = serde_json::from_str(SURFACE).expect("surface JSON");
     assert_eq!(count_nodes(&surface["root"]), 51);
     let top_level = surface["root"]["children"].as_array().expect("top level");
@@ -851,6 +858,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
         assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
         pinned_go_binary(&root, "4e582f28")
     };
+    #[cfg(windows)]
+    let mut recorder = capture_windows_migration::Recorder::from_env(
+        &go_binary,
+        &root.join("go-oracle"),
+        &binary(),
+    );
 
     for (index, case) in selected.iter().enumerate() {
         let argv = case["argv"]
@@ -1004,6 +1017,19 @@ fn frozen_command_surface_matches_phase_two_contract() {
             } else {
                 output.stdout.clone()
             };
+        #[cfg(windows)]
+        {
+            if let (Some(recorder), Some(go)) = (recorder.as_mut(), native_go.as_ref()) {
+                recorder.record_command(capture_windows_migration::CommandCase {
+                    id,
+                    root: &root,
+                    go,
+                    rust: &output,
+                    expected_stdout: &expected_stdout,
+                    actual_stdout: &actual_stdout,
+                });
+            }
+        }
         assert_eq!(
             fold_root(&actual_stdout, &root),
             fold_root(&expected_stdout, &root),
@@ -1058,6 +1084,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
         cwd_entries.is_empty(),
         "isolated cwd stayed clean: {cwd_entries:?}"
     );
+    #[cfg(windows)]
+    {
+        if let Some(recorder) = recorder.as_ref() {
+            recorder.finish_family("command-surface", 13);
+        }
+    }
 }
 
 #[test]
