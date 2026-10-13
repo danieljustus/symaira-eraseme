@@ -129,10 +129,45 @@ fn identity_failure_label(stderr: &[u8]) -> &'static str {
         "Add-Type",
         "CommandNotFoundException",
         "ParameterBindingValidationException",
+        "PSSecurityException",
+        "running scripts is disabled",
+        "is not digitally signed",
+        "UnauthorizedAccess",
+        "not recognized as the name of a script file",
+        "Failed to create CoreCLR",
     ]
     .into_iter()
     .find(|label| text.contains(label))
     .unwrap_or("unclassified PowerShell failure")
+}
+
+// Read-only engine probe, without paths, baseline contents or a policy override.
+const IDENTITY_ENGINE_PROBE: &str = r#"
+$ErrorActionPreference = 'Stop'
+Write-Output 'engine-started'
+Write-Output ('policy:' + [string](Get-ExecutionPolicy))
+Write-Output ('cim:' + [bool](Get-Command Get-CimInstance -ErrorAction SilentlyContinue))
+Write-Output ('git:' + [bool](Get-Command git -CommandType Application -ErrorAction SilentlyContinue))
+"#;
+
+fn identity_probe_markers(stdout: &[u8]) -> Vec<&'static str> {
+    let text = String::from_utf8_lossy(stdout);
+    [
+        "engine-started",
+        "policy:Restricted",
+        "policy:AllSigned",
+        "policy:RemoteSigned",
+        "policy:Unrestricted",
+        "policy:Bypass",
+        "policy:Undefined",
+        "cim:True",
+        "cim:False",
+        "git:True",
+        "git:False",
+    ]
+    .into_iter()
+    .filter(|marker| text.lines().any(|line| line == *marker))
+    .collect()
 }
 
 #[test]
@@ -150,7 +185,27 @@ fn identity_failure_diagnostics_are_fixed_labels_only() {
             identity_failure_label(input),
             "unclassified PowerShell failure"
         );
+        assert!(identity_probe_markers(input).is_empty());
     }
+    assert_eq!(
+        identity_failure_label(b"private-path: running scripts is disabled on this system"),
+        "running scripts is disabled"
+    );
+    assert_eq!(
+        identity_probe_markers(
+            b"engine-started\r\npolicy:Restricted\r\ncim:False\r\ngit:True\r\nprivate-value\n"
+        ),
+        [
+            "engine-started",
+            "policy:Restricted",
+            "cim:False",
+            "git:True"
+        ]
+    );
+    assert!(
+        identity_probe_markers(b"policy:Restricted private-value\ncim:True private-value")
+            .is_empty()
+    );
 }
 
 #[cfg(windows)]
@@ -178,15 +233,19 @@ fn verified_primary_group(logs: &Path, arch: &str) -> String {
     let revision = std::str::from_utf8(&output.stdout).unwrap().trim();
     let script = repo().join("scripts/capture-windows-identity.ps1");
     let script_bytes = fs::read(&script).unwrap();
-    let mut verify = Command::new(powershell);
-    private(&mut verify, logs);
-    // Native read-only identity verification needs git and system CIM modules,
-    // not user profiles, credentials or a Go installation.
-    for key in ["PATH", "PSModulePath", "ProgramFiles"] {
-        if let Some(value) = std::env::var_os(key) {
-            verify.env(key, value);
+    let identity_command = || {
+        let mut command = Command::new(&powershell);
+        private(&mut command, logs);
+        // Both commands use exactly the same isolated environment: PATH for Git,
+        // PSModulePath for CIM, ProgramFiles for the shared verifier's Git Bash.
+        for key in ["PATH", "PSModulePath", "ProgramFiles"] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
         }
-    }
+        command
+    };
+    let mut verify = identity_command();
     verify
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(&script)
@@ -201,6 +260,25 @@ fn verified_primary_group(logs: &Path, arch: &str) -> String {
         ])
         .arg(&baseline_path);
     let result = capture(verify, logs, "identity-verify", Duration::from_secs(60));
+    if !result.status.success() {
+        let mut probe = identity_command();
+        probe.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            IDENTITY_ENGINE_PROBE,
+        ]);
+        let probe = capture(probe, logs, "identity-engine", Duration::from_secs(30));
+        eprintln!(
+            "identity engine diagnostic: exit {:?}, markers {:?}, verifier stderr bytes {}, stderr contains NUL {}, stdout class {}",
+            probe.status.code(),
+            identity_probe_markers(&probe.stdout),
+            result.stderr.len(),
+            result.stderr.contains(&0),
+            identity_failure_label(&result.stdout)
+        );
+    }
     assert!(
         result.status.success(),
         "independent native identity verification failed (exit {:?}, class: {})",
