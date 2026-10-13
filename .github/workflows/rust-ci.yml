@@ -307,13 +307,33 @@ jobs:
         run: |
           $artifact = Join-Path $env:RUNNER_TEMP 'rust-native-identity/baseline.json'
           $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
+          $raw = & cargo "+$env:RUST_TOOLCHAIN" metadata --locked --no-deps --format-version 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $metadata = $raw | ConvertFrom-Json
+          $packages = @($metadata.packages | Where-Object { $_.id -in $metadata.workspace_members })
+          if ($packages.Count -eq 0 -or $packages.Count -ne $metadata.workspace_members.Count) {
+            throw 'Workspace test package inventory is incomplete'
+          }
+          # Each package retains the identity check and unchanged 24-minute bound.
+          # The complete ARM64 workspace exceeds that bound as a single child.
           $tests = @'
           set -euo pipefail
-          cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked --no-fail-fast
+          cargo +"$RUST_TOOLCHAIN" test -p "$SYMERASEME_CI_TEST_PACKAGE" --all-features --locked --no-fail-fast
+          '@
+          $failed = $false
+          foreach ($package in $packages) {
+            $env:SYMERASEME_CI_TEST_PACKAGE = $package.name
+            Write-Output "Native workspace package: $($package.name)"
+            ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $tests
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+          }
+          $docs = @'
+          set -euo pipefail
           cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
           '@
-          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $tests
-          exit $LASTEXITCODE
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $docs
+          if ($LASTEXITCODE -ne 0) { $failed = $true }
+          if ($failed) { exit 1 }
 
       - name: Verify recorded whole plan and Unix processes with Go absent on all six native hosts
         shell: bash
