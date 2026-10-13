@@ -13,6 +13,9 @@ mod frozen_schedule_oracle;
 #[path = "support/capture_windows_migration.rs"]
 mod capture_windows_migration;
 
+#[path = "support/frozen_windows_migration.rs"]
+mod frozen_windows_migration;
+
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
