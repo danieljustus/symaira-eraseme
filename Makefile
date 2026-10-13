@@ -2,12 +2,18 @@ SHELL := /bin/sh
 
 BINARY := symeraseme
 CARGO ?= cargo
-GORELEASER ?= goreleaser
 SWIFT ?= swift
 PYTHON ?= python3
 RUST_TARGET_DIR ?= $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),build/rust)
 COVERAGE_FILE ?= $(RUST_TARGET_DIR)/coverage.json
 NIGHTLY := nightly-2026-09-20
+
+# Local packaging inputs: supplied native binaries only; empty RELEASE_VERSION reads Cargo.toml.
+RELEASE_BINARIES ?= $(RUST_TARGET_DIR)/release-binaries
+RELEASE_DIST ?= $(RUST_TARGET_DIR)/release-dist
+RELEASE_VERSION ?=
+RELEASE_TARGETS := darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 windows-amd64 windows-arm64
+RELEASE_STAGER_ARGS = $(foreach target,$(RELEASE_TARGETS),--$(target) $(call shell_quote,$(RELEASE_BINARIES)/rust-binary-$(target)))
 
 # Quote a make-expanded value as one literal POSIX shell word.
 shell_quote = '$(subst ','"'"',$(1))'
@@ -54,14 +60,19 @@ app-test:
 	fi
 	cd app/SymairaEraseMe && $(call shell_quote,$(SWIFT)) test
 
+# Offline local packaging proof from supplied native binaries; not native build or release proof.
+# Never cleans or overwrites RELEASE_DIST: the stager refuses a non-empty destination.
 release-dry-run:
-	@if ! command -v $(call shell_quote,$(GORELEASER)) >/dev/null 2>&1; then \
-		printf '%s\n' 'release-dry-run requires goreleaser on PATH (or set GORELEASER=...).' >&2; \
-		exit 127; \
-	fi
-	$(call shell_quote,$(GORELEASER)) release --snapshot --clean
-	$(call shell_quote,$(PYTHON)) tests/test_release_archive_verifier.py
-	$(call shell_quote,$(PYTHON)) tests/verify_release_archives.py dist
+	@printf '%s\n' 'release-dry-run: LOCAL packaging proof only. Native build, SBOM, static-link and smoke gates stay in rust-prerelease.yml.'
+	@test -d $(call shell_quote,$(RELEASE_BINARIES)) || { printf '%s\n' 'release-dry-run requires RELEASE_BINARIES=<dir> with rust-binary-<os>-<arch> for all six targets.' >&2; exit 2; }
+	@set -eu; \
+	version=$(call shell_quote,$(RELEASE_VERSION)); \
+	if [ -z "$$version" ]; then \
+		version=$$($(call shell_quote,$(PYTHON)) -B -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("Cargo.toml").read_text())["workspace"]["package"]["version"])'); \
+	fi; \
+	$(call shell_quote,$(PYTHON)) -B tests/test_release_archive_verifier.py; \
+	$(call shell_quote,$(PYTHON)) -B scripts/stage_rust_release_archives.py --version "$$version" --output $(call shell_quote,$(RELEASE_DIST)) $(RELEASE_STAGER_ARGS); \
+	$(call shell_quote,$(PYTHON)) -B tests/verify_release_archives.py $(call shell_quote,$(RELEASE_DIST))
 
 test:
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) test --workspace --all-targets --all-features --locked

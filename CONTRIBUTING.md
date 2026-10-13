@@ -127,9 +127,32 @@ permissions.
 Release configuration for the current Rust-only candidate lives in
 `.github/workflows/release.yml`; it builds Rust CLI archives and the macOS app.
 The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
-last Go-only stable release. The legacy `.goreleaser.yml` configuration and
-`make release-dry-run` still reference deleted Go sources and must not be used
-as Rust release evidence while their retirement is pending. The Homebrew
-publisher consumes exact published archives and checksums. Do not create or move
+last Go-only stable release. The obsolete GoReleaser and golangci-lint
+configurations are removed; their historical Git versions remain available.
+The Homebrew publisher consumes exact published archives and checksums. Do not create or move
 a release tag from a feature branch; use the repository's release gate and
 verify the release assets and Homebrew Formula after publication.
+
+### Local Rust archive dry-run
+
+With Python 3.11+ and already-built native Rust binaries for all six targets:
+
+```bash
+make release-dry-run \
+  RELEASE_BINARIES=/path/to/native-binaries \
+  RELEASE_DIST=/path/to/empty-output
+```
+
+The input directory must contain `rust-binary-<os>-<arch>` for every combination
+of `darwin`, `linux`, `windows` and `amd64`, `arm64`, matching the native
+`rust-prerelease.yml` artifacts. The target checks executable headers, stages
+six archives and verifies their root layout and SHA-256 checksums. It neither
+builds binaries nor downloads or publishes anything. Missing or wrong-target
+inputs and non-empty output directories fail without cleaning existing output.
+
+Defaults are `$(RUST_TARGET_DIR)/release-binaries` and
+`$(RUST_TARGET_DIR)/release-dist`. The archive version defaults to
+`Cargo.toml`'s workspace version. An explicit `RELEASE_VERSION` changes the
+archive label only; it does not verify the executable's version or provenance.
+This packaging check does not replace the six native builds, version/smoke,
+static-dependency, SBOM, signing or release-acceptance gates.

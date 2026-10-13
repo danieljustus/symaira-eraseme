@@ -7,6 +7,8 @@ on:
       - .github/workflows/release.yml
       - Cargo.toml
       - Cargo.lock
+      - Makefile
+      - tests/test_make_rust_release_contract.py
       - crates/**
       - cmd/**
       - internal/**
@@ -272,16 +274,7 @@ jobs:
           DIST: ${{ runner.temp }}/rust-prerelease-dist
         run: |
           set -euo pipefail
-          python3 scripts/stage_rust_release_archives.py \
-            --version "$RELEASE_VERSION" \
-            --output "$DIST" \
-            --darwin-amd64 "$BINARIES/rust-binary-darwin-amd64" \
-            --darwin-arm64 "$BINARIES/rust-binary-darwin-arm64" \
-            --linux-amd64 "$BINARIES/rust-binary-linux-amd64" \
-            --linux-arm64 "$BINARIES/rust-binary-linux-arm64" \
-            --windows-amd64 "$BINARIES/rust-binary-windows-amd64" \
-            --windows-arm64 "$BINARIES/rust-binary-windows-arm64"
-          python3 tests/verify_release_archives.py "$DIST"
+          make release-dry-run RELEASE_BINARIES="$BINARIES" RELEASE_DIST="$DIST" RELEASE_VERSION="$RELEASE_VERSION"
 
       - name: Generate artifact-level Rust CycloneDX SBOMs
         shell: bash
