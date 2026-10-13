@@ -19,6 +19,7 @@ on:
       - cmd/symeraseme/**
       - internal/mcp/**
       - scripts/check-mcp-conformance.py
+      - scripts/test_check_mcp_conformance.py
       - scripts/mcp-conformance-auth.mjs
       - go.mod
       - go.sum
@@ -46,7 +47,7 @@ concurrency:
 jobs:
   official-core:
     if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
-    name: Official MCP core / Go and Rust
+    name: Official MCP core / Rust
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -63,22 +64,24 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24.19.0'
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
       - name: Build pinned official conformance CLI
         working-directory: official-conformance
         shell: bash
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build
-      - name: Build actual product backends
+      - name: Build actual Rust product
         working-directory: product
         shell: bash
         run: |
-          GOTOOLCHAIN=go1.26.6 go mod download
           rustup toolchain install 1.98.0 --profile minimal
           CARGO_TARGET_DIR="$RUNNER_TEMP/mcp-conformance-target" cargo +1.98.0 build -p symeraseme-cli --bin symeraseme-rust --locked
+      - name: Verify conformance acceptance controls
+        working-directory: product
+        shell: bash
+        run: |
+          python3 -B scripts/test_check_mcp_conformance.py
+          python3 -B -O scripts/test_check_mcp_conformance.py
       - name: Official applicable core scenarios with private authenticated servers
         working-directory: product
         shell: bash
@@ -108,14 +111,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # Frozen native readers verify immutable source and generator blobs.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
-        with:
-          go-version: '1.26.6'
-      - name: Download pinned Go modules
-        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
-        shell: bash
-        run: GOTOOLCHAIN=go1.26.6 go mod download
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy

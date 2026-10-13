@@ -7,12 +7,7 @@ on:
     branches: [main]
   schedule:
     - cron: '43 5 * * 1'
-  workflow_dispatch:
-    inputs:
-      capture_frozen_oracles:
-        description: Capture actual native Go service/projection observations for reviewed freezing
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +20,7 @@ env:
   RUST_TOOLCHAIN: '1.98.0'
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: '0'
+  SYMERASEME_PARITY_LIVE_GO: '0'
 
 jobs:
   rust-pr:
@@ -37,14 +33,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-
-      - name: Download Go oracle modules
-        run: go mod download
 
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -230,10 +218,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
+          fetch-depth: 0 # Frozen readers authenticate immutable producer blobs.
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -246,8 +231,6 @@ jobs:
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy
-      - name: Download Go oracle modules
-        run: go mod download
       - name: Check and lint Windows code
         shell: bash
         run: |
@@ -256,7 +239,7 @@ jobs:
       - name: Run Windows neutral parity tests
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
-      - name: Compare native Windows MCP HTTP against Go
+      - name: Replay native Windows MCP HTTP against frozen Go observations
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked -- --test-threads=1
 
@@ -314,43 +297,14 @@ jobs:
         shell: bash
         run: |
           git fetch --no-tags --no-write-fetch-head --depth=1 origin 0bc6b051890340822448fa3846c96f70022b79ad
-          git cat-file -e 0bc6b051890340822448fa3846c96f70022b79ad^{commit}
+          git cat-file -e '0bc6b051890340822448fa3846c96f70022b79ad^{commit}'
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-
-      - name: Download Go oracle modules
-        run: go mod download
-
-      - name: Capture actual native Go observations for reviewed freezing
-        if: github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        run: python3 scripts/capture-frozen-go-services.py --output "${{ runner.temp }}/frozen-go-services"
-
-      - name: Upload native Go observations for fixture review
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-services-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            ${{ runner.temp }}/frozen-go-services/manifest.json
-            ${{ runner.temp }}/frozen-go-services/*.stdout
-            ${{ runner.temp }}/frozen-go-services/*.stderr
-            ${{ runner.temp }}/frozen-go-services/scheduler-install.observations.json
-            ${{ runner.temp }}/frozen-go-services/campaign-plan.observations.json
-            ${{ runner.temp }}/frozen-go-services/provider-cancel.observations.json
-            ${{ runner.temp }}/frozen-go-services/cli-grant-case-*-consent-*.observations.json
-
-      - name: Check MCP stdio oracle without rewriting fixtures
+      - name: Check frozen MCP stdio corpus and cleanup controls
         shell: bash
         run: |
           set -euo pipefail
           python3 tests/test_mcp_stdio_oracle_check.py
           python3 tests/test_mcp_stdio_oracle_cleanup.py
-          python3 rust-tests/parity/oracle/mcp-stdio-mutations/generate.py "$(command -v go)" --check
 
       - name: Cache Cargo dependencies and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -387,14 +341,25 @@ jobs:
               cargo +"$RUST_TOOLCHAIN" check -p symeraseme-core --locked
           )
 
-      - name: Capture original actual native Go process references
-        if: github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
+      - name: Replay all 678 frozen MCP stdio observations through Rust
         shell: bash
-        run: python3 scripts/capture-native-process-references.py --output-root "${{ runner.temp }}"
+        run: |
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_stdio_mutation_process --locked \
+            -- --exact malformed_and_boundary_stdio_matches_source_bound_go_process \
+            2>&1 | tee "$RUNNER_TEMP/mcp-stdio-replay.log"
+          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/mcp-stdio-replay.log"
+
+      - name: Retain frozen MCP stdio replay diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mcp-stdio-replay-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/mcp-stdio-replay.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Test and doctest
-        env:
-          SYMERASEME_PARITY_LIVE_GO: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && '1' || '0' }}
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -408,66 +373,6 @@ jobs:
       - name: Verify recorded whole plan and Unix processes with Go absent on all six native hosts
         shell: bash
         run: python3 scripts/verify-frozen-plan-without-go.py
-
-      - name: Upload actual Go plan process observations
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-plan-processes-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            ${{ runner.temp }}/frozen-go-plan-processes/web-form.json
-            ${{ runner.temp }}/frozen-go-plan-processes/senderless-email.json
-
-      - name: Upload actual native Go triage observations
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-native-triage-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            ${{ runner.temp }}/frozen-go-native-triage/cli.json
-            ${{ runner.temp }}/frozen-go-native-triage/mcp.json
-
-      - name: Upload actual native Go agent-error observation
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-agent-error-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ runner.temp }}/frozen-go-agent-error/agent-error.json
-
-      - name: Upload actual Go HTTP wire observations
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles && runner.os != 'Windows'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-http-wire-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ runner.temp }}/frozen-go-http-wire/wire.json
-
-      - name: Upload actual complete Go HTTP response observations
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-http-headers-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ runner.temp }}/frozen-go-http-headers/headers.json
-
-      - name: Upload actual Go SMTP process and transaction observations
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.capture_frozen_oracles
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frozen-go-smtp-${{ runner.os }}-${{ runner.arch }}
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            ${{ runner.temp }}/frozen-go-smtp/campaign.json
-            ${{ runner.temp }}/frozen-go-smtp/transport.json
 
       - name: Run neutral parity subset on Unix
         if: runner.os != 'Windows'
