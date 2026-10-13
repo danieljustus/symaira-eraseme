@@ -2,7 +2,7 @@
 //!
 //! Enabled only by SYMERASEME_CAPTURE_WINDOWS_MIGRATION=<absolute directory
 //! outside the repository>. Raw Go streams, exit codes and filesystem snapshot
-//! bytes are written as blob files before any folding or assertion runs. Blobs
+//! bytes are retained as blobs before cleanup; some assertions precede recording. Blobs
 //! and family manifests are create-only and are never committed by the tests.
 #![cfg_attr(not(windows), allow(dead_code))]
 
@@ -257,6 +257,13 @@ impl Recorder {
                 && build_info.contains(&format!("GOARCH={goarch}")),
             "actual Go binary build info must match the native target"
         );
+        assert!(
+            build_info
+                .lines()
+                .next()
+                .is_some_and(|line| line.ends_with(GO_VERSION)),
+            "actual Go binary compiler must match the pinned toolchain"
+        );
         let commit_spec = format!("{GO_REVISION}^{{commit}}");
         let resolved = git(&["rev-parse", "--verify", commit_spec.as_str()]);
         assert!(resolved.starts_with(GO_REVISION), "pinned Go revision");
@@ -295,6 +302,7 @@ impl Recorder {
                 "goarch": goarch,
                 "build_info": build_info,
                 "binary": {"bytes": go_bytes.len(), "sha256": digest(&go_bytes)},
+                "binary_path": go_binary,
                 "source_closure": {"sha256": closure_before, "files": closure_files},
             },
             "rust": {
@@ -354,6 +362,7 @@ impl Recorder {
         let stderr = self.blob("filesystem", id, &output.stderr);
         json!({
             "index": index,
+            "runtime_root": root,
             "exit_code": output.status.code(),
             "stdout": {
                 "raw": stdout,
@@ -421,6 +430,7 @@ impl Recorder {
         let go_stdout = self.blob("command-surface", case.id, &case.go.stdout);
         let go_stderr = self.blob("command-surface", case.id, &case.go.stderr);
         let entry = json!({
+            "runtime_root": case.root,
             "go": {
                 "exit_code": case.go.status.code(),
                 "stdout": go_stdout,
@@ -481,6 +491,21 @@ impl Recorder {
     /// Writes the family manifest only after every required case passed.
     /// Refuses to overwrite and re-checks the Go binary and source closure.
     pub(crate) fn finish_family(&self, family: &str, expected: usize) {
+        assert!(
+            git(&["status", "--porcelain"]).is_empty(),
+            "producer became dirty"
+        );
+        assert_eq!(
+            git(&["rev-parse", "HEAD"]),
+            self.provenance["rust"]["revision"]
+        );
+        for name in PRODUCER_FILES {
+            assert_eq!(
+                digest(&fs::read(Path::new(ROOT).join(name)).expect("producer input")),
+                self.provenance["rust"]["producer_inputs"][name],
+                "producer input changed during capture: {name}"
+            );
+        }
         let (closure_after, closure_files) = source_closure(&self.go_source);
         assert_eq!(
             closure_after, self.closure_before,
@@ -505,6 +530,8 @@ impl Recorder {
             "source_closure_after": closure_after,
             "source_files_after": closure_files.len(),
             "case_count": expected,
+            "case_inventory": cases.keys().collect::<Vec<_>>(),
+            "assertions_completed": true,
             "cases": cases,
         });
         let mut file = OpenOptions::new()
