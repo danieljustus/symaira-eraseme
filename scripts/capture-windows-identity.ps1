@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)][ValidateSet('Capture', 'Verify')][string]$Mode,
     [Parameter(Mandatory = $true)][ValidateSet('X64', 'ARM64')][string]$ExpectedArch,
     [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedRevision,
-    [Parameter(Mandatory = $true)][string]$ArtifactPath
+    [Parameter(Mandatory = $true)][string]$ArtifactPath,
+    [string]$BashScript = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,6 +20,9 @@ function Fail([string]$message) {
 
 if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
     Fail 'unsupported platform (not Windows)'
+}
+if ($Mode -eq 'Capture' -and -not [string]::IsNullOrEmpty($BashScript)) {
+    Fail 'a capture command requires Verify mode'
 }
 
 # Official APIs: GetTokenInformation (TokenPrimaryGroup = 5, TOKEN_PRIMARY_GROUP holds one PSID pointer),
@@ -68,10 +72,10 @@ public static class SymWinIdentity
     }
 
     // TOKEN_USER and TOKEN_PRIMARY_GROUP both begin with their PSID pointer.
-    static string CurrentTokenSid(int infoClass)
+    static string TokenSid(IntPtr process, int infoClass)
     {
         IntPtr token;
-        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (!OpenProcessToken(process, TOKEN_QUERY, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
         IntPtr buffer = IntPtr.Zero;
         try
         {
@@ -95,8 +99,10 @@ public static class SymWinIdentity
         }
     }
 
-    public static string CurrentUserSid() { return CurrentTokenSid(TokenUser); }
-    public static string CurrentPrimaryGroupSid() { return CurrentTokenSid(TokenPrimaryGroup); }
+    public static string CurrentUserSid() { return TokenSid(GetCurrentProcess(), TokenUser); }
+    public static string CurrentPrimaryGroupSid() { return TokenSid(GetCurrentProcess(), TokenPrimaryGroup); }
+    public static string ProcessUserSid(IntPtr process) { return TokenSid(process, TokenUser); }
+    public static string ProcessPrimaryGroupSid(IntPtr process) { return TokenSid(process, TokenPrimaryGroup); }
 
     public static string AliasSid(string alias)
     {
@@ -120,7 +126,7 @@ function Check([bool]$ok, [string]$name) {
     $checks[$name] = $true
 }
 
-# Source: observed HEAD must equal the dispatched revision and the tree must be clean (capture only).
+# Source: both capture and launch must use the clean dispatched revision.
 $repo = Split-Path -Parent $PSScriptRoot
 # Windows PowerShell 5.1 turns native stderr into terminating errors under Stop; use Continue for git only.
 function GitOut([string[]]$gitArgs) {
@@ -131,10 +137,8 @@ function GitOut([string[]]$gitArgs) {
 }
 $head = GitOut @('rev-parse', 'HEAD')
 Check ($head.Code -eq 0 -and $head.Lines.Count -eq 1 -and $head.Lines[0] -eq $ExpectedRevision) 'source_revision_matches_head'
-if ($Mode -eq 'Capture') {
-    $dirty = GitOut @('status', '--porcelain', '--untracked-files=all')
-    Check ($dirty.Code -eq 0 -and $dirty.Lines.Count -eq 0) 'source_tree_clean'
-}
+$dirty = GitOut @('status', '--porcelain', '--untracked-files=all')
+Check ($dirty.Code -eq 0 -and $dirty.Lines.Count -eq 0) 'source_tree_clean'
 
 # Native architecture: process must not be WOW64 (processMachine UNKNOWN=0) and native machine must match.
 $expectedMachine = @{ 'X64' = [uint16]0x8664; 'ARM64' = [uint16]0xAA64 }[$ExpectedArch]
@@ -144,7 +148,8 @@ $expectedMachine = @{ 'X64' = [uint16]0x8664; 'ARM64' = [uint16]0xAA64 }[$Expect
 Check ($processMachine -eq 0 -and $nativeMachine -eq $expectedMachine -and [IntPtr]::Size -eq 8) 'native_architecture'
 
 # Identity from the process token and the runner user, not from Rust or Go output.
-$userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+try { $userSid = $identity.User.Value } finally { $identity.Dispose() }
 Check ($userSid -eq [SymWinIdentity]::CurrentUserSid()) 'user_matches_launch_process_token'
 $primaryGroupSid = [SymWinIdentity]::CurrentPrimaryGroupSid()
 Check ($userSid -match '^S-1-5-[0-9-]+$') 'user_sid_observed'
@@ -173,6 +178,42 @@ if ($Mode -eq 'Verify') {
     Check ($baseline.local_admin.rid500_sid -eq $rid500[0]) 'rid500_sid_matches_baseline'
     Check ($baseline.local_admin.sddl_la_sid -eq $laSid) 'sddl_la_matches_baseline'
     Write-Output "windows identity verify: $($checks.Count) checks passed"
+    if (-not [string]::IsNullOrEmpty($BashScript)) {
+        # The workflows use pwsh 7. Never resolve WSL bash via PATH or quote
+        # a script body into native argv. Hold stdin until the child token matches.
+        $bash = Join-Path $env:ProgramFiles 'Git/usr/bin/bash.exe'
+        Check (Test-Path -LiteralPath $bash -PathType Leaf) 'git_bash_exists'
+        $start = New-Object System.Diagnostics.ProcessStartInfo
+        $start.FileName = $bash
+        $start.WorkingDirectory = $repo
+        $start.Arguments = '-e -o pipefail -s'
+        $start.UseShellExecute = $false
+        $start.RedirectStandardInput = $true
+        $start.StandardInputEncoding = New-Object System.Text.UTF8Encoding($false)
+        $child = [System.Diagnostics.Process]::Start($start)
+        try {
+            Check ([SymWinIdentity]::ProcessUserSid($child.Handle) -eq $userSid) 'child_user_matches_baseline'
+            Check ([SymWinIdentity]::ProcessPrimaryGroupSid($child.Handle) -eq $primaryGroupSid) 'child_primary_group_matches_baseline'
+            Write-Output 'windows identity child token: user and primary group matched'
+            $probe = @'
+export PATH="/usr/bin:$PATH"
+case "$(uname -s)" in MINGW*|MSYS*) ;; *) exit 91 ;; esac
+quote='space "quoted" value'
+test "$(printf '%s' "$quote")" = 'space "quoted" value'
+printf '%s\n' 'identity-launch-probe: Git Bash stdin quotes ok'
+'@
+            $child.StandardInput.Write(($probe + "`n" + $BashScript).Replace("`r`n", "`n") + "`n")
+            $child.StandardInput.Close()
+            if (-not $child.WaitForExit([int]([TimeSpan]::FromMinutes(24).TotalMilliseconds))) {
+                Fail 'capture child exceeded its deadline'
+            }
+            $code = $child.ExitCode
+        } finally {
+            try { if (-not $child.HasExited) { $child.Kill($true); $child.WaitForExit() } }
+            finally { $child.Dispose() }
+        }
+        exit $code
+    }
     exit 0
 }
 

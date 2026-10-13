@@ -67,10 +67,7 @@ jobs:
           SYMERASEME_CAPTURE_CONSENT_ACL: ${{ runner.temp }}/consent-capture
         run: |
           $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
-          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # The verified process launches bash/cargo with its inherited token.
-          & bash -e -o pipefail -c @'
+          $captureScript = @'
           set -euo pipefail
           mkdir -p "${SYMERASEME_CAPTURE_CONSENT_ACL}"
           log="${RUNNER_TEMP}/consent-test.log"
@@ -88,6 +85,7 @@ jobs:
           test -s "${SYMERASEME_CAPTURE_CONSENT_ACL}/consent-windows-acl.json"
           echo "executed-test guard: 1 exact test passed; artifact present"
           '@
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $captureScript
           exit $LASTEXITCODE
       - name: Upload native raw originals
         if: success()
