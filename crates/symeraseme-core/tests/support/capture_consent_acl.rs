@@ -232,12 +232,34 @@ pub fn note_acl(rec: &mut Option<Recorder>, label: &str, output: &Output) {
     );
 }
 
+fn observed_file_path(directory: &Path, name: &str) -> PathBuf {
+    let mut parts = Path::new(name).components();
+    assert!(
+        matches!(parts.next(), Some(std::path::Component::Normal(_))) && parts.next().is_none(),
+        "observed Go file name must be one normal path component"
+    );
+    directory.join(name)
+}
+
+#[test]
+fn observed_file_paths_stay_in_the_case_directory() {
+    let root = Path::new("owned");
+    assert_eq!(observed_file_path(root, "sentinel"), root.join("sentinel"));
+    for name in ["", ".", "..", "../outside", "/outside", "nested/file"] {
+        assert!(std::panic::catch_unwind(|| observed_file_path(root, name)).is_err());
+    }
+    #[cfg(windows)]
+    for name in ["C:\\outside", "C:outside", "..\\outside", "nested\\file"] {
+        assert!(std::panic::catch_unwind(|| observed_file_path(root, name)).is_err());
+    }
+}
+
 pub fn note_go_files(rec: &mut Option<Recorder>, case: &str, directory: &Path, names: &[String]) {
     let Some(rec) = rec.as_mut() else { return };
     let mut entries = Map::new();
     let mut total = 0usize;
     for name in names {
-        let bytes = fs::read(directory.join(name)).expect("observed Go file");
+        let bytes = fs::read(observed_file_path(directory, name)).expect("observed Go file");
         assert!(
             bytes.len() <= MAX_FILE,
             "observed file exceeds the payload bound"
