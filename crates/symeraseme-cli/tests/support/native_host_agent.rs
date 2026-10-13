@@ -1,4 +1,4 @@
-//! Build the actual checked-out Go helper; its observations are never simulated.
+//! Builds the synthetic blocking agent from Rust source. It is not a Go oracle.
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
@@ -9,21 +9,18 @@ pub fn helper(root: &Path) -> PathBuf {
     } else {
         "agent-helper"
     });
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/native_host_agent.rs");
     let log = root.join("agent-build.log");
     let output = std::fs::File::create(&log).unwrap();
-    let mut child = Command::new("go")
-        .args(["build", "-o"])
+    let mut child = Command::new("rustc")
+        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
         .arg(&executable)
-        .arg("./rust-tests/parity/oracle/native-host-agent")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
+        .arg(&source)
         .stdout(Stdio::null())
         .stderr(output)
         .spawn()
         .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(180);
+    let deadline = Instant::now() + Duration::from_secs(60);
     let status = loop {
         if let Some(status) = child.try_wait().unwrap() {
             break status;
@@ -31,11 +28,10 @@ pub fn helper(root: &Path) -> PathBuf {
         if Instant::now() >= deadline {
             let _ = child.kill();
             child.wait().unwrap();
-            panic!("native agent Go helper build timed out");
+            panic!("native agent helper build timed out");
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    child.wait().unwrap();
     assert!(
         status.success(),
         "native agent helper build: {}",

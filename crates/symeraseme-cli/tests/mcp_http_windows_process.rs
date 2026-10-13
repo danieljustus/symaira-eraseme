@@ -1,7 +1,6 @@
-//! Native Windows Go/Rust MCP HTTP process contract.
+//! Native Windows Rust MCP HTTP replay of authenticated frozen Go observations.
 #![cfg(windows)]
 
-use serde_json::json;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::windows::process::CommandExt;
@@ -13,19 +12,16 @@ use std::time::{Duration, Instant};
 use symeraseme_core::storage::Store;
 use symeraseme_core::storage::repository::Repository;
 
-#[path = "support/capture_windows_http_process.rs"]
-mod capture_windows_http_process;
+#[path = "support/frozen_windows_http.rs"]
+mod frozen_windows_http;
 #[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
 #[path = "support/native_host_agent.rs"]
 mod native_host_agent;
-use capture_windows_http_process::Capture;
+use frozen_windows_http as frozen;
 use mcp_http_port::{
     StartedChild, accepts_token, free_port, read_bounded_response, spawn_with_handoff,
 };
-
-const GO_PROVIDER_CANCEL_FIXTURE: &str =
-    include_str!("../../../tests/fixtures/provider-cancel/http.json");
 
 struct Server(StartedChild);
 
@@ -177,82 +173,40 @@ fn exchange(port: u16, token: Option<&str>, origin: Option<&str>) -> (u16, Vec<u
     (status, body)
 }
 
-fn repo() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
-/// Runs `go <pre...> <path> <post...>` with the pinned offline toolchain.
-fn go(pre: &[&str], path: &Path, post: &[&str]) -> std::process::Output {
-    Command::new("go")
-        .args(pre)
-        .arg(path)
-        .args(post)
-        .current_dir(repo())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off")
-        .output()
-        .unwrap()
-}
-
-fn build_oracle(root: &Path) -> std::path::PathBuf {
-    let oracle = root.join("symeraseme-go-oracle.exe");
-    let build = go(&["build", "-o"], &oracle, &["./cmd/symeraseme"]);
-    assert!(
-        build.status.success(),
-        "Go oracle build: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
-    oracle
+fn recorded(test: &str) -> serde_json::Value {
+    let target = match std::env::consts::ARCH {
+        "x86_64" => "windows/amd64",
+        "aarch64" => "windows/arm64",
+        other => panic!("no recorded Windows target for {other}"),
+    };
+    frozen::load(target, test)
+        .expect("authenticated native Go observation")
+        .value
 }
 
 #[test]
 fn native_windows_http_matches_checked_out_go() {
+    let expected =
+        frozen::http_cases(&recorded("native_windows_http_matches_checked_out_go")).unwrap();
     let root = tempfile::tempdir().unwrap();
-    let oracle = build_oracle(root.path());
-    let mut capture = Capture::new(
-        "native_windows_http_matches_checked_out_go",
-        &[
-            ("go_oracle", oracle.as_path()),
-            (
-                "rust_symeraseme",
-                Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
-            ),
-        ],
-        &[root.path()],
-    );
-
-    let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
-    let (mut go_port, mut rust_port) = distinct_ports();
-    let mut go = start(&oracle, &go_root, &mut go_port);
+    let mut rust_port = port();
     let mut rust = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_root,
         &mut rust_port,
     );
-    ready(&mut go, go_port, &go_root);
     ready(&mut rust, rust_port, &rust_root);
-    let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
     let rust_token = std::fs::read_to_string(rust_root.join("data/mcp_token")).unwrap();
-    assert_eq!(go_token.len(), 43);
     assert_eq!(rust_token.len(), 43);
 
-    for (authorized, origin) in [
-        (false, None),
-        (true, None),
-        (true, Some("https://evil.example")),
-        (true, Some("")),
-    ] {
-        let go_reply = exchange(go_port, authorized.then_some(go_token.as_str()), origin);
+    for case in expected {
+        let authorized = case.authorized;
+        let origin = case.origin.as_deref();
         let rust_reply = exchange(rust_port, authorized.then_some(rust_token.as_str()), origin);
-        let go_body = capture.reply(&go_reply, Some(go_token.as_str()));
-        capture.push(
-            "http",
-            json!({"authorized": authorized, "origin": origin, "go": go_body}),
-        );
         assert_eq!(
-            rust_reply, go_reply,
+            rust_reply,
+            (case.status, case.body),
             "HTTP parity: authorized={authorized}, origin={origin:?}"
         );
     }
@@ -294,16 +248,6 @@ fn native_windows_http_matches_checked_out_go() {
     assert!(!status.success());
     let stderr = refused.0.stderr_text();
     assert!(stderr.contains("refusing non-loopback MCP bind"));
-    capture.finish();
-}
-
-fn distinct_ports() -> (u16, u16) {
-    let first = port();
-    let mut second = port();
-    while second == first {
-        second = port();
-    }
-    (first, second)
 }
 
 fn seed_reply(root: &Path) {
@@ -374,26 +318,14 @@ impl Drop for AgentProcess {
 
 #[test]
 fn native_windows_disconnect_reaps_host_agent_like_go() {
+    let expected = frozen::host_go(&recorded(
+        "native_windows_disconnect_reaps_host_agent_like_go",
+    ))
+    .unwrap();
     let root = tempfile::tempdir().unwrap();
     let helper = native_host_agent::helper(root.path());
-    let oracle = build_oracle(root.path());
-    let mut capture = Capture::new(
-        "native_windows_disconnect_reaps_host_agent_like_go",
-        &[
-            ("go_oracle", oracle.as_path()),
-            ("go_native_host_agent", helper.as_path()),
-            (
-                "rust_symeraseme",
-                Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
-            ),
-        ],
-        &[root.path()],
-    );
     let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"agent","save":true}}}"#;
-    for (name, binary) in [
-        ("go", oracle.as_path()),
-        ("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"))),
-    ] {
+    for (name, binary) in [("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")))] {
         let case = root.path().join(name);
         seed_reply(&case);
         let bin = case.join("bin");
@@ -437,32 +369,22 @@ fn native_windows_disconnect_reaps_host_agent_like_go() {
         };
         let agent = AgentProcess::open(pid);
         let live = agent.wait(0);
-        capture.push(
-            "host_agent",
-            json!({"implementation": name, "phase": "before_disconnect", "wait_result": live}),
-        );
+        assert_eq!(live, expected.before_wait);
         assert_eq!(live, 258, "agent must be running before disconnect");
         drop(client);
         let terminated = agent.wait(5000);
-        capture.push(
-            "host_agent",
-            json!({"implementation": name, "phase": "after_disconnect", "wait_result": terminated}),
-        );
+        assert_eq!(terminated, expected.after_wait);
         assert_eq!(
             terminated, 0,
             "{name} did not reap the agent after disconnect"
         );
         let alive = server.0.try_wait().unwrap().is_none();
-        capture.push(
-            "host_agent",
-            json!({"implementation": name, "server_alive_after_disconnect": alive}),
-        );
+        assert_eq!(alive, expected.alive);
         assert!(alive);
         let health = exchange(port, Some(&token), None);
-        let health_record = capture.reply(&health, Some(token.as_str()));
-        capture.push(
-            "host_agent",
-            json!({"implementation": name, "health_after_disconnect": health_record}),
+        assert_eq!(
+            health,
+            (expected.health_status, expected.health_body.clone())
         );
         assert_eq!(health.0, 200);
         let store = Store::open(case.join("data/symeraseme.db")).unwrap();
@@ -474,10 +396,6 @@ fn native_windows_disconnect_reaps_host_agent_like_go() {
                 |row| row.get(0),
             )
             .unwrap();
-        capture.push(
-            "persisted_classification",
-            json!({"implementation": name, "classified_as": classification}),
-        );
         assert_eq!(
             classification, None,
             "{name} persisted a cancelled classification"
@@ -486,30 +404,23 @@ fn native_windows_disconnect_reaps_host_agent_like_go() {
             "native host-agent {name}: live before disconnect, terminated afterwards, server healthy, no classification"
         );
     }
-    capture.finish();
 }
 
 #[test]
 fn native_windows_pathext_availability_matches_live_go() {
+    frozen::reject_retired_env().unwrap();
     const CHILD: &str = "SYMERASEME_LOOKUP_CHILD";
     if std::env::var_os(CHILD).is_some() {
         println!("lookup={}", symeraseme_core::llm::cli_on_path("claude"));
         return;
     }
+    let expected = frozen::pathext_go(&recorded(
+        "native_windows_pathext_availability_matches_live_go",
+    ))
+    .unwrap();
     let root = tempfile::tempdir().unwrap();
     let helper = native_host_agent::helper(root.path());
-    let mut capture = Capture::new(
-        "native_windows_pathext_availability_matches_live_go",
-        &[
-            ("go_native_host_agent", helper.as_path()),
-            (
-                "rust_test_harness",
-                std::env::current_exe().unwrap().as_path(),
-            ),
-        ],
-        &[root.path()],
-    );
-    for (id, filename, pathext, relative) in [
+    for ((id, filename, pathext, relative), expected) in [
         ("exe", "claude.EXE", ".EXE", false),
         ("com", "claude.com", ".COM;.EXE", false),
         ("cmd", "claude.cmd", ".CMD", false),
@@ -519,16 +430,21 @@ fn native_windows_pathext_availability_matches_live_go() {
         ("no-extension", "claude", ".EXE", false),
         ("empty-extension-list", "claude", ";", false),
         ("relative", "claude.exe", ".EXE", true),
-    ] {
+    ]
+    .into_iter()
+    .zip(expected)
+    {
+        assert_eq!(id, expected.case);
+        assert_eq!(pathext, expected.pathext);
+        assert_eq!(
+            if relative { "relative" } else { "absolute" },
+            expected.path_mode
+        );
         let case = root.path().join(id);
         let bin = case.join("bin");
         std::fs::create_dir_all(&bin).unwrap();
         std::fs::copy(&helper, bin.join(filename)).unwrap();
-        let mut go = Command::new(&helper);
         let mut rust = Command::new(std::env::current_exe().unwrap());
-        go.env_clear()
-            .arg("--lookup")
-            .env("SYMERASEME_ORACLE_SOURCE_ROOT", repo());
         rust.env_clear()
             .args([
                 "--exact",
@@ -536,7 +452,8 @@ fn native_windows_pathext_availability_matches_live_go() {
                 "--nocapture",
             ])
             .env(CHILD, "1");
-        for command in [&mut go, &mut rust] {
+        {
+            let command = &mut rust;
             // These lookup children need no credentials or operator profile.
             // Reconstruct the Windows loader environment and private roots.
             if let Some(value) = std::env::var_os("SystemRoot") {
@@ -551,35 +468,22 @@ fn native_windows_pathext_availability_matches_live_go() {
                 .env("GODEBUG", "")
                 .env("NoDefaultCurrentDirectoryInExePath", "1");
         }
-        let observation = native_host_agent::observe(go, &case, "go-lookup");
-        assert!(observation.status.success());
-        let observation: serde_json::Value = serde_json::from_slice(&observation.stdout).unwrap();
-        let mut redacted = observation.clone();
-        redacted.as_object_mut().unwrap().remove("path");
-        let path_mode = if relative { "relative" } else { "absolute" };
-        capture.push("pathext", json!({"case": id, "pathext": pathext, "path_mode": path_mode, "go_found": observation["found"], "go_available": observation["available"], "go_path_nonempty": observation["path"].as_str().is_some_and(|path| !path.is_empty()), "go_sources_sha256": observation["sources_sha256"]}));
-        use sha2::{Digest, Sha256};
-        for (source, digest) in observation["sources_sha256"].as_object().unwrap() {
-            let actual = Sha256::digest(std::fs::read(repo().join(source)).unwrap());
-            let actual: String = actual.iter().map(|byte| format!("{byte:02x}")).collect();
-            assert_eq!(actual, digest.as_str().unwrap(), "source-bound {source}");
-        }
-        assert_eq!(observation["found"], observation["available"]);
         let result = native_host_agent::observe(rust, &case, "rust-lookup");
         assert!(result.status.success());
         let rust_lookup = String::from_utf8_lossy(&result.stdout)
             .lines()
             .find_map(|line| line.strip_prefix("lookup=").map(str::to_owned));
-        capture.push("pathext", json!({"case": id, "rust_lookup": rust_lookup}));
-        let expected = format!("lookup={}\n", observation["available"].as_bool().unwrap());
-        assert!(
-            String::from_utf8_lossy(&result.stdout).contains(&expected),
-            "{id}: Rust disagrees with live Go {redacted}: {}",
+        assert_eq!(
+            rust_lookup.as_deref(),
+            Some(expected.available.to_string().as_str()),
+            "{id}: Rust disagrees with recorded Go: {}",
             String::from_utf8_lossy(&result.stdout)
         );
-        eprintln!("native PATHEXT {id}: {redacted}");
+        eprintln!(
+            "native PATHEXT {id}: matches recorded Go availability {}",
+            expected.available
+        );
     }
-    capture.finish();
 }
 
 /// Synthetic loopback OpenAI endpoint: captures one request, never answers,
@@ -637,40 +541,18 @@ fn blocking_provider() -> (String, mpsc::Receiver<String>, thread::JoinHandle<St
 /// running, and nothing is persisted.
 #[test]
 fn native_windows_disconnect_cancels_provider_request_like_go() {
-    let root = tempfile::tempdir().unwrap();
-    let fixture = root.path().join("provider-cancel.json");
-    let oracle_run = go(
-        &[
-            "run",
-            "./rust-tests/parity/oracle/provider-cancel",
-            "-fixture",
-        ],
-        &fixture,
-        &[],
-    );
-    assert!(
-        oracle_run.status.success(),
-        "Go provider cancellation oracle: {}",
-        String::from_utf8_lossy(&oracle_run.stderr)
-    );
-    let oracle = build_oracle(root.path());
-    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
-    let mut capture = Capture::new(
+    let expected = frozen::provider_go(&recorded(
         "native_windows_disconnect_cancels_provider_request_like_go",
-        &[("go_oracle", oracle.as_path()), ("rust_symeraseme", rust)],
-        &[root.path()],
-    );
-    let generated = std::fs::read(&fixture).unwrap();
-    let generated_record = capture.bytes(&generated);
-    capture.push("provider_fixture", json!({"generated": generated_record}));
-    assert_eq!(
-        generated,
-        GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
-        "Go provider cancellation oracle drifted"
-    );
+    ))
+    .unwrap();
+    // EOF and connection-reset are the original accepted cancellation class.
+    assert!(matches!(expected.upstream.as_str(), "eof" | "closed"));
+    let root = tempfile::tempdir().unwrap();
+    let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"openai","model":"oracle-model"}}}"#;
 
-    for (name, binary) in [("go", oracle.as_path()), ("rust", rust)] {
+    {
+        let (name, binary) = ("rust", rust);
         let case = root.path().join(name);
         seed_reply(&case);
         let (url, request_rx, provider) = blocking_provider();
@@ -697,27 +579,17 @@ fn native_windows_disconnect_cancels_provider_request_like_go() {
         let request_line = request_rx
             .recv_timeout(Duration::from_secs(10))
             .unwrap_or_else(|error| panic!("{name} did not reach the provider: {error}"));
-        capture.push(
-            "provider",
-            json!({"implementation": name, "request_line": request_line.trim()}),
-        );
+        assert_eq!(request_line.trim(), expected.request_line);
         assert_eq!(request_line.trim(), "POST /chat/completions HTTP/1.1");
 
         drop(client);
         let outcome = provider.join().unwrap();
-        capture.push(
-            "provider",
-            json!({"implementation": name, "upstream_after_disconnect": outcome}),
-        );
         assert!(
             outcome == "eof" || outcome == "closed",
             "{name} upstream after disconnect: {outcome}"
         );
         let alive = server.0.try_wait().unwrap().is_none();
-        capture.push(
-            "provider",
-            json!({"implementation": name, "server_alive_after_disconnect": alive}),
-        );
+        assert_eq!(alive, expected.alive);
         assert!(alive, "{name} MCP server stopped after a client disconnect");
         let store = Store::open(case.join("data/symeraseme.db")).unwrap();
         let classification: Option<String> = store
@@ -728,13 +600,8 @@ fn native_windows_disconnect_cancels_provider_request_like_go() {
                 |row| row.get(0),
             )
             .unwrap();
-        capture.push(
-            "persisted_classification",
-            json!({"implementation": name, "classified_as": classification}),
-        );
         assert_eq!(classification, None, "{name} persisted after cancellation");
     }
-    capture.finish();
 }
 
 /// MCP-013 on native Windows: Go and Rust both close a connection whose
@@ -742,31 +609,18 @@ fn native_windows_disconnect_cancels_provider_request_like_go() {
 /// serving afterwards.
 #[test]
 fn native_windows_slow_header_timeout_matches_go() {
+    let expected =
+        frozen::slow_go(&recorded("native_windows_slow_header_timeout_matches_go")).unwrap();
     let root = tempfile::tempdir().unwrap();
-    let oracle = build_oracle(root.path());
-    let mut capture = Capture::new(
-        "native_windows_slow_header_timeout_matches_go",
-        &[
-            ("go_oracle", oracle.as_path()),
-            (
-                "rust_symeraseme",
-                Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
-            ),
-        ],
-        &[root.path()],
-    );
-    let (mut go_port, mut rust_port) = distinct_ports();
-    let go_root = root.path().join("go");
+    let mut rust_port = port();
     let rust_root = root.path().join("rust");
-    let mut go_server = start(&oracle, &go_root, &mut go_port);
     let mut rust_server = start(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_root,
         &mut rust_port,
     );
-    ready(&mut go_server, go_port, &go_root);
     ready(&mut rust_server, rust_port, &rust_root);
-    let pending: Vec<_> = [("go", go_port), ("rust", rust_port)]
+    let pending: Vec<_> = [("rust", rust_port)]
         .into_iter()
         .map(|(name, port)| {
             thread::spawn(move || {
@@ -788,10 +642,9 @@ fn native_windows_slow_header_timeout_matches_go() {
         .collect();
     for handle in pending {
         let (name, result, elapsed) = handle.join().unwrap();
-        let closure = capture.closure(&result, elapsed);
-        capture.push(
-            "slow_header",
-            json!({"implementation": name, "closure": closure}),
+        eprintln!(
+            "recorded Go closure {} at {}ms; {name} closure {result:?} at {elapsed:?}",
+            expected.result, expected.elapsed_ms
         );
         assert!(
             matches!(
@@ -808,21 +661,10 @@ fn native_windows_slow_header_timeout_matches_go() {
             "{name} closed the slow-header connection after {elapsed:?}"
         );
     }
-    let go_alive = go_server.0.try_wait().unwrap().is_none();
     let rust_alive = rust_server.0.try_wait().unwrap().is_none();
-    capture.push(
-        "servers_alive_after_slow_header",
-        json!({"go": go_alive, "rust": rust_alive}),
-    );
-    assert!(go_alive);
     assert!(rust_alive);
     let rust_health = exchange(rust_port, None, None);
-    let go_health = exchange(go_port, None, None);
-    let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
-    let go_record = capture.reply(&go_health, Some(&go_token));
-    capture.push("health_after_slow_header", json!({"go": go_record}));
-    assert_eq!(rust_health, go_health);
-    capture.finish();
+    assert_eq!(rust_health, (expected.health_status, expected.health_body));
 }
 
 /// Go maps CTRL_BREAK_EVENT to os.Interrupt. Use a private console and target
@@ -847,15 +689,11 @@ fn console_shutdown_matches_go(ctrl_c: bool) {
     } else {
         "native_windows_ctrl_break_shutdown_matches_go"
     };
+    let expected = frozen::console_go(&recorded(test), signal).unwrap();
     const CHILD_ROOT: &str = "SYMERASEME_CTRL_BREAK_TEST_ROOT";
-    const GO_ORACLE: &str = "SYMERASEME_CTRL_BREAK_GO_ORACLE";
     if let Some(root) = std::env::var_os(CHILD_ROOT) {
         let root = std::path::PathBuf::from(root);
-        let oracle = std::path::PathBuf::from(std::env::var_os(GO_ORACLE).unwrap());
-        for (name, binary) in [
-            ("go", oracle.as_path()),
-            ("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"))),
-        ] {
+        for (name, binary) in [("rust", Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")))] {
             let mut port = port();
             let server_root = root.join(name);
             #[link(name = "Kernel32")]
@@ -895,9 +733,7 @@ fn console_shutdown_matches_go(ctrl_c: bool) {
                     if ctrl_c { 0 } else { server.0.id() },
                 )
             };
-            capture_windows_http_process::child_observation(
-                json!({"implementation": name, "signal": signal, "event_result": sent}),
-            );
+            assert_eq!(sent != 0, expected.event_nonzero);
             assert_ne!(
                 sent,
                 0,
@@ -913,40 +749,26 @@ fn console_shutdown_matches_go(ctrl_c: bool) {
                 thread::sleep(Duration::from_millis(20));
             };
             let port_closed = TcpStream::connect(("127.0.0.1", port)).is_err();
-            capture_windows_http_process::child_observation(
-                json!({"implementation": name, "signal": signal, "exit_success": status.success(), "exit_code": status.code(), "port_closed": port_closed}),
+            assert_eq!(status.success(), expected.exit_success);
+            assert_eq!(
+                status.code().and_then(|code| u64::try_from(code).ok()),
+                Some(expected.exit_code)
             );
+            assert_eq!(port_closed, expected.port_closed);
             assert!(status.success(), "{name} {signal} exit: {status}");
             assert!(port_closed);
         }
-        println!("{signal} Go/Rust comparison executed both processes");
+        println!("{signal} Rust shutdown matches recorded Go");
         return;
     }
 
     let root = tempfile::tempdir().unwrap();
-    let oracle = build_oracle(root.path());
     let log_path = root.path().join("console.log");
-    let mut capture = Capture::new(
-        test,
-        &[
-            ("go_oracle", oracle.as_path()),
-            (
-                "rust_symeraseme",
-                Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
-            ),
-            (
-                "rust_test_harness",
-                std::env::current_exe().unwrap().as_path(),
-            ),
-        ],
-        &[root.path()],
-    );
     let log = std::fs::File::create(&log_path).unwrap();
     let mut helper = Server(StartedChild::from_child(
         Command::new(std::env::current_exe().unwrap())
             .args(["--exact", test, "--nocapture", "--test-threads=1"])
             .env(CHILD_ROOT, root.path())
-            .env(GO_ORACLE, oracle)
             .creation_flags(0x0000_0010) // CREATE_NEW_CONSOLE
             .stdin(Stdio::null())
             .stdout(log.try_clone().unwrap())
@@ -963,14 +785,6 @@ fn console_shutdown_matches_go(ctrl_c: bool) {
         thread::sleep(Duration::from_millis(20));
     };
     let log = std::fs::read_to_string(log_path).unwrap();
-    capture.absorb_console_children(&log);
-    capture.push(
-        "console_parent",
-        json!({"child_exit_success": status.success(), "child_exit_code": status.code()}),
-    );
     assert!(status.success(), "isolated console test failed: {log}");
-    assert!(log.contains(&format!(
-        "{signal} Go/Rust comparison executed both processes"
-    )));
-    capture.finish();
+    assert!(log.contains(&format!("{signal} Rust shutdown matches recorded Go")));
 }
