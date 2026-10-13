@@ -1,0 +1,73 @@
+{
+  "schema": "symeraseme.token-acl-privacy-derivation.v1",
+  "source_revision": "a3db5a02f9a9aa08d172228caf709c621af3c0bb",
+  "original_run": 38374294030,
+  "derivation_script_sha256": "715ad6677a9b543db4705e7efaaa53a662fd84f8d334a23857c318dc5617b785",
+  "helper_sha256": {
+    "retain-identity-token.py": "e301d2d28b0d7687902dea60b340dbe44e156644b4d11b828ee4e88b7f4529f6",
+    "retain-token-capture-38359833196.py": "d72a481d4c15d7fec3adb0872eb44b0cef71703e38256d8abd162f8573d3437a"
+  },
+  "records": [
+    {
+      "target": "windows/amd64",
+      "file": "windows-amd64.json",
+      "original_sha256": "2f75925fa5abea9fdde7f3babf9e58f82d2b898317493d399f4750d608ee0acf",
+      "baseline_original_sha256": "98bbe2845dd1711fa850b5e9237943006d8d186b04234846405a424a61825d5a",
+      "zip_anchors": [
+        {
+          "artifact_id": 11800323542,
+          "sha256": "9ee58202d8366af444339a0f40b5e474f83d212b27113060677e3daf742f215e"
+        },
+        {
+          "artifact_id": 11800710749,
+          "sha256": "09655f2f5a64bde4075b54c0f5348f0f9dff6b96f048a9a9eba47a944f002394"
+        }
+      ],
+      "derived_sha256": "ededfa77f748594d507b393f6932af9d89b6ba4a92eff1a0e38ade57072b1a1f",
+      "derived_bytes": 37302,
+      "cases": 2,
+      "acl_role_checks": 10,
+      "negative_controls": 11,
+      "roles": {
+        "run_account_is_rid500": true,
+        "rid500_is_sddl_la": true,
+        "primary_group_distinct_from_user": true
+      }
+    },
+    {
+      "target": "windows/arm64",
+      "file": "windows-arm64.json",
+      "original_sha256": "48a3277083ab31f6bfced39ba4072170805a84610c67a2bf531bba3dc86b8de4",
+      "baseline_original_sha256": "937498b8a2b63719a63f5c3e11a5ce71d5935eb700d0f5a9e5ad0b78bb45b96b",
+      "zip_anchors": [
+        {
+          "artifact_id": 11801020590,
+          "sha256": "211bc918a00da0fd2751726ffcfa80c5159b79ecf42ed595acbd236699fb8458"
+        },
+        {
+          "artifact_id": 11800582613,
+          "sha256": "e8d08e36f1cfc03c8bf0588c553756a3cc61abd5e8e2100ed284bc75d4ce4210"
+        }
+      ],
+      "derived_sha256": "538dbdcda423adc72d4c117d209712b7e25d3fff50912de43543f592d384c8b9",
+      "derived_bytes": 37304,
+      "cases": 2,
+      "acl_role_checks": 10,
+      "negative_controls": 11,
+      "roles": {
+        "run_account_is_rid500": true,
+        "rid500_is_sddl_la": true,
+        "primary_group_distinct_from_user": true
+      }
+    }
+  ],
+  "allowed_transforms": [
+    "SDDL exact G: field to PRIMARY_GROUP, independently baseline-bound",
+    "exact runtime root in field and failed_stderr only",
+    "failed_stderr dependent base64/bytes/sha256 only",
+    "embedded build info initial local binary path only"
+  ],
+  "validation": "inverse restore preserves every original JSON key, type and value; all nested base64 privacy-scanned",
+  "publication_approved": false,
+  "native_rust_replay_approved": false
+}

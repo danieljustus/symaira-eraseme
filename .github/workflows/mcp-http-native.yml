@@ -8,6 +8,9 @@ on:
       - crates/symeraseme-cli/tests/support/mcp_*
       - crates/symeraseme-cli/tests/frozen_http_aux.rs
       - crates/symeraseme-cli/tests/support/*_http_aux.rs
+      - crates/symeraseme-cli/tests/support/frozen_token_acl.rs
+      - tests/fixtures/go-frozen/refresh-a3db5a02/token-acl/**
+      - scripts/capture-windows-identity.ps1
       - cmd/symeraseme/**
       - internal/mcp/**
       - scripts/check-mcp-conformance.py
@@ -19,8 +22,8 @@ on:
       - .github/workflows/mcp-http-native.yml
   workflow_dispatch:
     inputs:
-      capture_token_originals:
-        description: Capture real Windows token ACL originals only (not full MCP acceptance)
+      replay_token_acl:
+        description: Replay retained Windows token ACL observations using Rust only
         type: boolean
         default: false
 
@@ -33,7 +36,7 @@ concurrency:
 
 jobs:
   official-core:
-    if: github.event_name != 'workflow_dispatch' || !inputs.capture_token_originals
+    if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
     name: Official MCP core / Go and Rust
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -90,16 +93,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ inputs.capture_token_originals && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
+        os: ${{ inputs.replay_token_acl && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0 # Frozen native readers verify immutable source and generator blobs.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
         with:
           go-version: '1.26.6'
       - name: Download pinned Go modules
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
         shell: bash
         run: GOTOOLCHAIN=go1.26.6 go mod download
       - name: Install pinned Rust toolchain
@@ -114,13 +119,14 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Complete response headers, raw bodies and native bind failures
-        if: github.event_name != 'workflow_dispatch' || !inputs.capture_token_originals
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked \
-            --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux -- --nocapture
+            --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux \
+            -- --nocapture --skip windows_acl::native_windows_token_dacl_and_rotation_match_go
       - name: Native Windows console, auth, rotation, timeout and disconnect contracts
-        if: runner.os == 'Windows' && !inputs.capture_token_originals
+        if: runner.os == 'Windows' && !inputs.replay_token_acl
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture --test-threads=1
@@ -130,7 +136,7 @@ jobs:
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
       - name: Capture trusted Windows identity baseline
-        if: runner.os == 'Windows' && inputs.capture_token_originals
+        if: runner.os == 'Windows'
         shell: pwsh
         env:
           EXPECTED_ARCH: ${{ runner.arch }}
@@ -138,49 +144,34 @@ jobs:
         run: |
           $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
           ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
-      - name: Upload trusted Windows identity baseline
-        if: success() && runner.os == 'Windows' && inputs.capture_token_originals
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: windows-identity-baseline-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ runner.temp }}/identity-baseline/windows-identity-baseline.json
-          retention-days: 7
-          if-no-files-found: error
-      - name: Capture original native token ACL and rotation observations
-        if: inputs.capture_token_originals
+      - name: Rust-only native token ACL and rotation replay
+        if: runner.os == 'Windows'
         shell: pwsh
         env:
           EXPECTED_ARCH: ${{ runner.arch }}
           EXPECTED_REVISION: ${{ github.sha }}
-          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/token-acl-originals
         run: |
           $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
-          $captureScript = @'
+          $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
+          $replayScript = @'
           set -euo pipefail
           test "$RUNNER_OS" = Windows
           test -z "$(git status --porcelain)"
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_native_contract \
             -- --exact windows_acl::native_windows_token_dacl_and_rotation_match_go --nocapture \
-            2>&1 | tee "$RUNNER_TEMP/token-acl-capture.log"
-          grep -Eq '^running 1 test$' "$RUNNER_TEMP/token-acl-capture.log"
-          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/token-acl-capture.log"
-          test -s "$SYMERASEME_CAPTURE_HTTP_AUX/native_windows_token_dacl_and_rotation_match_go.json"
+            2>&1 | tee "$RUNNER_TEMP/token-acl-replay.log"
+          grep -Eq '^running 1 test$' "$RUNNER_TEMP/token-acl-replay.log"
+          grep -Eq '^test windows_acl::native_windows_token_dacl_and_rotation_match_go \.\.\.' "$RUNNER_TEMP/token-acl-replay.log"
+          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/token-acl-replay.log"
+          grep -Fq 'Windows token ACL replay executed inherited and owner-only-parent cases against actual Rust' "$RUNNER_TEMP/token-acl-replay.log"
           '@
-          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $captureScript
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $replayScript
           exit $LASTEXITCODE
-      - name: Retain original token ACL observations
-        if: success() && inputs.capture_token_originals
+      - name: Retain token replay diagnostics
+        if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: token-acl-originals-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ runner.temp }}/token-acl-originals/native_windows_token_dacl_and_rotation_match_go.json
+          name: token-acl-replay-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/token-acl-replay.log
           if-no-files-found: error
-          retention-days: 7
-      - name: Retain token capture diagnostics
-        if: failure() && inputs.capture_token_originals
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: token-acl-diagnostics-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ runner.temp }}/token-acl-capture.log
-          if-no-files-found: warn
           retention-days: 7
