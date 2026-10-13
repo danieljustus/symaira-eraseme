@@ -7,9 +7,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
+      - '**.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'rust-toolchain.toml'
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch: {}
@@ -34,23 +35,23 @@ jobs:
         include:
           - language: actions
             build_mode: none
-          - language: go
-            build_mode: autobuild
+          - language: rust
+            build_mode: none
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Install pinned Rust toolchain
+        if: matrix.language == 'rust'
+        run: rustup toolchain install 1.98.0 --profile minimal
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build_mode }}
-
-      - name: Autobuild compiled language
-        if: matrix.build_mode == 'autobuild'
-        uses: github/codeql-action/autobuild@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
