@@ -129,6 +129,32 @@ jobs:
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
+      - name: Capture trusted Windows identity baseline
+        if: runner.os == 'Windows' && inputs.capture_token_originals
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
+      - name: Upload trusted Windows identity baseline
+        if: success() && runner.os == 'Windows' && inputs.capture_token_originals
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-identity-baseline-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/identity-baseline/windows-identity-baseline.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Verify identity baseline against the tested process
+        if: runner.os == 'Windows' && inputs.capture_token_originals
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
       - name: Capture original native token ACL and rotation observations
         if: inputs.capture_token_originals
         shell: bash

@@ -41,6 +41,30 @@ jobs:
         run: |
           set -euo pipefail
           rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+      - name: Capture trusted Windows identity baseline
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
+      - name: Upload trusted Windows identity baseline
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-identity-baseline-${{ matrix.os }}
+          path: ${{ runner.temp }}/identity-baseline/windows-identity-baseline.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Verify identity baseline against the tested process
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
       - name: Capture real Go consent observations
         id: capture
         shell: bash
