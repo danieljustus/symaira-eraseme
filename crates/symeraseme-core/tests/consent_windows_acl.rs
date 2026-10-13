@@ -150,6 +150,18 @@ Write-Output ('cim:' + [bool](Get-Command Get-CimInstance -ErrorAction SilentlyC
 Write-Output ('git:' + [bool](Get-Command git -CommandType Application -ErrorAction SilentlyContinue))
 "#;
 
+// Optional diagnostics must not replace the verifier's original fatal result.
+fn optional_identity_probe(
+    probe: impl FnOnce() -> Output + std::panic::UnwindSafe,
+) -> Option<Output> {
+    std::panic::catch_unwind(probe).ok()
+}
+
+#[test]
+fn identity_probe_failure_returns_to_original_verifier() {
+    assert!(optional_identity_probe(|| panic!("synthetic capture failure")).is_none());
+}
+
 fn identity_probe_markers(stdout: &[u8]) -> Vec<&'static str> {
     let text = String::from_utf8_lossy(stdout);
     [
@@ -261,23 +273,34 @@ fn verified_primary_group(logs: &Path, arch: &str) -> String {
         .arg(&baseline_path);
     let result = capture(verify, logs, "identity-verify", Duration::from_secs(60));
     if !result.status.success() {
-        let mut probe = identity_command();
-        probe.args([
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            IDENTITY_ENGINE_PROBE,
-        ]);
-        let probe = capture(probe, logs, "identity-engine", Duration::from_secs(30));
         eprintln!(
-            "identity engine diagnostic: exit {:?}, markers {:?}, verifier stderr bytes {}, stderr contains NUL {}, stdout class {}",
-            probe.status.code(),
-            identity_probe_markers(&probe.stdout),
+            "identity verifier diagnostic: exit {:?}, stderr bytes {}, stderr contains NUL {}, stdout class {}, stderr class {}",
+            result.status.code(),
             result.stderr.len(),
             result.stderr.contains(&0),
-            identity_failure_label(&result.stdout)
+            identity_failure_label(&result.stdout),
+            identity_failure_label(&result.stderr)
         );
+        let probe = optional_identity_probe(|| {
+            let mut probe = identity_command();
+            probe.args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                IDENTITY_ENGINE_PROBE,
+            ]);
+            capture(probe, logs, "identity-engine", Duration::from_secs(30))
+        });
+        if let Some(probe) = probe {
+            eprintln!(
+                "identity engine diagnostic: exit {:?}, markers {:?}",
+                probe.status.code(),
+                identity_probe_markers(&probe.stdout)
+            );
+        } else {
+            eprintln!("identity engine diagnostic: probe unavailable; original failure retained");
+        }
     }
     assert!(
         result.status.success(),
