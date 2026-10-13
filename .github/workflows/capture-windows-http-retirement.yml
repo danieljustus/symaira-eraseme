@@ -2,6 +2,13 @@ name: Capture remaining native Windows HTTP contracts
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [migration/go-retirement-20261012]
+    paths:
+      - .github/workflows/capture-windows-http-retirement.yml
+      - crates/symeraseme-cli/tests/mcp_http_windows_process.rs
+      - crates/symeraseme-cli/tests/support/capture_windows_http_process.rs
+      - crates/symeraseme-cli/tests/windows_http_capture_contract.rs
 
 permissions:
   contents: read
