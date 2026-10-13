@@ -9,6 +9,11 @@ on:
       - crates/symeraseme-cli/tests/frozen_http_aux.rs
       - crates/symeraseme-cli/tests/support/*_http_aux.rs
       - crates/symeraseme-cli/tests/support/frozen_token_acl.rs
+      - crates/symeraseme-cli/tests/support/frozen_windows_http.rs
+      - crates/symeraseme-cli/tests/support/native_host_agent.rs
+      - crates/symeraseme-cli/tests/fixtures/native_host_agent.rs
+      - crates/symeraseme-cli/tests/windows_http_capture_contract.rs
+      - tests/fixtures/go-frozen/refresh-735ae51e/windows-http/**
       - tests/fixtures/go-frozen/refresh-a3db5a02/token-acl/**
       - scripts/capture-windows-identity.ps1
       - cmd/symeraseme/**
@@ -26,6 +31,10 @@ on:
         description: Replay retained Windows token ACL observations using Rust only
         type: boolean
         default: false
+      replay_windows_http:
+        description: Replay retained Windows HTTP process observations with Go unavailable
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,7 +45,7 @@ concurrency:
 
 jobs:
   official-core:
-    if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
+    if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
     name: Official MCP core / Go and Rust
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -93,18 +102,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ inputs.replay_token_acl && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
+        os: ${{ (inputs.replay_token_acl || inputs.replay_windows_http) && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0 # Frozen native readers verify immutable source and generator blobs.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
+        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
         with:
           go-version: '1.26.6'
       - name: Download pinned Go modules
-        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
+        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
         shell: bash
         run: GOTOOLCHAIN=go1.26.6 go mod download
       - name: Install pinned Rust toolchain
@@ -119,17 +128,62 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Complete response headers, raw bodies and native bind failures
-        if: github.event_name != 'workflow_dispatch' || !inputs.replay_token_acl
+        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked \
             --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux \
             -- --nocapture --skip windows_acl::native_windows_token_dacl_and_rotation_match_go
       - name: Native Windows console, auth, rotation, timeout and disconnect contracts
-        if: runner.os == 'Windows' && !inputs.replay_token_acl
-        shell: bash
+        if: runner.os == 'Windows' && (!inputs.replay_token_acl || inputs.replay_windows_http)
+        shell: pwsh
         run: |
-          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture --test-threads=1
+          $ErrorActionPreference = 'Stop'
+          $env:PATH = ($env:PATH.Split([IO.Path]::PathSeparator) | Where-Object {
+            $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'go.exe'))
+          }) -join [IO.Path]::PathSeparator
+          if (Get-Command go,go.exe -CommandType Application -ErrorAction SilentlyContinue) {
+            throw 'Go must be unavailable during the Rust-only replay'
+          }
+          $replayScript = @'
+          set -euo pipefail
+          test "$RUNNER_OS" = Windows
+          test -z "$(git status --porcelain)"
+          if command -v go >/dev/null 2>&1; then
+            printf 'Go unexpectedly resolves in the replay shell\n' >&2
+            exit 1
+          fi
+          cargo +1.98.0 test -p symeraseme-cli --locked --test windows_http_capture_contract \
+            2>&1 | tee "$RUNNER_TEMP/windows-http-reader.log"
+          grep -Eq '^running [1-9][0-9]* tests?$' "$RUNNER_TEMP/windows-http-reader.log"
+          tests=(
+            native_windows_http_matches_checked_out_go
+            native_windows_disconnect_reaps_host_agent_like_go
+            native_windows_pathext_availability_matches_live_go
+            native_windows_disconnect_cancels_provider_request_like_go
+            native_windows_slow_header_timeout_matches_go
+            native_windows_ctrl_break_shutdown_matches_go
+            native_windows_ctrl_c_shutdown_matches_go
+          )
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process \
+            -- "${tests[@]}" --exact --nocapture --test-threads=1 \
+            2>&1 | tee "$RUNNER_TEMP/windows-http-replay.log"
+          grep -Eq '^running 7 tests$' "$RUNNER_TEMP/windows-http-replay.log"
+          grep -Eq 'test result: ok\. 7 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/windows-http-replay.log"
+          test -z "$(git status --porcelain)"
+          '@
+          & bash --noprofile --norc -c $replayScript
+          exit $LASTEXITCODE
+      - name: Retain Windows HTTP replay diagnostics
+        if: always() && runner.os == 'Windows' && (!inputs.replay_token_acl || inputs.replay_windows_http)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-http-replay-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            ${{ runner.temp }}/windows-http-reader.log
+            ${{ runner.temp }}/windows-http-replay.log
+          if-no-files-found: error
+          retention-days: 7
       - name: Native Unix process and signal contracts
         if: runner.os != 'Windows'
         shell: bash
