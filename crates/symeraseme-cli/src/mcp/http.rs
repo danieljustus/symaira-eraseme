@@ -297,8 +297,21 @@ fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(path)?;
+        .open(path)
+        .map_err(|error| token_file_error("open", path, error))?;
     file.write_all(token.as_bytes())
+        .map_err(|error| token_file_error("write", path, error))
+}
+
+#[cfg(any(not(unix), test))]
+fn token_file_error(operation: &str, path: &Path, error: std::io::Error) -> std::io::Error {
+    // Go's os.PathError includes the operation and path, but not Rust's errno suffix.
+    let text = error.to_string();
+    let message = text.split(" (os error ").next().unwrap_or(&text);
+    std::io::Error::new(
+        error.kind(),
+        format!("{operation} {}: {message}", path.display()),
+    )
 }
 
 #[cfg(unix)]
@@ -708,6 +721,26 @@ mod transport_tests {
             error,
             format!("listen tcp {address}: bind: {}", expected_addr_in_use())
         );
+    }
+
+    #[test]
+    fn windows_token_file_errors_preserve_go_path_diagnostics() {
+        // Synthetic formatter control; the retained Windows replay proves native bytes.
+        for operation in ["open", "write"] {
+            let error = token_file_error(
+                operation,
+                Path::new(r"C:\private\data\mcp_token"),
+                std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "Access is denied. (os error 5)",
+                ),
+            );
+            assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+            assert_eq!(
+                error.to_string(),
+                format!(r"{operation} C:\private\data\mcp_token: Access is denied.")
+            );
+        }
     }
 
     #[test]
