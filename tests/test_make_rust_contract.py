@@ -60,6 +60,26 @@ if 'llvm-cov' in sys.argv:
         self.assertNotEqual(self.run_make('test').returncode, 0)
         self.assertEqual(len(self.calls.read_text().splitlines()), 1)
 
+    def test_clean_never_uses_configurable_output_paths(self):
+        overrides = {
+            'CARGO_TARGET_DIR': str(self.root / 'external cache'),
+            'RUST_TARGET_DIR': str(self.root / 'other project'),
+            'BINARY': str(self.root / 'external binary'),
+            'COVERAGE_FILE': str(self.root / 'external coverage.json'),
+        }
+        for arguments in ([], [f'{key}={value}' for key, value in overrides.items()]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    ['make', '-n', 'clean', *arguments], cwd=self.root,
+                    env=dict(self.env, **overrides), text=True,
+                    capture_output=True, timeout=20,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), [
+                    'rm -f -- symeraseme',
+                    'rm -rf -- build/rust dist',
+                ])
+
     def test_retired_race_target_does_not_fake_success(self):
         result = self.run_make('test-race')
         self.assertNotEqual(result.returncode, 0)
@@ -86,6 +106,16 @@ if 'llvm-cov' in sys.argv:
             with self.subTest(files=files):
                 self.report['data'][0]['files'] = files
                 self.assertNotEqual(self.run_make('coverage').returncode, 0)
+
+    def test_ci_uses_shared_coverage_gate_and_rejects_no_critical_code(self):
+        workflow = (ROOT / '.github/workflows/rust-ci.yml').read_text()
+        self.assertIn('run: bash scripts/check-rust-coverage.sh', workflow)
+        self.assertNotIn('critical_pattern=', workflow)
+        self.source.write_text('// Declaration-only facade.\npub mod child;\n')
+        result = self.run_make('coverage')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('No critical Rust files found', result.stderr)
+        self.assertFalse(self.calls.exists())
 
     def test_coverage_propagates_instrumentation_failure(self):
         self.env['FAIL'] = '1'

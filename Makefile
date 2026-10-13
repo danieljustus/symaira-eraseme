@@ -87,6 +87,7 @@ lint:
 fmt-check:
 	CARGO_TARGET_DIR=$(call shell_quote,$(RUST_TARGET_DIR)) $(call shell_quote,$(CARGO)) fmt --all --check
 
+# Never remove configurable outputs: they can belong to another project.
 clean:
-	rm -f -- $(call shell_quote,$(BINARY)) $(call shell_quote,$(COVERAGE_FILE))
-	rm -rf -- $(call shell_quote,$(RUST_TARGET_DIR)) dist
+	rm -f -- symeraseme
+	rm -rf -- build/rust dist
