@@ -95,7 +95,8 @@ def harness_identity():
              'rust-tests/parity/linux_store_sandbox.py',
              'rust-tests/parity/windows_store_sandbox.py',
              'rust-tests/parity/prepare_backup_restore.py',
-             'rust-tests/parity/oracle/store-sandbox-control/main.go',
+             'rust-tests/parity/src/bin/store_sandbox_control.rs',
+             'rust-tests/parity/go_build_info.py',
              'rust-tests/parity/test_plain_backup_restore.py',
              'docs/rust-port/backup-restore-rehearsal.md')
     committed = {}

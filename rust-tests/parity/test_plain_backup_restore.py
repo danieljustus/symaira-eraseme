@@ -1,12 +1,15 @@
 """Focused controls for the disposable historical-Go restore rehearsal."""
 from contextlib import closing
 import io
+import shutil
 import sqlite3
 import stat
+import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import warnings
 import zipfile
 
@@ -14,6 +17,51 @@ import backup_restore_rehearsal as rehearsal
 
 
 class BackupRestoreControls(unittest.TestCase):
+    def test_harness_identity_binds_current_rust_control_and_metadata_reader(self):
+        files = (
+            'rust-tests/parity/backup_restore_rehearsal.py',
+            '.github/workflows/backup-restore-native.yml',
+            'rust-tests/parity/plain_store_switchback.py',
+            'rust-tests/parity/linux_store_sandbox.py',
+            'rust-tests/parity/windows_store_sandbox.py',
+            'rust-tests/parity/prepare_backup_restore.py',
+            'rust-tests/parity/src/bin/store_sandbox_control.rs',
+            'rust-tests/parity/go_build_info.py',
+            'rust-tests/parity/test_plain_backup_restore.py',
+            'docs/rust-port/backup-restore-rehearsal.md',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*args):
+                subprocess.run(['git', '-C', str(root), *args], check=True,
+                               capture_output=True, timeout=30)
+
+            git('init', '-q')
+            git('config', 'user.name', 'Harness provenance control')
+            git('config', 'user.email', '88160656+danieljustus@users.noreply.github.com')
+            git('config', 'core.autocrlf', 'false')
+            for relative in files:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(rehearsal.REPO / relative, path)
+            git('add', '.')
+            git('commit', '-qm', 'Current Rust harness inputs')
+            with patch.object(rehearsal, 'REPO', root):
+                measured = rehearsal.harness_identity()
+                self.assertEqual(set(measured['committed_harness_files']), set(files))
+                self.assertEqual(measured['worktree_dirty_status'], 'clean')
+                for relative in files:
+                    path = root / relative
+                    original = path.read_bytes()
+                    path.write_bytes(original + b'\nchanged harness input\n')
+                    with self.subTest(path=relative), self.assertRaisesRegex(ValueError, 'committed candidate'):
+                        rehearsal.harness_identity()
+                    path.write_bytes(original)
+                (root / 'rust-tests/parity/src/bin/store_sandbox_control.rs').unlink()
+                with self.assertRaises(FileNotFoundError):
+                    rehearsal.harness_identity()
+
     def test_online_backup_keeps_committed_wal_state(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source.db'

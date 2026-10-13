@@ -84,6 +84,8 @@ tests/fixtures/go-frozen/refresh-*/** -text
 # Published Go rollback artifact identities are pinned byte-for-byte.
 tests/fixtures/go-rollback/** -text
 # Native backup/restore measures the exact committed harness bytes on Windows.
+rust-tests/parity/src/bin/store_sandbox_control.rs text eol=lf
+rust-tests/parity/go_build_info.py text eol=lf
 rust-tests/parity/backup_restore_rehearsal.py text eol=lf
 rust-tests/parity/plain_store_switchback.py text eol=lf
 rust-tests/parity/linux_store_sandbox.py text eol=lf

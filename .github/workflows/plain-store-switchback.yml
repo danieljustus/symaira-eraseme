@@ -133,7 +133,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s rust-tests/parity -p test_plain_store_switchback.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/controls.log"
+          python3 - <<'PY' 2>&1 | tee "$RUNNER_TEMP/switchback-logs/controls.log"
+          import json, os, pathlib, subprocess, sys
+          retained = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'switchback-retained-go/retained-release.json').read_text())
+          env = dict(os.environ, SYMERASEME_ROLLBACK_GO_BINARY=retained['binary'],
+                     SYMERASEME_ROLLBACK_GO_TAG='v0.13.0')
+          subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'rust-tests/parity',
+                          '-p', 'test_plain_store_switchback.py', '-v'], env=env, check=True)
+          PY
           python3 -m unittest discover -s rust-tests/parity -p test_go_build_info.py -v 2>&1 | tee "$RUNNER_TEMP/switchback-logs/retained-go-metadata-controls.log"
       - name: Execute plain and encrypted switchback with release-candidate binaries
         shell: bash
