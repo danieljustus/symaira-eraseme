@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "source_root": "<ORACLE_ROOT>\\filesystem\\migration-manual-secrets\\legacy-source",
+  "destination_root": "<ORACLE_ROOT>\\filesystem\\migration-manual-secrets\\go-destination",
+  "backup_dir": "<ORACLE_ROOT>\\filesystem\\migration-manual-secrets\\go-destination.migration-backup",
+  "items": {
+    "config:config.toml": "done",
+    "secret-store": "manual"
+  }
+}

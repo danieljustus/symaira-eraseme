@@ -1,0 +1,117 @@
+{
+  "detection": {
+    "detected": true,
+    "summary": "Python-era Symaira EraseMe installation detected (6 migration item(s))",
+    "reasons": [
+      "Python-era generated scheduler artifact found",
+      "Python-era generated scheduler artifact found",
+      "Python-era generated scheduler artifact found",
+      "Python-era generated scheduler artifact found",
+      "Python-era generated scheduler artifact found",
+      "Python-era generated scheduler artifact found"
+    ],
+    "secret_store": {
+      "detected": false,
+      "migratable": false
+    },
+    "artifacts": [
+      {
+        "id": "scheduler:crontab.txt",
+        "kind": "scheduler",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\source\\schedules\\crontab.txt",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\crontab.txt",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      {
+        "id": "scheduler:install.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\install.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      {
+        "id": "scheduler:symeraseme-poll.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-poll.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      {
+        "id": "scheduler:symeraseme-rescan.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-rescan.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      {
+        "id": "scheduler:symeraseme-tick.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-tick.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      {
+        "id": "scheduler:uninstall.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\uninstall.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      }
+    ]
+  },
+  "dry_run": true,
+  "resumed": false,
+  "items": [
+    {
+      "artifact": {
+        "id": "scheduler:crontab.txt",
+        "kind": "scheduler",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\source\\schedules\\crontab.txt",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\crontab.txt",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "scheduler:install.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\install.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "scheduler:symeraseme-poll.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-poll.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "scheduler:symeraseme-rescan.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-rescan.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "scheduler:symeraseme-tick.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\symeraseme-tick.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "scheduler:uninstall.sh",
+        "kind": "scheduler",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-scheduler-cron\\destination\\schedules\\uninstall.sh",
+        "reason": "Python-era generated scheduler artifact found"
+      },
+      "status": "planned"
+    }
+  ],
+  "complete": false
+}

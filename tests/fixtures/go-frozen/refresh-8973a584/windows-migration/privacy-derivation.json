@@ -1,0 +1,2546 @@
+{
+  "scope": "private local preparation only",
+  "source_run": 38361596992,
+  "producer_sha": "8973a5843279576c3e4faf3e44f0078af667d0cf",
+  "deriver_sha256": "890f5e136e3e5106b36f68d4b83307389e84f15542b904d3b43da49aba58b1bb",
+  "original_archives": {
+    "windows/arm64": "a4c7735ebff34b2d3d53e5de797663e2a9c13388fec2ca7bb310b51960f56dad",
+    "windows/amd64": "5c691e6ab9f0970d6cec5198081d287d31c04dc3922f0b3126a824bb68f1faac"
+  },
+  "derivation": "exact recorded case roots and Go binary path only; dependent blob bytes/hash pins updated; measurements and original comparison hashes unchanged",
+  "excluded": "both raw capture logs and native job logs remain private originals, not replay payloads",
+  "publication_approved": false,
+  "native_rust_replay_approved": false,
+  "families": [
+    {
+      "target": "windows/arm64",
+      "family": "command-surface",
+      "cases": 13,
+      "original_record_sha256": "0a2e857d9e7ab1dce73e148c76597d9df3465ce5fd1d74b1cdbbf1d54d07cc9a",
+      "derived_record_sha256": "70f9f06c2b544bca3f1e77e88cc238da3d1ef5d290b98c8fd271d13744dbee81",
+      "negative_controls": 7,
+      "test_only_input_snapshots_verified": 0,
+      "changed_json_paths": [
+        [
+          "provenance",
+          "go",
+          "build_info"
+        ],
+        [
+          "provenance",
+          "go",
+          "binary_path"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-text",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-empty-json",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-empty-text",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-invalid-platform",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-nested-roots",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "go",
+          "stderr",
+          "bytes"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "go",
+          "stderr",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-poll-inbox",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-schedule-status",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-uninstall",
+          "runtime_root"
+        ]
+      ],
+      "blobs": {
+        "command-surface/migrate-artifacts-json/blob-0015.bin": {
+          "original_sha256": "ceea4e94ba6f866a7930455ad9bc48c33fcf840d4b8b6ce3df7ac0ca8a9b5efd",
+          "original_bytes": 5211,
+          "derived_sha256": "491715b5b198582ba7b795ad69e0b026c8f34e0ca43054e3e1c582561bede987",
+          "derived_bytes": 3947
+        },
+        "command-surface/migrate-artifacts-json/blob-0016.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-artifacts-text/blob-0017.bin": {
+          "original_sha256": "d3f7f1b6fe050ba2b59daceaa20ab86292b411e5fff7ba497e66138d60055892",
+          "original_bytes": 226,
+          "derived_sha256": "d3f7f1b6fe050ba2b59daceaa20ab86292b411e5fff7ba497e66138d60055892",
+          "derived_bytes": 226
+        },
+        "command-surface/migrate-artifacts-text/blob-0018.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-empty-json/blob-0011.bin": {
+          "original_sha256": "9739dfd975d936be880cf1d6620bfce9628b6fbfd637440895e9994400fcccad",
+          "original_bytes": 320,
+          "derived_sha256": "9739dfd975d936be880cf1d6620bfce9628b6fbfd637440895e9994400fcccad",
+          "derived_bytes": 320
+        },
+        "command-surface/migrate-empty-json/blob-0012.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-empty-text/blob-0013.bin": {
+          "original_sha256": "45f9ac1f9852e876ff6726b5f1475d223a84050df23d5aa8e062eb5b582d8c25",
+          "original_bytes": 87,
+          "derived_sha256": "45f9ac1f9852e876ff6726b5f1475d223a84050df23d5aa8e062eb5b582d8c25",
+          "derived_bytes": 87
+        },
+        "command-surface/migrate-empty-text/blob-0014.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-invalid-platform/blob-0023.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-invalid-platform/blob-0024.bin": {
+          "original_sha256": "57801cc2a3b86968aa8bc7cbcee069cc1c5dfe3b1744c00a2abc30982eeb5cfa",
+          "original_bytes": 69,
+          "derived_sha256": "57801cc2a3b86968aa8bc7cbcee069cc1c5dfe3b1744c00a2abc30982eeb5cfa",
+          "derived_bytes": 69
+        },
+        "command-surface/migrate-nested-roots/blob-0025.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-nested-roots/blob-0026.bin": {
+          "original_sha256": "9b470333a244c2a69337e6d32b8049aa9f40802bb4d97801db1c7d9d6f9e6c75",
+          "original_bytes": 64,
+          "derived_sha256": "9b470333a244c2a69337e6d32b8049aa9f40802bb4d97801db1c7d9d6f9e6c75",
+          "derived_bytes": 64
+        },
+        "command-surface/migrate-scheduler-cron/blob-0021.bin": {
+          "original_sha256": "9a3dfe26c7651d9da414c001db2dd9bf4f93cfe02dfc96cac051b7758a7be9f6",
+          "original_bytes": 5450,
+          "derived_sha256": "4f7ddab3e7f3403c6f0f306b83a5192f88b9aa1cb59868182eaf7e307db062ad",
+          "derived_bytes": 4344
+        },
+        "command-surface/migrate-scheduler-cron/blob-0022.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-separate-config/blob-0019.bin": {
+          "original_sha256": "955fcc316d94eb90f1b7b901b6571c2d4170ea8c4708610083722a36e0b54479",
+          "original_bytes": 5263,
+          "derived_sha256": "c44909f3ee5fc413747c56d6498012c3a09ef68cc9d30a7f69c62bc4737ff1c7",
+          "derived_bytes": 3999
+        },
+        "command-surface/migrate-separate-config/blob-0020.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-migrate/blob-0001.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-migrate/blob-0002.bin": {
+          "original_sha256": "5b837810e27b02e44c8b6c12564b38d732eece833c5b2299e8ee7bb48e39930c",
+          "original_bytes": 193,
+          "derived_sha256": "6ec90f2429f3796c84be57b7271d867cd00161af4985c038fb8bde11078a5951",
+          "derived_bytes": 120
+        },
+        "command-surface/operate-poll-inbox/blob-0003.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-poll-inbox/blob-0004.bin": {
+          "original_sha256": "13ef27e4aa3148d278973a211f2fe2aae10c7b369f8e31fb5f3a6b4e386db6a0",
+          "original_bytes": 179,
+          "derived_sha256": "13ef27e4aa3148d278973a211f2fe2aae10c7b369f8e31fb5f3a6b4e386db6a0",
+          "derived_bytes": 179
+        },
+        "command-surface/operate-schedule-install/blob-0005.bin": {
+          "original_sha256": "3f8be2a701ff8f99833f5d2751122ee788a77ce6c6e0d079422dc6bdbbdb18bd",
+          "original_bytes": 2986,
+          "derived_sha256": "c81ef935be787a70403a5cca750881949e2634a709aa8652ac2426df8497f6ce",
+          "derived_bytes": 2461
+        },
+        "command-surface/operate-schedule-install/blob-0006.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-schedule-status/blob-0007.bin": {
+          "original_sha256": "55f849eeaf2140ad1f559cc8e9abd2dfae5d2f1077ee002ddd0dee9823a1818f",
+          "original_bytes": 170,
+          "derived_sha256": "55f849eeaf2140ad1f559cc8e9abd2dfae5d2f1077ee002ddd0dee9823a1818f",
+          "derived_bytes": 170
+        },
+        "command-surface/operate-schedule-status/blob-0008.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-schedule-uninstall/blob-0009.bin": {
+          "original_sha256": "b493cdb3b30ea63f6a924f814dfccfcfe305dac02106f9994ce2bcb2e8ed28c4",
+          "original_bytes": 17,
+          "derived_sha256": "b493cdb3b30ea63f6a924f814dfccfcfe305dac02106f9994ce2bcb2e8ed28c4",
+          "derived_bytes": 17
+        },
+        "command-surface/operate-schedule-uninstall/blob-0010.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        }
+      },
+      "transforms": [
+        {
+          "blob": "command-surface/migrate-artifacts-json/blob-0015.bin",
+          "changed": true,
+          "root_roles": 16,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-json/blob-0016.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-text/blob-0017.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-text/blob-0018.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-json/blob-0011.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-json/blob-0012.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-text/blob-0013.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-text/blob-0014.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-invalid-platform/blob-0023.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-invalid-platform/blob-0024.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-nested-roots/blob-0025.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-nested-roots/blob-0026.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-scheduler-cron/blob-0021.bin",
+          "changed": true,
+          "root_roles": 14,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-scheduler-cron/blob-0022.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-separate-config/blob-0019.bin",
+          "changed": true,
+          "root_roles": 16,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-separate-config/blob-0020.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-migrate/blob-0001.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-migrate/blob-0002.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-poll-inbox/blob-0003.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-poll-inbox/blob-0004.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-install/blob-0005.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 3
+        },
+        {
+          "blob": "command-surface/operate-schedule-install/blob-0006.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-status/blob-0007.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-status/blob-0008.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-uninstall/blob-0009.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-uninstall/blob-0010.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        }
+      ]
+    },
+    {
+      "target": "windows/arm64",
+      "family": "filesystem",
+      "cases": 5,
+      "original_record_sha256": "2c2070354166e645e5501b6dd0b5b4d843a665959d49c18e4d45e60dc60f9a0d",
+      "derived_record_sha256": "83b38e1fe6e3fa36e87ce5991abde66b9533ec92d3c9ae7e4e7bd20a097cab72",
+      "negative_controls": 7,
+      "test_only_input_snapshots_verified": 10,
+      "changed_json_paths": [
+        [
+          "provenance",
+          "go",
+          "build_info"
+        ],
+        [
+          "provenance",
+          "go",
+          "binary_path"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ]
+      ],
+      "blobs": {
+        "filesystem/migration/blob-0001.bin": {
+          "original_sha256": "1e90d455ebe0ab261446ed21d4b030776e43ec7e8016f59c290bfe6bbff6b1cb",
+          "original_bytes": 1528,
+          "derived_sha256": "30e4b68048761789a52963e08ae10b8ab3482c545d000c96959dca4b18a09e61",
+          "derived_bytes": 1133
+        },
+        "filesystem/migration/blob-0002.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration/blob-0003.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration/blob-0004.bin": {
+          "original_sha256": "89d17ea433191452558a39a5a73a8bd1549271aab2688879f705b2760eb5b640",
+          "original_bytes": 545,
+          "derived_sha256": "2f5c7be42f3fa67e5f8d99a476f3a2dded22738fbbbe4776d981d24244f7f3df",
+          "derived_bytes": 308
+        },
+        "filesystem/migration/blob-0005.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration/blob-0006.bin": {
+          "original_sha256": "18d8c351676dc0f6a289bf2eb6538ee9ccf3814550e4e94c1fe553e219c94955",
+          "original_bytes": 231,
+          "derived_sha256": "a0cf689ec0e7019111c0a80add2f085fba710d363ce0cc74d9e5523f1bb6aff1",
+          "derived_bytes": 152
+        },
+        "filesystem/migration/blob-0007.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0008.bin": {
+          "original_sha256": "9740761e428ca3d307dca27f5de819621d4c302935d25c2497728883f6c9ec27",
+          "original_bytes": 2155,
+          "derived_sha256": "8cd989b8b98b6abf4a1ed918013fdd0c729172468af0c800b63f246e29a6bbbe",
+          "derived_bytes": 1839
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0009.bin": {
+          "original_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+          "original_bytes": 69,
+          "derived_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+          "derived_bytes": 69
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0010.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0011.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0012.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-incomplete-backup/blob-0013.bin": {
+          "original_sha256": "9a8897ccaa48174ee64431d8a6a026fdce96c7499e37182f5376375322cc6c33",
+          "original_bytes": 1436,
+          "derived_sha256": "6f324df924b89040fe0b30652cc8ae785ff55120b55bf783d5d5cbb51082e4f9",
+          "derived_bytes": 1120
+        },
+        "filesystem/migration-incomplete-backup/blob-0014.bin": {
+          "original_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+          "original_bytes": 76,
+          "derived_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+          "derived_bytes": 76
+        },
+        "filesystem/migration-incomplete-backup/blob-0015.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-incomplete-backup/blob-0016.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-incomplete-backup/blob-0017.bin": {
+          "original_sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732",
+          "original_bytes": 27,
+          "derived_sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732",
+          "derived_bytes": 27
+        },
+        "filesystem/migration-manual-secrets/blob-0018.bin": {
+          "original_sha256": "0a5d8658a1171194fbc084e6cd9b172304c8f43bc8ead2184d1db34853140fef",
+          "original_bytes": 2403,
+          "derived_sha256": "cb31fd6c1182f88b13c12a5761b4f6229ca66fa9cda435e3b988b5087ed9acb4",
+          "derived_bytes": 2008
+        },
+        "filesystem/migration-manual-secrets/blob-0019.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-manual-secrets/blob-0020.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0021.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0022.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0023.bin": {
+          "original_sha256": "f9d353553be1f8aee68ba1eaf9d7258ed1d60d4bf42e700fb7115f0301d90954",
+          "original_bytes": 620,
+          "derived_sha256": "ecc869182ecca5c5630029dfe86d2f2fc6d98fa6a6a0df860f91d06aa1fba0cd",
+          "derived_bytes": 383
+        },
+        "filesystem/migration-manual-secrets/blob-0024.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0025.bin": {
+          "original_sha256": "2594b45c815d8629b37b316ac6c962e6e6c213e21a9d1451215306d3883752b4",
+          "original_bytes": 266,
+          "derived_sha256": "cbcc91b7af866b34090ce93a09d6c42262cabefd5159b2b6f6451849385c406d",
+          "derived_bytes": 187
+        },
+        "filesystem/migration-manual-secrets/blob-0026.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0027.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0028.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-resume/blob-0029.bin": {
+          "original_sha256": "bc1de4df90e96b4f2014ab57aed6b86cda2772852a46732963d416bda59a6e21",
+          "original_bytes": 1568,
+          "derived_sha256": "88c86839b3cca10a959fc2338e8ea411d1f43b55cfd9b7baee50a6a6a8f1b0fb",
+          "derived_bytes": 1168
+        },
+        "filesystem/migration-resume/blob-0030.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-resume/blob-0031.bin": {
+          "original_sha256": "4cbf4fbe203f54938a96cd0b89159e2acab26bf1b33c3814864b93a35fe54826",
+          "original_bytes": 1570,
+          "derived_sha256": "50f1113de5457ea31d1d0f3fe770032abdb875df970508e4e8c3881005221b6b",
+          "derived_bytes": 1170
+        },
+        "filesystem/migration-resume/blob-0032.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-resume/blob-0033.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0034.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-resume/blob-0035.bin": {
+          "original_sha256": "01d8809f7d35653b6a2a4c622980f8d3559b8ac029e9910504cfef14985787dd",
+          "original_bytes": 569,
+          "derived_sha256": "089d5b00fff9f1de0f082331441ea13f6e53fa94aed95b0f8d36b3225066fd7a",
+          "derived_bytes": 329
+        },
+        "filesystem/migration-resume/blob-0036.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0037.bin": {
+          "original_sha256": "38fd93ff91b922829dc4208076f9b73cc51767e0a026e89cd5994b50d3063378",
+          "original_bytes": 239,
+          "derived_sha256": "178f76cff2f76e5c268d6caf96ecdf2e8e785c8471433a4db7a0fdfdb7cc7969",
+          "derived_bytes": 159
+        },
+        "filesystem/migration-resume/blob-0038.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0039.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        }
+      },
+      "transforms": [
+        {
+          "blob": "filesystem/migration/blob-0001.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0002.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0003.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0004.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0005.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0006.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0007.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0008.bin",
+          "changed": true,
+          "root_roles": 4,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0009.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0010.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0011.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0012.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0013.bin",
+          "changed": true,
+          "root_roles": 4,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0014.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0015.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0016.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0017.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0018.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0019.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0020.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0021.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0022.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0023.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0024.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0025.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0026.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0027.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0028.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0029.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0030.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0031.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0032.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0033.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0034.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0035.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0036.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0037.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0038.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0039.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        }
+      ]
+    },
+    {
+      "target": "windows/amd64",
+      "family": "command-surface",
+      "cases": 13,
+      "original_record_sha256": "c3cf57e1840c38fef0897a11f0dd11dbb5895b1c22d13f4a070adca4e82ec278",
+      "derived_record_sha256": "c999eb8ee1a4ac62b12a3344aa291e3171f0468da2281ed6c1fc12d7153aa891",
+      "negative_controls": 7,
+      "test_only_input_snapshots_verified": 0,
+      "changed_json_paths": [
+        [
+          "provenance",
+          "go",
+          "build_info"
+        ],
+        [
+          "provenance",
+          "go",
+          "binary_path"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-json",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migrate-artifacts-text",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-empty-json",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-empty-text",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-invalid-platform",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-nested-roots",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-scheduler-cron",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migrate-separate-config",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "go",
+          "stderr",
+          "bytes"
+        ],
+        [
+          "cases",
+          "operate-migrate",
+          "go",
+          "stderr",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-poll-inbox",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "go",
+          "stdout",
+          "bytes"
+        ],
+        [
+          "cases",
+          "operate-schedule-install",
+          "go",
+          "stdout",
+          "sha256"
+        ],
+        [
+          "cases",
+          "operate-schedule-status",
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "operate-schedule-uninstall",
+          "runtime_root"
+        ]
+      ],
+      "blobs": {
+        "command-surface/migrate-artifacts-json/blob-0015.bin": {
+          "original_sha256": "ff3e88bebe03b764d2bb49d3f071f6d00cbde7e8c3cfddaa7546fec49572ba6f",
+          "original_bytes": 5211,
+          "derived_sha256": "491715b5b198582ba7b795ad69e0b026c8f34e0ca43054e3e1c582561bede987",
+          "derived_bytes": 3947
+        },
+        "command-surface/migrate-artifacts-json/blob-0016.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-artifacts-text/blob-0017.bin": {
+          "original_sha256": "d3f7f1b6fe050ba2b59daceaa20ab86292b411e5fff7ba497e66138d60055892",
+          "original_bytes": 226,
+          "derived_sha256": "d3f7f1b6fe050ba2b59daceaa20ab86292b411e5fff7ba497e66138d60055892",
+          "derived_bytes": 226
+        },
+        "command-surface/migrate-artifacts-text/blob-0018.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-empty-json/blob-0011.bin": {
+          "original_sha256": "9739dfd975d936be880cf1d6620bfce9628b6fbfd637440895e9994400fcccad",
+          "original_bytes": 320,
+          "derived_sha256": "9739dfd975d936be880cf1d6620bfce9628b6fbfd637440895e9994400fcccad",
+          "derived_bytes": 320
+        },
+        "command-surface/migrate-empty-json/blob-0012.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-empty-text/blob-0013.bin": {
+          "original_sha256": "45f9ac1f9852e876ff6726b5f1475d223a84050df23d5aa8e062eb5b582d8c25",
+          "original_bytes": 87,
+          "derived_sha256": "45f9ac1f9852e876ff6726b5f1475d223a84050df23d5aa8e062eb5b582d8c25",
+          "derived_bytes": 87
+        },
+        "command-surface/migrate-empty-text/blob-0014.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-invalid-platform/blob-0023.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-invalid-platform/blob-0024.bin": {
+          "original_sha256": "57801cc2a3b86968aa8bc7cbcee069cc1c5dfe3b1744c00a2abc30982eeb5cfa",
+          "original_bytes": 69,
+          "derived_sha256": "57801cc2a3b86968aa8bc7cbcee069cc1c5dfe3b1744c00a2abc30982eeb5cfa",
+          "derived_bytes": 69
+        },
+        "command-surface/migrate-nested-roots/blob-0025.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-nested-roots/blob-0026.bin": {
+          "original_sha256": "9b470333a244c2a69337e6d32b8049aa9f40802bb4d97801db1c7d9d6f9e6c75",
+          "original_bytes": 64,
+          "derived_sha256": "9b470333a244c2a69337e6d32b8049aa9f40802bb4d97801db1c7d9d6f9e6c75",
+          "derived_bytes": 64
+        },
+        "command-surface/migrate-scheduler-cron/blob-0021.bin": {
+          "original_sha256": "d10e299d14eef99cfeafcab5fc0daecc94509bb17743ea8a34a78b301f513ebd",
+          "original_bytes": 5450,
+          "derived_sha256": "4f7ddab3e7f3403c6f0f306b83a5192f88b9aa1cb59868182eaf7e307db062ad",
+          "derived_bytes": 4344
+        },
+        "command-surface/migrate-scheduler-cron/blob-0022.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/migrate-separate-config/blob-0019.bin": {
+          "original_sha256": "7c17628591f6e8636d52aa0cb9649cae2412d103f279db366a5a02e74ebf14df",
+          "original_bytes": 5263,
+          "derived_sha256": "c44909f3ee5fc413747c56d6498012c3a09ef68cc9d30a7f69c62bc4737ff1c7",
+          "derived_bytes": 3999
+        },
+        "command-surface/migrate-separate-config/blob-0020.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-migrate/blob-0001.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-migrate/blob-0002.bin": {
+          "original_sha256": "aae007f566747ff81a1955458d1e2c90ca721acd91183dfaacb7900f149f806f",
+          "original_bytes": 193,
+          "derived_sha256": "6ec90f2429f3796c84be57b7271d867cd00161af4985c038fb8bde11078a5951",
+          "derived_bytes": 120
+        },
+        "command-surface/operate-poll-inbox/blob-0003.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-poll-inbox/blob-0004.bin": {
+          "original_sha256": "13ef27e4aa3148d278973a211f2fe2aae10c7b369f8e31fb5f3a6b4e386db6a0",
+          "original_bytes": 179,
+          "derived_sha256": "13ef27e4aa3148d278973a211f2fe2aae10c7b369f8e31fb5f3a6b4e386db6a0",
+          "derived_bytes": 179
+        },
+        "command-surface/operate-schedule-install/blob-0005.bin": {
+          "original_sha256": "cb935d7bddfdb718c2c55498ec9861f6aeb09f32effd1afcaebcdeb204caf507",
+          "original_bytes": 2986,
+          "derived_sha256": "c81ef935be787a70403a5cca750881949e2634a709aa8652ac2426df8497f6ce",
+          "derived_bytes": 2461
+        },
+        "command-surface/operate-schedule-install/blob-0006.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-schedule-status/blob-0007.bin": {
+          "original_sha256": "55f849eeaf2140ad1f559cc8e9abd2dfae5d2f1077ee002ddd0dee9823a1818f",
+          "original_bytes": 170,
+          "derived_sha256": "55f849eeaf2140ad1f559cc8e9abd2dfae5d2f1077ee002ddd0dee9823a1818f",
+          "derived_bytes": 170
+        },
+        "command-surface/operate-schedule-status/blob-0008.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "command-surface/operate-schedule-uninstall/blob-0009.bin": {
+          "original_sha256": "b493cdb3b30ea63f6a924f814dfccfcfe305dac02106f9994ce2bcb2e8ed28c4",
+          "original_bytes": 17,
+          "derived_sha256": "b493cdb3b30ea63f6a924f814dfccfcfe305dac02106f9994ce2bcb2e8ed28c4",
+          "derived_bytes": 17
+        },
+        "command-surface/operate-schedule-uninstall/blob-0010.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        }
+      },
+      "transforms": [
+        {
+          "blob": "command-surface/migrate-artifacts-json/blob-0015.bin",
+          "changed": true,
+          "root_roles": 16,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-json/blob-0016.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-text/blob-0017.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-artifacts-text/blob-0018.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-json/blob-0011.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-json/blob-0012.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-text/blob-0013.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-empty-text/blob-0014.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-invalid-platform/blob-0023.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-invalid-platform/blob-0024.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-nested-roots/blob-0025.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-nested-roots/blob-0026.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-scheduler-cron/blob-0021.bin",
+          "changed": true,
+          "root_roles": 14,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-scheduler-cron/blob-0022.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-separate-config/blob-0019.bin",
+          "changed": true,
+          "root_roles": 16,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/migrate-separate-config/blob-0020.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-migrate/blob-0001.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-migrate/blob-0002.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-poll-inbox/blob-0003.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-poll-inbox/blob-0004.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-install/blob-0005.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 3
+        },
+        {
+          "blob": "command-surface/operate-schedule-install/blob-0006.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-status/blob-0007.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-status/blob-0008.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-uninstall/blob-0009.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "command-surface/operate-schedule-uninstall/blob-0010.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        }
+      ]
+    },
+    {
+      "target": "windows/amd64",
+      "family": "filesystem",
+      "cases": 5,
+      "original_record_sha256": "fa4a1cdf658e0d9e42b55731b8acec0625591b5468ec6d64f7707ce8ae3a4dd8",
+      "derived_record_sha256": "341d1567786470c45cbbd315614dd76506f38a031b356f41a6ecec8f53a148f9",
+      "negative_controls": 7,
+      "test_only_input_snapshots_verified": 10,
+      "changed_json_paths": [
+        [
+          "provenance",
+          "go",
+          "build_info"
+        ],
+        [
+          "provenance",
+          "go",
+          "binary_path"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-copy-secrets-rejected",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-incomplete-backup",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-manual-secrets",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          0,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "runtime_root"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "stdout",
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "processes",
+          1,
+          "stdout",
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          1,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "bytes"
+        ],
+        [
+          "cases",
+          "migration-resume",
+          "go",
+          "snapshots",
+          2,
+          "files",
+          0,
+          "raw",
+          "sha256"
+        ]
+      ],
+      "blobs": {
+        "filesystem/migration/blob-0001.bin": {
+          "original_sha256": "d9f3308400c43017dfe61b7ce070ed2fd3dc0518818b11ddfd006590fc08d074",
+          "original_bytes": 1528,
+          "derived_sha256": "30e4b68048761789a52963e08ae10b8ab3482c545d000c96959dca4b18a09e61",
+          "derived_bytes": 1133
+        },
+        "filesystem/migration/blob-0002.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration/blob-0003.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration/blob-0004.bin": {
+          "original_sha256": "c6ab257693841b050fdd6c67a36025f590396c9f9551299eab5fd4928f69d11a",
+          "original_bytes": 545,
+          "derived_sha256": "2f5c7be42f3fa67e5f8d99a476f3a2dded22738fbbbe4776d981d24244f7f3df",
+          "derived_bytes": 308
+        },
+        "filesystem/migration/blob-0005.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration/blob-0006.bin": {
+          "original_sha256": "7507428adde9223ac09bff55c89df312b803d5e49e5a70b6e7a2558aedec0fe5",
+          "original_bytes": 231,
+          "derived_sha256": "a0cf689ec0e7019111c0a80add2f085fba710d363ce0cc74d9e5523f1bb6aff1",
+          "derived_bytes": 152
+        },
+        "filesystem/migration/blob-0007.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0008.bin": {
+          "original_sha256": "be75dff18805173f7f9ea106d6ea79c16f09680c2e17656f0d39025f9780c91a",
+          "original_bytes": 2155,
+          "derived_sha256": "8cd989b8b98b6abf4a1ed918013fdd0c729172468af0c800b63f246e29a6bbbe",
+          "derived_bytes": 1839
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0009.bin": {
+          "original_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+          "original_bytes": 69,
+          "derived_sha256": "c38ebd35f7e8b92772d94b0846f4178af3d15d6877e3389d73e011776aaac99c",
+          "derived_bytes": 69
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0010.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0011.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-copy-secrets-rejected/blob-0012.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-incomplete-backup/blob-0013.bin": {
+          "original_sha256": "2cf49edf27d619bc1bed0a589b1683c443c3e28ea8df06b778ddf8b3d5f7e024",
+          "original_bytes": 1436,
+          "derived_sha256": "6f324df924b89040fe0b30652cc8ae785ff55120b55bf783d5d5cbb51082e4f9",
+          "derived_bytes": 1120
+        },
+        "filesystem/migration-incomplete-backup/blob-0014.bin": {
+          "original_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+          "original_bytes": 76,
+          "derived_sha256": "56cf5928f20b8da6bb52f25c642f133c13fdfc56d5c0355be601c74ccc6f3d6b",
+          "derived_bytes": 76
+        },
+        "filesystem/migration-incomplete-backup/blob-0015.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-incomplete-backup/blob-0016.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-incomplete-backup/blob-0017.bin": {
+          "original_sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732",
+          "original_bytes": 27,
+          "derived_sha256": "f6b15b8b0d662b413918b4c34319aab9525eabf03fda86552dd329ce845b9732",
+          "derived_bytes": 27
+        },
+        "filesystem/migration-manual-secrets/blob-0018.bin": {
+          "original_sha256": "bf42cb2f027009c210acfe22d5eb5f6b35bd9d789191b3e21bcff4b783c25c3e",
+          "original_bytes": 2403,
+          "derived_sha256": "cb31fd6c1182f88b13c12a5761b4f6229ca66fa9cda435e3b988b5087ed9acb4",
+          "derived_bytes": 2008
+        },
+        "filesystem/migration-manual-secrets/blob-0019.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-manual-secrets/blob-0020.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0021.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0022.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0023.bin": {
+          "original_sha256": "9af93b056ecfd9bfc06cdc08adc903e4974574b97008fdfd73836ff5d77999f9",
+          "original_bytes": 620,
+          "derived_sha256": "ecc869182ecca5c5630029dfe86d2f2fc6d98fa6a6a0df860f91d06aa1fba0cd",
+          "derived_bytes": 383
+        },
+        "filesystem/migration-manual-secrets/blob-0024.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0025.bin": {
+          "original_sha256": "d129a46815db0c01c9e92ed7130cad9b2e6ea157df0bbb5c9228b264e4ca09a6",
+          "original_bytes": 266,
+          "derived_sha256": "cbcc91b7af866b34090ce93a09d6c42262cabefd5159b2b6f6451849385c406d",
+          "derived_bytes": 187
+        },
+        "filesystem/migration-manual-secrets/blob-0026.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-manual-secrets/blob-0027.bin": {
+          "original_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "original_bytes": 31,
+          "derived_sha256": "5e0ec71993779cf7b263872c904d5c32102f88d3bf02ddf4cde2a30e75b434be",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-manual-secrets/blob-0028.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-resume/blob-0029.bin": {
+          "original_sha256": "14d48892ace49602c55ff156a50fee136a40c4e6e526b9d691f44edfaee608bc",
+          "original_bytes": 1568,
+          "derived_sha256": "88c86839b3cca10a959fc2338e8ea411d1f43b55cfd9b7baee50a6a6a8f1b0fb",
+          "derived_bytes": 1168
+        },
+        "filesystem/migration-resume/blob-0030.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-resume/blob-0031.bin": {
+          "original_sha256": "78c01e5ae27782473d31c9cc4ef10735c82ecdc2d4c6d7fd3f7e8841b1af0c5e",
+          "original_bytes": 1570,
+          "derived_sha256": "50f1113de5457ea31d1d0f3fe770032abdb875df970508e4e8c3881005221b6b",
+          "derived_bytes": 1170
+        },
+        "filesystem/migration-resume/blob-0032.bin": {
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "original_bytes": 0,
+          "derived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "derived_bytes": 0
+        },
+        "filesystem/migration-resume/blob-0033.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0034.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        },
+        "filesystem/migration-resume/blob-0035.bin": {
+          "original_sha256": "ded85d46e4423b0ea2690fb8ad95f771f9194bc5dc81801f11bff04d23e9034b",
+          "original_bytes": 569,
+          "derived_sha256": "089d5b00fff9f1de0f082331441ea13f6e53fa94aed95b0f8d36b3225066fd7a",
+          "derived_bytes": 329
+        },
+        "filesystem/migration-resume/blob-0036.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0037.bin": {
+          "original_sha256": "0a193b03b979601fd2aedcaa5632b0bf34e8a48d7875855c2bf58aa0eb4d1415",
+          "original_bytes": 239,
+          "derived_sha256": "178f76cff2f76e5c268d6caf96ecdf2e8e785c8471433a4db7a0fdfdb7cc7969",
+          "derived_bytes": 159
+        },
+        "filesystem/migration-resume/blob-0038.bin": {
+          "original_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "original_bytes": 20,
+          "derived_sha256": "0147b27b2b13d1c826f67f663726cb6cb3ed8d9db7926c41a388d63385949105",
+          "derived_bytes": 20
+        },
+        "filesystem/migration-resume/blob-0039.bin": {
+          "original_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "original_bytes": 31,
+          "derived_sha256": "ee65157257fb41ac24546c334bb460e122b3130a623c9220efd5d8b5a60a3497",
+          "derived_bytes": 31
+        }
+      },
+      "transforms": [
+        {
+          "blob": "filesystem/migration/blob-0001.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0002.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0003.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0004.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0005.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0006.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration/blob-0007.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0008.bin",
+          "changed": true,
+          "root_roles": 4,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0009.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0010.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0011.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-copy-secrets-rejected/blob-0012.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0013.bin",
+          "changed": true,
+          "root_roles": 4,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0014.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0015.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0016.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-incomplete-backup/blob-0017.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0018.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0019.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0020.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0021.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0022.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0023.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0024.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0025.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0026.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0027.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-manual-secrets/blob-0028.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0029.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0030.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0031.bin",
+          "changed": true,
+          "root_roles": 5,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0032.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0033.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0034.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0035.bin",
+          "changed": true,
+          "root_roles": 3,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0036.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0037.bin",
+          "changed": true,
+          "root_roles": 1,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0038.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        },
+        {
+          "blob": "filesystem/migration-resume/blob-0039.bin",
+          "changed": false,
+          "root_roles": 0,
+          "binary_roles": 0
+        }
+      ]
+    }
+  ]
+}

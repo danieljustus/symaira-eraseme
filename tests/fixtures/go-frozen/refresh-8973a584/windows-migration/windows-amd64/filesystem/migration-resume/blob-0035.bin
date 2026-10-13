@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "source_root": "<ORACLE_ROOT>\\filesystem\\migration-resume\\legacy-source",
+  "destination_root": "<ORACLE_ROOT>\\filesystem\\migration-resume\\go-destination",
+  "backup_dir": "<ORACLE_ROOT>\\filesystem\\migration-resume\\go-destination.migration-backup",
+  "items": {
+    "config:config.toml": "done"
+  }
+}

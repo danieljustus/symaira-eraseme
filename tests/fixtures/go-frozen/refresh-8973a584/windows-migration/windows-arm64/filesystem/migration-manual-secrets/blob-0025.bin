@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "source": "<ORACLE_ROOT>\\filesystem\\migration-manual-secrets\\legacy-source",
+  "artifacts": [
+    "config:config.toml",
+    "secret-store"
+  ],
+  "external": null
+}

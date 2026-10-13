@@ -1,0 +1,56 @@
+{
+  "detection": {
+    "detected": true,
+    "summary": "Python-era Symaira EraseMe installation detected (2 migration item(s))",
+    "reasons": [
+      "Python-era configuration found",
+      "Python secrets are keyring-backed; values were not inspected"
+    ],
+    "secret_store": {
+      "detected": true,
+      "description": "Python secrets are keyring-backed; values were not inspected",
+      "migratable": false
+    },
+    "artifacts": [
+      {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\filesystem\\migration-copy-secrets-rejected\\legacy-source\\config.toml",
+        "destination": "<ORACLE_ROOT>\\filesystem\\migration-copy-secrets-rejected\\go-destination\\config.toml",
+        "reason": "Python-era configuration found"
+      },
+      {
+        "id": "secret-store",
+        "kind": "secret-store",
+        "source": "keyring://symeraseme",
+        "destination": "keyring://symeraseme",
+        "reason": "Python secrets are keyring-backed; values were not inspected"
+      }
+    ]
+  },
+  "dry_run": false,
+  "resumed": false,
+  "items": [
+    {
+      "artifact": {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\filesystem\\migration-copy-secrets-rejected\\legacy-source\\config.toml",
+        "destination": "<ORACLE_ROOT>\\filesystem\\migration-copy-secrets-rejected\\go-destination\\config.toml",
+        "reason": "Python-era configuration found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "secret-store",
+        "kind": "secret-store",
+        "source": "keyring://symeraseme",
+        "destination": "keyring://symeraseme",
+        "reason": "Python secrets are keyring-backed; values were not inspected"
+      },
+      "status": "planned"
+    }
+  ],
+  "complete": false
+}

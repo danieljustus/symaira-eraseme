@@ -1,0 +1,110 @@
+{
+  "detection": {
+    "detected": true,
+    "summary": "Python-era Symaira EraseMe installation detected (5 migration item(s))",
+    "reasons": [
+      "Python-era event database found",
+      "Python-era configuration found",
+      "Python-era configuration found",
+      "Python-era encrypted identity profile found",
+      "Python secrets are keyring-backed; values were not inspected"
+    ],
+    "secret_store": {
+      "detected": true,
+      "description": "Python secrets are keyring-backed; values were not inspected",
+      "migratable": false
+    },
+    "artifacts": [
+      {
+        "id": "config:.symeraseme.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\.symeraseme.toml",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\.symeraseme.toml",
+        "reason": "Python-era configuration found"
+      },
+      {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\config.toml",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\config.toml",
+        "reason": "Python-era configuration found"
+      },
+      {
+        "id": "event-db",
+        "kind": "event-db",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\source\\symeraseme.db",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\destination\\symeraseme.db",
+        "reason": "Python-era event database found"
+      },
+      {
+        "id": "profile",
+        "kind": "profile",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\identity.enc",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\identity.encrypted",
+        "reason": "Python-era encrypted identity profile found"
+      },
+      {
+        "id": "secret-store",
+        "kind": "secret-store",
+        "source": "keyring://symeraseme",
+        "destination": "keyring://symeraseme",
+        "reason": "Python secrets are keyring-backed; values were not inspected"
+      }
+    ]
+  },
+  "dry_run": true,
+  "resumed": false,
+  "items": [
+    {
+      "artifact": {
+        "id": "config:.symeraseme.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\.symeraseme.toml",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\.symeraseme.toml",
+        "reason": "Python-era configuration found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\config.toml",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\config.toml",
+        "reason": "Python-era configuration found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "event-db",
+        "kind": "event-db",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\source\\symeraseme.db",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\destination\\symeraseme.db",
+        "reason": "Python-era event database found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "profile",
+        "kind": "profile",
+        "source": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\legacy-config\\identity.enc",
+        "destination": "<ORACLE_ROOT>\\cli\\migrate-separate-config\\new-config\\identity.encrypted",
+        "reason": "Python-era encrypted identity profile found"
+      },
+      "status": "planned"
+    },
+    {
+      "artifact": {
+        "id": "secret-store",
+        "kind": "secret-store",
+        "source": "keyring://symeraseme",
+        "destination": "keyring://symeraseme",
+        "reason": "Python secrets are keyring-backed; values were not inspected"
+      },
+      "status": "planned"
+    }
+  ],
+  "complete": false
+}

@@ -1,0 +1,7 @@
+Python-era Symaira EraseMe installation detected (5 migration item(s))
+[planned] config:.symeraseme.toml
+[planned] config:config.toml
+[planned] event-db
+[planned] profile
+[planned] secret-store
+Dry run: no files were changed.

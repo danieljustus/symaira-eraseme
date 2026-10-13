@@ -1,0 +1,16 @@
+{
+  "detection": {
+    "detected": false,
+    "summary": "No known Python-era Symaira EraseMe artifacts detected",
+    "reasons": null,
+    "secret_store": {
+      "detected": false,
+      "migratable": false
+    },
+    "artifacts": null
+  },
+  "dry_run": true,
+  "resumed": false,
+  "items": null,
+  "complete": true
+}

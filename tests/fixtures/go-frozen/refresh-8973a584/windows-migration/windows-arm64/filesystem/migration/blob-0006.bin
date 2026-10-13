@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "source": "<ORACLE_ROOT>\\filesystem\\migration\\legacy-source",
+  "artifacts": [
+    "config:config.toml"
+  ],
+  "external": null
+}

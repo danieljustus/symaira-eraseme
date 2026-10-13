@@ -1,0 +1,37 @@
+{
+  "detection": {
+    "detected": true,
+    "summary": "Python-era Symaira EraseMe installation detected (1 migration item(s))",
+    "reasons": [
+      "Python-era configuration found"
+    ],
+    "secret_store": {
+      "detected": false,
+      "migratable": false
+    },
+    "artifacts": [
+      {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\filesystem\\migration-incomplete-backup\\legacy-source\\config.toml",
+        "destination": "<ORACLE_ROOT>\\filesystem\\migration-incomplete-backup\\go-destination\\config.toml",
+        "reason": "Python-era configuration found"
+      }
+    ]
+  },
+  "dry_run": false,
+  "resumed": false,
+  "items": [
+    {
+      "artifact": {
+        "id": "config:config.toml",
+        "kind": "config",
+        "source": "<ORACLE_ROOT>\\filesystem\\migration-incomplete-backup\\legacy-source\\config.toml",
+        "destination": "<ORACLE_ROOT>\\filesystem\\migration-incomplete-backup\\go-destination\\config.toml",
+        "reason": "Python-era configuration found"
+      },
+      "status": "planned"
+    }
+  ],
+  "complete": false
+}
