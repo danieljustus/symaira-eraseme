@@ -11,11 +11,13 @@ brew install symeraseme
 symeraseme version
 ```
 
-For a source build of the current Rust-only candidate, run `make build-rust` from
-the repository root. The binary is `build/rust/debug/symeraseme-rust`. Published
+For a source build of the current Rust-only candidate, run `make build` from
+the repository root. It copies the Rust binary to `./symeraseme`, including
+when `CARGO_TARGET_DIR` selects an external build directory. Published
 Rust-only binaries are available in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0);
-`v0.12.1` remains the latest stable release and Homebrew version.
+check [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases)
+for published versions and channels rather than inferring them from source changes.
 
 ## MCP server cannot start
 
@@ -122,28 +124,30 @@ files for diagnosis.
 
 The GUI requires a full Xcode installation, not Command Line Tools alone. For a
 local DMG from the current source-tree candidate, the package version in
-`Cargo.toml` is `0.14.0`. A Rust-only canary DMG is published in the
+`Cargo.toml` is `0.14.1`. A Rust-only canary DMG is published in the
 [`v0.14.0` prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 To produce a local build instead, run from the repository root with full Xcode:
 
 ```bash
 ./app/SymairaEraseMe/build.sh
-VERSION=0.14.0 ./scripts/package-dmg.sh
+VERSION=0.14.1 ./scripts/package-dmg.sh
 ```
 
 The current candidate app bundle contains `Symaira EraseMe.app/Contents/MacOS/symeraseme`.
 A local build may be ad-hoc signed. The published `v0.14.0` canary DMG completed
 Developer ID signing, notarization, stapling and attestation in the release
 workflow; an ad-hoc local DMG is not Gatekeeper-ready. Canary publication does
-not complete stable acceptance, the seven-day post-stable observation or the
-separate Go-source retirement approval.
+not complete stable or Go-retirement technical acceptance. The maintainer
+authorized source retirement and waived only the seven-day post-stable
+observation period on 2026-10-12.
 
 ## Windows source build
 
 The current Rust-only source-tree candidate builds on Windows with the Rust
-CLI target: `cargo build -p symeraseme-cli --bin symeraseme-rust`. The release
-workflow defines Windows target builds. Go cross-builds are for the retained
-development oracle, not the current candidate product.
+CLI target: `cargo build --locked -p symeraseme-cli --bin symeraseme-rust`.
+The release workflow defines native Windows target builds. Go implementation
+and module files have been removed; the current build and normal Rust tests
+do not require Go. Frozen Go observations retain their source-provenance checks.
 
 ## Reporting a problem
 

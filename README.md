@@ -21,9 +21,11 @@ was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
 last Go-only stable release. Check [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases)
-for published versions and channels. Stable acceptance and the seven-day
-post-stable observation are tracked under CUT-004. The Go implementation remains temporarily
-as a development oracle until the separately approved CUT-005 retirement.
+for published versions and channels. The maintainer waived the seven-day
+post-stable observation period and authorized Go-source retirement on 2026-10-12.
+The Go implementation and module files are removed from this source tree;
+frozen Go observations and their immutable source history remain for conformance.
+CUT-004/CUT-005 technical acceptance and release gates are not waived.
 
 **Status:** Beta. Core planning, event tracking, deadline handling, registry
 validation, inbox triage, reports, and the MCP/CLI contracts are implemented.
@@ -154,10 +156,9 @@ configuration is consumed by the shared Rust LLM provider layer.
 
 ## Development
 
-Requirements: Rust 1.98.0 (pinned in `rust-toolchain.toml`). Go 1.26.6 is needed
-only for the temporary Go reference/oracle checks (`make go-gate` and live
-`make parity-live`); it is not needed to build or run the Rust product. A full
-Xcode installation is required for the macOS GUI.
+Requirements: Rust 1.98.0 (pinned in `rust-toolchain.toml`). The Rust build,
+test suite and frozen-observation checks do not require Go. A full Xcode
+installation is required for the macOS GUI.
 
 ```bash
 # Rust CLI and frozen-observation conformance suite
@@ -165,9 +166,9 @@ make build-rust
 make rust-gate
 make parity
 
-# Temporary Go reference checks (development only, not a product runtime)
-make go-gate
-make parity-live
+# Additional Rust acceptance gates (require cargo-llvm-cov and pinned Miri)
+make coverage
+make miri
 
 # macOS app
 make app-test
@@ -177,11 +178,14 @@ make app-test
 VERSION=0.14.1 ./scripts/package-dmg.sh
 ```
 
-`make parity` uses recorded Go observations by default and does not require a
-Go executable; `make parity-live` rebuilds and runs the Go oracle. `make go-gate`
-is the retained Go reference quality/build gate, including its exact 75%
-statement-coverage threshold. The Go implementation and tooling remain only for
-development/conformance work until the separately scoped CUT-005 retirement.
+`make parity` replays recorded Go observations through Rust without a Go
+executable. Keep the frozen observations and their source-provenance checks
+intact. `make build`, `make test`, `make lint`, `make vet` and `make fmt-check`
+now run Rust tooling. `make coverage` enforces 80% project line coverage and
+90% aggregate critical-code line coverage. `make miri` runs the pinned Rust
+interpreter contract; it is not a substitute for native concurrency tests.
+The old live-oracle Make targets are retired. Native platform, security and
+release-artifact gates remain separate from the local `make rust-gate`.
 
 ### Registry contributions
 
@@ -200,8 +204,6 @@ in the Rust CLI and is not rewritten by normal CLI operation.
 ```text
 crates/                 Rust CLI, core, and engine
 rust-tests/parity/      Conformance suite and frozen Go observations
-cmd/symeraseme/,        Temporary Go reference implementation and packages
-internal/               (development oracle only until CUT-005)
 registry/               Broker/law/schema source data
 skills/                 Agent skill bundle and workflow documentation
 app/SymairaEraseMe/      SwiftUI macOS client
@@ -231,10 +233,11 @@ No GUI Homebrew cask is configured; the macOS GUI is distributed as a DMG.
 Previously published `v0.13.0` dual-backend prerelease assets remain unchanged;
 `v0.12.1` is the last Go-only stable release. The `v0.14.0` canary introduced
 the Rust-only package layout; version 0.14.1 adds identity/consent safety fixes
-and complete-asset immutable publication. Canary publication does not complete CUT-004 stable
-acceptance and its seven-day observation, or authorize CUT-005 Go-source
-retirement. The historical `python-final` tag remains available for migration
-and recovery.
+and complete-asset immutable publication. Canary publication alone does not
+complete stable acceptance or Go-retirement technical gates. The maintainer's
+2026-10-12 decision separately authorizes source retirement and waives only
+the seven-day observation period. The historical `python-final` tag remains
+available for migration and recovery.
 
 ## Documentation
 

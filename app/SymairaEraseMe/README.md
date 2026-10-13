@@ -12,8 +12,9 @@ The Rust-only layout was introduced in the
 Its DMG completed Developer ID signing, notarization, stapling and attestation;
 local builds below may be ad-hoc signed. The historical `v0.13.0` prerelease
 remains dual-backend and unchanged; `v0.12.1` is the last Go-only stable release.
-Canary publication does not complete stable acceptance, seven-day post-stable
-observation or separate Go-source retirement approval.
+Canary publication does not complete stable or Go-retirement technical
+acceptance. The maintainer authorized Go-source retirement and waived only
+the seven-day post-stable observation period on 2026-10-12.
 
 ## Requirements
 
@@ -22,9 +23,9 @@ observation or separate Go-source retirement approval.
 - Rust 1.98.0 for the bundled CLI/MCP server
 - Python 3 for the local backend-staging script
 
-Go 1.26.6 is not needed to build or run the app. It is retained only for the
-repository's temporary Go reference/oracle development checks until the
-separate CUT-005 retirement.
+Go is not needed to build or run the app or execute the repository's normal
+Rust tests. Go implementation and module files have been removed; frozen
+observations and immutable source history remain for conformance checks.
 
 ## Build
 

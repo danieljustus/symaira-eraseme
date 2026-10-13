@@ -19,10 +19,11 @@
 
 4. Open a pull request with a focused change and the relevant issue reference.
 
-The current source tree is the Rust-only candidate and is not yet a published
-release. Published `v0.13.0` remains a dual-backend prerelease; `v0.12.1` is the
-latest stable release. Go is retained only as a development oracle for
-conformance checks until the separately scoped CUT-005 retirement.
+This source tree includes the Go-source retirement candidate, not a claim of
+published retirement acceptance. Historical `v0.13.0` remains a dual-backend
+prerelease; `v0.12.1` is the last Go-only stable release. Frozen Go observations
+and their immutable source history remain as conformance evidence; normal
+builds and tests require no Go installation.
 
 ## Adding a data broker
 
@@ -68,9 +69,9 @@ make build-rust
 - Rust is the current source-tree product implementation. Keep CLI and MCP
   behavior compatible with `docs/mcp-contract.md` and use `make rust-gate` for
   the full Rust check.
-- Go code is retained as a development oracle. Keep it CGO-free and use
-  `make go-gate`; use `make parity-live` when a change needs comparison with the
-  live Go oracle.
+- Use `make parity` for frozen-observation conformance. Preserve recorded
+  observations, immutable source pins and negative controls; do not regenerate
+  expected behavior from the Rust candidate or bypass provenance checks.
 - Keep secrets as references or environment configuration. Never log resolved
   secret values or commit credentials.
 - Use the existing event-store and registry abstractions instead of adding
@@ -85,14 +86,18 @@ make build-rust
 | Rust CLI build | `make build-rust` | Build the current Rust CLI candidate |
 | Rust full gate | `make rust-gate` | Format, workspace check, Clippy, tests, and doctests |
 | Frozen-observation parity | `make parity` | Compare Rust behavior with recorded Go observations |
-| Live oracle parity | `make parity-live` | Rebuild and compare with the Go development oracle |
-| Go oracle checks | `make go-gate` | Go format, tests, lint, vet, 75% coverage, and oracle build |
+| Rust coverage | `make coverage` | cargo-llvm-cov; 80% project lines and 90% aggregate critical-code lines |
+| Rust interpreter | `make miri` | Pinned nightly Miri contract, not whole-program race detection |
 | macOS GUI tests | `make app-test` | Swift package tests with full Xcode |
 | macOS app build | `./app/SymairaEraseMe/build.sh` | Build the app and stage its Rust CLI/MCP server |
 
 Do not weaken an assertion to make a test pass. When a test reveals a
 compatibility or byte-format mismatch, fix the implementation or document the
 intentional contract change.
+
+`make rust-gate` does not replace native platform, coverage, Miri, dependency
+security or release-artifact acceptance. `make test-race` fails explicitly:
+the retired Go race detector is not silently relabelled as a Rust check.
 
 ## CI icon compilation
 
@@ -121,9 +126,10 @@ permissions.
 
 Release configuration for the current Rust-only candidate lives in
 `.github/workflows/release.yml`; it builds Rust CLI archives and the macOS app.
-The published `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
-latest stable release. `.goreleaser.yml` and `make release-dry-run` are retained
-legacy Go packaging/oracle tooling, not the current release path. The Homebrew
+The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
+last Go-only stable release. The legacy `.goreleaser.yml` configuration and
+`make release-dry-run` still reference deleted Go sources and must not be used
+as Rust release evidence while their retirement is pending. The Homebrew
 publisher consumes exact published archives and checksums. Do not create or move
 a release tag from a feature branch; use the repository's release gate and
 verify the release assets and Homebrew Formula after publication.
