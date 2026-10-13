@@ -10,9 +10,6 @@ mod frozen_grant_oracle;
 #[path = "support/frozen_schedule_oracle.rs"]
 mod frozen_schedule_oracle;
 
-#[path = "support/capture_windows_migration.rs"]
-mod capture_windows_migration;
-
 #[path = "support/frozen_windows_migration.rs"]
 mod frozen_windows_migration;
 
@@ -283,59 +280,6 @@ fn run_program_inner(
         stdout: read_bounded(&stdout_path),
         stderr: read_bounded(&stderr_path),
     }
-}
-
-/// Build the frozen CLI's pinned Go source for the current host. OS error
-/// messages must come from a native oracle, not from the Unix fixture.
-#[cfg(windows)]
-fn pinned_go_binary(root: &Path, revision: &str) -> PathBuf {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let archive = root.join("go-oracle.tar");
-    let source = root.join("go-oracle");
-    fs::create_dir_all(&source).expect("isolated pinned oracle source");
-    let archived = Command::new("git")
-        .current_dir(&repo)
-        .args(["archive", "--format=tar", "-o"])
-        .arg(&archive)
-        .arg(revision)
-        .output()
-        .expect("archive pinned Go source");
-    assert!(
-        archived.status.success(),
-        "pinned Go source unavailable: {}",
-        String::from_utf8_lossy(&archived.stderr)
-    );
-    let extracted = Command::new("tar")
-        .current_dir(root)
-        .arg("-xf")
-        .arg("go-oracle.tar")
-        .arg("-C")
-        .arg("go-oracle")
-        .output()
-        .expect("extract pinned Go source");
-    assert!(
-        extracted.status.success(),
-        "pinned Go source extraction failed: {}",
-        String::from_utf8_lossy(&extracted.stderr)
-    );
-    let program = root.join("symeraseme-go.exe");
-    let built = Command::new("go")
-        .current_dir(&source)
-        .env("GOWORK", "off")
-        .env("GOENV", "off")
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .arg("build")
-        .arg("-o")
-        .arg(&program)
-        .arg("./cmd/symeraseme")
-        .output()
-        .expect("build pinned Go CLI");
-    assert!(
-        built.status.success(),
-        "pinned Go CLI build failed: {}",
-        String::from_utf8_lossy(&built.stderr)
-    );
-    program
 }
 
 fn capture_exceeded(stdout_path: &Path, stderr_path: &Path) -> bool {
@@ -817,12 +761,23 @@ fn is_exact_case(case: &Value) -> bool {
         || case["category"] == "migration"
 }
 
+/// Stdout of a recorded Windows case in the replay's folded form. Schedule
+/// wrappers name the Go binary; it folds to the same placeholder as the Rust one.
+#[cfg(windows)]
+fn recorded_stdout(id: &str, observed: &frozen_windows_migration::Observation) -> Vec<u8> {
+    let text = std::str::from_utf8(&observed.stdout).expect("recorded stdout is UTF-8");
+    if id.starts_with("operate-schedule") {
+        text.replace("<GO_ORACLE_BIN>", "<ORACLE_ROOT>/bin/symeraseme")
+            .into_bytes()
+    } else {
+        text.as_bytes().to_vec()
+    }
+}
+
 #[test]
 fn frozen_command_surface_matches_phase_two_contract() {
-    capture_windows_migration::opt_in_dir(
-        std::env::var_os(capture_windows_migration::ENV).as_deref(),
-    )
-    .expect("windows migration capture opt-in");
+    frozen_windows_migration::reject_retired_capture_env()
+        .expect("retired Windows capture mode must not be requested");
     let surface: Value = serde_json::from_str(SURFACE).expect("surface JSON");
     assert_eq!(count_nodes(&surface["root"]), 51);
     let top_level = surface["root"]["children"].as_array().expect("top level");
@@ -855,18 +810,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
     fs::create_dir_all(&cwd).expect("isolated cwd");
     fs::create_dir_all(&capture).expect("capture directory");
     let _cleanup = Cleanup(root.clone());
-
     #[cfg(windows)]
-    let go_binary = {
-        assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
-        pinned_go_binary(&root, "4e582f28")
-    };
+    assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
     #[cfg(windows)]
-    let mut recorder = capture_windows_migration::Recorder::from_env(
-        &go_binary,
-        &root.join("go-oracle"),
-        &binary(),
-    );
+    let mut recorded_count = 0usize;
 
     for (index, case) in selected.iter().enumerate() {
         let argv = case["argv"]
@@ -931,35 +878,28 @@ fn frozen_command_surface_matches_phase_two_contract() {
         } else {
             run(&argv, &home, &case_cwd, &capture, index)
         };
-        assert_eq!(
-            output.status.code(),
-            Some(case["exit_code"].as_i64().unwrap() as i32),
-            "{id} status"
-        );
+        let expected_status = case["exit_code"].as_i64().unwrap() as i32;
+        // Windows replays the 13 retained native Go records; other hosts keep
+        // the frozen expectations unchanged.
         #[cfg(windows)]
-        let native_migration = id == "operate-migrate" || case["category"] == "migration";
+        let recorded = frozen_windows_migration::command_ids()
+            .contains(&id)
+            .then(|| {
+                frozen_windows_migration::command_observation(
+                    frozen_windows_migration::native_host_target().expect("native Windows target"),
+                    id,
+                )
+                .expect("retained Windows command record")
+            });
         #[cfg(windows)]
-        let native_go =
-            if native_migration || id == "operate-poll-inbox" || id.starts_with("operate-schedule")
-            {
-                let go = run_program_with_resources(
-                    &go_binary,
-                    &argv,
-                    &home,
-                    &case_cwd,
-                    &capture,
-                    index + cases.len(),
-                    None,
-                );
-                assert_eq!(
-                    go.status.code(),
-                    output.status.code(),
-                    "{id} native Go exit"
-                );
-                Some(go)
-            } else {
-                None
-            };
+        if recorded.is_some() {
+            recorded_count += 1;
+        }
+        #[cfg(windows)]
+        let expected_status = recorded
+            .as_ref()
+            .map_or(expected_status, |observed| observed.status);
+        assert_eq!(output.status.code(), Some(expected_status), "{id} status");
         let expected_stdout = match id {
             "root-version" => {
                 format!("symeraseme version {}\n", env!("CARGO_PKG_VERSION")).into_bytes()
@@ -986,14 +926,9 @@ fn frozen_command_surface_matches_phase_two_contract() {
             )
             .into_bytes(),
             #[cfg(windows)]
-            _ if native_migration => {
-                native_go.as_ref().expect("native migrate oracle").stdout.clone()
-            }
-            #[cfg(windows)]
-            id if id.starts_with("operate-schedule") => fold_schedule_output(
-                &native_go.as_ref().expect("native schedule oracle").stdout,
-                &root,
-                &go_binary,
+            _ if recorded.is_some() => recorded_stdout(
+                id,
+                recorded.as_ref().expect("recorded Windows command record"),
             ),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
@@ -1020,30 +955,16 @@ fn frozen_command_surface_matches_phase_two_contract() {
             } else {
                 output.stdout.clone()
             };
-        #[cfg(windows)]
-        {
-            if let (Some(recorder), Some(go)) = (recorder.as_mut(), native_go.as_ref()) {
-                recorder.record_command(capture_windows_migration::CommandCase {
-                    id,
-                    root: &root,
-                    go,
-                    rust: &output,
-                    expected_stdout: &expected_stdout,
-                    actual_stdout: &actual_stdout,
-                });
-            }
-        }
         assert_eq!(
             fold_root(&actual_stdout, &root),
             fold_root(&expected_stdout, &root),
             "{id} stdout"
         );
         #[cfg(windows)]
-        let expected_stderr = if let Some(go) = &native_go {
-            fold_root(&go.stderr, &root)
-        } else {
-            decode_base64(case["stderr_base64"].as_str().unwrap())
-        };
+        let expected_stderr = recorded.as_ref().map_or_else(
+            || decode_base64(case["stderr_base64"].as_str().unwrap()),
+            |observed| observed.stderr.clone(),
+        );
         #[cfg(not(windows))]
         let expected_stderr = decode_base64(case["stderr_base64"].as_str().unwrap());
         assert_eq!(
@@ -1088,11 +1009,10 @@ fn frozen_command_surface_matches_phase_two_contract() {
         "isolated cwd stayed clean: {cwd_entries:?}"
     );
     #[cfg(windows)]
-    {
-        if let Some(recorder) = recorder.as_ref() {
-            recorder.finish_family("command-surface", 13);
-        }
-    }
+    assert_eq!(
+        recorded_count, 13,
+        "every retained Windows command record was replayed"
+    );
 }
 
 #[test]

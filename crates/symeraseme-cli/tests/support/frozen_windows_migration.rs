@@ -5,6 +5,8 @@
 
 use super::frozen_review_oracle::digest;
 use serde_json::Value;
+use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -282,6 +284,214 @@ pub fn validate_dataset(root: &Path) -> Result<usize, String> {
     Ok(files)
 }
 
+/// The capture producer is retired. Any definition of its variable, even an
+/// empty one, is an explicit request this reader cannot honour, so it fails
+/// instead of being silently ignored on every host.
+pub const RETIRED_CAPTURE_ENV: &str = "SYMERASEME_CAPTURE_WINDOWS_MIGRATION";
+
+pub fn reject_retired_capture(value: Option<&OsStr>) -> Result<(), String> {
+    match value {
+        None => Ok(()),
+        Some(_) => Err(format!(
+            "{RETIRED_CAPTURE_ENV} is retired: the committed Windows records are the only oracle"
+        )),
+    }
+}
+
+pub fn reject_retired_capture_env() -> Result<(), String> {
+    reject_retired_capture(std::env::var_os(RETIRED_CAPTURE_ENV).as_deref())
+}
+
+/// Recorded target matching this host. Only Windows hosts return one; every
+/// other host gets None and never runs the native comparison.
+pub fn native_host_target() -> Option<&'static str> {
+    if !cfg!(windows) {
+        return None;
+    }
+    match std::env::consts::ARCH {
+        "x86_64" => Some("windows-amd64"),
+        "aarch64" => Some("windows-arm64"),
+        _ => None,
+    }
+}
+
+/// Command-surface case ids recorded from native Windows Go.
+pub fn command_ids() -> &'static [&'static str] {
+    &COMMAND_CASES
+}
+
+/// Status and root-folded streams of one recorded command case.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Observation {
+    pub status: i32,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FsProcess {
+    pub status: i32,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FsEntry {
+    pub kind: String,
+    pub size: Option<u64>,
+    pub sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FsRoot {
+    pub exists: bool,
+    pub entries: BTreeMap<String, FsEntry>,
+    /// Snapshot file content: (path, bytes, sha256).
+    pub files: Vec<(String, u64, String)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FsCase {
+    pub processes: Vec<FsProcess>,
+    pub roots: BTreeMap<String, FsRoot>,
+}
+
+fn load_family(target: &str, family: &str) -> Result<(PathBuf, Value), String> {
+    let root = dataset_root();
+    let sidecar = sidecar(&root)?;
+    validate_family(&root, &sidecar, target, family)?;
+    let bytes = read_checked(&root, target, &format!("{family}.json"))?;
+    let record: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    Ok((root, record))
+}
+
+fn checked_blob(root: &Path, target: &str, reference: &Value) -> Result<Vec<u8>, String> {
+    let file = reference["file"]
+        .as_str()
+        .ok_or("blob reference lacks file")?;
+    let bytes = reference["bytes"]
+        .as_u64()
+        .ok_or("blob reference lacks bytes")?;
+    let sha = reference["sha256"]
+        .as_str()
+        .ok_or("blob reference lacks sha256")?;
+    let raw = read_checked(root, target, file)?;
+    check(raw.len() as u64 == bytes && digest(&raw) == sha, || {
+        format!("{target}: {file} bytes or hash differ")
+    })?;
+    Ok(raw)
+}
+
+/// Authenticated status and streams of one recorded command case. The stdout
+/// normalization must match the recorded one before the bytes are used.
+pub fn command_observation(target: &str, id: &str) -> Result<Observation, String> {
+    let (root, record) = load_family(target, "command-surface")?;
+    let case = record["cases"]
+        .get(id)
+        .ok_or_else(|| format!("{target}: no recorded command case {id}"))?;
+    let go = &case["go"];
+    let status = go["exit_code"].as_i64().ok_or("recorded exit code")?;
+    let stdout_norm = if id.starts_with("operate-schedule") {
+        "fold_schedule_output"
+    } else {
+        "fold_root"
+    };
+    check(case["normalization"]["stdout"] == stdout_norm, || {
+        format!("{target}/{id}: stdout normalization differs")
+    })?;
+    check(case["normalization"]["stderr"] == "fold_root", || {
+        format!("{target}/{id}: stderr normalization differs")
+    })?;
+    check(case["rust"]["exit_code"].as_i64() == Some(status), || {
+        format!("{target}/{id}: recorded Rust status differs from Go")
+    })?;
+    Ok(Observation {
+        status: i32::try_from(status).map_err(|error| error.to_string())?,
+        stdout: checked_blob(&root, target, &go["stdout"])?,
+        stderr: checked_blob(&root, target, &go["stderr"])?,
+    })
+}
+
+/// Authenticated processes, manifests and snapshots of one recorded filesystem
+/// case. Every manifest root must have exactly one recorded snapshot.
+pub fn filesystem_observation(target: &str, id: &str) -> Result<FsCase, String> {
+    let (root, record) = load_family(target, "filesystem")?;
+    let case = record["cases"]
+        .get(id)
+        .ok_or_else(|| format!("{target}: no recorded filesystem case {id}"))?;
+    let go = &case["go"];
+    let mut processes = Vec::new();
+    for (position, process) in go["processes"]
+        .as_array()
+        .ok_or("recorded processes")?
+        .iter()
+        .enumerate()
+    {
+        check(process["index"].as_u64() == Some(position as u64), || {
+            format!("{target}/{id}: process index {position}")
+        })?;
+        processes.push(FsProcess {
+            status: i32::try_from(process["exit_code"].as_i64().ok_or("process exit code")?)
+                .map_err(|error| error.to_string())?,
+            stdout: checked_blob(&root, target, &process["stdout"]["raw"])?,
+            stderr: checked_blob(&root, target, &process["stderr"]["raw"])?,
+        });
+    }
+    let mut roots: BTreeMap<String, FsRoot> = BTreeMap::new();
+    for (name, entries) in go["manifests"].as_object().ok_or("recorded manifests")? {
+        let mut map = BTreeMap::new();
+        for (path, entry) in entries.as_object().ok_or("recorded manifest entries")? {
+            check(entry["path"] == path.as_str(), || {
+                format!("{target}/{id}/{name}: manifest path key differs")
+            })?;
+            map.insert(
+                path.clone(),
+                FsEntry {
+                    kind: entry["type"]
+                        .as_str()
+                        .ok_or("manifest entry type")?
+                        .to_owned(),
+                    size: entry.get("size_bytes").and_then(Value::as_u64),
+                    sha256: entry
+                        .get("sha256")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                },
+            );
+        }
+        roots.insert(
+            name.clone(),
+            FsRoot {
+                exists: false,
+                entries: map,
+                files: Vec::new(),
+            },
+        );
+    }
+    let mut snapshotted = 0usize;
+    for snapshot in go["snapshots"].as_array().ok_or("recorded snapshots")? {
+        let name = snapshot["name"].as_str().ok_or("snapshot name")?;
+        let entry = roots
+            .get_mut(name)
+            .ok_or_else(|| format!("{target}/{id}: snapshot {name} has no manifest"))?;
+        entry.exists = snapshot["exists"].as_bool().ok_or("snapshot existence")?;
+        snapshotted += 1;
+        for file in snapshot["files"].as_array().ok_or("snapshot files")? {
+            let raw = &file["raw"];
+            checked_blob(&root, target, raw)?;
+            entry.files.push((
+                file["path"].as_str().ok_or("snapshot path")?.to_owned(),
+                raw["bytes"].as_u64().ok_or("snapshot bytes")?,
+                raw["sha256"].as_str().ok_or("snapshot sha256")?.to_owned(),
+            ));
+        }
+    }
+    check(snapshotted == roots.len(), || {
+        format!("{target}/{id}: a manifest root has no recorded snapshot")
+    })?;
+    Ok(FsCase { processes, roots })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +593,41 @@ mod tests {
             rejection.contains("fixed anchor"),
             "unexpected: {rejection}"
         );
+    }
+
+    #[test]
+    fn retired_capture_request_fails_even_when_empty() {
+        assert!(reject_retired_capture(None).is_ok());
+        assert!(reject_retired_capture(Some(OsStr::new(""))).is_err());
+        assert!(reject_retired_capture(Some(OsStr::new("/tmp/capture"))).is_err());
+    }
+
+    #[test]
+    fn every_recorded_observation_loads_for_every_target() {
+        for target in TARGETS {
+            for id in command_ids() {
+                command_observation(target, id).expect("recorded command observation");
+            }
+            for id in FILESYSTEM_CASES {
+                let case =
+                    filesystem_observation(target, id).expect("recorded filesystem observation");
+                assert_eq!(case.roots.len(), 3, "{target}/{id}: manifest roots");
+            }
+        }
+    }
+
+    #[test]
+    fn recorded_observation_rejects_unknown_target_and_case() {
+        assert!(command_observation("linux-amd64", "operate-migrate").is_err());
+        assert!(command_observation("windows-amd64", "no-such-case").is_err());
+        assert!(filesystem_observation("windows-amd64", "no-such-case").is_err());
+    }
+
+    #[test]
+    fn native_target_is_absent_off_windows() {
+        if !cfg!(windows) {
+            assert_eq!(native_host_target(), None);
+        }
     }
 
     fn sidecar_unchecked(root: &Path) -> Value {
