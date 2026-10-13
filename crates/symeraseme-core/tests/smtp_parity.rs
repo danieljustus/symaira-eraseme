@@ -1,8 +1,10 @@
+#[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
+mod go_source_pin;
+
 use chrono::{DateTime, FixedOffset};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
-use std::fs;
 use std::path::Path;
 use symeraseme_core::email::{
     EmailMessage, SmtpTransport, build_mime_at, recipients, send_message_at,
@@ -67,7 +69,10 @@ fn source_bound_go_mime_bytes_recipients_and_errors_match() {
     let document = fixture();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (path, expected) in document["source_sha256"].as_object().unwrap() {
-        let digest = hex::encode(Sha256::digest(fs::read(root.join(path)).unwrap()));
+        let digest = hex::encode(Sha256::digest(go_source_pin::current_source(
+            root.to_str().unwrap(),
+            path,
+        )));
         assert_eq!(
             digest,
             expected.as_str().unwrap(),
