@@ -180,6 +180,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Verify immutable fixture exceptions across full history
+        run: |
+          python3 scripts/check_frozen_secret_scan_scope.py
+          python3 tests/test_frozen_secret_scan_scope.py
       - name: TruffleHog secrets scan
         uses: trufflesecurity/trufflehog@0186870afd2c4a90def791d80260923ba583d076 # v3.98.0
         with:
@@ -197,7 +201,7 @@ jobs:
           version: '3.97.5@sha256:1cec88f18ca39e26e04e61fe9d886c9c4e5f2fc0ba4f2ed185cac0722bd8a076'
           # --since-commit excludes its base commit. Starting at the known
           # fixture commit therefore scans the scanner-safe remediation and
-          # every later revision of the one path omitted above.
+          # every later revision of the legacy test path omitted above.
           base: fa366dcabb830af478c44c372c2ca40395654644
           head: HEAD
           extra_args: --exclude-detectors Lob --include-paths .trufflehog-include-paths --fail-on-scan-errors

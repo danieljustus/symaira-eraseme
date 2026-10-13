@@ -5,7 +5,7 @@
 # that the URI detector reported even though it was never a real credential.
 # The current test assembles its placeholder at runtime instead.
 #
-# The primary scan excludes only this exact path. CI runs a companion
+# The legacy test exception covers only this exact path. CI runs a companion
 # include-only scan from the historical fixture commit, excluding that commit
 # itself, so the scanner-safe remediation and every later revision remain
 # covered. Do not broaden this expression or remove the companion scan without
@@ -14,3 +14,11 @@
 # Historical fixture commit: fa366dcabb830af478c44c372c2ca40395654644
 # Scanner-safe remediation commit: 76b2f6b7d55c88d0c48689099bc7e8598b7568af
 ^internal/registry/sync_test\.go$
+# Four immutable native fixture blobs, not a directory-wide or future-file exemption.
+# check_frozen_secret_scan_scope.py rejects any other bytes in the checkout or
+# complete reachable history, including reverted changes and merged side branches.
+# Remove these entries to scan changed captures; never update their pins blindly.
+^tests/fixtures/go\-frozen/refresh\-8973a584/windows\-migration/windows\-amd64/command\-surface\.json$
+^tests/fixtures/go\-frozen/refresh\-8973a584/windows\-migration/windows\-amd64/filesystem\.json$
+^tests/fixtures/go\-frozen/refresh\-8973a584/windows\-migration/windows\-arm64/command\-surface\.json$
+^tests/fixtures/go\-frozen/refresh\-8973a584/windows\-migration/windows\-arm64/filesystem\.json$
