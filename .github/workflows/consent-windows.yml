@@ -15,7 +15,12 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/consent-windows.yml
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      capture_originals:
+        description: Retain original Go observations for retirement (no replay acceptance)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,7 +30,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  capture-originals:
+    if: github.event_name == 'workflow_dispatch' && inputs.capture_originals
+    uses: ./.github/workflows/capture-consent-retirement.yml
   native-consent:
+    if: github.event_name != 'workflow_dispatch' || !inputs.capture_originals
     name: Consent filesystem / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

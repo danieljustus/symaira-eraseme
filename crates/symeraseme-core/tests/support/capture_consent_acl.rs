@@ -1,6 +1,5 @@
 //! Opt-in native capture of the ORIGINAL Go consent ACL observations.
-//! Included only from consent_windows_acl.rs, a cfg(windows) test, so this file
-//! never compiles off Windows. Collection happens only when
+//! Compiled on every platform; collection requires native Windows and
 //! SYMERASEME_CAPTURE_CONSENT_ACL names an absolute directory outside the
 //! repository. Values are recorded raw; nothing is normalized or simulated.
 use base64::Engine;
