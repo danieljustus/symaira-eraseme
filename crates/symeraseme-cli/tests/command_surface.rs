@@ -879,6 +879,11 @@ fn frozen_command_surface_matches_phase_two_contract() {
             run(&argv, &home, &case_cwd, &capture, index)
         };
         let expected_status = case["exit_code"].as_i64().unwrap() as i32;
+        assert_eq!(
+            output.status.code(),
+            Some(expected_status),
+            "{id} frozen status"
+        );
         // Windows replays the 13 retained native Go records; other hosts keep
         // the frozen expectations unchanged.
         #[cfg(windows)]

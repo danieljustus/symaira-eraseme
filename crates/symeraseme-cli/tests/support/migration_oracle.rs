@@ -330,12 +330,6 @@ const FILESYSTEM_IDS: [&str; 5] = [
     "migration-incomplete-backup",
 ];
 
-/// Migration-state and completion markers carry run-time values. Both sides
-/// compare their presence and type only, as the retired native comparator did.
-fn volatile(path: &str) -> bool {
-    matches!(path, ".migration-state.json" | ".complete.json")
-}
-
 #[cfg(windows)]
 fn project(manifests: &RootManifests) -> Projected {
     manifests
@@ -348,14 +342,10 @@ fn project(manifests: &RootManifests) -> Projected {
                         path.clone(),
                         (
                             entry["type"].as_str().expect("entry type").to_owned(),
-                            entry
-                                .get("size_bytes")
-                                .and_then(Value::as_u64)
-                                .filter(|_| !volatile(path)),
+                            entry.get("size_bytes").and_then(Value::as_u64),
                             entry
                                 .get("sha256")
                                 .and_then(Value::as_str)
-                                .filter(|_| !volatile(path))
                                 .map(str::to_owned),
                         ),
                     )
@@ -385,14 +375,10 @@ fn recorded_projection(case: &frozen_windows_migration::FsCase) -> Projected {
                 .entries
                 .iter()
                 .map(|(path, entry)| {
-                    (path.clone(), {
-                        let keep = !volatile(path);
-                        (
-                            entry.kind.clone(),
-                            entry.size.filter(|_| keep),
-                            entry.sha256.clone().filter(|_| keep),
-                        )
-                    })
+                    (
+                        path.clone(),
+                        (entry.kind.clone(), entry.size, entry.sha256.clone()),
+                    )
                 })
                 .collect();
             (root.clone(), shape)
@@ -428,7 +414,7 @@ fn assert_snapshots_match(
 ) {
     for (root, snapshot) in &recorded.roots {
         assert_eq!(exists[root], snapshot.exists, "{id}: {root} existence");
-        for (path, bytes, sha) in snapshot.files.iter().filter(|(path, _, _)| !volatile(path)) {
+        for (path, bytes, sha) in &snapshot.files {
             let entry = observed
                 .get(root)
                 .and_then(|entries| entries.get(path))
@@ -467,8 +453,7 @@ fn assert_comparator_rejects_corruption(id: &str, recorded: &frozen_windows_migr
         .find_map(|(root, snapshot)| {
             snapshot
                 .files
-                .iter()
-                .find(|(path, _, _)| !volatile(path))
+                .first()
                 .map(|(path, bytes, sha)| (root.clone(), path.clone(), (*bytes, sha.clone())))
         })
         .expect("a recorded snapshot file");
@@ -509,6 +494,43 @@ fn migration_comparator_rejects_recorded_mutations_on_every_host() {
         assert_projection_equal(id, &projection, &projection);
         assert_snapshots_match(id, &recorded, &projection, &recorded_exists(&recorded));
         assert_comparator_rejects_corruption(id, &recorded);
+    }
+}
+
+#[test]
+fn migration_metadata_hashes_are_not_ignored() {
+    for target in ["windows-amd64", "windows-arm64"] {
+        let mut checked = 0;
+        for id in FILESYSTEM_IDS {
+            let recorded = frozen_windows_migration::filesystem_observation(target, id)
+                .expect("retained Windows record");
+            let expected = recorded_projection(&recorded);
+            for (root, snapshot) in &recorded.roots {
+                for path in snapshot.entries.keys().filter(|path| {
+                    matches!(path.as_str(), ".migration-state.json" | ".complete.json")
+                }) {
+                    let mut changed = recorded.clone();
+                    changed
+                        .roots
+                        .get_mut(root)
+                        .unwrap()
+                        .entries
+                        .get_mut(path)
+                        .unwrap()
+                        .sha256 = Some("0".repeat(64));
+                    assert!(
+                        rejects(|| assert_projection_equal(
+                            id,
+                            &expected,
+                            &recorded_projection(&changed)
+                        )),
+                        "{target}/{id}/{root}/{path}: metadata corruption accepted"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "metadata controls must execute for {target}");
     }
 }
 
@@ -610,6 +632,8 @@ fn run_rust_case(
 #[test]
 #[cfg(windows)]
 fn migration_filesystem_matches_recorded_native_go() {
+    frozen_windows_migration::reject_retired_capture_env()
+        .expect("retired Windows capture mode must not be requested");
     let target = frozen_windows_migration::native_host_target().expect("native Windows target");
     let fixture: Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

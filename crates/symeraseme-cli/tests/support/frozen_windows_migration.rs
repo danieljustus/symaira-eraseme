@@ -133,13 +133,13 @@ fn check(condition: bool, message: impl FnOnce() -> String) -> Result<(), String
 }
 
 /// Validates one family record against its sidecar entry and its raw blobs.
-/// Returns the number of blob files it referenced.
+/// Returns the record parsed from the authenticated bytes, without rereading it.
 fn validate_family(
     root: &Path,
     sidecar: &Value,
     target: &str,
     family: &str,
-) -> Result<usize, String> {
+) -> Result<Value, String> {
     check(TARGETS.contains(&target), || {
         format!("unsupported target: {target}")
     })?;
@@ -241,7 +241,7 @@ fn validate_family(
             format!("{target}: {file} bytes or hash differ")
         })?;
     }
-    Ok(references.len())
+    Ok(record)
 }
 
 /// Validates the sidecar, all four family records and every committed blob.
@@ -357,11 +357,10 @@ pub struct FsCase {
 }
 
 fn load_family(target: &str, family: &str) -> Result<(PathBuf, Value), String> {
+    reject_retired_capture_env()?;
     let root = dataset_root();
     let sidecar = sidecar(&root)?;
-    validate_family(&root, &sidecar, target, family)?;
-    let bytes = read_checked(&root, target, &format!("{family}.json"))?;
-    let record: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    let record = validate_family(&root, &sidecar, target, family)?;
     Ok((root, record))
 }
 

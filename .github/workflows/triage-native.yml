@@ -9,6 +9,9 @@ on:
       - crates/symeraseme-cli/src/commands/generate_rebuttal.rs
       - crates/symeraseme-cli/tests/triage*
       - crates/symeraseme-cli/tests/mcp_triage_process.rs
+      - crates/symeraseme-cli/tests/command_surface.rs
+      - crates/symeraseme-cli/tests/support/*migration*.rs
+      - tests/fixtures/go-frozen/refresh-8973a584/windows-migration/**
       - rust-tests/parity/oracle/native-triage-agent/**
       - tests/fixtures/cli-triage/**
       - go.mod
@@ -18,8 +21,8 @@ on:
       - .github/workflows/triage-native.yml
   workflow_dispatch:
     inputs:
-      capture_windows_migration:
-        description: Capture original Windows CLI and migration comparisons only
+      replay_windows_migration:
+        description: Replay retained Windows CLI and migration records using Rust only
         type: boolean
         default: false
 
@@ -38,17 +41,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ inputs.capture_windows_migration && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
+        os: ${{ inputs.replay_windows_migration && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Windows reconstructs the measured CLI from pinned Go revision 4e582f28.
+          # Retained readers authenticate immutable historical source objects.
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_windows_migration
         with:
           go-version: '1.26.6'
       - name: Download pinned Go modules
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_windows_migration
         shell: bash
         run: GOTOOLCHAIN=go1.26.6 go mod download
       - name: Install pinned Rust toolchain
@@ -63,14 +68,14 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Source-bound mapping, prompts, persisted service and IMAP transcripts
-        if: github.event_name != 'workflow_dispatch' || !inputs.capture_windows_migration
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_windows_migration
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-core --locked \
             --test triage_contract --test triage_prompts --test triage_corpus \
             --test triage_service --test imap_transport_parity -- --nocapture
       - name: Every retained CLI triage input and raw MCP process effects
-        if: github.event_name != 'workflow_dispatch' || !inputs.capture_windows_migration
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_windows_migration
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test triage_native_process -- --nocapture
@@ -81,35 +86,31 @@ jobs:
           cargo +1.98.0 test -p symeraseme-cli --locked \
             --test triage_commands --test mcp_triage_process -- --nocapture
       - name: Full retained CLI corpus including poll-inbox aliases and errors
-        if: github.event_name != 'workflow_dispatch' || !inputs.capture_windows_migration
+        if: github.event_name != 'workflow_dispatch' || !inputs.replay_windows_migration
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test command_surface \
             -- --exact frozen_command_surface_matches_phase_two_contract --nocapture
-      - name: Capture real Windows CLI and migration originals
-        if: inputs.capture_windows_migration
+      - name: Rust-only Windows CLI and filesystem replay
+        if: runner.os == 'Windows'
         shell: bash
-        env:
-          SYMERASEME_CAPTURE_WINDOWS_MIGRATION: ${{ runner.temp }}/windows-migration-originals
         run: |
           set -euo pipefail
           test "$RUNNER_OS" = Windows
           test -z "$(git status --porcelain)"
           cargo +1.98.0 test -p symeraseme-cli --locked --test command_surface \
             -- --exact frozen_command_surface_matches_phase_two_contract \
-            migration_oracle::migration_filesystem_matches_pinned_native_go \
-            --nocapture --test-threads=1 2>&1 | tee "$RUNNER_TEMP/windows-migration-capture.log"
-          grep -Eq '^running 2 tests$' "$RUNNER_TEMP/windows-migration-capture.log"
-          grep -Eq 'test result: ok\. 2 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/windows-migration-capture.log"
-          test -s "$SYMERASEME_CAPTURE_WINDOWS_MIGRATION/command-surface.json"
-          test -s "$SYMERASEME_CAPTURE_WINDOWS_MIGRATION/filesystem.json"
-      - name: Retain Windows migration originals and diagnostics
-        if: always() && inputs.capture_windows_migration
+            migration_oracle::migration_filesystem_matches_recorded_native_go \
+            --nocapture --test-threads=1 2>&1 | tee "$RUNNER_TEMP/windows-migration-replay.log"
+          grep -Eq '^running 2 tests$' "$RUNNER_TEMP/windows-migration-replay.log"
+          grep -Eq 'test result: ok\. 2 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/windows-migration-replay.log"
+          grep -Eq '^test frozen_command_surface_matches_phase_two_contract .*ok$' "$RUNNER_TEMP/windows-migration-replay.log"
+          grep -Eq '^test migration_oracle::migration_filesystem_matches_recorded_native_go \.\.\.' "$RUNNER_TEMP/windows-migration-replay.log"
+      - name: Retain Windows migration replay diagnostics
+        if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: windows-migration-originals-${{ runner.os }}-${{ runner.arch }}
-          path: |
-            ${{ runner.temp }}/windows-migration-originals/
-            ${{ runner.temp }}/windows-migration-capture.log
+          name: windows-migration-replay-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/windows-migration-replay.log
           if-no-files-found: error
           retention-days: 7
