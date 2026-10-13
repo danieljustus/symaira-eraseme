@@ -1,23 +1,23 @@
-name: Go CI
+name: Required CLI checks (Rust)
 
-# Go-only CI for the static symeraseme CLI. The macOS GUI is built and verified
-# by the tag-triggered release workflow.
+# Historical check names stay required by the main protection ruleset.
+# Keep their names but execute Rust gates, without installing a Go toolchain.
 on:
   push:
     branches: [main]
     paths:
-      - 'go.mod'
-      - 'go.sum'
-      - '**.go'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'crates/**'
+      - 'rust-tests/**'
       - 'Makefile'
-      - '.golangci.yml'
-      - 'cmd/**'
-      - 'internal/**'
+      - 'scripts/check-rust-coverage.sh'
+      - 'tests/test_make_rust_contract.py'
+      - '.github/workflows/go-ci.yml'
   pull_request:
     branches: [main]
-    # No paths filter on pull requests: both CI legs must run on every PR
-    # (issue #710), so the Python tree gets continuous Go-leg feedback and
-    # the Go leg cannot silently skip.
+    # Required checks must execute even on documentation-only pull requests.
   workflow_dispatch: {}
 
 concurrency:
@@ -28,10 +28,8 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: '1.26.6'
-  CGO_ENABLED: '0'
-  # Pinned so the lint gate cannot drift from the configuration in .golangci.yml.
-  GOLANGCI_LINT_VERSION: 'v2.13.2'
+  RUST_TOOLCHAIN: '1.98.0'
+  CARGO_INCREMENTAL: '0'
 
 jobs:
   go-lint:
@@ -40,18 +38,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Install golangci-lint
-        # Without this the lint target would fall back to `go vet` and the
-        # linters configured in .golangci.yml would never run.
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
       - name: Check formatting
         run: make fmt-check
       - name: Lint
         run: make lint
+      - name: Check Make and coverage failure controls
+        run: |
+          python3 -B tests/test_make_rust_contract.py
+          python3 -B -O tests/test_make_rust_contract.py
 
   go-test:
     name: Go / test
@@ -59,13 +58,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust toolchain and coverage
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component llvm-tools-preview
+          cargo +"$RUST_TOOLCHAIN" install cargo-llvm-cov --version 0.9.0 --locked
       - name: Build
         run: make build
       - name: Test
         run: make test
       - name: Coverage gate
-        run: make coverage COVERAGE_FILE="$RUNNER_TEMP/coverage.out"
+        run: make coverage COVERAGE_FILE="$RUNNER_TEMP/coverage.json"

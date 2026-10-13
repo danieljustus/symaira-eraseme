@@ -115,14 +115,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-      - name: Install golangci-lint
-        # Without this the lint target would fall back to `go vet` and the
-        # linters configured in .golangci.yml would never run.
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+      - name: Install pinned Rust lint tools
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
       - name: Check formatting and lint
         run: |
           make fmt-check
@@ -134,15 +128,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.6'
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust toolchains
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup toolchain install nightly-2026-09-20 --profile minimal --component miri,rust-src
       - name: Build and test
         run: |
           make build
           make test
-          make test-race
+          make miri
 
   schema-validate:
     name: schema-validate
@@ -150,10 +147,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
       - name: Validate embedded registry
         run: |
           make build
@@ -165,20 +160,16 @@ jobs:
     name: vuln-scan
     runs-on: ubuntu-latest
     steps:
-      # Deliberate toolchain split: the frozen Go oracle captures stay bound to
-      # go1.26.6 provenance per docs/rust-port/dependency-refresh-policy.md
-      # (a toolchain bump is a generator input requiring a full native
-      # recapture, tracked under CUT-005 Go retirement). The audit itself runs
-      # on go1.26.9 so net/http stdlib findings GO-2026-6610..6617 (fixed in
-      # 1.26.9) reflect the toolchain any current builder would use.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.9'
-      - name: Audit Go dependencies
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Install pinned Rust audit tool
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          cargo +1.98.0 install cargo-audit --version 0.22.2 --locked
+      - name: Audit Rust dependencies
+        run: |
+          cargo +1.98.0 audit --file Cargo.lock
+          cargo +1.98.0 audit --file fuzz/Cargo.lock
 
   secrets-scan:
     name: secrets-scan
