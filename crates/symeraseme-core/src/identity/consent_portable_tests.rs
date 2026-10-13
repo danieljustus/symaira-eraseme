@@ -93,9 +93,10 @@ fn id005_fault_fixture_is_bound_to_source_and_probe() {
     }
     for (path, expected) in document["helper_sha256"].as_object().unwrap() {
         assert_eq!(
-            hex::encode(Sha256::digest(
-                fs::read(root.join("scripts/consent-oracle").join(path)).unwrap()
-            )),
+            hex::encode(Sha256::digest(go_source_pin::current_source(
+                root.to_str().unwrap(),
+                &format!("scripts/consent-oracle/{path}")
+            ))),
             expected.as_str().unwrap(),
             "Go helper drift: {path}"
         );

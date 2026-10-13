@@ -94,6 +94,10 @@ fn retired_template_and_source_do_not_depend_on_checkout_files() {
     for name in [
         "cmd/symeraseme/main.go",
         "internal/templating/templates/report.html.gotmpl",
+        "scripts/consent-oracle/consent_id005_fault_test.go.in",
+        "scripts/consent-oracle/consent_id005_test.go.in",
+        "scripts/consent-oracle/consent_id005_unix_test.go.in",
+        "scripts/consent-oracle/consent_id005_windows_test.go.in",
     ] {
         let path = std::path::Path::new(root).join(name);
         assert!(!path.exists());
