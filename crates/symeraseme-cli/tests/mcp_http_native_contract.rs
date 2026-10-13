@@ -16,6 +16,10 @@ use mcp_http_port::StartedChild;
 #[allow(dead_code)]
 mod frozen_http_aux;
 
+#[path = "support/capture_http_aux.rs"]
+#[allow(dead_code)] // Collection is opt-in and Windows-only; compile the helper on all hosts.
+mod capture_http_aux;
+
 const THIS_FILE: &str = "crates/symeraseme-cli/tests/mcp_http_native_contract.rs";
 
 #[cfg(windows)]
@@ -209,7 +213,7 @@ mod windows_acl {
     use super::*;
     use base64::Engine;
     use mcp_http_port::{accepts_token, spawn_with_handoff};
-    use serde_json::Value;
+    use serde_json::{Value, json};
 
     fn acl(path: &Path, mode: &str, logs: &Path, label: &str) -> Value {
         let powershell = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
@@ -273,6 +277,7 @@ mod windows_acl {
         let root = tempfile::tempdir().unwrap();
         let go = oracle(root.path());
         let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+        let mut recorded = Vec::new();
         for (case, protected) in [("inherited", false), ("owner-only-parent", true)] {
             let parent = root.path().join(case);
             fs::create_dir(&parent).unwrap();
@@ -305,16 +310,12 @@ mod windows_acl {
                 );
                 let (mut restarted, port, new) = start(binary, directory);
                 assert!(old != new, "{name} token did not rotate");
-                assert!(!accepts_token(
-                    port,
-                    &old,
-                    Instant::now() + Duration::from_secs(2)
-                ));
-                assert!(accepts_token(
-                    port,
-                    &new,
-                    Instant::now() + Duration::from_secs(2)
-                ));
+                let old_accepted =
+                    accepts_token(port, &old, Instant::now() + Duration::from_secs(2));
+                assert!(!old_accepted);
+                let new_accepted =
+                    accepts_token(port, &new, Instant::now() + Duration::from_secs(2));
+                assert!(new_accepted);
                 restarted.kill().unwrap();
                 restarted.wait().unwrap();
                 drop(restarted);
@@ -357,20 +358,39 @@ mod windows_acl {
                     &format!("{case}-{name}-failed"),
                 );
                 assert!(
-                    String::from_utf8(failed.stderr)
+                    std::str::from_utf8(&failed.stderr)
                         .unwrap()
                         .starts_with("write MCP auth token: ")
                 );
                 assert_eq!(fs::read_to_string(&token_file).unwrap(), new);
-                assert_eq!(
-                    acl(
-                        &token_file,
-                        "read",
-                        root.path(),
-                        &format!("{case}-{name}-retained")
-                    ),
-                    readonly_acl
+                let retained_acl = acl(
+                    &token_file,
+                    "read",
+                    root.path(),
+                    &format!("{case}-{name}-retained"),
                 );
+                assert_eq!(retained_acl, readonly_acl);
+                if name == "go" {
+                    recorded.push(json!({
+                        "case": case,
+                        "runtime_root": directory,
+                        "token_before_bytes": old.len(),
+                        "token_after_bytes": new.len(),
+                        "rotated": old != new,
+                        "old_accepted": old_accepted,
+                        "new_accepted": new_accepted,
+                        "before_acl": before,
+                        "after_acl": after,
+                        "directory_acl": directory_acl,
+                        "readonly_acl": readonly_acl,
+                        "retained_acl": retained_acl,
+                        "failed_exit_code": failed.status.code(),
+                        "failed_stdout": capture_http_aux::bytes(&failed.stdout),
+                        "failed_stderr": capture_http_aux::bytes(&failed.stderr),
+                        "retained_token": fs::read_to_string(&token_file).unwrap() == new,
+                        "sentinel": capture_http_aux::bytes(&fs::read(directory.join("sentinel")).unwrap()),
+                    }));
+                }
                 observations.push((before, directory_acl, readonly_acl));
                 fs::set_permissions(&token_file, original_permissions).unwrap();
             }
@@ -382,5 +402,30 @@ mod windows_acl {
         eprintln!(
             "Windows token ACL differential executed inherited and protected parents, rotation and read-only retention"
         );
+        assert_eq!(recorded.len(), 2);
+        capture_http_aux::record(
+            &go,
+            THIS_FILE,
+            "native_windows_token_dacl_and_rotation_match_go",
+            json!({
+                "cases": recorded,
+                "assertions_completed": true,
+                "acl_script": capture_http_aux::bytes(&fs::read(repo().join(
+                    "crates/symeraseme-cli/tests/support/mcp_token_acl.ps1"
+                )).unwrap()),
+                "scope": "Real native Go token-length/rotation/auth observations, parsed original PowerShell security descriptors, exact failed-process bytes and retained-token/sentinel checks. No bearer tokens retained. Raw path/SID metadata requires publication privacy review.",
+            }),
+        );
     }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn windows_token_capture_rejects_non_windows() {
+    assert!(
+        std::env::var_os("SYMERASEME_CAPTURE_HTTP_AUX")
+            .filter(|value| !value.is_empty())
+            .is_none(),
+        "token ACL capture requires native Windows; refusing to record"
+    );
 }

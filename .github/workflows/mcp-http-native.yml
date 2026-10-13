@@ -17,7 +17,12 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/mcp-http-native.yml
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      capture_token_originals:
+        description: Capture real Windows token ACL originals only (not full MCP acceptance)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ concurrency:
 
 jobs:
   official-core:
+    if: github.event_name != 'workflow_dispatch' || !inputs.capture_token_originals
     name: Official MCP core / Go and Rust
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -84,7 +90,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+        os: ${{ inputs.capture_token_originals && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,12 +114,13 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Complete response headers, raw bodies and native bind failures
+        if: github.event_name != 'workflow_dispatch' || !inputs.capture_token_originals
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked \
             --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux -- --nocapture
       - name: Native Windows console, auth, rotation, timeout and disconnect contracts
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && !inputs.capture_token_originals
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process -- --nocapture --test-threads=1
@@ -122,3 +129,34 @@ jobs:
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
+      - name: Capture original native token ACL and rotation observations
+        if: inputs.capture_token_originals
+        shell: bash
+        env:
+          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/token-acl-originals
+        run: |
+          set -euo pipefail
+          test "$RUNNER_OS" = Windows
+          test -z "$(git status --porcelain)"
+          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_native_contract \
+            -- --exact windows_acl::native_windows_token_dacl_and_rotation_match_go --nocapture \
+            2>&1 | tee "$RUNNER_TEMP/token-acl-capture.log"
+          grep -Eq '^running 1 test$' "$RUNNER_TEMP/token-acl-capture.log"
+          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/token-acl-capture.log"
+          test -s "$SYMERASEME_CAPTURE_HTTP_AUX/native_windows_token_dacl_and_rotation_match_go.json"
+      - name: Retain original token ACL observations
+        if: success() && inputs.capture_token_originals
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: token-acl-originals-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/token-acl-originals/native_windows_token_dacl_and_rotation_match_go.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain token capture diagnostics
+        if: failure() && inputs.capture_token_originals
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: token-acl-diagnostics-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/token-acl-capture.log
+          if-no-files-found: warn
+          retention-days: 7
