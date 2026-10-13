@@ -2,6 +2,7 @@
 # Capture mode writes a create-only JSON file under RUNNER_TEMP (outside the repo).
 # Verify mode re-observes the same runner identity and compares it to that baseline.
 # Output contains SIDs only. Messages never include SIDs, user names or paths.
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][ValidateSet('Capture', 'Verify')][string]$Mode,
@@ -128,7 +129,7 @@ function Check([bool]$ok, [string]$name) {
 
 # Source: both capture and launch must use the clean dispatched revision.
 $repo = Split-Path -Parent $PSScriptRoot
-# Windows PowerShell 5.1 turns native stderr into terminating errors under Stop; use Continue for git only.
+# Collect git's exit code explicitly without treating native stderr as a PowerShell error.
 function GitOut([string[]]$gitArgs) {
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -198,11 +199,15 @@ if ($Mode -eq 'Verify') {
             $probe = @'
 export PATH="/usr/bin:$PATH"
 case "$(uname -s)" in MINGW*|MSYS*) ;; *) exit 91 ;; esac
+test -z "$(cat)"
 quote='space "quoted" value'
 test "$(printf '%s' "$quote")" = 'space "quoted" value'
 printf '%s\n' 'identity-launch-probe: Git Bash stdin quotes ok'
 '@
-            $child.StandardInput.Write(($probe + "`n" + $BashScript).Replace("`r`n", "`n") + "`n")
+            # Bash parses the complete group before executing it. Give every
+            # command empty stdin so no child can consume the remaining script.
+            $payload = "{`n" + $probe + "`n" + $BashScript + "`n} </dev/null`n"
+            $child.StandardInput.Write($payload.Replace("`r`n", "`n"))
             $child.StandardInput.Close()
             if (-not $child.WaitForExit([int]([TimeSpan]::FromMinutes(24).TotalMilliseconds))) {
                 Fail 'capture child exceeded its deadline'
