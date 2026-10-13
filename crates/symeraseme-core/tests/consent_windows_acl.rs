@@ -1,8 +1,8 @@
-//! Native Windows files, DACLs and atomic replacement compared with real Go.
+//! Native Windows files and DACLs compared with authenticated retained Go observations.
 #![cfg_attr(not(windows), allow(dead_code, unused_imports))]
 
-#[path = "support/capture_consent_acl.rs"]
-mod capture_consent_acl;
+#[path = "support/frozen_consent_acl.rs"]
+mod frozen_consent_acl;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -33,12 +33,7 @@ fn capture(mut command: Command, root: &Path, label: &str, budget: Duration) -> 
         if Instant::now() >= deadline {
             let _ = child.kill();
             child.wait().unwrap();
-            let diagnostic = if fs::metadata(&stderr).unwrap().len() <= 4096 {
-                fs::read_to_string(&stderr).unwrap_or_default()
-            } else {
-                "diagnostic exceeds limit".into()
-            };
-            panic!("{label} exceeded its native deadline: {diagnostic}");
+            panic!("native consent helper exceeded its deadline; private diagnostics retained");
         }
         std::thread::sleep(Duration::from_millis(20));
     };
@@ -76,13 +71,7 @@ fn private(command: &mut Command, root: &Path) {
     }
 }
 
-fn acl(
-    path: &Path,
-    mode: &str,
-    logs: &Path,
-    label: &str,
-    recorder: &mut Option<capture_consent_acl::Recorder>,
-) -> Value {
+fn acl(path: &Path, mode: &str, logs: &Path, label: &str) -> Value {
     let executable = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");
     let mut command = Command::new(executable);
@@ -102,47 +91,106 @@ fn acl(
         .arg("-Mode")
         .arg(mode);
     let result = capture(command, logs, label, Duration::from_secs(30));
+    assert!(result.status.success(), "native ACL observation failed");
+    assert!(
+        result.stderr
+            == format!(
+                "consent ACL script started: {mode}\r\nconsent ACL script completed: {mode}\r\n"
+            )
+            .as_bytes()
+    );
+    serde_json::from_slice(&result.stdout).unwrap()
+}
+
+#[cfg(windows)]
+fn verified_primary_group(logs: &Path, arch: &str) -> String {
+    let baseline_path = PathBuf::from(
+        std::env::var_os("SYMERASEME_WINDOWS_IDENTITY_BASELINE")
+            .expect("fresh Windows identity baseline is required"),
+    );
+    assert!(baseline_path.is_absolute() && fs::metadata(&baseline_path).unwrap().len() <= 16384);
+    let before = fs::read(&baseline_path).unwrap();
+    assert!(before.len() <= 16384);
+    let baseline: Value = serde_json::from_slice(&before).unwrap();
+    let programs = PathBuf::from(std::env::var_os("ProgramFiles").expect("native ProgramFiles"));
+    let powershell = programs.join("PowerShell/7/pwsh.exe");
+    let git = programs.join("Git/cmd/git.exe");
+    assert!(
+        powershell.is_file() && git.is_file(),
+        "trusted native executables unavailable"
+    );
+    let mut revision = Command::new(&git);
+    private(&mut revision, logs);
+    revision.arg("-C").arg(repo()).args(["rev-parse", "HEAD"]);
+    let output = capture(revision, logs, "identity-source", Duration::from_secs(30));
+    assert!(output.status.success());
+    let revision = std::str::from_utf8(&output.stdout).unwrap().trim();
+    let script = repo().join("scripts/capture-windows-identity.ps1");
+    let script_bytes = fs::read(&script).unwrap();
+    let mut verify = Command::new(powershell);
+    private(&mut verify, logs);
+    // Native read-only identity verification needs git and system CIM modules,
+    // not user profiles, credentials or a Go installation.
+    for key in ["PATH", "PSModulePath", "ProgramFiles"] {
+        if let Some(value) = std::env::var_os(key) {
+            verify.env(key, value);
+        }
+    }
+    verify
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(&script)
+        .args([
+            "-Mode",
+            "Verify",
+            "-ExpectedArch",
+            arch,
+            "-ExpectedRevision",
+            revision,
+            "-ArtifactPath",
+        ])
+        .arg(&baseline_path);
+    let result = capture(verify, logs, "identity-verify", Duration::from_secs(60));
     assert!(
         result.status.success(),
-        "ACL observation: {}",
-        String::from_utf8_lossy(&result.stderr)
+        "independent native identity verification failed"
     );
-    capture_consent_acl::note_acl(recorder, label, &result);
-    serde_json::from_slice(&result.stdout).unwrap()
+    assert!(
+        fs::read(&baseline_path).unwrap() == before,
+        "identity baseline changed during verification"
+    );
+    assert!(
+        fs::read(&script).unwrap() == script_bytes,
+        "identity verifier changed"
+    );
+    frozen_consent_acl::verified_group(
+        &baseline,
+        revision,
+        &hex::encode(Sha256::digest(script_bytes)),
+        arch,
+    )
 }
 
 #[cfg(not(windows))]
 #[test]
 fn consent_acl_capture_fails_off_windows_when_requested() {
-    assert!(
-        std::env::var_os("SYMERASEME_CAPTURE_CONSENT_ACL")
-            .filter(|v| !v.is_empty())
-            .is_none(),
-        "SYMERASEME_CAPTURE_CONSENT_ACL requires native Windows; refusing to record"
-    );
+    frozen_consent_acl::reject_retired_modes();
 }
 
 #[cfg(windows)]
 #[test]
-fn native_consent_files_and_dacls_match_checked_out_go() {
+fn native_consent_files_and_dacls_match_recorded_go() {
+    use frozen_consent_acl::{assert_acl, assert_files};
+    use std::collections::BTreeMap;
+    frozen_consent_acl::reject_retired_modes();
     let root = tempfile::tempdir().unwrap();
-    let helper = root.path().join("consent-go.exe");
-    let mut build = Command::new("go");
-    build
-        .args(["build", "-o"])
-        .arg(&helper)
-        .arg("./rust-tests/parity/oracle/consent-windows-acl")
-        .current_dir(repo())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off");
-    let result = capture(build, root.path(), "go-build", Duration::from_secs(180));
-    assert!(
-        result.status.success(),
-        "Go consent build: {}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    let mut recorder = capture_consent_acl::Recorder::from_env(&helper);
+    let (target, arch) = match std::env::consts::ARCH {
+        "x86_64" => ("windows/amd64", "X64"),
+        "aarch64" => ("windows/arm64", "ARM64"),
+        _ => panic!("unsupported native Windows architecture"),
+    };
+    let record = frozen_consent_acl::load(target);
+    let group = verified_primary_group(root.path(), arch);
+    let mut completed = 0;
 
     for (case, protect, readonly_dir, readonly_token) in [
         ("inherited", false, false, false),
@@ -153,85 +201,24 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
         let parent = root.path().join(case);
         fs::create_dir(&parent).unwrap();
         if protect {
-            assert_eq!(
-                acl(&parent, "protect", root.path(), case, &mut recorder)["protected"],
-                true
-            );
+            let observed = acl(&parent, "protect", root.path(), case);
+            assert!(observed["protected"] == true);
+            assert_acl(&record.acl(case, &group), &observed);
         }
-        if recorder.is_some() {
-            acl(
-                &parent,
-                "read",
-                root.path(),
-                &format!("parent-{case}"),
-                &mut recorder,
-            );
-        }
-        let go_dir = parent.join("go");
+        let parent_label = format!("parent-{case}");
+        assert_acl(
+            &record.acl(&parent_label, &group),
+            &acl(&parent, "read", root.path(), &parent_label),
+        );
         let rust_dir = parent.join("rust");
-        for directory in [&go_dir, &rust_dir] {
-            fs::create_dir(directory).unwrap();
-            fs::write(directory.join("sentinel"), "unrelated sentinel").unwrap();
-            if readonly_dir {
-                let mut p = fs::metadata(directory).unwrap().permissions();
-                p.set_readonly(true);
-                fs::set_permissions(directory, p).unwrap();
-            }
+        fs::create_dir(&rust_dir).unwrap();
+        fs::write(rust_dir.join("sentinel"), "unrelated sentinel").unwrap();
+        let directory_permissions = fs::metadata(&rust_dir).unwrap().permissions();
+        if readonly_dir {
+            let mut p = directory_permissions.clone();
+            p.set_readonly(true);
+            fs::set_permissions(&rust_dir, p).unwrap();
         }
-        let mut command = Command::new(&helper);
-        private(&mut command, root.path());
-        command
-            .arg(&go_dir)
-            .arg(if readonly_token {
-                "readonly-token"
-            } else {
-                "fresh"
-            })
-            .env("SYMERASEME_ORACLE_SOURCE_ROOT", repo());
-        let result = capture(
-            command,
-            root.path(),
-            &format!("go-{case}"),
-            Duration::from_secs(30),
-        );
-        assert!(
-            result.status.success(),
-            "Go consent observation: {}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        capture_consent_acl::note_go_run(&mut recorder, case, &result);
-        let observation: Value = serde_json::from_slice(&result.stdout).unwrap();
-        assert_eq!(
-            observation["schema"],
-            "symeraseme.go-oracle.consent-windows-acl.v1"
-        );
-        assert_eq!(observation["go_version"], "go1.26.6");
-        assert!(
-            observation["platform"]
-                .as_str()
-                .unwrap()
-                .starts_with("windows/")
-        );
-        let sources = observation["sources_sha256"].as_object().unwrap();
-        assert_eq!(sources.len(), 4);
-        for source in [
-            "go.mod",
-            "internal/identity/consent.go",
-            "internal/identity/gate.go",
-            "rust-tests/parity/oracle/consent-windows-acl/main.go",
-        ] {
-            assert_eq!(
-                hex::encode(Sha256::digest(fs::read(repo().join(source)).unwrap())),
-                sources[source].as_str().unwrap()
-            );
-        }
-        let go_names: Vec<String> = observation["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|name| name.as_str().unwrap().to_owned())
-            .collect();
-        capture_consent_acl::note_go_files(&mut recorder, case, &go_dir, &go_names);
         let store = ConsentStore::new(&rust_dir)
             .with_clock(|| 1000)
             .with_random_source(|length| Ok(vec![7; length]));
@@ -253,72 +240,53 @@ fn native_consent_files_and_dacls_match_checked_out_go() {
             );
             failed = true;
         }
-        assert_eq!(observation["failed"], failed);
-        assert_eq!(
-            observation["error_class"],
-            if failed { "permission" } else { "ok" }
-        );
-        capture_consent_acl::note_outcome(&mut recorder, case, &observation, failed);
-        assert_eq!(
-            acl(
-                &rust_dir,
-                "read",
-                root.path(),
-                &format!("rust-dir-{case}"),
-                &mut recorder
-            ),
-            acl(
-                &go_dir,
-                "read",
-                root.path(),
-                &format!("go-dir-{case}"),
-                &mut recorder
-            )
-        );
+        record.assert_outcome(case, failed);
+        let observed_dir = acl(&rust_dir, "read", root.path(), &format!("rust-dir-{case}"));
+        for implementation in ["go", "rust"] {
+            assert_acl(
+                &record.acl(&format!("{implementation}-dir-{case}"), &group),
+                &observed_dir,
+            );
+        }
         let mut names = fs::read_dir(&rust_dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         names.sort();
-        assert_eq!(serde_json::to_value(&names).unwrap(), observation["files"]);
-        for name in names {
-            let go = go_dir.join(&name);
+        let expected = record.files(case);
+        let actual: BTreeMap<_, _> = names
+            .iter()
+            .map(|name| (name.clone(), fs::read(rust_dir.join(name)).unwrap()))
+            .collect();
+        assert_files(&expected, &actual);
+        for (index, name) in names.into_iter().enumerate() {
             let rust = rust_dir.join(&name);
-            assert!(
-                fs::read(&go).unwrap() == fs::read(&rust).unwrap(),
-                "{case}/{name}: native bytes differ"
-            );
-            assert_eq!(
-                acl(
-                    &rust,
-                    "read",
-                    root.path(),
-                    &format!("rust-file-{case}-{name}"),
-                    &mut recorder
-                ),
-                acl(
-                    &go,
-                    "read",
-                    root.path(),
-                    &format!("go-file-{case}-{name}"),
-                    &mut recorder
-                )
-            );
+            let observed = acl(&rust, "read", root.path(), &format!("file-{case}-{index}"));
+            let role = if name == "sentinel" {
+                "sentinel"
+            } else {
+                frozen_consent_acl::NAME_ROLE
+            };
+            for implementation in ["go", "rust"] {
+                assert_acl(
+                    &record.acl(&format!("{implementation}-file-{case}-{role}"), &group),
+                    &observed,
+                );
+            }
             // Undo only our own read-only control before checked cleanup.
-            for path in [go, rust] {
-                #[allow(clippy::permissions_set_readonly_false)]
-                {
-                    let mut p = fs::metadata(&path).unwrap().permissions();
-                    p.set_readonly(false);
-                    fs::set_permissions(path, p).unwrap();
-                }
+            #[allow(clippy::permissions_set_readonly_false)]
+            {
+                let mut p = fs::metadata(&rust).unwrap().permissions();
+                p.set_readonly(false);
+                fs::set_permissions(rust, p).unwrap();
             }
         }
-        capture_consent_acl::note_case_complete(&mut recorder, case);
+        fs::set_permissions(&rust_dir, directory_permissions).unwrap();
+        completed += 1;
         eprintln!(
-            "native consent {case}: real Go bytes, owner/group/DACL, read-only state, full owned tree and sentinel matched"
+            "native consent {case}: retained Go bytes, full security descriptor and sentinel matched by Rust"
         );
     }
-    capture_consent_acl::finish(recorder);
+    assert_eq!(completed, 4, "all native consent cases executed");
     root.close().unwrap();
 }

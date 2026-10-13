@@ -7,6 +7,9 @@ on:
       - crates/symeraseme-core/tests/consent_windows_acl.rs
       - crates/symeraseme-core/tests/consent_api.rs
       - crates/symeraseme-core/tests/support/consent_acl.ps1
+      - crates/symeraseme-core/tests/support/frozen_consent_acl.rs
+      - tests/fixtures/go-frozen/refresh-a3db5a02/consent-acl/**
+      - scripts/capture-windows-identity.ps1
       - rust-tests/parity/oracle/consent-windows-acl/**
       - rust-tests/parity/cases/consent-filesystem/**
       - internal/identity/**
@@ -15,12 +18,7 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/consent-windows.yml
-  workflow_dispatch:
-    inputs:
-      capture_originals:
-        description: Retain original Go observations for retirement (no replay acceptance)
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -30,11 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  capture-originals:
-    if: github.event_name == 'workflow_dispatch' && inputs.capture_originals
-    uses: ./.github/workflows/capture-consent-retirement.yml
   native-consent:
-    if: github.event_name != 'workflow_dispatch' || !inputs.capture_originals
     name: Consent filesystem / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -46,12 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26.6'
-      - name: Download pinned Go modules
-        shell: bash
-        run: GOTOOLCHAIN=go1.26.6 go mod download
+          fetch-depth: 0 # Authenticate retained source objects, never build Go.
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
@@ -63,16 +52,49 @@ jobs:
             ~/.cargo/git/db
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Real Go consent bytes and inherited DACLs
-        shell: bash
+      - name: Capture independent native identity for Rust replay
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
         run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'consent-replay-identity/baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
+      - name: Rust-only consent bytes and inherited DACL replay
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'consent-replay-identity/baseline.json'
+          $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
+          $replay = @'
+          set -euo pipefail
+          log="$RUNNER_TEMP/consent-replay.log"
           cargo +1.98.0 test -p symeraseme-core --locked --test consent_windows_acl \
-            -- --exact native_consent_files_and_dacls_match_checked_out_go --nocapture
+            -- --exact native_consent_files_and_dacls_match_recorded_go --nocapture 2>&1 | tee "$log"
+          grep -Eq '^running 1 test$' "$log"
+          grep -Eq '^test native_consent_files_and_dacls_match_recorded_go \.\.\.' "$log"
+          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$log"
+          for case in inherited owner-only-parent readonly-directory readonly-token; do
+            grep -Fq "native consent $case: retained Go bytes, full security descriptor and sentinel matched by Rust" "$log"
+          done
+          '@
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $replay
+          exit $LASTEXITCODE
+      - name: Retain Rust consent replay diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consent-replay-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/consent-replay.log
+          if-no-files-found: error
+          retention-days: 7
       - name: Real kernel close failure and open-old-file rollback
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-core --locked --lib windows_filesystem_tests -- --nocapture
-      - name: Consent API and portable Go cleanup controls
+      - name: Consent API and portable cleanup controls
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-core --locked --test consent_api -- --nocapture
