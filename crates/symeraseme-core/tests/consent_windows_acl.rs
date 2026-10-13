@@ -102,6 +102,57 @@ fn acl(path: &Path, mode: &str, logs: &Path, label: &str) -> Value {
     serde_json::from_slice(&result.stdout).unwrap()
 }
 
+// Return only fixed labels, never the private PowerShell diagnostic or its values.
+fn identity_failure_label(stderr: &[u8]) -> &'static str {
+    let text = String::from_utf8_lossy(stderr);
+    [
+        "source_revision_matches_head",
+        "source_tree_clean",
+        "native_architecture",
+        "user_matches_launch_process_token",
+        "user_sid_observed",
+        "primary_group_sid_observed",
+        "rid500_local_account_unique",
+        "rid500_matches_sddl_la",
+        "baseline_schema",
+        "baseline_revision_matches",
+        "baseline_script_matches",
+        "baseline_native_host_matches",
+        "user_sid_matches_baseline",
+        "primary_group_sid_matches_baseline",
+        "rid500_sid_matches_baseline",
+        "sddl_la_matches_baseline",
+        "baseline artifact missing",
+        "baseline artifact too large",
+        "Get-CimInstance",
+        "Get-FileHash",
+        "Add-Type",
+        "CommandNotFoundException",
+        "ParameterBindingValidationException",
+    ]
+    .into_iter()
+    .find(|label| text.contains(label))
+    .unwrap_or("unclassified PowerShell failure")
+}
+
+#[test]
+fn identity_failure_diagnostics_are_fixed_labels_only() {
+    assert_eq!(
+        identity_failure_label(b"private-prefix check failed: source_tree_clean private-suffix"),
+        "source_tree_clean"
+    );
+    assert_eq!(
+        identity_failure_label(b"Get-CimInstance: private details"),
+        "Get-CimInstance"
+    );
+    for input in [b"private-value".as_slice(), b"", b"\xff\xfe private-value"] {
+        assert_eq!(
+            identity_failure_label(input),
+            "unclassified PowerShell failure"
+        );
+    }
+}
+
 #[cfg(windows)]
 fn verified_primary_group(logs: &Path, arch: &str) -> String {
     let baseline_path = PathBuf::from(
@@ -152,7 +203,9 @@ fn verified_primary_group(logs: &Path, arch: &str) -> String {
     let result = capture(verify, logs, "identity-verify", Duration::from_secs(60));
     assert!(
         result.status.success(),
-        "independent native identity verification failed"
+        "independent native identity verification failed (exit {:?}, class: {})",
+        result.status.code(),
+        identity_failure_label(&result.stderr)
     );
     assert!(
         fs::read(&baseline_path).unwrap() == before,
