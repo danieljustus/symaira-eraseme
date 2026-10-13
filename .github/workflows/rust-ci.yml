@@ -282,15 +282,38 @@ jobs:
           retention-days: 7
 
       - name: Test and doctest
+        if: runner.os != 'Windows'
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked --no-fail-fast
-            cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
-          else
-            cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked
-            cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
-          fi
+          cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked
+          cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
+
+      - name: Capture independent Windows identity for workspace tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'rust-native-identity/baseline.json'
+          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
+
+      - name: Windows test and doctest with verified native identity
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ runner.arch }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          $artifact = Join-Path $env:RUNNER_TEMP 'rust-native-identity/baseline.json'
+          $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
+          $tests = @'
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked --no-fail-fast
+          cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
+          '@
+          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $tests
+          exit $LASTEXITCODE
 
       - name: Verify recorded whole plan and Unix processes with Go absent on all six native hosts
         shell: bash

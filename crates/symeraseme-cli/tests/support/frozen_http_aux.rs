@@ -21,7 +21,7 @@ const SOURCE_ROOTS: [&str; 4] = [
 ];
 // (target, test, source revision, whole-record SHA-256, record). Populate only
 // after retaining and independently verifying actual native captures.
-const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
+pub(crate) const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
         "linux/arm64",
         "live_http_disconnect_cancels_and_reaps_host_agent_like_go",

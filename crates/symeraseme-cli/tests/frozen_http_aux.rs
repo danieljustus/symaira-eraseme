@@ -12,11 +12,6 @@ use sha2::{Digest, Sha256};
 use std::panic::catch_unwind;
 const FILE: &str = "crates/symeraseme-cli/tests/mcp_http_native_contract.rs";
 const TEST: &str = "native_bind_failures_match_checked_out_go";
-const REVISION: &str = "13ddc6a43036d6b34706db2b82bbb5a13c40d6de";
-const RECORD_PIN: &str = "5ccae33a51528f5a1f286bb521ade37361dfcd7076bccf936d7391fd2f382280";
-const RECORD: &[u8] = include_bytes!(
-    "../../../tests/fixtures/go-frozen/refresh-13ddc6a4/http-aux/darwin-arm64/native_bind_failures_match_checked_out_go.json"
-);
 
 fn pin(raw: &[u8]) -> String {
     Sha256::digest(raw)
@@ -27,15 +22,21 @@ fn pin(raw: &[u8]) -> String {
 
 #[test]
 fn frozen_http_aux_rejects_corrupt_truncated_and_fabricated_records() {
-    let revision = REVISION.to_owned();
-    let target = "darwin/arm64";
-    let raw = RECORD.to_vec();
+    // Current input bytes must match this host's recorded checkout semantics.
+    // A Darwin LF record is not a valid positive control on Windows CRLF.
+    let target = frozen_http_aux::native_target().expect("supported native target");
+    let (_, _, revision, record_pin, raw) = frozen_http_aux::RECORDS
+        .iter()
+        .find(|record| record.0 == target && record.1 == TEST)
+        .expect("native bind-failure capture");
+    let revision = (*revision).to_owned();
+    let raw = raw.to_vec();
     let record: Value = serde_json::from_slice(&raw).unwrap();
     let verify = |raw: &[u8], pin: &str, revision: &str| {
         frozen_http_aux::verify(raw, pin, revision, target, FILE, TEST)
     };
     // Positive control: the negatives below fail for their mutation alone.
-    verify(&raw, RECORD_PIN, &revision);
+    verify(&raw, record_pin, &revision);
 
     let mut corrupt = raw.clone();
     corrupt.push(b'!');
