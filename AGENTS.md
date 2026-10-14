@@ -8,12 +8,17 @@
 skill formats and adapter files.
 
 The current source uses the Rust CLI and a native SwiftUI macOS app,
-without a bundled Go backend or backend selector. Rust 1.98.0 is required for development;
-the Go implementation remains a temporary development oracle until the separate
-CUT-005 retirement. The maintainer waived the seven-day stable observation period
-and authorized retirement on 2026-10-12; all technical acceptance gates remain.
-Historical `v0.13.0` assets
-stay immutable; Rust-only candidates require fresh native and release evidence.
+without a bundled Go backend or backend selector. Rust 1.98.0 is required for
+development. Go sources and module files have been removed from the current
+source tree. Normal builds and tests require no Go installation; frozen Go
+observations and their immutable producer history remain as conformance
+evidence. See [CONTRIBUTING.md](CONTRIBUTING.md) for explicit history preparation
+before the first test run.
+
+The maintainer waived the seven-day stable observation period and authorized
+retirement on 2026-10-12; all technical acceptance gates remain. Source removal
+does not by itself complete CUT-005 acceptance. Historical `v0.13.0` assets stay
+immutable; Rust-only candidates require fresh native and release evidence.
 
 ## Ecosystem Guidance
 
