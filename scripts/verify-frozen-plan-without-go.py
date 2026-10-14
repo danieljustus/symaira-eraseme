@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix="native-plan-no-go-") as temporary:
     sys.stdout.buffer.write(result.stdout)
     assert result.returncode == 0, "native Go-absent comparator failed"
     totals = re.findall(rb"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", result.stdout)
-    assert totals == [(b"2", b"0", b"0")], "both real cases must execute; no skips or zero-case acceptance"
+    assert totals == [(b"3", b"0", b"0")], "both real cases and retired-control regression must execute; no skips or zero-case acceptance"
     if sys.platform != "win32":
         print("Verified: Go absent; all three original Unix process comparators execute native records", flush=True)
         result = subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli",

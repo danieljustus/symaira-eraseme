@@ -163,7 +163,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
                 archive.status.success(),
                 "immutable HTTP producer must remain verifiable"
             );
-            // These two former capture producers are now Rust-only replay tests.
+            // The former capture producers are retired or Rust-only replay tests.
             // Bind their original bytes to the independent retirement commit,
             // not to the changed replay implementation. All other inputs retain
             // the current-tree check below, including Cargo.lock.
@@ -172,6 +172,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
                     name.as_str(),
                     "crates/symeraseme-core/tests/campaign_smtp.rs"
                         | "crates/symeraseme-core/tests/smtp_transport.rs"
+                        | "crates/symeraseme-core/tests/support/capture_smtp.rs"
                 );
             if retired_producer {
                 go_source_pin::assert_retired_generator_matches_archive(

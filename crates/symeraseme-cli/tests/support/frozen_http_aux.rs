@@ -404,6 +404,7 @@ pub fn verify(
                     name.as_str(),
                     "crates/symeraseme-cli/tests/mcp_http_process.rs"
                         | "crates/symeraseme-cli/tests/mcp_http_native_contract.rs"
+                        | "crates/symeraseme-cli/tests/support/capture_http_aux.rs"
                 );
             if retired_producer {
                 let producer = git(&["cat-file", "blob", &format!("{revision}:{name}")]);

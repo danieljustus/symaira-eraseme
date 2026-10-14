@@ -103,10 +103,13 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
                 archive.status.success(),
                 "immutable HTTP producer must remain verifiable"
             );
-            // This former producer now only replays the capture against Rust.
-            // Its original generator bytes remain bound to an independent pin.
+            // Retired producers remain bound to the independent Go-era pin.
             let retired_producer = field == "archived_generators"
-                && name == "crates/symeraseme-cli/tests/mcp_http_headers_process.rs";
+                && matches!(
+                    name.as_str(),
+                    "crates/symeraseme-cli/tests/mcp_http_headers_process.rs"
+                        | "crates/symeraseme-cli/tests/support/capture_http_headers.rs"
+                );
             if retired_producer {
                 go_source_pin::assert_retired_generator_matches_archive(
                     ROOT,

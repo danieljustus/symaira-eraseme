@@ -116,7 +116,33 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
             );
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
-            if go_source_pin::current_tree_bound(name) {
+            if matches!(
+                name.as_str(),
+                "crates/symeraseme-cli/tests/mcp_agent_error_json_windows.rs"
+                    | "crates/symeraseme-cli/tests/support/capture_agent_error.rs"
+            ) {
+                // Retired producers retain their independent pin and recorded
+                // checkout policy; all other inputs remain current-tree bound.
+                let pinned = Command::new("git")
+                    .args([
+                        "-c",
+                        &format!("core.autocrlf={autocrlf}"),
+                        "cat-file",
+                        "--filters",
+                        &format!("{}:{name}", go_source_pin::RETIREMENT_SOURCE_REVISION),
+                    ])
+                    .current_dir(ROOT)
+                    .output()
+                    .expect("read independently pinned agent-error producer");
+                assert!(
+                    pinned.status.success(),
+                    "retired agent-error producer unavailable"
+                );
+                assert_eq!(
+                    archive.stdout, pinned.stdout,
+                    "retired agent-error producer: {name}"
+                );
+            } else if go_source_pin::current_tree_bound(name) {
                 let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
@@ -176,14 +202,14 @@ impl Corpus {
     }
 }
 
-pub fn observations() -> Option<Corpus> {
-    if std::env::var_os("SYMERASEME_CAPTURE_AGENT_ERROR").is_some_and(|value| !value.is_empty()) {
-        return None;
-    }
+pub fn observations() -> Corpus {
+    assert!(
+        std::env::var_os("SYMERASEME_CAPTURE_AGENT_ERROR").is_none(),
+        "live Go capture is retired; use the recorded native agent-error observations"
+    );
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -192,9 +218,12 @@ pub fn observations() -> Option<Corpus> {
         ("macos", "aarch64") => "darwin/arm64",
         ("windows", "x86_64") => "windows/amd64",
         ("windows", "aarch64") => "windows/arm64",
-        _ => return None,
+        _ => panic!("unrecorded native agent-error target"),
     };
-    let (_, revision, pin, raw) = RECORDS.iter().find(|record| record.0 == target)?;
+    let (_, revision, pin, raw) = RECORDS
+        .iter()
+        .find(|record| record.0 == target)
+        .expect("recorded native agent-error target");
     let record = verify(raw, pin, revision, target);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -213,5 +242,5 @@ pub fn observations() -> Option<Corpus> {
         ))
         .is_err()
     );
-    Some(Corpus(record))
+    Corpus(record)
 }

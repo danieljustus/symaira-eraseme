@@ -15,10 +15,20 @@ also anchors the complete capture digest independently in its provenance test:
 
 `3b6839287256b08d74e891203ed663a88fdc9851c6779d41ed5c9397f8a84d9f`
 
-## Reproduce
+## Historical reproduction
 
-From the repository root, using the Go 1.26.6 SDK (the generator rejects other
-versions):
+`generate.py` and `evidence/run-gates.py` are retired and unavailable in the
+current checkout. Their archived source is pinned at
+`22615ae67325c581fbe60cb0f2d3d2b2139cf900`; this does not change the original
+`4e582f284a639bdaa01260b6b8ab6000482e6c0d` production-source pin or fixture
+identities. Current Rust tests replay the retained fixture without a Go SDK.
+
+The commands below are historical only. Reproduction requires an isolated
+checkout of that archived revision, not the current Rust-only tree. Run from
+that historical repository root using Go 1.26.6 (the generator rejects other
+versions). The recorded `/Users/daniel/sdk/go1.26.6/bin/go` path is specific to
+the original capture host; substitute the verified SDK path in the isolated
+environment:
 
 ```sh
 python3 rust-tests/parity/oracle/migration-state/generate.py \
@@ -91,13 +101,15 @@ JSON behavior or adding dependencies. State serialization still uses the
 existing Serde encoder. All path, backup, atomic-write and native Path/OsString
 code remains unchanged.
 
-## Observed gates and remaining scope
+## Historical observed gates and remaining scope
 
 `evidence/identity.json` binds the dirty candidate source hashes, replay binary,
 worktree, base, branch, compiler and observed counts. `evidence/outputs.json`
 retains exact UTF-8 log bytes and checksums (avoiding the repository-wide
-`*.log` ignore rule). `evidence/run-gates.py`
-records the exact isolated environment and commands; `gates.json` records exits.
+`*.log` ignore rule). The retired `evidence/run-gates.py`, available only in the
+archived revision above, recorded the exact isolated environment and commands;
+the retained `gates.json` records exits. These are historical observations,
+not fresh acceptance evidence for the current checkout.
 The focused command was:
 
 ```sh

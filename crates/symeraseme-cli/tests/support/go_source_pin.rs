@@ -21,15 +21,21 @@ const RECORDED_GO_TEST_PACKAGES: [&str; 2] =
 pub const RETIREMENT_SOURCE_REVISION: &str = "22615ae67325c581fbe60cb0f2d3d2b2139cf900";
 
 #[allow(dead_code)]
-fn is_go_source(name: &str) -> bool {
+fn is_retired_source(name: &str) -> bool {
     name.ends_with(".go")
         || name.ends_with(".go.in")
         || name.ends_with(".gotmpl")
         || name == "go.mod"
         || name == "go.sum"
+        || matches!(
+            name,
+            "scripts/consent-oracle/generate.py"
+                | "rust-tests/parity/oracle/migration-state/generate.py"
+                | "rust-tests/parity/profile_read.py"
+        )
 }
 
-/// Immutable bytes of a former Go source. Missing objects fail; nothing fetches.
+/// Immutable Go source or explicitly retired capture script. Missing objects fail; nothing fetches.
 #[allow(dead_code)]
 pub fn retired_go_source(root: &str, name: &str) -> Result<Vec<u8>, String> {
     let relative = Path::new(name);
@@ -39,7 +45,7 @@ pub fn retired_go_source(root: &str, name: &str) -> Result<Vec<u8>, String> {
         || !relative
             .components()
             .all(|c| matches!(c, Component::Normal(_)))
-        || !is_go_source(name)
+        || !is_retired_source(name)
     {
         return Err(format!("not a retired Go source path: {name:?}"));
     }
@@ -59,7 +65,7 @@ pub fn retired_go_source(root: &str, name: &str) -> Result<Vec<u8>, String> {
 }
 
 /// Authenticate a retired Rust capture producer against the independent Go-era pin.
-#[allow(dead_code)] // Only SMTP/HTTP replay readers use this shared boundary.
+#[allow(dead_code)] // Only retired-producer replay readers use this shared boundary.
 pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived: &[u8]) {
     assert!(
         matches!(
@@ -71,6 +77,10 @@ pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived
                 | "crates/symeraseme-cli/tests/mcp_http_native_contract.rs"
                 | "crates/symeraseme-cli/tests/plan_execute_live_process.rs"
                 | "crates/symeraseme-cli/tests/support/capture_plan_process.rs"
+                | "crates/symeraseme-core/tests/support/capture_smtp.rs"
+                | "crates/symeraseme-cli/tests/support/capture_http_headers.rs"
+                | "crates/symeraseme-cli/tests/support/capture_http_wire.rs"
+                | "crates/symeraseme-cli/tests/support/capture_http_aux.rs"
         ),
         "not a retired capture producer: {name}"
     );
@@ -90,10 +100,10 @@ pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived
     );
 }
 
-/// Former Go sources come from history; every other pinned input keeps its checkout bytes.
+/// Retired Go sources/scripts come from history; all other inputs keep their checkout bytes.
 #[allow(dead_code)]
 pub fn current_source(root: &str, name: &str) -> Vec<u8> {
-    if is_go_source(name) {
+    if is_retired_source(name) {
         retired_go_source(root, name).unwrap_or_else(|error| panic!("{error}"))
     } else {
         std::fs::read(Path::new(root).join(name)).unwrap()

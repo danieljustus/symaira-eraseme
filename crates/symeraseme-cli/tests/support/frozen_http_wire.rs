@@ -91,7 +91,11 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
             let retired_producer = field == "archived_generators"
-                && name == "crates/symeraseme-cli/tests/mcp_http_process.rs";
+                && matches!(
+                    name.as_str(),
+                    "crates/symeraseme-cli/tests/mcp_http_process.rs"
+                        | "crates/symeraseme-cli/tests/support/capture_http_wire.rs"
+                );
             if retired_producer {
                 go_source_pin::assert_retired_generator_matches_archive(
                     ROOT,

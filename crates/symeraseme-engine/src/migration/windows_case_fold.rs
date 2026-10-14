@@ -1,5 +1,5 @@
 // Generated from Go 1.26.6 unicode.SimpleFold, Unicode 15.0.0.
-// Regenerate/check: python3 rust-tests/parity/oracle/migration-safety/generate_fold.py [--check]
+// Historical generator: 22615ae67325c581fbe60cb0f2d3d2b2139cf900:rust-tests/parity/oracle/migration-safety/generate_fold.py
 // Windows filepath.sameWord uses strings.EqualFold; ASCII-only/lowercase comparisons differ.
 #[rustfmt::skip]
 const RANGES: &[(u32, u32, u32, u32)] = &[

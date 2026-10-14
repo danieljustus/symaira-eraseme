@@ -1,5 +1,18 @@
 # Consent filesystem oracle (ID-005)
 
+## Current replay and archived generator
+
+The current Rust tests replay these unchanged captures without a Go compiler.
+The generator and Go helper templates are retired from the checkout; their
+original bytes remain at `22615ae67325c581fbe60cb0f2d3d2b2139cf900` and are
+checked against the retained source/helper/generator digests. The regeneration
+commands and capture-era limitations below describe that historical checkout,
+not commands to run in the current Rust-only tree. Historical regeneration
+requires a separate isolated checkout and the pinned Go toolchain; never derive
+replacement Go observations from Rust output.
+
+## Historical capture procedure
+
 `id005.json` is a privacy-reviewed derived capture of the real Go consent
 implementation at `93721a93ec9e527410c4ec3051779cf516216b72`. The generator
 checks that `consent.go` and `gate.go` are byte-identical to the corrected

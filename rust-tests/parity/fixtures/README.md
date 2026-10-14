@@ -1,7 +1,15 @@
 # Go oracle fixtures
 
-These fixtures are generated from corrected Go commit `4e582f28` by
-`scripts/generate-go-oracle-fixtures.sh`. The generator exports that commit with
+These fixtures were generated from corrected Go commit `4e582f28` by
+`scripts/generate-go-oracle-fixtures.sh`. That generator is retired and absent
+from the current checkout. Its archived source is pinned at
+`22615ae67325c581fbe60cb0f2d3d2b2139cf900`; this archive revision does not replace
+the fixtures' original Go oracle pin. The generation procedure below is
+historical only and requires an isolated checkout of that archived revision,
+not the current Rust-only tree. Current verification replays the retained
+fixtures without a Go SDK; see [the parity guide](../README.md).
+
+The historical generator exports the oracle commit with
 `git archive`, injects one untracked `_test.go` beside the real `newRootCommand`,
 and launches the resulting binary as a black box. No tracked Go source is
 modified and no developer profile, keychain, database, or credential is read.
@@ -54,7 +62,11 @@ The generator builds a complete same-filesystem staging corpus and swaps
 failure leaves the previous corpus byte-identical and rollback restores it if a
 swap is interrupted.
 
-The generator is an executable drift gate:
+## Historical regeneration drift gate
+
+Run these commands only from the root of an isolated checkout of
+`22615ae67325c581fbe60cb0f2d3d2b2139cf900`, with its pinned Go SDK and module
+cache. They are not executable instructions for the current checkout:
 
 ```bash
 scripts/generate-go-oracle-fixtures.sh

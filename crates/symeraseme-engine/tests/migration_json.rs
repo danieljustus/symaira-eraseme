@@ -231,8 +231,11 @@ fn migration_json_provenance() {
     for (name, bytes) in [
         (
             "generate.py",
-            include_bytes!("../../../rust-tests/parity/oracle/migration-state/generate.py")
-                .as_slice(),
+            go_source_pin::current_source(
+                ROOT,
+                "rust-tests/parity/oracle/migration-state/generate.py",
+            )
+            .as_slice(),
         ),
         (
             "probe.go",

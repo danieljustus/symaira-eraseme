@@ -102,11 +102,37 @@ fn id005_fault_fixture_is_bound_to_source_and_probe() {
         );
     }
     assert_eq!(
-        hex::encode(Sha256::digest(
-            fs::read(root.join("scripts/consent-oracle/generate.py")).unwrap()
-        )),
+        hex::encode(Sha256::digest(go_source_pin::current_source(
+            root.to_str().unwrap(),
+            "scripts/consent-oracle/generate.py"
+        ))),
         document["generator_sha256"].as_str().unwrap()
     );
+}
+
+#[test]
+fn retired_capture_script_allowlist_is_exact() {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    for name in [
+        "scripts/consent-oracle/generate.py",
+        "rust-tests/parity/oracle/migration-state/generate.py",
+        "rust-tests/parity/profile_read.py",
+    ] {
+        let bytes = go_source_pin::retired_go_source(root, name).unwrap();
+        assert!(!bytes.is_empty());
+    }
+    for name in [
+        "scripts/unknown.py",
+        "scripts/consent-oracle/other.py",
+        "../scripts/consent-oracle/generate.py",
+        "/scripts/consent-oracle/generate.py",
+        "scripts\\consent-oracle\\generate.py",
+    ] {
+        assert!(
+            go_source_pin::retired_go_source(root, name).is_err(),
+            "{name}"
+        );
+    }
 }
 
 fn manifest(root: &Path, directory: &Path, entries: &mut Vec<Value>) {
