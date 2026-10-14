@@ -20,6 +20,8 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/mcp-tools-native.yml
+      - scripts/prepare-frozen-history.py
+      - tests/test_prepare_frozen_history.py
   workflow_dispatch: {}
 
 permissions:
@@ -43,6 +45,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy

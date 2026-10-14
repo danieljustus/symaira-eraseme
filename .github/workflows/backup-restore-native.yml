@@ -11,6 +11,8 @@ on:
       - 'rust-tests/parity/go_build_info.py'
       - 'tests/fixtures/go-rollback/**'
       - 'docs/rust-port/backup-restore-rehearsal.md'
+      - 'scripts/prepare-frozen-history.py'
+      - 'tests/test_prepare_frozen_history.py'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +53,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
 
       - name: Pin native build paths and source
         shell: bash

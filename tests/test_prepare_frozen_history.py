@@ -17,7 +17,18 @@ SPEC.loader.exec_module(HISTORY)
 
 class FrozenHistoryPreparation(unittest.TestCase):
     def test_preparation_fails_closed_and_precedes_every_affected_gate(self):
-        self.assertEqual(len(HISTORY.REVISIONS), 3)
+        # Derive the active frozen readers' Git inputs, not historical metadata
+        # from unused captures. This guards the preparer's hand-written list.
+        texts = (path.read_text() for path in ROOT.glob('crates/*/tests/support/frozen_*.rs'))
+        readers = [text for text in texts if '"git"' in text]
+        self.assertTrue(readers)
+        required = set().union(*(set(re.findall(r'"([0-9a-f]{40})"', text)) for text in readers))
+        stdio = re.findall(r'^SOURCE_REVISION = "([0-9a-f]{40})"$',
+                           (ROOT / 'rust-tests/parity/oracle/mcp-stdio-mutations/generate.py').read_text(),
+                           re.MULTILINE)
+        self.assertEqual(len(stdio), 1)
+        self.assertEqual(set(HISTORY.REVISIONS), required | set(stdio))
+        self.assertEqual(len(HISTORY.REVISIONS), len(set(HISTORY.REVISIONS)))
         for revision in HISTORY.REVISIONS:
             self.assertRegex(revision, r'^[0-9a-f]{40}$')
         self.assertEqual(HISTORY.REPOSITORY, 'https://github.com/danieljustus/symaira-eraseme.git')
@@ -67,7 +78,7 @@ class FrozenHistoryPreparation(unittest.TestCase):
                         HISTORY.prepare(ROOT, fetch)
                 self.assertEqual(sum('fetch' in call for call in calls), int(fetch and not present))
                 self.assertEqual(sum('cat-file' in call for call in calls),
-                                 6 if fetch and not present and not fetch_error else 3)
+                                 len(HISTORY.REVISIONS) * (2 if fetch and not present and not fetch_error else 1))
 
         # Fixed owning-job inventory. This is structural protection; the real
         # clean-clone/native gates must still execute all original comparisons.
@@ -83,6 +94,12 @@ class FrozenHistoryPreparation(unittest.TestCase):
             'mcp-http-native.yml': {'native-mcp': 'Complete response headers'},
             'consent-windows.yml': {'native-consent': 'Capture independent native identity'},
             'host-agent-windows.yml': {'native-agent': 'Rust host-agent reaping'},
+            'campaign-smtp-native.yml': {'native-smtp': 'Actual SMTP transport'},
+            'triage-native.yml': {'native-triage': 'Every retained CLI triage input'},
+            'mcp-tools-native.yml': {'native-tools': 'Compiled native agent'},
+            'backup-restore-native.yml': {'native': 'Execute migration CLI'},
+            'frozen-http-wire-capture.yml': {'capture': 'Read interruption controls'},
+            'frozen-http-aux-capture.yml': {'capture': 'Replay every auxiliary comparison'},
         }
         for workflow, targets in jobs.items():
             text = (ROOT / '.github/workflows' / workflow).read_text()

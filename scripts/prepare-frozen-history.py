@@ -8,6 +8,7 @@ import subprocess
 # Keep the original capture identities; never substitute a squash revision.
 REVISIONS = (
     '0bc6b051890340822448fa3846c96f70022b79ad',  # MCP stdio producer
+    '13ddc6a43036d6b34706db2b82bbb5a13c40d6de',  # HTTP/SMTP/plan/triage/agent-error producers
     '735ae51ed9c49ca6df88f78c108df8b83f928877',  # Native Windows HTTP producer
     'a3db5a02f9a9aa08d172228caf709c621af3c0bb',  # Native token/consent ACL producer
 )

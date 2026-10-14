@@ -19,6 +19,8 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/triage-native.yml
+      - scripts/prepare-frozen-history.py
+      - tests/test_prepare_frozen_history.py
   workflow_dispatch:
     inputs:
       replay_windows_migration:
@@ -48,6 +50,9 @@ jobs:
           persist-credentials: false
           # Retained readers authenticate immutable historical source objects.
           fetch-depth: 0
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
