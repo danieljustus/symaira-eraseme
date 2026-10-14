@@ -59,6 +59,14 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
             archive.status.success(),
             "immutable input generator must remain verifiable"
         );
+        let retired = matches!(
+            name.as_str(),
+            "crates/symeraseme-cli/tests/plan_execute_live_process.rs"
+                | "crates/symeraseme-cli/tests/support/capture_plan_process.rs"
+        );
+        if retired {
+            go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &archive.stdout);
+        }
         // These three archived generators were measured as an actual Git
         // autocrlf checkout on both Windows producers. Preserve the recorded
         // digest and reproduce only that independently verified transform.
@@ -77,10 +85,12 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         };
         assert_eq!(pin["bytes"], bytes.len());
         assert_eq!(pin["sha256"], digest(&bytes));
-        // Changed generators or dependency bytes outside local release labels
-        // require actual recapture, even when their immutable archive is available.
-        let current = go_source_pin::current_source(ROOT, name);
-        go_source_pin::assert_current_matches_archive(name, &bytes, &current);
+        // Retired producers were independently authenticated above. Other
+        // inputs remain checkout-bound, including the strict dependency check.
+        if !retired {
+            let current = go_source_pin::current_source(ROOT, name);
+            go_source_pin::assert_current_matches_archive(name, &bytes, &current);
+        }
     }
     let build = record["embedded_build_info"].as_str().unwrap();
     let (os, arch) = target.split_once('/').unwrap();
@@ -103,15 +113,14 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
     record
 }
 
-pub fn observation(case: &str) -> Option<(Output, Value)> {
-    if std::env::var_os("SYMERASEME_CAPTURE_PLAN_PROCESSES").is_some_and(|value| !value.is_empty())
-    {
-        return None; // Explicit native recording always executes actual Go.
-    }
+pub fn observation(case: &str) -> (Output, Value) {
+    assert!(
+        std::env::var_os("SYMERASEME_CAPTURE_PLAN_PROCESSES").is_none(),
+        "live Go capture is retired; use the immutable historical capture producer"
+    );
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -120,7 +129,7 @@ pub fn observation(case: &str) -> Option<(Output, Value)> {
         ("windows", "aarch64") => "windows/arm64",
         ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => return None, // Unrecorded hosts still execute actual Go.
+        _ => panic!("no recorded plan process for this target; live Go is retired"),
     };
     let (raw, pin) = match (target, case) {
         ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-13ddc6a4/plan-processes/darwin-arm64/web-form.json").as_slice(), "630f955c0a5deb68cb3a5821cf3b3c40acbc9c5f075a5341238edf6dc89b0182"),
@@ -172,5 +181,5 @@ pub fn observation(case: &str) -> Option<(Output, Value)> {
             .decode(record["stderr_base64"].as_str().unwrap())
             .unwrap(),
     };
-    Some((output, record["persisted_effects"].clone()))
+    (output, record["persisted_effects"].clone())
 }

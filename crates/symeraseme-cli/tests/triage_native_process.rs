@@ -11,8 +11,6 @@ use symeraseme_core::storage::{Repository, Store};
 #[allow(dead_code)]
 mod mcp_http_port;
 use mcp_http_port::StartedChild;
-#[path = "support/capture_native_triage.rs"]
-mod capture_native_triage;
 #[path = "support/frozen_native_triage.rs"]
 mod frozen_native_triage;
 
@@ -77,26 +75,6 @@ fn capture(mut command: Command, logs: &Path, label: &str, budget: Duration) -> 
         stdout: fs::read(stdout).unwrap(),
         stderr: fs::read(stderr).unwrap(),
     }
-}
-
-fn oracle(logs: &Path) -> PathBuf {
-    let binary = logs.join("go-triage.exe");
-    let mut command = Command::new("go");
-    command
-        .args(["build", "-o"])
-        .arg(&binary)
-        .arg("./cmd/symeraseme")
-        .current_dir(repo())
-        .env("GOTOOLCHAIN", "go1.26.6")
-        .env("GOPROXY", "off")
-        .env("GOSUMDB", "off");
-    let result = capture(command, logs, "go-build", Duration::from_secs(180));
-    assert!(
-        result.status.success(),
-        "{}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    binary
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -197,37 +175,14 @@ fn normalize_provider_order(stderr: &[u8]) -> Vec<u8> {
     format!("{}{}{}", &text[..start], providers.join(", "), &text[end..]).into_bytes()
 }
 
-fn prepare(logs: &Path, live: bool) -> (Option<(PathBuf, PathBuf)>, PathBuf) {
-    let go = live.then(|| oracle(logs));
-    let bin = logs.join("bin");
-    if live {
-        fs::create_dir(&bin).unwrap();
-    }
-    let agent = bin.join(if cfg!(windows) {
+fn prepare(logs: &Path) -> PathBuf {
+    let rust_bin = logs.join("rust-bin");
+    fs::create_dir(&rust_bin).unwrap();
+    let rust_agent = rust_bin.join(if cfg!(windows) {
         "claude.exe"
     } else {
         "claude"
     });
-    if live {
-        let mut build = Command::new("go");
-        build
-            .args(["build", "-o"])
-            .arg(&agent)
-            .arg("./rust-tests/parity/oracle/native-triage-agent")
-            .current_dir(repo())
-            .env("GOTOOLCHAIN", "go1.26.6")
-            .env("GOPROXY", "off")
-            .env("GOSUMDB", "off");
-        let output = capture(build, logs, "agent-build", Duration::from_secs(180));
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    let rust_bin = logs.join("rust-bin");
-    fs::create_dir(&rust_bin).unwrap();
-    let rust_agent = rust_bin.join(agent.file_name().unwrap());
     let mut build = Command::new("rustc");
     build
         .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
@@ -239,7 +194,7 @@ fn prepare(logs: &Path, live: bool) -> (Option<(PathBuf, PathBuf)>, PathBuf) {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    (go.map(|binary| (binary, bin)), rust_bin)
+    rust_bin
 }
 
 fn command(binary: &Path, root: &Path, bin: &Path) -> Command {
@@ -317,39 +272,11 @@ fn execute(
     capture(child, logs, label, Duration::from_secs(30))
 }
 
-fn go_observation(
-    live: Option<&(PathBuf, PathBuf)>,
-    corpus: Option<&frozen_native_triage::Corpus>,
-    root: &Path,
-    id: &str,
-    input: &Value,
-) -> Value {
-    if let Some(corpus) = corpus {
-        return corpus.case(id, input);
-    }
-    let (binary, bin) = live.expect("unrecorded targets require an actual native Go process");
-    let directory = root.join(format!("go-{id}"));
-    let output = execute(binary, &directory, bin, input, root, &format!("go-{id}"));
-    observed(&output, &directory, id, input.clone())
-}
-
-fn observed(output: &Output, root: &Path, id: &str, input: Value) -> Value {
-    json!({
-        "id": id, "input": input,
-        "exit_status": output.status.code().unwrap(),
-        "stdout_bytes": output.stdout.len(), "stderr_bytes": output.stderr.len(),
-        "stdout_base64": base64::engine::general_purpose::STANDARD.encode(&output.stdout),
-        "stderr_base64": base64::engine::general_purpose::STANDARD.encode(&output.stderr),
-        "saved_reply_and_ordered_events": read_snapshot(&root.join("data")),
-        "actual_agent_invocations": fs::read_to_string(root.join("agent-control")).unwrap_or_default(),
-    })
-}
-
 #[test]
 fn native_cli_triage_matches_go_for_every_retained_case() {
     let root = tempfile::tempdir().unwrap();
     let corpus = frozen_native_triage::observations("cli");
-    let (go, rust_bin) = prepare(root.path(), corpus.is_none());
+    let rust_bin = prepare(root.path());
     let cases: Value = serde_json::from_slice(
         &fs::read(repo().join("tests/fixtures/cli-triage/cases.json")).unwrap(),
     )
@@ -357,7 +284,6 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
     let cases = cases["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 16);
     let mut positive_controls = 0;
-    let mut recorded = Vec::new();
     for case in cases {
         let id = case["id"].as_str().unwrap();
         let argv = case["argv"]
@@ -368,7 +294,7 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
             .collect::<Vec<_>>();
         let rust_root = root.path().join(format!("rust-{id}"));
         let input = json!({"argv": argv, "environment": case["environment"], "stdin_base64": ""});
-        let measured = go_observation(go.as_ref(), corpus.as_ref(), root.path(), id, &input);
+        let measured = corpus.case(id, &input);
         let rust = execute(
             Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
             &rust_root,
@@ -393,7 +319,6 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
             );
             positive_controls += 1;
         }
-        recorded.push(measured.clone());
         assert_eq!(
             measured["exit_status"].as_i64(),
             case["exit_code"].as_i64(),
@@ -402,9 +327,6 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
         assert_process_and_state(&measured, rust, &rust_root, id);
     }
     assert!(positive_controls >= 9);
-    if let Some((binary, _)) = &go {
-        capture_native_triage::record(binary, "cli", &recorded);
-    }
     eprintln!(
         "native CLI triage executed all 16 measured Go/Rust cases and {positive_controls} agent controls"
     );
@@ -414,7 +336,7 @@ fn native_cli_triage_matches_go_for_every_retained_case() {
 fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
     let root = tempfile::tempdir().unwrap();
     let corpus = frozen_native_triage::observations("mcp");
-    let (go, rust_bin) = prepare(root.path(), corpus.is_none());
+    let rust_bin = prepare(root.path());
     let cases = [
         (
             "classify-nosave",
@@ -457,13 +379,12 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
             json!({"request_id":999,"save":false}),
         ),
     ];
-    let mut recorded = Vec::new();
     for (id, name, arguments) in cases {
         let mut frame = serde_json::to_vec(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":name,"arguments":arguments}})).unwrap();
         frame.push(b'\n');
         let input = json!({"argv": ["mcp", "--stdio"], "environment": {"SYMERASEME_LLM_PROVIDER": "agent"}, "stdin_base64": base64::engine::general_purpose::STANDARD.encode(frame)});
         let rust_root = root.path().join(format!("rust-{id}"));
-        let measured = go_observation(go.as_ref(), corpus.as_ref(), root.path(), id, &input);
+        let measured = corpus.case(id, &input);
         let rust = execute(
             Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
             &rust_root,
@@ -487,7 +408,6 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
                 "{id}: missing native Rust agent control"
             );
         }
-        recorded.push(measured.clone());
         assert_eq!(measured["exit_status"], 0);
         let decode = |stream: &str| {
             base64::engine::general_purpose::STANDARD
@@ -507,10 +427,54 @@ fn native_mcp_triage_matches_go_raw_frames_and_saved_effects() {
         );
         assert_process_and_state(&measured, rust, &rust_root, id);
     }
-    if let Some((binary, _)) = &go {
-        capture_native_triage::record(binary, "mcp", &recorded);
-    }
     eprintln!(
         "native MCP triage executed all eight measured Go/Rust raw-frame and saved-effect comparisons"
     );
+}
+
+#[test]
+fn retired_triage_capture_controls_fail_closed() {
+    let logs = tempfile::tempdir().unwrap();
+    for (index, (variable, value, message)) in [
+        (
+            "SYMERASEME_PARITY_LIVE_GO",
+            "1",
+            "live Go execution is retired",
+        ),
+        (
+            "SYMERASEME_CAPTURE_NATIVE_TRIAGE",
+            "",
+            "live Go capture is retired",
+        ),
+        (
+            "SYMERASEME_CAPTURE_NATIVE_TRIAGE",
+            "requested",
+            "live Go capture is retired",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "native_cli_triage_matches_go_for_every_retained_case",
+                "--nocapture",
+            ])
+            .env_remove("SYMERASEME_PARITY_LIVE_GO")
+            .env_remove("SYMERASEME_CAPTURE_NATIVE_TRIAGE")
+            .env(variable, value)
+            .env("PATH", logs.path())
+            .current_dir(logs.path())
+            .stdin(Stdio::null());
+        let output = capture(
+            command,
+            logs.path(),
+            &format!("retired-{index}"),
+            Duration::from_secs(30),
+        );
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains(message));
+    }
 }

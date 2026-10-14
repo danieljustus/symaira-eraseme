@@ -173,7 +173,33 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             );
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
-            if go_source_pin::current_tree_bound(name) {
+            if matches!(
+                name.as_str(),
+                "crates/symeraseme-cli/tests/triage_native_process.rs"
+                    | "crates/symeraseme-cli/tests/support/capture_native_triage.rs"
+            ) {
+                // Retired producers stay bound to the independent Go-era pin,
+                // using the original recorded checkout policy on every host.
+                let pinned = Command::new("git")
+                    .args([
+                        "-c",
+                        &format!("core.autocrlf={autocrlf}"),
+                        "cat-file",
+                        "--filters",
+                        &format!("{}:{name}", go_source_pin::RETIREMENT_SOURCE_REVISION),
+                    ])
+                    .current_dir(ROOT)
+                    .output()
+                    .expect("read independently pinned triage producer");
+                assert!(
+                    pinned.status.success(),
+                    "retired triage producer unavailable"
+                );
+                assert_eq!(
+                    archive.stdout, pinned.stdout,
+                    "retired triage producer: {name}"
+                );
+            } else if go_source_pin::current_tree_bound(name) {
                 let current = go_source_pin::current_source(ROOT, name);
                 go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
@@ -241,14 +267,14 @@ impl Corpus {
     }
 }
 
-pub fn observations(family: &str) -> Option<Corpus> {
-    if std::env::var_os("SYMERASEME_CAPTURE_NATIVE_TRIAGE").is_some_and(|value| !value.is_empty()) {
-        return None;
-    }
+pub fn observations(family: &str) -> Corpus {
+    assert!(
+        std::env::var_os("SYMERASEME_CAPTURE_NATIVE_TRIAGE").is_none(),
+        "live Go capture is retired; use the immutable historical capture producer"
+    );
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
-        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
+        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -257,11 +283,12 @@ pub fn observations(family: &str) -> Option<Corpus> {
         ("macos", "aarch64") => "darwin/arm64",
         ("windows", "x86_64") => "windows/amd64",
         ("windows", "aarch64") => "windows/arm64",
-        _ => return None,
+        _ => panic!("no recorded native triage capture for this target; live Go is retired"),
     };
     let (_, _, revision, pin, raw) = RECORDS
         .iter()
-        .find(|record| record.0 == target && record.1 == family)?;
+        .find(|record| record.0 == target && record.1 == family)
+        .expect("recorded native triage family; live Go is retired");
     let record = verify(raw, pin, revision, target, family);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -282,5 +309,5 @@ pub fn observations(family: &str) -> Option<Corpus> {
         ))
         .is_err()
     );
-    Some(Corpus(record))
+    Corpus(record)
 }
