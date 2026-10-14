@@ -63,7 +63,7 @@ jobs:
           ref: 21a9a2febd7100d7c17ac1021ee7f2ed9f66a1e0 # 0.1.16, immutable upstream source
           path: official-conformance
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.19.0'
       - name: Build pinned official conformance CLI
@@ -94,7 +94,7 @@ jobs:
             --output "$RUNNER_TEMP/mcp-conformance-result"
       - name: Retain source-bound official check receipt
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: official-mcp-core
           path: ${{ runner.temp }}/mcp-conformance-result/manifest.json
@@ -176,7 +176,7 @@ jobs:
           exit $LASTEXITCODE
       - name: Retain Windows HTTP replay diagnostics
         if: always() && runner.os == 'Windows' && (!inputs.replay_token_acl || inputs.replay_windows_http)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-http-replay-${{ runner.os }}-${{ runner.arch }}
           path: |
@@ -223,7 +223,7 @@ jobs:
           exit $LASTEXITCODE
       - name: Retain token replay diagnostics
         if: always() && runner.os == 'Windows'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: token-acl-replay-${{ runner.os }}-${{ runner.arch }}
           path: ${{ runner.temp }}/token-acl-replay.log

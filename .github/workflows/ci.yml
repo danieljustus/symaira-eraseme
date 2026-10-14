@@ -187,7 +187,7 @@ jobs:
           python3 scripts/check_frozen_secret_scan_scope.py
           python3 tests/test_frozen_secret_scan_scope.py
       - name: TruffleHog secrets scan
-        uses: trufflesecurity/trufflehog@0186870afd2c4a90def791d80260923ba583d076 # v3.98.0
+        uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
         with:
           path: ./
           # action.yml constructs IMAGE:VERSION; tag@digest keeps the
@@ -196,7 +196,7 @@ jobs:
           version: '3.97.5@sha256:1cec88f18ca39e26e04e61fe9d886c9c4e5f2fc0ba4f2ed185cac0722bd8a076'
           extra_args: --exclude-detectors Lob --exclude-paths .trufflehog-exclude-paths --fail-on-scan-errors
       - name: TruffleHog protected-history scan
-        uses: trufflesecurity/trufflehog@0186870afd2c4a90def791d80260923ba583d076 # v3.98.0
+        uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
         with:
           path: ./
           image: ghcr.io/trufflesecurity/trufflehog
