@@ -89,6 +89,10 @@ jobs:
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
+
       - name: Tests
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" nextest run --workspace --all-features --locked
@@ -158,6 +162,9 @@ jobs:
         run: |
           cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
           cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Run Windows neutral parity tests
         shell: bash
         run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
@@ -215,11 +222,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Retain immutable MCP oracle source across squash merges
+      - name: Prepare immutable frozen producer history
         shell: bash
-        run: |
-          git fetch --no-tags --no-write-fetch-head --depth=1 origin 0bc6b051890340822448fa3846c96f70022b79ad
-          git cat-file -e '0bc6b051890340822448fa3846c96f70022b79ad^{commit}'
+        run: python3 scripts/prepare-frozen-history.py --fetch
 
       - name: Check frozen MCP stdio corpus and cleanup controls
         shell: bash

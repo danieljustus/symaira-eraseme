@@ -13,6 +13,8 @@ on:
       - 'rust-tests/**'
       - 'Makefile'
       - 'scripts/check-rust-coverage.sh'
+      - 'scripts/prepare-frozen-history.py'
+      - 'tests/test_prepare_frozen_history.py'
       - 'tests/test_make_rust_contract.py'
       - '.github/workflows/go-ci.yml'
   pull_request:
@@ -51,6 +53,8 @@ jobs:
         run: |
           python3 -B tests/test_make_rust_contract.py
           python3 -B -O tests/test_make_rust_contract.py
+          python3 -B tests/test_prepare_frozen_history.py
+          python3 -B -O tests/test_prepare_frozen_history.py
 
   go-test:
     name: Go / test
@@ -65,6 +69,8 @@ jobs:
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component llvm-tools-preview
           cargo +"$RUST_TOOLCHAIN" install cargo-llvm-cov --version 0.9.0 --locked
+      - name: Prepare immutable frozen producer history
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Build
         run: make build
       - name: Test

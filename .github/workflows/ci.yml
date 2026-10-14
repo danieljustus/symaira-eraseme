@@ -135,6 +135,8 @@ jobs:
         run: |
           rustup toolchain install 1.98.0 --profile minimal
           rustup toolchain install nightly-2026-09-20 --profile minimal --component miri,rust-src
+      - name: Prepare immutable frozen producer history
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Build and test
         run: |
           make build

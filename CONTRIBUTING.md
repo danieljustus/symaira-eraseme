@@ -6,6 +6,7 @@
 2. Build and verify the Rust CLI candidate:
 
    ```bash
+   python3 scripts/prepare-frozen-history.py --fetch
    make build-rust
    make rust-gate
    ```
@@ -24,6 +25,15 @@ published retirement acceptance. Historical `v0.13.0` remains a dual-backend
 prerelease; `v0.12.1` is the last Go-only stable release. Frozen Go observations
 and their immutable source history remain as conformance evidence; normal
 builds and tests require no Go installation.
+
+Use a full-history clone. Before the first test run, explicitly prepare the
+three immutable producer commits with the command above. A squash merge and
+feature-branch deletion can leave these objects outside normal branch/tag
+history, even with `fetch-depth: 0`. Preparation downloads only missing pinned
+objects from the public upstream repository, without changing the checkout,
+fixtures or recorded source identities. Without `--fetch`, the command only
+checks availability and fails if an object is missing. Subsequent tests remain
+offline with respect to this history; they never fetch or bypass provenance.
 
 ## Adding a data broker
 

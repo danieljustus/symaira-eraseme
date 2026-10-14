@@ -7,6 +7,8 @@ on:
       - crates/symeraseme-cli/src/mcp/**
       - crates/symeraseme-cli/tests/mcp_http_windows_process.rs
       - crates/symeraseme-cli/tests/support/native_host_agent.rs
+      - scripts/prepare-frozen-history.py
+      - tests/test_prepare_frozen_history.py
       - rust-tests/parity/oracle/native-host-agent/**
       - internal/llm/**
       - internal/mcp/**
@@ -38,6 +40,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # Frozen native readers verify immutable source and generator blobs.
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy

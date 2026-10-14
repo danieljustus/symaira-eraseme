@@ -44,6 +44,8 @@ on:
       - crates/symeraseme-cli/tests/backend_fallback_process.rs
       - crates/symeraseme-cli/tests/support/retained_go_release.rs
       - scripts/fetch-retained-go-release.py
+      - scripts/prepare-frozen-history.py
+      - tests/test_prepare_frozen_history.py
       - crates/symeraseme-cli/tests/support/frozen_plan_process.rs
       - crates/symeraseme-cli/tests/support/capture_plan_process.rs
       - crates/symeraseme-cli/tests/support/migration_oracle.rs
@@ -83,6 +85,8 @@ jobs:
         with:
           fetch-depth: 0 # SQLite verifies immutable Python and Go archive blobs.
           persist-credentials: false
+      - name: Prepare immutable frozen producer history before offline replay
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.98.0 --profile minimal
       - name: Fetch locked Rust dependencies

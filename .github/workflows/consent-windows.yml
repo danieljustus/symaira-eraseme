@@ -10,6 +10,8 @@ on:
       - crates/symeraseme-core/tests/support/frozen_consent_acl.rs
       - tests/fixtures/go-frozen/refresh-a3db5a02/consent-acl/**
       - scripts/capture-windows-identity.ps1
+      - scripts/prepare-frozen-history.py
+      - tests/test_prepare_frozen_history.py
       - rust-tests/parity/oracle/consent-windows-acl/**
       - rust-tests/parity/cases/consent-filesystem/**
       - internal/identity/**
@@ -41,6 +43,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # Authenticate retained source objects, never build Go.
+      - name: Prepare immutable frozen producer history
+        shell: bash
+        run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
