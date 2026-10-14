@@ -3,7 +3,19 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-## Current authorization checkpoint (2026-10-12)
+## Current retirement candidate (2026-10-13)
+
+Go source/module/toolchain retirement is implemented on PR #1232 candidate
+`3b8916b827768ab3500c0804d1cbf749cc22ad23`. All 20 candidate workflows pass;
+six-target native tests, actual archive/SBOMs, copied-store/backup evidence and
+both native Swift suites have fresh readback. See the
+[source-bound acceptance and limitations](../rust-port/handoffs/2026-10-13-go-retirement-native-acceptance.md).
+This supersedes the older implementation-pending statement only for this
+candidate. CUT-005 remains OPEN: final documentation/helper classification,
+protected AGENTS metadata, independent acceptance review, normal merge and a
+new verified release remain separate. No historical asset is replaced.
+
+## Historical authorization checkpoint (2026-10-12)
 
 The maintainer explicitly waived the seven-day stable observation period and
 separately approved CUT-005 Go-source/toolchain retirement, subject to all other

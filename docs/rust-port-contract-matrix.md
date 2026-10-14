@@ -1,6 +1,19 @@
 # Go → Rust executable contract matrix
 
-## Current authorization and readback (2026-10-12)
+## Current retirement candidate readback (2026-10-13)
+
+[Candidate acceptance](rust-port/handoffs/2026-10-13-go-retirement-native-acceptance.md)
+binds PR #1232 head `3b8916b827768ab3500c0804d1cbf749cc22ad23` to fresh
+six-target native Rust tests, 48 backup/restore cases, 72 copied-store cases,
+six actual Rust-only archives with twelve SBOM sidecars, and 42 Swift tests
+on each Mac architecture. All 20 candidate workflows pass.
+
+CUT-005 source/module/toolchain removal is implemented on that candidate;
+overall CUT-005 remains OPEN for the documented review, metadata, merge and
+release requirements. No release row is promoted from CI archives or mock
+packaging tests. The historical checkpoints below retain their original scope.
+
+## Historical authorization and readback (2026-10-12)
 
 The [maintainer's dated amendment](rust-port/handoffs/2026-10-12-observation-waiver.md)
 waives the seven-day observation period and explicitly authorizes Go retirement.

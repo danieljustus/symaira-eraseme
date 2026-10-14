@@ -2,6 +2,15 @@
   "schema_version": 1,
   "plan": "docs/plans/2026-09-04-go-to-rust-implementation-plan.md",
   "approval_trigger": "go",
+  "retirement_candidate": {
+    "source_revision": "3b8916b827768ab3500c0804d1cbf749cc22ad23",
+    "pull_request": 1232,
+    "implementation": "Go source, module and toolchain retirement implemented on the candidate",
+    "native_acceptance": "20 candidate workflows successful; native Rust, Swift, backup/restore, copied-store and real Rust archive/SBOM readback recorded",
+    "evidence": "docs/rust-port/handoffs/2026-10-13-go-retirement-native-acceptance.md",
+    "cut_005": "OPEN: final metadata/helper classification, independent acceptance review, merge and fresh verified release remain",
+    "history": "Supersedes older implementation-pending snapshots only for this candidate; no old release or observation claim is rewritten"
+  },
   "retirement_amendment": {
     "approved_on": "2026-10-12",
     "observation": "seven-day period explicitly waived, not completed",
