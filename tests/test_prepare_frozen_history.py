@@ -27,7 +27,9 @@ class FrozenHistoryPreparation(unittest.TestCase):
                            (ROOT / 'rust-tests/parity/oracle/mcp-stdio-mutations/generate.py').read_text(),
                            re.MULTILINE)
         self.assertEqual(len(stdio), 1)
-        self.assertEqual(set(HISTORY.REVISIONS), required | set(stdio))
+        # Keep the historical producer available after readers select a refresh.
+        historical = {'13ddc6a43036d6b34706db2b82bbb5a13c40d6de'}
+        self.assertEqual(set(HISTORY.REVISIONS), required | set(stdio) | historical)
         self.assertEqual(len(HISTORY.REVISIONS), len(set(HISTORY.REVISIONS)))
         for revision in HISTORY.REVISIONS:
             self.assertRegex(revision, r'^[0-9a-f]{40}$')

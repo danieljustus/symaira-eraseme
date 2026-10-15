@@ -49,7 +49,7 @@ minijinja = { version = "2.24.0", default-features = false, features = ["builtin
 pbkdf2 = { version = "0.13.0", features = ["hmac"] }
 regex = "1.11.3"
 sha2 = "0.11.0"
-rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 rustls-native-certs = "0.8.4"
 hex = "0.4.3"
 rand = "0.10.2"

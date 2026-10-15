@@ -11,6 +11,7 @@ REVISIONS = (
     '13ddc6a43036d6b34706db2b82bbb5a13c40d6de',  # HTTP/SMTP/plan/triage/agent-error producers
     '735ae51ed9c49ca6df88f78c108df8b83f928877',  # Native Windows HTTP producer
     'a3db5a02f9a9aa08d172228caf709c621af3c0bb',  # Native token/consent ACL producer
+    '968e1a2dda9c621ba880e7b618dc49daa31970b3',  # Rustls/Yoke native dependency refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 
