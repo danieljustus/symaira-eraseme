@@ -45,7 +45,7 @@ toml = "1.1.0"
 rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
 ureq = { version = "=3.4.1", default-features = false, features = ["rustls"] }
 yaml-rust2 = "0.13.0"
-minijinja = { version = "2.24.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
+minijinja = { version = "3.0.0", default-features = false, features = ["builtins", "fuel", "serde", "std_collections"] }
 pbkdf2 = { version = "0.13.0", features = ["hmac"] }
 regex = "1.11.3"
 sha2 = "0.11.0"
