@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+Preparing the next patch on the Rust-only line (target `v0.14.2`). These notes
+do not claim publication or complete CUT-005 acceptance. New releases remain
+canary-first, with all assets completed before immutable publication and
+separately verified stable promotion before Homebrew distribution. Historical
+`v0.13.0`, `v0.14.0` and `v0.14.1` assets remain unchanged.
+
+### Changed
+
+- Remove retired Go product sources, module files and live capture tooling.
+  Normal builds, tests and six-target CLI packaging use Rust without a Go
+  installation. Frozen Go observations and immutable producer history remain
+  conformance evidence; the maintainer's observation-period waiver does not
+  waive native, privacy, backup/restore or release acceptance (#1232).
+- Replace the unmaintained YAML backend with `yaml_serde` and `libyaml-rs`,
+  retaining registry contracts, resource preflight and reviewed six-target
+  conformance captures (#1228).
+- Document explicit frozen-history preparation before testing a fresh clone;
+  preserve the source pins and offline replay after preparation (#1237).
+
+### Fixed
+
+- Resolve an existing draft through its release-ID API before immutable
+  publication, retaining exact-source and complete-asset safeguards (#1217).
+- Keep frozen grant privacy-derivation integrity and output protections active
+  under Python optimization without changing valid derived bytes (#1220).
+- Publish the stable Homebrew Formula through a protected tap pull request,
+  after four-host validation and exact stable-release revalidation (#1221).
+- Audit the generated Formula and verify its inferred version before native
+  installation or tap publication (#1223).
+
 ## [v0.14.1] - 2026-10-10
 
 Security and release-safety patch on the Rust-only line. Publication starts as
