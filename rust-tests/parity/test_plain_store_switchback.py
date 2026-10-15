@@ -37,6 +37,46 @@ class SwitchbackControls(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'regular file'):
                 gate.install_artifact(rust, active)
 
+    def test_install_bounds_windows_denial_without_weakening_real_switches(self):
+        # Synthetic error/clock controls, not native Windows execution evidence.
+        replace_image = gate.os.replace
+        cases = [('win32', 5, True), ('win32', 32, True),
+                 ('win32', 5, False), ('win32', 32, False),
+                 ('darwin', 5, False), ('win32', 1, False),
+                 ('win32', None, False)]
+        for platform, winerror, recover in cases:
+            with self.subTest(platform=platform, winerror=winerror, recover=recover), \
+                    tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source, active = root / 'rust', root / 'symeraseme.exe'
+                source.write_bytes(b'synthetic replacement image')
+                active.write_bytes(b'synthetic original image')
+                previous = gate.identity(active)
+                denial = PermissionError('synthetic replacement denial')
+                if winerror is not None:
+                    setattr(denial, 'winerror', winerror)
+
+                def replace(stage, target):
+                    if recover and attempt.call_count > 1:
+                        return replace_image(stage, target)
+                    raise denial
+
+                with patch.object(gate.sys, 'platform', platform), \
+                        patch.object(gate.os, 'replace', side_effect=replace) as attempt, \
+                        patch.object(time, 'monotonic', side_effect=[0, 0, 0, 5]), \
+                        patch.object(time, 'sleep') as sleep:
+                    if recover:
+                        self.assertEqual(gate.install_artifact(source, active), gate.identity(source))
+                    else:
+                        with self.assertRaises(PermissionError) as raised:
+                            gate.install_artifact(source, active)
+                        self.assertIs(raised.exception, denial)
+                        self.assertEqual(gate.identity(active), previous)
+                        self.assertEqual(gate.identity(active.with_suffix('.next')), gate.identity(source))
+                    retries = platform == 'win32' and winerror in (5, 32)
+                    self.assertEqual(attempt.call_count, 2 if retries else 1)
+                    self.assertEqual(sleep.call_count, 1 if retries else 0)
+
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS sandbox Go runtime control')
     def test_go_build_info_reads_only_explicit_goroot(self):
         if os.environ.get('SYMERASEME_ROLLBACK_GO_BINARY') or shutil.which('go') is None:

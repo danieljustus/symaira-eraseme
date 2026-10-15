@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import go_build_info
 
 REPO = Path(__file__).resolve().parents[2]
@@ -61,7 +62,19 @@ def install_artifact(artifact, active):
     shutil.copyfile(artifact, stage)
     stage.chmod(0o700)
     require(identity(stage) == expected, 'staged executable mismatch')
-    os.replace(stage, active)
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            os.replace(stage, active)
+            break
+        except PermissionError as error:
+            remaining = deadline - time.monotonic()
+            if (sys.platform != 'win32' or getattr(error, 'winerror', None) not in (5, 32)
+                    or remaining <= 0):
+                raise
+            time.sleep(min(0.05, remaining))
+            if time.monotonic() >= deadline:
+                raise
     installed = identity(active)
     require(installed == expected, 'installed executable mismatch')
     return installed
