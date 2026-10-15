@@ -13,50 +13,50 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "8561f7c93d1346846e778b726bd26afdd16c750adf8677b4b91149da194f8251",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "ba40ae82070cab185c549d08a70dad0713b3ad5afec0c191677e509f09cc4dd0",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/darwin-amd64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/darwin-amd64/agent-error.json"
         ),
     ),
     (
         "darwin/arm64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "2fed32377a48d412ad629ed03ec79b9033d00a2321e32e252b4b984e578606b8",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "f09a6d34f568fab79c733ca1cc26b94d0bab9a964a6a0663a2c5842bac60def5",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/darwin-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/darwin-arm64/agent-error.json"
         ),
     ),
     (
         "linux/amd64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "0c2adb801764baa6bd907802dc47fd846e0ea95dd141f197b05cb748edc6ad2f",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "816d5ec36eeea833ddf44b63547afa55905158dd017cad7217f97ae61b444560",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/linux-amd64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/linux-amd64/agent-error.json"
         ),
     ),
     (
         "linux/arm64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "ecb62ba79638a3547bc289d542e3ebb540603934077318f694af4765b0967707",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "2cccebbd5af4484ee1a4e95a2fa07db5f5dcf459d1b3c8cd76fa88170f93dcd9",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/linux-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/linux-arm64/agent-error.json"
         ),
     ),
     (
         "windows/amd64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "ef658660bcbc438683c4c11b291fc646b6e6d53679aa41e5bc7b53b53f5975cf",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "ee23f0e718b65947572bae9ad6bcbd59bcf5d52cbf44aa607c2d23267949c639",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/windows-amd64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/windows-amd64/agent-error.json"
         ),
     ),
     (
         "windows/arm64",
-        "968e1a2dda9c621ba880e7b618dc49daa31970b3",
-        "17703c36abf620a17dc8f3b322be83626e2101a97e900e0a62c16f4f05e7603b",
+        "ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33",
+        "0814a72c6296516754e284c7bc0f10d11a37729d47b8c9cc7b5162c90261077a",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-968e1a2d/agent-error/windows-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-ac0b3b4b/agent-error/windows-arm64/agent-error.json"
         ),
     ),
 ];
