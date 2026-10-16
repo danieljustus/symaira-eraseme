@@ -161,6 +161,9 @@ test suite and frozen-observation checks do not require Go. A full Xcode
 installation is required for the macOS GUI.
 
 ```bash
+# Prepare immutable producer history once, before the first test run
+python3 scripts/prepare-frozen-history.py --fetch
+
 # Rust CLI and frozen-observation conformance suite
 make build-rust
 make rust-gate
@@ -177,6 +180,13 @@ make app-test
 # Local development packaging example only; not a release-version claim
 VERSION=0.14.1 ./scripts/package-dmg.sh
 ```
+
+Use a full-history clone. Even then, squash merges and deleted feature branches
+can leave pinned producer commits outside ordinary branch/tag history. The
+explicit preparation above fetches only missing immutable producer objects;
+it does not change the checkout, fixtures or recorded source identities.
+Subsequent replay is offline with respect to that history. Without `--fetch`,
+the preparation command only checks availability and fails if an object is missing.
 
 `make parity` replays recorded Go observations through Rust without a Go
 executable. Keep the frozen observations and their source-provenance checks

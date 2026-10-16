@@ -138,6 +138,27 @@ fn every_canonical_template_matches_the_external_golden_byte_for_byte() {
 }
 
 #[test]
+fn dashboard_preserves_nested_maps_and_half_tie_chart_widths() {
+    for (planned, width) in [(1, 13), (5, 63)] {
+        let mut context = context_for("templates/dashboard.html.j2");
+        context.data["planned"] = json!(planned);
+        context.data["sent"] = json!(8);
+        context.data["total_requests"] = json!(planned + 9);
+        context.data["campaigns"][0]["id"] = json!("nested-campaign");
+        let html = render("dashboard.html.j2", &context).unwrap();
+        assert!(
+            html.contains("<strong style=\"color: var(--gold-primary)\">nested-campaign</strong>")
+        );
+        assert!(
+            html.contains(&format!(
+                "class=\"chart-bar-fill planned\" style=\"width: {width}%\""
+            )),
+            "planned={planned}: expected half-away-from-zero chart width {width}%"
+        );
+    }
+}
+
+#[test]
 fn arbitrary_precision_numbers_are_exact_or_rejected() {
     for (input, expected) in [
         (
@@ -242,6 +263,43 @@ fn context_precedence_unicode_and_markdown_behavior_are_stable() {
     let html = render("report.html.j2", &report).unwrap();
     assert!(html.contains("&lt;sentinel&gt; &amp;"));
     assert!(!html.contains("<sentinel> &"));
+
+    for (value, expected) in [
+        (
+            json!(["<quoted>", "O'Reilly", "\n"]),
+            r#"["<quoted>", "O'Reilly", "\n"]"#,
+        ),
+        (
+            json!({"nested": [true, null, {"a": "<quoted>"}]}),
+            r#"{"nested": [True, None, {"a": "<quoted>"}]}"#,
+        ),
+        // Expected bytes independently rendered by MiniJinja 2.24.0.
+        (
+            json!(["double\"quote", "back\\slash", "O'Reilly", "\n"]),
+            r#"["double\"quote", "back\\slash", "O'Reilly", "\n"]"#,
+        ),
+        (
+            json!(["Ü😀\u{e000}", 1.5, u64::MAX, true, null]),
+            r#"["Ü😀\u{e000}", 1.5, 18446744073709551615, True, None]"#,
+        ),
+    ] {
+        context.extra.insert("full_name".into(), value.clone());
+        let markdown = render("gdpr-art17.en.md.j2", &context).unwrap();
+        assert!(
+            markdown.contains(expected),
+            "legacy collection quoting: {markdown}"
+        );
+        report.data["broker_leaderboard"][0]["broker_id"] = value;
+        let html = render("report.html.j2", &report).unwrap();
+        let escaped = expected
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&#39;");
+        assert!(html.contains(&escaped));
+        assert!(!html.contains("<quoted>"));
+    }
 }
 
 #[test]
@@ -371,6 +429,27 @@ fn bounded_rendering_rejects_string_aggregate_and_output_amplification() {
         .to_string();
     assert!(error.len() <= 256);
     assert!(!error.contains(sentinel));
+}
+
+#[test]
+fn collection_formatter_amplification_has_static_errors() {
+    let sentinel = "collection amplification sentinel";
+    let item = format!("{sentinel}{}", "\"<".repeat(24_000));
+    let collection = json!(vec![item; 20]);
+    let mut context = fixture_context();
+    context.extra.insert("full_name".into(), collection.clone());
+    assert_eq!(
+        render("gdpr-art17.en.md.j2", &context)
+            .unwrap_err()
+            .to_string(),
+        "template could not be rendered"
+    );
+    let mut report = fixture_context();
+    report.data["broker_leaderboard"][0]["broker_id"] = collection;
+    assert_eq!(
+        render("report.html.j2", &report).unwrap_err().to_string(),
+        "template could not be rendered"
+    );
 }
 
 #[test]

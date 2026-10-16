@@ -373,6 +373,14 @@ fn golden_reporting_anchor_values() {
     assert_eq!(report["broker_leaderboard"][0]["broker_id"], "broker-a");
     assert_eq!(report["broker_leaderboard"][0]["total"], 2);
     assert_eq!(report["jurisdiction_stats"][0]["jurisdiction"], "GDPR");
+    // report.html.j2 joins these map keys as string event names, not collections.
+    let timeline = report["timeline"].as_array().expect("timeline array");
+    assert!(!timeline.is_empty());
+    for day in timeline {
+        let events = day["events"].as_object().expect("event-name count map");
+        assert!(!events.is_empty());
+        assert!(events.values().all(Value::is_i64));
+    }
 }
 
 /// An unknown campaign yields Go's `emptyReport` shape rather than an error.
