@@ -15,7 +15,7 @@ Fixes # (issue)
 ## Checklist
 
 - [ ] I have linked the issue this PR addresses (see above).
-- [ ] I have run `make test` and all Go tests pass.
+- [ ] I have run `make test` and the Rust workspace tests and doctests pass.
 - [ ] I have run `make lint` and `make vet` with no errors.
 - [ ] I have added tests for any new functionality.
 - [ ] I have updated the README or documentation if this change is user-facing.
@@ -27,7 +27,7 @@ Fixes # (issue)
 If this PR adds or modifies broker YAML files, complete this section.
 
 - [ ] YAML validates against `registry/schemas/broker.schema.json` (`symeraseme registry validate`)
-- [ ] Broker `id` is unique and matches the filename (e.g. `beenverified-us` → `beenverified.yaml`)
+- [ ] Broker `id` is unique and matches the filename (e.g. `beenverified-us` → `beenverified-us.yaml`)
 - [ ] Opt-out URL / email address is reachable and verified manually
 - [ ] At least one `ack_keywords` entry reflects the actual confirmation text from the broker
 - [ ] CAPTCHAs: site_key is the live value from the page DOM (not a placeholder)

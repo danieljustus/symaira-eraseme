@@ -1,5 +1,11 @@
 # Python test classification for the Go port
 
+Historical Python-to-Go migration record. The Go evidence paths and coverage
+numbers below describe that completed milestone, not the current source tree.
+Go sources are now retired; see [CONTRIBUTING.md](../CONTRIBUTING.md#testing)
+for current Rust tests and coverage gates. The original classifications remain
+unchanged for auditability.
+
 This inventory records the 74 Python test files that existed before the cutover.
 The files are removed by #731; the table preserves the review decision and the
 replacement evidence for future audits.
@@ -97,6 +103,6 @@ The local reference run covers 5,184 / 6,842 statements = 75.77%. CI remains
 canonical for the runner's target OS; the exact profile gate is evaluated there
 rather than trusting rounded package summaries.
 
-`make coverage` enforces `COVERAGE_THRESHOLD ?= 75` using the profile's exact
-statement counts. The Python test files listed above are now archived decisions;
+At that milestone, `make coverage` enforced `COVERAGE_THRESHOLD ?= 75` using the
+profile's exact statement counts. The Python test files listed above are now archived decisions;
 #731 removed the Python CI leg and implementation after the Go gate passed.

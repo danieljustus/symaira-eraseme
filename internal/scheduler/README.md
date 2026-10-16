@@ -1,5 +1,13 @@
 # Go scheduler integration
 
+Historical Go implementation notes. The Go package described below has been
+removed from the current source tree; its code remains in immutable Git history.
+The current Rust scheduler lives in
+[`crates/symeraseme-engine/src/scheduler/`](../../crates/symeraseme-engine/src/scheduler/),
+with generation and lifecycle coverage in `scheduler_parity.rs` and
+`scheduler_install_parity.rs` under `crates/symeraseme-engine/tests/`.
+Run `make rust-gate` from the repository root for the current Rust suite.
+
 `internal/scheduler` provides the cross-platform scheduler integration without relying on
 ambient `PATH` resolution. An empty `Config.BinaryPath` resolves to the exact
 absolute path returned by `os.Executable`; an explicit path is preserved

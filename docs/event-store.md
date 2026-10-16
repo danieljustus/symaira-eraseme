@@ -2,6 +2,13 @@
 
 **Status:** pinned · **Schema version:** `2` (PRAGMA user_version) · **Scope:** milestone v1.0.0 (Go port)
 
+The Python/Go names and migration notes below preserve the historical contract,
+not an active Go development dependency. The current implementation is Rust;
+the Go sources are retained in immutable Git history. Current Rust checks are
+listed in §6 and [CONTRIBUTING.md](../CONTRIBUTING.md#testing). Historical
+milestone limitations below do not describe the current Rust acceptance state;
+see the [migration ledger](migration/go-to-rust.md).
+
 This document specifies the on-disk format of the Symaira EraseMe event
 store so the Go port can read and write the same database files used by the
 pre-cutover implementation. The archived implementation is available at the
@@ -245,11 +252,20 @@ tests/fixtures/event-store/
   golden-projection.json    expected rebuilt projections (keyed by request id)
 ```
 
-The golden fixtures are maintained as committed data. Run the Go conformance
-tests after changing the event-store contract:
-`go test ./internal/eventstore/...`
+The golden fixtures are maintained as committed data. For the current Rust
+implementation, run these tests from the repository root:
 
-Conformance: `internal/eventstore/conformance_test.go`
+```bash
+cargo test -p symeraseme-core --test sqlite_contract --test projection_contract --locked
+```
+
+`crates/symeraseme-core/tests/projection_contract.rs` copies the committed
+database and checks the rebuilt JSON bytes and persisted SQLite projections.
+Use `make rust-gate` for the complete Rust suite; the focused command is not a
+replacement for encryption, native-platform or release acceptance.
+
+Historical Go conformance: `internal/eventstore/conformance_test.go`, retained
+in Git history, ran with `go test ./internal/eventstore/...`:
 1. copies the golden DB to a temp path, opens it with the Go store, rebuilds
    state per request, and compares **exactly** against `golden-projection.json`;
 2. asserts `request_state` is empty before rebuild (projection is derived);

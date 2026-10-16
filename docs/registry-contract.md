@@ -4,9 +4,10 @@
 
 This document is the language-neutral contract for the data broker registry.
 These behaviors are part of the committed registry contract and are verified
-by the current Rust production loader and the retained Go development oracle.
-The pre-cutover loader and tests are preserved only at the `python-final` tag
-for historical comparison.
+by the current Rust production loader and frozen Go observations. Go sources
+and tests are retained in immutable Git history, not as a live development
+dependency. References below to Go describe the historical contract. The
+pre-cutover Python loader and tests remain at the `python-final` tag.
 
 ## 1. Versioning
 
@@ -138,13 +139,17 @@ Two independent checkers must both pass for any change to the registry:
 
 1. **Schema validation** — every non-`_` YAML under `registry/brokers/**`
    validates against `registry/schemas/broker.schema.json` and `id` equals
-   the file stem. The Go CI job `schema-validate` and
-   `internal/registry` tests enforce this rule.
+   the file stem. The CI job `schema-validate` runs the current Rust CLI's
+   `symeraseme registry validate`; `crates/symeraseme-core/tests/registry_contract.rs`
+   also validates the complete registry and file-stem rule.
 2. **Loader conformance** — the golden fixtures
    (`tests/fixtures/registry-contract/`) load through the runtime loader
-   unchanged, and the invalid fixture is rejected by the Go loader tests.
+   unchanged, and the invalid fixture is rejected by the Rust loader tests.
 
-The Go conformance suite runs these same two checks against the same files.
+Run `cargo test -p symeraseme-core --test registry_contract --locked` for the
+current loader checks. The historical Go conformance suite covered the same
+committed fixture contract; it is no longer an executable test target in this
+source tree.
 
 ## 8. Golden fixtures
 
@@ -159,7 +164,8 @@ The Go conformance suite runs these same two checks against the same files.
 ## 9. Implicit behaviours (traps for the port)
 
 These behaviors are part of the committed registry contract and are verified
-by the Go loader; the pre-cutover implementation is historical context only.
+by the Rust loader. Go implementation references and the corpus measurements
+below record the original contract; they do not require a Go installation.
 
 - `template`/`locale`/`required_fields`/`supports_suppression`/
   `expected_response_days` are **not** email-only in practice — web_form
