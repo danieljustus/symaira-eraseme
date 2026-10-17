@@ -14,15 +14,15 @@ struct CampaignsView: View {
                 header
 
                 if let plan = vm.planResult {
-                    successBanner(plan.message ?? "Campaign created")
+                    SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
                 }
                 if let exec = vm.executeResult {
-                    successBanner(exec.message ?? "Execution complete")
+                    SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)
                 }
 
                 switch vm.state {
                 case .idle, .loading:
-                    LoadingOverlay(message: "Loading campaigns…")
+                    SymairaLoadingState("Loading campaigns…")
                         .frame(height: 200)
 
                 case .failed(let message):
@@ -33,8 +33,8 @@ struct CampaignsView: View {
 
                 case .loaded(let campaigns):
                     if campaigns.isEmpty {
-                        EmptyStateView(
-                            icon: "megaphone.fill",
+                        SymairaEmptyState(
+                            systemImage: "megaphone.fill",
                             title: "No Campaigns",
                             message: "Create your first campaign to start removing data from brokers."
                         )
@@ -79,9 +79,7 @@ struct CampaignsView: View {
             } label: {
                 Label("New Campaign", systemImage: "plus")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(BrandColors.goldPrimary)
-            .foregroundStyle(BrandColors.bgDark)
+            .symairaButtonStyle(.primary)
         }
     }
 
@@ -99,14 +97,13 @@ struct CampaignsView: View {
                         pendingExecuteId = campaign.id
                         showExecuteAlert = true
                     }
-                    .buttonStyle(.bordered)
-                    .tint(BrandColors.goldPrimary)
+                    .symairaButtonStyle(.secondary)
                     .controlSize(.small)
                 }
             }
             .frame(minHeight: 200)
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 
 
@@ -133,7 +130,7 @@ struct CampaignsView: View {
                         }
                     }
                     .disabled(!vm.canCreateCampaign)
-                    .tint(BrandColors.goldPrimary)
+                    .symairaButtonStyle(.primary)
                 }
             }
             .formStyle(.grouped)
@@ -149,26 +146,12 @@ struct CampaignsView: View {
                 }
             }
         }
-        .frame(width: 450)
+        .frame(width: 500, height: 460)
         .onExitCommand {
             showCreateSheet = false
             vm.resetForm()
         }
     }
 
-    private func successBanner(_ message: String) -> some View {
-        HStack {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(BrandColors.confirmed)
-            Text(message)
-                .symairaText(.callout)
-                .foregroundStyle(BrandColors.textPrimary)
-            Spacer()
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(BrandColors.confirmedBg)
-        )
-    }
+
 }

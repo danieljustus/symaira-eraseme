@@ -14,9 +14,11 @@ else
 fi
 
 echo "Building SymairaEraseMe..."
-swift build "$@"
+# ponytail: keep the real linked SDK for native chrome while supporting macOS 14.
+# Return to Swift Build when LC_BUILD_VERSION.sdk no longer equals deployment target.
+swift build --build-system native "$@"
 
-SWIFT_BIN_PATH="$(swift build --show-bin-path "$@")"
+SWIFT_BIN_PATH="$(swift build --build-system native --show-bin-path "$@")"
 PROJECT_ROOT="$(cd ../.. && pwd)"
 if [ -n "${SYMERASEME_RUST_TEST_BINARY:-}" ]; then
     test -x "$SYMERASEME_RUST_TEST_BINARY"

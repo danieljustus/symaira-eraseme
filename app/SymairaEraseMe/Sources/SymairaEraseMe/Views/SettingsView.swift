@@ -5,6 +5,7 @@ import SymairaTheme
 struct SettingsView: View {
     @EnvironmentObject var serverManager: ServerManager
     @StateObject private var vm: SettingsViewModel
+    @AppStorage("symeraseme_appearance") private var appearance: SymairaAppearance = .system
 
     init(serverManager: ServerManager) {
         _vm = StateObject(wrappedValue: SettingsViewModel(serverManager: serverManager))
@@ -15,6 +16,12 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
+                SymairaFormSection("Appearance") {
+                    SymairaFormRow("Color scheme") {
+                        SymairaAppearancePicker(selection: $appearance)
+                            .frame(width: 300)
+                    }
+                }
                 serverSection
                 connectionSection
                 configurationSection
@@ -22,8 +29,12 @@ struct SettingsView: View {
                 aboutSection
             }
             .padding(24)
+            .frame(maxWidth: 768)
+            .frame(maxWidth: .infinity)
         }
-        .background(Color.clear)
+        .background(SymairaTokens.canvas)
+        .onAppear { appearance.apply() }
+        .onChange(of: appearance) { _, value in value.apply() }
         .task { await vm.checkConnection() }
         .onChange(of: serverManager.isRunning) { _, running in
             guard running else { return }
@@ -74,20 +85,17 @@ struct SettingsView: View {
                     Button("Stop Server") {
                         serverManager.stop()
                     }
-                    .buttonStyle(.bordered)
-                    .tint(BrandColors.rejected)
+                    .symairaButtonStyle(.secondary)
                 } else {
                     Button("Start Server") {
                         serverManager.start()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandColors.goldPrimary)
-                    .foregroundStyle(BrandColors.bgDark)
+                    .symairaButtonStyle(.primary)
                 }
             }
 
             if let error = serverManager.lastError {
-                ErrorBanner(message: error) { serverManager.lastError = nil }
+                SymairaNotice(message: error, tone: .critical) { serverManager.lastError = nil }
             }
         }
     }
@@ -122,8 +130,7 @@ struct SettingsView: View {
                 Button("Test Connection") {
                     Task { await vm.checkConnection() }
                 }
-                .buttonStyle(.bordered)
-                .tint(BrandColors.goldPrimary)
+                .symairaButtonStyle(.secondary)
                 .disabled(vm.isChecking)
             }
 
@@ -186,14 +193,13 @@ struct SettingsView: View {
                 Button("Generate & Open Dashboard") {
                     Task { await vm.openHTMLDashboard() }
                 }
-                .buttonStyle(.bordered)
-                .tint(BrandColors.goldPrimary)
+                .symairaButtonStyle(.secondary)
 
                 if let path = vm.dashboardPath {
                     Button("Show in Finder") {
                         vm.showInFinder(path)
                     }
-                    .buttonStyle(.bordered)
+                    .symairaButtonStyle(.secondary)
                 }
             }
 

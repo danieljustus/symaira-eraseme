@@ -21,7 +21,7 @@ struct ManualTasksView: View {
 
                 switch vm.state {
                 case .idle, .loading:
-                    LoadingOverlay(message: "Loading tasks…")
+                    SymairaLoadingState("Loading tasks…")
                         .frame(height: 200)
 
                 case .failed(let message):
@@ -32,10 +32,12 @@ struct ManualTasksView: View {
 
                 case .loaded(let tasks):
                     if tasks.isEmpty {
-                        EmptyStateView(
-                            icon: "checklist",
+                        SymairaEmptyState(
+                            systemImage: "checklist",
                             title: "No Manual Tasks",
-                            message: "All broker forms are handled automatically. Manual tasks appear when automation fails."
+                            message: """
+                            No matching tasks. Broker web forms and verification steps are handled here manually.
+                            """
                         )
                         .frame(height: 200)
                     } else {
@@ -63,13 +65,8 @@ struct ManualTasksView: View {
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
-            Picker("Filter", selection: $vm.filterStatus) {
-                Text("All").tag("")
-                Text("Pending").tag("pending")
-                Text("Completed").tag("completed")
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
+            SymairaSegmentedControl("Filter", selection: $vm.filterStatus,
+                options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
             .onChange(of: vm.filterStatus) { _, _ in
                 Task { await vm.refresh() }
             }
@@ -79,8 +76,8 @@ struct ManualTasksView: View {
                 Image(systemName: "arrow.clockwise")
                     .symairaText(.heading)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
+            .accessibilityLabel("Refresh manual tasks")
         }
     }
 
@@ -89,8 +86,8 @@ struct ManualTasksView: View {
             GridItem(.flexible()),
             GridItem(.flexible()),
         ], spacing: 12) {
-            StatCard(title: "Pending", value: vm.pendingTasks, color: BrandColors.pending)
-            StatCard(title: "Completed", value: vm.completedTasks, color: BrandColors.confirmed)
+            StatCard(title: "Pending", value: vm.pendingTasks)
+            StatCard(title: "Completed", value: vm.completedTasks)
         }
     }
 
@@ -115,8 +112,7 @@ struct ManualTasksView: View {
                             completionNotes = ""
                             showCompleteSheet = true
                         }
-                        .buttonStyle(.bordered)
-                        .tint(BrandColors.confirmed)
+                        .symairaButtonStyle(.secondary)
                         .controlSize(.small)
                     } else {
                         Text("Done")
@@ -127,7 +123,7 @@ struct ManualTasksView: View {
             }
             .frame(minHeight: 150)
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 
     private var completeSheet: some View {
@@ -165,7 +161,7 @@ struct ManualTasksView: View {
                             }
                         }
                     }
-                    .tint(BrandColors.confirmed)
+                    .symairaButtonStyle(.primary)
                 }
             }
             .formStyle(.grouped)

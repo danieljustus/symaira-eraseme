@@ -12,7 +12,7 @@ struct CalendarView: View {
 
                 switch vm.state {
                 case .idle, .loading:
-                    LoadingOverlay(message: "Loading calendar…")
+                    SymairaLoadingState("Loading calendar…")
                         .frame(height: 200)
 
                 case .failed(let message):
@@ -27,8 +27,8 @@ struct CalendarView: View {
                     }
                     tickActionsSection
                     if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
-                        EmptyStateView(
-                            icon: "calendar",
+                        SymairaEmptyState(
+                            systemImage: "calendar",
                             title: "No Calendar Data",
                             message: "Create a campaign to see upcoming deadlines."
                         )
@@ -53,14 +53,8 @@ struct CalendarView: View {
                     .foregroundStyle(BrandColors.textMuted)
             }
             Spacer()
-            Picker("Weeks", selection: $vm.weeks) {
-                Text("2 weeks").tag(2)
-                Text("4 weeks").tag(4)
-                Text("8 weeks").tag(8)
-                Text("12 weeks").tag(12)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 280)
+            SymairaSegmentedControl("Weeks", selection: $vm.weeks,
+                options: [(2, "2 weeks"), (4, "4 weeks"), (8, "8 weeks"), (12, "12 weeks")])
             .onChange(of: vm.weeks) { _, _ in
                 Task { await vm.refresh() }
             }
@@ -70,14 +64,13 @@ struct CalendarView: View {
                 Image(systemName: "arrow.clockwise")
                     .symairaText(.heading)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
             .accessibilityLabel("Refresh calendar")
         }
     }
 
     /// Human-readable label for an escalation category identifier returned
-    /// by the Go reporting backend. Unknown identifiers fall back to
+    /// by the reporting backend. Unknown identifiers fall back to
     /// the raw key so the UI never crashes on a new backend category.
     static func escalationLabel(for key: String) -> String {
         switch key {
@@ -104,9 +97,9 @@ struct CalendarView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                 ], spacing: 12) {
-                    StatCard(title: "Total Requests", value: totals.requests ?? 0, color: BrandColors.textPrimary)
-                    StatCard(title: "Resolved", value: totals.resolved ?? 0, color: BrandColors.confirmed)
-                    StatCard(title: "Open", value: totals.open ?? 0, color: BrandColors.pending)
+                    StatCard(title: "Total Requests", value: totals.requests ?? 0)
+                    StatCard(title: "Resolved", value: totals.resolved ?? 0)
+                    StatCard(title: "Open", value: totals.open ?? 0)
                 }
             }
 
@@ -117,10 +110,10 @@ struct CalendarView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                 ], spacing: 12) {
-                    StatCard(title: "Overdue", value: upcoming.overdue ?? 0, color: BrandColors.overdue)
-                    StatCard(title: "Due in 7d", value: upcoming.deadlineDueWithin7d ?? 0, color: BrandColors.pending)
-                    StatCard(title: "Due in 30d", value: upcoming.deadlineDueWithin30d ?? 0, color: BrandColors.planned)
-                    StatCard(title: "Tick Actions", value: upcoming.tickActionsReady ?? 0, color: BrandColors.goldPrimary)
+                    StatCard(title: "Overdue", value: upcoming.overdue ?? 0)
+                    StatCard(title: "Due in 7d", value: upcoming.deadlineDueWithin7d ?? 0)
+                    StatCard(title: "Due in 30d", value: upcoming.deadlineDueWithin30d ?? 0)
+                    StatCard(title: "Tick Actions", value: upcoming.tickActionsReady ?? 0)
                 }
             }
 
@@ -162,7 +155,7 @@ struct CalendarView: View {
                 }
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 
     private var tickActionsSection: some View {
@@ -188,6 +181,6 @@ struct CalendarView: View {
                 .frame(minHeight: 100, idealHeight: CGFloat(min(vm.tickActions.count, 8)) * 36 + 40)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 }

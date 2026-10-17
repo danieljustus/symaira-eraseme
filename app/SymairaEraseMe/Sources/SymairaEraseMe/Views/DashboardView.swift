@@ -13,7 +13,7 @@ struct DashboardView: View {
 
                 switch vm.state {
                 case .idle, .loading:
-                    LoadingOverlay(message: "Loading dashboard…")
+                    SymairaLoadingState("Loading dashboard…")
                         .frame(height: 300)
 
                 case .failed(let message):
@@ -24,8 +24,8 @@ struct DashboardView: View {
 
                 case .loaded(let data):
                     if data.totalRequests == 0 {
-                        EmptyStateView(
-                            icon: "chart.bar.fill",
+                        SymairaEmptyState(
+                            systemImage: "chart.bar.fill",
                             title: "No Data Yet",
                             message: "Create a campaign to start removing your data from brokers."
                         )
@@ -40,6 +40,8 @@ struct DashboardView: View {
                 }
             }
             .padding(24)
+            .frame(maxWidth: 1008)
+            .frame(maxWidth: .infinity)
         }
         .background(Color.clear)
         .task { await vm.refresh() }
@@ -52,11 +54,11 @@ struct DashboardView: View {
             VStack(alignment: .leading) {
                 Text("Dashboard")
                     .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
+                    .topoProtected()
                 if let data = vm.data {
                     Text("Generated \(data.generatedAt.formattedDate)")
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
+                        .topoProtected()
                 }
             }
             Spacer()
@@ -66,9 +68,9 @@ struct DashboardView: View {
                 Image(systemName: "arrow.clockwise")
                     .symairaText(.heading)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
             .accessibilityLabel("Refresh dashboard")
+            .topoProtected()
         }
     }
 
@@ -76,17 +78,13 @@ struct DashboardView: View {
 
     private var summaryCards: some View {
         LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
+            GridItem(.adaptive(minimum: 150))
         ], spacing: 12) {
-            StatCard(title: "Total", value: vm.totalRequests, color: BrandColors.textPrimary)
-            StatCard(title: "In Progress", value: vm.inProgress, color: BrandColors.pending)
-            StatCard(title: "Confirmed", value: vm.confirmed, color: BrandColors.confirmed)
-            StatCard(title: "Rejected", value: vm.rejected, color: BrandColors.rejected)
-            StatCard(title: "Overdue", value: vm.overdue, color: BrandColors.overdue)
+            StatCard(title: "Total", value: vm.totalRequests)
+            StatCard(title: "In Progress", value: vm.inProgress)
+            StatCard(title: "Confirmed", value: vm.confirmed)
+            StatCard(title: "Rejected", value: vm.rejected)
+            StatCard(title: "Overdue", value: vm.overdue)
         }
     }
 
@@ -103,11 +101,7 @@ struct DashboardView: View {
                     x: .value("Count", item.count),
                     y: .value("Status", item.label)
                 )
-                .foregroundStyle(LinearGradient(
-                    colors: [item.color, item.color.opacity(0.6)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ))
+                .foregroundStyle(item.color)
                 .cornerRadius(4)
             }
             .chartXAxis(.hidden)
@@ -119,7 +113,8 @@ struct DashboardView: View {
             }
             .frame(height: CGFloat(vm.statusBreakdown.count * 32 + 20))
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Campaigns Table
@@ -150,7 +145,8 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Broker Status Grid
@@ -176,7 +172,8 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Recent Events Timeline
@@ -192,8 +189,7 @@ struct DashboardView: View {
                     ForEach(events.prefix(15)) { event in
                         EventRow(event: event)
                         if event.id != events.prefix(15).last?.id {
-                            Divider()
-                                .background(BrandColors.textMuted.opacity(0.2))
+                            SymairaFormDivider()
                         }
                     }
                 }
@@ -203,7 +199,8 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 }
 
@@ -211,7 +208,6 @@ struct DashboardView: View {
 
 struct BrokerStatusCard: View {
     let broker: BrokerStatus
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -246,21 +242,7 @@ struct BrokerStatusCard: View {
                 .foregroundStyle(BrandColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovered ? BrandColors.bgCardHover : BrandColors.bgCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isHovered ? BrandColors.goldPrimary.opacity(0.2) : Color.white.opacity(0.05), lineWidth: 1)
-                )
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .onHover { hovering in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                isHovered = hovering
-            }
-        }
+        .symairaCard(padding: SymairaSpacing.medium)
     }
 }
 
@@ -302,26 +284,14 @@ struct ErrorStateView: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(BrandColors.overdue)
-            Text("Failed to Load")
-                .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
-            Text(message)
-                .symairaText(.callout)
-                .foregroundStyle(BrandColors.textMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+        SymairaEmptyState(
+            systemImage: "exclamationmark.triangle.fill", title: "Failed to Load", message: message
+        ) {
             Button(action: onRetry) {
                 Label("Retry", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.bordered)
-            .tint(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .interactiveGlassCard()
     }
 }
 
