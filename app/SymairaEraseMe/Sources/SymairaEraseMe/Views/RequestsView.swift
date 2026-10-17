@@ -16,7 +16,7 @@ struct RequestsView: View {
 
                     switch vm.state {
                     case .idle, .loading:
-                        LoadingOverlay(message: "Loading requests…")
+                        SymairaLoadingState("Loading requests…")
                             .frame(height: 200)
 
                     case .failed(let message):
@@ -27,8 +27,8 @@ struct RequestsView: View {
 
                     case .loaded(let requests):
                         if requests.isEmpty {
-                            EmptyStateView(
-                                icon: "envelope.fill",
+                            SymairaEmptyState(
+                                systemImage: "envelope.fill",
                                 title: "No Requests",
                                 message: "Create a campaign to generate removal requests."
                             )
@@ -68,30 +68,29 @@ struct RequestsView: View {
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
+            .accessibilityLabel("Refresh requests")
         }
     }
 
     private var filters: some View {
-        HStack(spacing: 12) {
-            TextField("Campaign", text: $vm.filterCampaignId)
-                .textFieldStyle(.symaira)
-                .frame(width: 150)
-            TextField("Status", text: $vm.filterStatus)
-                .textFieldStyle(.symaira)
-                .frame(width: 180)
-            TextField("Broker", text: $vm.filterBrokerId)
-                .textFieldStyle(.symaira)
-                .frame(width: 150)
-            Button("Apply") {
-                vm.page = 1
-                Task { await vm.refresh() }
+        VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
+            HStack(spacing: SymairaSpacing.medium) {
+                TextField("Campaign", text: $vm.filterCampaignId)
+                TextField("Status", text: $vm.filterStatus)
+                TextField("Broker", text: $vm.filterBrokerId)
             }
-            .buttonStyle(.bordered)
-            .tint(BrandColors.goldPrimary)
-            Button("Reset") { vm.resetFilters() }
-                .buttonStyle(.bordered)
+            .textFieldStyle(.symaira)
+            HStack(spacing: SymairaSpacing.medium) {
+                Button("Apply") {
+                    vm.page = 1
+                    Task { await vm.refresh() }
+                }
+                .symairaButtonStyle(.secondary)
+                Button("Reset") { vm.resetFilters() }
+                    .symairaButtonStyle(.secondary)
+            }
+            .fixedSize()
         }
     }
 
@@ -111,7 +110,7 @@ struct RequestsView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
-            Divider().background(BrandColors.textMuted.opacity(0.2))
+            SymairaFormDivider()
 
             // Data rows
             ScrollView {
@@ -150,7 +149,7 @@ struct RequestsView: View {
                             }
                         }
 
-                        Divider().background(BrandColors.textMuted.opacity(0.1))
+                        SymairaFormDivider()
                     }
                 }
             }
@@ -165,8 +164,10 @@ struct RequestsView: View {
                 .foregroundStyle(BrandColors.textMuted)
             Spacer()
             Button("Previous") { vm.previousPage() }
+                .symairaButtonStyle(.secondary)
                 .disabled(!vm.hasPrevious)
             Button("Next") { vm.nextPage() }
+                .symairaButtonStyle(.secondary)
                 .disabled(!vm.hasNext)
         }
     }
@@ -186,6 +187,7 @@ struct RequestsView: View {
                         .foregroundStyle(BrandColors.textMuted)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close request details")
             }
 
             Group {
@@ -210,8 +212,7 @@ struct RequestsView: View {
                 }
             }
 
-            Divider()
-                .background(BrandColors.textMuted.opacity(0.2))
+            SymairaFormDivider()
 
             Text("Events")
                 .symairaText(.bodyEmphasized)
@@ -272,14 +273,7 @@ struct RequestsView: View {
             }
         }
         .padding(16)
-        .background(
-            Rectangle()
-                .fill(BrandColors.bgDarker.opacity(0.8))
-                .overlay(
-                    Rectangle()
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-        )
+        .background(SymairaTokens.surface)
     }
 
     private func eventTone(for eventType: String) -> SymairaTone {
@@ -293,14 +287,10 @@ struct RequestsView: View {
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
-                .frame(width: 90, alignment: .trailing)
+        SymairaFormRow(label) {
             Text(value)
                 .symairaText(.callout)
-                .foregroundStyle(BrandColors.textPrimary)
+                .textSelection(.enabled)
         }
     }
 }

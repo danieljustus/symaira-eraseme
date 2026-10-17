@@ -88,8 +88,15 @@ fi
 if [ "$DMG_ONLY" != "true" ]; then
     echo "Building SymairaEraseMe in Release mode..."
     cd app/SymairaEraseMe
-    swift build -c release --jobs "${SWIFT_BUILD_JOBS:-2}"
-    SWIFT_BIN_PATH="$(swift build -c release --jobs "${SWIFT_BUILD_JOBS:-2}" --show-bin-path)"
+    # ponytail: Swift Build currently stamps the deployment target as the SDK
+    # (14.0), disabling native Liquid Glass. Native SwiftPM records the real SDK.
+    # Remove this workaround once Swift Build preserves LC_BUILD_VERSION.sdk.
+    SWIFT_BUILD_ARGS=(--build-system native -c release --jobs "${SWIFT_BUILD_JOBS:-2}")
+    if [ -n "${SWIFT_SCRATCH_PATH:-}" ]; then
+        SWIFT_BUILD_ARGS+=(--scratch-path "$SWIFT_SCRATCH_PATH")
+    fi
+    swift build "${SWIFT_BUILD_ARGS[@]}"
+    SWIFT_BIN_PATH="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
     cd ../..
 
     BUILD_DIR="$SWIFT_BIN_PATH"
@@ -138,6 +145,29 @@ if [ "$DMG_ONLY" != "true" ]; then
     cp "$BUILD_DIR/symeraseme" "$APP_BUNDLE/Contents/MacOS/symeraseme"
     chmod 0755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/symeraseme"
     test -x "$APP_BUNDLE/Contents/MacOS/symeraseme"
+
+    # Bundle.module resolves from the app resources. Keep the shared
+    # font/license and shader resources with the distributable, not in a cache.
+    for resource_bundle in "$BUILD_DIR"/*.bundle; do
+        [ -d "$resource_bundle" ] || continue
+        cp -R "$resource_bundle" "$APP_BUNDLE/Contents/Resources/"
+    done
+    THEME_RESOURCES="$APP_BUNDLE/Contents/Resources/symaira-appkit_SymairaTheme.bundle"
+    if [ -d "$THEME_RESOURCES/Contents/Resources" ]; then
+        THEME_RESOURCES="$THEME_RESOURCES/Contents/Resources"
+    fi
+    test -s "$THEME_RESOURCES/GoogleSansFlex.ttf"
+    test -s "$THEME_RESOURCES/GoogleSansFlex-OFL.txt"
+    # Xcode's SwiftPM backend compiles Metal. Native SwiftPM copies its source;
+    # compile that source only when no library was produced by the build.
+    if [ ! -s "$THEME_RESOURCES/default.metallib" ]; then
+        test -s "$THEME_RESOURCES/SymairaTopo.metal"
+        xcrun -sdk macosx metal -target air64-apple-macos14.0 \
+            -c "$THEME_RESOURCES/SymairaTopo.metal" -o "$BUILD_DIR/SymairaTopo.air"
+        xcrun -sdk macosx metallib "$BUILD_DIR/SymairaTopo.air" \
+            -o "$THEME_RESOURCES/default.metallib"
+    fi
+    test -s "$THEME_RESOURCES/default.metallib"
 
     echo "Writing Info.plist..."
     cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"

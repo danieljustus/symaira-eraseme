@@ -34,6 +34,11 @@ SWIFT_BIN="$TEST_DIR/mock_swift_bin"
 mkdir -p "$SWIFT_BIN"
 touch "$SWIFT_BIN/SymairaEraseMe"
 chmod +x "$SWIFT_BIN/SymairaEraseMe"
+RESOURCE_DIR="$SWIFT_BIN/symaira-appkit_SymairaTheme.bundle/Contents/Resources"
+mkdir -p "$RESOURCE_DIR"
+for resource in GoogleSansFlex.ttf GoogleSansFlex-OFL.txt default.metallib; do
+    printf 'packaging fixture: %s\n' "$resource" > "$RESOURCE_DIR/$resource"
+done
 
 case "$*" in
     *--show-bin-path*)
@@ -204,6 +209,10 @@ test_package_dmg_modes() {
     "$REPO_ROOT/scripts/package-dmg.sh" --app-only
 
     local APP_BUNDLE="$STAGE_DIR/Symaira EraseMe.app"
+    for resource in GoogleSansFlex.ttf GoogleSansFlex-OFL.txt default.metallib; do
+        cmp "$TEST_DIR/mock_swift_bin/symaira-appkit_SymairaTheme.bundle/Contents/Resources/$resource" \
+            "$APP_BUNDLE/Contents/Resources/symaira-appkit_SymairaTheme.bundle/Contents/Resources/$resource"
+    done
     test -d "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     test -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     "$REPO_ROOT/scripts/verify-app-icon.sh" "$APP_BUNDLE"
@@ -239,6 +248,17 @@ PYCODE
 
     test -f "$DIST_DIR/Symaira-EraseMe-0.13.0-macos.dmg"
     grep -q "codesign.*Symaira-EraseMe-0.13.0-macos.dmg" "$MOCK_LOG"
+
+    # Development and packaged apps must use the same SDK-preserving backend.
+    SYMERASEME_RUST_TEST_BINARY="$TEST_DIR/mock_rust_bin/symeraseme-rust" \
+        "$REPO_ROOT/app/SymairaEraseMe/build.sh" --configuration release
+    python3 - "$MOCK_LOG" <<'PYCODE'
+import pathlib, sys
+builds = [line for line in pathlib.Path(sys.argv[1]).read_text().splitlines()
+          if line.startswith('swift build ')]
+assert len(builds) == 4, builds
+assert all('--build-system native' in line for line in builds), builds
+PYCODE
 
     echo "PASS: package-dmg.sh --app-only and --dmg-only succeeded"
 }

@@ -14,7 +14,7 @@ struct BrokersView: View {
 
                 switch vm.state {
                 case .idle, .loading:
-                    LoadingOverlay(message: "Loading brokers…")
+                    SymairaLoadingState("Loading brokers…")
                         .frame(height: 200)
 
                 case .failed(let message):
@@ -25,8 +25,8 @@ struct BrokersView: View {
 
                 case .loaded:
                     if vm.filteredBrokers.isEmpty {
-                        EmptyStateView(
-                            icon: "person.2.fill",
+                        SymairaEmptyState(
+                            systemImage: "person.2.fill",
                             title: "No Brokers Found",
                             message: "Adjust filters or check the broker registry."
                         )
@@ -65,33 +65,49 @@ struct BrokersView: View {
                 Image(systemName: "arrow.clockwise")
                     .symairaText(.heading)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
             .accessibilityLabel("Refresh brokers")
         }
     }
 
     private var filters: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
+            filterFields
+            HStack(spacing: SymairaSpacing.medium) {
+                Button("Apply") {
+                    Task { await vm.refresh() }
+                }
+                .symairaButtonStyle(.secondary)
+                Button("Reset") { vm.resetFilters() }
+                    .symairaButtonStyle(.secondary)
+            }
+            .fixedSize()
+        }
+    }
+
+    private var filterFields: some View {
+        HStack(spacing: SymairaSpacing.medium) {
             Picker("Jurisdiction", selection: $vm.filterJurisdiction) {
-                Text("All").tag("")
+                Text("All jurisdictions").tag("")
                 Text("GDPR").tag("GDPR")
                 Text("CCPA").tag("CCPA")
                 Text("LGPD").tag("LGPD")
                 Text("PIPEDA").tag("PIPEDA")
             }
-            .frame(width: 130)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
 
             Picker("Priority", selection: $vm.filterPriority) {
-                Text("All").tag("")
+                Text("All priorities").tag("")
                 Text("High").tag("high")
                 Text("Medium").tag("medium")
                 Text("Low").tag("low")
             }
-            .frame(width: 110)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
 
             Picker("Category", selection: $vm.filterCategory) {
-                Text("All").tag("")
+                Text("All categories").tag("")
                 Text("People Search").tag("people-search")
                 Text("Marketing").tag("marketing")
                 Text("Credit").tag("credit")
@@ -99,15 +115,8 @@ struct BrokersView: View {
                 Text("Background Check").tag("background-check")
                 Text("Social Media").tag("social-media")
             }
-            .frame(width: 160)
-
-            Button("Apply") {
-                Task { await vm.refresh() }
-            }
-            .buttonStyle(.bordered)
-            .tint(BrandColors.goldPrimary)
-            Button("Reset") { vm.resetFilters() }
-                .buttonStyle(.bordered)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -118,11 +127,14 @@ struct BrokersView: View {
 
         return LazyVGrid(columns: columns, spacing: 12) {
             ForEach(vm.filteredBrokers) { broker in
-                BrokerCard(broker: broker)
-                    .onTapGesture {
-                        vm.selectedBroker = broker
-                        showDetail = true
-                    }
+                Button {
+                    vm.selectedBroker = broker
+                    showDetail = true
+                } label: {
+                    BrokerCard(broker: broker)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Details for \(broker.name)")
             }
         }
     }
@@ -158,7 +170,7 @@ struct BrokersView: View {
                         }
                     }
 
-                    Divider().background(BrandColors.textMuted.opacity(0.2))
+                    SymairaFormDivider()
 
                     // Opt-out channels
                     if let optOut = broker.optOut, !optOut.isEmpty {
@@ -189,7 +201,7 @@ struct BrokersView: View {
                     }
 
                     if let notes = broker.notes, !notes.isEmpty {
-                        Divider().background(BrandColors.textMuted.opacity(0.2))
+                        SymairaFormDivider()
                         Text("Notes")
                             .symairaText(.subheading)
                             .foregroundStyle(BrandColors.textPrimary)
@@ -220,21 +232,16 @@ struct BrokersView: View {
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
-                .frame(width: 110, alignment: .trailing)
+        SymairaFormRow(label) {
             Text(value)
                 .symairaText(.callout)
-                .foregroundStyle(BrandColors.textPrimary)
+                .textSelection(.enabled)
         }
     }
 }
 
 struct BrokerCard: View {
     let broker: Broker
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -245,14 +252,7 @@ struct BrokerCard: View {
                     .lineLimit(1)
                 Spacer()
                 if let priority = broker.priority {
-                    Text(priority.uppercased())
-                        .symairaText(.sectionLabel)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(priority == "high" ? BrandColors.rejectedBg : BrandColors.pendingBg)
-                        )
-                        .foregroundStyle(priority == "high" ? BrandColors.rejected : BrandColors.pending)
+                    SymairaBadge(priority.capitalized, tone: priority == "high" ? .critical : .warning)
                 }
             }
 
@@ -265,12 +265,7 @@ struct BrokerCard: View {
             if let jurisdictions = broker.jurisdictions, !jurisdictions.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(jurisdictions, id: \.self) { jur in
-                        Text(jur)
-                            .symairaText(.caption)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(BrandColors.plannedBg))
-                            .foregroundStyle(BrandColors.planned)
+                        SymairaBadge(jur)
                     }
                 }
             }
@@ -286,21 +281,7 @@ struct BrokerCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isHovered ? BrandColors.bgCardHover : BrandColors.bgCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(isHovered ? BrandColors.goldPrimary.opacity(0.2) : Color.white.opacity(0.05), lineWidth: 1)
-                )
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .onHover { hovering in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                isHovered = hovering
-            }
-        }
+        .symairaCard(padding: SymairaSpacing.medium)
         .contentShape(Rectangle())
     }
 }
