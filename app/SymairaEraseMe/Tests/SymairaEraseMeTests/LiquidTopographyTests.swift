@@ -7,10 +7,15 @@ import XCTest
 
 extension XCTestCase {
     /// SwiftUI aborts in MTLLoader ("Target device architecture is nil") when it renders
-    /// on the paravirtual GPU of hosted macOS Intel runners. Real Macs always have a GPU.
+    /// on the paravirtual GPU of hosted macOS Intel runners; Apple silicon VMs render fine.
     func skipWithoutRealGPU() throws {
         let name = MTLCreateSystemDefaultDevice()?.name ?? "none"
-        if name == "none" || name.contains("Paravirtual") {
+        #if arch(x86_64)
+        let unsupported = name == "none" || name.contains("Paravirtual")
+        #else
+        let unsupported = name == "none"
+        #endif
+        if unsupported {
             throw XCTSkip("Native SwiftUI rendering needs a real GPU (\(name))")
         }
     }
@@ -84,6 +89,7 @@ final class LiquidTopographyTests: XCTestCase {
         guard #available(macOS 14.4, *) else {
             throw XCTSkip("NSHostingMenu requires macOS 14.4")
         }
+        _ = NSApplication.shared  // menu actions need NSApp; don't rely on an earlier test creating it
         var openedSettings = false
         let menu = NSHostingMenu(rootView: SymairaSettingsButton { openedSettings = true })
         menu.update()
