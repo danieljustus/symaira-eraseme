@@ -36,8 +36,12 @@ struct ContentView: View {
 
     // ponytail: Metal asserts (SIGABRT) loading the topography shader on devices without a GPU
     // architecture, e.g. paravirtual macOS VMs. Drop once SymairaTopoView falls back itself.
-    static let topographyShaderSupported = MTLCreateSystemDefaultDevice()
-        .flatMap { ($0 as? NSObject)?.value(forKey: "architecture") } != nil
+    static let topographyShaderSupported: Bool = {
+        guard let device = MTLCreateSystemDefaultDevice(), !device.name.contains("Paravirtual"),
+              let architecture = (device as? NSObject)?.value(forKey: "architecture") as? NSObject
+        else { return false }
+        return !((architecture.value(forKey: "name") as? String) ?? "").isEmpty
+    }()
 
     init(initialNavigation: NavItem = .dashboard) {
         _selectedNav = State(initialValue: initialNavigation)

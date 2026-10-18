@@ -36,6 +36,8 @@ final class LiquidTopographyTests: XCTestCase {
     @MainActor
     func testAllDestinationsRenderAtMinimumAndDefaultWidths() async throws {
         _ = NSApplication.shared
+        let device = MTLCreateSystemDefaultDevice()
+        print("Metal device: \(device?.name ?? "none"), topography: \(ContentView.topographyShaderSupported)")
         // No live user backend or credentials: all reads hit an unavailable local port.
         let oldHost = MCPClient.configuredHost
         let oldPort = MCPClient.configuredPort
