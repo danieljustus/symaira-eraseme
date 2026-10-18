@@ -111,13 +111,14 @@ protection regions; dense lists and Settings use a static canvas. Content
 cards are opaque shared `symairaCard` surfaces, not local glass copies.
 Shared controls honor the AppKit accessibility and older-macOS fallbacks.
 
-The manifest pins the published AppKit commit
-`50baf937221fd7a8be35f35b107fe5e96fe95132`
-([shared workspace and packaged resources, PR #170](https://github.com/danieljustus/symaira-appkit/pull/170)).
+The manifest pins the exact AppKit release
+[`0.15.1`](https://github.com/danieljustus/symaira-appkit/releases/tag/0.15.1),
+including the shared workspace, packaged resources and the `SymairaIcon` set.
+Action and status icons use `SymairaIconView`; shared navigation, badge and
+empty-state components still take SF Symbol names until AppKit accepts icons.
 A fresh checkout needs no local AppKit worktree or SwiftPM edit mode. Existing
 preview workspaces that used edit mode should use a fresh scratch path and
-verify `show-dependencies --format json` before building. Replace the revision
-pin with an exact AppKit release tag before releasing this GUI. No public GUI
+verify `show-dependencies --format json` before building. No public GUI
 release, notarization or completed VoiceOver acceptance is implied.
 
 ### Shared-component inventory

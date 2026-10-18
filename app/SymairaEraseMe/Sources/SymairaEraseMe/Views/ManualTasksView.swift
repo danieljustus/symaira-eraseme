@@ -73,7 +73,7 @@ struct ManualTasksView: View {
             Button {
                 Task { await vm.refresh() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                SymairaIconView(.refresh)
                     .symairaText(.heading)
             }
             .symairaButtonStyle(.secondary)

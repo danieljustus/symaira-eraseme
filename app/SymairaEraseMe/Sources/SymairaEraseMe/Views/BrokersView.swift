@@ -62,7 +62,7 @@ struct BrokersView: View {
             Button {
                 Task { await vm.refresh() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                SymairaIconView(.refresh)
                     .symairaText(.heading)
             }
             .symairaButtonStyle(.secondary)
@@ -273,7 +273,7 @@ struct BrokerCard: View {
             if let channels = broker.optOut {
                 HStack(spacing: 8) {
                     ForEach(channels, id: \.type) { ch in
-                        Label(ch.type, systemImage: ch.type == "email" ? "envelope" : "globe")
+                        Label(ch.type, symairaIcon: ch.type == "email" ? .mail : .link, size: 12)
                             .symairaText(.caption)
                             .foregroundStyle(BrandColors.textMuted)
                     }

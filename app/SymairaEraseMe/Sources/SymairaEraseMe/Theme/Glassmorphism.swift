@@ -58,3 +58,15 @@ struct StatCard: View {
         .topoProtected(hill: true)
     }
 }
+
+extension Label where Title == Text, Icon == SymairaIconView<Int> {
+    /// Caption-sized `Label(_:symairaIcon:)` for runtime strings.
+    @MainActor
+    init(_ title: String, symairaIcon icon: SymairaIcon, size: CGFloat) {
+        self.init {
+            Text(title)
+        } icon: {
+            SymairaIconView(icon, size: size)
+        }
+    }
+}

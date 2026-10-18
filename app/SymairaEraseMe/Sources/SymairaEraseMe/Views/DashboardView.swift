@@ -65,7 +65,7 @@ struct DashboardView: View {
             Button {
                 Task { await vm.refresh() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                SymairaIconView(.refresh)
                     .symairaText(.heading)
             }
             .symairaButtonStyle(.secondary)
@@ -217,22 +217,22 @@ struct BrokerStatusCard: View {
                 .lineLimit(1)
             HStack(spacing: 8) {
                 if broker.confirmed > 0 {
-                    Label("\(broker.confirmed.plainDigits)", systemImage: "checkmark.circle.fill")
+                    Label("\(broker.confirmed.plainDigits)", symairaIcon: .success, size: 12)
                         .foregroundStyle(BrandColors.confirmed)
                         .symairaText(.caption)
                 }
                 if broker.pending > 0 {
-                    Label("\(broker.pending.plainDigits)", systemImage: "clock.fill")
+                    Label("\(broker.pending.plainDigits)", symairaIcon: .pending, size: 12)
                         .foregroundStyle(BrandColors.pending)
                         .symairaText(.caption)
                 }
                 if broker.overdue > 0 {
-                    Label("\(broker.overdue.plainDigits)", systemImage: "exclamationmark.circle.fill")
+                    Label("\(broker.overdue.plainDigits)", symairaIcon: .warning, size: 12)
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                 }
                 if broker.rejected > 0 {
-                    Label("\(broker.rejected.plainDigits)", systemImage: "xmark.circle.fill")
+                    Label("\(broker.rejected.plainDigits)", symairaIcon: .failure, size: 12)
                         .foregroundStyle(BrandColors.rejected)
                         .symairaText(.caption)
                 }
@@ -288,7 +288,7 @@ struct ErrorStateView: View {
             systemImage: "exclamationmark.triangle.fill", title: "Failed to Load", message: message
         ) {
             Button(action: onRetry) {
-                Label("Retry", systemImage: "arrow.clockwise")
+                Label("Retry", symairaIcon: .refresh)
             }
             .symairaButtonStyle(.secondary)
         }

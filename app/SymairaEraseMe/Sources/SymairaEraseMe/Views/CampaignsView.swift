@@ -77,7 +77,7 @@ struct CampaignsView: View {
             Button {
                 showCreateSheet = true
             } label: {
-                Label("New Campaign", systemImage: "plus")
+                Label("New Campaign", symairaIcon: .add)
             }
             .symairaButtonStyle(.primary)
         }

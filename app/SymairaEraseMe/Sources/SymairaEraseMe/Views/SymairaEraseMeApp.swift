@@ -88,8 +88,7 @@ struct ContentView: View {
     private func sidebar(showsLabels: Bool) -> some View {
         VStack(alignment: showsLabels ? .leading : .center, spacing: SymairaSpacing.large) {
             HStack(spacing: SymairaSpacing.small) {
-                Image(systemName: "shield.checkerboard")
-                    .font(.system(size: 20, weight: .semibold))
+                SymairaIconView(.productEraseme)
                     .foregroundStyle(SymairaTokens.ink2)
                     .frame(width: 32, height: 36)
                     .accessibilityHidden(true)

@@ -74,6 +74,11 @@ final class NativeChromeTests: XCTestCase {
 
     @MainActor
     private func verifyNavigation(in window: NSWindow) async throws {
+        // SwiftUI builds its accessibility tree only for an assistive client; AX trust alone is not enough.
+        let enhancedUI = NSSelectorFromString("accessibilitySetEnhancedUserInterfaceAttribute:")
+        _ = NSApp.perform(enhancedUI, with: NSNumber(value: true))
+        defer { _ = NSApp.perform(enhancedUI, with: NSNumber(value: false)) }
+        try await Task.sleep(for: .milliseconds(300))
         var nodes = elements(window)
         for identifier in ["symaira-sidebar-toggle", "symaira-settings-button"] {
             XCTAssertEqual(nodes.filter { text($0, "accessibilityIdentifier") == identifier }.count, 1, identifier)
@@ -104,6 +109,8 @@ final class NativeChromeTests: XCTestCase {
         var seen = Set<ObjectIdentifier>()
         func walk(_ node: NSObject) -> [NSObject] {
             guard seen.insert(ObjectIdentifier(node)).inserted else { return [] }
+            // AppKit's toolbar viewer mirrors the hosted SwiftUI control's identifier but cannot press it.
+            if let viewer = NSClassFromString("NSToolbarItemViewer"), node.isKind(of: viewer) { return [] }
             let selector = NSSelectorFromString("accessibilityChildren")
             var children = node.responds(to: selector)
                 ? node.perform(selector)?.takeUnretainedValue() as? [NSObject] ?? [] : []

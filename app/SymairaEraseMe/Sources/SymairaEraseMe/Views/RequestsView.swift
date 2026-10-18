@@ -66,7 +66,7 @@ struct RequestsView: View {
             Button {
                 Task { await vm.refresh() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                SymairaIconView(.refresh)
             }
             .symairaButtonStyle(.secondary)
             .accessibilityLabel("Refresh requests")
@@ -183,7 +183,7 @@ struct RequestsView: View {
                 Button {
                     showDetail = false
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    SymairaIconView(.close)
                         .foregroundStyle(BrandColors.textMuted)
                 }
                 .buttonStyle(.plain)
@@ -225,7 +225,7 @@ struct RequestsView: View {
 
             case .failed(let message):
                 HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    SymairaIconView(.warning, size: 12)
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                     Text(message)
