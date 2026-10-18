@@ -1,3 +1,4 @@
+import Metal
 import SwiftUI
 import SymairaTheme
 
@@ -32,6 +33,11 @@ struct ContentView: View {
     @State private var selectedNav: NavItem
     @State private var sidebarLayout = SymairaSidebarState()
     @State private var topography = SymairaTopoModel()
+
+    // ponytail: Metal asserts (SIGABRT) loading the topography shader on devices without a GPU
+    // architecture, e.g. paravirtual macOS VMs. Drop once SymairaTopoView falls back itself.
+    static let topographyShaderSupported = MTLCreateSystemDefaultDevice()
+        .flatMap { ($0 as? NSObject)?.value(forKey: "architecture") } != nil
 
     init(initialNavigation: NavItem = .dashboard) {
         _selectedNav = State(initialValue: initialNavigation)
@@ -69,7 +75,7 @@ struct ContentView: View {
     var body: some View {
         SymairaWorkspace(
             sidebar: $sidebarLayout,
-            topography: selectedNav == .dashboard ? topography : nil,
+            topography: selectedNav == .dashboard && Self.topographyShaderSupported ? topography : nil,
             navigation: { showsLabels in sidebar(showsLabels: showsLabels) },
             content: {
                 detail.font(SymairaTypography.body)

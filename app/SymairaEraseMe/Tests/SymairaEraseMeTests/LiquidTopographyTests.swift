@@ -1,4 +1,5 @@
 import AppKit
+import Metal
 import SwiftUI
 import SymairaTheme
 import XCTest
@@ -22,6 +23,14 @@ final class LiquidTopographyTests: XCTestCase {
                 }
             }
         }
+    }
+
+    func testTopographyShaderGuardKeepsRealGPUs() throws {
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
+        guard !device.name.contains("Paravirtual") else {
+            throw XCTSkip("Paravirtual GPU: topography is intentionally disabled")
+        }
+        XCTAssertTrue(ContentView.topographyShaderSupported, device.name)
     }
 
     @MainActor
