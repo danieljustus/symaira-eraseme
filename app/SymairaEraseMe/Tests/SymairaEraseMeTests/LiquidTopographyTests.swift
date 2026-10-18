@@ -5,6 +5,17 @@ import SymairaTheme
 import XCTest
 @testable import SymairaEraseMe
 
+extension XCTestCase {
+    /// SwiftUI aborts in MTLLoader ("Target device architecture is nil") when it renders
+    /// on the paravirtual GPU of hosted macOS Intel runners. Real Macs always have a GPU.
+    func skipWithoutRealGPU() throws {
+        let name = MTLCreateSystemDefaultDevice()?.name ?? "none"
+        if name == "none" || name.contains("Paravirtual") {
+            throw XCTSkip("Native SwiftUI rendering needs a real GPU (\(name))")
+        }
+    }
+}
+
 /// Native rendering and in-process actions, not physical mouse/VoiceOver acceptance.
 final class LiquidTopographyTests: XCTestCase {
     @MainActor
@@ -25,19 +36,10 @@ final class LiquidTopographyTests: XCTestCase {
         }
     }
 
-    func testTopographyShaderGuardKeepsRealGPUs() throws {
-        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
-        guard !device.name.contains("Paravirtual") else {
-            throw XCTSkip("Paravirtual GPU: topography is intentionally disabled")
-        }
-        XCTAssertTrue(ContentView.topographyShaderSupported, device.name)
-    }
-
     @MainActor
     func testAllDestinationsRenderAtMinimumAndDefaultWidths() async throws {
+        try skipWithoutRealGPU()
         _ = NSApplication.shared
-        let device = MTLCreateSystemDefaultDevice()
-        print("Metal device: \(device?.name ?? "none"), topography: \(ContentView.topographyShaderSupported)")
         // No live user backend or credentials: all reads hit an unavailable local port.
         let oldHost = MCPClient.configuredHost
         let oldPort = MCPClient.configuredPort

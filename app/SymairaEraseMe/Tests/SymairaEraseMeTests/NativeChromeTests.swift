@@ -22,6 +22,7 @@ final class NativeChromeTests: XCTestCase {
 
     @MainActor
     private func verifyNativeWindow(checkAccessibility: Bool) async throws {
+        try skipWithoutRealGPU()
         _ = NSApplication.shared
         let previousPolicy = NSApp.activationPolicy()
         NSApp.setActivationPolicy(.regular)
