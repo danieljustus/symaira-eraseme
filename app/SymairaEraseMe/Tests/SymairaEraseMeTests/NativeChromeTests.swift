@@ -61,9 +61,12 @@ final class NativeChromeTests: XCTestCase {
         XCTAssertEqual(toolbar.items.last?.label, "Settings")
         let toggle = try XCTUnwrap(toolbar.items.first?.view)
         let gear = try XCTUnwrap(toolbar.items.last?.view)
-        XCTAssertEqual(toggle.frame.size, gear.frame.size, "Shared native controls have equal geometry")
-        XCTAssertGreaterThanOrEqual(toggle.frame.width, 28)
-        XCTAssertGreaterThanOrEqual(toggle.frame.height, 28)
+        // macOS 26 sizes toolbar items to their symbol width (sidebar.left > gearshape); only the row height is shared.
+        XCTAssertEqual(toggle.frame.height, gear.frame.height, "Shared native controls share the toolbar row height")
+        for control in [toggle, gear] {
+            XCTAssertGreaterThanOrEqual(control.frame.width, 28)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 28)
+        }
         XCTAssertEqual(window.toolbarStyle, .unified)
         XCTAssertEqual(window.titleVisibility, .visible)
         XCTAssertFalse(manager.isRunning)
