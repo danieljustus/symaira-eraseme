@@ -15,7 +15,7 @@ struct BrokersView: View {
             PageState(state: vm.state, loading: "Loading brokers…", retry: vm.refresh) { _ in
                 if vm.filteredBrokers.isEmpty {
                     PageEmpty(
-                        systemImage: "person.2.fill",
+                        icon: .team,
                         title: "No Brokers Found",
                         message: "Adjust filters or check the broker registry."
                     )
@@ -32,39 +32,39 @@ struct BrokersView: View {
     }
 
     private var filterFields: some View {
-        HStack(spacing: SymairaSpacing.medium) {
-            Picker("Jurisdiction", selection: $vm.filterJurisdiction) {
-                Text("All jurisdictions").tag("")
-                Text("GDPR").tag("GDPR")
-                Text("CCPA").tag("CCPA")
-                Text("LGPD").tag("LGPD")
-                Text("PIPEDA").tag("PIPEDA")
+        // Few options: segments, like Calendar and Manual Tasks. Many options: filter menus.
+        // Narrow windows wrap the segments below instead of truncating menu labels.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SymairaSpacing.medium) {
+                filterMenus
+                priorityFilter
             }
-            .labelsHidden()
-            .fixedSize()
-
-            Picker("Priority", selection: $vm.filterPriority) {
-                Text("All priorities").tag("")
-                Text("High").tag("high")
-                Text("Medium").tag("medium")
-                Text("Low").tag("low")
+            VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
+                HStack(spacing: SymairaSpacing.medium) { filterMenus }
+                priorityFilter
             }
-            .labelsHidden()
-            .fixedSize()
-
-            Picker("Category", selection: $vm.filterCategory) {
-                Text("All categories").tag("")
-                Text("People Search").tag("people-search")
-                Text("Marketing").tag("marketing")
-                Text("Credit").tag("credit")
-                Text("Analytics").tag("analytics")
-                Text("Background Check").tag("background-check")
-                Text("Social Media").tag("social-media")
-            }
-            .labelsHidden()
-            .fixedSize()
-            Spacer(minLength: 0)
         }
+    }
+
+    @ViewBuilder private var filterMenus: some View {
+        SymairaFilterMenu(
+            "Jurisdiction", selection: $vm.filterJurisdiction,
+            options: [("", "All jurisdictions"), ("GDPR", "GDPR"), ("CCPA", "CCPA"), ("LGPD", "LGPD"),
+                      ("PIPEDA", "PIPEDA")])
+            .frame(minWidth: 200)
+        SymairaFilterMenu(
+            "Category", selection: $vm.filterCategory,
+            options: [("", "All categories"), ("people-search", "People Search"), ("marketing", "Marketing"),
+                      ("credit", "Credit"), ("analytics", "Analytics"),
+                      ("background-check", "Background Check"), ("social-media", "Social Media")])
+            .frame(minWidth: 200)
+    }
+
+    private var priorityFilter: some View {
+        SymairaSegmentedControl(
+            "Priority", selection: $vm.filterPriority,
+            options: [("", "All"), ("high", "High"), ("medium", "Medium"), ("low", "Low")])
+            .frame(width: 320)
     }
 
     private var brokerGrid: some View {

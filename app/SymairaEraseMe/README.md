@@ -112,10 +112,13 @@ cards are opaque shared `symairaCard` surfaces, not local glass copies.
 Shared controls honor the AppKit accessibility and older-macOS fallbacks.
 
 The manifest pins the exact AppKit release
-[`0.15.1`](https://github.com/danieljustus/symaira-appkit/releases/tag/0.15.1),
+[`0.16.0`](https://github.com/danieljustus/symaira-appkit/releases/tag/0.16.0),
 including the shared workspace, packaged resources and the `SymairaIcon` set.
-Action and status icons use `SymairaIconView`; shared navigation, badge and
-empty-state components still take SF Symbol names until AppKit accepts icons.
+Sidebar, empty states, badges, notices and actions all use Symaira icons; no
+SF Symbols remain in the sidebar pages. Every page uses the shared `Page`
+scaffold (one header, width and state height), filters use
+`SymairaFilterMenu` or segments, and champagne marks only selection, active
+controls and focus.
 A fresh checkout needs no local AppKit worktree or SwiftPM edit mode. Existing
 preview workspaces that used edit mode should use a fresh scratch path and
 verify `show-dependencies --format json` before building. No public GUI

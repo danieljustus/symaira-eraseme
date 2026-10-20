@@ -23,7 +23,7 @@ struct RequestsView: View {
                 PageState(state: vm.state, loading: "Loading requests…", retry: vm.refresh) { requests in
                     if requests.isEmpty {
                         PageEmpty(
-                            systemImage: "envelope.fill",
+                            icon: .mail,
                             title: "No Requests",
                             message: "Create a campaign to generate removal requests."
                         )
@@ -57,14 +57,10 @@ struct RequestsView: View {
         HStack(spacing: SymairaSpacing.medium) {
             TextField("Campaign", text: $vm.filterCampaignId)
                 .textFieldStyle(.symaira)
-            Picker("Status", selection: $vm.filterStatus) {
-                Text("All statuses").tag("")
-                ForEach(Self.statusFilters, id: \.self) { status in
-                    Text(StatusBadge.vocabulary[status]?.label ?? status).tag(status)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
+            SymairaFilterMenu(
+                "Status", selection: $vm.filterStatus,
+                options: [("", "All statuses")]
+                    + Self.statusFilters.map { ($0, StatusBadge.vocabulary[$0]?.label ?? $0) })
             TextField("Broker", text: $vm.filterBrokerId)
                 .textFieldStyle(.symaira)
         }

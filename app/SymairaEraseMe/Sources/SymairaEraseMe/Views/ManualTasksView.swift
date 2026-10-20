@@ -21,7 +21,7 @@ struct ManualTasksView: View {
             PageState(state: vm.state, loading: "Loading tasks…", retry: vm.refresh) { tasks in
                 if tasks.isEmpty {
                     PageEmpty(
-                        systemImage: "checklist",
+                        icon: .checklist,
                         title: "No Manual Tasks",
                         message: "No matching tasks. Broker web forms and verification steps are handled here manually."
                     )

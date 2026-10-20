@@ -54,14 +54,14 @@ struct ContentView: View {
         /// VoiceOver users can distinguish the product destinations.
         var accessibilityName: String { rawValue }
 
-        var icon: String {
+        var icon: SymairaIcon {
             switch self {
-            case .dashboard: return "chart.bar"
-            case .campaigns: return "megaphone"
-            case .requests: return "envelope"
-            case .brokers: return "person.2"
-            case .calendar: return "calendar"
-            case .manualTasks: return "checklist"
+            case .dashboard: return .dashboard
+            case .campaigns: return .announcement
+            case .requests: return .mail
+            case .brokers: return .team
+            case .calendar: return .calendar
+            case .manualTasks: return .checklist
             }
         }
     }
@@ -103,7 +103,7 @@ struct ContentView: View {
                 VStack(spacing: SymairaSpacing.xSmall) {
                     ForEach(NavItem.sidebarItems) { item in
                         SymairaNavigationButton(
-                            item.accessibilityName, systemImage: item.icon,
+                            item.accessibilityName, icon: item.icon,
                             isSelected: selectedNav == item, showsLabel: showsLabels
                         ) {
                             selectedNav = item

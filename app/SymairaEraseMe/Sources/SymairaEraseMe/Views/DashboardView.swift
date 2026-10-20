@@ -15,7 +15,7 @@ struct DashboardView: View {
             PageState(state: vm.state, loading: "Loading dashboard…", retry: vm.refresh) { data in
                 if data.totalRequests == 0 {
                     PageEmpty(
-                        systemImage: "chart.bar.fill",
+                        icon: .chart,
                         title: "No Data Yet",
                         message: "Create a campaign to start removing your data from brokers."
                     )
@@ -242,7 +242,7 @@ struct ErrorStateView: View {
 
     var body: some View {
         SymairaEmptyState(
-            systemImage: "exclamationmark.triangle.fill", title: "Failed to Load", message: message
+            icon: .warning, title: "Failed to Load", message: message
         ) {
             Button(action: onRetry) {
                 Label("Retry", symairaIcon: .refresh)

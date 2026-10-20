@@ -26,7 +26,7 @@ struct CampaignsView: View {
             PageState(state: vm.state, loading: "Loading campaigns…", retry: vm.refresh) { campaigns in
                 if campaigns.isEmpty {
                     PageEmpty(
-                        systemImage: "megaphone.fill",
+                        icon: .announcement,
                         title: "No Campaigns",
                         message: "Create your first campaign to start removing data from brokers."
                     )

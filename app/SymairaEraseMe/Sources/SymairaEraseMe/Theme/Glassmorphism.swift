@@ -28,7 +28,7 @@ struct StatusBadge: View {
 
     var body: some View {
         let entry = Self.vocabulary[status.uppercased()] ?? (status, .neutral)
-        SymairaBadge(entry.label, tone: entry.tone, systemImage: entry.tone.systemImage)
+        SymairaBadge(entry.label, tone: entry.tone, icon: entry.tone.symairaIcon)
     }
 }
 
@@ -161,12 +161,12 @@ struct PageState<Value, Loaded: View>: View {
 
 /// Empty result with the shared state height.
 struct PageEmpty: View {
-    let systemImage: String
+    let icon: SymairaIcon
     let title: String
     let message: String
 
     var body: some View {
-        SymairaEmptyState(systemImage: systemImage, title: title, message: message)
+        SymairaEmptyState(icon: icon, title: title, message: message)
             .frame(height: PageLayout.stateHeight)
     }
 }

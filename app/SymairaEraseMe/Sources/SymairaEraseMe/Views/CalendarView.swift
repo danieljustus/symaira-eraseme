@@ -14,7 +14,7 @@ struct CalendarView: View {
             PageState(state: vm.state, loading: "Loading calendar…", retry: vm.refresh) { data in
                 if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
                     PageEmpty(
-                        systemImage: "calendar",
+                        icon: .calendar,
                         title: "No Calendar Data",
                         message: "Create a campaign to see upcoming deadlines."
                     )
