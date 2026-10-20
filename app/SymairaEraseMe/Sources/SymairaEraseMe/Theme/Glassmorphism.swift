@@ -71,25 +71,34 @@ extension Label where Title == Text, Icon == SymairaIconView<Int> {
 
 // MARK: - Page scaffold
 
-/// One frame for every sidebar page: same header, content width, spacing and state heights.
+/// One grid for every sidebar page: a header zone (title, subtitle, refresh), a toolbar
+/// zone (filters, segments, page actions; kept even when empty) and a content zone that
+/// therefore starts at the same height everywhere. Loading, failure and empty states
+/// replace the whole content zone.
 enum PageLayout {
     static let maxWidth: CGFloat = 1008
     static let stateHeight: CGFloat = 240
+    /// Fixed, not minimum: segments and primary buttons are taller than fields, and a
+    /// growing toolbar would push one page's content below another's.
+    static let toolbarHeight: CGFloat = 44
 }
 
-struct Page<Accessory: View, Content: View>: View {
+struct Page<Toolbar: View, Content: View>: View {
     let title: String
     /// Required: a one-line header on some pages and two on others misaligns the controls.
     let subtitle: String
     /// Lists that scroll themselves (native `Table`) fill the page instead of nesting scroll views.
     var scrolls = true
     let refresh: () async -> Void
-    @ViewBuilder var accessory: Accessory
+    @ViewBuilder var toolbar: Toolbar
     @ViewBuilder var content: Content
 
     var body: some View {
         let column = VStack(alignment: .leading, spacing: SymairaSpacing.large) {
             header
+            HStack(spacing: SymairaSpacing.medium) { toolbar }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: PageLayout.toolbarHeight)
             content
         }
         .padding(SymairaSpacing.xLarge)
@@ -115,7 +124,6 @@ struct Page<Accessory: View, Content: View>: View {
                     .topoProtected()
             }
             Spacer(minLength: SymairaSpacing.large)
-            accessory
             Button {
                 Task { await refresh() }
             } label: {
@@ -128,13 +136,13 @@ struct Page<Accessory: View, Content: View>: View {
     }
 }
 
-extension Page where Accessory == EmptyView {
+extension Page where Toolbar == EmptyView {
     init(
         title: String, subtitle: String, scrolls: Bool = true, refresh: @escaping () async -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
-            title: title, subtitle: subtitle, scrolls: scrolls, refresh: refresh, accessory: { EmptyView() },
+            title: title, subtitle: subtitle, scrolls: scrolls, refresh: refresh, toolbar: { EmptyView() },
             content: content)
     }
 }

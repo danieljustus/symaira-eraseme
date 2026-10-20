@@ -13,12 +13,14 @@ struct ManualTasksView: View {
             SymairaSegmentedControl(
                 "Filter", selection: $vm.filterStatus,
                 options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
+            .frame(width: 360)
         } content: {
             if let success = vm.successMessage {
                 SymairaNotice(message: success, tone: .positive)
             }
-            summaryCards
             PageState(state: vm.state, loading: "Loading tasks…", retry: vm.refresh) { tasks in
+                // Counts only make sense for loaded data; failures start where every page's content starts.
+                summaryCards
                 if tasks.isEmpty {
                     PageEmpty(
                         icon: .checklist,

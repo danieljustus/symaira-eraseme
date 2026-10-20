@@ -20,6 +20,7 @@ struct RequestsView: View {
                 refresh: vm.refresh
             ) {
                 filters
+            } content: {
                 PageState(state: vm.state, loading: "Loading requests…", retry: vm.refresh) { requests in
                     if requests.isEmpty {
                         PageEmpty(
@@ -53,17 +54,15 @@ struct RequestsView: View {
         }
     }
 
-    private var filters: some View {
-        HStack(spacing: SymairaSpacing.medium) {
-            TextField("Campaign", text: $vm.filterCampaignId)
-                .textFieldStyle(.symaira)
-            SymairaFilterMenu(
-                "Status", selection: $vm.filterStatus,
-                options: [("", "All statuses")]
-                    + Self.statusFilters.map { ($0, StatusBadge.vocabulary[$0]?.label ?? $0) })
-            TextField("Broker", text: $vm.filterBrokerId)
-                .textFieldStyle(.symaira)
-        }
+    @ViewBuilder private var filters: some View {
+        TextField("Campaign", text: $vm.filterCampaignId)
+            .textFieldStyle(.symaira)
+        SymairaFilterMenu(
+            "Status", selection: $vm.filterStatus,
+            options: [("", "Status")]
+                + Self.statusFilters.map { ($0, StatusBadge.vocabulary[$0]?.label ?? $0) })
+        TextField("Broker", text: $vm.filterBrokerId)
+            .textFieldStyle(.symaira)
     }
 
     private var requestsTable: some View {

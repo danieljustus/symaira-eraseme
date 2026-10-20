@@ -10,6 +10,7 @@ struct CalendarView: View {
             SymairaSegmentedControl(
                 "Weeks", selection: $vm.weeks,
                 options: [(2, "2 weeks"), (4, "4 weeks"), (8, "8 weeks"), (12, "12 weeks")])
+            .frame(width: 420)
         } content: {
             PageState(state: vm.state, loading: "Loading calendar…", retry: vm.refresh) { data in
                 if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {

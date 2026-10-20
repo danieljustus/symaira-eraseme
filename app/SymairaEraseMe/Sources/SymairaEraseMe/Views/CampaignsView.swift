@@ -10,6 +10,7 @@ struct CampaignsView: View {
 
     var body: some View {
         Page(title: "Campaigns", subtitle: "Removal campaigns and their progress", refresh: vm.refresh) {
+            Spacer()
             Button {
                 showCreateSheet = true
             } label: {

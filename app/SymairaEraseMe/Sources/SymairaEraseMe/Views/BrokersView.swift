@@ -7,11 +7,8 @@ struct BrokersView: View {
 
     var body: some View {
         Page(title: "Brokers", subtitle: "\(vm.total.plainDigits) brokers in registry", refresh: vm.refresh) {
-            TextField("Search…", text: $vm.searchText)
-                .textFieldStyle(.symaira)
-                .frame(width: 200)
-        } content: {
             filterFields
+        } content: {
             PageState(state: vm.state, loading: "Loading brokers…", retry: vm.refresh) { _ in
                 if vm.filteredBrokers.isEmpty {
                     PageEmpty(
@@ -31,40 +28,25 @@ struct BrokersView: View {
         }
     }
 
+    /// One row that always fits the minimum window: menus show their name until a choice is made,
+    /// like the text fields' placeholders, so the toolbar zone never wraps.
     private var filterFields: some View {
-        // Few options: segments, like Calendar and Manual Tasks. Many options: filter menus.
-        // Narrow windows wrap the segments below instead of truncating menu labels.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: SymairaSpacing.medium) {
-                filterMenus
-                priorityFilter
-            }
-            VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
-                HStack(spacing: SymairaSpacing.medium) { filterMenus }
-                priorityFilter
-            }
+        HStack(spacing: SymairaSpacing.medium) {
+            TextField("Search…", text: $vm.searchText)
+                .textFieldStyle(.symaira)
+            SymairaFilterMenu(
+                "Jurisdiction", selection: $vm.filterJurisdiction,
+                options: [("", "Jurisdiction"), ("GDPR", "GDPR"), ("CCPA", "CCPA"), ("LGPD", "LGPD"),
+                          ("PIPEDA", "PIPEDA")])
+            SymairaFilterMenu(
+                "Category", selection: $vm.filterCategory,
+                options: [("", "Category"), ("people-search", "People Search"), ("marketing", "Marketing"),
+                          ("credit", "Credit"), ("analytics", "Analytics"),
+                          ("background-check", "Background Check"), ("social-media", "Social Media")])
+            SymairaFilterMenu(
+                "Priority", selection: $vm.filterPriority,
+                options: [("", "Priority"), ("high", "High"), ("medium", "Medium"), ("low", "Low")])
         }
-    }
-
-    @ViewBuilder private var filterMenus: some View {
-        SymairaFilterMenu(
-            "Jurisdiction", selection: $vm.filterJurisdiction,
-            options: [("", "All jurisdictions"), ("GDPR", "GDPR"), ("CCPA", "CCPA"), ("LGPD", "LGPD"),
-                      ("PIPEDA", "PIPEDA")])
-            .frame(minWidth: 200)
-        SymairaFilterMenu(
-            "Category", selection: $vm.filterCategory,
-            options: [("", "All categories"), ("people-search", "People Search"), ("marketing", "Marketing"),
-                      ("credit", "Credit"), ("analytics", "Analytics"),
-                      ("background-check", "Background Check"), ("social-media", "Social Media")])
-            .frame(minWidth: 200)
-    }
-
-    private var priorityFilter: some View {
-        SymairaSegmentedControl(
-            "Priority", selection: $vm.filterPriority,
-            options: [("", "All"), ("high", "High"), ("medium", "Medium"), ("low", "Low")])
-            .frame(width: 320)
     }
 
     private var brokerGrid: some View {

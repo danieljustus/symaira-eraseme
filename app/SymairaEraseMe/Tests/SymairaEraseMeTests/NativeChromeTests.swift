@@ -88,6 +88,7 @@ final class NativeChromeTests: XCTestCase {
         }
         XCTAssertFalse(nodes.contains { text($0, "accessibilityIdentifier") == "eraseme-nav-Settings" })
         var firstRefreshY: CGFloat?
+        var firstFailureY: CGFloat?
         for item in ContentView.NavItem.sidebarItems {
             try press(identifier: "eraseme-nav-\(item.id)", in: window)
             try await Task.sleep(for: .milliseconds(100))
@@ -108,6 +109,21 @@ final class NativeChromeTests: XCTestCase {
                 text($0 as! NSObject, "accessibilityLabel") == "Refresh \(item.rawValue.lowercased())"
             }
             let refreshY = try XCTUnwrap(refresh, "Missing refresh on \(item.rawValue)").accessibilityFrame().midY
+            // Every page starts its content zone at the same height: the failure state proves it here.
+            var failure: NSAccessibilityElementProtocol?
+            for _ in 0..<30 where failure == nil {
+                failure = elements(window).compactMap { $0 as? NSAccessibilityElementProtocol }.first {
+                    text($0 as! NSObject, "accessibilityValue") == "Failed to Load"
+                        || text($0 as! NSObject, "accessibilityLabel") == "Failed to Load"
+                }
+                if failure == nil { try await Task.sleep(for: .milliseconds(100)) }
+            }
+            let failureY = try XCTUnwrap(failure, "No failure state on \(item.rawValue)").accessibilityFrame().maxY
+            if let first = firstFailureY {
+                XCTAssertEqual(failureY, first, accuracy: 0.5, "Content zone starts lower on \(item.rawValue)")
+            } else {
+                firstFailureY = failureY
+            }
             if let first = firstRefreshY {
                 XCTAssertEqual(refreshY, first, accuracy: 0.5, "Refresh misaligned on \(item.rawValue)")
             } else {
