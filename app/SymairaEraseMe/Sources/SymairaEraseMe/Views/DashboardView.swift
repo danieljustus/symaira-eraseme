@@ -7,71 +7,27 @@ struct DashboardView: View {
     @StateObject private var vm = DashboardViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                switch vm.state {
-                case .idle, .loading:
-                    SymairaLoadingState("Loading dashboard…")
-                        .frame(height: 300)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 300)
-
-                case .loaded(let data):
-                    if data.totalRequests == 0 {
-                        SymairaEmptyState(
-                            systemImage: "chart.bar.fill",
-                            title: "No Data Yet",
-                            message: "Create a campaign to start removing your data from brokers."
-                        )
-                        .frame(height: 300)
-                    } else {
-                        summaryCards
-                        statusBreakdownChart
-                        campaignsSection
-                        brokerGrid
-                        recentEvents
-                    }
+        Page(
+            title: "Dashboard", subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" },
+            refresh: vm.refresh
+        ) {
+            PageState(state: vm.state, loading: "Loading dashboard…", retry: vm.refresh) { data in
+                if data.totalRequests == 0 {
+                    PageEmpty(
+                        systemImage: "chart.bar.fill",
+                        title: "No Data Yet",
+                        message: "Create a campaign to start removing your data from brokers."
+                    )
+                } else {
+                    summaryCards
+                    statusBreakdownChart
+                    campaignsSection
+                    brokerGrid
+                    recentEvents
                 }
             }
-            .padding(24)
-            .frame(maxWidth: 1008)
-            .frame(maxWidth: .infinity)
         }
-        .background(Color.clear)
         .task { await vm.refresh() }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Dashboard")
-                    .symairaText(.display)
-                    .topoProtected()
-                if let data = vm.data {
-                    Text("Generated \(data.generatedAt.formattedDate)")
-                        .symairaText(.caption)
-                        .topoProtected()
-                }
-            }
-            Spacer()
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                SymairaIconView(.refresh)
-                    .symairaText(.heading)
-            }
-            .symairaButtonStyle(.secondary)
-            .accessibilityLabel("Refresh dashboard")
-            .topoProtected()
-        }
     }
 
     // MARK: - Summary Cards
@@ -79,7 +35,7 @@ struct DashboardView: View {
     private var summaryCards: some View {
         LazyVGrid(columns: [
             GridItem(.adaptive(minimum: 150))
-        ], spacing: 12) {
+        ], spacing: SymairaSpacing.medium) {
             StatCard(title: "Total", value: vm.totalRequests)
             StatCard(title: "In Progress", value: vm.inProgress)
             StatCard(title: "Confirmed", value: vm.confirmed)
@@ -91,7 +47,7 @@ struct DashboardView: View {
     // MARK: - Status Breakdown Chart
 
     private var statusBreakdownChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Status Breakdown")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -120,7 +76,7 @@ struct DashboardView: View {
     // MARK: - Campaigns Table
 
     private var campaignsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Campaigns")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -152,16 +108,16 @@ struct DashboardView: View {
     // MARK: - Broker Status Grid
 
     private var brokerGrid: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Broker Status")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let brokerStatus = vm.data?.brokerStatus, !brokerStatus.isEmpty {
                 let columns = [
-                    GridItem(.adaptive(minimum: 180, maximum: 280), spacing: 12)
+                    GridItem(.adaptive(minimum: 180, maximum: 280), spacing: SymairaSpacing.medium)
                 ]
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: SymairaSpacing.medium) {
                     ForEach(brokerStatus.prefix(20)) { broker in
                         BrokerStatusCard(broker: broker)
                     }
@@ -179,7 +135,7 @@ struct DashboardView: View {
     // MARK: - Recent Events Timeline
 
     private var recentEvents: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Recent Events")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -215,7 +171,7 @@ struct BrokerStatusCard: View {
                 .symairaText(.bodyEmphasized)
                 .foregroundStyle(BrandColors.goldPrimary)
                 .lineLimit(1)
-            HStack(spacing: 8) {
+            HStack(spacing: SymairaSpacing.small) {
                 if broker.confirmed > 0 {
                     Label("\(broker.confirmed.plainDigits)", symairaIcon: .success, size: 12)
                         .foregroundStyle(BrandColors.confirmed)
@@ -250,7 +206,7 @@ struct EventRow: View {
     let event: RecentEvent
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SymairaSpacing.medium) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
                     .symairaText(.callout)

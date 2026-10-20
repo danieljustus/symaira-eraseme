@@ -47,13 +47,4 @@ final class BrokersViewModel: ObservableObject {
             state = .failed(error.localizedDescription)
         }
     }
-
-    func resetFilters() {
-        filterJurisdiction = ""
-        filterLaw = ""
-        filterPriority = ""
-        filterCategory = ""
-        searchText = ""
-        Task { await refresh() }
-    }
 }

@@ -24,6 +24,15 @@ extension XCTestCase {
 /// Native rendering and in-process actions, not physical mouse/VoiceOver acceptance.
 final class LiquidTopographyTests: XCTestCase {
     @MainActor
+    func testStatusBadgeNamesManualTaskAndBackendStatuses() {
+        // Manual tasks used to borrow request statuses ("Sent"/"Confirmed").
+        XCTAssertEqual(StatusBadge.vocabulary["PENDING"]?.label, "Pending")
+        XCTAssertEqual(StatusBadge.vocabulary["COMPLETED"]?.label, "Completed")
+        for status in ["AWAITING_USER_ACTION", "SEND_FAILED", "ESCALATED", "REJECTED_FINAL", "OVERDUE"] {
+            XCTAssertNotNil(StatusBadge.vocabulary[status], status)
+        }
+    }
+
     func testStatusAndTextContrastInBothAppearances() throws {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let native = try XCTUnwrap(NSAppearance(named: appearance))

@@ -5,32 +5,30 @@ import SymairaTheme
 struct StatusBadge: View {
     let status: String
 
+    /// Request statuses from the backend projection plus manual-task states.
+    static let vocabulary: [String: (label: String, tone: SymairaTone)] = [
+        "PLANNED": ("Planned", .neutral),
+        "SENT": ("Sent", .informative),
+        "ACK": ("Acknowledged", .informative),
+        "AWAITING_ACK": ("Awaiting ACK", .warning),
+        "AWAITING_RESPONSE": ("Awaiting Response", .warning),
+        "AWAITING_USER_ACTION": ("Action Needed", .warning),
+        "RE_SCAN_DUE": ("Re-scan Due", .informative),
+        "CONFIRMED": ("Confirmed", .positive),
+        "REJECTED": ("Rejected", .critical),
+        "REJECTED_FINAL": ("Rejected", .critical),
+        "OVERDUE": ("Overdue", .critical),
+        "SEND_FAILED": ("Send Failed", .critical),
+        "BOUNCE": ("Bounced", .critical),
+        "ESCALATED": ("Escalated", .critical),
+        "DPA_FILED": ("DPA Filed", .critical),
+        "PENDING": ("Pending", .warning),
+        "COMPLETED": ("Completed", .positive),
+    ]
+
     var body: some View {
-        SymairaBadge(displayText, tone: tone, systemImage: tone.systemImage)
-    }
-
-    private var tone: SymairaTone {
-        switch status.uppercased() {
-        case "CONFIRMED": return .positive
-        case "REJECTED", "REJECTED_FINAL", "OVERDUE": return .critical
-        case "AWAITING_ACK", "AWAITING_RESPONSE": return .warning
-        case "SENT": return .informative
-        case "PLANNED": return .neutral
-        default: return .neutral
-        }
-    }
-
-    private var displayText: String {
-        switch status.uppercased() {
-        case "PLANNED": return "Planned"
-        case "SENT": return "Sent"
-        case "AWAITING_ACK": return "Awaiting ACK"
-        case "AWAITING_RESPONSE": return "Awaiting Response"
-        case "CONFIRMED": return "Confirmed"
-        case "REJECTED", "REJECTED_FINAL": return "Rejected"
-        case "OVERDUE": return "Overdue"
-        default: return status
-        }
+        let entry = Self.vocabulary[status.uppercased()] ?? (status, .neutral)
+        SymairaBadge(entry.label, tone: entry.tone, systemImage: entry.tone.systemImage)
     }
 }
 
@@ -68,5 +66,108 @@ extension Label where Title == Text, Icon == SymairaIconView<Int> {
         } icon: {
             SymairaIconView(icon, size: size)
         }
+    }
+}
+
+// MARK: - Page scaffold
+
+/// One frame for every sidebar page: same header, content width, spacing and state heights.
+enum PageLayout {
+    static let maxWidth: CGFloat = 1008
+    static let stateHeight: CGFloat = 240
+}
+
+struct Page<Accessory: View, Content: View>: View {
+    let title: String
+    var subtitle: String?
+    /// Lists that scroll themselves (native `Table`) fill the page instead of nesting scroll views.
+    var scrolls = true
+    let refresh: () async -> Void
+    @ViewBuilder var accessory: Accessory
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let column = VStack(alignment: .leading, spacing: SymairaSpacing.large) {
+            header
+            content
+        }
+        .padding(SymairaSpacing.xLarge)
+        .frame(maxWidth: PageLayout.maxWidth, maxHeight: scrolls ? nil : .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity)
+        if scrolls {
+            ScrollView { column }
+        } else {
+            column
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: SymairaSpacing.medium) {
+            VStack(alignment: .leading, spacing: SymairaSpacing.xSmall) {
+                Text(title)
+                    .symairaText(.display)
+                    .foregroundStyle(BrandColors.textPrimary)
+                    .topoProtected()
+                if let subtitle {
+                    Text(subtitle)
+                        .symairaText(.caption)
+                        .foregroundStyle(BrandColors.textMuted)
+                        .topoProtected()
+                }
+            }
+            Spacer(minLength: SymairaSpacing.large)
+            accessory
+            Button {
+                Task { await refresh() }
+            } label: {
+                SymairaIconView(.refresh)
+            }
+            .symairaButtonStyle(.secondary)
+            .accessibilityLabel("Refresh \(title.lowercased())")
+            .topoProtected()
+        }
+    }
+}
+
+extension Page where Accessory == EmptyView {
+    init(
+        title: String, subtitle: String? = nil, scrolls: Bool = true, refresh: @escaping () async -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title, subtitle: subtitle, scrolls: scrolls, refresh: refresh, accessory: { EmptyView() },
+            content: content)
+    }
+}
+
+/// Loading and failure look identical on every page; `loaded` decides empty vs content.
+struct PageState<Value, Loaded: View>: View {
+    let state: ViewState<Value>
+    let loading: String
+    let retry: () async -> Void
+    @ViewBuilder let loaded: (Value) -> Loaded
+
+    var body: some View {
+        switch state {
+        case .idle, .loading:
+            SymairaLoadingState(loading).frame(height: PageLayout.stateHeight)
+        case .failed(let message):
+            ErrorStateView(message: message) { Task { await retry() } }
+                .frame(height: PageLayout.stateHeight)
+        case .loaded(let value):
+            loaded(value)
+        }
+    }
+}
+
+/// Empty result with the shared state height.
+struct PageEmpty: View {
+    let systemImage: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        SymairaEmptyState(systemImage: systemImage, title: title, message: message)
+            .frame(height: PageLayout.stateHeight)
     }
 }

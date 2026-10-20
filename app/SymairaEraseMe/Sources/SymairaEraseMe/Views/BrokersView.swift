@@ -4,84 +4,30 @@ import SymairaTheme
 /// Brokers view — browse and filter the broker registry.
 struct BrokersView: View {
     @StateObject private var vm = BrokersViewModel()
-    @State private var showDetail = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                filters
-
-                switch vm.state {
-                case .idle, .loading:
-                    SymairaLoadingState("Loading brokers…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded:
-                    if vm.filteredBrokers.isEmpty {
-                        SymairaEmptyState(
-                            systemImage: "person.2.fill",
-                            title: "No Brokers Found",
-                            message: "Adjust filters or check the broker registry."
-                        )
-                        .frame(height: 200)
-                    } else {
-                        brokerGrid
-                    }
-                }
-            }
-            .padding(24)
-        }
-        .background(Color.clear)
-        .task { await vm.refresh() }
-        .sheet(item: $vm.selectedBroker) { broker in
-            brokerDetailSheet(broker)
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Brokers")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                Text("\(vm.total.plainDigits) brokers in registry")
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            }
-            Spacer()
+        Page(title: "Brokers", subtitle: "\(vm.total.plainDigits) brokers in registry", refresh: vm.refresh) {
             TextField("Search…", text: $vm.searchText)
                 .textFieldStyle(.symaira)
                 .frame(width: 200)
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                SymairaIconView(.refresh)
-                    .symairaText(.heading)
-            }
-            .symairaButtonStyle(.secondary)
-            .accessibilityLabel("Refresh brokers")
-        }
-    }
-
-    private var filters: some View {
-        VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
+        } content: {
             filterFields
-            HStack(spacing: SymairaSpacing.medium) {
-                Button("Apply") {
-                    Task { await vm.refresh() }
+            PageState(state: vm.state, loading: "Loading brokers…", retry: vm.refresh) { _ in
+                if vm.filteredBrokers.isEmpty {
+                    PageEmpty(
+                        systemImage: "person.2.fill",
+                        title: "No Brokers Found",
+                        message: "Adjust filters or check the broker registry."
+                    )
+                } else {
+                    brokerGrid
                 }
-                .symairaButtonStyle(.secondary)
-                Button("Reset") { vm.resetFilters() }
-                    .symairaButtonStyle(.secondary)
             }
-            .fixedSize()
+        }
+        // Filters apply on change, like every other page; no separate Apply step.
+        .task(id: "\(vm.filterJurisdiction)|\(vm.filterPriority)|\(vm.filterCategory)") { await vm.refresh() }
+        .sheet(item: $vm.selectedBroker) { broker in
+            brokerDetailSheet(broker)
         }
     }
 
@@ -95,7 +41,7 @@ struct BrokersView: View {
                 Text("PIPEDA").tag("PIPEDA")
             }
             .labelsHidden()
-            .frame(maxWidth: .infinity)
+            .fixedSize()
 
             Picker("Priority", selection: $vm.filterPriority) {
                 Text("All priorities").tag("")
@@ -104,7 +50,7 @@ struct BrokersView: View {
                 Text("Low").tag("low")
             }
             .labelsHidden()
-            .frame(maxWidth: .infinity)
+            .fixedSize()
 
             Picker("Category", selection: $vm.filterCategory) {
                 Text("All categories").tag("")
@@ -116,20 +62,20 @@ struct BrokersView: View {
                 Text("Social Media").tag("social-media")
             }
             .labelsHidden()
-            .frame(maxWidth: .infinity)
+            .fixedSize()
+            Spacer(minLength: 0)
         }
     }
 
     private var brokerGrid: some View {
         let columns = [
-            GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 12)
+            GridItem(.adaptive(minimum: 220, maximum: 320), spacing: SymairaSpacing.medium)
         ]
 
-        return LazyVGrid(columns: columns, spacing: 12) {
+        return LazyVGrid(columns: columns, spacing: SymairaSpacing.medium) {
             ForEach(vm.filteredBrokers) { broker in
                 Button {
                     vm.selectedBroker = broker
-                    showDetail = true
                 } label: {
                     BrokerCard(broker: broker)
                 }
@@ -218,7 +164,6 @@ struct BrokersView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         vm.selectedBroker = nil
-                        showDetail = false
                     }
                     .keyboardShortcut(.cancelAction)
                 }
@@ -227,7 +172,6 @@ struct BrokersView: View {
         .frame(width: 500, height: 600)
         .onExitCommand {
             vm.selectedBroker = nil
-            showDetail = false
         }
     }
 
@@ -271,7 +215,7 @@ struct BrokerCard: View {
             }
 
             if let channels = broker.optOut {
-                HStack(spacing: 8) {
+                HStack(spacing: SymairaSpacing.small) {
                     ForEach(channels, id: \.type) { ch in
                         Label(ch.type, symairaIcon: ch.type == "email" ? .mail : .link, size: 12)
                             .symairaText(.caption)

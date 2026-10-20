@@ -9,44 +9,32 @@ struct CampaignsView: View {
     @State private var pendingExecuteId: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                if let plan = vm.planResult {
-                    SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
-                }
-                if let exec = vm.executeResult {
-                    SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)
-                }
-
-                switch vm.state {
-                case .idle, .loading:
-                    SymairaLoadingState("Loading campaigns…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded(let campaigns):
-                    if campaigns.isEmpty {
-                        SymairaEmptyState(
-                            systemImage: "megaphone.fill",
-                            title: "No Campaigns",
-                            message: "Create your first campaign to start removing data from brokers."
-                        )
-                        .frame(height: 200)
-                    } else {
-                        campaignsTable(campaigns)
-                    }
+        Page(title: "Campaigns", subtitle: "Removal campaigns and their progress", refresh: vm.refresh) {
+            Button {
+                showCreateSheet = true
+            } label: {
+                Label("New Campaign", symairaIcon: .add)
+            }
+            .symairaButtonStyle(.primary)
+        } content: {
+            if let plan = vm.planResult {
+                SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
+            }
+            if let exec = vm.executeResult {
+                SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)
+            }
+            PageState(state: vm.state, loading: "Loading campaigns…", retry: vm.refresh) { campaigns in
+                if campaigns.isEmpty {
+                    PageEmpty(
+                        systemImage: "megaphone.fill",
+                        title: "No Campaigns",
+                        message: "Create your first campaign to start removing data from brokers."
+                    )
+                } else {
+                    campaignsTable(campaigns)
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
         .task { await vm.refresh() }
         .sheet(isPresented: $showCreateSheet) {
             createSheet
@@ -68,23 +56,8 @@ struct CampaignsView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Text("Campaigns")
-                .symairaText(.display)
-                .foregroundStyle(BrandColors.textPrimary)
-            Spacer()
-            Button {
-                showCreateSheet = true
-            } label: {
-                Label("New Campaign", symairaIcon: .add)
-            }
-            .symairaButtonStyle(.primary)
-        }
-    }
-
     private func campaignsTable(_ campaigns: [DashboardCampaign]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(campaigns) {
                 TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
                 TableColumn("Kind") { Text($0.kind ?? "—") }

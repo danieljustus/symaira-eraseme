@@ -9,75 +9,30 @@ struct ManualTasksView: View {
     @State private var completionNotes: String = ""
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                if let success = vm.successMessage {
-                    SymairaNotice(message: success, tone: .positive)
-                }
-
-                summaryCards
-
-                switch vm.state {
-                case .idle, .loading:
-                    SymairaLoadingState("Loading tasks…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded(let tasks):
-                    if tasks.isEmpty {
-                        SymairaEmptyState(
-                            systemImage: "checklist",
-                            title: "No Manual Tasks",
-                            message: """
-                            No matching tasks. Broker web forms and verification steps are handled here manually.
-                            """
-                        )
-                        .frame(height: 200)
-                    } else {
-                        tasksTable
-                    }
+        Page(title: "Manual Tasks", subtitle: "Tasks requiring human intervention", refresh: vm.refresh) {
+            SymairaSegmentedControl(
+                "Filter", selection: $vm.filterStatus,
+                options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
+        } content: {
+            if let success = vm.successMessage {
+                SymairaNotice(message: success, tone: .positive)
+            }
+            summaryCards
+            PageState(state: vm.state, loading: "Loading tasks…", retry: vm.refresh) { tasks in
+                if tasks.isEmpty {
+                    PageEmpty(
+                        systemImage: "checklist",
+                        title: "No Manual Tasks",
+                        message: "No matching tasks. Broker web forms and verification steps are handled here manually."
+                    )
+                } else {
+                    tasksTable
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
-        .task { await vm.refresh() }
+        .task(id: vm.filterStatus) { await vm.refresh() }
         .sheet(isPresented: $showCompleteSheet) {
             completeSheet
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Manual Tasks")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                Text("Tasks requiring human intervention")
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            }
-            Spacer()
-            SymairaSegmentedControl("Filter", selection: $vm.filterStatus,
-                options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
-            .onChange(of: vm.filterStatus) { _, _ in
-                Task { await vm.refresh() }
-            }
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                SymairaIconView(.refresh)
-                    .symairaText(.heading)
-            }
-            .symairaButtonStyle(.secondary)
-            .accessibilityLabel("Refresh manual tasks")
         }
     }
 
@@ -85,20 +40,20 @@ struct ManualTasksView: View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible()),
-        ], spacing: 12) {
+        ], spacing: SymairaSpacing.medium) {
             StatCard(title: "Pending", value: vm.pendingTasks)
             StatCard(title: "Completed", value: vm.completedTasks)
         }
     }
 
     private var tasksTable: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(vm.tasks) {
                 TableColumn("ID") { Text("\($0.taskId.plainDigits)") }
                 TableColumn("Broker") { Text($0.brokerName).foregroundStyle(BrandColors.goldPrimary) }
                 TableColumn("Reason") { Text($0.reason.replacingOccurrences(of: "_", with: " ").capitalized) }
                 TableColumn("Status") {
-                    StatusBadge(status: $0.status.uppercased() == "PENDING" ? "SENT" : "CONFIRMED")
+                    StatusBadge(status: $0.status)
                 }
                 TableColumn("Created") {
                     if let date = $0.createdDate {

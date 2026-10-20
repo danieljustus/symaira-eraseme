@@ -6,67 +6,27 @@ struct CalendarView: View {
     @StateObject private var vm = CalendarViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                switch vm.state {
-                case .idle, .loading:
-                    SymairaLoadingState("Loading calendar…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded(let data):
+        Page(title: "Calendar", subtitle: "Upcoming deadlines and tick actions", refresh: vm.refresh) {
+            SymairaSegmentedControl(
+                "Weeks", selection: $vm.weeks,
+                options: [(2, "2 weeks"), (4, "4 weeks"), (8, "8 weeks"), (12, "12 weeks")])
+        } content: {
+            PageState(state: vm.state, loading: "Loading calendar…", retry: vm.refresh) { data in
+                if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
+                    PageEmpty(
+                        systemImage: "calendar",
+                        title: "No Calendar Data",
+                        message: "Create a campaign to see upcoming deadlines."
+                    )
+                } else {
                     if let deadlines = data.upcomingDeadlines {
                         deadlinesSummary(deadlines)
                     }
                     tickActionsSection
-                    if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
-                        SymairaEmptyState(
-                            systemImage: "calendar",
-                            title: "No Calendar Data",
-                            message: "Create a campaign to see upcoming deadlines."
-                        )
-                        .frame(height: 200)
-                    }
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
-        .task { await vm.refresh() }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Calendar")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                Text("Upcoming deadlines and tick actions")
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            }
-            Spacer()
-            SymairaSegmentedControl("Weeks", selection: $vm.weeks,
-                options: [(2, "2 weeks"), (4, "4 weeks"), (8, "8 weeks"), (12, "12 weeks")])
-            .onChange(of: vm.weeks) { _, _ in
-                Task { await vm.refresh() }
-            }
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                SymairaIconView(.refresh)
-                    .symairaText(.heading)
-            }
-            .symairaButtonStyle(.secondary)
-            .accessibilityLabel("Refresh calendar")
-        }
+        .task(id: vm.weeks) { await vm.refresh() }
     }
 
     /// Human-readable label for an escalation category identifier returned
@@ -86,7 +46,7 @@ struct CalendarView: View {
     }
 
     private func deadlinesSummary(_ deadlines: UpcomingDeadlines) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.medium) {
             Text("Deadline Summary")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -96,7 +56,7 @@ struct CalendarView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                     GridItem(.flexible()),
-                ], spacing: 12) {
+                ], spacing: SymairaSpacing.medium) {
                     StatCard(title: "Total Requests", value: totals.requests ?? 0)
                     StatCard(title: "Resolved", value: totals.resolved ?? 0)
                     StatCard(title: "Open", value: totals.open ?? 0)
@@ -109,7 +69,7 @@ struct CalendarView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                     GridItem(.flexible()),
-                ], spacing: 12) {
+                ], spacing: SymairaSpacing.medium) {
                     StatCard(title: "Overdue", value: upcoming.overdue ?? 0)
                     StatCard(title: "Due in 7d", value: upcoming.deadlineDueWithin7d ?? 0)
                     StatCard(title: "Due in 30d", value: upcoming.deadlineDueWithin30d ?? 0)
@@ -159,7 +119,7 @@ struct CalendarView: View {
     }
 
     private var tickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Tick Actions")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
