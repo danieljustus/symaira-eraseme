@@ -25,7 +25,6 @@ struct SettingsView: View {
                 serverSection
                 connectionSection
                 configurationSection
-                htmlDashboardSection
                 aboutSection
             }
             .padding(24)
@@ -181,36 +180,6 @@ struct SettingsView: View {
                 SecureField("ANTHROPIC_API_KEY", text: $serverManager.anthropicKey)
                     .textFieldStyle(.symaira)
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
-            }
-        }
-    }
-
-    // MARK: - HTML Dashboard
-
-    private var htmlDashboardSection: some View {
-        SymairaFormSection(
-            "HTML Dashboard",
-            footer: "Generate and open the HTML dashboard in your browser as a fallback."
-        ) {
-            HStack(spacing: SymairaSpacing.medium) {
-                Button("Generate & Open Dashboard") {
-                    Task { await vm.openHTMLDashboard() }
-                }
-                .symairaButtonStyle(.secondary)
-
-                if let path = vm.dashboardPath {
-                    Button("Show in Finder") {
-                        vm.showInFinder(path)
-                    }
-                    .symairaButtonStyle(.secondary)
-                }
-            }
-
-            if let path = vm.dashboardPath {
-                Text(path)
-                    .symairaText(.monoSmall)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
             }
         }
     }
