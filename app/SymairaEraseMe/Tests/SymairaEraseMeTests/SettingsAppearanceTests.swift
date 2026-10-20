@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import SymairaTheme
 import XCTest
@@ -7,6 +8,10 @@ import XCTest
 final class SettingsAppearanceTests: XCTestCase {
     @MainActor
     func testProductionPickerPersistsAndAppliesToNativeWindows() async throws {
+        // The shared picker is SwiftUI segments; only an AX-authorized host can press them.
+        guard AXIsProcessTrusted() else {
+            throw XCTSkip("Pressing SwiftUI segments requires an AX-authorized test host")
+        }
         _ = NSApplication.shared
         let previousAppearance = NSApp.appearance
         let previousHost = MCPClient.configuredHost
@@ -36,22 +41,20 @@ final class SettingsAppearanceTests: XCTestCase {
         window.setContentSize(NSSize(width: 720, height: 680))
         defer { window.close(); otherWindow.close() }
         window.contentView?.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(200))
-        let control = try XCTUnwrap(findPicker(try XCTUnwrap(window.contentView)))
+        window.orderFront(nil)
+        let restoreAccessibility = enableEnhancedAccessibility()
+        defer { restoreAccessibility() }
+        try await Task.sleep(for: .milliseconds(300))
         for choice in [SymairaAppearance.dark, .light, .system] {
-            control.selectedSegment = try XCTUnwrap(SymairaAppearance.allCases.firstIndex(of: choice))
-            control.sendAction(control.action, to: control.target)
-            try await Task.sleep(for: .milliseconds(100))
+            try press(in: window, "Missing segment \(choice.title)") {
+                text($0, "accessibilityRole") == NSAccessibility.Role.button.rawValue
+                    && text($0, "accessibilityLabel") == choice.title
+            }
+            try await Task.sleep(for: .milliseconds(150))
             XCTAssertEqual(defaults.string(forKey: "symeraseme_appearance"), choice.rawValue)
             XCTAssertEqual(NSApp.appearance?.name, choice.nativeAppearance?.name)
             XCTAssertEqual(window.effectiveAppearance.name, otherWindow.effectiveAppearance.name)
         }
         XCTAssertFalse(manager.isRunning)
-    }
-
-    @MainActor
-    private func findPicker(_ view: NSView) -> NSSegmentedControl? {
-        if let control = view as? NSSegmentedControl { return control }
-        return view.subviews.compactMap(findPicker).first
     }
 }
