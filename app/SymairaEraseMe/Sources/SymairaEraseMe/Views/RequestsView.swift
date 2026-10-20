@@ -7,7 +7,8 @@ struct RequestsView: View {
     @State private var showDetail = false
 
     var body: some View {
-        HSplitView {
+        // Not HSplitView: its NSSplitView ignores the toolbar safe area and clips the header.
+        HStack(spacing: 0) {
             // Main list
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -44,8 +45,9 @@ struct RequestsView: View {
 
             // Detail panel
             if showDetail, let request = vm.selectedRequest {
+                Divider().overlay(SymairaTokens.line)
                 detailPanel(request: request)
-                    .frame(minWidth: 320, idealWidth: 400)
+                    .frame(width: 360)
             }
         }
         .background(Color.clear)

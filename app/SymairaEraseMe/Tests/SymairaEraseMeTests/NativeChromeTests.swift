@@ -94,6 +94,18 @@ final class NativeChromeTests: XCTestCase {
             nodes = elements(window)
             XCTAssertTrue(nodes.contains { text($0, "accessibilityIdentifier") == "symaira-settings-button" })
             XCTAssertTrue(nodes.contains { text($0, "accessibilityIdentifier") == "eraseme-content-\(item.id)" })
+            // The page heading must sit fully below the toolbar, not under it (#1255 Requests regression).
+            let visible = window.convertToScreen(window.contentLayoutRect)
+            let headings = nodes.compactMap { $0 as? NSAccessibilityElementProtocol }.filter {
+                let node = $0 as! NSObject
+                return text(node, "accessibilityRole") == NSAccessibility.Role.staticText.rawValue
+                    && (text(node, "accessibilityValue") ?? text(node, "accessibilityLabel")) == item.rawValue
+                    && $0.accessibilityFrame().minX > visible.minX + 200
+            }
+            XCTAssertFalse(headings.isEmpty, "Missing heading \(item.rawValue)")
+            for heading in headings {
+                XCTAssertLessThanOrEqual(heading.accessibilityFrame().maxY, visible.maxY, "Clipped heading \(item.rawValue)")
+            }
         }
         for _ in 0..<2 {
             try press(identifier: "symaira-sidebar-toggle", in: window)
