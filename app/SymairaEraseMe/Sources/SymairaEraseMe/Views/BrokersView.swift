@@ -85,94 +85,75 @@ struct BrokersView: View {
         }
     }
 
-    @ViewBuilder
     private func brokerDetailSheet(_ broker: Broker) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Header
+        SheetScaffold(title: "Broker Details", dismissTitle: "Close", dismiss: { vm.selectedBroker = nil }) {
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text(broker.name)
+                    .symairaText(.heading)
+                    .foregroundStyle(BrandColors.textPrimary)
+                if let website = broker.website {
+                    Link(website, destination: URL(string: website) ?? URL(string: "about:blank")!)
+                        .symairaText(.caption)
+                }
+            }
+
+            // Info grid
+            Group {
+                detailRow("ID", broker.brokerId)
+                detailRow("Category", broker.category ?? "—")
+                detailRow("Priority", broker.priority ?? "—")
+                detailRow("Jurisdictions", broker.jurisdictions?.joined(separator: ", ") ?? "—")
+                detailRow("Laws", broker.laws?.joined(separator: ", ") ?? "—")
+                if let sensitivity = broker.dataSensitivity {
+                    detailRow("Data Sensitivity", "\(sensitivity)/5")
+                }
+                if let disabled = broker.disabled, disabled {
+                    detailRow("Status", "DISABLED")
+                }
+            }
+
+            SymairaFormDivider()
+
+            // Opt-out channels
+            if let optOut = broker.optOut, !optOut.isEmpty {
+                Text("Opt-Out Channels")
+                    .symairaText(.subheading)
+                    .foregroundStyle(BrandColors.textPrimary)
+                ForEach(optOut.indices, id: \.self) { index in
+                    let channel = optOut[index]
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(broker.name)
-                            .symairaText(.heading)
-                            .foregroundStyle(BrandColors.textPrimary)
-                        if let website = broker.website {
-                            Link(website, destination: URL(string: website) ?? URL(string: "about:blank")!)
-                                .symairaText(.caption)
-                        }
-                    }
-
-                    // Info grid
-                    Group {
-                        detailRow("ID", broker.brokerId)
-                        detailRow("Category", broker.category ?? "—")
-                        detailRow("Priority", broker.priority ?? "—")
-                        detailRow("Jurisdictions", broker.jurisdictions?.joined(separator: ", ") ?? "—")
-                        detailRow("Laws", broker.laws?.joined(separator: ", ") ?? "—")
-                        if let sensitivity = broker.dataSensitivity {
-                            detailRow("Data Sensitivity", "\(sensitivity)/5")
-                        }
-                        if let disabled = broker.disabled, disabled {
-                            detailRow("Status", "DISABLED")
-                        }
-                    }
-
-                    SymairaFormDivider()
-
-                    // Opt-out channels
-                    if let optOut = broker.optOut, !optOut.isEmpty {
-                        Text("Opt-Out Channels")
-                            .symairaText(.subheading)
-                            .foregroundStyle(BrandColors.textPrimary)
-                        ForEach(optOut.indices, id: \.self) { index in
-                            let channel = optOut[index]
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    StatusBadge(status: channel.type)
-                                    if let endpoint = channel.endpoint {
-                                        Text(endpoint)
-                                            .symairaText(.caption)
-                                    }
-                                    if let url = channel.url {
-                                        Link(url, destination: URL(string: url) ?? URL(string: "about:blank")!)
-                                            .symairaText(.caption)
-                                    }
-                                }
-                                if let fields = channel.requiredFields, !fields.isEmpty {
-                                    Text("Required fields: \(fields.joined(separator: ", "))")
-                                        .symairaText(.caption)
-                                        .foregroundStyle(BrandColors.textMuted)
-                                }
+                        HStack {
+                            StatusBadge(status: channel.type)
+                            if let endpoint = channel.endpoint {
+                                Text(endpoint)
+                                    .symairaText(.caption)
+                            }
+                            if let url = channel.url {
+                                Link(url, destination: URL(string: url) ?? URL(string: "about:blank")!)
+                                    .symairaText(.caption)
                             }
                         }
+                        if let fields = channel.requiredFields, !fields.isEmpty {
+                            Text("Required fields: \(fields.joined(separator: ", "))")
+                                .symairaText(.caption)
+                                .foregroundStyle(BrandColors.textMuted)
+                        }
                     }
+                }
+            }
 
-                    if let notes = broker.notes, !notes.isEmpty {
-                        SymairaFormDivider()
-                        Text("Notes")
-                            .symairaText(.subheading)
-                            .foregroundStyle(BrandColors.textPrimary)
-                        Text(notes)
-                            .symairaText(.callout)
-                            .foregroundStyle(BrandColors.textSecondary)
-                    }
-                }
-                .padding(20)
-            }
-            .background(BrandColors.bgDark)
-            .navigationTitle("Broker Details")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        vm.selectedBroker = nil
-                    }
-                    .keyboardShortcut(.cancelAction)
-                }
+            if let notes = broker.notes, !notes.isEmpty {
+                SymairaFormDivider()
+                Text("Notes")
+                    .symairaText(.subheading)
+                    .foregroundStyle(BrandColors.textPrimary)
+                Text(notes)
+                    .symairaText(.callout)
+                    .foregroundStyle(BrandColors.textSecondary)
             }
         }
-        .frame(width: 500, height: 600)
-        .onExitCommand {
-            vm.selectedBroker = nil
-        }
+        .frame(width: 520, height: 600)
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {

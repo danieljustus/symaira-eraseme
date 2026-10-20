@@ -67,35 +67,38 @@ struct SettingsView: View {
 
     private var serverSection: some View {
         SymairaFormSection("MCP Server") {
-            HStack(spacing: SymairaSpacing.large) {
-                HStack(spacing: SymairaSpacing.medium) {
-                    SymairaStatusLabel(
-                        serverManager.isRunning ? "Running" : "Stopped",
-                        tone: serverManager.isRunning ? .positive : .critical
-                    )
-                    if let pid = serverManager.pid {
-                        Text("PID \(String(pid))")
-                            .symairaText(.monoSmall)
+            // Rows in a form section sit flush; the notice needs its own gap below the button.
+            VStack(alignment: .leading, spacing: SymairaSpacing.large) {
+                HStack(spacing: SymairaSpacing.large) {
+                    HStack(spacing: SymairaSpacing.medium) {
+                        SymairaStatusLabel(
+                            serverManager.isRunning ? "Running" : "Stopped",
+                            tone: serverManager.isRunning ? .positive : .critical
+                        )
+                        if let pid = serverManager.pid {
+                            Text("PID \(String(pid))")
+                                .symairaText(.monoSmall)
+                        }
+                    }
+
+                    Spacer(minLength: SymairaSpacing.medium)
+
+                    if serverManager.isRunning {
+                        Button("Stop Server") {
+                            serverManager.stop()
+                        }
+                        .symairaButtonStyle(.secondary)
+                    } else {
+                        Button("Start Server") {
+                            serverManager.start()
+                        }
+                        .symairaButtonStyle(.primary)
                     }
                 }
 
-                Spacer(minLength: SymairaSpacing.medium)
-
-                if serverManager.isRunning {
-                    Button("Stop Server") {
-                        serverManager.stop()
-                    }
-                    .symairaButtonStyle(.secondary)
-                } else {
-                    Button("Start Server") {
-                        serverManager.start()
-                    }
-                    .symairaButtonStyle(.primary)
+                if let error = serverManager.lastError {
+                    SymairaNotice(message: error, tone: .critical) { serverManager.lastError = nil }
                 }
-            }
-
-            if let error = serverManager.lastError {
-                SymairaNotice(message: error, tone: .critical) { serverManager.lastError = nil }
             }
         }
     }

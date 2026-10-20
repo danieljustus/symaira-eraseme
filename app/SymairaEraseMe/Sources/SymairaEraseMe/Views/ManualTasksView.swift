@@ -82,60 +82,49 @@ struct ManualTasksView: View {
     }
 
     private var completeSheet: some View {
-        NavigationStack {
-            Form {
-                Section("Task Details") {
-                    if let task = selectedTask {
-                        LabeledContent("Broker", value: task.brokerName)
-                        LabeledContent("Reason", value: task.reason)
-                        LabeledContent("URL") {
-                            Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
-                                .symairaText(.caption)
-                        }
-                        if !task.instructions.isEmpty {
-                            Text(task.instructions)
-                                .symairaText(.callout)
-                                .foregroundStyle(BrandColors.textSecondary)
-                        }
-                    }
-                }
-
-                Section("Completion Notes") {
-                    TextEditor(text: $completionNotes)
-                        .frame(height: 80)
-                        .textFieldStyle(.symaira)
-                }
-
-                Section {
-                    Button("Mark Complete") {
-                        if let task = selectedTask {
-                            Task {
-                                await vm.completeTask(task, notes: completionNotes)
-                                showCompleteSheet = false
-                                selectedTask = nil
-                            }
-                        }
-                    }
-                    .symairaButtonStyle(.primary)
-                }
-            }
-            .formStyle(.grouped)
-            .background(BrandColors.bgDark)
-            .navigationTitle("Complete Task")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+        SheetScaffold(
+            title: "Complete Task",
+            dismiss: {
+                showCompleteSheet = false
+                selectedTask = nil
+            },
+            primaryTitle: "Mark Complete", primaryDisabled: selectedTask == nil,
+            primary: {
+                if let task = selectedTask {
+                    Task {
+                        await vm.completeTask(task, notes: completionNotes)
                         showCompleteSheet = false
                         selectedTask = nil
                     }
-                    .keyboardShortcut(.cancelAction)
                 }
             }
+        ) {
+            if let task = selectedTask {
+                SymairaFormSection("Task Details") {
+                    SymairaFormRow("Broker") { Text(task.brokerName).symairaText(.callout) }
+                    SymairaFormDivider()
+                    SymairaFormRow("Reason") { Text(task.reason).symairaText(.callout) }
+                    SymairaFormDivider()
+                    SymairaFormRow("Form") {
+                        Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
+                            .symairaText(.caption)
+                            .lineLimit(1)
+                    }
+                    if !task.instructions.isEmpty {
+                        SymairaFormDivider()
+                        Text(task.instructions)
+                            .symairaText(.callout)
+                            .foregroundStyle(BrandColors.textSecondary)
+                    }
+                }
+            }
+            SymairaFormSection("Completion Notes") {
+                TextField("Completion notes", text: $completionNotes, prompt: Text("Optional"), axis: .vertical)
+                    .labelsHidden()
+                    .lineLimit(3...6)
+                    .textFieldStyle(.symaira)
+            }
         }
-        .frame(width: 500, height: 450)
-        .onExitCommand {
-            showCompleteSheet = false
-            selectedTask = nil
-        }
+        .frame(width: 520, height: 500)
     }
 }

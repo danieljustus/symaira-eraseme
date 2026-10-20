@@ -88,6 +88,21 @@ final class LiquidTopographyTests: XCTestCase {
                     .environment(\.colorScheme, scheme)
                     .transaction { $0.animation = nil }
                 try await render(settings, name: "Settings-\(scheme)-\(Int(width))", width: width, scheme: scheme)
+                // A start failure shows a notice under the server button; it must not touch it.
+                manager.lastError = "refusing non-loopback MCP bind \"0\" without --allow-remote"
+                try await render(
+                    settings, name: "Settings-error-\(scheme)-\(Int(width))", width: width, scheme: scheme)
+                manager.lastError = nil
+                let sheet = SheetScaffold(title: "New Campaign", dismiss: {}, primaryTitle: "Create Campaign") {
+                    SymairaFormSection("Campaign Details") {
+                        SymairaFormRow("Campaign ID") {
+                            TextField("Campaign ID", text: .constant("srd")).labelsHidden().textFieldStyle(.symaira)
+                        }
+                    }
+                }
+                .frame(width: 520, height: 500)
+                .environment(\.colorScheme, scheme)
+                if width == 900 { try await render(sheet, name: "Sheet-\(scheme)", width: 520, scheme: scheme) }
             }
         }
         XCTAssertFalse(manager.isRunning, "Visual review must never start a backend")

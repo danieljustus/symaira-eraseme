@@ -81,48 +81,45 @@ struct CampaignsView: View {
 
 
     private var createSheet: some View {
-        NavigationStack {
-            Form {
-                Section("Campaign Details") {
-                    TextField("Campaign ID", text: $vm.newCampaignId)
-                        .textFieldStyle(.symaira)
-                    TextField("Jurisdiction (optional)", text: $vm.newCampaignJurisdiction)
-                        .textFieldStyle(.symaira)
-                    TextField("Law (optional)", text: $vm.newCampaignLaw)
-                        .textFieldStyle(.symaira)
-                    TextField("Priority (optional)", text: $vm.newCampaignPriority)
-                        .textFieldStyle(.symaira)
-                    Stepper("Max Brokers: \(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
-                }
-
-                Section {
-                    Button("Create Campaign") {
-                        Task {
-                            await vm.createCampaign()
-                            showCreateSheet = false
-                        }
-                    }
-                    .disabled(!vm.canCreateCampaign)
-                    .symairaButtonStyle(.primary)
+        SheetScaffold(
+            title: "New Campaign",
+            dismiss: {
+                showCreateSheet = false
+                vm.resetForm()
+            },
+            primaryTitle: "Create Campaign", primaryDisabled: !vm.canCreateCampaign,
+            primary: {
+                Task {
+                    await vm.createCampaign()
+                    showCreateSheet = false
                 }
             }
-            .formStyle(.grouped)
-            .background(BrandColors.bgDark)
-            .navigationTitle("New Campaign")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showCreateSheet = false
-                        vm.resetForm()
-                    }
-                    .keyboardShortcut(.cancelAction)
+        ) {
+            SymairaFormSection("Campaign Details") {
+                field("Campaign ID", "e.g. q4-gdpr", text: $vm.newCampaignId)
+                SymairaFormDivider()
+                field("Jurisdiction", "Optional", text: $vm.newCampaignJurisdiction)
+                SymairaFormDivider()
+                field("Law", "Optional", text: $vm.newCampaignLaw)
+                SymairaFormDivider()
+                field("Priority", "Optional", text: $vm.newCampaignPriority)
+                SymairaFormDivider()
+                SymairaFormRow("Max Brokers") {
+                    Stepper(
+                        "\(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
+                        .symairaText(.bodyEmphasized)
                 }
             }
         }
-        .frame(width: 500, height: 460)
-        .onExitCommand {
-            showCreateSheet = false
-            vm.resetForm()
+        .frame(width: 520, height: 500)
+    }
+
+    private func field(_ label: String, _ prompt: String, text: Binding<String>) -> some View {
+        SymairaFormRow(label) {
+            TextField(label, text: text, prompt: Text(prompt))
+                .labelsHidden()
+                .textFieldStyle(.symaira)
+                .frame(width: 260)
         }
     }
 

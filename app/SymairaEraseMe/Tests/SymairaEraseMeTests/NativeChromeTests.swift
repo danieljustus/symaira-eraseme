@@ -79,9 +79,8 @@ final class NativeChromeTests: XCTestCase {
     @MainActor
     private func verifyNavigation(in window: NSWindow) async throws {
         // SwiftUI builds its accessibility tree only for an assistive client; AX trust alone is not enough.
-        let enhancedUI = NSSelectorFromString("accessibilitySetEnhancedUserInterfaceAttribute:")
-        _ = NSApp.perform(enhancedUI, with: NSNumber(value: true))
-        defer { _ = NSApp.perform(enhancedUI, with: NSNumber(value: false)) }
+        let restoreAccessibility = enableEnhancedAccessibility()
+        defer { restoreAccessibility() }
         try await Task.sleep(for: .milliseconds(300))
         var nodes = elements(window)
         for identifier in ["symaira-sidebar-toggle", "symaira-settings-button"] {
@@ -123,16 +122,27 @@ final class NativeChromeTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(100))
         }
     }
+}
+
+/// In-process accessibility helpers. SwiftUI builds its tree only for an assistive
+/// client, so callers enable the enhanced UI attribute first (AX-trusted hosts only).
+extension XCTestCase {
+    @MainActor
+    func enableEnhancedAccessibility() -> () -> Void {
+        let selector = NSSelectorFromString("accessibilitySetEnhancedUserInterfaceAttribute:")
+        _ = NSApp.perform(selector, with: NSNumber(value: true))
+        return { _ = NSApp.perform(selector, with: NSNumber(value: false)) }
+    }
 
     @MainActor
-    private func text(_ object: NSObject, _ name: String) -> String? {
+    func text(_ object: NSObject, _ name: String) -> String? {
         let selector = NSSelectorFromString(name)
         guard object.responds(to: selector) else { return nil }
         return object.perform(selector)?.takeUnretainedValue() as? String
     }
 
     @MainActor
-    private func elements(_ root: NSObject) -> [NSObject] {
+    func elements(_ root: NSObject) -> [NSObject] {
         var seen = Set<ObjectIdentifier>()
         func walk(_ node: NSObject) -> [NSObject] {
             guard seen.insert(ObjectIdentifier(node)).inserted else { return [] }
@@ -152,13 +162,16 @@ final class NativeChromeTests: XCTestCase {
     }
 
     @MainActor
-    private func press(identifier: String, in window: NSWindow) throws {
+    func press(identifier: String, in window: NSWindow) throws {
+        try press(in: window, "Missing native action \(identifier)") { text($0, "accessibilityIdentifier") == identifier }
+    }
+
+    @MainActor
+    func press(in window: NSWindow, _ message: String, where matches: (NSObject) -> Bool) throws {
         let selector = NSSelectorFromString("accessibilityPerformPress")
-        let target = try XCTUnwrap(elements(window).first {
-            text($0, "accessibilityIdentifier") == identifier && $0.responds(to: selector)
-        }, "Missing native action \(identifier)")
+        let target = try XCTUnwrap(elements(window).first { matches($0) && $0.responds(to: selector) }, message)
         typealias Action = @convention(c) (AnyObject, Selector) -> Bool
         let action = unsafeBitCast(target.method(for: selector), to: Action.self)
-        XCTAssertTrue(action(target, selector), identifier)
+        XCTAssertTrue(action(target, selector), message)
     }
 }

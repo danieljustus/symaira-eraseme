@@ -170,3 +170,48 @@ struct PageEmpty: View {
             .frame(height: PageLayout.stateHeight)
     }
 }
+
+// MARK: - Sheet scaffold
+
+/// One frame for every sheet: heading, scrolling content and a footer where the
+/// secondary dismiss button sits left of the primary action. Esc and Return work.
+struct SheetScaffold<Content: View>: View {
+    let title: String
+    var dismissTitle = "Cancel"
+    let dismiss: () -> Void
+    var primaryTitle: String?
+    var primaryDisabled = false
+    var primary: () -> Void = {}
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .symairaText(.heading)
+                .foregroundStyle(BrandColors.textPrimary)
+                .padding([.horizontal, .top], SymairaSpacing.xLarge)
+                .padding(.bottom, SymairaSpacing.large)
+            ScrollView {
+                VStack(alignment: .leading, spacing: SymairaSpacing.large) { content }
+                    .padding(.horizontal, SymairaSpacing.xLarge)
+                    .padding(.bottom, SymairaSpacing.large)
+            }
+            Divider().overlay(SymairaTokens.line)
+            HStack(spacing: SymairaSpacing.medium) {
+                Spacer()
+                Button(dismissTitle, action: dismiss)
+                    .symairaButtonStyle(.secondary)
+                    .keyboardShortcut(.cancelAction)
+                if let primaryTitle {
+                    Button(primaryTitle, action: primary)
+                        .symairaButtonStyle(.primary)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(primaryDisabled)
+                }
+            }
+            .padding(SymairaSpacing.large)
+        }
+        .background(BrandColors.bgDark)
+        .onExitCommand(perform: dismiss)
+    }
+}
