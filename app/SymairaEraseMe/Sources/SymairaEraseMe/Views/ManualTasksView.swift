@@ -50,7 +50,7 @@ struct ManualTasksView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(vm.tasks) {
                 TableColumn("ID") { Text("\($0.taskId.plainDigits)") }
-                TableColumn("Broker") { Text($0.brokerName).foregroundStyle(BrandColors.goldPrimary) }
+                TableColumn("Broker") { Text($0.brokerName) }
                 TableColumn("Reason") { Text($0.reason.replacingOccurrences(of: "_", with: " ").capitalized) }
                 TableColumn("Status") {
                     StatusBadge(status: $0.status)

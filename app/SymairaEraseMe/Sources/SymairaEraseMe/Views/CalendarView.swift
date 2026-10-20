@@ -131,7 +131,7 @@ struct CalendarView: View {
             } else {
                 Table(vm.tickActions) {
                     TableColumn("Request") { Text("\($0.requestId.plainDigits)") }
-                    TableColumn("Broker") { Text($0.brokerId).foregroundStyle(BrandColors.goldPrimary) }
+                    TableColumn("Broker") { Text($0.brokerId) }
                     TableColumn("Action") {
                         Text($0.actionType.replacingOccurrences(of: "_", with: " ").capitalized)
                     }

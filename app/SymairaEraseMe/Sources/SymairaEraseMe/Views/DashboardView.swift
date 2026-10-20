@@ -8,7 +8,8 @@ struct DashboardView: View {
 
     var body: some View {
         Page(
-            title: "Dashboard", subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" },
+            title: "Dashboard",
+            subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" } ?? "Overview of your removal requests",
             refresh: vm.refresh
         ) {
             PageState(state: vm.state, loading: "Loading dashboard…", retry: vm.refresh) { data in
@@ -83,7 +84,7 @@ struct DashboardView: View {
 
             if let campaigns = vm.data?.campaigns, !campaigns.isEmpty {
                 Table(campaigns) {
-                    TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
+                    TableColumn("ID") { Text($0.id) }
                     TableColumn("Kind") { Text($0.kind ?? "—") }
                     TableColumn("Total") { Text("\($0.total.plainDigits)") }
                     TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
@@ -169,7 +170,7 @@ struct BrokerStatusCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(broker.brokerId)
                 .symairaText(.bodyEmphasized)
-                .foregroundStyle(BrandColors.goldPrimary)
+                .foregroundStyle(BrandColors.textPrimary)
                 .lineLimit(1)
             HStack(spacing: SymairaSpacing.small) {
                 if broker.confirmed > 0 {
@@ -214,7 +215,7 @@ struct EventRow: View {
                 if let brokerId = event.brokerId {
                     Text(brokerId)
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.goldPrimary)
+                        .foregroundStyle(BrandColors.textPrimary)
                 }
             }
             Spacer()

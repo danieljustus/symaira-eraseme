@@ -74,7 +74,7 @@ struct RequestsView: View {
         Table(vm.requests, selection: $selection) {
             TableColumn("ID") { Text("\($0.id.plainDigits)") }
                 .width(min: 40, ideal: 50)
-            TableColumn("Broker") { Text($0.brokerId).foregroundStyle(BrandColors.goldPrimary) }
+            TableColumn("Broker") { Text($0.brokerId) }
             TableColumn("Channel") { Text($0.channel) }
             TableColumn("Status") { StatusBadge(status: $0.statusDisplay) }
                 .width(min: 110, ideal: 140)
@@ -155,7 +155,6 @@ struct RequestsView: View {
             switch vm.eventsState {
             case .idle, .loading:
                 ProgressView()
-                    .tint(BrandColors.goldPrimary)
 
             case .failed(let message):
                 HStack {
@@ -168,8 +167,8 @@ struct RequestsView: View {
                     Button("Retry") {
                         Task { await vm.loadEvents(for: request) }
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(BrandColors.goldPrimary)
+                    .symairaButtonStyle(.secondary)
+                    .controlSize(.small)
                 }
 
             case .loaded:

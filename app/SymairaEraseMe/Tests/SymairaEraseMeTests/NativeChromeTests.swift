@@ -88,6 +88,7 @@ final class NativeChromeTests: XCTestCase {
             XCTAssertEqual(nodes.filter { text($0, "accessibilityIdentifier") == identifier }.count, 1, identifier)
         }
         XCTAssertFalse(nodes.contains { text($0, "accessibilityIdentifier") == "eraseme-nav-Settings" })
+        var firstRefreshY: CGFloat?
         for item in ContentView.NavItem.sidebarItems {
             try press(identifier: "eraseme-nav-\(item.id)", in: window)
             try await Task.sleep(for: .milliseconds(100))
@@ -103,6 +104,16 @@ final class NativeChromeTests: XCTestCase {
                     && $0.accessibilityFrame().minX > visible.minX + 200
             }
             XCTAssertFalse(headings.isEmpty, "Missing heading \(item.rawValue)")
+            // Every page shares one header: the refresh button sits at the same height everywhere.
+            let refresh = nodes.compactMap { $0 as? NSAccessibilityElementProtocol }.first {
+                text($0 as! NSObject, "accessibilityLabel") == "Refresh \(item.rawValue.lowercased())"
+            }
+            let refreshY = try XCTUnwrap(refresh, "Missing refresh on \(item.rawValue)").accessibilityFrame().midY
+            if let first = firstRefreshY {
+                XCTAssertEqual(refreshY, first, accuracy: 0.5, "Refresh misaligned on \(item.rawValue)")
+            } else {
+                firstRefreshY = refreshY
+            }
             for heading in headings {
                 XCTAssertLessThanOrEqual(heading.accessibilityFrame().maxY, visible.maxY, "Clipped heading \(item.rawValue)")
             }

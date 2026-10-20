@@ -9,8 +9,9 @@ enum BrandColors {
     static let bgCard = SymairaTokens.surface
     static let bgCardHover = SymairaTokens.raised
 
-    // Selection/link foreground must remain readable in light appearance.
-    static let goldPrimary = SymairaTokens.selected
+    // No accent here on purpose: champagne (`SymairaTokens.selected`) belongs only to
+    // selection, active controls and focus, which the shared AppKit controls and the
+    // app-wide tint already apply. IDs, names and values stay in ink (DESIGN.md).
 
     static let textPrimary = SymairaTokens.ink
     static let textSecondary = SymairaTokens.ink2

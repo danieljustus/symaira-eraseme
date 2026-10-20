@@ -94,7 +94,7 @@ struct BrokersView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(broker.name)
                             .symairaText(.heading)
-                            .foregroundStyle(BrandColors.goldPrimary)
+                            .foregroundStyle(BrandColors.textPrimary)
                         if let website = broker.website {
                             Link(website, destination: URL(string: website) ?? URL(string: "about:blank")!)
                                 .symairaText(.caption)
@@ -192,7 +192,7 @@ struct BrokerCard: View {
             HStack {
                 Text(broker.name)
                     .symairaText(.bodyEmphasized)
-                    .foregroundStyle(BrandColors.goldPrimary)
+                    .foregroundStyle(BrandColors.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 if let priority = broker.priority {

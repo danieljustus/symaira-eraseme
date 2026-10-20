@@ -59,7 +59,7 @@ struct CampaignsView: View {
     private func campaignsTable(_ campaigns: [DashboardCampaign]) -> some View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(campaigns) {
-                TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
+                TableColumn("ID") { Text($0.id) }
                 TableColumn("Kind") { Text($0.kind ?? "—") }
                 TableColumn("Total") { Text("\($0.total.plainDigits)") }
                 TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }

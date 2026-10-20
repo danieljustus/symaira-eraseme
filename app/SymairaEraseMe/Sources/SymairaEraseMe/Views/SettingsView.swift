@@ -219,7 +219,7 @@ struct SettingsView: View {
             HStack {
                 Text("Symaira EraseMe")
                     .symairaText(.callout)
-                    .foregroundStyle(BrandColors.goldPrimary)
+                    .foregroundStyle(BrandColors.textPrimary)
                 Text("•")
                     .foregroundStyle(BrandColors.textMuted)
                     .accessibilityHidden(true)

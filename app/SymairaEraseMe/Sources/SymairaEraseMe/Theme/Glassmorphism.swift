@@ -79,7 +79,8 @@ enum PageLayout {
 
 struct Page<Accessory: View, Content: View>: View {
     let title: String
-    var subtitle: String?
+    /// Required: a one-line header on some pages and two on others misaligns the controls.
+    let subtitle: String
     /// Lists that scroll themselves (native `Table`) fill the page instead of nesting scroll views.
     var scrolls = true
     let refresh: () async -> Void
@@ -108,12 +109,10 @@ struct Page<Accessory: View, Content: View>: View {
                     .symairaText(.display)
                     .foregroundStyle(BrandColors.textPrimary)
                     .topoProtected()
-                if let subtitle {
-                    Text(subtitle)
-                        .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
-                        .topoProtected()
-                }
+                Text(subtitle)
+                    .symairaText(.caption)
+                    .foregroundStyle(BrandColors.textMuted)
+                    .topoProtected()
             }
             Spacer(minLength: SymairaSpacing.large)
             accessory
@@ -131,7 +130,7 @@ struct Page<Accessory: View, Content: View>: View {
 
 extension Page where Accessory == EmptyView {
     init(
-        title: String, subtitle: String? = nil, scrolls: Bool = true, refresh: @escaping () async -> Void,
+        title: String, subtitle: String, scrolls: Bool = true, refresh: @escaping () async -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
