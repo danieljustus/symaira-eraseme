@@ -34,6 +34,13 @@ separately verified stable promotion before Homebrew distribution. Historical
 - Audit the generated Formula and verify its inferred version before native
   installation or tap publication (#1223).
 
+### Security
+
+- Store the macOS app's Anthropic API key in the login Keychain instead of the
+  plain-text preferences plist. An existing key is migrated on launch and the
+  old preference is removed only after a verified Keychain write; on failure
+  the key is kept and the Settings window shows the error (#1254).
+
 ## [v0.14.1] - 2026-10-10
 
 Security and release-safety patch on the Rust-only line. Publication starts as
