@@ -13,6 +13,7 @@ REVISIONS = (
     'a3db5a02f9a9aa08d172228caf709c621af3c0bb',  # Native token/consent ACL producer
     '968e1a2dda9c621ba880e7b618dc49daa31970b3',  # Rustls/Yoke native dependency refresh
     'ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33',  # MiniJinja/minor native dependency refresh
+    'e61132f85b89580c96d95d098289f7238e810255',  # webpki distrusted-roots native dependency refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 
