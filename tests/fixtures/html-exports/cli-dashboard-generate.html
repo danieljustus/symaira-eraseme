@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Symaira EraseMe Dashboard</title>
+<style>
+/* Symaira Liquid Topography. Local fonts only: opening this file makes no network request. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  color-scheme: light dark;
+  --canvas: #EEEDEA;
+  --surface: #E1E0DA;
+  --raised: #EEEDEA;
+  --line: #B0AEA9;
+  --ink: #141413;
+  --ink-2: #2B2B2A;
+  --ink-3: #62615D;
+  --selected: #141413;
+  --on-selected: #E1E0DA;
+  --focus: #141413;
+  --positive: #34694A;
+  --warning: #7E5310;
+  --critical: #9A4634;
+  --informative: #245C86;
+  --neutral: #2B2B2A;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #1C1C1B;
+    --surface: #141413;
+    --raised: #2B2B2A;
+    --line: #30302E;
+    --ink: #EEEDEA;
+    --ink-2: #B0AEA9;
+    --ink-3: #97958F;
+    --selected: #E0D2BA;
+    --on-selected: #1A1814;
+    --focus: #E0D2BA;
+    --positive: #93C49F;
+    --warning: #E9BC73;
+    --critical: #E39C8A;
+    --informative: #8CC8F2;
+    --neutral: #B0AEA9;
+  }
+}
+
+body {
+  font-family: "Google Sans Flex", "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  background: var(--canvas);
+  color: var(--ink);
+  line-height: 1.5;
+  padding: 24px 16px 48px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 1008px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* Header zone: title, subtitle, generation time */
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.subtitle { color: var(--ink-3); font-size: 0.8125rem; }
+.last-updated { color: var(--ink-3); font-size: 0.8125rem; text-align: right; }
+.last-updated strong { color: var(--ink); font-weight: 600; }
+
+/* Cards: opaque surface with a 1px line, no glass, no shadow */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.section-title-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.section-title { font-size: 1.0625rem; font-weight: 700; color: var(--ink); }
+.empty { color: var(--ink-3); font-size: 0.875rem; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8125rem; }
+
+/* Summary stat cards */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.summary-card { display: flex; flex-direction: column; gap: 8px; }
+.summary-card .label { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+.summary-card .count { font-size: 1.75rem; font-weight: 700; line-height: 1; color: var(--ink); }
+
+/* Status breakdown */
+.chart-container { display: flex; flex-direction: column; gap: 10px; }
+.chart-bar-row { display: flex; align-items: center; gap: 12px; font-size: 0.8125rem; }
+.chart-bar-label { width: 120px; color: var(--ink-2); font-weight: 600; flex-shrink: 0; }
+.chart-bar-wrapper { flex-grow: 1; background: var(--raised); border: 1px solid var(--line); height: 22px; border-radius: 10px; overflow: hidden; position: relative; }
+.chart-bar-fill { height: 100%; border-radius: 9px; position: relative; }
+.chart-bar-fill.planned { background: var(--neutral); }
+.chart-bar-fill.sent { background: var(--informative); }
+.chart-bar-fill.awaiting { background: var(--warning); }
+.chart-bar-fill.confirmed { background: var(--positive); }
+.chart-bar-fill.rejected { background: var(--critical); }
+.chart-bar-fill.overdue { background: var(--critical); }
+.chart-bar-value { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 0.75rem; color: var(--canvas); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; text-align: left; }
+th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+tr:last-child td { border-bottom: none; }
+.campaign-id { font-weight: 700; }
+.muted { color: var(--ink-3); }
+.num-positive { color: var(--positive); font-weight: 600; }
+.num-warning { color: var(--warning); font-weight: 600; }
+.num-critical { color: var(--critical); font-weight: 600; }
+
+/* Status badges: tone text, 12% tone fill, 26% tone outline */
+.badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; border: 1px solid; }
+.badge-green { color: var(--positive); background: color-mix(in srgb, var(--positive) 12%, transparent); border-color: color-mix(in srgb, var(--positive) 26%, transparent); }
+.badge-yellow { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); border-color: color-mix(in srgb, var(--warning) 26%, transparent); }
+.badge-red { color: var(--critical); background: color-mix(in srgb, var(--critical) 12%, transparent); border-color: color-mix(in srgb, var(--critical) 26%, transparent); }
+.badge-blue { color: var(--informative); background: color-mix(in srgb, var(--informative) 12%, transparent); border-color: color-mix(in srgb, var(--informative) 26%, transparent); }
+.badge-gray { color: var(--neutral); background: color-mix(in srgb, var(--neutral) 12%, transparent); border-color: color-mix(in srgb, var(--neutral) 26%, transparent); }
+
+/* Filter toolbar: text field and segments; champagne marks only the active segment */
+.filter-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.search-input { background: var(--raised); border: 1px solid var(--line); color: var(--ink); padding: 8px 12px; min-height: 36px; border-radius: 10px; font: inherit; font-size: 0.875rem; width: 240px; outline: none; }
+.search-input::placeholder { color: var(--ink-3); }
+.search-input:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.filter-btn-group { display: flex; gap: 4px; background: var(--raised); border: 1px solid var(--line); padding: 3px; border-radius: 14px; }
+.filter-btn { background: transparent; border: none; color: var(--ink-2); padding: 6px 12px; border-radius: 10px; font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; }
+.filter-btn:hover { color: var(--ink); }
+.filter-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.filter-btn.active { background: var(--selected); color: var(--on-selected); font-weight: 700; }
+
+/* Broker grid */
+.broker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.broker-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.broker-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.broker-name { font-weight: 700; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.broker-stats-container { display: flex; flex-wrap: wrap; gap: 6px; }
+.stat-tag { font-size: 0.6875rem; font-weight: 600; color: var(--ink-3); }
+.stat-tag.confirmed { color: var(--positive); }
+.stat-tag.pending { color: var(--warning); }
+.stat-tag.rejected, .stat-tag.overdue { color: var(--critical); }
+#no-results-msg { grid-column: 1 / -1; text-align: center; padding: 32px; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 16px; display: none; }
+
+/* Recent events */
+.timeline { display: flex; flex-direction: column; }
+.timeline-item { display: grid; grid-template-columns: 150px 150px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.8125rem; }
+.timeline-item:last-child { border-bottom: none; }
+.timeline-time { color: var(--ink-3); }
+.timeline-badge-wrap .badge { width: 100%; }
+.timeline-broker { font-weight: 600; }
+.timeline-source { color: var(--ink-3); text-align: right; }
+
+@media (max-width: 720px) {
+  header { flex-direction: column; align-items: flex-start; }
+  .last-updated { text-align: left; }
+  .timeline-item { grid-template-columns: 1fr; gap: 4px; }
+  .timeline-source { text-align: left; }
+  .search-input { width: 100%; }
+}
+
+@media print {
+  body { background: #FFFFFF; padding: 0; }
+  .filter-controls { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>Dashboard</h1>
+      <div class="subtitle">0 requests across 0 campaign(s)</div>
+    </div>
+    <div class="last-updated">
+      <div>Generated <strong><TIMESTAMP></strong></div>
+    </div>
+  </header>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="card summary-card total">
+      <div class="label">Total Requests</div>
+      <div class="count">0</div>
+    </div>
+    <div class="card summary-card pending">
+      <div class="label">In Progress</div>
+      <div class="count">0</div>
+    </div>
+    <div class="card summary-card confirmed">
+      <div class="label">Confirmed</div>
+      <div class="count">0</div>
+    </div>
+    <div class="card summary-card rejected">
+      <div class="label">Rejected</div>
+      <div class="count">0</div>
+    </div>
+    <div class="card summary-card overdue">
+      <div class="label">Overdue</div>
+      <div class="count">0</div>
+    </div>
+  </div>
+
+  <!-- Status breakdown chart -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Status Breakdown</h2>
+    </div>
+    <p class="empty">No requests yet. Run <code>plan</code> and <code>execute</code> to populate the dashboard.</p>
+  </section>
+
+  <!-- Campaigns Table -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Campaigns</h2>
+    </div>
+    <p class="empty">No campaigns found.</p>
+  </section>
+
+  <!-- Broker status grid -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Broker Status</h2>
+      <div class="filter-controls">
+        <input type="text" class="search-input" id="broker-search" placeholder="Search data brokers…" aria-label="Search data brokers" oninput="handleSearch(this.value)">
+        <div class="filter-btn-group" role="group" aria-label="Filter by status">
+          <button class="filter-btn active" aria-pressed="true" onclick="setFilter('all', this)">All</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('confirmed', this)">Confirmed</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('pending', this)">Pending</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('overdue', this)">Overdue</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('rejected', this)">Rejected</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="empty">No broker data available.</p>
+  </section>
+
+  <!-- Recent events -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Recent Events</h2>
+    </div>
+    <p class="empty">No events recorded yet.</p>
+  </section>
+</div>
+
+<script>
+let currentFilter = 'all';
+let searchQuery = '';
+
+function setFilter(status, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  currentFilter = status;
+  applyFilter();
+}
+
+function handleSearch(val) {
+  searchQuery = val.toLowerCase().trim();
+  applyFilter();
+}
+
+function applyFilter() {
+  const cards = document.querySelectorAll('.broker-card');
+  let visibleCount = 0;
+  cards.forEach(card => {
+    const matchesSearch = card.dataset.broker.toLowerCase().includes(searchQuery);
+    const matchesFilter = currentFilter === 'all' || card.dataset.status === currentFilter;
+    card.style.display = matchesSearch && matchesFilter ? 'flex' : 'none';
+    if (matchesSearch && matchesFilter) visibleCount++;
+  });
+  const noResults = document.getElementById('no-results-msg');
+  if (noResults) noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

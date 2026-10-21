@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Report — empty</title>
+<style>
+/* Symaira Liquid Topography. Local fonts only: opening this file makes no network request. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  color-scheme: light dark;
+  --canvas: #EEEDEA;
+  --surface: #E1E0DA;
+  --raised: #EEEDEA;
+  --line: #B0AEA9;
+  --ink: #141413;
+  --ink-2: #2B2B2A;
+  --ink-3: #62615D;
+  --positive: #34694A;
+  --critical: #9A4634;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #1C1C1B;
+    --surface: #141413;
+    --raised: #2B2B2A;
+    --line: #30302E;
+    --ink: #EEEDEA;
+    --ink-2: #B0AEA9;
+    --ink-3: #97958F;
+    --positive: #93C49F;
+    --critical: #E39C8A;
+  }
+}
+
+body {
+  font-family: "Google Sans Flex", "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  background: var(--canvas);
+  color: var(--ink);
+  line-height: 1.5;
+  padding: 24px 16px 48px;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1008px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.subtitle { color: var(--ink-3); font-size: 0.8125rem; margin: 4px 0 24px; }
+h2 { font-size: 1.0625rem; font-weight: 700; margin: 28px 0 12px; }
+h3 { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px; }
+.meta { font-size: 0.8125rem; color: var(--ink-3); margin-bottom: 12px; }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.metric-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.metric-card .value { font-size: 1.375rem; font-weight: 700; line-height: 1.1; }
+.metric-card .label { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+.metric-card .change { font-size: 0.75rem; font-weight: 600; }
+.change.positive { color: var(--positive); }
+.change.negative { color: var(--critical); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+th { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+tr:last-child td { border-bottom: none; }
+.details { font-size: 0.75rem; color: var(--ink-2); }
+
+.error { border: 1px solid var(--critical); color: var(--critical); background: var(--surface); padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+.empty, .note { color: var(--ink-3); font-size: 0.8125rem; }
+.footer { margin-top: 32px; font-size: 0.75rem; color: var(--ink-3); text-align: center; }
+
+@media print {
+  body { background: #FFFFFF; padding: 0; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Campaign Report</h1>
+  <p class="subtitle">
+    Generated 2026-08-06 12:00 UTC
+    &middot; 2 requests
+    &middot; 2 campaign(s)
+  </p>
+
+
+  <h2>Success Metrics</h2>
+  <div class="metrics-grid">
+    <div class="metric-card"><div class="label">Confirmation Rate</div><div class="value">50%</div></div>
+    <div class="metric-card"><div class="label">Rejection Rate</div><div class="value">0%</div></div>
+    <div class="metric-card"><div class="label">Overdue Rate</div><div class="value">50%</div></div>
+    <div class="metric-card"><div class="label">Avg Response (days)</div><div class="value">2</div></div>
+    <div class="metric-card"><div class="label">Median Response (days)</div><div class="value">2</div></div>
+  </div>
+
+  <h2>Historical Comparison</h2>
+  <div class="metrics-grid">
+    <div class="metric-card"><div class="label">Request Change</div><div class="value">-2</div></div>
+    <div class="metric-card">
+      <div class="label">Confirmation Rate Change</div>
+      <div class="value">-50%</div>
+      <div class="change negative">↓</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Rejection Rate Change</div>
+      <div class="value">0%</div>
+      <div class="change positive">↓</div>
+    </div>
+  </div>
+
+  <h2>Campaign: empty</h2>
+  <p class="meta">
+    initial &middot; Created 2026-08-03
+    &middot; 0 requests
+    &middot; 0% confirmed
+  </p>
+  <div class="metrics-grid">
+    <div class="metric-card"><div class="label">Planned</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Sent</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Awaiting Ack</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Awaiting Response</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Confirmed</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Rejected</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Overdue</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Reminders</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Avg Response (days)</div><div class="value">—</div></div>
+  </div>
+
+  <h3>Requests</h3>
+  <p class="empty">No requests in this campaign.</p>
+  <h2>Campaign: new</h2>
+  <p class="meta">
+    initial &middot; Created 2026-08-02
+    &middot; 2 requests
+    &middot; 50% confirmed
+  </p>
+  <div class="metrics-grid">
+    <div class="metric-card"><div class="label">Planned</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Sent</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Awaiting Ack</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Awaiting Response</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Confirmed</div><div class="value">1</div></div>
+    <div class="metric-card"><div class="label">Rejected</div><div class="value">0</div></div>
+    <div class="metric-card"><div class="label">Overdue</div><div class="value">1</div></div>
+    <div class="metric-card"><div class="label">Reminders</div><div class="value">3</div></div>
+    <div class="metric-card"><div class="label">Avg Response (days)</div><div class="value">2</div></div>
+  </div>
+
+  <h3>Requests</h3>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Broker</th><th>Jurisdiction</th><th>Status</th><th>Sent</th><th>Resolved</th><th>Reminders</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>#1</td>
+        <td>broker-a</td>
+        <td>GDPR</td>
+        <td>CONFIRMED</td>
+        <td>2026-08-02</td>
+        <td>2026-08-04</td>
+        <td>1</td>
+      </tr>
+      <tr>
+        <td>#2</td>
+        <td>broker-b</td>
+        <td>CCPA</td>
+        <td>OVERDUE</td>
+        <td>2026-08-02</td>
+        <td></td>
+        <td>2</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Broker Leaderboard</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Broker</th><th>Total</th><th>Confirmed</th><th>Rejected</th><th>Overdue</th><th>Success Rate</th><th>Avg Response</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>broker-a</strong></td>
+        <td>1</td>
+        <td>1</td>
+        <td>0</td>
+        <td>0</td>
+        <td>100%</td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td><strong>broker-b</strong></td>
+        <td>1</td>
+        <td>0</td>
+        <td>0</td>
+        <td>1</td>
+        <td>0%</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Jurisdiction Breakdown</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Jurisdiction</th><th>Total</th><th>Confirmed</th><th>Rejected</th><th>Overdue</th><th>Confirmation Rate</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>CCPA</strong></td>
+        <td>1</td>
+        <td>0</td>
+        <td>0</td>
+        <td>1</td>
+        <td>0%</td>
+      </tr>
+      <tr>
+        <td><strong>GDPR</strong></td>
+        <td>1</td>
+        <td>1</td>
+        <td>0</td>
+        <td>0</td>
+        <td>100%</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Timeline</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Events</th><th>Details</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2026-08-02</td>
+        <td>2</td>
+        <td class="details">SENT ×2</td>
+      </tr>
+      <tr>
+        <td>2026-08-04</td>
+        <td>1</td>
+        <td class="details">CONFIRMED ×1</td>
+      </tr>
+      <tr>
+        <td>2026-08-05</td>
+        <td>1</td>
+        <td class="details">DEADLINE_REACHED ×1</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="footer">Generated by Symaira EraseMe &middot; 2026-08-06 12:00 UTC</div>
+</div>
+</body>
+</html>
