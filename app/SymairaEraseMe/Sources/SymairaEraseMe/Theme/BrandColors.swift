@@ -1,46 +1,37 @@
 import SwiftUI
 import SymairaTheme
 
-/// Symaira brand color tokens — matches the HTML dashboard design system.
-/// Shared brand values come from symaira-appkit; status colors and the
-/// lighter card backings are EraseMe-specific and stay local.
+/// Product status vocabulary mapped to the shared, appearance-aware palette.
+/// Legacy names keep existing reporting/chart call sites source-compatible.
 enum BrandColors {
-    // MARK: - Backgrounds (shared tokens; card backings deviate on purpose)
-    static let bgDark = SymairaTheme.bgDark
-    static let bgDarker = SymairaTheme.bgDarker
-    static let bgCard = Color.white.opacity(0.065)
-    static let bgCardHover = Color.white.opacity(0.1)
+    static let bgDark = SymairaTokens.canvas
+    static let bgDarker = SymairaTokens.sidebar
+    static let bgCard = SymairaTokens.surface
+    static let bgCardHover = SymairaTokens.raised
 
-    // MARK: - Gold (shared tokens)
-    static let goldPrimary = SymairaTheme.goldPrimary
-    static let goldSecondary = SymairaTheme.goldSecondary
-    static let goldShadow = SymairaTheme.goldShadow
+    // No accent here on purpose: champagne (`SymairaTokens.selected`) belongs only to
+    // selection, active controls and focus, which the shared AppKit controls and the
+    // app-wide tint already apply. IDs, names and values stay in ink (DESIGN.md).
 
-    // MARK: - Text (shared tokens)
-    static let textPrimary = SymairaTheme.textPrimary
-    static let textSecondary = SymairaTheme.textSecondary
-    static let textMuted = SymairaTheme.textMuted
+    static let textPrimary = SymairaTokens.ink
+    static let textSecondary = SymairaTokens.ink2
+    static let textMuted = SymairaTokens.ink3
 
     // MARK: - Status Colors
-    static let confirmed = Color(red: 0xA7/255, green: 0xF3/255, blue: 0xD0/255)
-    static let confirmedBg = Color(red: 0x06/255, green: 0x4E/255, blue: 0x3B/255).opacity(0.5)
-    static let confirmedBorder = Color(red: 0x10/255, green: 0xB9/255, blue: 0x81/255).opacity(0.3)
+    static let confirmed = SymairaTokens.positive
+    static let confirmedBg = SymairaTokens.surface
 
-    static let pending = Color(red: 0xFD/255, green: 0xE6/255, blue: 0x8A/255)
-    static let pendingBg = Color(red: 0x78/255, green: 0x35/255, blue: 0x0F/255).opacity(0.5)
-    static let pendingBorder = Color(red: 0xF5/255, green: 0x9E/255, blue: 0x0B/255).opacity(0.3)
+    static let pending = SymairaTokens.warning
+    static let pendingBg = SymairaTokens.surface
 
-    static let rejected = Color(red: 0xFC/255, green: 0xA5/255, blue: 0xA5/255)
-    static let rejectedBg = Color(red: 0x5C/255, green: 0x1D/255, blue: 0x1D/255).opacity(0.5)
-    static let rejectedBorder = Color(red: 0xEF/255, green: 0x44/255, blue: 0x44/255).opacity(0.3)
+    static let rejected = SymairaTokens.critical
+    static let rejectedBg = SymairaTokens.criticalSoft
 
-    static let overdue = Color(red: 0xFE/255, green: 0xCA/255, blue: 0xCA/255)
-    static let overdueBg = Color(red: 0x7F/255, green: 0x1D/255, blue: 0x1D/255).opacity(0.6)
-    static let overdueBorder = Color(red: 0xEF/255, green: 0x44/255, blue: 0x44/255).opacity(0.4)
+    static let overdue = SymairaTokens.critical
+    static let overdueBg = SymairaTokens.criticalSoft
 
-    static let planned = Color(red: 0xDB/255, green: 0xEA/255, blue: 0xFE/255)
-    static let plannedBg = Color(red: 0x1E/255, green: 0x3A/255, blue: 0x8A/255).opacity(0.4)
-    static let plannedBorder = Color(red: 0x3B/255, green: 0x82/255, blue: 0xF6/255).opacity(0.3)
+    static let planned = SymairaTokens.ink2
+    static let plannedBg = SymairaTokens.raised
 
     // MARK: - Helper
 
@@ -64,7 +55,7 @@ enum BrandColors {
         case "CONFIRMED": return confirmedBg
         case "REJECTED", "REJECTED_FINAL": return rejectedBg
         case "OVERDUE": return overdueBg
-        default: return Color.white.opacity(0.05)
+        default: return SymairaTokens.surface
         }
     }
 }

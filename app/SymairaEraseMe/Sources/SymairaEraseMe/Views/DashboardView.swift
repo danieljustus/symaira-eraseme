@@ -7,93 +7,48 @@ struct DashboardView: View {
     @StateObject private var vm = DashboardViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                switch vm.state {
-                case .idle, .loading:
-                    LoadingOverlay(message: "Loading dashboard…")
-                        .frame(height: 300)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 300)
-
-                case .loaded(let data):
-                    if data.totalRequests == 0 {
-                        EmptyStateView(
-                            icon: "chart.bar.fill",
-                            title: "No Data Yet",
-                            message: "Create a campaign to start removing your data from brokers."
-                        )
-                        .frame(height: 300)
-                    } else {
-                        summaryCards
-                        statusBreakdownChart
-                        campaignsSection
-                        brokerGrid
-                        recentEvents
-                    }
+        Page(
+            title: "Dashboard",
+            subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" } ?? "Overview of your removal requests",
+            refresh: vm.refresh
+        ) {
+            PageState(state: vm.state, loading: "Loading dashboard…", retry: vm.refresh) { data in
+                if data.totalRequests == 0 {
+                    PageEmpty(
+                        icon: .chart,
+                        title: "No Data Yet",
+                        message: "Create a campaign to start removing your data from brokers."
+                    )
+                } else {
+                    summaryCards
+                    statusBreakdownChart
+                    campaignsSection
+                    brokerGrid
+                    recentEvents
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
         .task { await vm.refresh() }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Dashboard")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                if let data = vm.data {
-                    Text("Generated \(data.generatedAt.formattedDate)")
-                        .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
-                }
-            }
-            Spacer()
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .symairaText(.heading)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
-            .accessibilityLabel("Refresh dashboard")
-        }
     }
 
     // MARK: - Summary Cards
 
     private var summaryCards: some View {
         LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-        ], spacing: 12) {
-            StatCard(title: "Total", value: vm.totalRequests, color: BrandColors.textPrimary)
-            StatCard(title: "In Progress", value: vm.inProgress, color: BrandColors.pending)
-            StatCard(title: "Confirmed", value: vm.confirmed, color: BrandColors.confirmed)
-            StatCard(title: "Rejected", value: vm.rejected, color: BrandColors.rejected)
-            StatCard(title: "Overdue", value: vm.overdue, color: BrandColors.overdue)
+            GridItem(.adaptive(minimum: 150))
+        ], spacing: SymairaSpacing.medium) {
+            StatCard(title: "Total", value: vm.totalRequests)
+            StatCard(title: "In Progress", value: vm.inProgress)
+            StatCard(title: "Confirmed", value: vm.confirmed)
+            StatCard(title: "Rejected", value: vm.rejected)
+            StatCard(title: "Overdue", value: vm.overdue)
         }
     }
 
     // MARK: - Status Breakdown Chart
 
     private var statusBreakdownChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Status Breakdown")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -103,11 +58,7 @@ struct DashboardView: View {
                     x: .value("Count", item.count),
                     y: .value("Status", item.label)
                 )
-                .foregroundStyle(LinearGradient(
-                    colors: [item.color, item.color.opacity(0.6)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ))
+                .foregroundStyle(item.color)
                 .cornerRadius(4)
             }
             .chartXAxis(.hidden)
@@ -119,20 +70,21 @@ struct DashboardView: View {
             }
             .frame(height: CGFloat(vm.statusBreakdown.count * 32 + 20))
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Campaigns Table
 
     private var campaignsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Campaigns")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let campaigns = vm.data?.campaigns, !campaigns.isEmpty {
                 Table(campaigns) {
-                    TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
+                    TableColumn("ID") { Text($0.id) }
                     TableColumn("Kind") { Text($0.kind ?? "—") }
                     TableColumn("Total") { Text("\($0.total.plainDigits)") }
                     TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
@@ -150,22 +102,23 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Broker Status Grid
 
     private var brokerGrid: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Broker Status")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
 
             if let brokerStatus = vm.data?.brokerStatus, !brokerStatus.isEmpty {
                 let columns = [
-                    GridItem(.adaptive(minimum: 180, maximum: 280), spacing: 12)
+                    GridItem(.adaptive(minimum: 180, maximum: 280), spacing: SymairaSpacing.medium)
                 ]
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: SymairaSpacing.medium) {
                     ForEach(brokerStatus.prefix(20)) { broker in
                         BrokerStatusCard(broker: broker)
                     }
@@ -176,13 +129,14 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 
     // MARK: - Recent Events Timeline
 
     private var recentEvents: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Recent Events")
                 .symairaText(.subheading)
                 .foregroundStyle(BrandColors.textPrimary)
@@ -192,8 +146,7 @@ struct DashboardView: View {
                     ForEach(events.prefix(15)) { event in
                         EventRow(event: event)
                         if event.id != events.prefix(15).last?.id {
-                            Divider()
-                                .background(BrandColors.textMuted.opacity(0.2))
+                            SymairaFormDivider()
                         }
                     }
                 }
@@ -203,7 +156,8 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
             }
         }
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 }
 
@@ -211,32 +165,31 @@ struct DashboardView: View {
 
 struct BrokerStatusCard: View {
     let broker: BrokerStatus
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(broker.brokerId)
                 .symairaText(.bodyEmphasized)
-                .foregroundStyle(BrandColors.goldPrimary)
+                .foregroundStyle(BrandColors.textPrimary)
                 .lineLimit(1)
-            HStack(spacing: 8) {
+            HStack(spacing: SymairaSpacing.small) {
                 if broker.confirmed > 0 {
-                    Label("\(broker.confirmed.plainDigits)", systemImage: "checkmark.circle.fill")
+                    Label("\(broker.confirmed.plainDigits)", symairaIcon: .success, size: 12)
                         .foregroundStyle(BrandColors.confirmed)
                         .symairaText(.caption)
                 }
                 if broker.pending > 0 {
-                    Label("\(broker.pending.plainDigits)", systemImage: "clock.fill")
+                    Label("\(broker.pending.plainDigits)", symairaIcon: .pending, size: 12)
                         .foregroundStyle(BrandColors.pending)
                         .symairaText(.caption)
                 }
                 if broker.overdue > 0 {
-                    Label("\(broker.overdue.plainDigits)", systemImage: "exclamationmark.circle.fill")
+                    Label("\(broker.overdue.plainDigits)", symairaIcon: .warning, size: 12)
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                 }
                 if broker.rejected > 0 {
-                    Label("\(broker.rejected.plainDigits)", systemImage: "xmark.circle.fill")
+                    Label("\(broker.rejected.plainDigits)", symairaIcon: .failure, size: 12)
                         .foregroundStyle(BrandColors.rejected)
                         .symairaText(.caption)
                 }
@@ -246,21 +199,7 @@ struct BrokerStatusCard: View {
                 .foregroundStyle(BrandColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovered ? BrandColors.bgCardHover : BrandColors.bgCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isHovered ? BrandColors.goldPrimary.opacity(0.2) : Color.white.opacity(0.05), lineWidth: 1)
-                )
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .onHover { hovering in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                isHovered = hovering
-            }
-        }
+        .symairaCard(padding: SymairaSpacing.medium)
     }
 }
 
@@ -268,7 +207,7 @@ struct EventRow: View {
     let event: RecentEvent
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SymairaSpacing.medium) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
                     .symairaText(.callout)
@@ -276,7 +215,7 @@ struct EventRow: View {
                 if let brokerId = event.brokerId {
                     Text(brokerId)
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.goldPrimary)
+                        .foregroundStyle(BrandColors.textPrimary)
                 }
             }
             Spacer()
@@ -302,26 +241,14 @@ struct ErrorStateView: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(BrandColors.overdue)
-            Text("Failed to Load")
-                .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
-            Text(message)
-                .symairaText(.callout)
-                .foregroundStyle(BrandColors.textMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+        SymairaEmptyState(
+            icon: .warning, title: "Failed to Load", message: message
+        ) {
             Button(action: onRetry) {
-                Label("Retry", systemImage: "arrow.clockwise")
+                Label("Retry", symairaIcon: .refresh)
             }
-            .buttonStyle(.bordered)
-            .tint(BrandColors.goldPrimary)
+            .symairaButtonStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .interactiveGlassCard()
     }
 }
 

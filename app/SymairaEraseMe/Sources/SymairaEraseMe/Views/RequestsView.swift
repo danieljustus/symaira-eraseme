@@ -4,158 +4,86 @@ import SymairaTheme
 /// Requests view — paginated list with filters and event detail.
 struct RequestsView: View {
     @StateObject private var vm = RequestsViewModel()
-    @State private var showDetail = false
+    @State private var selection: RemovalRequest.ID?
+
+    /// Backend status values (`list_requests` matches them exactly).
+    private static let statusFilters = [
+        "PLANNED", "AWAITING_ACK", "AWAITING_RESPONSE", "AWAITING_USER_ACTION", "CONFIRMED",
+        "REJECTED_FINAL", "OVERDUE", "SEND_FAILED", "ESCALATED",
+    ]
 
     var body: some View {
-        HSplitView {
-            // Main list
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    filters
-
-                    switch vm.state {
-                    case .idle, .loading:
-                        LoadingOverlay(message: "Loading requests…")
-                            .frame(height: 200)
-
-                    case .failed(let message):
-                        ErrorStateView(message: message) {
-                            Task { await vm.refresh() }
-                        }
-                        .frame(height: 200)
-
-                    case .loaded(let requests):
-                        if requests.isEmpty {
-                            EmptyStateView(
-                                icon: "envelope.fill",
-                                title: "No Requests",
-                                message: "Create a campaign to generate removal requests."
-                            )
-                            .frame(height: 200)
-                        } else {
-                            requestsTable
-                            pagination
-                        }
+        // Not HSplitView: its NSSplitView ignores the toolbar safe area and clips the header.
+        HStack(spacing: 0) {
+            Page(
+                title: "Requests", subtitle: "\(vm.total.plainDigits) total requests", scrolls: false,
+                refresh: vm.refresh
+            ) {
+                filters
+            } content: {
+                PageState(state: vm.state, loading: "Loading requests…", retry: vm.refresh) { requests in
+                    if requests.isEmpty {
+                        PageEmpty(
+                            icon: .mail,
+                            title: "No Requests",
+                            message: "Create a campaign to generate removal requests."
+                        )
+                    } else {
+                        requestsTable
+                        pagination
                     }
                 }
-                .padding(24)
             }
 
-            // Detail panel
-            if showDetail, let request = vm.selectedRequest {
+            if selection != nil, let request = vm.selectedRequest {
+                Divider().overlay(SymairaTokens.line)
                 detailPanel(request: request)
-                    .frame(minWidth: 320, idealWidth: 400)
+                    .frame(width: 360)
             }
         }
-        .background(Color.clear)
-        .task { await vm.refresh() }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Requests")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                Text("\(vm.total.plainDigits) total requests")
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            }
-            Spacer()
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
+        // Filters apply on change; the delay keeps typing from firing a request per key.
+        .task(id: "\(vm.filterCampaignId)|\(vm.filterStatus)|\(vm.filterBrokerId)") {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            vm.page = 1
+            await vm.refresh()
+        }
+        .onChange(of: selection) { _, id in
+            guard let request = vm.requests.first(where: { $0.id == id }) else { return }
+            Task { await vm.loadEvents(for: request) }
         }
     }
 
-    private var filters: some View {
-        HStack(spacing: 12) {
-            TextField("Campaign", text: $vm.filterCampaignId)
-                .textFieldStyle(.symaira)
-                .frame(width: 150)
-            TextField("Status", text: $vm.filterStatus)
-                .textFieldStyle(.symaira)
-                .frame(width: 180)
-            TextField("Broker", text: $vm.filterBrokerId)
-                .textFieldStyle(.symaira)
-                .frame(width: 150)
-            Button("Apply") {
-                vm.page = 1
-                Task { await vm.refresh() }
-            }
-            .buttonStyle(.bordered)
-            .tint(BrandColors.goldPrimary)
-            Button("Reset") { vm.resetFilters() }
-                .buttonStyle(.bordered)
-        }
+    @ViewBuilder private var filters: some View {
+        TextField("Campaign", text: $vm.filterCampaignId)
+            .textFieldStyle(.symaira)
+        SymairaFilterMenu(
+            "Status", selection: $vm.filterStatus,
+            options: [("", "Status")]
+                + Self.statusFilters.map { ($0, StatusBadge.vocabulary[$0]?.label ?? $0) })
+        TextField("Broker", text: $vm.filterBrokerId)
+            .textFieldStyle(.symaira)
     }
 
     private var requestsTable: some View {
-        VStack(spacing: 0) {
-            // Header row
-            HStack {
-                Text("ID").frame(width: 50, alignment: .leading)
-                Text("Broker").frame(width: 100, alignment: .leading)
-                Text("Channel").frame(width: 80, alignment: .leading)
-                Text("Status").frame(width: 120, alignment: .leading)
-                Text("Jurisdiction").frame(width: 90, alignment: .leading)
-                Text("Deadline").frame(width: 80, alignment: .leading)
-            }
-            .symairaText(.sectionLabel)
-            .foregroundStyle(BrandColors.textMuted)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
-            Divider().background(BrandColors.textMuted.opacity(0.2))
-
-            // Data rows
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(vm.requests) { request in
-                        HStack {
-                            Text("\(request.id.plainDigits)")
-                                .frame(width: 50, alignment: .leading)
-                            Text(request.brokerId)
-                                .foregroundStyle(BrandColors.goldPrimary)
-                                .lineLimit(1)
-                                .frame(width: 100, alignment: .leading)
-                            Text(request.channel)
-                                .frame(width: 80, alignment: .leading)
-                            StatusBadge(status: request.statusDisplay)
-                                .frame(width: 120, alignment: .leading)
-                            Text(request.jurisdiction)
-                                .frame(width: 90, alignment: .leading)
-                            if let date = request.deadlineDate {
-                                Text(date.formatted(.dateTime.month().day()))
-                                    .frame(width: 80, alignment: .leading)
-                            } else {
-                                Text("—")
-                                    .foregroundStyle(BrandColors.textMuted)
-                                    .frame(width: 80, alignment: .leading)
-                            }
-                        }
-                        .symairaText(.callout)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            Task {
-                                await vm.loadEvents(for: request)
-                                showDetail = true
-                            }
-                        }
-
-                        Divider().background(BrandColors.textMuted.opacity(0.1))
-                    }
+        Table(vm.requests, selection: $selection) {
+            TableColumn("ID") { Text("\($0.id.plainDigits)") }
+                .width(min: 40, ideal: 50)
+            TableColumn("Broker") { Text($0.brokerId) }
+            TableColumn("Channel") { Text($0.channel) }
+            TableColumn("Status") { StatusBadge(status: $0.statusDisplay) }
+                .width(min: 110, ideal: 140)
+            TableColumn("Jurisdiction") { Text($0.jurisdiction) }
+            TableColumn("Deadline") { request in
+                if let date = request.deadlineDate {
+                    Text(date.formatted(.dateTime.month().day()))
+                } else {
+                    Text("—").foregroundStyle(BrandColors.textMuted)
                 }
             }
         }
-        .frame(minHeight: 200)
+        .frame(maxHeight: .infinity)
+        .symairaCard()
     }
 
     private var pagination: some View {
@@ -165,8 +93,10 @@ struct RequestsView: View {
                 .foregroundStyle(BrandColors.textMuted)
             Spacer()
             Button("Previous") { vm.previousPage() }
+                .symairaButtonStyle(.secondary)
                 .disabled(!vm.hasPrevious)
             Button("Next") { vm.nextPage() }
+                .symairaButtonStyle(.secondary)
                 .disabled(!vm.hasNext)
         }
     }
@@ -180,12 +110,13 @@ struct RequestsView: View {
                     .foregroundStyle(BrandColors.textPrimary)
                 Spacer()
                 Button {
-                    showDetail = false
+                    selection = nil
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    SymairaIconView(.close)
                         .foregroundStyle(BrandColors.textMuted)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close request details")
             }
 
             Group {
@@ -210,8 +141,7 @@ struct RequestsView: View {
                 }
             }
 
-            Divider()
-                .background(BrandColors.textMuted.opacity(0.2))
+            SymairaFormDivider()
 
             Text("Events")
                 .symairaText(.bodyEmphasized)
@@ -220,11 +150,10 @@ struct RequestsView: View {
             switch vm.eventsState {
             case .idle, .loading:
                 ProgressView()
-                    .tint(BrandColors.goldPrimary)
 
             case .failed(let message):
                 HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    SymairaIconView(.warning, size: 12)
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                     Text(message)
@@ -233,8 +162,8 @@ struct RequestsView: View {
                     Button("Retry") {
                         Task { await vm.loadEvents(for: request) }
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(BrandColors.goldPrimary)
+                    .symairaButtonStyle(.secondary)
+                    .controlSize(.small)
                 }
 
             case .loaded:
@@ -244,9 +173,9 @@ struct RequestsView: View {
                         .foregroundStyle(BrandColors.textMuted)
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
                             ForEach(vm.requestEvents) { event in
-                                HStack(alignment: .top, spacing: 8) {
+                                HStack(alignment: .top, spacing: SymairaSpacing.small) {
                                     SymairaStatusDot(
                                         tone: eventTone(for: event.eventType),
                                         accessibilityLabel: event.eventType.replacingOccurrences(of: "_", with: " ").capitalized
@@ -271,15 +200,8 @@ struct RequestsView: View {
                 }
             }
         }
-        .padding(16)
-        .background(
-            Rectangle()
-                .fill(BrandColors.bgDarker.opacity(0.8))
-                .overlay(
-                    Rectangle()
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-        )
+        .padding(SymairaSpacing.large)
+        .background(SymairaTokens.surface)
     }
 
     private func eventTone(for eventType: String) -> SymairaTone {
@@ -293,14 +215,10 @@ struct RequestsView: View {
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
-                .frame(width: 90, alignment: .trailing)
+        SymairaFormRow(label) {
             Text(value)
                 .symairaText(.callout)
-                .foregroundStyle(BrandColors.textPrimary)
+                .textSelection(.enabled)
         }
     }
 }

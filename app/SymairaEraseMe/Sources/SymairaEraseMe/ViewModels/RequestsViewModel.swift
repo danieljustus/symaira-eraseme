@@ -73,12 +73,4 @@ final class RequestsViewModel: ObservableObject {
             eventsState = .failed(error.localizedDescription)
         }
     }
-
-    func resetFilters() {
-        filterCampaignId = ""
-        filterStatus = ""
-        filterBrokerId = ""
-        page = 1
-        Task { await refresh() }
-    }
 }

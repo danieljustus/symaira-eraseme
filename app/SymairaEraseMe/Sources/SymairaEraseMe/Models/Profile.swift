@@ -104,19 +104,3 @@ struct ExecuteResult: Codable, Identifiable {
     }
 }
 
-/// Response from `generate_dashboard`.
-struct GenerateDashboardResponse: Codable {
-    let message: String?
-    let outputFile: String?
-    let sizeBytes: Int?
-    let campaigns: Int?
-    let requestsCount: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case message
-        case outputFile = "output_file"
-        case sizeBytes = "size_bytes"
-        case campaigns
-        case requestsCount = "requests"
-    }
-}

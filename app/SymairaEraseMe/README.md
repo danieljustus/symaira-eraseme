@@ -19,7 +19,7 @@ the seven-day post-stable observation period on 2026-10-12.
 ## Requirements
 
 - macOS 14+ (Sonoma)
-- Swift 5.10+ with Xcode or Xcode-beta installed (SwiftUI macro plugins required)
+- Swift 6+ with full Xcode installed (SwiftUI macros and Metal compiler required)
 - Rust 1.98.0 for the bundled CLI/MCP server
 - Python 3 for the local backend-staging script
 
@@ -34,7 +34,7 @@ observations and immutable source history remain for conformance checks.
 ./build.sh
 
 # Or build the SwiftUI app by itself when using an existing Rust server
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build --build-system native
 
 # Or open in Xcode
 open Package.swift
@@ -44,7 +44,7 @@ open Package.swift
 
 ```bash
 # From the project directory (after ./build.sh)
-"$(swift build --show-bin-path)/SymairaEraseMe"
+"$(swift build --build-system native --show-bin-path)/SymairaEraseMe"
 
 # Or open the generated app bundle from the release packaging script
 open .build/dmg-stage/"Symaira EraseMe.app"
@@ -84,29 +84,89 @@ Sources/SymairaEraseMe/
 │   ├── ManualTasksView.swift       Task list, complete sheet
 │   └── SettingsView.swift          Server start/stop, config, HTML fallback
 └── Theme/
-    ├── BrandColors.swift           Color tokens matching HTML dashboard
-    └── Glassmorphism.swift         Glass cards, badges, stat cards, error banners
+    ├── BrandColors.swift           Product status aliases for shared adaptive tokens
+    └── Glassmorphism.swift         Product status mapping and dashboard stat composition
 ```
 
 ## How It Works
 
 1. The app starts and shows the sidebar navigation.
-2. Go to **Settings** and click **Start Server** to spawn the bundled Rust `symeraseme mcp` binary.
+2. Click the toolbar gear to open the settings window directly, then click **Start Server** to spawn the bundled Rust `symeraseme mcp` binary.
 3. The app connects to `http://127.0.0.1:8000` via JSON-RPC 2.0.
 4. Each view fetches data from the appropriate MCP tool.
 5. The app parses `result.content[0].text` → JSON → Swift models.
 
-## Brand Colors
+## Liquid Topography GUI preview
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| bgDark | `#0D0C0A` | Main background |
-| goldPrimary | `#E5C397` | Accents, links, buttons |
-| confirmed | `#A7F3D0` | Confirmed status |
-| pending | `#FDE68A` | Sent/awaiting status |
-| rejected | `#FCA5A5` | Rejected status |
-| overdue | `#FECACA` | Overdue status |
-| planned | `#DBEAFE` | Planned status |
+The native GUI adopts the same shared AppKit workspace as the Cockpit pilot:
+resizable/collapsible sidebar, a direct settings-window button, Google Sans Flex,
+neutral surfaces and restrained champagne selection. The settings window contains
+the shared System/Light/Dark picker alongside the other preferences. Cmd-comma
+opens the same native settings window; the workspace keeps its current destination.
+Appearance persists under `symeraseme_appearance`; existing preferences and
+the `com.symaira.eraseme` bundle identity remain unchanged.
+
+Only Dashboard mounts the decorative topography. Text and cards register
+protection regions; dense lists and Settings use a static canvas. Content
+cards are opaque shared `symairaCard` surfaces, not local glass copies.
+Shared controls honor the AppKit accessibility and older-macOS fallbacks.
+
+The manifest pins the exact AppKit release
+[`0.17.1`](https://github.com/danieljustus/symaira-appkit/releases/tag/0.17.1),
+including the shared workspace, packaged resources and the `SymairaIcon` set.
+Sidebar, empty states, badges, notices and actions all use Symaira icons; no
+SF Symbols remain in the sidebar pages. Every page uses the shared `Page`
+scaffold (one header, width and state height), filters use
+`SymairaFilterMenu` or segments, and champagne marks only selection, active
+controls and focus.
+A fresh checkout needs no local AppKit worktree or SwiftPM edit mode. Existing
+preview workspaces that used edit mode should use a fresh scratch path and
+verify `show-dependencies --format json` before building. No public GUI
+release, notarization or completed VoiceOver acceptance is implied.
+
+### Shared-component inventory
+
+| Area | Shared implementation |
+| --- | --- |
+| Native window/toolbar, sidebar resize and collapse | `symairaWorkspaceWindow`, `SymairaWorkspaceToolbar`, `SymairaWorkspace`, `SymairaSidebarState` |
+| Six navigation destinations, selected/focus state, icon rail | `SymairaNavigationButton` |
+| Direct settings gear; persisted System/Light/Dark inside settings | `SymairaSettingsButton`, `SymairaAppearancePicker`, `SymairaAppearance` |
+| Content cards, typography, actions, search and filters | `symairaCard`, `SymairaTypography`, `symairaText`, `symairaButtonStyle`, `SymairaTextFieldStyle`, `SymairaSegmentedControl` |
+| Settings and creation forms | `SymairaFormSection`, `SymairaFormRow`, `SymairaFormDivider`, `.symaira` text-field style |
+| Status, failures, empty/loading states | `SymairaBadge`, `SymairaStatusLabel`, `SymairaStatusDot`, `SymairaNotice`, `SymairaEmptyState`, `SymairaLoadingState` |
+| Dashboard decoration/readability | `SymairaTopoModel`, `topoProtected` |
+| Existing backend foundations | `SymairaToolKit`, `SymairaDaemonKit` |
+
+Domain models, request actions, retry wording, chart/stat composition and
+status-to-tone mapping remain local. `BrandColors` contains only shared-token
+aliases, not another palette. Provider setup, credential storage, updater and
+MCP transport migration are separate functional/security changes, not design work.
+
+`scripts/package-dmg.sh` includes SwiftPM font/license and Metal resources.
+AppKit resolves the bundle from the packaged app's Resources directory before
+SwiftPM's development fallback. Verify a packaged launch with its build-cache
+resource bundle unavailable; inspecting resource files alone does not prove
+the production font/shader loader uses them.
+Set `SWIFT_SCRATCH_PATH`, `STAGE_DIR` and `DIST_DIR` to keep local builds outside
+the source tree. A local preview can be assembled from the repository root:
+
+```bash
+VERSION=0.14.1-design.3 ./scripts/package-dmg.sh --app-only --non-release-test
+```
+
+The build scripts select native SwiftPM while Swift Build incorrectly records
+the deployment target as the linked SDK on this toolchain. `vtool -show-build`
+must show the real Xcode SDK (27.0 on the verified host), while `minos` stays 14.0.
+A successful compile with `sdk 14.0` does not enable modern native toolbar glass.
+Remove the deprecated-backend workaround once the SDK metadata is correct with
+Swift Build; do not raise the minimum macOS version just to change chrome.
+
+Run `swift test --build-system native` for regressions. `ERASEME_RENDER_DIR=/path/to/evidence` also
+exports native renders of the six offline destinations and separate settings
+view at 900/1200-point widths in both appearances. These renders contain no real removal data and
+do not establish live mouse or screen-reader acceptance. Set
+`SYMERASEME_RUST_TEST_APP_BUNDLE` and `SYMERASEME_RUST_TEST_BINARY` to exercise
+the actual packaged/backend authentication, tool catalogue and shutdown paths.
 
 ## Limitations
 

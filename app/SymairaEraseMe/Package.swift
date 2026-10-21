@@ -7,7 +7,7 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/danieljustus/symaira-appkit.git", exact: "0.15.1"),
+        .package(url: "https://github.com/danieljustus/symaira-appkit.git", exact: "0.17.1"),
     ],
     targets: [
         .executableTarget(

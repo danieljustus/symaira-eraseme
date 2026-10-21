@@ -1,61 +1,34 @@
 import SwiftUI
 import SymairaTheme
 
-/// Glassmorphism card style matching the HTML dashboard aesthetic.
-struct GlassCardModifier: ViewModifier {
-    var cornerRadius: CGFloat = 12
-    var padding: CGFloat = 16
-
-    func body(content: Content) -> some View {
-        content
-            .padding(padding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(BrandColors.bgCard)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.05), lineWidth: 1)
-                    )
-            )
-    }
-}
-
-extension View {
-    func glassCard(cornerRadius: CGFloat = 12, padding: CGFloat = 16) -> some View {
-        modifier(GlassCardModifier(cornerRadius: cornerRadius, padding: padding))
-    }
-}
-
 /// Shared status badge with a visible label and semantic tone.
 struct StatusBadge: View {
     let status: String
 
+    /// Request statuses from the backend projection plus manual-task states.
+    static let vocabulary: [String: (label: String, tone: SymairaTone)] = [
+        "PLANNED": ("Planned", .neutral),
+        "SENT": ("Sent", .informative),
+        "ACK": ("Acknowledged", .informative),
+        "AWAITING_ACK": ("Awaiting ACK", .warning),
+        "AWAITING_RESPONSE": ("Awaiting Response", .warning),
+        "AWAITING_USER_ACTION": ("Action Needed", .warning),
+        "RE_SCAN_DUE": ("Re-scan Due", .informative),
+        "CONFIRMED": ("Confirmed", .positive),
+        "REJECTED": ("Rejected", .critical),
+        "REJECTED_FINAL": ("Rejected", .critical),
+        "OVERDUE": ("Overdue", .critical),
+        "SEND_FAILED": ("Send Failed", .critical),
+        "BOUNCE": ("Bounced", .critical),
+        "ESCALATED": ("Escalated", .critical),
+        "DPA_FILED": ("DPA Filed", .critical),
+        "PENDING": ("Pending", .warning),
+        "COMPLETED": ("Completed", .positive),
+    ]
+
     var body: some View {
-        SymairaBadge(displayText, tone: tone, systemImage: tone.systemImage)
-    }
-
-    private var tone: SymairaTone {
-        switch status.uppercased() {
-        case "CONFIRMED": return .positive
-        case "REJECTED", "REJECTED_FINAL", "OVERDUE": return .critical
-        case "AWAITING_ACK", "AWAITING_RESPONSE": return .warning
-        case "SENT": return .informative
-        case "PLANNED": return .neutral
-        default: return .neutral
-        }
-    }
-
-    private var displayText: String {
-        switch status.uppercased() {
-        case "PLANNED": return "Planned"
-        case "SENT": return "Sent"
-        case "AWAITING_ACK": return "Awaiting ACK"
-        case "AWAITING_RESPONSE": return "Awaiting Response"
-        case "CONFIRMED": return "Confirmed"
-        case "REJECTED", "REJECTED_FINAL": return "Rejected"
-        case "OVERDUE": return "Overdue"
-        default: return status
-        }
+        let entry = Self.vocabulary[status.uppercased()] ?? (status, .neutral)
+        SymairaBadge(entry.label, tone: entry.tone, icon: entry.tone.symairaIcon)
     }
 }
 
@@ -63,146 +36,190 @@ struct StatusBadge: View {
 struct StatCard: View {
     let title: String
     let value: Int
-    let color: Color
     var subtitle: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text(title)
-                .symairaText(.caption)
-                .foregroundStyle(BrandColors.textSecondary)
+                .symairaText(.sectionLabel)
                 .textCase(.uppercase)
-                .kerning(0.8)
             Text("\(value)")
-                .symairaText(.display, respectsForeground: false)
-                .foregroundStyle(color)
+                .font(SymairaTypography.stat)
+                .foregroundStyle(SymairaTokens.ink)
             if let subtitle {
                 Text(subtitle)
                     .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(
-            ZStack {
-                RadialGradient(
-                    colors: [color.opacity(0.08), Color.clear],
-                    center: .topTrailing,
-                    startRadius: 0,
-                    endRadius: 80
-                )
-            }
-            .blendMode(.screen)
-        )
-        .interactiveGlassCard()
+        .symairaCard()
+        .topoProtected(hill: true)
     }
 }
 
+extension Label where Title == Text, Icon == SymairaIconView<Int> {
+    /// Caption-sized `Label(_:symairaIcon:)` for runtime strings.
+    @MainActor
+    init(_ title: String, symairaIcon icon: SymairaIcon, size: CGFloat) {
+        self.init {
+            Text(title)
+        } icon: {
+            SymairaIconView(icon, size: size)
+        }
+    }
+}
 
-/// Placeholder shown when a view has no data.
-struct EmptyStateView: View {
-    let icon: String
+// MARK: - Page scaffold
+
+/// One grid for every sidebar page: a header zone (title, subtitle, refresh), a toolbar
+/// zone (filters, segments, page actions; kept even when empty) and a content zone that
+/// therefore starts at the same height everywhere. Loading, failure and empty states
+/// replace the whole content zone.
+enum PageLayout {
+    static let maxWidth: CGFloat = 1008
+    static let stateHeight: CGFloat = 240
+    /// Fixed, not minimum: segments and primary buttons are taller than fields, and a
+    /// growing toolbar would push one page's content below another's.
+    static let toolbarHeight: CGFloat = 44
+}
+
+struct Page<Toolbar: View, Content: View>: View {
+    let title: String
+    /// Required: a one-line header on some pages and two on others misaligns the controls.
+    let subtitle: String
+    /// Lists that scroll themselves (native `Table`) fill the page instead of nesting scroll views.
+    var scrolls = true
+    let refresh: () async -> Void
+    @ViewBuilder var toolbar: Toolbar
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let column = VStack(alignment: .leading, spacing: SymairaSpacing.large) {
+            header
+            HStack(spacing: SymairaSpacing.medium) { toolbar }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: PageLayout.toolbarHeight)
+            content
+        }
+        .padding(SymairaSpacing.xLarge)
+        .frame(maxWidth: PageLayout.maxWidth, maxHeight: scrolls ? nil : .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity)
+        if scrolls {
+            ScrollView { column }
+        } else {
+            column
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: SymairaSpacing.medium) {
+            VStack(alignment: .leading, spacing: SymairaSpacing.xSmall) {
+                Text(title)
+                    .symairaText(.display)
+                    .foregroundStyle(BrandColors.textPrimary)
+                    .topoProtected()
+                Text(subtitle)
+                    .symairaText(.caption)
+                    .foregroundStyle(BrandColors.textMuted)
+                    .topoProtected()
+            }
+            Spacer(minLength: SymairaSpacing.large)
+            Button {
+                Task { await refresh() }
+            } label: {
+                SymairaIconView(.refresh)
+            }
+            .symairaButtonStyle(.secondary)
+            .accessibilityLabel("Refresh \(title.lowercased())")
+            .topoProtected()
+        }
+    }
+}
+
+extension Page where Toolbar == EmptyView {
+    init(
+        title: String, subtitle: String, scrolls: Bool = true, refresh: @escaping () async -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title, subtitle: subtitle, scrolls: scrolls, refresh: refresh, toolbar: { EmptyView() },
+            content: content)
+    }
+}
+
+/// Loading and failure look identical on every page; `loaded` decides empty vs content.
+struct PageState<Value, Loaded: View>: View {
+    let state: ViewState<Value>
+    let loading: String
+    let retry: () async -> Void
+    @ViewBuilder let loaded: (Value) -> Loaded
+
+    var body: some View {
+        switch state {
+        case .idle, .loading:
+            SymairaLoadingState(loading).frame(height: PageLayout.stateHeight)
+        case .failed(let message):
+            ErrorStateView(message: message) { Task { await retry() } }
+                .frame(height: PageLayout.stateHeight)
+        case .loaded(let value):
+            loaded(value)
+        }
+    }
+}
+
+/// Empty result with the shared state height.
+struct PageEmpty: View {
+    let icon: SymairaIcon
     let title: String
     let message: String
 
     var body: some View {
-        SymairaEmptyState(systemImage: icon, title: title, message: message)
+        SymairaEmptyState(icon: icon, title: title, message: message)
+            .frame(height: PageLayout.stateHeight)
     }
 }
 
-/// Error banner for displaying tool call failures.
-struct ErrorBanner: View {
-    let message: String
-    var onDismiss: (() -> Void)? = nil
+// MARK: - Sheet scaffold
+
+/// One frame for every sheet: heading, scrolling content and a footer where the
+/// secondary dismiss button sits left of the primary action. Esc and Return work.
+struct SheetScaffold<Content: View>: View {
+    let title: String
+    var dismissTitle = "Cancel"
+    let dismiss: () -> Void
+    var primaryTitle: String?
+    var primaryDisabled = false
+    var primary: () -> Void = {}
+    @ViewBuilder var content: Content
 
     var body: some View {
-        SymairaNotice(message: message, tone: .critical, onDismiss: onDismiss)
-    }
-}
-
-/// Loading spinner overlay.
-struct LoadingOverlay: View {
-    let message: String
-
-    var body: some View {
-        SymairaLoadingState(message)
-    }
-}
-
-/// A beautiful tiled blueprint grid background with ambient glowing radial blobs
-/// matching the Champagne Gold and Warm Sand theme.
-struct BlueprintBackground: View {
-    var body: some View {
-        ZStack {
-            BrandColors.bgDark.ignoresSafeArea()
-            
-            // Subtle dot grid
-            Canvas { context, size in
-                let spacing: CGFloat = 24
-                var x: CGFloat = 0
-                while x < size.width {
-                    var y: CGFloat = 0
-                    while y < size.height {
-                        let rect = CGRect(x: x, y: y, width: 1.5, height: 1.5)
-                        context.fill(Path(ellipseIn: rect), with: .color(BrandColors.goldPrimary.opacity(0.045)))
-                        y += spacing
-                    }
-                    x += spacing
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .symairaText(.heading)
+                .foregroundStyle(BrandColors.textPrimary)
+                .padding([.horizontal, .top], SymairaSpacing.xLarge)
+                .padding(.bottom, SymairaSpacing.large)
+            ScrollView {
+                VStack(alignment: .leading, spacing: SymairaSpacing.large) { content }
+                    .padding(.horizontal, SymairaSpacing.xLarge)
+                    .padding(.bottom, SymairaSpacing.large)
+            }
+            Divider().overlay(SymairaTokens.line)
+            HStack(spacing: SymairaSpacing.medium) {
+                Spacer()
+                Button(dismissTitle, action: dismiss)
+                    .symairaButtonStyle(.secondary)
+                    .keyboardShortcut(.cancelAction)
+                if let primaryTitle {
+                    Button(primaryTitle, action: primary)
+                        .symairaButtonStyle(.primary)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(primaryDisabled)
                 }
             }
-            .ignoresSafeArea()
-            
-            // Top Right ambient glow
-            RadialGradient(
-                colors: [BrandColors.goldPrimary.opacity(0.06), Color.clear],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 550
-            )
-            .ignoresSafeArea()
-            
-            // Bottom Left ambient glow
-            RadialGradient(
-                colors: [BrandColors.goldShadow.opacity(0.04), Color.clear],
-                center: .bottomLeading,
-                startRadius: 0,
-                endRadius: 550
-            )
-            .ignoresSafeArea()
+            .padding(SymairaSpacing.large)
         }
+        .background(BrandColors.bgDark)
+        .onExitCommand(perform: dismiss)
     }
 }
-
-/// Interactive Glassmorphism card style that scales and highlights its border on hover.
-struct InteractiveGlassCardModifier: ViewModifier {
-    var cornerRadius: CGFloat = 12
-    var padding: CGFloat = 16
-    @State private var isHovered = false
-
-    func body(content: Content) -> some View {
-        content
-            .padding(padding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(isHovered ? BrandColors.bgCardHover : BrandColors.bgCard)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(isHovered ? BrandColors.goldPrimary.opacity(0.2) : Color.white.opacity(0.05), lineWidth: 1)
-                    )
-            )
-            .scaleEffect(isHovered ? 1.008 : 1.0)
-            .shadow(color: isHovered ? BrandColors.goldShadow.opacity(0.08) : Color.clear, radius: 10, x: 0, y: 5)
-            .onHover { hovering in
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                    isHovered = hovering
-                }
-            }
-    }
-}
-
-extension View {
-    func interactiveGlassCard(cornerRadius: CGFloat = 12, padding: CGFloat = 16) -> some View {
-        modifier(InteractiveGlassCardModifier(cornerRadius: cornerRadius, padding: padding))
-    }
-}
-

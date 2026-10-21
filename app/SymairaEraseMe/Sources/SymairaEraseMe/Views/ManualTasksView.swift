@@ -9,78 +9,32 @@ struct ManualTasksView: View {
     @State private var completionNotes: String = ""
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                if let success = vm.successMessage {
-                    SymairaNotice(message: success, tone: .positive)
-                }
-
+        Page(title: "Manual Tasks", subtitle: "Tasks requiring human intervention", refresh: vm.refresh) {
+            SymairaSegmentedControl(
+                "Filter", selection: $vm.filterStatus,
+                options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
+            .frame(width: 360)
+        } content: {
+            if let success = vm.successMessage {
+                SymairaNotice(message: success, tone: .positive)
+            }
+            PageState(state: vm.state, loading: "Loading tasks…", retry: vm.refresh) { tasks in
+                // Counts only make sense for loaded data; failures start where every page's content starts.
                 summaryCards
-
-                switch vm.state {
-                case .idle, .loading:
-                    LoadingOverlay(message: "Loading tasks…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded(let tasks):
-                    if tasks.isEmpty {
-                        EmptyStateView(
-                            icon: "checklist",
-                            title: "No Manual Tasks",
-                            message: "All broker forms are handled automatically. Manual tasks appear when automation fails."
-                        )
-                        .frame(height: 200)
-                    } else {
-                        tasksTable
-                    }
+                if tasks.isEmpty {
+                    PageEmpty(
+                        icon: .checklist,
+                        title: "No Manual Tasks",
+                        message: "No matching tasks. Broker web forms and verification steps are handled here manually."
+                    )
+                } else {
+                    tasksTable
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
-        .task { await vm.refresh() }
+        .task(id: vm.filterStatus) { await vm.refresh() }
         .sheet(isPresented: $showCompleteSheet) {
             completeSheet
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Manual Tasks")
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                Text("Tasks requiring human intervention")
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-            }
-            Spacer()
-            Picker("Filter", selection: $vm.filterStatus) {
-                Text("All").tag("")
-                Text("Pending").tag("pending")
-                Text("Completed").tag("completed")
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
-            .onChange(of: vm.filterStatus) { _, _ in
-                Task { await vm.refresh() }
-            }
-            Button {
-                Task { await vm.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .symairaText(.heading)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(BrandColors.goldPrimary)
         }
     }
 
@@ -88,20 +42,20 @@ struct ManualTasksView: View {
         LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible()),
-        ], spacing: 12) {
-            StatCard(title: "Pending", value: vm.pendingTasks, color: BrandColors.pending)
-            StatCard(title: "Completed", value: vm.completedTasks, color: BrandColors.confirmed)
+        ], spacing: SymairaSpacing.medium) {
+            StatCard(title: "Pending", value: vm.pendingTasks)
+            StatCard(title: "Completed", value: vm.completedTasks)
         }
     }
 
     private var tasksTable: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(vm.tasks) {
                 TableColumn("ID") { Text("\($0.taskId.plainDigits)") }
-                TableColumn("Broker") { Text($0.brokerName).foregroundStyle(BrandColors.goldPrimary) }
+                TableColumn("Broker") { Text($0.brokerName) }
                 TableColumn("Reason") { Text($0.reason.replacingOccurrences(of: "_", with: " ").capitalized) }
                 TableColumn("Status") {
-                    StatusBadge(status: $0.status.uppercased() == "PENDING" ? "SENT" : "CONFIRMED")
+                    StatusBadge(status: $0.status)
                 }
                 TableColumn("Created") {
                     if let date = $0.createdDate {
@@ -115,8 +69,7 @@ struct ManualTasksView: View {
                             completionNotes = ""
                             showCompleteSheet = true
                         }
-                        .buttonStyle(.bordered)
-                        .tint(BrandColors.confirmed)
+                        .symairaButtonStyle(.secondary)
                         .controlSize(.small)
                     } else {
                         Text("Done")
@@ -127,64 +80,53 @@ struct ManualTasksView: View {
             }
             .frame(minHeight: 150)
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 
     private var completeSheet: some View {
-        NavigationStack {
-            Form {
-                Section("Task Details") {
-                    if let task = selectedTask {
-                        LabeledContent("Broker", value: task.brokerName)
-                        LabeledContent("Reason", value: task.reason)
-                        LabeledContent("URL") {
-                            Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
-                                .symairaText(.caption)
-                        }
-                        if !task.instructions.isEmpty {
-                            Text(task.instructions)
-                                .symairaText(.callout)
-                                .foregroundStyle(BrandColors.textSecondary)
-                        }
-                    }
-                }
-
-                Section("Completion Notes") {
-                    TextEditor(text: $completionNotes)
-                        .frame(height: 80)
-                        .textFieldStyle(.symaira)
-                }
-
-                Section {
-                    Button("Mark Complete") {
-                        if let task = selectedTask {
-                            Task {
-                                await vm.completeTask(task, notes: completionNotes)
-                                showCompleteSheet = false
-                                selectedTask = nil
-                            }
-                        }
-                    }
-                    .tint(BrandColors.confirmed)
-                }
-            }
-            .formStyle(.grouped)
-            .background(BrandColors.bgDark)
-            .navigationTitle("Complete Task")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+        SheetScaffold(
+            title: "Complete Task",
+            dismiss: {
+                showCompleteSheet = false
+                selectedTask = nil
+            },
+            primaryTitle: "Mark Complete", primaryDisabled: selectedTask == nil,
+            primary: {
+                if let task = selectedTask {
+                    Task {
+                        await vm.completeTask(task, notes: completionNotes)
                         showCompleteSheet = false
                         selectedTask = nil
                     }
-                    .keyboardShortcut(.cancelAction)
                 }
             }
+        ) {
+            if let task = selectedTask {
+                SymairaFormSection("Task Details") {
+                    SymairaFormRow("Broker") { Text(task.brokerName).symairaText(.callout) }
+                    SymairaFormDivider()
+                    SymairaFormRow("Reason") { Text(task.reason).symairaText(.callout) }
+                    SymairaFormDivider()
+                    SymairaFormRow("Form") {
+                        Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
+                            .symairaText(.caption)
+                            .lineLimit(1)
+                    }
+                    if !task.instructions.isEmpty {
+                        SymairaFormDivider()
+                        Text(task.instructions)
+                            .symairaText(.callout)
+                            .foregroundStyle(BrandColors.textSecondary)
+                    }
+                }
+            }
+            SymairaFormSection("Completion Notes") {
+                TextField("Completion notes", text: $completionNotes, prompt: Text("Optional"), axis: .vertical)
+                    .labelsHidden()
+                    .lineLimit(3...6)
+                    .textFieldStyle(.symaira)
+            }
         }
-        .frame(width: 500, height: 450)
-        .onExitCommand {
-            showCompleteSheet = false
-            selectedTask = nil
-        }
+        .frame(width: 520, height: 500)
     }
 }

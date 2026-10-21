@@ -2,7 +2,7 @@ import XCTest
 @testable import SymairaEraseMe
 
 /// Regression tests for #620: every sidebar navigation button must expose an
-/// accessible name. The SidebarButton's `.accessibilityLabel` is sourced from
+/// accessible name. The shared navigation button's label is sourced from
 /// `NavItem.accessibilityName`, so a test here fails if any nav item ever
 /// loses its label source.
 final class NavItemAccessibilityTests: XCTestCase {
@@ -20,7 +20,7 @@ final class NavItemAccessibilityTests: XCTestCase {
         }
     }
 
-    func testNavItemAccessibilityNamesMatchTheSevenSidebarEntries() {
+    func testSidebarContainsSixDestinationsWithoutDuplicateSettings() {
         let expected = Set([
             "Dashboard",
             "Campaigns",
@@ -28,18 +28,19 @@ final class NavItemAccessibilityTests: XCTestCase {
             "Brokers",
             "Calendar",
             "Manual Tasks",
-            "Settings",
         ])
-        let actual = Set(ContentView.NavItem.allCases.map(\.accessibilityName))
+        let actual = Set(ContentView.NavItem.sidebarItems.map(\.accessibilityName))
 
         XCTAssertEqual(
             actual, expected,
-            "sidebar accessibility names must exactly match the seven nav entries"
+            "sidebar accessibility names must exactly match the six product destinations"
         )
         XCTAssertEqual(
-            ContentView.NavItem.allCases.count, 7,
-            "sidebar must expose exactly seven nav items"
+            ContentView.NavItem.sidebarItems.count, 6,
+            "Settings belongs in its own native window, not the sidebar"
         )
+        XCTAssertFalse(actual.contains("Settings"))
+        XCTAssertEqual(ContentView.NavItem.allCases.count, 6)
     }
 
     /// Regression guard for #646: duplicate accessible names are as bad as
@@ -53,16 +54,8 @@ final class NavItemAccessibilityTests: XCTestCase {
         )
     }
 
-    // NOTE (no view-structure regression test for #646): the fix lives in
-    // SidebarButton's body — `.accessibilityElement(children: .ignore)` on the
-    // composed button content plus `.accessibilityAddTraits(.isButton)`, so the
-    // button is a single accessibility element carrying the `.accessibilityLabel`
-    // below. SwiftUI view modifiers are opaque — they cannot be introspected
-    // from a plain XCTest without ViewInspector (which would require a
-    // Package.swift dependency change, out of scope) or by launching the app and
-    // querying the AX tree (UI/AX tests are out of scope for this change). The
-    // tests above therefore pin the *source* of every button's accessible name;
-    // the live AX tree was verified manually via the raw AXUIElement API (each
-    // sidebar button exposes its name in AXDescription/AXAttributedDescription,
-    // e.g. "Dashboard", matching the visible label).
+    // AppKit's SymairaNavigationButton owns the single-element semantics from
+    // #646. These tests pin the product-owned label sources. NativeChromeTests
+    // separately mounts the production toolbar/navigation in an NSWindow;
+    // in-process AX actions are not keyboard or VoiceOver acceptance.
 }

@@ -9,44 +9,33 @@ struct CampaignsView: View {
     @State private var pendingExecuteId: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                if let plan = vm.planResult {
-                    successBanner(plan.message ?? "Campaign created")
-                }
-                if let exec = vm.executeResult {
-                    successBanner(exec.message ?? "Execution complete")
-                }
-
-                switch vm.state {
-                case .idle, .loading:
-                    LoadingOverlay(message: "Loading campaigns…")
-                        .frame(height: 200)
-
-                case .failed(let message):
-                    ErrorStateView(message: message) {
-                        Task { await vm.refresh() }
-                    }
-                    .frame(height: 200)
-
-                case .loaded(let campaigns):
-                    if campaigns.isEmpty {
-                        EmptyStateView(
-                            icon: "megaphone.fill",
-                            title: "No Campaigns",
-                            message: "Create your first campaign to start removing data from brokers."
-                        )
-                        .frame(height: 200)
-                    } else {
-                        campaignsTable(campaigns)
-                    }
+        Page(title: "Campaigns", subtitle: "Removal campaigns and their progress", refresh: vm.refresh) {
+            Spacer()
+            Button {
+                showCreateSheet = true
+            } label: {
+                Label("New Campaign", symairaIcon: .add)
+            }
+            .symairaButtonStyle(.primary)
+        } content: {
+            if let plan = vm.planResult {
+                SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
+            }
+            if let exec = vm.executeResult {
+                SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)
+            }
+            PageState(state: vm.state, loading: "Loading campaigns…", retry: vm.refresh) { campaigns in
+                if campaigns.isEmpty {
+                    PageEmpty(
+                        icon: .announcement,
+                        title: "No Campaigns",
+                        message: "Create your first campaign to start removing data from brokers."
+                    )
+                } else {
+                    campaignsTable(campaigns)
                 }
             }
-            .padding(24)
         }
-        .background(Color.clear)
         .task { await vm.refresh() }
         .sheet(isPresented: $showCreateSheet) {
             createSheet
@@ -68,27 +57,10 @@ struct CampaignsView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Text("Campaigns")
-                .symairaText(.display)
-                .foregroundStyle(BrandColors.textPrimary)
-            Spacer()
-            Button {
-                showCreateSheet = true
-            } label: {
-                Label("New Campaign", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(BrandColors.goldPrimary)
-            .foregroundStyle(BrandColors.bgDark)
-        }
-    }
-
     private func campaignsTable(_ campaigns: [DashboardCampaign]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Table(campaigns) {
-                TableColumn("ID") { Text($0.id).foregroundStyle(BrandColors.goldPrimary) }
+                TableColumn("ID") { Text($0.id) }
                 TableColumn("Kind") { Text($0.kind ?? "—") }
                 TableColumn("Total") { Text("\($0.total.plainDigits)") }
                 TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
@@ -99,76 +71,58 @@ struct CampaignsView: View {
                         pendingExecuteId = campaign.id
                         showExecuteAlert = true
                     }
-                    .buttonStyle(.bordered)
-                    .tint(BrandColors.goldPrimary)
+                    .symairaButtonStyle(.secondary)
                     .controlSize(.small)
                 }
             }
             .frame(minHeight: 200)
         }
-        .interactiveGlassCard()
+        .symairaCard()
     }
 
 
     private var createSheet: some View {
-        NavigationStack {
-            Form {
-                Section("Campaign Details") {
-                    TextField("Campaign ID", text: $vm.newCampaignId)
-                        .textFieldStyle(.symaira)
-                    TextField("Jurisdiction (optional)", text: $vm.newCampaignJurisdiction)
-                        .textFieldStyle(.symaira)
-                    TextField("Law (optional)", text: $vm.newCampaignLaw)
-                        .textFieldStyle(.symaira)
-                    TextField("Priority (optional)", text: $vm.newCampaignPriority)
-                        .textFieldStyle(.symaira)
-                    Stepper("Max Brokers: \(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
-                }
-
-                Section {
-                    Button("Create Campaign") {
-                        Task {
-                            await vm.createCampaign()
-                            showCreateSheet = false
-                        }
-                    }
-                    .disabled(!vm.canCreateCampaign)
-                    .tint(BrandColors.goldPrimary)
+        SheetScaffold(
+            title: "New Campaign",
+            dismiss: {
+                showCreateSheet = false
+                vm.resetForm()
+            },
+            primaryTitle: "Create Campaign", primaryDisabled: !vm.canCreateCampaign,
+            primary: {
+                Task {
+                    await vm.createCampaign()
+                    showCreateSheet = false
                 }
             }
-            .formStyle(.grouped)
-            .background(BrandColors.bgDark)
-            .navigationTitle("New Campaign")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showCreateSheet = false
-                        vm.resetForm()
-                    }
-                    .keyboardShortcut(.cancelAction)
+        ) {
+            SymairaFormSection("Campaign Details") {
+                field("Campaign ID", "e.g. q4-gdpr", text: $vm.newCampaignId)
+                SymairaFormDivider()
+                field("Jurisdiction", "Optional", text: $vm.newCampaignJurisdiction)
+                SymairaFormDivider()
+                field("Law", "Optional", text: $vm.newCampaignLaw)
+                SymairaFormDivider()
+                field("Priority", "Optional", text: $vm.newCampaignPriority)
+                SymairaFormDivider()
+                SymairaFormRow("Max Brokers") {
+                    Stepper(
+                        "\(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
+                        .symairaText(.bodyEmphasized)
                 }
             }
         }
-        .frame(width: 450)
-        .onExitCommand {
-            showCreateSheet = false
-            vm.resetForm()
+        .frame(width: 520, height: 500)
+    }
+
+    private func field(_ label: String, _ prompt: String, text: Binding<String>) -> some View {
+        SymairaFormRow(label) {
+            TextField(label, text: text, prompt: Text(prompt))
+                .labelsHidden()
+                .textFieldStyle(.symaira)
+                .frame(width: 260)
         }
     }
 
-    private func successBanner(_ message: String) -> some View {
-        HStack {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(BrandColors.confirmed)
-            Text(message)
-                .symairaText(.callout)
-                .foregroundStyle(BrandColors.textPrimary)
-            Spacer()
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(BrandColors.confirmedBg)
-        )
-    }
+
 }
