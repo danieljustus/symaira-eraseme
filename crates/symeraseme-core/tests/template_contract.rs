@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
+#[path = "../../../rust-tests/html_exports.rs"]
+mod html_exports;
+
 use serde_json::{Value, json};
 use symeraseme_core::templating::{
     Address, FrozenDateTime, RenderContext, embedded_template_sources, list_template_names, render,
@@ -118,6 +121,11 @@ fn every_canonical_template_matches_the_external_golden_byte_for_byte() {
             .map_or(public_name.as_str(), |(_, name)| name);
         let actual = render(bare, &context_for(&public_name))
             .unwrap_or_else(|error| panic!("{bare}: {error}"));
+        // The HTML templates are Symaira-designed now; their Go golden stays as history.
+        if let Some(html) = bare.strip_suffix(".html.j2") {
+            html_exports::assert_html_golden(&format!("template-{html}"), &actual);
+            continue;
+        }
         if actual.as_bytes() != expected.as_bytes() {
             let first = actual
                 .as_bytes()
@@ -146,9 +154,7 @@ fn dashboard_preserves_nested_maps_and_half_tie_chart_widths() {
         context.data["total_requests"] = json!(planned + 9);
         context.data["campaigns"][0]["id"] = json!("nested-campaign");
         let html = render("dashboard.html.j2", &context).unwrap();
-        assert!(
-            html.contains("<strong style=\"color: var(--gold-primary)\">nested-campaign</strong>")
-        );
+        assert!(html.contains("<td class=\"campaign-id\">nested-campaign</td>"));
         assert!(
             html.contains(&format!(
                 "class=\"chart-bar-fill planned\" style=\"width: {width}%\""

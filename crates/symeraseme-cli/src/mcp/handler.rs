@@ -11,6 +11,9 @@
 #[cfg(test)]
 #[path = "../../tests/support/frozen_mcp_runtime.rs"]
 mod frozen_mcp_runtime;
+#[cfg(test)]
+#[path = "../../../../rust-tests/html_exports.rs"]
+mod html_exports;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -2113,6 +2116,22 @@ mod tests {
 
     /// Compares a response the way the contract does, and names the first
     /// differing byte instead of dumping two walls of escaped JSON.
+    /// Replaces the doubly escaped HTML value of `field` in a raw tool response
+    /// (it sits inside the JSON text of the result) with a placeholder.
+    fn without_html(response: &str, field: &str, next: &str) -> String {
+        let start_marker = format!("\\\"{field}\\\":\\\"");
+        let end_marker = format!("\\\",\\\"{next}\\\":");
+        let start = response
+            .find(&start_marker)
+            .unwrap_or_else(|| panic!("no {field} field in response"))
+            + start_marker.len();
+        let end = start
+            + response[start..]
+                .find(&end_marker)
+                .unwrap_or_else(|| panic!("no {next} field after {field}"));
+        format!("{}<html export>{}", &response[..start], &response[end..])
+    }
+
     fn assert_response_matches(name: &str, actual: Option<String>, expected: Option<&str>) {
         let expected = expected.unwrap_or_default();
         let actual = actual.unwrap_or_default();
@@ -3255,11 +3274,33 @@ mod tests {
                 InitializeOutcome::Response(bytes) => bytes,
                 other => panic!("{name}: expected a complete response, got {other:?}"),
             };
-            assert_response_matches(
-                name,
-                Some(String::from_utf8(actual).unwrap()),
-                case["response"].as_str(),
-            );
+            let actual = String::from_utf8(actual).unwrap();
+            let expected = case["response"].as_str().unwrap_or_default();
+            // HTML exports are Symaira-designed since the Liquid Topography redesign:
+            // the envelope still matches Go byte for byte, the HTML a Rust golden.
+            if let Some((field, next)) = match name {
+                "dashboard-empty-html" => Some(("dashboard", "requests")),
+                "report-empty-html" => Some(("report", "success")),
+                _ => None,
+            } {
+                let inner: Value = serde_json::from_str(
+                    serde_json::from_str::<Value>(&actual).unwrap()["result"]["content"][0]["text"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap();
+                html_exports::assert_html_golden(
+                    &format!("mcp-{name}"),
+                    inner[field].as_str().unwrap(),
+                );
+                assert_response_matches(
+                    name,
+                    Some(without_html(&actual, field, next)),
+                    Some(&without_html(expected, field, next)),
+                );
+                continue;
+            }
+            assert_response_matches(name, Some(actual), Some(expected));
         }
         eprintln!(
             "25 recorded Go tool gap cases match complete response bytes; nine source digests verified"

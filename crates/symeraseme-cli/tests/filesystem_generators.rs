@@ -9,7 +9,16 @@ use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "../../../rust-tests/html_exports.rs"]
+mod html_exports;
+
 type Manifest = BTreeMap<String, Value>;
+
+/// HTML exports are Symaira-designed since the Liquid Topography redesign: their
+/// process, tree shape and timestamps still match Go; size and bytes match a Rust golden.
+fn is_html_export(id: &str) -> bool {
+    matches!(id, "report-generate" | "dashboard-generate")
+}
 
 fn unique_root() -> PathBuf {
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -288,7 +297,18 @@ fn replay(case: &Value) {
                 )
             })
             .collect();
+        let mut expected = expected;
         let mut actual = manifest(&directory, &root);
+        if is_html_export(id) {
+            for tree in [&mut expected, &mut actual] {
+                for record in tree.values_mut() {
+                    record
+                        .as_object_mut()
+                        .expect("file record")
+                        .remove("size_bytes");
+                }
+            }
+        }
         for (path, record) in &expected {
             if record.get("sha256").is_none() {
                 actual
@@ -322,6 +342,13 @@ fn replay(case: &Value) {
                     timestamp_count, 2,
                     "report timestamps are the only normalized fields"
                 );
+            }
+            if is_html_export(id) {
+                html_exports::assert_html_golden(
+                    &format!("cli-{id}"),
+                    std::str::from_utf8(&normalized).expect("HTML export is UTF-8"),
+                );
+                continue;
             }
             let expected_bytes = decode_base64(
                 evidence["content_base64"]
