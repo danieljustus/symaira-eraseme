@@ -68,3 +68,11 @@ It records each artifact ID, ZIP digest, original member, native target and
 original/derived file digest. Raw ZIPs remain retained outside the repository.
 Publication privacy approval does not clear the unchanged frozen/native
 acceptance gates, which must execute on the integrated candidate.
+
+## Lock-binding decision (#1263)
+
+The strict whole-`Cargo.lock` binding in `go_source_pin::assert_current_matches_archive`
+is retained after Go retirement. Narrowing to a named input set was evaluated and
+not adopted: the Rust producers import dependencies whose versions can shape
+recorded bytes, and no provable reachability closure exists. Full record and
+reviewer checklist: `docs/rust-port/decisions/1263-lock-binding.md`.
