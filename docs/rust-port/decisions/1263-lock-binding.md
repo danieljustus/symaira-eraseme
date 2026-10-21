@@ -22,7 +22,7 @@ Rule as implemented (`crates/symeraseme-cli/tests/support/go_source_pin.rs`):
 - `:163-166` the rest of the lock must be byte-identical (dependencies, checksums,
   line endings).
 
-Call sites (eight production readers plus the self-test):
+Call sites (seven production readers plus the self-test at `go_source_pin.rs:171`):
 
 - `crates/symeraseme-cli/tests/support/frozen_plan_process.rs:92`
 - `crates/symeraseme-cli/tests/support/frozen_native_triage.rs:204`
@@ -42,17 +42,18 @@ recorded bytes or the code path that produces them:
 - `crates/symeraseme-core/tests/campaign_smtp.rs:3-5` — `chrono`, `serde_json`, `sha2`
 - `crates/symeraseme-core/tests/smtp_transport.rs:3-4` — `base64`, `serde_json`; `:26-28` — `rcgen`, `rustls` (certificate and TLS handshake material)
 - `crates/symeraseme-cli/tests/plan_execute_live_process.rs:4` — `serde_json`
-- `crates/symeraseme-core/tests/support/frozen_smtp.rs:141` — `sha2` digests of recorded source bytes
+- `crates/symeraseme-core/tests/support/frozen_smtp.rs:4,125,199` — `sha2` import, `Sha256::digest` and the recorded-source digest assertion
 
 Current state: the active reader fixture `refresh-e61132f8` records a lock of 80762
-bytes, sha256 `05c1fcaa…`. That equals the base lock exactly, so the strict rule
+bytes, sha256 `05c1fcaa…` (LF form; the 18 Windows records hold the CRLF form, 83984 bytes,
+sha256 `2db30721…`, matching the autocrlf transform in `frozen_plan_process.rs:73-86`). That equals the base lock exactly, so the strict rule
 passes today without relying on the local-version allowance. Six lock-changing
 commits sit between `5df99f8f` and base (`#1194`, `#1215`, `#1228`, `#1247`, `#1248`,
 `#1261`); each refreshed captures rather than relaxing the check.
 
 Policy: `docs/rust-port/dependency-refresh-policy.md` — the strict rule is retained
 at `:20-21`, the native-capture refresh procedure at `:10-25`, and the publication
-privacy derivation at `:40-70` explicitly does not relax it (`:56-57`, `:69-70`).
+privacy derivation at `:40-70` explicitly does not relax it (`:56-57`).
 
 Go retirement: `RETIREMENT_SOURCE_REVISION = 22615ae…` (`go_source_pin.rs:21`) keeps
 recorded Go and generator bytes authenticated from history. It does not reduce the
@@ -101,9 +102,9 @@ Stage 2 (narrowing) is not started; it is listed as remaining work below.
 
 ## Reviewer checklist
 
-- [ ] `go_source_pin.rs` is unchanged by this commit (`git diff --stat HEAD~1` shows only doc files).
+- [ ] `go_source_pin.rs` is unchanged by this commit (`git diff --stat <base>..HEAD` shows only doc files).
 - [ ] The eight call sites above still route through `assert_current_matches_archive`.
 - [ ] `RETIREMENT_SOURCE_REVISION` and the four local-version labels are unchanged.
-- [ ] `refresh-e61132f8` archived-lock digest equals the base lock digest (`05c1fcaa…`).
+- [ ] `refresh-e61132f8` archived-lock digest equals the base lock digest (`05c1fcaa…` for LF records; `2db30721…` is its CRLF form for Windows records).
 - [ ] No frozen capture, fixture, CI file or Cargo manifest was modified.
 - [ ] The policy document's decision section points to this record and does not relax `#1188`.
