@@ -29,6 +29,9 @@ const GOLDEN_REPORTING_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/event-store/golden-reporting.json"
 );
+#[path = "../../../rust-tests/html_exports.rs"]
+mod html_exports;
+
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const GO_REPORTING_SOURCE: &str = "internal/reporting/reporting.go";
 const GO_BYTES_ORACLE_TEST: &str = "internal/reporting/reporting_json_oracle_test.go";
@@ -59,9 +62,6 @@ struct GoReportingExports {
     template_source_sha256: String,
     templating_source_sha256: String,
     json: String,
-    html: String,
-    html_single_campaign: String,
-    html_empty_campaign: String,
 }
 
 /// The seed used by Go's `fixtureStore`, copied statement for statement.
@@ -265,10 +265,11 @@ fn generated_report_exports_match_go() {
         generate_report(&report, "json", now).expect("report JSON export"),
         &fixture.json,
     );
-    assert_output(
-        "HTML",
-        generate_report(&report, "html", now).expect("report HTML export"),
-        &fixture.html,
+    // HTML exports are Symaira-designed since the Liquid Topography redesign; the
+    // Go HTML in the fixture stays as history, Rust goldens pin the new output.
+    html_exports::assert_html_golden(
+        "report-all-campaigns",
+        &generate_report(&report, "html", now).expect("report HTML export"),
     );
 
     let single_campaign = get_report_data(
@@ -280,10 +281,9 @@ fn generated_report_exports_match_go() {
         now,
     )
     .expect("single campaign report data");
-    assert_output(
-        "single campaign HTML",
-        generate_report(&single_campaign, "html", now).expect("single campaign HTML export"),
-        &fixture.html_single_campaign,
+    html_exports::assert_html_golden(
+        "report-single-campaign",
+        &generate_report(&single_campaign, "html", now).expect("single campaign HTML export"),
     );
 
     let (_empty_tree, empty_store) = fixture_store();
@@ -307,10 +307,9 @@ fn generated_report_exports_match_go() {
         now,
     )
     .expect("empty-campaign report data");
-    assert_output(
-        "two campaigns with one empty HTML",
-        generate_report(&empty_campaign_report, "html", now).expect("empty-campaign HTML export"),
-        &fixture.html_empty_campaign,
+    html_exports::assert_html_golden(
+        "report-with-empty-campaign",
+        &generate_report(&empty_campaign_report, "html", now).expect("empty-campaign HTML export"),
     );
 }
 

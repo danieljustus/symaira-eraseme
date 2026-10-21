@@ -7,611 +7,173 @@
 <meta http-equiv="refresh" content="{{ auto_refresh_seconds }}">
 {% endif %}
 <title>Symaira EraseMe Dashboard</title>
-<!-- Load Roboto Flex variable font from Google Fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap" rel="stylesheet">
 <style>
-/* Reset and Font system */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* Symaira Liquid Topography. Local fonts only: opening this file makes no network request. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Symaira brand design tokens */
-  --bg-dark: #0D0C0A;
-  --bg-darker: #070605;
-  --bg-card: rgba(18, 17, 14, 0.65);
-  --bg-card-hover: rgba(26, 24, 20, 0.85);
-  
-  --gold-primary: #E5C397;
-  --gold-secondary: #F8E6CD;
-  --gold-shadow: #C29965;
-  
-  --ice-primary: #EEDCC4;
-  --ice-secondary: #D4B285;
-  
-  --text-primary: #F5F4F0;
-  --text-secondary: #B5AEA5;
-  --text-muted: #6E6860;
-  
-  --border-glass: rgba(255, 255, 255, 0.05);
-  --border-glass-hover: rgba(229, 195, 151, 0.18);
-  
-  --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-fast: all 0.15s ease;
-
-  /* Status Colors */
-  --color-confirmed: #A7F3D0;
-  --bg-confirmed: rgba(6, 78, 59, 0.5);
-  --border-confirmed: rgba(16, 185, 129, 0.3);
-
-  --color-pending: #FDE68A;
-  --bg-pending: rgba(120, 53, 15, 0.5);
-  --border-pending: rgba(245, 158, 11, 0.3);
-
-  --color-rejected: #FCA5A5;
-  --bg-rejected: rgba(92, 29, 29, 0.5);
-  --border-rejected: rgba(239, 68, 68, 0.3);
-
-  --color-overdue: #FECACA;
-  --bg-overdue: rgba(127, 29, 29, 0.6);
-  --border-overdue: rgba(239, 68, 68, 0.4);
-
-  --color-planned: #DBEAFE;
-  --bg-planned: rgba(30, 58, 138, 0.4);
-  --border-planned: rgba(59, 130, 246, 0.3);
+  color-scheme: light dark;
+  --canvas: #EEEDEA;
+  --surface: #E1E0DA;
+  --raised: #EEEDEA;
+  --line: #B0AEA9;
+  --ink: #141413;
+  --ink-2: #2B2B2A;
+  --ink-3: #62615D;
+  --selected: #141413;
+  --on-selected: #E1E0DA;
+  --focus: #141413;
+  --positive: #34694A;
+  --warning: #7E5310;
+  --critical: #9A4634;
+  --informative: #245C86;
+  --neutral: #2B2B2A;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-dark: #0D0C0A;
+    --canvas: #1C1C1B;
+    --surface: #141413;
+    --raised: #2B2B2A;
+    --line: #30302E;
+    --ink: #EEEDEA;
+    --ink-2: #B0AEA9;
+    --ink-3: #97958F;
+    --selected: #E0D2BA;
+    --on-selected: #1A1814;
+    --focus: #E0D2BA;
+    --positive: #93C49F;
+    --warning: #E9BC73;
+    --critical: #E39C8A;
+    --informative: #8CC8F2;
+    --neutral: #B0AEA9;
   }
 }
 
 body {
-  font-family: 'Roboto Flex', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: var(--bg-dark);
-  color: var(--text-primary);
-  line-height: 1.6;
-  padding: 40px 20px;
-  position: relative;
-  min-height: 100vh;
-  overflow-x: hidden;
+  font-family: "Google Sans Flex", "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  background: var(--canvas);
+  color: var(--ink);
+  line-height: 1.5;
+  padding: 24px 16px 48px;
   -webkit-font-smoothing: antialiased;
-
-  /* Blueprint Grid Background */
-  background-image: radial-gradient(rgba(229, 195, 151, 0.02) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-/* Ambient glow blobs */
-.ambient-glow {
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(140px);
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-.glow-top-right {
-  top: -150px;
-  right: -100px;
-  width: 50vw;
-  height: 50vw;
-  background: radial-gradient(circle, rgba(229, 195, 151, 0.06) 0%, transparent 70%);
-}
-
-.glow-bottom-left {
-  bottom: -200px;
-  left: -150px;
-  width: 45vw;
-  height: 45vw;
-  background: radial-gradient(circle, rgba(212, 178, 133, 0.04) 0%, transparent 70%);
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-}
-
-/* Header design */
-header {
-  margin-bottom: 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  border-bottom: 1px solid var(--border-glass);
-  padding-bottom: 24px;
-}
-
-h1 {
-  font-size: 2.25rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--gold-secondary) 30%, var(--gold-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 4px;
-}
-
-.subtitle {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.last-updated {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-align: right;
-}
-
-.brand-badge {
-  display: inline-block;
-  background: rgba(229, 195, 151, 0.1);
-  border: 1px solid var(--gold-primary);
-  color: var(--gold-primary);
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-bottom: 8px;
-}
-
-/* Glassmorphism Cards */
-.card {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow);
-  transition: var(--transition-smooth);
-}
-
-.card:hover {
-  border-color: var(--border-glass-hover);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
-}
-
-/* Summary Grid styling */
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 40px;
-}
-
-.summary-card {
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 110px;
-}
-
-.summary-card .count {
-  font-size: 2.25rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  margin-bottom: 8px;
-}
-
-.summary-card .label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.summary-card.total .count { color: var(--text-primary); }
-.summary-card.pending .count { color: var(--gold-primary); }
-.summary-card.confirmed .count { color: var(--color-confirmed); }
-.summary-card.rejected .count { color: var(--color-rejected); }
-.summary-card.overdue .count { color: var(--color-overdue); }
-
-/* Section Headers */
-.section-title-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.section-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--gold-secondary);
-  letter-spacing: -0.01em;
-}
-
-.section {
-  margin-bottom: 48px;
-}
-
-/* Status Breakdown Chart */
-.chart-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.chart-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 0.85rem;
-}
-
-.chart-bar-label {
-  width: 120px;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.chart-bar-wrapper {
-  flex-grow: 1;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  height: 24px;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-}
-
-.chart-bar-fill {
-  height: 100%;
-  border-radius: 11px;
-  transition: width 1s ease-out;
-  position: relative;
-}
-
-.chart-bar-fill.planned { background: linear-gradient(90deg, rgba(30,58,138,0.7), rgba(59,130,246,0.8)); }
-.chart-bar-fill.sent { background: linear-gradient(90deg, rgba(110,104,96,0.5), rgba(181,174,165,0.7)); }
-.chart-bar-fill.awaiting { background: linear-gradient(90deg, rgba(120,53,15,0.7), rgba(245,158,11,0.8)); }
-.chart-bar-fill.confirmed { background: linear-gradient(90deg, rgba(6,78,59,0.7), rgba(16,185,129,0.8)); }
-.chart-bar-fill.rejected { background: linear-gradient(90deg, rgba(92,29,29,0.7), rgba(239,68,68,0.8)); }
-.chart-bar-fill.overdue { background: linear-gradient(90deg, rgba(127,29,29,0.8), rgba(239,68,68,0.9)); }
-
-.chart-bar-value {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-weight: 700;
-  font-size: 0.75rem;
-  color: var(--text-primary);
-}
-
-/* Tables styling */
-.table-wrap {
-  overflow-x: auto;
-  border-radius: 8px;
-  border: 1px solid var(--border-glass);
-  background: rgba(7, 6, 5, 0.3);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  text-align: left;
-}
-
-th, td {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border-glass);
-}
-
-th {
-  font-weight: 700;
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(255, 255, 255, 0.01);
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover td {
-  background: rgba(255, 255, 255, 0.015);
-}
-
-/* Status Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border: 1px solid transparent;
-}
-
-.badge-green {
-  background: var(--bg-confirmed);
-  color: var(--color-confirmed);
-  border-color: var(--border-confirmed);
-}
-
-.badge-yellow {
-  background: var(--bg-pending);
-  color: var(--color-pending);
-  border-color: var(--border-pending);
-}
-
-.badge-red {
-  background: var(--bg-rejected);
-  color: var(--color-rejected);
-  border-color: var(--border-rejected);
-}
-
-.badge-blue {
-  background: var(--bg-planned);
-  color: var(--color-planned);
-  border-color: var(--border-planned);
-}
-
-.badge-gray {
-  background: rgba(110, 104, 96, 0.25);
-  color: var(--text-secondary);
-  border-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Interactive Search & Filter Controls */
-.filter-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.search-input-wrapper {
-  position: relative;
-}
-
-.search-input {
-  background: rgba(7, 6, 5, 0.5);
-  border: 1px solid var(--border-glass);
-  color: var(--text-primary);
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  outline: none;
-  width: 240px;
-  font-family: inherit;
-  transition: var(--transition-fast);
-}
-
-.search-input:focus {
-  border-color: var(--gold-primary);
-  box-shadow: 0 0 0 2px rgba(229, 195, 151, 0.15);
-}
-
-.filter-btn-group {
-  display: flex;
-  background: rgba(7, 6, 5, 0.4);
-  border: 1px solid var(--border-glass);
-  padding: 3px;
-  border-radius: 8px;
-}
-
-.filter-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition-fast);
-  font-family: inherit;
-}
-
-.filter-btn:hover {
-  color: var(--text-primary);
-}
-
-.filter-btn.active {
-  background: rgba(229, 195, 151, 0.12);
-  color: var(--gold-primary);
-}
-
-/* Broker Grid Layout */
-.broker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.broker-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  border-radius: 10px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 12px;
-  transition: var(--transition-smooth);
-}
-
-.broker-card:hover {
-  border-color: var(--border-glass-hover);
-  transform: translateY(-2px);
-}
-
-.broker-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.broker-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--gold-secondary);
-  letter-spacing: -0.01em;
-}
-
-.broker-stats-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.stat-tag {
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--border-glass);
-  color: var(--text-secondary);
-}
-
-.stat-tag.confirmed { color: var(--color-confirmed); }
-.stat-tag.pending { color: var(--color-pending); }
-.stat-tag.rejected { color: var(--color-rejected); }
-.stat-tag.overdue { color: var(--color-overdue); }
-
-/* Timeline design */
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.timeline-item {
-  display: flex;
-  gap: 16px;
-  padding: 12px 16px;
-  background: rgba(7, 6, 5, 0.25);
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
-  align-items: center;
-}
-
-.timeline-time {
-  width: 140px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.timeline-badge-wrap {
-  width: 130px;
-}
-
-.timeline-content {
-  flex-grow: 1;
-  font-size: 0.85rem;
-}
-
-.timeline-broker {
-  color: var(--gold-primary);
-  font-weight: 600;
-}
-
-.timeline-source {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: right;
-  width: 100px;
-}
-
-#no-results-msg {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 40px;
-  color: var(--text-muted);
-  background: rgba(7, 6, 5, 0.2);
-  border: 1px dashed var(--border-glass);
-  border-radius: 8px;
-  display: none;
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-darker);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
 }
 
-@media (max-width: 768px) {
-  header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  .last-updated {
-    text-align: left;
-  }
-  .timeline-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    position: relative;
-    padding-bottom: 30px;
-  }
-  .timeline-time {
-    width: auto;
-  }
-  .timeline-source {
-    position: absolute;
-    bottom: 10px;
-    right: 16px;
-    width: auto;
-  }
+.container { max-width: 1008px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* Header zone: title, subtitle, generation time */
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.subtitle { color: var(--ink-3); font-size: 0.8125rem; }
+.last-updated { color: var(--ink-3); font-size: 0.8125rem; text-align: right; }
+.last-updated strong { color: var(--ink); font-weight: 600; }
+
+/* Cards: opaque surface with a 1px line, no glass, no shadow */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.section-title-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.section-title { font-size: 1.0625rem; font-weight: 700; color: var(--ink); }
+.empty { color: var(--ink-3); font-size: 0.875rem; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8125rem; }
+
+/* Summary stat cards */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.summary-card { display: flex; flex-direction: column; gap: 8px; }
+.summary-card .label { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+.summary-card .count { font-size: 1.75rem; font-weight: 700; line-height: 1; color: var(--ink); }
+
+/* Status breakdown */
+.chart-container { display: flex; flex-direction: column; gap: 10px; }
+.chart-bar-row { display: flex; align-items: center; gap: 12px; font-size: 0.8125rem; }
+.chart-bar-label { width: 120px; color: var(--ink-2); font-weight: 600; flex-shrink: 0; }
+.chart-bar-wrapper { flex-grow: 1; background: var(--raised); border: 1px solid var(--line); height: 22px; border-radius: 10px; overflow: hidden; position: relative; }
+.chart-bar-fill { height: 100%; border-radius: 9px; position: relative; }
+.chart-bar-fill.planned { background: var(--neutral); }
+.chart-bar-fill.sent { background: var(--informative); }
+.chart-bar-fill.awaiting { background: var(--warning); }
+.chart-bar-fill.confirmed { background: var(--positive); }
+.chart-bar-fill.rejected { background: var(--critical); }
+.chart-bar-fill.overdue { background: var(--critical); }
+.chart-bar-value { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 0.75rem; color: var(--canvas); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; text-align: left; }
+th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.6875rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+tr:last-child td { border-bottom: none; }
+.campaign-id { font-weight: 700; }
+.muted { color: var(--ink-3); }
+.num-positive { color: var(--positive); font-weight: 600; }
+.num-warning { color: var(--warning); font-weight: 600; }
+.num-critical { color: var(--critical); font-weight: 600; }
+
+/* Status badges: tone text, 12% tone fill, 26% tone outline */
+.badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; border: 1px solid; }
+.badge-green { color: var(--positive); background: color-mix(in srgb, var(--positive) 12%, transparent); border-color: color-mix(in srgb, var(--positive) 26%, transparent); }
+.badge-yellow { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); border-color: color-mix(in srgb, var(--warning) 26%, transparent); }
+.badge-red { color: var(--critical); background: color-mix(in srgb, var(--critical) 12%, transparent); border-color: color-mix(in srgb, var(--critical) 26%, transparent); }
+.badge-blue { color: var(--informative); background: color-mix(in srgb, var(--informative) 12%, transparent); border-color: color-mix(in srgb, var(--informative) 26%, transparent); }
+.badge-gray { color: var(--neutral); background: color-mix(in srgb, var(--neutral) 12%, transparent); border-color: color-mix(in srgb, var(--neutral) 26%, transparent); }
+
+/* Filter toolbar: text field and segments; champagne marks only the active segment */
+.filter-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.search-input { background: var(--raised); border: 1px solid var(--line); color: var(--ink); padding: 8px 12px; min-height: 36px; border-radius: 10px; font: inherit; font-size: 0.875rem; width: 240px; outline: none; }
+.search-input::placeholder { color: var(--ink-3); }
+.search-input:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.filter-btn-group { display: flex; gap: 4px; background: var(--raised); border: 1px solid var(--line); padding: 3px; border-radius: 14px; }
+.filter-btn { background: transparent; border: none; color: var(--ink-2); padding: 6px 12px; border-radius: 10px; font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; }
+.filter-btn:hover { color: var(--ink); }
+.filter-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.filter-btn.active { background: var(--selected); color: var(--on-selected); font-weight: 700; }
+
+/* Broker grid */
+.broker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.broker-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.broker-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.broker-name { font-weight: 700; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.broker-stats-container { display: flex; flex-wrap: wrap; gap: 6px; }
+.stat-tag { font-size: 0.6875rem; font-weight: 600; color: var(--ink-3); }
+.stat-tag.confirmed { color: var(--positive); }
+.stat-tag.pending { color: var(--warning); }
+.stat-tag.rejected, .stat-tag.overdue { color: var(--critical); }
+#no-results-msg { grid-column: 1 / -1; text-align: center; padding: 32px; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 16px; display: none; }
+
+/* Recent events */
+.timeline { display: flex; flex-direction: column; }
+.timeline-item { display: grid; grid-template-columns: 150px 150px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.8125rem; }
+.timeline-item:last-child { border-bottom: none; }
+.timeline-time { color: var(--ink-3); }
+.timeline-badge-wrap .badge { width: 100%; }
+.timeline-broker { font-weight: 600; }
+.timeline-source { color: var(--ink-3); text-align: right; }
+
+@media (max-width: 720px) {
+  header { flex-direction: column; align-items: flex-start; }
+  .last-updated { text-align: left; }
+  .timeline-item { grid-template-columns: 1fr; gap: 4px; }
+  .timeline-source { text-align: left; }
+  .search-input { width: 100%; }
+}
+
+@media print {
+  body { background: #FFFFFF; padding: 0; }
+  .filter-controls { display: none; }
 }
 </style>
 </head>
 <body>
 
-<!-- Ambient Backdrops -->
-<div class="ambient-glow glow-top-right"></div>
-<div class="ambient-glow glow-bottom-left"></div>
-
 <div class="container">
   <header>
     <div>
-      <div class="brand-badge">Symaira EraseMe</div>
-      <h1>EraseMe Dashboard</h1>
-      <div class="subtitle">{{ data.total_requests }} Requests across {{ data.campaigns|length }} campaign(s)</div>
+      <h1>Dashboard</h1>
+      <div class="subtitle">{{ data.total_requests }} requests across {{ data.campaigns|length }} campaign(s)</div>
     </div>
     <div class="last-updated">
-      <div>Report generated</div>
-      <strong style="color: var(--text-primary);">{{ now.strftime("%Y-%m-%d %H:%M UTC") }}</strong>
+      <div>Generated <strong>{{ now.strftime("%Y-%m-%d %H:%M UTC") }}</strong></div>
       {% if auto_refresh_seconds > 0 %}
-      <div style="font-size: 0.7rem; color: var(--gold-primary); margin-top: 4px;">Auto-refresh: {{ auto_refresh_seconds }}s</div>
+      <div>Auto-refresh every {{ auto_refresh_seconds }}s</div>
       {% endif %}
     </div>
   </header>
@@ -640,99 +202,94 @@ tr:hover td {
     </div>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 48px;">
-    <!-- Status breakdown chart -->
-    <div class="card section">
-      <div class="section-title-bar">
-        <h2 class="section-title">Status Breakdown</h2>
-      </div>
-      {% set statuses = [
-        ("Planned", data.planned, "planned"),
-        ("Sent", data.sent, "sent"),
-        ("Awaiting Ack", data.awaiting_ack, "awaiting"),
-        ("Awaiting Resp.", data.awaiting_response, "awaiting"),
-        ("Confirmed", data.confirmed, "confirmed"),
-        ("Rejected", data.rejected, "rejected"),
-        ("Overdue", data.overdue, "overdue"),
-      ] %}
-      {% set max_count = statuses|map(attribute=1)|max or 1 %}
-      {% if data.total_requests > 0 %}
-      <div class="chart-container">
-        {% for label, count, cls in statuses %}
-        <div class="chart-bar-row">
-          <div class="chart-bar-label">{{ label }}</div>
-          <div class="chart-bar-wrapper">
-            <div class="chart-bar-fill {{ cls }}" style="width: {{ (count / max_count * 100)|round|int }}%">
-              {% if count > 0 %}
-              <span class="chart-bar-value">{{ count }}</span>
-              {% endif %}
-            </div>
+  <!-- Status breakdown chart -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Status Breakdown</h2>
+    </div>
+    {% set statuses = [
+      ("Planned", data.planned, "planned"),
+      ("Sent", data.sent, "sent"),
+      ("Awaiting Ack", data.awaiting_ack, "awaiting"),
+      ("Awaiting Resp.", data.awaiting_response, "awaiting"),
+      ("Confirmed", data.confirmed, "confirmed"),
+      ("Rejected", data.rejected, "rejected"),
+      ("Overdue", data.overdue, "overdue"),
+    ] %}
+    {% set max_count = statuses|map(attribute=1)|max or 1 %}
+    {% if data.total_requests > 0 %}
+    <div class="chart-container">
+      {% for label, count, cls in statuses %}
+      <div class="chart-bar-row">
+        <div class="chart-bar-label">{{ label }}</div>
+        <div class="chart-bar-wrapper">
+          <div class="chart-bar-fill {{ cls }}" style="width: {{ (count / max_count * 100)|round|int }}%">
+            {% if count > 0 %}
+            <span class="chart-bar-value">{{ count }}</span>
+            {% endif %}
           </div>
         </div>
-        {% endfor %}
       </div>
-      {% else %}
-      <p style="color: var(--text-muted); font-size: 0.85rem;">No requests yet. Run <code>plan</code> and <code>execute</code> to populate the dashboard.</p>
-      {% endif %}
+      {% endfor %}
     </div>
+    {% else %}
+    <p class="empty">No requests yet. Run <code>plan</code> and <code>execute</code> to populate the dashboard.</p>
+    {% endif %}
+  </section>
 
-    <!-- Campaigns Table -->
-    <div class="card section">
-      <div class="section-title-bar">
-        <h2 class="section-title">Active Campaigns</h2>
-      </div>
-      {% if data.campaigns %}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Campaign ID</th>
-              <th>Kind</th>
-              <th>Created</th>
-              <th>Total</th>
-              <th>Confirmed</th>
-              <th>Rejected</th>
-              <th>Overdue</th>
-              <th>Pending</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for camp in data.campaigns %}
-            <tr>
-              <td><strong style="color: var(--gold-primary)">{{ camp.id }}</strong></td>
-              <td><span style="color: var(--text-secondary)">{{ camp.kind }}</span></td>
-              <td>{{ camp.created_at[:10] if camp.created_at else "—" }}</td>
-              <td><strong>{{ camp.total }}</strong></td>
-              <td><span style="color: var(--color-confirmed); font-weight: 600;">{{ camp.confirmed }}</span></td>
-              <td><span style="color: var(--color-rejected); font-weight: 600;">{{ camp.rejected }}</span></td>
-              <td><span style="color: var(--color-overdue); font-weight: 600;">{{ camp.overdue }}</span></td>
-              <td><span style="color: var(--color-pending); font-weight: 600;">{{ camp.planned + camp.sent + camp.awaiting_ack + camp.awaiting_response }}</span></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p style="color: var(--text-muted); font-size: 0.85rem;">No campaigns found.</p>
-      {% endif %}
+  <!-- Campaigns Table -->
+  <section class="card">
+    <div class="section-title-bar">
+      <h2 class="section-title">Campaigns</h2>
     </div>
-  </div>
+    {% if data.campaigns %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Campaign ID</th>
+            <th>Kind</th>
+            <th>Created</th>
+            <th>Total</th>
+            <th>Confirmed</th>
+            <th>Rejected</th>
+            <th>Overdue</th>
+            <th>Pending</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for camp in data.campaigns %}
+          <tr>
+            <td class="campaign-id">{{ camp.id }}</td>
+            <td class="muted">{{ camp.kind }}</td>
+            <td>{{ camp.created_at[:10] if camp.created_at else "—" }}</td>
+            <td><strong>{{ camp.total }}</strong></td>
+            <td class="num-positive">{{ camp.confirmed }}</td>
+            <td class="num-critical">{{ camp.rejected }}</td>
+            <td class="num-critical">{{ camp.overdue }}</td>
+            <td class="num-warning">{{ camp.planned + camp.sent + camp.awaiting_ack + camp.awaiting_response }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No campaigns found.</p>
+    {% endif %}
+  </section>
 
   <!-- Broker status grid -->
-  <div class="section">
+  <section class="card">
     <div class="section-title-bar">
       <h2 class="section-title">Broker Status</h2>
-      
       <div class="filter-controls">
-        <div class="search-input-wrapper">
-          <input type="text" class="search-input" id="broker-search" placeholder="Search data brokers..." oninput="handleSearch(this.value)">
-        </div>
-        <div class="filter-btn-group">
-          <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
-          <button class="filter-btn" onclick="setFilter('confirmed', this)">Confirmed</button>
-          <button class="filter-btn" onclick="setFilter('pending', this)">Pending</button>
-          <button class="filter-btn" onclick="setFilter('overdue', this)">Overdue</button>
-          <button class="filter-btn" onclick="setFilter('rejected', this)">Rejected</button>
+        <input type="text" class="search-input" id="broker-search" placeholder="Search data brokers…" aria-label="Search data brokers" oninput="handleSearch(this.value)">
+        <div class="filter-btn-group" role="group" aria-label="Filter by status">
+          <button class="filter-btn active" aria-pressed="true" onclick="setFilter('all', this)">All</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('confirmed', this)">Confirmed</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('pending', this)">Pending</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('overdue', this)">Overdue</button>
+          <button class="filter-btn" aria-pressed="false" onclick="setFilter('rejected', this)">Rejected</button>
         </div>
       </div>
     </div>
@@ -744,9 +301,7 @@ tr:hover td {
       <div class="broker-card" data-broker="{{ bs.broker_id }}" data-status="{{ dominant }}">
         <div class="broker-card-top">
           <div class="broker-name">{{ bs.broker_id }}</div>
-          <span class="badge badge-{% if dominant == 'confirmed' %}green{% elif dominant == 'pending' %}yellow{% elif dominant == 'rejected' or dominant == 'overdue' %}red{% else %}gray{% endif %}">
-            {{ dominant }}
-          </span>
+          <span class="badge badge-{% if dominant == 'confirmed' %}green{% elif dominant == 'pending' %}yellow{% elif dominant == 'rejected' or dominant == 'overdue' %}red{% else %}gray{% endif %}">{{ dominant|capitalize }}</span>
         </div>
         <div class="broker-stats-container">
           {% if bs.confirmed > 0 %}<div class="stat-tag confirmed">{{ bs.confirmed }} confirmed</div>{% endif %}
@@ -756,16 +311,15 @@ tr:hover td {
         </div>
       </div>
       {% endfor %}
-      
       <div id="no-results-msg">No data brokers match your filters.</div>
     </div>
     {% else %}
-    <p style="color: var(--text-muted); font-size: 0.85rem;">No broker data available.</p>
+    <p class="empty">No broker data available.</p>
     {% endif %}
-  </div>
+  </section>
 
   <!-- Recent events -->
-  <div class="card section">
+  <section class="card">
     <div class="section-title-bar">
       <h2 class="section-title">Recent Events</h2>
     </div>
@@ -775,21 +329,17 @@ tr:hover td {
       <div class="timeline-item">
         <div class="timeline-time">{{ evt.occurred_at[:19].replace('T', ' ') if evt.occurred_at else "—" }}</div>
         <div class="timeline-badge-wrap">
-          <span class="badge badge-{% if 'CONFIRMED' in evt.event_type %}green{% elif 'REJECT' in evt.event_type or 'FAIL' in evt.event_type or 'OVERDUE' in evt.event_type %}red{% elif 'PLANNED' in evt.event_type %}blue{% else %}gray{% endif %}" style="width: 100%; justify-content: center;">
-            {{ evt.event_type }}
-          </span>
+          <span class="badge badge-{% if 'CONFIRMED' in evt.event_type %}green{% elif 'REJECT' in evt.event_type or 'FAIL' in evt.event_type or 'OVERDUE' in evt.event_type %}red{% elif 'PLANNED' in evt.event_type %}gray{% else %}blue{% endif %}">{{ evt.event_type }}</span>
         </div>
-        <div class="timeline-content">
-          Request <strong style="color: var(--text-primary)">#{{ evt.request_id }}</strong> for data broker <span class="timeline-broker">{{ evt.broker_id or "—" }}</span>
-        </div>
+        <div>Request <strong>#{{ evt.request_id }}</strong> · <span class="timeline-broker">{{ evt.broker_id or "—" }}</span></div>
         <div class="timeline-source">{{ evt.source }}</div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p style="color: var(--text-muted); font-size: 0.85rem;">No events recorded yet.</p>
+    <p class="empty">No events recorded yet.</p>
     {% endif %}
-  </div>
+  </section>
 </div>
 
 <script>
@@ -797,8 +347,12 @@ let currentFilter = 'all';
 let searchQuery = '';
 
 function setFilter(status, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
   btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
   currentFilter = status;
   applyFilter();
 }
@@ -811,28 +365,14 @@ function handleSearch(val) {
 function applyFilter() {
   const cards = document.querySelectorAll('.broker-card');
   let visibleCount = 0;
-  
   cards.forEach(card => {
-    const brokerId = card.dataset.broker.toLowerCase();
-    const status = card.dataset.status;
-    
-    const matchesSearch = brokerId.includes(searchQuery);
-    const matchesFilter = currentFilter === 'all' || status === currentFilter;
-    
-    if (matchesSearch && matchesFilter) {
-      card.style.display = 'flex';
-      visibleCount++;
-    } else {
-      card.style.display = 'none';
-    }
+    const matchesSearch = card.dataset.broker.toLowerCase().includes(searchQuery);
+    const matchesFilter = currentFilter === 'all' || card.dataset.status === currentFilter;
+    card.style.display = matchesSearch && matchesFilter ? 'flex' : 'none';
+    if (matchesSearch && matchesFilter) visibleCount++;
   });
-  
   const noResults = document.getElementById('no-results-msg');
-  if (visibleCount === 0) {
-    noResults.style.display = 'block';
-  } else {
-    noResults.style.display = 'none';
-  }
+  if (noResults) noResults.style.display = visibleCount === 0 ? 'block' : 'none';
 }
 </script>
 </body>

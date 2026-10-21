@@ -1096,112 +1096,14 @@ fn export_csv(data: &Value) -> String {
 
 /// Go's `ExportHTML`: the report template over the report data.
 fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
-    // Keep caller text untouched; Go and MiniJinja retain different template
-    // blank lines when there are no campaigns, one campaign, or repeated
-    // campaigns, so normalize only those template-generated boundaries below.
-    let mut template_data = data.clone();
-    let campaign_count = template_data
-        .get("campaigns")
-        .and_then(Value::as_array)
-        .map_or(0, Vec::len);
-    // Go's report template passes the timeline event-count map to a helper
-    // that only joins slices, so its Details column is empty for these maps.
-    // MiniJinja joins mapping values; replace only this template input with an
-    // empty slice to preserve the actual Go output without changing report data.
-    if let Some(Value::Array(timeline)) = template_data.get_mut("timeline") {
-        for entry in timeline {
-            if let Value::Object(fields) = entry
-                && matches!(fields.get("events"), Some(Value::Object(_)))
-            {
-                fields.insert("events".to_owned(), Value::Array(Vec::new()));
-            }
-        }
-    }
-    encode_data_newlines(&mut template_data);
+    // The HTML export is Symaira-designed and no longer byte-compatible with Go:
+    // no blank-line compaction and the timeline lists its event counts.
     let context = RenderContext {
-        data: template_data,
+        data: data.clone(),
         now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
         ..RenderContext::default()
     };
-    let html = render("report.html.j2", &context).map_err(|error| error.to_string())?;
-    let html = if campaign_count == 0 {
-        compact_template_blank_lines(&html)
-    } else if campaign_count == 1 {
-        html.replace("\n\n\n  <h2>Campaign:", "\n\n  <h2>Campaign:")
-    } else if campaign_count > 1 {
-        html.replace("</table>\n  <h2>Campaign:", "</table>\n\n  <h2>Campaign:")
-            .replace("</p>\n  <h2>Campaign:", "</p>\n\n  <h2>Campaign:")
-    } else {
-        html
-    };
-    Ok(decode_data_newlines(&html))
-}
-
-fn compact_template_blank_lines(html: &str) -> String {
-    let mut compact = String::with_capacity(html.len());
-    let mut line_breaks = 0;
-    for character in html.chars() {
-        if character == '\n' {
-            line_breaks += 1;
-            if line_breaks <= 2 {
-                compact.push(character);
-            }
-        } else {
-            line_breaks = 0;
-            compact.push(character);
-        }
-    }
-    compact
-}
-
-const NEWLINE_MARKER: char = '\u{e001}';
-const ESCAPE_MARKER: char = '\u{e000}';
-
-fn encode_data_newlines(value: &mut Value) {
-    match value {
-        Value::String(text) => {
-            let mut encoded = String::with_capacity(text.len());
-            for character in text.chars() {
-                match character {
-                    '\n' => encoded.push(NEWLINE_MARKER),
-                    ESCAPE_MARKER => {
-                        encoded.push(ESCAPE_MARKER);
-                        encoded.push('0');
-                    }
-                    NEWLINE_MARKER => {
-                        encoded.push(ESCAPE_MARKER);
-                        encoded.push('1');
-                    }
-                    other => encoded.push(other),
-                }
-            }
-            *text = encoded;
-        }
-        Value::Array(values) => values.iter_mut().for_each(encode_data_newlines),
-        Value::Object(values) => values.values_mut().for_each(encode_data_newlines),
-        _ => {}
-    }
-}
-
-fn decode_data_newlines(text: &str) -> String {
-    let mut decoded = String::with_capacity(text.len());
-    let mut characters = text.chars();
-    while let Some(character) = characters.next() {
-        match character {
-            NEWLINE_MARKER => decoded.push('\n'),
-            ESCAPE_MARKER => match characters.next() {
-                Some('0') => decoded.push(ESCAPE_MARKER),
-                Some('1') => decoded.push(NEWLINE_MARKER),
-                Some(other) => {
-                    decoded.push(ESCAPE_MARKER);
-                    decoded.push(other);
-                }
-                None => decoded.push(ESCAPE_MARKER),
-            },
-            other => decoded.push(other),
-        }
-    }
-    decoded
+    render("report.html.j2", &context).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

@@ -12,6 +12,12 @@ separately verified stable promotion before Homebrew distribution. Historical
 
 ### Changed
 
+- `generate-dashboard` and `generate-report --format html` render in the
+  Symaira Liquid Topography design: light and dark appearance, system fonts and
+  no network request when the file is opened (the dashboard used to load Google
+  Fonts). The report timeline now lists its event counts. The HTML no longer
+  matches the frozen Go output byte for byte; data, MCP envelopes and process
+  output still do (#1259).
 - Remove retired Go product sources, module files and live capture tooling.
   Normal builds, tests and six-target CLI packaging use Rust without a Go
   installation. Frozen Go observations and immutable producer history remain
