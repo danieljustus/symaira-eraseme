@@ -24,6 +24,29 @@ on:
       - Cargo.toml
       - Cargo.lock
       - crates/**
+      # Union with rust-prerelease.yml: the release-candidate gate now replaces its
+      # former direct pull_request run, so these paths must still start it.
+      - Makefile
+      - regdata.go
+      - go.mod
+      - go.sum
+      - cmd/**
+      - internal/**
+      - registry/**
+      - scripts/stage_rust_release_archives.py
+      - scripts/rust_artifact_sbom.py
+      - scripts/verify_rust_artifact_sbom.py
+      - scripts/verify-release-source.sh
+      - scripts/verify_windows_dll_dependencies.py
+      - scripts/classify-switchback-inputs.sh
+      - tests/test_make_rust_release_contract.py
+      - tests/test_rust_artifact_sbom.py
+      - tests/test_rust_release_workflow.py
+      - tests/test_immutable_release_publication.py
+      - tests/test_homebrew_release_workflow.py
+      - tests/verify_release_archives.py
+      - README.md
+      - LICENSE
 
   workflow_dispatch:
   workflow_call: {}
@@ -39,13 +62,52 @@ env:
   PYTHONDONTWRITEBYTECODE: '1'
 
 jobs:
+  # Pull requests only: decides whether the switchback legs run. Fail-closed: a
+  # failed selector leaves run unset, which runs the switchback.
+  selector:
+    name: Switchback input selector
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.classify.outputs.run }}
+    steps:
+      - name: Checkout PR history for exact base/head comparison
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify switchback inputs
+        id: classify
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # The classifier comes from the base commit so a PR cannot relax its own gate.
+          if git show "${BASE_SHA}:scripts/classify-switchback-inputs.sh" > "$RUNNER_TEMP/classify-switchback-inputs.sh" 2>/dev/null; then
+            bash "$RUNNER_TEMP/classify-switchback-inputs.sh"
+          else
+            echo "No base classifier at ${BASE_SHA}; running the switchback."
+            printf 'run=true\n' >> "$GITHUB_OUTPUT"
+          fi
+
   release-candidate:
     name: Release candidate
     uses: ./.github/workflows/rust-prerelease.yml
+    with:
+      store_gate: true
 
   switchback:
     name: Store switchback / ${{ matrix.runner }}
-    needs: release-candidate
+    needs: [selector, release-candidate]
+    # Skip only when the selector succeeded and reported run=false. Release runs
+    # have a skipped selector and always run the switchback.
+    if: >-
+      always() &&
+      needs.release-candidate.result == 'success' &&
+      (needs.selector.result != 'success' || needs.selector.outputs.run != 'false')
     strategy:
       fail-fast: false
       matrix:

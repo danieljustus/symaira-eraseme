@@ -29,10 +29,21 @@ on:
       - README.md
       - LICENSE
   workflow_dispatch: {}
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      store_gate:
+        description: 'Set by the native store gate. Direct pull_request runs skip the six-target build because the gate already runs it for the same commit.'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
+
+# Superseded pull_request runs are cancelled; dispatch and release-called runs are never cancelled.
+concurrency:
+  group: rust-prerelease-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   RUST_TOOLCHAIN: '1.98.0'
@@ -42,6 +53,7 @@ env:
 jobs:
   native-release-binary:
     name: Native Rust release binary / ${{ matrix.name }}
+    if: github.event_name != 'pull_request' || inputs.store_gate
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -239,6 +251,7 @@ jobs:
   verify-archives:
     name: Stage and verify the six archives
     needs: native-release-binary
+    if: github.event_name != 'pull_request' || inputs.store_gate
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
