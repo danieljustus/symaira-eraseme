@@ -64,6 +64,7 @@ Sources/SymairaEraseMe/
 │   ├── ManualTask.swift     ManualTask
 │   └── Profile.swift        IdentityProfile, ExecuteResponse
 ├── Services/
+│   ├── APIKeyStore.swift    Anthropic API key in the login Keychain + legacy migration
 │   ├── MCPClient.swift      JSON-RPC 2.0 HTTP actor (tools/call, tools/list)
 │   └── ServerManager.swift  Bundled/Dev/Homebrew Rust server process manager
 ├── ViewModels/     @MainActor ObservableObject view models

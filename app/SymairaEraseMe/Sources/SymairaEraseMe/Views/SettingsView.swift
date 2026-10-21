@@ -181,6 +181,10 @@ struct SettingsView: View {
                     .textFieldStyle(.symaira)
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
+
+            if let error = serverManager.apiKeyStorageError {
+                SymairaNotice(message: error, tone: .critical) { serverManager.apiKeyStorageError = nil }
+            }
         }
     }
 

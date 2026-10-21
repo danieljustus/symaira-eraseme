@@ -29,10 +29,14 @@ final class ServerManager: ObservableObject {
         didSet { UserDefaults.standard.set(dataDir, forKey: "symeraseme_data_dir") }
     }
 
-    /// Configurable Anthropic API key.
+    /// Configurable Anthropic API key, persisted in the Keychain (never in
+    /// `UserDefaults`, which is a plain-text plist).
     @Published var anthropicKey: String {
-        didSet { UserDefaults.standard.set(anthropicKey, forKey: "symeraseme_anthropic_key") }
+        didSet { persistAnthropicKey() }
     }
+
+    /// User-facing Keychain problem for the API key; never contains the key.
+    @Published var apiKeyStorageError: String?
 
     /// Server host.
     @Published var host: String {
@@ -53,22 +57,51 @@ final class ServerManager: ObservableObject {
     @Published var mcpReachable = false
 
     private let supervisor = DaemonSupervisor()
+    private let apiKeyStore: APIKeyStore
+    private let defaults: UserDefaults
     private let resourceURL: URL?
     private let executableURL: URL?
     private var reachabilityTask: Task<Void, Never>?
 
-    init(resourceURL: URL? = Bundle.main.resourceURL, executableURL: URL? = Bundle.main.executableURL) {
+    init(
+        resourceURL: URL? = Bundle.main.resourceURL,
+        executableURL: URL? = Bundle.main.executableURL,
+        apiKeyStore: APIKeyStore = KeychainAPIKeyStore(),
+        defaults: UserDefaults = .standard
+    ) {
         self.resourceURL = resourceURL
         self.executableURL = executableURL
-        let defaults = UserDefaults.standard
+        self.apiKeyStore = apiKeyStore
+        self.defaults = defaults
         self.binaryPath = defaults.string(forKey: "symeraseme_binary_path") ?? ""
         self.dataDir = defaults.string(forKey: "symeraseme_data_dir") ?? ""
-        self.anthropicKey = defaults.string(forKey: "symeraseme_anthropic_key") ?? ""
+        let apiKey = APIKeyMigration.load(store: apiKeyStore, defaults: defaults)
+        self.anthropicKey = apiKey.key
+        self.apiKeyStorageError = apiKey.storageError
         self.host = defaults.string(forKey: "symeraseme_host") ?? "127.0.0.1"
         self.port = defaults.object(forKey: "symeraseme_port") as? Int ?? 8000
 
         setupSupervisor()
         startReachabilityPolling()
+    }
+
+    /// Writes the edited key to the Keychain. A failed save keeps the key in
+    /// memory for this session and never falls back to `UserDefaults`.
+    private func persistAnthropicKey() {
+        do {
+            if anthropicKey.isEmpty {
+                try apiKeyStore.delete()
+            } else {
+                try apiKeyStore.save(anthropicKey)
+            }
+            // The Keychain is authoritative now; drop any plain-text copy.
+            defaults.removeObject(forKey: APIKeyMigration.legacyDefaultsKey)
+            apiKeyStorageError = nil
+        } catch {
+            apiKeyStorageError = anthropicKey.isEmpty
+                ? APIKeyMigration.deleteFailureMessage(error)
+                : APIKeyMigration.saveFailureMessage(error)
+        }
     }
 
     /// Shared reachability poller. Runs for the app's lifetime; every
