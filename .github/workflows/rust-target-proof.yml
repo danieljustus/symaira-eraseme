@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+# Superseded PR and main-push runs are cancelled; the newest head carries the proof. Manual dispatch is never cancelled.
+concurrency:
+  group: rust-target-proof-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 env:
   RUST_TOOLCHAIN: '1.98.0'
   CARGO_TERM_COLOR: always

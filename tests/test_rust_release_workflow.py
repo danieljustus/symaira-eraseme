@@ -60,7 +60,7 @@ class ReleaseWorkflowControls(unittest.TestCase):
         self.assertIn('  workflow_call: {}\n', stores)
         self.assertIn('      - .github/workflows/release.yml\n', stores)
         self.assertEqual(stores.count('uses: ./.github/workflows/rust-prerelease.yml'), 1)
-        self.assertIn('    needs: release-candidate\n', stores)
+        self.assertIn('    needs: [selector, release-candidate]\n', stores)
         self.assertIn('          ref: ${{ github.sha }}\n', stores)
         self.assertIn('name: symeraseme-rust-prerelease-archives', stores)
         self.assertNotIn('run-id:', stores)
