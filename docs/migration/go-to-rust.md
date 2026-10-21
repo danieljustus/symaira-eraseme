@@ -3,17 +3,14 @@
 Single resumption entrypoint. Detailed per-slice write-ups live in
 `docs/rust-port/handoffs/`; this file is the state, not the narrative.
 
-## Current retirement candidate (2026-10-13)
+## Go-source retirement state (2026-10-21)
 
-Go source/module/toolchain retirement is implemented on PR #1232 candidate
-`3b8916b827768ab3500c0804d1cbf749cc22ad23`. All 20 candidate workflows pass;
-six-target native tests, actual archive/SBOMs, copied-store/backup evidence and
-both native Swift suites have fresh readback. See the
-[source-bound acceptance and limitations](../rust-port/handoffs/2026-10-13-go-retirement-native-acceptance.md).
-This supersedes the older implementation-pending statement only for this
-candidate. CUT-005 remains OPEN: final documentation/helper classification,
-protected AGENTS metadata, independent acceptance review, normal merge and a
-new verified release remain separate. No historical asset is replaced.
+- **Merged:** PR #1232 "Retire Go sources and run verification and packaging through Rust" merged 2026-10-14T10:23:08Z as merge commit `18a3d497bc7380836840a1b84eb72ad9f9ac536e`; that commit is an ancestor of `main` at `2b61192f`. Its candidate head was `3b8916b827768ab3500c0804d1cbf749cc22ad23` and its merged PR head `5c58ff5c`; candidate evidence is bound to `3b8916b8`, merged-tree evidence is the `main` CI listed below; the [source-bound acceptance and limitations](../rust-port/handoffs/2026-10-13-go-retirement-native-acceptance.md) record the candidate evidence.
+- **Removed from the tree (verified at `2b61192f`):** `git ls-files '*.go' go.mod go.sum` returns nothing. No file under `.github/workflows` contains `setup-go`, `go-version` or `GOTOOLCHAIN`, so no workflow installs a Go toolchain. `release.yml`, `publish-homebrew.yml` and `app-rust-native.yml` assert that `symeraseme-go` is absent from the packaged output.
+- **CI on `main` at `2b61192f` (verified 2026-10-21):** `Rust CI` (run 39624685025), `Rust native target proof` (39624685095) and `Native Swift app Rust bundle` (39624685099) completed `success`. The required check contexts `Go / lint` and `Go / test` (jobs `go-lint` and `go-test` in `go-ci.yml`, display name "Required CLI checks (Rust)") are retained names only; they run Rust toolchains and no Go SDK.
+- **Not yet released:** stable `v0.14.1` (published 2026-10-10T17:27:04Z) predates #1232. Its 21 assets contain no Go-named artifact, but no release containing the removal exists yet.
+- **CUT-005 remains OPEN** until both of these outstanding items are complete: (1) a new release is cut through the release process after #1232 and its assets are verified Go-free; (2) maintainer acceptance of the Go-source retirement is recorded. This document does not claim CUT-005 complete. Earlier candidate items (documentation/helper classification, protected AGENTS metadata, independent review) are not re-verified here.
+- No historical asset is replaced; frozen Go observations and the `python-final` tag remain as recorded history.
 
 ## Historical authorization checkpoint (2026-10-12)
 
@@ -22,7 +19,7 @@ separately approved CUT-005 Go-source/toolchain retirement, subject to all other
 technical gates. See the [dated decision and unchanged boundaries](../rust-port/handoffs/2026-10-12-observation-waiver.md).
 This is risk acceptance, not completed observation. CUT-004 retained technical
 readback passes within its documented scope; independent review and merge remain
-required. CUT-005 implementation/acceptance remains pending; no Go removal is claimed.
+required. At that date CUT-005 implementation/acceptance was pending; the Go-source removal was later merged by #1232 (see the state section above).
 The following checkpoint retains its historical evidence and waiting state.
 
 ## Published-candidate checkpoint (2026-10-11)
